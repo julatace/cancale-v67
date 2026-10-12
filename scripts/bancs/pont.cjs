@@ -39,14 +39,23 @@
 //     geste ⟳ ; et l'AUTRE SENS : le bon code n'est jamais dit périmé ;
 //   · « ACTIONS POSSIBLES · SAUF PUBLIER » quand publier est bloqué alors que le
 //     reste marche (deux voix contraires sur le même écran avant) ;
-//   · LA SESSION ADRESSÉE : plus rien n'est posté dans la page ; la session va
-//     à UNE extension (son identifiant, son nonce) ; une extension trop ancienne
-//     ne reçoit rien, et l'app ne promet pas « je réessaie ».
+//   · LA SESSION ADRESSÉE : la session va à UNE extension ≥ 5.171 (son
+//     identifiant, son nonce), rien n'est posté dans la page pour elle ;
+//   · RELECTURE CROISÉE DE LA 5.174 (12 octobre) : une extension d'AVANT la 5.171
+//     (5.164, 5.170 — Julien ne peut pas les mettre à jour) n'entend que
+//     l'ancien message de la page. L'app le lui envoie quand elle en a besoin
+//     (pas de session, session morte, autre compte au premier plan), avec une
+//     session fabriquée par le serveur — jamais la sienne — et RIEN quand deux
+//     copies répondent. Vérifié aussi avec le VRAI bridge.js de la 5.164 (lu
+//     dans git), devant un service worker qui reprend les réponses du vrai
+//     code : session morte → reconnectée ; deux copies → rien ; « Se
+//     déconnecter » puis reconnexion à VRM → reconnectée.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { execFileSync } = require('child_process');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4791;
+const PORT = Number(process.env.BANC_PORT) || 4791;
 const EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
 const auj = new Date();
@@ -158,12 +167,56 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
   });
   post({ __vmr: 'ready', version });
 };
+// ── LE VRAI bridge.js D'UNE EXTENSION ANCIENNE (lu dans git, comme Chrome le lit
+//    sur le disque), exécuté avec un `chrome.runtime` d'extension — la page,
+//    elle, n'en a pas (monde isolé). Derrière, un service worker SIMULÉ, côté
+//    Node (il survit aux rechargements), qui reprend les réponses du vrai code :
+//    `etatPourApp`/`authEtatRapide` de la 5.164 (`mort` quand la session est
+//    morte) et `action: 'session'` (il ADOPTE ce qu'on lui envoie, `null` = oublie).
+const DEPOT = (() => { let d = path.join(__dirname, '..', '..'); for (let i = 0; i < 6; i++) { if (fs.existsSync(path.join(d, '.git'))) return d; d = path.dirname(d); } return process.env.VRM_DEPOT || ''; })();
+const bridgeDe = (commit) => { try { return execFileSync('git', ['-C', DEPOT, 'show', `${commit}:vinted-sync-extension/bridge.js`], { encoding: 'utf8' }); } catch (_) { return null; } };
+const BRIDGE_164 = DEPOT ? bridgeDe('cdc9c1d') : null;
+function swSimule({ session = null, mort = false } = {}) {
+  const st = { session, mort, recues: [] };
+  const vrm = () => !st.session ? { ok: true, connecte: false, expiree: false, email: '', user_id: null, cloisonne: true }
+    : st.mort ? { ok: true, connecte: false, expiree: true, email: st.session.email, user_id: st.session.user_id, cloisonne: true, mort: true }
+      : { ok: true, connecte: true, expiree: false, email: st.session.email, user_id: st.session.user_id, cloisonne: true };
+  const handle = (msg) => {
+    const a = msg && msg.action;
+    if (a === 'etat') return { ok: true, version: '5.164.0', vrm: vrm(), vinted: { uid: '111', login: 'compte_a' }, cmds: {} };
+    if (a === 'authEtat') return vrm();
+    if (a === 'cmd:statut') return { ok: true, cmd: null };
+    if (a === 'cmd') return msg.cmd === 'ventes' ? { accepte: true, etape: 'recent' } : { accepte: false, code: 'inconnue' };
+    if (a === 'session') { st.recues.push(msg.session ? (msg.session.refresh_token || 'session') : null); st.session = msg.session ? { user_id: msg.session.user_id, email: msg.session.email } : null; st.mort = false; return { ok: true }; }
+    return { __noresp: true };
+  };
+  return { st, handle };
+}
+const INJECT_VRAI = ({ src, version, id, vieux }) => {
+  window.__sessions = [];
+  window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'session') window.__sessions.push(d.session || null); });
+  if (vieux) window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'ping') window.postMessage({ __vmr: 'ready', version: vieux }, '*'); });
+  const rt = {
+    id, lastError: null,
+    getManifest: () => ({ version }),
+    sendMessage(msg, cb) {
+      window.__swAppel(msg).then((r) => {
+        if (r && r.__noresp) { rt.lastError = { message: 'The message port closed before a response was received.' }; try { cb && cb(undefined); } finally { rt.lastError = null; } return; }
+        cb && cb(r);
+      });
+    },
+    onMessage: { addListener() {} },
+  };
+  // eslint-disable-next-line no-new-func
+  new Function('chrome', src)({ runtime: rt });
+};
+
 const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renouvellement-de-l-app', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.test' } };
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes' }) {
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes', vrai = null, sessionUneFois = false }) {
   const vp = tel ? { width: largeur || 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -172,8 +225,14 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   await pg.exposeFunction('__cmdRecu', (tx) => { cmds.push(tx); setTimeout(() => { labelPret = true; }, 600); });
   // Ce qui part vers l'extension, noté HORS de la page (un rechargement l'effacerait).
   const notes = []; await pg.exposeFunction('__noterPost', (x) => { notes.push(x); });
-  await pg.addInitScript((sess) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, session ? SESSION : null);
-  await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente, code, offresAutoLocal, verdict, extId: EXT_ID, besoin, vieux });
+  // `sessionUneFois` : la session n'est posée qu'au PREMIER chargement — sinon le
+  // rechargement qui suit « Se déconnecter » la reposerait (une reconnexion que
+  // personne n'a faite, et le banc mesurerait sa propre fiction).
+  await pg.addInitScript(([sess, uneFois]) => { try { if (uneFois) { if (sessionStorage.getItem('__banc_session')) return; sessionStorage.setItem('__banc_session', '1'); } if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, [session ? SESSION : null, sessionUneFois]);
+  // `vrai` : { src, sw } — le VRAI bridge.js d'une extension ancienne, devant un
+  // service worker simulé (voir `swSimule`) ; sinon le pont simulé.
+  if (vrai) { await pg.exposeFunction('__swAppel', (m) => vrai.sw.handle(m)); await pg.addInitScript(INJECT_VRAI, { src: vrai.src, version: '5.164.0', id: EXT_ID, vieux }); }
+  else await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente, code, offresAutoLocal, verdict, extId: EXT_ID, besoin, vieux });
   // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
   if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
@@ -335,10 +394,21 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       const p = await r.panneau();
       dit(p && /mot de passe VRM|Se connecter avec VRM/.test(p.txt) && !/réessaie/.test(p.txt), 'et le panneau dit le vrai geste (pas « je réessaie » sans fin)', JSON.stringify(p && p.txt).slice(0, 260));
       await r.ctx.close(); }
+    // ⚠️⚠️ Relecture croisée de la 5.174 : ce cas exigeait « rien dans la page »
+    //    — la production la reconnectait, l'intégration la laissait en
+    //    « Lecture seule » pour de bon (il ne peut pas la mettre à jour).
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
-      dit(v.sessions.length === 0 && r.fourches.length === 0, 'une extension 5.164 (pas de canal adressé) : rien dans la page, aucune session fabriquée pour rien', `page : ${v.sessions.length} · demandes : ${r.fourches.length}`);
+      dit(v.sessions.length === 1 && v.sessions[0] && v.sessions[0].refresh_token === FOURCHE.refresh_token && r.fourches.length === 1, 'une extension 5.164 sans session : UNE session postée dans la page — celle que le serveur fabrique POUR ELLE', `page : ${JSON.stringify(v.sessions.map((x) => x && x.refresh_token))} · demandes : ${r.fourches.length}`);
+      dit(!v.sessions.some((x) => x && x.refresh_token === SESSION.refresh_token) && v.externes.length === 0, 'jamais le jeton de l’app, et rien d’adressé (elle n’a pas le canal)', JSON.stringify({ page: v.sessions.map((x) => x && x.refresh_token), adressees: v.externes }));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: { ok: true, connecte: false, email: '' }, routeFourche: 503, attente: 5000 }); const v = await r.lire();
+      dit(v.sessions.length === 0 && r.fourches.length === 1, '5.164, le serveur refuse de fabriquer sa session : rien n’est posté (jamais la nôtre en repli)', `page : ${v.sessions.length} · demandes : ${r.fourches.length}`);
       const p = await r.panneau();
-      dit(p && /mets-la à jour|Mettre à jour/.test(p.txt) && /mot de passe VRM/.test(p.txt) && !/Je réessaie/.test(p.txt), 'et l’app le DIT : la mettre à jour, ou s’y connecter au mot de passe VRM — jamais « je réessaie »', JSON.stringify(p && p.txt).slice(0, 300));
+      dit(p && p.geste === 'mdp' && /mot de passe VRM/.test(p.txt) && !/« avec mon mot de passe VRM »|Se connecter avec VRM/.test(p.txt), 'et le panneau dit le geste que SA fenêtre connaît (email + mot de passe VRM), pas un bouton qu’elle n’a pas', JSON.stringify(p && { geste: p.geste, fin: p.txt.split('\n').slice(-1)[0] }).slice(0, 300));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: { ok: true, connecte: false, email: '' }, vieux: '5.77.0', attente: 7000 }); const v = await r.lire();
+      dit(v.etat && v.etat.code === 'plusieurs', 'deux copies (5.164 + 5.77) : la pastille le dit', JSON.stringify(v.etat));
+      dit(v.sessions.length === 0 && r.fourches.length === 0, 'deux copies : AUCUNE session postée (les deux l’adopteraient — même famille, révoquée), aucune fabriquée', `page : ${v.sessions.length} · demandes : ${r.fourches.length}`);
       await r.ctx.close(); }
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.128.0', attente: 6000 }); const v = await r.lire();
       dit(v.sessions.length === 0, 'une extension < 5.129 : l’app ne lui prête plus SA session (même famille → l’app perdait la sienne 12 s plus tard)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
@@ -369,9 +439,9 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
     console.log('── 5.170 DE PRODUCTION (publiée sans `code` ni canal adressé)');
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.170.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
       dit(v.etat && v.etat.code !== 'perime', 'une 5.170 publiée n’est JAMAIS dite « périmée » (⟳ ne lui ajouterait pas le champ)', JSON.stringify(v.etat));
-      dit(v.externes.filter((x) => x.type === 'session').length === 0 && v.sessions.length === 0, 'et rien ne lui est adressé ni posté : elle n’ouvre pas le canal adressé', JSON.stringify({ adressees: v.externes, page: v.sessions.length }));
+      dit(v.externes.length === 0 && v.sessions.length === 1 && v.sessions[0] && v.sessions[0].refresh_token === FOURCHE.refresh_token, 'rien ne lui est ADRESSÉ (elle n’a pas le canal) : sa session part par l’ancien message de la page, fabriquée pour elle (relecture croisée de la 5.174)', JSON.stringify({ adressees: v.externes, page: v.sessions.map((x) => x && x.refresh_token) }));
       const p = await r.panneau();
-      dit(p && p.geste !== 'recharger-extension' && /mets-la à jour|Mettre à jour/.test(p.txt) && !/je la connecte/i.test(p.txt), 'le panneau dit le vrai geste (la mettre à jour), jamais « je la connecte » ni « recharge-la (⟳) »', JSON.stringify(p && { geste: p.geste, txt: p.txt.slice(0, 260) }));
+      dit(p && p.geste !== 'recharger-extension' && !/Se connecter avec VRM/.test(p.txt), 'le panneau ne dit jamais « recharge-la (⟳) » ni un bouton que sa fenêtre n’a pas', JSON.stringify(p && { geste: p.geste, txt: p.txt.slice(0, 260) }));
       await r.ctx.close(); }
     { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.170.0', attente: 4500 }); const v = await r.lire();
       dit(v.etat && v.etat.niveau === 'ok', 'autre sens : une 5.170 connectée à ton compte peut agir (« Actions possibles »)', JSON.stringify(v.etat));
@@ -382,18 +452,22 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
     // chose — c'est l'envoi qui juge, pas la phrase. Le geste dit est celui qui
     // marche avec l'extension qui répond.
     const AUTRE = { ok: true, connecte: true, user_id: '99999999-8888-7777-6666-555555555555', email: 'autre@exemple.test' };
-    console.log('── 5.164 CONNECTÉE AU COMPTE VRM D’UN AUTRE (elle n’entend pas le canal adressé)');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: AUTRE, attente: 6000 }); const v = await r.lire();
-      const envoye = r.fourches.length + v.externes.length + v.sessions.length;
-      dit(v.etat && v.etat.code === 'autre-vrm', 'l’en-tête retient « autre compte VRM »', JSON.stringify(v.etat));
-      dit(envoye === 0, 'rien n’est envoyé (ni fabriqué, ni adressé, ni posté) — c’est le fait que la phrase doit suivre', `serveur ${r.fourches.length} · adressés ${v.externes.length} · page ${v.sessions.length}`);
+    // ⚠️⚠️ Relecture croisée de la 5.174 : l'intégration ne lui envoyait plus RIEN
+    //    (« déconnecte-la, puis ton mot de passe VRM ») — ses captures partaient
+    //    dans l'autre boutique tant qu'il ne faisait pas ce geste, dans CHACUN de
+    //    ses Chrome. La production la reconnectait, onglet au premier plan.
+    //    La promesse « je la reconnecte » suit l'envoi : c'est l'envoi qui juge.
+    console.log('── 5.164 CONNECTÉE AU COMPTE VRM D’UN AUTRE (elle n’entend que l’ancien message de la page)');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: AUTRE, attente: 3000 });
+      await r.pg.bringToFront().catch(() => {});
+      for (let i = 0; i < 100; i++) { const x = await r.lire(); if (x.sessions.length) break; await r.pg.waitForTimeout(250); }
+      const v = await r.lire();
+      dit(v.etat && v.etat.code === 'autre-vrm', 'l’en-tête retient « autre compte VRM » (le pont simulé ne change pas de compte)', JSON.stringify(v.etat));
+      dit(v.sessions.length === 1 && v.sessions[0] && v.sessions[0].refresh_token === FOURCHE.refresh_token && r.fourches.length === 1 && v.externes.length === 0, 'au premier plan, l’app lui envoie UNE session à elle — par la page (elle n’a pas le canal adressé), jamais la nôtre', `serveur ${r.fourches.length} · adressés ${v.externes.length} · page ${JSON.stringify(v.sessions.map((x) => x && x.refresh_token))}`);
       const raison = v.raisons.join(' ');
-      dit(!/je la reconnecte|je la connecte/i.test(raison) && /mets-la à jour/i.test(raison) && /mot de passe VRM/i.test(raison), 'au-dessus des ventes : aucune promesse « je la reconnecte », les vrais gestes (mise à jour, mot de passe VRM)', raison.slice(0, 300));
+      dit(/je la reconnecte/i.test(raison) && !/mets-la à jour/i.test(raison), 'au-dessus des ventes : « je la reconnecte » (elle le FAIT), plus « mets-la à jour »', raison.slice(0, 300));
       const p = await r.panneau();
-      dit(p && p.geste === 'deconnecter' && !/je la reconnecte/i.test(p.txt), 'le panneau propose de la DÉCONNECTER d’ici (son icône, connectée, ouvre VRM — pas sa fenêtre)', JSON.stringify(p && { geste: p.geste, fin: p.txt.split('\n').slice(-1)[0] }).slice(0, 300));
-      await r.pg.click('[data-etat-geste-deconnecter]').catch(() => {}); await r.pg.waitForTimeout(600);
-      const v2 = await r.lire();
-      dit(v2.sessions.length === 1 && v2.sessions[0] === null, 'son clic lui fait oublier sa session — l’ancien message (session: null), une fois, seulement sur ce geste', JSON.stringify(v2.sessions));
+      dit(p && p.geste !== 'deconnecter' && !/Se connecter avec VRM/.test(p.txt), 'le panneau ne propose plus de la déconnecter à la main (l’app la reconnecte)', JSON.stringify(p && { geste: p.geste, fin: p.txt.split('\n').slice(-1)[0] }).slice(0, 300));
       await r.ctx.close(); }
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.171.0', vrm: AUTRE, attente: 6000 }); const v = await r.lire();
       const p = await r.panneau();
@@ -463,6 +537,38 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       if (attendu === 'page') dit(valide && apres.filter((x) => x === 'page:null').length === 1 && !apres.includes('page:session'), `${ver} : « Se déconnecter » lui fait oublier sa session (l’ancien message, qu’elle comprend)`, JSON.stringify({ valide, notes: apres }));
       else dit(valide && !apres.some((x) => /^page:/.test(x)) && apres.includes('adresse:deconnexion'), `${ver} : adressée (canal de la 5.171), rien posté dans la page`, JSON.stringify({ valide, notes: apres }));
       await r.ctx.close();
+    }
+
+    // ══ LE VRAI bridge.js DE LA 5.164 (relecture croisée de la 5.174) ══════════
+    console.log('── VRAI bridge.js 5.164 : session morte, deux copies, déconnexion → reconnexion');
+    if (!BRIDGE_164) dit(false, 'le bridge.js de la 5.164 (cdc9c1d) est lisible dans git', DEPOT || 'dépôt introuvable');
+    else {
+      { const sw = swSimule({ session: { user_id: SESSION.user.id, email: SESSION.user.email }, mort: true });
+        const r = await rendre(b, { vrai: { src: BRIDGE_164, sw }, connecte: '111', session: true, separee: true, attente: 9000 }); const v = await r.lire();
+        dit(sw.st.recues.length === 1 && sw.st.recues[0] === FOURCHE.refresh_token && r.fourches.length === 1, 'session MORTE : le service worker reçoit UNE session — celle fabriquée pour lui', JSON.stringify({ recues: sw.st.recues, demandes: r.fourches.length }));
+        dit(!!sw.st.session && !sw.st.mort && v.etat && v.etat.niveau === 'ok', 'et l’en-tête repasse « Actions possibles »', JSON.stringify(v.etat));
+        await r.ctx.close(); }
+      { const sw = swSimule({ session: { user_id: SESSION.user.id, email: SESSION.user.email }, mort: true });
+        const r = await rendre(b, { vrai: { src: BRIDGE_164, sw }, connecte: '111', session: true, separee: true, vieux: '5.77.0', attente: 9000 }); const v = await r.lire();
+        dit(sw.st.recues.length === 0 && r.fourches.length === 0 && v.sessions.length === 0, 'deux copies (5.164 + 5.77) : RIEN n’est reçu, rien n’est posté, rien n’est fabriqué', JSON.stringify({ recues: sw.st.recues, page: v.sessions.length, demandes: r.fourches.length, etat: v.etat && v.etat.code }));
+        await r.ctx.close(); }
+      { const sw = swSimule({ session: { user_id: SESSION.user.id, email: SESSION.user.email } });
+        const r = await rendre(b, { vrai: { src: BRIDGE_164, sw }, connecte: '111', session: true, sessionUneFois: true, separee: true, url: '/?tab=settings&vue=compte', attente: 6000 });
+        await r.pg.getByText('Se déconnecter', { exact: true }).first().click().catch(() => {});
+        await r.pg.waitForTimeout(400);
+        let valide = false;
+        for (const x of await r.pg.$$('button')) { const t = ((await x.innerText().catch(() => '')) || '').trim(); const st = (await x.getAttribute('style')) || ''; if (t === 'Se déconnecter' && /flex: 2/.test(st)) { await x.click().catch(() => {}); valide = true; break; } }
+        await r.pg.waitForTimeout(2500);
+        const apresLogout = { session: sw.st.session, recues: sw.st.recues.slice() };
+        dit(valide && !apresLogout.session && apresLogout.recues.length === 1 && apresLogout.recues[0] === null, '« Se déconnecter » : elle OUBLIE sa session (session: null, sur ce geste)', JSON.stringify(apresLogout));
+        // Il se reconnecte à VRM.
+        await r.pg.evaluate((s) => { localStorage.setItem('vrm_session', JSON.stringify(s)); }, SESSION);
+        await r.pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await r.pg.waitForTimeout(9000);
+        const v = await r.lire();
+        dit(!!sw.st.session && sw.st.recues.slice(-1)[0] === FOURCHE.refresh_token, 'il se reconnecte à VRM : elle RETROUVE une session à elle (la production le faisait ; l’intégration la laissait déconnectée)', JSON.stringify({ recues: sw.st.recues, etat: v.etat && v.etat.code }));
+        dit(!sw.st.recues.includes(SESSION.refresh_token), 'jamais le jeton de l’app', JSON.stringify(sw.st.recues));
+        await r.ctx.close(); }
     }
 
     console.log('── « ACTIONS POSSIBLES » AU-DESSUS D’UN « PUBLIER » GRISÉ');

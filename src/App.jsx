@@ -42,7 +42,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.174.0';
+const EXT_ATTENDUE = '5.175.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -4857,11 +4857,39 @@ const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'ind
 //                  de passe VRM dans SA fenêtre ;
 //      'serveur' — le serveur a refusé : le mot de passe VRM (l'app réessaie
 //                  quand même après `__sessExtPasAvant`).
-function voieConnexionExt() {
-  if (extSait('liaison') !== 'ok') return 'retard';
-  if (__sessExtErreur) return 'serveur';
-  return 'app';
+//      'page'    — elle est d'avant la 5.171 mais répond à « état » : l'app la
+//                  connecte par l'ancien message de la page (`sessionParLaPage`,
+//                  le chemin de la production 2fed734), avec une session
+//                  fabriquée par le serveur — jamais la sienne.
+// ⚠️⚠️ RELECTURE CROISÉE DE LA 5.174 (12 octobre) — la voie 'page'. Le chantier
+//    « connexion » avait retiré TOUT envoi par la page : une 5.164 ou une 5.170
+//    dont la session était morte, absente, ou sur un autre compte VRM n'était
+//    plus jamais reconnectée par l'app (mesuré au banc, vrai bridge.js 5.164 et
+//    5.170 : production 1 session reçue, « Actions possibles » ; intégration 0,
+//    « Lecture seule »). Or Julien NE PEUT PAS mettre à jour ses extensions
+//    maintenant (5 de ses 6 Chrome exécutent un code d'avant) : la nouvelle app
+//    doit faire AU MOINS ce que faisait la production. Les risques qui avaient
+//    motivé le retrait restent fermés — deux copies (`__vmrPlusieurs` : rien ne
+//    part), `null` au démarrage (seul un GESTE le poste), la famille de jetons
+//    de l'app (la session vient du serveur, `sessionAppPourExtension` reste
+//    retirée).
+function connexionParLaPage() {
+  if (extSait('liaison') === 'ok' || __vmrPlusieurs || !pontSaitRepondreEtat() || codePerime()) return false;
+  // « Pas su » ne vaut pas « oui » : la promesse suit l'envoi, et l'app n'envoie
+  // que si l'extension a dit sous quel compte elle écrit (son « état »).
+  const e = __vmrEtat;
+  return !!(e && e.ok && e.vrm && typeof e.vrm === 'object');
 }
+function voieConnexionExt() {
+  const ancienne = extSait('liaison') !== 'ok';
+  if (ancienne && !connexionParLaPage()) return 'retard';
+  if (__sessExtErreur) return 'serveur';
+  return ancienne ? 'page' : 'app';
+}
+// Le geste de secours quand l'app n'y arrive pas : la fenêtre de l'extension.
+// Celle d'avant la 5.171 n'a pas « Se connecter avec VRM » ni « avec mon mot de
+// passe VRM » — seulement email et mot de passe (son icône l'ouvre).
+const fenetreAncienne = () => extSait('liaison') !== 'ok';
 const minutesAvantReessai = () => Math.max(1, Math.ceil((__sessExtPasAvant - Date.now()) / 60000));
 // « Déconnecter l'extension de ce Chrome » pour une extension qui ne connaît
 // pas le canal adressé (avant la 5.171) : l'ancien message de la page, qu'elle
@@ -4943,11 +4971,14 @@ async function assurerSessionExtension() {
   // est le ⟳, dit ailleurs). Une liaison demandée le DIT (le bandeau ne reste
   // pas sur « Je connecte… ») et repart dès que le code est réparé.
   if (codePerime()) { if (lier && lier.bloque !== 'perime') poserLier(Object.assign({}, lier, { bloque: 'perime' })); return; }
+  // ⚠️⚠️ Relecture croisée de la 5.174 : une extension d'avant la 5.171 (canal
+  //    adressé inconnu) qui répond à « état » est connectée par l'ancien message
+  //    de la page, comme le faisait la production (voir `voieConnexionExt`).
+  if (!lier && extSait('liaison') !== 'ok') { if (connexionParLaPage()) await sessionParLaPage(s, u, e); return; }
   // La cible : l'extension qui a demandé (« Se connecter »), sinon celle qui
   // répond à l'état dans cette page. Jamais « toutes ».
   const ext = String((lier && lier.id) || (e && e.ok && e.ext) || '');
   if (!ext) return;
-  if (extSait('liaison') !== 'ok' && !lier) return;
   // Ce que l'état dit de la session ne vaut que s'il vient de CETTE extension.
   const v = e && e.ok && (!e.ext || String(e.ext) === ext) ? e.vrm : null;
   const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
@@ -5010,6 +5041,56 @@ async function assurerSessionExtension() {
     }
     __sessExtPasAvant = Date.now() + 60000;
     if (lierIci) poserLier(Object.assign({}, lier, { etat: 'erreur', message: '' }));
+  } finally { enVolSession(false); }
+}
+// ══ UNE EXTENSION D'AVANT LA 5.171 : L'ANCIEN MESSAGE DE LA PAGE ═══════════
+// Le chemin de la production 2fed734, gardé pour les extensions qu'il a
+// AUJOURD'HUI (5.164, 5.170 — il ne peut pas les mettre à jour) et resserré :
+//   · seule, connue (`connexionParLaPage` : un seul pont répond, son code n'est
+//     pas périmé, elle a dit sous quel compte elle écrit) ;
+//   · seulement quand elle en a BESOIN : pas connectée, « pas su » deux
+//     battements de suite, ou un AUTRE compte VRM avec cet onglet au premier
+//     plan (deux onglets sur deux comptes se la renverraient) — jamais pour
+//     « séparer » une extension saine ;
+//   · une session fabriquée par le serveur (`/api/compte?mode=session-extension`,
+//     une famille de jetons à ELLE) — jamais celle de l'app, et rien du tout si
+//     le serveur refuse (on le dit, `__sessExtErreur`) ;
+//   · `session: null` n'est jamais posté ici : seul un geste le poste
+//     (`deconnecterExtensionAncienne`).
+async function sessionParLaPage(s, u, e) {
+  const v = e && e.ok ? e.vrm : null;
+  if (!v || typeof v !== 'object') return;
+  const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
+  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
+  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  __sessExtIncertain = v.connecte === null ? __sessExtIncertain + 1 : 0;
+  const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
+  if (!(v.connecte === false || __sessExtIncertain >= 2 || (autre && auPremierPlan))) return;
+  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  enVolSession(true);
+  try {
+    let r = null;
+    try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
+    const j = r ? await r.json().catch(() => null) : null;
+    // Déconnexion ou changement de compte PENDANT l'attente : on n'envoie pas la
+    // session d'un compte qui n'est plus celui de cette page. Et si une seconde
+    // copie a répondu entre-temps (ou si son code s'est révélé périmé), la page
+    // la ferait adopter par les deux : rien ne part.
+    if (!AUTH.session || !AUTH.user || String(AUTH.user.id) !== monId) return;
+    if (!connexionParLaPage()) return;
+    const neuve = r && r.ok && j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
+    if (!neuve || String(neuve.user_id || '') !== monId) {
+      __sessExtErreur = { status: r ? r.status : 0, message: (j && j.message) || '' };
+      __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+      return;
+    }
+    try { window.postMessage({ __vmr: 'session', session: neuve }, window.location.origin); } catch (_) { __sessExtPasAvant = Date.now() + 60000; return; }
+    __sessExtErreur = null;
+    try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {}
+    __sessExtPasAvant = Date.now() + 60000;
+    __sessExtIncertain = 0;
+    // Elle vient de changer de session : on relit son état tout de suite.
+    setTimeout(battementExt, 800);
   } finally { enVolSession(false); }
 }
 // « Se déconnecter » dans VRM : l'extension de ce Chrome oublie sa session —
@@ -5305,13 +5386,17 @@ function raisonExtGlobale(sansSouris, opt) {
   // ⚠️ 11 octobre : une extension plus ancienne que la 5.171 n'écoute pas le
   //    canal adressé — l'app ne lui prête plus JAMAIS sa propre session. On le
   //    dit, avec les deux vrais gestes, au lieu de promettre un « je réessaie ».
-  if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
+  // ⚠️ Relecture croisée de la 5.174 : une 5.164/5.170 qui répond à « état »
+  //    est connectée par la page (voie 'page') — la promesse suit l'envoi.
+  if (v.connecte === false) { const voie = voieConnexionExt(); return { code: 'vrm', voie, texte: __sessExtEnVol
     ? "Je connecte l'extension à ton compte VRM…"
-    : extSait('liaison') === 'retard'
+    : voie === 'retard'
       ? `L'extension n'est pas connectée à ton compte VRM, et celle-ci (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la connexion de VRM : mets-la à jour (${EXT_ATTENDUE}), ou clique son icône et connecte-toi avec ton mot de passe VRM.`
-      : __sessExtErreur
+      : voie === 'serveur'
         ? `L'extension n'est pas connectée à ton compte VRM et le serveur n'a pas pu préparer sa connexion${__sessExtErreur.message ? ' (' + __sessExtErreur.message + ')' : ''} — clique son icône et connecte-toi avec ton mot de passe VRM.`
-        : "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page." };
+        : voie === 'page'
+          ? "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page, ou clique son icône et connecte-toi avec ton mot de passe VRM."
+          : "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page." }; }
   if (v.connecte === null) return { code: 'vrm-encours', texte: "L'extension renouvelle sa connexion à VRM — un instant." };
   // Même compte ? Par IDENTITÉ (l'identifiant du compte), l'email en repli —
   // la même règle que la session qu'on lui donne (§11).
@@ -9856,12 +9941,18 @@ function EtatActions({ onNav, ordi, sombre }) {
   //    connecter avec VRM » repasse par la même route, bloquée 15 min — le
   //    panneau disait ce geste pendant que la liste des ventes disait le mot de
   //    passe. Une règle (`voieConnexionExt`), les mêmes gestes partout (§11).
-  else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
+  // ⚠️ Relecture croisée de la 5.174 : la voie 'page' (une 5.164/5.170 que l'app
+  //    connecte par l'ancien message) — sa fenêtre n'a que email et mot de passe.
+  else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : voie === 'page' ? 'page' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
     : voie === 'retard'
       ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Réglages) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
       : voie === 'serveur'
-        ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>
-        : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
+        ? (fenetreAncienne()
+          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>)
+        : voie === 'page'
+          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM.</>
+          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
   // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
   // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
   // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
@@ -10014,7 +10105,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {voie === 'retard' ? (
         <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
       ) : voie === 'serveur' ? (
-        <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+        fenetreAncienne()
+          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+          : <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      ) : voie === 'page' ? (
+        /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
+           message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
       ) : (
         <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
       )}
@@ -13306,7 +13403,16 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     // porte pas l'annonce : « Générer » répondrait « déjà fait » et ne relierait
     // rien — l'écran Ventes, lui, dit « prêt à imprimer », §11), et sur un
     // ordinateur (au doigt, un bouton grisé n'explique rien).
-    const aBouton = (v) => !sansSouris && !v.bordCapte && aExpedier({ status: v.statut, transaction_user_status: v.tus });
+    // ⚠️ Relecture croisée de la 5.174 : « ou génère son bordereau (bouton
+    //    ci-dessous) » s'écrivait au-dessus d'un bouton GRISÉ — deux extensions
+    //    (« je n'en envoie aucune » dans le même paragraphe), code périmé, autre
+    //    compte VRM, pas connectée, et sa 5.164 d'aujourd'hui. Le bouton ne sert
+    //    ici qu'à RELIER la vente : il n'est monté — et proposé — que si
+    //    l'extension de ce navigateur peut recevoir la commande (la règle de
+    //    l'indicateur, `raisonExtGlobale`, §11). Sinon : ouvrir la vente sur
+    //    vinted.fr, et le bouton reste sur l'écran Ventes (grisé, avec sa raison).
+    const commandePossible = raisonExtGlobale(sansSouris, { cap: 'commande' }) === null;
+    const aBouton = (v) => commandePossible && !v.bordCapte && aExpedier({ status: v.statut, transaction_user_status: v.tus });
     const generer = sansPreuve.some(aBouton);
     // (revue du 11 octobre) LE CHIFFRE, PAS LA PROMESSE : l'extension n'en lit
     // que `PREUVE_PAR_VISITE` par visite et par compte (`PREUVE_MAX_PAR_VISITE`

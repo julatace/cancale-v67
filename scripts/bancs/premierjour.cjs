@@ -27,7 +27,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist');   // ⚠️ JAMAIS un che
 // absolu : la méthode de preuve (§6.1) copie le banc dans /tmp/avN et le lance
 // DEPUIS cet arbre. Un `/home/...` en dur relirait le dépôt courant et la
 // preuve serait truquée — c'est arrivé aux quatorze bancs de rendu.
-const PORT = 4501;
+const PORT = Number(process.env.BANC_PORT) || 4501;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 
 const SESSION = {
@@ -108,6 +108,13 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
         const d = ev.data;
         if (d.__vmr === 'session') { window.__posts.push(d.session === null ? 'null' : 'session'); if (d.session === null && p && typeof p === 'object') p.connecte = false; return; }
         if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version }, '*'); return; }
+        // `p.etat` : elle répond aussi à « état » (une 5.129+ dont le code tourne,
+        // comme la VRAIE 5.164) — elle dit sous quel compte VRM elle écrit.
+        if (d.__vmr === 'etat' && d.reqId && p && typeof p === 'object' && p.etat) {
+          window.postMessage({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version,
+            vrm: { ok: true, connecte: !!p.connecte, email: p.connecte ? (p.email || '') : '', user_id: p.connecte ? (p.user_id || null) : null, cloisonne: true }, vinted: null, cmds: {} } }, '*');
+          return;
+        }
         if (d.__vmr === 'authEtat' && d.reqId && p !== 'muette') {
           window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId,
             etat: { ok: true, connecte: !!p.connecte, email: p.connecte ? (p.email || '') : '', cloisonne: true } }, '*');
@@ -135,7 +142,9 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comptes) });
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await pg.route('**/api/**', (r) => (/mode=session-extension/.test(r.request().url())
+    ? r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, session: { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3, user_id: SESSION.user.id, email: SESSION.user.email } }) })
+    : r.fulfill({ status: 200, contentType: 'application/json', body: '{}' })));
   // Déterminisme : aucune image du CDN Vinted (un hoquet réseau a déjà tué un banc).
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
   await pg.route('**://*.vinted.com/**', (r) => r.abort());
@@ -285,7 +294,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //    reconnecte… rien à taper » — l'app ne lui envoie plus RIEN (canal
   //    adressé : 5.171), et « Se connecter avec VRM » nommait un bouton que sa
   //    fenêtre n'a pas. On juge l'état décidé (`data-voie`) et ses gestes.
-  console.log('\n── Extension 5.164 (pas de canal adressé) : aucune promesse, le vrai geste');
+  console.log('\n── Extension 5.164 qui ne dit PAS sous quel compte elle écrit (pas d’« état ») : aucune promesse, le vrai geste');
   const vieillePas = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.164.0' });
   dit(vieillePas.etat === 'pasconnectee' && vieillePas.voie === 'retard', 'pas connectée, 5.164 : l’app sait qu’elle ne peut PAS la connecter', `${vieillePas.etat} · voie ${vieillePas.voie}`);
   dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(vieillePas.carte), 'aucune promesse « je la connecte… rien à taper »', vieillePas.carte.slice(0, 300).replace(/\n/g, ' · '));
@@ -307,6 +316,17 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   const prod = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.170.0' });
   dit(prod.etat === 'pasconnectee' && prod.voie === 'retard', 'pas connectée, 5.170 de production : l’app sait qu’elle ne peut PAS la connecter', `${prod.etat} · voie ${prod.voie}`);
   dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(prod.carte), '5.170 : aucune promesse « je la connecte… rien à taper »', prod.carte.slice(0, 300).replace(/\n/g, ' · '));
+  // ⚠️⚠️ Relecture croisée de la 5.174 : la VRAIE 5.164 (et la 5.170 de
+  //    production) répondent à « état » — l'app la connecte alors par l'ancien
+  //    message de la page, avec une session fabriquée pour elle (voie 'page').
+  //    La promesse « sans rien à taper » est tenue (une session part) ; sa
+  //    fenêtre n'a pas « Se connecter avec VRM » : le secours dit son mot de passe.
+  for (const ver of ['5.164.0', '5.170.0']) {
+    const r = await rendre(nav, { comptes: [], pont: { connecte: false, etat: true }, version: ver });
+    dit(r.etat === 'pasconnectee' && r.voie === 'page', `pas connectée, ${ver} qui répond à « état » : l’app SAIT la connecter (voie « page »)`, `${r.etat} · voie ${r.voie}`);
+    dit(r.posts.filter((x) => x === 'session').length === 1, `${ver} : la promesse est TENUE — une session lui est postée (fabriquée pour elle)`, JSON.stringify(r.posts));
+    dit(!/Se connecter avec VRM/.test(r.carte) && /mot de passe/i.test(r.carte), `${ver} : le secours nomme ce que SA fenêtre a (email + mot de passe VRM), pas « Se connecter avec VRM »`, r.carte.slice(0, 400).replace(/\n/g, ' · '));
+  }
   // L'autre sens : une 5.171 (canal adressé) garde la promesse — l'app LA tient.
   const neuve = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.171.0' });
   dit(neuve.etat === 'pasconnectee' && neuve.voie === 'app' && /sans rien à taper/i.test(neuve.carte), 'autre sens : une 5.171 garde « je la connecte d’ici, sans rien à taper »', `${neuve.etat} · voie ${neuve.voie}`);

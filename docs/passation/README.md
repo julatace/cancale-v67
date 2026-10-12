@@ -28,6 +28,15 @@ et cette section** : ce qui y est marqué « en cours » est déjà pris.
   tour 2 de la règle d'offre eBay (corrigée en `c4fa405`, relecture en cours).
 - Si cette session s'arrête de nouveau, ces chantiers reprennent depuis les
   branches du paquet (§3) et les listes de défauts dans `docs/passation/notes/`.
+- **Relecture croisée de la 5.174 : faite (12 octobre)** — 4 défauts reproduits
+  et corrigés, l'extension passe en **5.175.0** (la 5.174 ne sera jamais
+  livrée) : (1-2) une 5.164/5.170 sans session, morte, sur un autre compte VRM,
+  ou après « Se déconnecter » puis reconnexion, n'était plus jamais reconnectée
+  (la production le faisait — voie `page` rétablie, resserrée) ; (3) un échec
+  passager (base, 429, 401, réseau) cachait une vente 6 h à l'anti double vente
+  (+ codes de retrait 6 h, versements 24 h) ; (4) eBay → Annonces proposait
+  « génère son bordereau » devant un bouton grisé. Détail et preuves : CLAUDE.md,
+  « Relecture croisée de la 5.174 ».
 
 ## 1. Ce qui est EN PRODUCTION (main, vrm.center)
 
@@ -38,7 +47,7 @@ et cette section** : ce qui y est marqué « en cours » est déjà pris.
 
 - Migration **013** (anciens numéros en B) **appliquée** le 11 à 14:58 UTC.
 - ⚠️ Julien **n'a pas encore installé** la 5.170 (il ne peut pas en ce moment).
-  Il installera UNE seule fois la prochaine version (5.174, voir §2).
+  Il installera UNE seule fois la prochaine version (5.175, voir §2).
 - `diag_photos` était encore absent en base à 20:40 UTC : soit il n'a pas rouvert
   VRM, soit les photos s'affichent (la mesure ne s'écrit qu'au premier échec).
 
@@ -61,8 +70,9 @@ passation : voir `git log`). Contenu au-dessus de main :
 4. **K3 : migration 014** (mémoire de l'agent eBay) — **fichier seulement, PAS
    appliquée** ; audit `scripts/audit-agent-sql.cjs` (193 contrôles, 66
    mutations).
-5. **Extension 5.174.0** réunissant 1, 2 et 3 (les 5.171, 5.172, 5.173 des
-   branches n'ont **jamais** été publiées : ne les réutilisez pas).
+5. **Extension 5.175.0** réunissant 1, 2 et 3, plus la relecture croisée du
+   12 octobre (les 5.171, 5.172, 5.173 et 5.174 n'ont **jamais** été publiées :
+   ne les réutilisez pas).
 6. CLAUDE.md §2.8, §2.9, §3 (choix de Julien du 11).
 
 **À faire pour la mettre en ligne (Session 1, §4)** : la vérification complète
@@ -81,7 +91,7 @@ Puis une **relecture croisée** des trois chantiers ensemble (ils ont été relu
 séparément ; leurs interactions — liaison × promesse eBay × notifications — ne
 l'ont pas été), puis PR vers `main`, merge, vérifier le déploiement Vercel
 (READY) et `/api/sante` avec l'outil Vercel (`web_fetch_vercel_url` — vrm.center
-est bloqué par le proxy du conteneur), puis **envoyer le zip 5.174 à Julien**
+est bloqué par le proxy du conteneur), puis **envoyer le zip 5.175 à Julien**
 avec la consigne : un seul dossier, retirer toute autre copie de VRM dans
 `chrome://extensions` **dans chaque profil Chrome**, cliquer ⟳ **dans chaque
 Chrome**, recharger les onglets Vinted.
@@ -125,7 +135,7 @@ modèle utilisé).
 
 Dans l'ordre :
 
-1. **Mettre la 5.174 en ligne** (§2) — c'est ce que Julien attend : sa connexion
+1. **Mettre la 5.175 en ligne** (§2) — c'est ce que Julien attend : sa connexion
    d'extension, ses notifications, l'anti double vente eBay.
 2. **Règle d'offre eBay** : récupérer `passation/worktree-wf_30feaf2f-334-8`,
    corriger les 7 défauts restants (sondes fournies), relire adversairement
@@ -192,8 +202,9 @@ Dans l'ordre :
   travaille jamais à deux sur la même. On met en ligne par PR vers `main` ;
   avant chaque PR : `git fetch` puis **`git merge origin/main` (vrai merge,
   jamais `-s ours`)**, conflits résolus à la main, puis build + audits + bancs.
-- **Numéros d'extension** : la prochaine publiée est **5.174.0** (Session 1).
-  Ensuite **Session 1 : 5.190 à 5.199**, **Session 2 : 5.175 à 5.189**. Un
+- **Numéros d'extension** : la prochaine publiée est **5.175.0** (l'intégration,
+  relecture croisée comprise — la 5.174 ne sera jamais livrée). Ensuite
+  **Session 1 : 5.190 à 5.199**, **Session 2 : 5.176 à 5.189**. Un
   numéro publié ne change jamais de contenu ; deux contenus ne portent jamais
   le même numéro ; une capacité (`EXT_CAPACITES`) porte la version qui la
   PUBLIE (lire l'historique de main avant de la poser — `scripts/_versions-publiees.cjs`).
@@ -210,12 +221,12 @@ Dans l'ordre :
 
 ## 7. Ce que seul Julien peut faire (à lui rappeler, une fois, sans insister)
 
-- Installer l'extension **5.174** quand il pourra (un dossier, retirer les
+- Installer l'extension **5.175** quand il pourra (un dossier, retirer les
   autres copies dans chaque profil Chrome, ⟳ dans chaque Chrome). Une vieille
   copie sans session fige **arthuror2** et **tomj683**.
 - Sur angeled92, tomj606 et arthuror2 : vérifier les **notifications email de
   Vinted** (aucun email n'arrive à VRM ; Réglages → Notifications le dira avec
-  la 5.174).
+  la 5.175).
 - Stripe : recréer le prix **12,99 €** (clé `vrm_mensuel`, transférer la clé) ;
   tant que ce n'est pas fait, le paiement reste fermé (voulu).
 - Supabase → URL Configuration (Site URL `https://vrm.center`) et un SMTP.

@@ -37,6 +37,12 @@
 //      extension qui A `capterPreuvesVente` : la 5.167.0 et la 5.168.0 PUBLIÉES
 //      (PR #471, #472) ne l'ont pas — elles rendent « retard » ; et le rythme
 //      que l'écran annonce (« 3 par visite ») est celui de l'extension.
+//  10. (relecture croisée de la 5.174, 12 octobre) un échec PASSAGER ne bloque
+//      pas 6 h : une écriture refusée par NOTRE base, un 429 de Vinted, un 401
+//      ou une coupure ⇒ la vente est relue à la visite suivante (après la
+//      pause) et reste comptée dans la réserve de lecture ; un 5xx ⇒ 30 min ;
+//      un refus de Vinted (404) ⇒ 6 h. Même règle pour `capterRetraits` (6 h)
+//      et `capterDatesVersement` (24 h).
 //  ⚠️ Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie`.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
@@ -90,6 +96,12 @@ const MUTATIONS = {
   'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.172.0' };", "preuves: '5.170.0' };", 'capacite-publiee') },
   // L'écran annonce un autre rythme que celui de l'extension.
   'rythme-different': { app: (s) => remplace(s, 'const PREUVE_PAR_VISITE = 3;', 'const PREUVE_PAR_VISITE = 5;', 'rythme-different') },
+  // (relecture croisée de la 5.174) Le mémo reste posé quand l'échec n'est pas celui de la vente.
+  'memo-echec-garde': { ext: (s) => remplace(s, 'function memoApresEchec(memo, cle, rep, delaiMs) {\n', 'function memoApresEchec(memo, cle, rep, delaiMs) {\n  return !!(rep && (rep.pause || freinVinted(Number(rep.status) || 0)));\n', 'memo-echec-garde') },
+  'memo-ecriture-preuve': { ext: (s) => remplace(s, '      if (range === null) { delete memo[tx]; break; }', '      if (range === null) break;', 'memo-ecriture-preuve') },
+  'memo-ecriture-versement': { ext: (s) => remplace(s, "if (ok === false) { noterDiag('versement_ecriture_ratee'); delete memo[tx]; break; }", "if (ok === false) { noterDiag('versement_ecriture_ratee'); continue; }", 'memo-ecriture-versement') },
+  'memo-ecriture-retrait': { ext: (s) => remplace(s, '      if (ecrit === null) { delete memo[cid]; break; }', '', 'memo-ecriture-retrait') },
+  'cinq-cents-six-heures': { ext: (s) => remplace(s, "  if (s >= 500) return 'bref';\n", '', 'cinq-cents-six-heures') },
 };
 if (PROUVE) {
   let rouges = 0; const noms = Object.keys(MUTATIONS);
@@ -527,11 +539,13 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     dit(e.j.evts.some((x) => x && x.type === 'maj' && x.quoi === 'preuves'), 'et l\'app est prévenue (elle relit la preuve)');
   });
   await essaie('memo 6 h', async () => {
-    const e = chargeExt({ lignes: lignesP(), vinted: vintedP(500) });
+    // Un REFUS de Vinted (404 : il a jugé cette transaction) — pas un échec
+    // passager (voir le §10 pour ceux-là).
+    const e = chargeExt({ lignes: lignesP(), vinted: vintedP(404) });
     await e.ctx.capterPreuvesVente(A);
     const n1 = lusTx(e).length;
     await e.ctx.capterPreuvesVente(A);
-    dit(n1 === 3 && lusTx(e).length === 5, 'une lecture refusée ne se retente pas avant 6 h (les deux autres passent)', `${n1} puis ${lusTx(e).length}`);
+    dit(n1 === 3 && lusTx(e).length === 5, 'une lecture REFUSÉE par Vinted (404) ne se retente pas avant 6 h (les deux autres passent)', `${n1} puis ${lusTx(e).length}`);
     await e.ctx.capterPreuvesVente(A);
     dit(lusTx(e).length === 5, 'et rien n\'est relu dans les 6 h', `${lusTx(e).length}`);
     const memo = e.store.vrmPreuveFaits || {};
@@ -560,6 +574,113 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     const i = corps.indexOf('await capterPreuvesVente(uid);'), j = corps.indexOf('await capterRetraits(uid);'), k = corps.indexOf('const r = await runActive();');
     dit(i > 0 && k > 0 && k < i && i < j, 'la visite lit les preuves APRÈS la moisson (les ventes viennent d\'être captées) et AVANT le reste');
     dit(/preuve: PREUVE_MAX_PAR_VISITE/.test(EXT), 'et leur place est gardée dans la réserve des lectures prioritaires (les photos ne la mangent pas)');
+  });
+
+  // ══ 10. UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (relecture croisée de la 5.174) ══
+  // Mesuré sur 0caff0d : le mémo était posé AVANT la requête et jamais ôté — une
+  // écriture refusée par notre base (recul d'une minute) ou un 429 (pause de
+  // 15 min) cachaient la vente à l'anti double vente pendant 6 h, alors que
+  // l'écran eBay promettait « à ta prochaine visite ».
+  console.log('\n10. UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (preuves, codes de retrait, versements)');
+  // L'horloge du service worker, pilotée (`__dec` ms de plus).
+  const horloge = (e) => { vm.runInContext('(function(){ var r = Date.now; Date.now = function(){ return r() + (globalThis.__dec || 0); }; })();', e.ctx); e.ctx.__dec = 0; return (ms) => { e.ctx.__dec = ms; }; };
+  // Notre base REFUSE les écritures qui répondent à `re` tant que `etat.ko`.
+  const ecritureKO = (e, re, etat) => { const f0 = e.ctx.fetch; e.ctx.fetch = async (u, o = {}) => (etat.ko && /\/rest\/v1\//.test(String(u)) && String(o.method || 'GET') === 'POST' && re.test(String(o.body || '')) ? { ok: false, status: 503, headers: { get: () => 'text/html' }, json: async () => null, text: async () => '<html>503</html>', clone() { return this; } } : f0(u, o)); };
+  const dues = (e, quoi) => (((e.store.vrmLecturesDues || {})[A] || {})[quoi] || {}).reste;
+  const rangees = (e) => Object.keys(e.lignes).filter((k) => /_txn_70000005(57|62|63|65|66)$/.test(k)).map((k) => k.split('_').pop()).sort();
+  await essaie('preuve : écriture refusée', async () => {
+    const etat = { ko: true };
+    const e = chargeExt({ lignes: lignesP(), vinted: vintedP() });
+    const temps = horloge(e); ecritureKO(e, /_txn_/, etat);
+    await e.ctx.capterPreuvesVente(A);
+    const l1 = lusTx(e);
+    dit(l1.length === 1 && rangees(e).length === 0, 'notre base refuse l\'écriture : on s\'arrête à la première (la suivante échouerait aussi)', `${l1.length} lue(s), ${rangees(e).length} rangée(s)`);
+    dit(dues(e, 'preuve') === 5, 'et les 5 ventes restent comptées dans la réserve de lecture (les photos ne la mangent pas)', String(dues(e, 'preuve')));
+    etat.ko = false; temps(2 * 60000);                      // la base est revenue
+    await e.ctx.capterPreuvesVente(A);
+    dit(lusTx(e).slice(l1.length).includes(l1[0]) && rangees(e).includes(l1[0]), 'base revenue ⇒ à la visite suivante (2 min), la vente est RELUE et prouvée — pas dans 6 h', `relues : ${lusTx(e).slice(l1.length).join(', ')} · rangées : ${rangees(e).join(', ')}`);
+  });
+  await essaie('preuve : 429 puis fin de pause', async () => {
+    const etat = { frein: 1 };
+    const e = chargeExt({ lignes: lignesP(), vinted: (r) => (/\/transactions\//.test(r.chemin) && etat.frein > 0 ? (etat.frein--, { status: 429, body: {} }) : vintedP()(r)) });
+    const temps = horloge(e);
+    await e.ctx.capterPreuvesVente(A);
+    const l1 = lusTx(e);
+    dit(l1.length === 1 && !!(e.store.vrmPauseVinted && e.store.vrmPauseVinted.jusqua), 'un 429 : la pause s\'ouvre, plus rien ne part', `${l1.length} lue(s)`);
+    dit(dues(e, 'preuve') === 5, 'la vente freinée reste comptée dans la réserve', String(dues(e, 'preuve')));
+    temps(16 * 60000);                                      // la pause (15 min) est finie
+    await e.ctx.capterPreuvesVente(A);
+    dit(lusTx(e).slice(1).includes(l1[0]) && rangees(e).includes(l1[0]), 'pause finie ⇒ la vente freinée est RELUE et prouvée (pas dans 6 h)', `relues : ${lusTx(e).slice(1).join(', ')}`);
+  });
+  await essaie('preuve : 401, réseau', async () => {
+    for (const st of [401, 0]) {
+      const etat = { n: 1 };
+      const e = chargeExt({ lignes: lignesP(), vinted: (r) => (/\/transactions\//.test(r.chemin) && etat.n > 0 ? (etat.n--, { status: st, body: {} }) : vintedP()(r)) });
+      await e.ctx.capterPreuvesVente(A);
+      const l1 = lusTx(e);
+      await e.ctx.capterPreuvesVente(A);
+      dit(lusTx(e).slice(l1.length).includes(l1[0]), `${st === 0 ? 'une coupure réseau' : 'un 401'} : la vente est relue à la visite suivante`, `${l1.join(', ')} → ${lusTx(e).slice(l1.length).join(', ')}`);
+    }
+  });
+  await essaie('preuve : 5xx', async () => {
+    const e = chargeExt({ lignes: lignesP(), vinted: vintedP(503) });
+    const temps = horloge(e);
+    await e.ctx.capterPreuvesVente(A);
+    await e.ctx.capterPreuvesVente(A);
+    const n = lusTx(e).length;
+    temps(20 * 60000); await e.ctx.capterPreuvesVente(A);
+    dit(lusTx(e).length === n, 'Vinted en panne (5xx) : pas relu dans les 30 min (une transaction cassée ne mange pas le budget à chaque visite)', `${n} → ${lusTx(e).length}`);
+    temps(31 * 60000); await e.ctx.capterPreuvesVente(A);
+    dit(lusTx(e).length > n, '… mais relu après 30 min, pas 6 h', `${n} → ${lusTx(e).length}`);
+  });
+  await essaie('versement : écriture refusée, 429', async () => {
+    const finalisee = (tx) => vente(tx, "Commande finalisée - l'acheteur a validé la commande", 'completed');
+    const lignesV = () => ({ [`harvest_${A}_orders_sold`]: { capturedAt: iso(0), payload: { my_orders: [finalisee(7000000801), finalisee(7000000802)] } } });
+    const vintedV = (etat) => (r) => {
+      const m = /\/api\/v2\/transactions\/(\d+)$/.exec(r.chemin);
+      if (!m) return { status: 404, body: {} };
+      if (etat.frein > 0) { etat.frein--; return { status: 429, body: {} }; }
+      return { status: 200, body: { transaction: { id: Number(m[1]), item_id: 1, status: 450, status_title: 'Commande finalisée', status_updated_at: '2026-10-01T08:00:00+02:00' } } };
+    };
+    const datees = (e) => Object.keys(e.lignes).filter((k) => /_txn_700000080/.test(k)).length;
+    { const etat = { ko: true, frein: 0 };
+      const e = chargeExt({ lignes: lignesV(), vinted: vintedV(etat) });
+      const temps = horloge(e); ecritureKO(e, /_txn_/, etat);
+      await e.ctx.capterDatesVersement(A);
+      const n1 = lusTx(e).length;
+      etat.ko = false; temps(2 * 60000);
+      await e.ctx.capterDatesVersement(A);
+      dit(n1 === 1 && datees(e) === 2, 'versement : notre base refuse ⇒ on s\'arrête, puis la date est relue et rangée à la visite suivante (pas dans 24 h)', `${n1} lue(s) puis ${datees(e)} datée(s)`); }
+    { const etat = { ko: false, frein: 1 };
+      const e = chargeExt({ lignes: lignesV(), vinted: vintedV(etat) });
+      const temps = horloge(e);
+      await e.ctx.capterDatesVersement(A);
+      temps(16 * 60000);
+      await e.ctx.capterDatesVersement(A);
+      dit(datees(e) === 2, 'versement : un 429 ⇒ relue après la pause, pas dans 24 h', `${datees(e)} datée(s)`); }
+  });
+  await essaie('retrait : écriture refusée, 429', async () => {
+    const achat = { transaction_id: 7000000901, conversation_id: 7000000911, status: 'Colis déposé au point relais', title: 'Paire achetée' };
+    const lignesR = () => ({ [`harvest_${A}_orders_purchased`]: { capturedAt: iso(0), payload: { my_orders: [achat] } } });
+    const conv = { conversation: { id: 7000000911, transaction: { id: 7000000901, item_id: 1, current_user_side: 'buyer' }, messages: [{ entity_type: 'action_message', entity: { title: 'Ton colis est arrivé !', subtitle: "Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes, France. Saisis le code C65735 pour le récupérer." } }] } };
+    const vintedR = (etat) => (r) => (/\/api\/v2\/conversations\/7000000911$/.test(r.chemin) ? (etat.frein > 0 ? (etat.frein--, { status: 429, body: {} }) : { status: 200, body: conv }) : { status: 404, body: {} });
+    const code = (e) => ((e.lignes.panel_colis_relais || {})['7000000901'] || {}).code || '';
+    const lusC = (e) => e.j.vinted.filter((x) => /\/conversations\//.test(x.chemin)).length;
+    { const etat = { ko: true, frein: 0 };
+      const e = chargeExt({ lignes: lignesR(), vinted: vintedR(etat) });
+      const temps = horloge(e); ecritureKO(e, /panel_colis_relais/, etat);
+      await e.ctx.capterRetraits(A);
+      dit(lusC(e) === 1 && !code(e), 'retrait : le code est lu mais notre base refuse l\'écriture', `${lusC(e)} lecture(s), code « ${code(e)} »`);
+      etat.ko = false; temps(2 * 60000);
+      await e.ctx.capterRetraits(A);
+      dit(code(e) === 'C65735', 'base revenue ⇒ relu et RANGÉ à la visite suivante (pas dans 6 h : un code manqué, c\'est un colis qui repart)', `code « ${code(e)} », ${lusC(e)} lecture(s)`); }
+    { const etat = { ko: false, frein: 1 };
+      const e = chargeExt({ lignes: lignesR(), vinted: vintedR(etat) });
+      const temps = horloge(e);
+      await e.ctx.capterRetraits(A);
+      temps(16 * 60000);
+      await e.ctx.capterRetraits(A);
+      dit(code(e) === 'C65735', 'retrait : un 429 ⇒ relu après la pause, pas dans 6 h', `code « ${code(e)} »`); }
   });
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);

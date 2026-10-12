@@ -46,6 +46,12 @@
 //     une extension à jour dit le CHIFFRE (3 par visite, « au fil de tes
 //     visites » au-delà) ; et l'interrupteur éteint dans le nuage n'affiche
 //     jamais ALLUMÉ parce que l'appareil gardait « true ».
+//   · (relecture croisée de la 5.174) « ou génère son bordereau (bouton
+//     ci-dessous) » et le bouton ne sont là QUE si l'extension de ce navigateur
+//     peut recevoir la commande : ni avec deux extensions (« je n'en envoie
+//     aucune » dans le même paragraphe), ni code périmé, ni sa 5.164 d'aujourd'hui
+//     (périmée ou muette), ni pas connectée / autre compte VRM, ni absente — et
+//     l'autre sens : une 5.170 connectée (commande possible) les garde.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
@@ -59,12 +65,15 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4711;
 const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
 // Le pont simulé (le VRAI dialogue `ready` / `etat`), injecté AVANT l'app.
+// `o.vieux` : une seconde copie (elle répond au ping) · `o.muette` : le code qui
+// tourne ne connaît pas « état » (5.95–5.128 sous un manifeste 5.164) ·
+// `o.extra` : des clés de plus dans l'état (une clé d'un ancien code).
 const PONT = (o) => {
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
-    if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, ...(o.etatCode || {}), vrm: o.vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'ping') { post({ __vmr: 'ready', version: o.version }); if (o.vieux) post({ __vmr: 'ready', version: o.vieux }); }
+    if (d.__vmr === 'etat' && !o.muette) post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, ...(o.etatCode || {}), ...(o.extra || {}), vrm: o.vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
     // Comme le VRAI background.js quand le PDF est déjà rangé (mesuré dans le vm) :
     // « fait », sans rien demander à Vinted — et sans relier la vente.
@@ -208,7 +217,7 @@ async function ouvrir(b, vp, panne, opts = {}) {
   if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
   else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   if (opts.session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
-  if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: codeEtat(opts.pont.version) }));
+  if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: opts.pont.etatCode !== undefined ? opts.pont.etatCode : codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   await pg.addInitScript(() => {
     window.__etatsAuto = [];
@@ -348,11 +357,12 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
           '(revue du 11 octobre) la vente est NOMMÉE (son titre) — on sait laquelle ouvrir', JSON.stringify(vv.map((x) => x.t)));
         dit(vv.length === 1 && vv[0].liens.length === 1 && /vinted\.fr\/inbox\/88010$/.test(vv[0].liens[0]),
           'avec le lien vers SA conversation sur vinted.fr — une fois (le bouton du bordereau ne le répète pas, §7)', JSON.stringify(vv[0] && vv[0].liens));
-        if (vp.width > 600) dit(vv.length === 1 && vv[0].bord, 'et, à poster, son bouton « Générer le bordereau » (un bordereau généré par VRM relie la vente)', JSON.stringify(vv[0] && vv[0].bord));
-        // (revue du 11 octobre, défaut 13) Au doigt, un bouton grisé n'explique
-        // rien (sa raison n'est que dans l'infobulle) : pas de bouton ici — le
-        // texte dit déjà « sur l'ordinateur où l'extension est installée ».
-        else dit(vv.length === 1 && !vv[0].bord, 'au doigt (téléphone) : PAS de bouton « Bordereau » grisé et muet dans cette ligne', JSON.stringify(vv[0] && vv[0].bord));
+        // (revue du 11 octobre, défaut 13 ; relecture croisée de la 5.174) Pas
+        // d'extension ICI : le bouton ne pourrait rien commander — pas de bouton
+        // grisé et muet dans cette ligne (le texte dit où agir ; l'écran Ventes
+        // garde le sien, grisé avec sa raison). Le bouton, quand la commande est
+        // possible : voir « génère son bordereau » plus bas.
+        dit(vv.length === 1 && !vv[0].bord && !/génère (son|leur) bordereau/.test(v.sansPreuve[0].t), `${vp.width > 600 ? 'sans extension ici' : 'au doigt (téléphone)'} : PAS de bouton « Bordereau » qui ne peut rien commander, ni « génère son bordereau »`, JSON.stringify(vv[0] && vv[0].bord));
         dit(v.autoEtat === 'ÉTEINT', 'le retrait automatique dit son état en un mot : ÉTEINT', String(v.autoEtat));
         dit(v.vendues.length === 1 && v.vendues[0].num === '24' && /vinted\.fr\/items\/7004$/.test(v.vendues[0].href),
           'vendue sur eBay ⇒ l\'alerte pour la N°24 mène à SON annonce Vinted (pas la commande annulée N°21, pas la commande sans SKU au titre identique)', JSON.stringify(v.vendues));
@@ -619,6 +629,39 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(l.blocage === code, `${nom} : la ligne dit ce qui bloque (« ${code} », la raison de l'indicateur)`, String(l.blocage));
         if (code === 'autre-vrm') dit(/quelquun@ailleurs\.test/.test(l.t || ''), 'autre compte : la ligne nomme l\'adresse sous laquelle l\'extension écrit', String(l.t || '').slice(0, 260));
         dit(/ouvre la vente sur vinted\.fr/.test(l.t || ''), `${nom} : et le geste qui marche quand même (ouvrir la vente)`, String(l.t || '').slice(0, 260));
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
+    }
+    // ── (relecture croisée de la 5.174) « OU GÉNÈRE SON BORDEREAU (BOUTON
+    //    CI-DESSOUS) » NE S'ÉCRIT QU'AU-DESSUS D'UN BOUTON QUI MARCHE. Sur
+    //    0caff0d : avec deux extensions, le même paragraphe disait « je n'en
+    //    envoie aucune » puis « génère son bordereau (bouton ci-dessous) », et le
+    //    bouton était grisé ; idem périmé, autre compte, pas connectée, et sa
+    //    5.164 d'aujourd'hui. C'est la règle de l'indicateur qui juge (§11).
+    console.log('── ventes pas reliées · « génère son bordereau » seulement si le bouton peut commander (1512 px)');
+    for (const [nom, pont, session, bouton] of [
+      ['deux extensions (5.174 + 5.164)', { version: EXT_ATTENDUE, vieux: '5.164.0' }, true, false],
+      ['code périmé (5.174 sans `code`)', { version: EXT_ATTENDUE, etatCode: {} }, true, false],
+      ['5.164 au code d’avant la 5.159', { version: '5.164.0', extra: { offresAutoLocal: false } }, true, false],
+      ['5.164 au code 5.95–5.128 (muette)', { version: '5.164.0', muette: true }, true, false],
+      ['5.174 pas connectée', { version: EXT_ATTENDUE, vrm: { ok: true, connecte: false, email: '' } }, false, false],
+      ['5.174 sur un autre compte VRM', { version: EXT_ATTENDUE, vrm: { ok: true, connecte: true, email: 'quelquun@ailleurs.test', user_id: '99999999-8888-7777-6666-555555555555' } }, true, false],
+      ['5.170 connectée (commande possible, lecture des transactions pas encore)', { version: '5.170.0' }, false, true],
+    ]) {
+      remettre();
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { pont, session });
+      await essaie('génère · ' + nom, async () => {
+        await versAnnoncesEbay(o.pg);
+        await o.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-ventes-sans-preuve]'); return e && e.getAttribute('data-ebay-sans-preuve-geste') !== 'absente'; }, null, { timeout: 15000 }).catch(() => {});
+        await o.pg.waitForTimeout(2500);
+        const l = (await lire(o.pg)).sansPreuve[0] || {};
+        const vv = l.ventes || [];
+        const t = String(l.t || '');
+        if (bouton) dit(vv.length === 1 && vv[0].bord && /génère son bordereau depuis VRM/.test(t), `${nom} : le bouton ET « ou génère son bordereau » (il peut commander)`, JSON.stringify({ bord: vv.map((x) => x.bord), t: t.slice(0, 200) }));
+        else dit(vv.length === 1 && !vv[0].bord && !/génère (son|leur) bordereau/.test(t), `${nom} : ni bouton, ni « ou génère son bordereau » (il ne pourrait rien commander)`, JSON.stringify({ bord: vv.map((x) => x.bord), t: t.slice(0, 260) }));
+        dit(/ouvre la vente sur vinted\.fr|passe sur vinted\.fr/.test(t), `${nom} : le geste qui marche quand même (ouvrir la vente sur vinted.fr)`, t.slice(0, 220));
+        dit(!/n'en envoie aucune[\s\S]*génère/.test(t), `${nom} : jamais « je n'en envoie aucune » puis « génère » dans le même paragraphe`, t.slice(0, 220));
         dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
       });
       await o.ctx.close();

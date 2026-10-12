@@ -31,23 +31,29 @@
 //       secondes, sans pause de 30 s ;
 //    E. une session d'extension morte : l'app ouverte la répare en quelques
 //       secondes (avant : au battement suivant, jusqu'à 20 s, et rien sans app) ;
-//    F. une extension ANCIENNE (5.164) seule : l'app ne lui prête rien, ne poste
-//       aucune session dans la page, et le DIT ;
+//    F. une extension ANCIENNE (5.164 — il ne peut pas la mettre à jour) seule,
+//       sans session, session MORTE ou sur un AUTRE compte VRM : l'app lui donne
+//       une session fabriquée POUR ELLE par le serveur (l'ancien message de la
+//       page, comme la production 2fed734) — jamais la sienne ; et deux copies
+//       (5.164 + 5.174) ne reçoivent RIEN (relecture croisée de la 5.174) ;
 //    G. code PÉRIMÉ (dossier remplacé, ⟳ jamais cliqué) : réparé tout seul ;
 //    H. l'app et l'extension renouvellent chacune plusieurs fois : aucune ne
-//       tue l'autre.
+//       tue l'autre ;
+//    S. « Se déconnecter » de VRM avec une 5.164 connectée : elle oublie sa
+//       session — puis, à la reconnexion à VRM, elle la RETROUVE (relecture
+//       croisée de la 5.174 : elle restait déconnectée pour de bon).
 //
 //  Usage : node scripts/bancs/session.cjs [--arbre DOSSIER] [--seul A,C]
 //    `--arbre` : un autre arbre (son `dist/` construit et son
 //    `vinted-sync-extension/`) — c'est la preuve §6.1 sur le code d'avant.
-//  Port : 4794.
+//  Port : 4794 (`BANC_PORT` pour un autre).
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os'), https = require('https'), crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const chargerPw = () => { for (const p of [__dirname, process.cwd(), '/home/user/cancale-v67']) { try { return require(require.resolve('playwright', { paths: [p] })); } catch (_) {} } return null; };
 const pw = chargerPw();
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const PORT = 4794;
+const PORT = Number(process.env.BANC_PORT) || 4794;
 const iA = process.argv.indexOf('--arbre');
 const ARBRE = iA > 0 ? path.resolve(process.argv[iA + 1]) : path.join(__dirname, '..', '..');
 const iS = process.argv.indexOf('--seul');
@@ -447,28 +453,92 @@ let TLS = null;
   });
 
   // ══ F. UNE EXTENSION ANCIENNE (5.164) SEULE ════════════════════════════════
+  // ⚠️⚠️ RELECTURE CROISÉE DE LA 5.174 (12 octobre) : ce cas exigeait l'inverse
+  //    (« l'app ne poste AUCUNE session dans la page »). Or Julien NE PEUT PAS
+  //    mettre à jour ses extensions — et la production 2fed734 reconnectait une
+  //    5.164 sans session, morte, ou sur un autre compte VRM, en un battement.
+  //    L'intégration la laissait en « Lecture seule » pour de bon (mesuré, vrai
+  //    bridge.js). Ce qui reste interdit, et vérifié : la session de l'APP (même
+  //    famille de jetons → révoquée), et tout envoi quand deux copies répondent.
   const V164 = extensionDe('cdc9c1d', 'v5164');
-  await cas('F · une extension 5.164 seule, l’app connectée', async (F, ouvrir) => {
-    if (!V164) { dit(false, 'F : la 5.164 ne peut pas être reconstituée (dépôt git introuvable)'); return; }
+  const sansPagePrete = async (pg) => { for (let i = 0; i < 40; i++) { const c = await pg.evaluate(() => { const b = document.querySelector('[data-etat-actions]'); return b ? b.getAttribute('data-etat-code') : null; }).catch(() => null); if (c && c !== 'verif') return c; await attendre(250); } return null; };
+  const casAncienne = async (F, ouvrir, lettre, preparer) => {
+    if (!V164) { dit(false, `${lettre} : la 5.164 ne peut pas être reconstituée (dépôt git introuvable)`); return null; }
     const app = sessionApp(F);
     const ID164 = extId(V164);
-    const ctx = await ouvrir([V164], 'F');
+    const ctx = await ouvrir([V164], lettre);
     const postes = []; await espionnerPage(ctx, postes); await poserSessionApp(ctx, app.s, { separee: false });
-    if (!(await sw(ctx, ID164))) { dit(false, 'F : le service worker de la 5.164 démarre'); return; }
+    if (!(await sw(ctx, ID164))) { dit(false, `${lettre} : le service worker de la 5.164 démarre`); return null; }
+    const avant = preparer ? await preparer(ctx, ID164) : null;
     const pg = await ctx.newPage();
     await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' }).catch(() => {});
-    await attendre(9000);
+    await pg.bringToFront().catch(() => {});
+    const r = await attendreQue(async () => { const e = await sessionExt(ctx, ID164); return e && e.session && !e.session.mort && (!avant || e.session.sid !== avant) ? e : null; }, 20000);
     const sess = postes.filter((p) => p.type === 'session' && !p.nul);
-    dit(sess.length === 0, 'F : l’app ne poste AUCUNE session dans la page (une copie ancienne l’adoptait, famille partagée)', JSON.stringify(sess));
-    dit(!sess.some((p) => p.jeton === app.s.refresh_token), 'F : et JAMAIS son propre jeton de renouvellement', JSON.stringify(sess));
-    const e = await sessionExt(ctx, ID164);
-    dit(!e.session, 'F : la 5.164 reste sans session (elle ne sait pas recevoir la session adressée)', JSON.stringify(e.session));
+    return { app, ctx, pg, postes, sess, r, ID164 };
+  };
+  const verdictsAncienne = async (F, lettre, x) => {
+    const { app, pg, sess, r } = x;
+    dit(!!r.v && /session-extension/.test(r.v.session.sid), `${lettre} : la 5.164 est CONNECTÉE par l’app, avec une session fabriquée POUR ELLE par le serveur`, r.v ? `${r.v.session.sid} en ${r.ms} ms` : `pas connectée après ${r.ms} ms`);
+    dit(!!r.v && r.v.session.sid !== app.sid, `${lettre} : une AUTRE famille que l’app (elles ne se marchent pas dessus)`, `app ${app.sid} · ext ${r.v && r.v.session.sid}`);
+    dit(sess.length === 1, `${lettre} : UNE session postée (l’ancien message de la page — la seule voie qu’elle entend)`, JSON.stringify(sess));
+    dit(!sess.some((p) => p.jeton === app.s.refresh_token), `${lettre} : et JAMAIS le jeton de renouvellement de l’app`, JSON.stringify(sess));
+    dit(F.st.fourches === 1, `${lettre} : une seule session fabriquée`, String(F.st.fourches));
     const vrmSess = [...F.st.sessions.values()].filter((s) => s.sources.has('ext') && s.sid === app.sid);
-    dit(vrmSess.length === 0, 'F : la famille de l’app n’est jamais utilisée par une extension', JSON.stringify(vrmSess.map((s) => s.sid)));
-    await pg.click('[data-etat-actions]').catch(() => {}); await attendre(300);
-    const txt = await pg.evaluate(() => { const p = document.querySelector('[data-etat-panneau]'); const b = document.querySelector('[data-etat-actions]'); return (b ? b.getAttribute('data-etat-code') + ' | ' : '') + (p ? p.innerText : ''); }).catch(() => '');
-    dit(/mets-la à jour|mettre à jour|Mettre à jour/i.test(txt) && /mot de passe VRM|5\.16/.test(txt), 'F : et l’app le DIT : la mettre à jour, ou s’y connecter avec le mot de passe VRM', txt.slice(0, 1200));
+    dit(vrmSess.length === 0, `${lettre} : la famille de l’app n’est jamais utilisée par une extension`, JSON.stringify(vrmSess.map((s) => s.sid)));
+    await attendre(1500);
+    const code = await sansPagePrete(pg);
+    dit(code && code !== 'vrm' && code !== 'autre-vrm', `${lettre} : l’en-tête ne dit plus « Lecture seule · pas connectée »`, String(code));
+  };
+  await cas('F · une extension 5.164 seule, sans session, l’app connectée', async (F, ouvrir) => {
+    const x = await casAncienne(F, ouvrir, 'F'); if (!x) return;
+    await verdictsAncienne(F, 'F', x);
   });
+  await cas('F2 · une extension 5.164 dont la session est MORTE', async (F, ouvrir) => {
+    const x = await casAncienne(F, ouvrir, 'F2', async (ctx, id) => {
+      await appelSW(ctx, id, async (a) => { await authLogin(a.e, a.p); }, { e: U.email, p: MDP });
+      const av = await sessionExt(ctx, id);
+      F.revoquer(av.session.sid);
+      await appelSW(ctx, id, async () => { const s = await loadSession(); await saveSession(Object.assign({}, s, { expires_at: Date.now() - 1000 })); await authToken(); });
+      const m = await sessionExt(ctx, id);
+      dit(!!m.session && m.session.mort, 'F2 : reproduit — refus définitif, sa session est morte', JSON.stringify(m.session));
+      return av.session.sid;
+    }); if (!x) return;
+    await verdictsAncienne(F, 'F2', x);
+  });
+  await cas('F3 · une extension 5.164 connectée au compte VRM d’un AUTRE', async (F, ouvrir) => {
+    const U2 = { id: 'bbbbbbbb-0000-4000-8000-000000000002', email: 'compte-essai@exemple.test' };
+    const x = await casAncienne(F, ouvrir, 'F3', async (ctx, id) => {
+      const s2 = F.nouvelleSession('ext-autre-compte', U2);
+      await appelSW(ctx, id, async (a) => { await saveSession(a); }, { access_token: s2.access_token, refresh_token: s2.refresh_token, expires_at: Date.now() + 3600e3, user_id: U2.id, email: U2.email });
+      return lireJwt(s2.access_token).session_id;
+    }); if (!x) return;
+    await verdictsAncienne(F, 'F3', x);
+    const g = await appelSW(x.ctx, x.ID164, async () => (await chrome.storage.local.get('vrmBascule')).vrmBascule || null);
+    dit(g && /compte-essai/.test(g.de || '') && /vendeur@/.test(g.vers || ''), 'F3 : et l’extension note la bascule (son petit écran la dit)', JSON.stringify(g));
+  });
+  // Deux copies : deux anciennes (5.164 + 5.170 de production — la page les
+  // atteindrait TOUTES LES DEUX), et une ancienne à côté de la neuve.
+  const V170 = extensionDe('2fed734', 'v5170');
+  for (const [lettre, nom, dirs] of [['F4', '5.164 + 5.170', () => [V164, V170]], ['F5', '5.164 + la neuve', () => [V164, EXT]]]) {
+    await cas(`${lettre} · deux copies (${nom}) : rien ne part`, async (F, ouvrir) => {
+      if (!V164 || !V170) { dit(false, `${lettre} : les anciennes ne peuvent pas être reconstituées`); return; }
+      const app = sessionApp(F);
+      const l = dirs(), ids = l.map((d) => extId(d));
+      const ctx = await ouvrir(l, lettre);
+      const postes = []; await espionnerPage(ctx, postes); await poserSessionApp(ctx, app.s, { separee: false });
+      for (const id of ids) if (!(await sw(ctx, id))) { dit(false, `${lettre} : les deux services workers démarrent`); return; }
+      const pg = await ctx.newPage();
+      await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await pg.bringToFront().catch(() => {});
+      await attendre(10000);
+      const code = await sansPagePrete(pg);
+      dit(code === 'plusieurs', `${lettre} : l’app voit deux extensions`, String(code));
+      dit(postes.filter((p) => p.type === 'session' && !p.nul).length === 0, `${lettre} : AUCUNE session postée dans la page (les deux l’adopteraient : même famille, révoquée)`, JSON.stringify(postes.filter((p) => p.type === 'session')));
+      const es = []; for (const id of ids) es.push((await sessionExt(ctx, id)).session);
+      dit(es.every((x) => !x) && F.st.fourches === 0, `${lettre} : ni l’une ni l’autre ne reçoit de session, aucune fabriquée pour rien`, JSON.stringify({ sessions: es, fourches: F.st.fourches }));
+    });
+  }
 
   // ══ G. CODE PÉRIMÉ : DOSSIER REMPLACÉ, ⟳ JAMAIS CLIQUÉ ═════════════════════
   //    Comme chez lui : installée UNE fois (« Charger l'extension non empaquetée »),
@@ -573,6 +643,15 @@ let TLS = null;
     for (const x of await pg.$$('button')) { const t = ((await x.innerText().catch(() => '')) || '').trim(); const st = (await x.getAttribute('style').catch(() => '')) || ''; if (t === 'Se déconnecter' && /flex: 2/.test(st)) { await x.click().catch(() => {}); valide = true; break; } }
     const r = await attendreQue(async () => { const e = await sessionExt(ctx, ID164); return e && !e.session ? e : null; }, 8000, 300);
     dit(valide && !!r.v, 'S : « Se déconnecter » de VRM lui fait OUBLIER sa session (l’ancien message, sur ce geste seulement)', JSON.stringify({ valide, apres: (await sessionExt(ctx, ID164)).session }));
+    // ⚠️⚠️ Relecture croisée de la 5.174 : il se RECONNECTE à VRM — la production
+    //    la retrouvait connectée ; l'intégration la laissait déconnectée pour de
+    //    bon (il devait retaper son mot de passe dans CHACUN de ses Chrome).
+    const app2 = sessionApp(F);
+    await pg.evaluate((s) => { localStorage.setItem('vrm_session', JSON.stringify(s)); }, app2.s).catch(() => {});
+    await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await pg.bringToFront().catch(() => {});
+    const re = await attendreQue(async () => { const e = await sessionExt(ctx, ID164); return e && e.session && !e.session.mort ? e : null; }, 20000);
+    dit(!!re.v && /session-extension/.test(re.v.session.sid) && re.v.session.sid !== app2.sid, 'S : il se reconnecte à VRM — la 5.164 retrouve une session À ELLE, sans rien taper', re.v ? `${re.v.session.sid} en ${re.ms} ms` : `toujours déconnectée après ${re.ms} ms`);
   });
 
   // ══ H. CHACUN SA FAMILLE : PERSONNE NE TUE PERSONNE ══════════════════════

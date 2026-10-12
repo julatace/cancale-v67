@@ -2,7 +2,7 @@
 
 > ⚠️⚠️ **PASSATION DU 11 OCTOBRE (SOIR) — LIS D'ABORD `docs/passation/README.md`.**
 > Ce qui est en production, ce qui attend sur la branche d'intégration (extension
-> 5.174), le travail sauvé dans un paquet git (`docs/passation/*.bundle`, 21
+> 5.175 depuis la relecture croisée du 12 octobre), le travail sauvé dans un paquet git (`docs/passation/*.bundle`, 21
 > branches qui n'existaient que sur une machine), et la répartition entre les
 > deux sessions (Session 1 : mise en ligne, eBay, agent ; Session 2 :
 > fonctionnalités, accueil, revue).
@@ -7843,7 +7843,8 @@ Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
   vérifie AVANT ⟳ ; l'état porte `code` et `ext` ; l'app dit « périmé » (pastille
   ambre, commandes coupées, geste ⟳). La consigne de mise à jour dit les DEUX
   gestes : remplacer le dossier, PUIS ⟳ dans CHAQUE Chrome (`audit-extension-zip`).
-- ⚠️⚠️ **La session ne passe plus JAMAIS par la page** : `window.postMessage` était
+- ⚠️⚠️ **La session ne passe plus par la page** (⚠️ sauf, depuis le 12 octobre,
+  pour une extension d'AVANT la 5.171 — voir « Relecture croisée de la 5.174 ») : `window.postMessage` était
   entendu par toute extension (une copie ancienne adoptait la même famille de
   jetons → révoquée), un `session: null` au démarrage d'une app morte faisait
   oublier la sienne à l'extension (B9), et l'app prêtait SA famille aux < 5.129.
@@ -7920,8 +7921,10 @@ extension), corrigé, rouge sur 24bec0d et sous mutation.
   plus « n'a pas abouti », nomme « Déjà publiée », et **relancer exige sa
   confirmation** (l'extension refuse `confirmer` sans elle). La paire en dépôt
   n'est rendue (`getPending`) qu'à l'onglet ouvert pour elle.
-- Laissé tel quel, décision assumée : une extension d'avant la 5.169 ne reçoit
-  plus de session de l'app (le mot de passe VRM dans sa fenêtre marche toujours).
+- ~~Laissé tel quel, décision assumée : une extension d'avant la 5.169 ne reçoit
+  plus de session de l'app~~ — ⚠️⚠️ **RENVERSÉ le 12 octobre** (« Relecture
+  croisée de la 5.174 », plus bas) : il ne peut pas mettre à jour, et la
+  production les reconnectait.
 - Preuves : `pont.cjs` **18 rouges** sur 24bec0d · `premierjour.cjs` 10 ·
   `deux-extensions.cjs` 2 · `publier.cjs` 6 · `popup.cjs` 3 · `leboncoin.cjs` 1 ·
   `audit-pont-session.cjs` 7 · `session.cjs` (vrai Chromium, cas G/P/S) 5 ;
@@ -8111,6 +8114,76 @@ ROUGE sous mutation.
   — dit, pas codé ; la forme réelle d'un 4xx d'Anthropic facturé (aucun appel réel).
 - **Gestes de Julien** : installer la **5.173**, recoller `scripts/gmail-forwarder.gs`
   et le Worker de `docs/email-pipeline.md`.
+
+### ⚠️⚠️ RELECTURE CROISÉE DE LA 5.174 : QUATRE DÉFAUTS ENTRE LES TROIS CHANTIERS (12 octobre, 5.175)
+Les trois chantiers de l'intégration (connexion, preuve de vente, notifications)
+avaient été relus SÉPARÉMENT. Relus ENSEMBLE, face aux extensions qu'il a
+AUJOURD'HUI — **il ne peut pas mettre à jour** (5 de ses 6 Chrome exécutent un
+code 5.95–5.129 sous un manifeste 5.164 ; la 5.170 n'est pas installée) — la
+nouvelle app devait faire AU MOINS ce que faisait la production (2fed734).
+Chaque défaut REPRODUIT d'abord (le VRAI `bridge.js` de la 5.164 et de la 5.170
+lu dans git, le vrai `background.js` dans un `vm`, la vraie 5.164 chargée dans
+Chromium), corrigé, rouge sur 0caff0d et sous mutation.
+- ⚠️⚠️ **Une 5.164 / 5.170 sans session, à la session MORTE, ou sur un AUTRE
+  compte VRM n'était plus jamais reconnectée** (la production le faisait en un
+  battement). `assurerSessionExtension` sortait sur `!ext` (l'état d'avant la
+  5.171 n'a pas `ext`) puis sur `liaison !== 'ok'`. Sans session, la 5.164 écrit
+  avec la clé publique — refusée par RLS : plus rien de ce Chrome n'arrivait tant
+  qu'il ne retapait pas son mot de passe, **dans chacun de ses Chrome**. Et l'app
+  y menait elle-même : elle conseille ⟳ au code 5.95–5.128, après quoi c'est la
+  5.164 qui tourne… sans session.
+  ⇒ **Voie `page`** (`connexionParLaPage`, `sessionParLaPage`) : le chemin de la
+  production, resserré — extension d'avant la 5.171 qui répond à « état »
+  (≥ 5.129), code non périmé, UN seul pont (`!__vmrPlusieurs`, après
+  `sondageConnu`), et seulement si `connecte === false`, « pas su » deux
+  battements de suite, ou un autre compte avec l'onglet au premier plan (jamais
+  pour « séparer » une extension saine) ; session fabriquée par le serveur
+  (`mode=session-extension`, une famille à ELLE — `sessionAppPourExtension`
+  reste retirée ; serveur qui refuse ⇒ rien, et `__sessExtErreur` le dit) ;
+  postée `{__vmr:'session'}` vers `location.origin`, bornée par
+  `__sessExtPasAvant`. `session: null` n'est toujours posté que sur un GESTE.
+  `voieConnexionExt()` rend `'page'` : la promesse « je la connecte » suit
+  l'envoi, et le secours nomme ce que SA fenêtre a (email + mot de passe VRM —
+  pas « Se connecter avec VRM », qu'elle n'a pas). Une 5.171+ ignore ce message
+  (son pont répond `canal`).
+- ⚠️ **« Se déconnecter » puis reconnexion laissait une 5.164 / 5.170 déconnectée
+  pour de bon** (D9 lui fait oublier sa session au geste — juste ; mais rien ne la
+  lui rendait). Corrigé par la voie `page`.
+- ⚠️⚠️ **Preuve de vente : un échec passager cachait la vente 6 h** à l'anti
+  double vente (et au retrait automatique d'eBay), pendant que l'écran promettait
+  « à ta prochaine visite ». Le mémo était posé AVANT la requête et jamais ôté :
+  une écriture refusée par NOTRE base (recul d'une minute) ou un 429 (pause de
+  15 min) ⇒ relue à +6 h 06. Même motif dans `capterRetraits` (6 h) et
+  `capterDatesVersement` (24 h). ⇒ `suiteLectureRatee` / `memoApresEchec` (une
+  règle pour les trois) : 4xx autre que 401/403/429 = jugé, délai normal ; 5xx =
+  30 min ; pause, 429/403, 401, réseau = mémo ôté (la pause empêche avant) ;
+  écriture refusée par notre base = mémo ôté et on s'arrête (`rangerTransaction`
+  et `noterRetrait` rendent `null` pour « pas rangé », `false` pour « rien à
+  ranger »). La vente reste comptée dans `noterLecturesDues` : la réserve de
+  lecture tient. Extension **5.175.0** (CODE_VERSION, EXT_ATTENDUE, zip).
+- **eBay → Annonces, « vente pas encore reliée »** : « ou génère son bordereau
+  (bouton ci-dessous) » s'écrivait au-dessus d'un bouton GRISÉ — et avec deux
+  extensions, le même paragraphe disait « je n'en envoie aucune ». Le bouton et
+  la phrase ne sont là que si `raisonExtGlobale(sansSouris, {cap:'commande'})`
+  vaut `null` ; sinon « ouvre la vente sur vinted.fr » (le bouton de l'écran
+  Ventes reste, grisé avec sa raison).
+- Preuves (rouges sur 0caff0d, verts après) : `session.cjs` (vraie 5.164 dans
+  Chromium, cas F, F2 morte, F3 autre compte, F4 5.164+5.170, F5 5.164+neuve, S
+  déconnexion → reconnexion) **17 rouges** ; mutation (deux copies + jeton de
+  l'app) ⇒ 5 rouges, dont F4 « les deux adoptent la même famille » ;
+  `pont.cjs` (simulé + VRAI `bridge.js` 5.164 : morte, deux copies, cycle)
+  **10 rouges** ; `premierjour.cjs` **4** ; `audit-preuve-vente.cjs` §10
+  **12 rouges**, 5 mutations rouges (`memo-echec-garde`, `memo-ecriture-*`,
+  `cinq-cents-six-heures`) ; `ebay-annonces.cjs` **8 rouges** (deux extensions,
+  périmé, 5.164 périmée et muette, pas connectée, autre compte, absente ; l'autre
+  sens : une 5.170 connectée garde bouton et phrase). Banc d'origine :
+  `scratchpad/croisee/compat/banc-compat.cjs` (prod 2fed734 contre l'intégration).
+- ⚠️ **Limite connue, comme en production** : deux copies de la MÊME version
+  ancienne (sans identifiant dans leur `ready`, d'avant la 5.165) comptent pour
+  une — la page les atteindrait toutes les deux. Non vu chez lui ; le geste
+  (une seule copie par profil) est déjà dans la consigne.
+- **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
+  (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

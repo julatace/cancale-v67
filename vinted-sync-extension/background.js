@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.174.0';
+const CODE_VERSION = '5.175.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3668,6 +3668,10 @@ const RETRAIT_MAX_J = 45;
 //    annonçait « code récupéré » sur un code qui n'était nulle part). C'est
 //    aussi ce qui prévient l'app (`maj · retrait`) : un seul endroit, quel que
 //    soit le chemin (conversation passive ou `capterRetraits`).
+// Rend `true` (un code neuf, rangé) · `false` (rien de neuf, ou rien à ranger) ·
+// `null` (la base n'a pas répondu ou a refusé : le code lu n'est PAS rangé —
+// relecture croisée de la 5.174 : `capterRetraits` le relit alors à la visite
+// suivante au lieu d'attendre 6 h).
 async function noterRetrait(r, uid) {
   if (!r || !r.tx) return false;
   try {
@@ -3676,7 +3680,7 @@ async function noterRetrait(r, uid) {
     //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
     //    reste. On n'écrit pas.
     //    Ici on perdrait les CODES DE RETRAIT déjà lus dans les conversations.
-    if (rows === null) return false;
+    if (rows === null) return null;
     const cur = (rows[0] && rows[0].data) || {};
     const avant = cur[r.tx];
     // Rien de neuf → aucune écriture (égress, §34).
@@ -3686,11 +3690,11 @@ async function noterRetrait(r, uid) {
     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
     out[r.tx] = r;
     const ok = await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
-    if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return false; }
+    if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return null; }
     noterDiag('retrait_conv_ecrit');
     if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
     return true;
-  } catch (_) { return false; }
+  } catch (_) { return null; }
 }
 
 function resumeCommandes(type, payload) {
@@ -6181,6 +6185,41 @@ async function convDernierMessageId(uid, convId) {
   } catch (_) { return null; }
 }
 
+// ══ UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (relecture croisée de la 5.174) ══════
+// Les lecteurs bornés (`capterRetraits` 6 h, `capterDatesVersement` 24 h,
+// `capterPreuvesVente` 6 h) posaient leur mémo AVANT la requête et ne l'ôtaient
+// jamais : un 429 de Vinted (pause de 15 min), un 401, une coupure réseau, ou une
+// écriture refusée par NOTRE base cachaient la vente 6 ou 24 h. Mesuré (vrai
+// background.js dans un vm, 12 octobre) : 2 ventes lues, 0 rangée, relues
+// seulement à +6 h 06 — pendant que l'écran eBay promettait « à ta prochaine
+// visite », et que le retrait automatique d'eBay ne voyait pas la vente.
+// Ce qu'un échec dit de la suite :
+//   'garder'  — Vinted a JUGÉ cette demande (4xx autre que 401/403/429) : le
+//               délai normal ;
+//   'bref'    — Vinted en panne (5xx) : 30 min, pas 6 h (une transaction cassée
+//               ne mange pas le budget de lecture à chaque visite) ;
+//   'oublier' — rien n'a été jugé (pause, frein 429/403, 401, réseau) : la visite
+//               suivante la relit — la pause, elle, l'empêche avant.
+// (Une réponse 200 sans l'objet attendu est un jugement : le délai normal, posé
+// par l'appelant. Une ÉCRITURE refusée par notre base : l'appelant ôte le mémo
+// et s'arrête — la base refuse, la suivante échouerait aussi.)
+const RELECTURE_BREVE_MS = 30 * 60000;
+function suiteLectureRatee(rep) {
+  if (!rep || rep.pause) return 'oublier';
+  const s = Number(rep.status) || 0;
+  if (!s || s === 401 || freinVinted(s)) return 'oublier';
+  if (s >= 500) return 'bref';
+  return 'garder';
+}
+// Applique la suite au mémo (`cle` → date de l'essai, relu avec `delaiMs`) ;
+// rend `true` quand la boucle doit s'arrêter (Vinted a demandé de ralentir).
+function memoApresEchec(memo, cle, rep, delaiMs) {
+  const suite = suiteLectureRatee(rep);
+  if (suite === 'oublier') delete memo[cle];
+  else if (suite === 'bref') memo[cle] = Date.now() - delaiMs + RELECTURE_BREVE_MS;
+  return !!(rep && (rep.pause || freinVinted(Number(rep.status) || 0)));
+}
+
 const RETRAIT_MAX_PAR_VISITE = 3;
 async function capterRetraits(uid) {
   try {
@@ -6222,11 +6261,13 @@ async function capterRetraits(uid) {
       memo[cid] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); continue; }
+      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); if (memoApresEchec(memo, cid, rep, BORD_RETRY_MS)) break; continue; }
       const r = retraitDeConversation(rep.json);
       if (!r) { noterDiag('retrait_conv_sans_message'); continue; }
       if (!r.tx && tx) r.tx = tx;                                 // identité de l'achat
       const ecrit = await noterRetrait(r, uid);
+      // Code lu mais PAS rangé (notre base) : relu à la visite suivante.
+      if (ecrit === null) { delete memo[cid]; break; }
       if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
@@ -6290,13 +6331,15 @@ async function capterDatesVersement(uid) {
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); continue; }
+      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); if (memoApresEchec(memo, tx, rep, VERSEMENT_RETRY_MS)) break; continue; }
       const t = rep.json.transaction;
       if (!t || typeof t !== 'object') { noterDiag('versement_sans_transaction'); continue; }
       const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
         capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
       const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
-      if (ok === false) { noterDiag('versement_ecriture_ratee'); continue; }
+      // Notre base refuse : la date n'est PAS rangée — relue à la visite suivante
+      // (pas dans 24 h), et on s'arrête (la suivante échouerait aussi).
+      if (ok === false) { noterDiag('versement_ecriture_ratee'); delete memo[tx]; break; }
       if (String(t.status) === '450' && t.status_updated_at) { ecrites++; noterDiag('versement_date_ecrit'); }
       else noterDiag(`versement_statut_${String(t.status).slice(0, 8)}`);
     }
@@ -6317,7 +6360,9 @@ async function capterDatesVersement(uid) {
 // de vente de l'app et de l'extension — rien à changer chez elles.
 // ⚠️ Une réponse qui porte une AUTRE transaction n'est pas rangée sous ce
 //    numéro (on ne fabrique pas une preuve pour la mauvaise vente).
-// Rend `true` si la base l'a RANGÉE.
+// Rend `true` si la base l'a RANGÉE · `false` si ce n'est pas une transaction
+// rangeable (absente, ou une AUTRE) · `null` si NOTRE base a refusé l'écriture
+// (relecture croisée de la 5.174 : la preuve se relit alors à la visite suivante).
 async function rangerTransaction(uid, acc, tx, json, quoi) {
   try {
     const t = json && json.transaction;
@@ -6326,10 +6371,10 @@ async function rangerTransaction(uid, acc, tx, json, quoi) {
     const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
       capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
     const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
-    if (ok === false) { await noterDiag(`${quoi}_txn_ecriture_ratee`); return false; }
+    if (ok === false) { await noterDiag(`${quoi}_txn_ecriture_ratee`); return null; }
     await noterDiag(`${quoi}_txn_rangee`);
     return true;
-  } catch (_) { return false; }
+  } catch (_) { return null; }
 }
 
 // ═══ LA PREUVE DES VENTES EN COURS (5.169, 11 octobre) ═════════════════════
@@ -6379,8 +6424,12 @@ async function capterPreuvesVente(uid) {
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
-      if (!rep || !rep.ok || !rep.json) { await noterDiag(`preuve_refuse_${(rep && rep.status) || 0}`); continue; }
-      if (await rangerTransaction(uid, acc, tx, rep.json, 'preuve')) ecrites++;
+      if (!rep || !rep.ok || !rep.json) { await noterDiag(`preuve_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, PREUVE_RETRY_MS)) break; continue; }
+      const range = await rangerTransaction(uid, acc, tx, rep.json, 'preuve');
+      // Notre base refuse : la preuve n'est PAS rangée — relue à la visite
+      // suivante (et comptée dans la réserve), et on s'arrête.
+      if (range === null) { delete memo[tx]; break; }
+      if (range) ecrites++;
     }
     await chrome.storage.local.set({ vrmPreuveFaits: memo });
     await noterLecturesDues(uid, 'preuve', enCours.filter(aLire).length);
