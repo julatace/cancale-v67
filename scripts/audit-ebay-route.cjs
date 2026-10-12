@@ -1789,6 +1789,24 @@ const RA = {};
     const o9 = await app(JWT_J, { action: 'revise', itemId: '110000000302', quantity: '2' });
     dit(o9.code === 200 && !auCompte(o9.journal).some((x) => x.appel === 'GetItem') && !o9.journal.some((x) => x.ou === 'base' && /ebay_offres/.test(x.corps)), '[R-prix-change] le stock seul ⇒ aucun GetItem, rien n\'est écrit dans ebay_offres');
   });
+  // [R-revise-sans-regle] (tour 4, #10) Un changement de PRIX ne peut pas créer
+  // de règle d'offre. Sur une annonce SANS règle dont la relecture rate, ne
+  // RIEN ranger : « apres-ecriture » (risque) inventerait « eBay tient peut-être
+  // une règle » sous un « ✓ Modifié ». Le risque n'est légitime que s'il y avait
+  // une règle AVANT (elle a pu tomber).
+  await essaie('[R-revise-sans-regle]', async () => {
+    const regleR3 = () => lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' } }, capturedAt: 5 } });
+    avecR(); regleR3(); mode.getitemKoPour = '110000000001';
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70' });
+    const it = (offresDe(J) || {})['110000000001'];
+    dit(o.code === 200 && o.corps.ok === true && !it,
+      '[R-revise-sans-regle] prix changé sur une annonce SANS règle + relecture ratée ⇒ AUCUNE entrée « apres-ecriture » inventée', `entrée=${JSON.stringify(it)}`);
+    avecR(); regleR3(); mode.getitemKoPour = '110000000302';
+    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const it2 = (offresDe(J) || {})['110000000302'];
+    dit(o2.code === 200 && it2 && it2.lu === false && (it2.raison === 'apres-ecriture' || it2.raison === 'incertain'),
+      '[R-revise-sans-regle] à l\'inverse : une annonce À RÈGLE dont la relecture rate RESTE un risque (la règle a pu tomber)', JSON.stringify(it2));
+  });
   // ── [R-concurrence] (11 octobre, revue) DEUX GESTES SUR DEUX CARTES DU MÊME
   // COMPTE qui se croisent. `rangerReglesOffre` lisait la ligne, fusionnait et
   // la réécrivait ENTIÈRE : le second écrit remettait la copie périmée de

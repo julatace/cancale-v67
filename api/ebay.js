@@ -643,7 +643,15 @@ async function handleRevise(b, ctx) {
   }
   if (!prixChange) return { status: 200, body: { ok: true, ack: r.ack } };
   const post = await lireRegleOffre(at.token, itemId);
-  await rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'revise', _force: aRegle } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: aRegle } });
+  // ⚠️ (tour 4, #10) Un changement de PRIX (`ReviseInventoryStatus`) ne peut PAS
+  // créer de règle d'offre. Quand l'annonce n'avait AUCUNE règle avant
+  // (`!aRegle`) et que la relecture qui suit échoue, ne RIEN ranger : écrire
+  // « apres-ecriture » inventerait « eBay tient peut-être une règle » (risque)
+  // sur une annonce qui n'en a jamais eu — une fausse alerte sous un
+  // « ✓ Modifié ». On ne marque « apres-ecriture » (relecture ratée, la règle a
+  // pu tomber) que s'il y avait une règle connue AVANT.
+  if (post.ok) await rangerReglesOffre(ctx, { [itemId]: { ...post.lecture, par: 'revise', _force: aRegle } });
+  else if (aRegle) await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: true } });
   return { status: 200, body: { ok: true, ack: r.ack, avertissements: r.avertissements, erreurs: r.erreurs,
     regle: {
       lecture: post.ok ? post.lecture : null,

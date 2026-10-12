@@ -596,7 +596,16 @@ async function finPage(pg, errs, quoi) {
         dit(e[A.A2].etat === 'pas-su' && !/✓/.test(info), `[8] ${T} non relu : « pas su », aucun ✓`, `${e[A.A2].etat} · ${info}`);
         await ouvrirPanneau(pg, A.A2); await saisir(pg, A.A2, 'accepte', '81'); await poser(pg, A.A2);
         info = await pg.$eval(`[data-ebay-info="${A.A2}"]`, (x) => x.innerText).catch(() => ''); e = await etats(pg);
-        dit(e[A.A2].etat === 'connue' && /VRM n'a pas pu le noter/.test(info), `[8] ${T} posée mais pas notée : « connue » ET la note « VRM n'a pas pu le noter »`, info);
+        // (tour 4, #11) eBay a posé la règle mais VRM n'a pas pu la NOTER
+        // (range:false) : la carte ne doit PAS dire « connue » (la base ne la
+        // porte pas, un rechargement la perdrait et la carte n'a aucun bouton
+        // pour la relire). Elle reste « pas su » re-lisible, la note renvoie
+        // « plus haut », et le bouton « Relire chez eBay » de la ligne du haut
+        // existe vraiment — le geste cité devient réel (il la reprend et la
+        // persiste).
+        const relireCount = await pg.locator('[data-regles-relire]').count();
+        dit(e[A.A2].etat === 'pas-su' && e[A.A2].raison === 'apres-ecriture' && /VRM n'a pas pu le noter/.test(info) && /plus haut/.test(info) && relireCount >= 1,
+          `[8] ${T} posée mais pas notée (#11) : carte « pas su » re-lisible (jamais « connue »), note « plus haut », et le bouton « Relire chez eBay » existe`, `${e[A.A2].etat}/${e[A.A2].raison} · relire=${relireCount} · ${info}`);
         await ctx.close();
       });
       if (bloc(8)) await essaie(`[8] ${T} relu, offres activées ou non pas montré`, async () => {
@@ -1264,6 +1273,54 @@ async function finPage(pg, errs, quoi) {
         dit(syncs.includes('{"action":"sync"}') && e && e.etat === 'connue' && e.accepte === '70.00',
           `[16] ${T} une programmée partie avec sa règle (70 €) : l'écran relit la liste du compte, l'annonce apparaît, sa règle lue (connue, 70 €) — elle n'est plus invisible nulle part`, `syncs ${JSON.stringify(syncs)} · ${JSON.stringify(e && { etat: e.etat, accepte: e.accepte })}`);
         await finPage(pg, errs, `[16] ${T} programmée partie`);
+        await ctx.close();
+      });
+
+      // ── 18. TOUR 4 — #7 (relire lève « prix changé »), #9 (offres déjà
+      //      faites portées en offres-inconnues, lien dans le lot) ───────────
+      if (bloc(18)) await essaie(`[18] ${T} relire lève « prix changé » quand la liste est en retard (#7)`, async () => {
+        // La liste porte 80 € ; la règle a été relue à 75 € (« Baisser sur
+        // eBay » a baissé le prix chez eBay sans réécrire la liste). Avant,
+        // « Relire chez eBay » re-lisait la règle mais gardait le prix de la
+        // LISTE : « prix changé » revenait sans fin. Le prix relu suit désormais.
+        const { ctx, pg } = await ouvrir(b, vp, {
+          offresP: (o) => { o[A.A1] = entree({ offresActives: true, accepte: 72, refuse: null, prix: 75, lueA: Date.now() }); },
+          ebay: (st) => { st[A.A1].prix = 75; st[A.A1].regle = { offresActives: true, accepte: 72, refuse: null, offresFaites: null }; },
+        });
+        await allerAnnonces(pg);
+        const e0 = (await etats(pg))[A.A1];
+        const n0 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        await pg.click('[data-regles-relire]'); await finRelire(pg, n0);
+        await pg.waitForTimeout(300);
+        const e1 = (await etats(pg))[A.A1];
+        dit(e0 && e0.etat === 'pas-su' && e0.raison === 'prix-change' && e1 && e1.etat === 'connue' && e1.accepte === '72.00',
+          `[18] ${T} liste à 80 €, règle relue à 75 € : « prix changé » AVANT, « Relire chez eBay » le LÈVE (le prix relu suit, carte « connue » 72 €)`, `avant ${e0 && e0.raison} · après ${e1 && e1.etat}/${e1 && e1.accepte}`);
+        await ctx.close();
+      });
+      if (bloc(18)) await essaie(`[18] ${T} offres-inconnues : « N offres déjà faites » dans le panneau (#9.2)`, async () => {
+        // Seuil relu, activation inconnue, ET 3 offres déjà faites : la branche
+        // « offres-inconnues » d'etatRegleOffre ne portait pas `offresFaites`,
+        // donc le panneau ne prévenait pas qu'une offre en attente peut être
+        // acceptée dès la pose.
+        const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A1] = entree({ offresActives: null, accepte: 72, refuse: null, prix: 80, offresFaites: 3 }); } });
+        await allerAnnonces(pg);
+        const e = (await etats(pg))[A.A1];
+        await ouvrirPanneau(pg, A.A1);
+        const nf = await pg.$eval(`[data-regle-panneau="${A.A1}"] [data-regle-offres-faites]`, (x) => x.getAttribute('data-regle-offres-faites')).catch(() => null);
+        dit(e && e.raison === 'offres-inconnues' && nf === '3',
+          `[18] ${T} offres-inconnues (seuil relu, activation inconnue) + 3 offres déjà faites : le panneau le dit (offresFaites porté)`, `${e && e.raison} · offres-faites=${nf}`);
+        await ctx.close();
+      });
+      if (bloc(18)) await essaie(`[18] ${T} lot : « regarde-la sur eBay » porte son lien (#9.3)`, async () => {
+        // Une annonce « seuil lu, offres inconnues » dans « Une règle pour
+        // toutes » : la ligne du lot disait « regarde-la sur eBay » sans lien
+        // (la carte, elle, l'avait).
+        const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A1] = entree({ offresActives: null, accepte: 72, refuse: null, prix: 80 }); } });
+        await allerAnnonces(pg); await ouvrirToutes(pg, 90);
+        const st = await pg.$eval(`[data-regles-ligne="${A.A1}"]`, (x) => x.getAttribute('data-regles-statut')).catch(() => null);
+        const lien = await pg.$eval(`[data-regles-ligne="${A.A1}"] [data-regles-lot-voir-ebay]`, (x) => x.getAttribute('href')).catch(() => null);
+        dit(st === 'a-voir-ebay' && lien && lien.includes('/itm/' + A.A1),
+          `[18] ${T} lot : une annonce « seuil lu, offres inconnues » porte son lien « Voir sur eBay »`, `statut=${st} · lien=${lien}`);
         await ctx.close();
       });
 

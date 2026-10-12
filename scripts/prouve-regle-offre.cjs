@@ -86,6 +86,10 @@ const MUTATIONS = [
   // (tour 4 #2) l'annonce retrouvée par SKU au second essai (409 « deja-* ») ne
   //   range plus sa règle : `rangerRetrouvee` redevient un no-op.
   ['retrouvee-non-rangee', API, "  if (!it.regleOffre || !/^deja-/.test(String(body.reason || '')) || !ID_EBAY.test(id)) return;", "  return;", ['R-retrouvee']],
+  // (tour 4 #10) un changement de PRIX sur une annonce SANS règle, relecture
+  //   ratée, range de nouveau « apres-ecriture » (fausse alerte « peut-être une
+  //   règle ») : le correctif qui ne range qu'en présence d'une règle est annulé.
+  ['revise-invente-regle', API, "  if (post.ok) await rangerReglesOffre(ctx, { [itemId]: { ...post.lecture, par: 'revise', _force: aRegle } });\n  else if (aRegle) await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: true } });", "  await rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'revise', _force: aRegle } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: aRegle } });", ['R-revise-sans-regle']],
   // retirer une annonce laisse sa règle rangée (la déconnexion la compte encore).
   ['retirer-garde-regle', API, "  // n'a plus de règle qu'eBay applique.\n  const regles = await sortirDesRegles(itemId, ctx);", "  // n'a plus de règle qu'eBay applique.\n  const regles = true;", ['R-retire-regle']],
   // « Relire chez eBay » ne sort plus la règle d'une annonce qu'eBay ne montre plus.

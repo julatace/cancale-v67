@@ -137,6 +137,15 @@ const SC_REGLE = {
   annonces: [],
   brouillons: () => { const o = brouillonsDe([['b-22', 22, 7022, 3], ['b-23', 23, 7023, 2], ['b-24', 24, 7024, 1]])(); o['b-22'].offreAccepte = '70'; o['b-23'].offreAccepte = '30'; return o; },
 };
+// ── Tour 4, #8 : une programmée « tout de suite » avec une règle qu'eBay a
+//    activée SANS garder le montant (`offre.verifie:false`). Le bilan du
+//    planificateur devait le DIRE (il se taisait, juste après une feuille qui
+//    annonçait « dès 70 € »).
+const SC_REGLE_NON_GARDEE = {
+  annonces: [],
+  brouillons: () => { const o = brouillonsDe([['b-22', 22, 7022, 3], ['b-23', 23, 7023, 2], ['b-24', 24, 7024, 1]])(); o['b-22'].offreAccepte = '70'; return o; },
+  programmer: (body, num) => (num === '22' ? { body: { ok: true, itemId: '11000090' + num, sku: 'VRM-' + num, demande: body.scheduleTime || '', debut: body.scheduleTime || null, fin: null, enLigneMaintenant: !body.scheduleTime, frais: { total: 0.2 }, offre: { envoyee: { accepte: 70, refuse: null }, verifie: false, lecture: { lu: true, offresActives: true, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() }, range: true } } } : null),
+};
 
 let rows = [], progEbay = [], envois = [], ecritures = [], lectures = [], essais = {}, prochainId = 110000000801;
 // La ligne des brouillons ne répond plus (la base debout par ailleurs) : le cas
@@ -699,6 +708,32 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         const po = await pg.$$eval('[data-programmee-offre]', (els) => els.map((e) => e.getAttribute('data-programmee-offre')));
         dit(JSON.stringify(po) === '["70.00"]', 'la programmée issue du brouillon dit la règle envoyée (`data-programmee-offre="70.00"`)', JSON.stringify(po));
         await photo(pg, '[data-ebay-programmees]', 'ebay-programmees-regle-1512');
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+    // ── Tour 4, #8 : le bilan dit ce qu'eBay a fait de la RÈGLE ───────────────
+    console.log('── #8 : le bilan du planificateur dit ce qu\'eBay a fait de la règle (1512 px)');
+    {
+      remettre(SC_REGLE_NON_GARDEE);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { horloge: SOIR });
+      await essaie('#8 bilan règle', async () => {
+        await versAnnonces(pg);
+        await pg.click('[data-brouillons-tout]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif]', { timeout: 5000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-planif-ventes-en-cours]'), null, { timeout: 10000 }).catch(() => {});
+        await pg.waitForFunction(() => document.querySelectorAll('[data-planif-ligne]').length === 3, null, { timeout: 8000 });
+        await pg.click('[data-planif-verifier]');
+        await pg.waitForFunction(() => document.querySelectorAll('[data-planif-frais]').length === 3, null, { timeout: 15000 });
+        await pg.locator('[data-planif-compris]').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+        await pg.check('[data-planif-compris]');
+        await pg.click('[data-planif-confirmer]');
+        await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click({ timeout: 5000 });
+        await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
+        const reg = await pg.$eval('[data-planif-regle]', (e) => e.innerText).catch(() => '');
+        dit(/activé les offres mais n'a pas gardé le montant/.test(reg),
+          '#8 eBay a activé les offres mais pas gardé le montant (verifie:false) : le bilan du planificateur le DIT (il se taisait, après une feuille « dès 70 € »)', reg.replace(/\s+/g, ' ').slice(0, 200));
         dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       });
       await ctx.close();
