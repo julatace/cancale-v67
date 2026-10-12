@@ -70,3 +70,29 @@ soit mergée dans `main` avant sa première mise en ligne.
 tant que la 5.175 n'était pas dans `main` — c'est fait).
 
 ### Étape C — migration 014 (K3) : EN COURS
+
+### Étape C — migration 014 : revue + fichier en ligne ✅ ; APPLICATION DIFFÉRÉE
+- `git merge passation2/k3-014` (9df8061) : propre, 4 fichiers (migration,
+  `essai-annule.cjs`, `audit-agent-sql.cjs`, section CLAUDE.md). Inerte
+  (`agent_ebay='0'`).
+- Revue (C.1) : **`audit-agent-sql` 221 contrôles, 0 rouge** (Postgres jetable
+  embarqué — il tourne dans ce conteneur sans Postgres système). Couvre les
+  classes nommées : sérialisation effacement↔écrivains (verrou consultatif),
+  bails bornés (pas de gel 33 h), garde d'isolation (REPEATABLE READ refusé),
+  « Fermer mon compte » pas « fait » sur porte ouverte, droit manquant ≠ échec
+  de purge. **Revue par UN agent** (pas le panel de 4) s'appuyant sur ces
+  contrôles + lecture du diff. Les défauts de revue 2 étaient déjà corrigés.
+- Build vert, **92 audits verts** (`audit-renum-b` sauté : 5 min Postgres, non
+  concerné).
+- **PR #477 → `main` mergée** (`ac37a2a`). Fichier corrigé en ligne, INERTE.
+- ⚠️⚠️ **PAS appliquée à la base de production** : cette session n'a **aucun
+  outil SQL Supabase** (pas de connecteur, pas de clé). L'essai-annulé (C.3) et
+  l'application (C.4) attendent une session qui a `execute_sql` sur le projet
+  `lgonxzrzjcqthjtbdpzo`. Rien n'est faké. `vrm_reglages.agent_ebay` reste '0'
+  tant que non appliquée — donc aucun effet, aucun risque en l'état.
+
+### Étape D — règle d'offre eBay : EN COURS
+- Base : `passation2/regle-offre` (`00a9d92`, revue tour 3). Tour 4 :
+  6 confirmés (0,2,3,4,5,6) à corriger, 5 à juger (7-11), #1 rejeté (laissé).
+- Fusion dans l'intégration = gros conflit attendu (branche partie de `cdc9c1d`,
+  avant 013 / preuve-vente / relecture croisée).
