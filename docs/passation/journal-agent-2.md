@@ -144,3 +144,37 @@ Mesuré sur `origin/main` (vrai worktree git) à mon démarrage, AVANT mon étap
   **connexion de l'extension / 5.175** (EXT_CAPACITES.liaison dans App.jsx +
   `scripts/_versions-publiees.cjs`). Je n'y touche pas (risque de conflit avec
   ta lane). À corriger côté 5.175, car ça touche Julien à l'installation.
+
+### Étape G — fonctions retenues par Julien (11 oct), groupe « Argent et stock »
+
+#### 1 · Prix d'achat au numérotage (TERMINÉE ✅)
+Julien (§2 retenu le 11 oct) : « prix d'achat au numérotage ». Mesuré avant de
+coder : §« prix d'achat » du dossier dit que **8 paires sur 401** seulement ont
+un prix d'achat saisi, et qu'il n'existe **aucun pont automatique** paire↔achat
+(il les saisit lui-même, §2.5). Le bon moment pour le lui demander, c'est quand
+il a la paire en main — **au numérotage**.
+- `demanderPrixAchat(item, numeroPose)` (juste avant `poserNumero`) : une modale
+  `askText` « Prix d'achat de la N°… ? », facultative (« Plus tard »), qui
+  **n'écrase jamais** un prix déjà saisi (`buyOf != null`) ni un achat déjà relié
+  (`e.buyFromId`). Même écriture que le champ « achat » de la carte
+  (`updatePair { buyPrice, buyFromId:null, buyFrom:null }` — un prix à la main
+  n'est pas « relié à un achat »). On ne devine RIEN (§5) : s'il ne le tape pas,
+  rien n'est écrit.
+- Branchée sur les **4 chemins de succès** de `poserNumero` (pose propre,
+  même-paire confirmée, « prendre le prochain » après collision présente,
+  « non — numéro neuf » après collision d'archive). ⚠️ **PAS** sur la reprise
+  `meme` (la paire revient : elle **hérite** du `buyPrice` de l'ancienne fiche,
+  lui redemander l'effacerait).
+- **Preuves** : `npm run build` vert ; banc `annonces-carte.cjs` — deux contrôles
+  neufs (la feuille s'ouvre tout de suite sur une paire sans prix ; la saisie
+  écrit « achat 18,00 € »), **verts aux deux tailles**, et **4 rouges sous
+  mutation** (`demanderPrixAchat` no-op, après rebuild — le banc sert `dist/`).
+- **Deux audits suivaient l'orthographe, corrigés (règle, pas orthographe)** :
+  `audit-identite.cjs` (regex d'ordre de collision assoupli pour tolérer l'appel
+  ajouté — toujours rouge si la garde `!autres.length` saute) et
+  `audit-numerotation-lecteurs.cjs` (délimiteur `corps()` de `poserNumero` passé
+  à `const buyOf = (o) =>`, repère stable qui borne la fonction entière — rouge
+  si `manuelAt` disparaît de `poserNumero`). 29ᵉ et 30ᵉ « cri au loup ».
+- Passe d'audits : seul `audit-planchers-code.cjs` rouge (pré-existant, domaine
+  Agent 1, EXT_CAPACITES.liaison/5.175 — pas touché). `audit-photos-vinted` est
+  repassé vert entre-temps.
