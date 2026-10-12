@@ -8161,6 +8161,9 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
   et `noterRetrait` rendent `null` pour « pas rangé », `false` pour « rien à
   ranger »). La vente reste comptée dans `noterLecturesDues` : la réserve de
   lecture tient. Extension **5.175.0** (CODE_VERSION, EXT_ATTENDUE, zip).
+  ⚠️ `audit-evt-extension.cjs` exigeait l'orthographe `noterRetrait(...) === false`
+  sur une écriture refusée : il juge maintenant la règle (jamais « écrit », l'app
+  pas prévenue) et la nouvelle distinction (`null` ≠ `false`).
 - **eBay → Annonces, « vente pas encore reliée »** : « ou génère son bordereau
   (bouton ci-dessous) » s'écrivait au-dessus d'un bouton GRISÉ — et avec deux
   extensions, le même paragraphe disait « je n'en envoie aucune ». Le bouton et

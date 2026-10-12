@@ -209,7 +209,11 @@ const retrait = (code) => ({ tx: TX, item: '5550001', titre: 'Paire essai', phot
     const a = faireCtx({ ecriture: (ids) => (ids.includes('panel_colis_relais') ? 522 : 201) });
     const r = await a.ctx.noterRetrait(retrait('C22222'), UID);
     await attendre(20);
-    dit(r === false && a.evts('retrait').length === 0, "la base refuse le code : noterRetrait ne dit pas « écrit » et l'app n'est PAS prévenue", `rendu ${r} · ${JSON.stringify(a.j.evts)}`);
+    // (relecture croisée de la 5.174) « pas rangé » (`null`) se distingue de
+    // « rien de neuf » (`false`, ci-dessus) : `capterRetraits` relit alors la
+    // conversation à la visite suivante au lieu d'attendre 6 h. La règle reste :
+    // jamais « écrit », et l'app n'est pas prévenue.
+    dit(r !== true && r === null && a.evts('retrait').length === 0, "la base refuse le code : noterRetrait ne dit pas « écrit » (il dit « pas rangé », distinct de « rien de neuf ») et l'app n'est PAS prévenue", `rendu ${r} · ${JSON.stringify(a.j.evts)}`);
   });
   await essaie('retrait · conversation passive', async () => {
     const a = faireCtx();
