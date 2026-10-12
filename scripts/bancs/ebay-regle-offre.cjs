@@ -1266,6 +1266,53 @@ async function finPage(pg, errs, quoi) {
         await finPage(pg, errs, `[16] ${T} programmée partie`);
         await ctx.close();
       });
+
+      // ── 17. DEVISE ÉTRANGÈRE (#4/#6) ────────────────────────────────────
+      // VRM ne POSE pas de règle en devise (la route refuse une feuille en
+      // euros) : la carte ne propose donc JAMAIS « Définir ». Mais une règle
+      // qu'eBay TIENT en USD (offres activées + seuil) ENGAGE — eBay vend seul —
+      // et doit compter dans « ce que ça engage ». Avant (00a9d92) : la carte
+      // offrait « Définir » (feuille € refusée ensuite) et la règle active ne
+      // comptait nulle part.
+      const usd = (o) => { o[A.A7] = entree({ devise: 'USD', offresActives: true, accepte: 72, refuse: null, prix: 50, offresFaites: 0, lueA: Date.now() }); };
+      if (bloc(17)) await essaie(`[17] ${T} règle active en USD : comptée, jamais « Définir »`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, { offresP: usd });
+        await allerAnnonces(pg);
+        const e = (await etats(pg))[A.A7];
+        const c = carte(pg, A.A7);
+        const nOuvrir = await c.locator('[data-regle-ouvrir]').count();
+        const nModifier = await c.locator('[data-regle-modifier]').count();
+        const nDev = await c.locator('[data-regle-devise]').count();
+        const txtDev = nDev ? await c.locator('[data-regle-devise]').first().innerText() : '';
+        dit(e && e.etat === 'pas-su' && e.raison === 'devise' && nOuvrir === 0 && nModifier === 0 && nDev === 1,
+          `[17] ${T} A7 en USD, règle active : « pas su/devise », AUCUN bouton « Définir »/« Modifier », une phrase devise à la place`,
+          JSON.stringify({ etat: e && e.etat, raison: e && e.raison, ouvrir: nOuvrir, modifier: nModifier, devise: nDev }));
+        dit(/eBay/i.test(txtDev) && /applique une|vendre seul/i.test(txtDev),
+          `[17] ${T} la phrase dit qu'eBay y applique une règle (il peut vendre seul)`, txtDev);
+        const eng = await pg.$$eval('[data-regles-engagement]', (l) => l.map((e) => e.getAttribute('data-regles-engagement')));
+        dit(eng.length === 1 && eng[0] === '4',
+          `[17] ${T} « ce que ça engage » compte 4 (A1, A5, A6 + la règle USD d'A7) — une règle qu'eBay tient en devise n'est pas invisible`, JSON.stringify(eng));
+        await finPage(pg, errs, `[17] ${T} USD active`);
+        await ctx.close();
+      });
+      if (bloc(17)) await essaie(`[17] ${T} USD sans règle : pas « Définir » non plus, pas comptée`, async () => {
+        // Témoin : A7 en USD mais SANS règle. La carte ne propose toujours pas
+        // « Définir » (la route refuserait la feuille €), et rien n'est compté.
+        const { ctx, pg, errs } = await ouvrir(b, vp, { offresP: (o) => { o[A.A7] = entree({ devise: 'USD', offresActives: false, accepte: null, refuse: null, prix: 50 }); } });
+        await allerAnnonces(pg);
+        const c = carte(pg, A.A7);
+        const nOuvrir = await c.locator('[data-regle-ouvrir]').count();
+        const nDev = await c.locator('[data-regle-devise]').count();
+        const txtDev = nDev ? await c.locator('[data-regle-devise]').first().innerText() : '';
+        dit(nOuvrir === 0 && nDev === 1 && !/applique une/i.test(txtDev),
+          `[17] ${T} A7 en USD sans règle : toujours aucun « Définir », la phrase ne prétend aucune règle active`,
+          JSON.stringify({ ouvrir: nOuvrir, devise: nDev, txt: txtDev }));
+        const eng = await pg.$$eval('[data-regles-engagement]', (l) => l.map((e) => e.getAttribute('data-regles-engagement')));
+        dit(eng.length === 1 && eng[0] === '3',
+          `[17] ${T} « ce que ça engage » reste à 3 (A1, A5, A6) — une annonce USD sans règle n'ajoute rien`, JSON.stringify(eng));
+        await finPage(pg, errs, `[17] ${T} USD sans règle`);
+        await ctx.close();
+      });
     }
   } catch (e) { dit(false, 'le banc', String((e && e.message) || e).split('\n')[0]); }
   finally { if (b) await b.close().catch(() => {}); srv.close(); }

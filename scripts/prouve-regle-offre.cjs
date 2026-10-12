@@ -84,7 +84,10 @@ const MUTATIONS = [
   // « Relire chez eBay » ne sort plus la règle d'une annonce qu'eBay ne montre plus.
   ['lire-sans-garder', API, '  const garder = L.complet ? { ids: aMoi, a: tListe } : null;', '  const garder = null;', ['R-lire-absente']],
   // (app) « règle active » redevient « connue » seule (le filtre brut d'avant).
-  ['engage-connue-seule', APP, "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));", "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : null));", ['R-engage']],
+  ['engage-connue-seule', APP, "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' || (e.etat === 'pas-su' && e.active === true) ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));", "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : null));", ['R-engage']],
+  // (app, tour 4 #4/#6) la branche devise redevient « rien » (risque:false, pas
+  //   d'`active`) : une règle qu'eBay TIENT en USD ne compterait plus nulle part.
+  ['devise-rien', APP, "    const active = avaitRegle && e.offresActives === true;\n    return { etat: 'pas-su', raison: 'devise', devise: e.devise, active, risque: avaitRegle && e.offresActives == null, accepte: avaitRegle ? Number(e.accepte) : null, refuse: e.refuse == null ? null : Number(e.refuse), offresActives: e.offresActives, lu: { accepte: avaitRegle ? Number(e.accepte) : null, refuse: e.refuse == null ? null : Number(e.refuse) } };", "    return { etat: 'pas-su', raison: 'devise', risque: false };", ['R-engage']],
   // (app) une règle d'annonce terminée compte de nouveau (la liste n'est plus lue).
   ['engage-sans-liste', APP, '      if (filtre && !prix.has(id) && (Number(e.lueA) || 0) < Number(c.cap) - 10 * 60000) continue;\n', '', ['R-engage']],
   // (app) « ✓ … reste à » sur un seuil relu, offres activées ou non pas montré.
