@@ -6231,6 +6231,114 @@ DEPUIS elle, §6.1), vert après, rouge sous une mutation qui réaffaiblit le co
   sur l'horloge d'UNE instance Vercel — deux instances aux horloges décalées de
   plus que la durée d'une pose pourraient encore se croiser.
 
+#### Revue du 11 octobre, tour 3 — douze défauts signalés, douze reproduits, corrigés
+Même méthode, sur c4fa405 : chaque défaut REPRODUIT (la vraie route dans le
+harnais d'`audit-ebay-route`, l'app rendue sur données inventées), corrigé à la
+racine, rouge sur c4fa405 (copie `git archive`, contrôle lancé DEPUIS elle,
+§6.1), vert après, rouge sous une mutation qui réaffaiblit le correctif.
+- ⚠️⚠️ **Une règle qu'eBay tient PEUT-ÊTRE n'était comptée NULLE PART** (n° 1 et
+  n° 6, une cause). Cinq lecteurs jugeaient « règle active » chacun à sa façon
+  (`offresActives === true` sur la ligne BRUTE, ou `etat === 'connue'`) : un seuil
+  relu sans l'état des offres, une pose incertaine, en cours, ou posée mais pas
+  relue — même quand eBay avait répondu « Success » — n'entraient ni dans la
+  relecture des ventes eBay à l'ouverture, ni dans « ce que ça engage », ni dans
+  la déconnexion du compte eBay, ni dans « Fermer mon compte » : **eBay pouvait
+  vendre au seuil sans que VRM relise rien ni le dise**. Et, dans l'autre sens,
+  la ligne brute comptait des annonces TERMINÉES et des prix changés : l'écran
+  disait « 2 actives + 1 peut-être », la feuille de déconnexion « 4 ».
+  ⇒ UNE règle (§11) : `regleEngage` (`'oui'` = connue · `'peut-etre'` = « pas su »
+  AVEC risque, `etatRegleOffre` · `null`) et `reglesEngagees(parCompte)`, lues par
+  la relecture des ventes, le bloc « ce que ça engage » (« 0 connue · 1
+  peut-être », avec le geste), l'alerte « vendue sur Vinted — encore en vente sur
+  eBay » (« elle a PEUT-ÊTRE une règle d'offre »), `compterReglesEbay`
+  (déconnexion, fermeture : `{oui, peutEtre}`, les deux dits). Une entrée dont
+  l'annonce n'est ni en ligne ni programmée sur des listes COMPLÈTES lues après
+  elle (10 min de marge) ne compte plus ; listes illisibles ⇒ elle compte (« pas
+  su » ne cache rien) ; le prix de la liste juge « prix changé ».
+  ⇒ Côté route, une annonce terminée SORT des règles rangées : « Retirer d'eBay »
+  et l'annulation vérifiée d'une programmation (`sortirDesRegles`,
+  compare-et-échange : une lecture ratée n'écrit rien, la réponse dit `regles`),
+  et « Relire chez eBay » sur une liste complète (`garder = {ids, a: heure de la
+  liste}`, la règle de la synchro du tour 2).
+- ⚠️⚠️ **Une annonce PROGRAMMÉE avec sa règle n'était jamais rangée ni relue**
+  (n° 2) — même mise en ligne « Maintenant » : partie, elle sortait des
+  programmées sans entrer dans Annonces, et le seuil que VRM venait d'envoyer
+  n'était plus visible nulle part. ⇒ `rangerRegleProgrammee` (route) : en ligne
+  maintenant (pas d'heure, ou eBay a ignoré l'heure) ⇒ relue et rangée comme une
+  publication (`par: 'programmation'`) ; pour plus tard ⇒ rangée `programmee`
+  avec ce qui a été ENVOYÉ (un risque : « peut-être », « Relire chez eBay ») ; le
+  doublon 488 (premier essai resté sans réponse) la range aussi. Côté app, une
+  programmée qu'eBay dit partie mais que la liste ne porte pas encore fait relire
+  le compte (une synchro, une fois par annonce et par ouverture).
+- **« Retirer la règle » manquait sur une paire bloquée** (vendue, en vente sur
+  deux comptes) quand la règle n'était que « peut-être » (n° 3) : le bouton
+  suit `regleEngage`, plus `etat === 'connue'`.
+- **Les confirmations ne disaient pas toutes la même conséquence** : la feuille
+  du lot ne disait pas qu'une offre déjà faite peut être acceptée dès la pose
+  (n° 4 — `texteOffresDejaFaites`, une phrase pour la carte et le lot), celle du
+  planificateur ne disait pas qu'une offre acceptée VEND la paire (n° 5 — la
+  forme exigée par la décision du 9 octobre ; `OFFRE_VEND_LA_PAIRE`, une
+  conséquence pour la carte, le lot, la publication et le planificateur).
+- **Trois phrases ne venaient pas de la source de la carte** (§5) : « ✓ Prix
+  changé — ta règle reste à 72 € » en couleur de texte sous une carte « pas su »
+  ou « aucune » sur la même lecture (n° 7 — `regleApresPrix` passe par
+  `etatRegleOffre`) ; la publication écrivait « pas encore relue » sur un seuil
+  relu (n° 8 — `messageOffreCreation` passe par `resultatRegleOffre`, la route
+  rend `range`) ; le lot écrivait « ✓ réglée » sur une règle qu'eBay a posée et
+  que VRM n'a pas pu noter (n° 12 — `nonNote`, en ambre, comme la carte).
+- **« Pas sur ce compte » était AVALÉ par « Relire chez eBay »** (n° 9) : eBay
+  disait, sur sa liste complète, que l'annonce n'y était plus — la carte restait
+  « en ligne », la ligne du haut « jamais lue », et Relire renvoyait la même
+  relecture sans fin. ⇒ La carte le porte, l'écran le dit, relit la LISTE du
+  compte (une synchro) ; `pas-sur-ce-compte` rejoint `PAS_SU_SANS_RELECTURE`.
+- **Chaque « pas su » avec SON geste, et seulement le sien** (n° 10, n° 11) :
+  deux annonces « seuil relu, offres activées ou non pas montré » avaient deux
+  cartes identiques à « jamais lue », sans lien ⇒ la carte dit le seuil MONTRÉ
+  par eBay et porte SON lien, la ligne du haut nomme chacune avec son lien.
+  « Relire chez eBay » était proposé pour une autre devise et pour NOTRE lecture
+  ratée, et le lot proposait « Relire ces 9 annonces chez eBay », un bouton qui
+  n'envoyait rien ⇒ autre devise : dite, sans geste ; notre lecture ratée :
+  « Réessayer » (relit VRM, rien ne part chez eBay) ; le lot dit « règle actuelle
+  pas lisible dans VRM — rien n'est remplacé à l'aveugle ».
+- ⚠️ **`[R-course]` tombait une fois sur plusieurs dizaines** : le faux eBay
+  servait la pose et la lecture tenue dans la MÊME milliseconde, et deux `lueA`
+  égaux ne s'ordonnent pas. Le contrôle attend 3 ms (la route ne change pas) —
+  sur la vraie horloge, une lecture qui part avant une pose et une pose ne
+  partagent pas leur milliseconde.
+- **Preuves** : `audit-ebay-route.cjs` **393 contrôles** (+15 : `[R-prog-regle]`,
+  `[R-retire-regle]`, `[R-lire-absente]`, `[R-engage]`, `[R-apres-prix]`,
+  `[R-publie-offre]` — les deux derniers exécutent les règles de l'APP dans un
+  `vm`) : **10 rouges sur c4fa405**, 0 après ; `prouve-regle-offre.cjs` : 7
+  mutations nouvelles (route : `prog-non-rangee`, `retirer-garde-regle`,
+  `lire-sans-garder` ; app : `engage-connue-seule`, `engage-sans-liste`,
+  `apres-prix-brut`, `publie-sans-lecture`), chacune rouge sur SON contrôle — **33 sur 33** au total (28 mutations ; le XML
+  sans règle toujours identique, 12 048 caractères).
+  ⚠️ Le premier jet d'`apres-prix-brut` était VERT : il ne retirait que la
+  ligne « offres activées ou non », et la ligne suivante disait déjà ambre — la
+  mutation neutralise maintenant la règle elle-même (l'état forcé à « connue »).
+  Banc `ebay-regle-offre.cjs` bloc **16** (nouveau) et blocs 2 et 13 révisés :
+  **21 rouges sur le build de c4fa405** (47 contrôles à 1512 px) ; en entier,
+  **342 contrôles, 0 rouge** aux deux tailles.
+  `prouve-banc-regle-offre.cjs` : 13 mutations nouvelles, dont deux qui visent
+  un AUTRE banc (`planif-vend` → `ebay-programmer`, `publie-pas-relue` →
+  `ebay-form` : il les lance tels quels et exige le contrôle visé), relancées une
+  par une : **13 rouges sur 13**, chacune sur SON contrôle. ⚠️ Le premier jet de
+  `devise-relire` exigeait le premier contrôle de l'essai — vert sous la mutation
+  (le clic n'envoie qu'A4 dans les deux cas) : c'est « il ne reste que la
+  devise : plus de « Relire chez eBay » » qui l'attrape.
+  `ebay-programmer` et `ebay-form` : +1 contrôle chacun, **1 rouge** chacun sur
+  le build de c4fa405. Les 83 audits verts (`audit-renum-b` sauté) ; bancs eBay
+  un par un (ports 4791-4796) : `ebay-annonces` (92), `ebay-programmer` (110),
+  `ebay-form` (45), `ebay-comptes` (54), `annonces-carte` (60), `ebay-api`,
+  `ebay-write`, `ebay-callback`, `ebay-deletion` verts. ⚠️ Lancés pendant les
+  audits, `annonces-carte` (« les cas « règle d'offre » se déroulent », un clic
+  à 4 s) et `audit-pont-session` (« il ne s'annonce qu'une fois » : 2 `ready`,
+  extension intouchée) sont tombés une fois — relancés SEULS, verts.
+- **Non mesuré** : ce qu'eBay répond à `GetItem` sur une annonce programmée pas
+  encore partie (elle n'est pas relue avant son départ — la synchro qui suit la
+  relit) ; ce qu'il rend quand une programmée part sans que la liste la porte
+  encore (servi par le faux de l'audit et du banc).
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

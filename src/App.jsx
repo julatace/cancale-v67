@@ -9515,7 +9515,10 @@ function etatRegleOffre(it, regles, illisibles, maintenant) {
   if (illisibles && (illisibles.has(ref) || illisibles.has('*'))) return { etat: 'pas-su', raison: 'illisible', risque: false };
   const e = regles && regles.get(ref + ':' + String(it && it.itemId));
   if (!e) return { etat: 'pas-su', raison: 'jamais', risque: false };
-  if (e.lu !== true) { const r = e.raison || 'lecture-ratee'; return { etat: 'pas-su', raison: r, risque: r === 'incertain' || r === 'apres-ecriture' || r === 'en-cours' }; }
+  // (11 octobre, revue — tour 3) « programmee » : la règle est partie avec une
+  // annonce programmée (rangée par la route, pas encore relue) — eBay la tiendra
+  // dès la mise en ligne : un risque, comme une écriture pas relue.
+  if (e.lu !== true) { const r = e.raison || 'lecture-ratee'; return { etat: 'pas-su', raison: r, risque: r === 'incertain' || r === 'apres-ecriture' || r === 'en-cours' || r === 'programmee' }; }
   const avaitRegle = e.accepte != null;
   if (e.devise && e.devise !== 'EUR') return { etat: 'pas-su', raison: 'devise', risque: false };
   const lueA = Number(e.lueA) || 0;
@@ -9542,8 +9545,64 @@ function etatRegleOffre(it, regles, illisibles, maintenant) {
 // chose, le geste est de regarder l'annonce sur eBay. La carte le disait ; la
 // ligne du haut et l'aperçu du lot disaient « pas encore lue — relis-la », et
 // la relecture tournait en boucle sur la même annonce.
-const PAS_SU_SANS_RELECTURE = ['illisible', 'devise', 'offres-inconnues'];
+// (11 octobre, revue — tour 3) + « pas-sur-ce-compte » : eBay vient de dire,
+// sur sa liste COMPLÈTE, que l'annonce n'est plus en vente sur ce compte
+// (terminée, vendue, déplacée) — relire rendrait la même chose ; le geste est
+// de relire la LISTE (une synchro), que l'écran lance lui-même.
+const PAS_SU_SANS_RELECTURE = ['illisible', 'devise', 'offres-inconnues', 'pas-sur-ce-compte'];
 const seRelitChezEbay = (e) => !!e && e.etat === 'pas-su' && !PAS_SU_SANS_RELECTURE.includes(e.raison);
+// ── CE QU'UNE RÈGLE ENGAGE (11 octobre, revue — tour 3) ─────────────────────
+// UNE règle (§11) pour tout ce qui doit savoir si eBay PEUT vendre seul : la
+// relecture des ventes eBay à l'ouverture, « ce que ça engage », l'alerte
+// « vendue sur Vinted — encore en vente sur eBay », la déconnexion d'un compte
+// eBay et « Fermer mon compte ». Chacun jugeait « règle active » à sa façon
+// (`offresActives === true` sur la ligne brute, ou `etat === 'connue'`) :
+// une règle qu'eBay tient PEUT-ÊTRE (seuil relu sans l'état des offres, pose
+// incertaine / en cours / posée pas relue — même quand eBay a répondu
+// « Success » —, prix changé, programmée) n'était comptée nulle part : ventes
+// eBay pas relues, aucun bloc, déconnexion muette, pendant qu'eBay vendait.
+// Et la déconnexion comptait au contraire des règles d'annonces terminées.
+//   'oui'       : connue (relue, offres activées) ;
+//   'peut-etre' : « pas su » AVEC risque (`etatRegleOffre`) ;
+//   null        : rien n'engage (aucune ; pas su sans risque).
+const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));
+// Les règles qu'eBay tient — ou tient peut-être — sur des comptes, avec la
+// MÊME règle par annonce que l'écran eBay → Annonces (`etatRegleOffre` +
+// `regleEngage`). `parCompte` : [{ ref, entrees: { itemId: entrée rangée },
+// annonces: [{ itemId, price }] | null, programmees: [...] | null,
+// cap: ms | null (lecture de ces listes), complet: bool | null }].
+// Une entrée dont l'annonce n'est NI en ligne NI programmée sur des listes
+// COMPLÈTES lues après elle (10 min de marge) ne compte pas : terminée ou
+// vendue (la règle `garder` de la synchro). Listes illisibles ou incomplètes
+// ⇒ elle compte (« pas su » ne cache rien). Le prix de la liste juge « prix
+// changé ». Rend { oui, peutEtre, refs: Set(ref) }.
+function reglesEngagees(parCompte, maintenant) {
+  let oui = 0, peutEtre = 0; const refs = new Set();
+  for (const c of (Array.isArray(parCompte) ? parCompte : [])) {
+    if (!c) continue;
+    const ref = c.ref || 'principal';
+    const prix = new Map();
+    for (const a of [...(Array.isArray(c.annonces) ? c.annonces : []), ...(Array.isArray(c.programmees) ? c.programmees : [])]) if (a && a.itemId != null && !prix.has(String(a.itemId))) prix.set(String(a.itemId), a.price);
+    const filtre = Array.isArray(c.annonces) && Array.isArray(c.programmees) && c.complet !== false && Number(c.cap) > 0;
+    for (const [id, e] of Object.entries(c.entrees && typeof c.entrees === 'object' && !Array.isArray(c.entrees) ? c.entrees : {})) {
+      if (!e || typeof e !== 'object') continue;
+      if (filtre && !prix.has(id) && (Number(e.lueA) || 0) < Number(c.cap) - 10 * 60000) continue;
+      const k = regleEngage(etatRegleOffre({ itemId: id, _compte: ref, price: prix.has(id) ? prix.get(id) : undefined }, new Map([[ref + ':' + id, e]]), null, maintenant));
+      if (k === 'oui') oui++; else if (k === 'peut-etre') peutEtre++;
+      if (k) refs.add(ref);
+    }
+  }
+  return { oui, peutEtre, refs };
+}
+// UNE phrase pour la carte ET le lot (§11) : une offre déjà faite, qui attend
+// encore la réponse, peut être acceptée par eBay au moment même de la pose.
+const OFFRE_DEJA_FAITE = 'Une offre déjà faite peut être acceptée dès la pose.';
+const texteOffresDejaFaites = (n, total) => (!(n > 0) ? '' : (total === 1 ? OFFRE_DEJA_FAITE
+  : `${n} où des offres ont déjà été faites : une offre déjà faite peut être acceptée dès la pose.`));
+// UNE conséquence pour toutes les confirmations d'une règle d'offre (carte,
+// « Une règle pour toutes », publication, planificateur) — la décision du
+// 9 octobre : la confirmation DIT qu'une offre acceptée vend la paire.
+const OFFRE_VEND_LA_PAIRE = 'sera acceptée par eBay sans te demander : la paire sera vendue à ce prix';
 // La règle que l'écran MONTRE, envoyée à la route comme garde (`attendu`) :
 // connue/aucune ⇒ ce qu'eBay tenait à la dernière lecture ; « pas su » ⇒
 // 'inconnu' — sauf « offres-inconnues », dont le seuil a été relu et que le
@@ -9566,6 +9625,14 @@ function regleApresPrix(regle, erreurs) {
   if (regle.tombee === true) return { msg: `Prix changé — ta règle d'offre (dès ${eurEbay((regle.avant && regle.avant.accepte) || 0)}) n'est plus sur l'annonce eBay : repose-la si tu la veux (« Définir une règle d'offre »).` + plus, ton: 'warn', lecture };
   const l = regle.lecture;
   if (l && l.accepte != null) {
+    // ⚠️ (11 octobre, revue — tour 3) La phrase vient de la MÊME règle que la
+    // carte (`etatRegleOffre`, §5) : un seuil relu ne vaut « ✓ reste à X » que
+    // si eBay montre les offres ACTIVÉES. Avant, « ✓ Prix changé — ta règle
+    // d'offre reste à 72 € » s'écrivait en couleur de texte juste sous une
+    // carte qui disait, sur la même lecture, « pas su » ou « aucune ».
+    const etL = etatRegleOffre({ itemId: 'x', price: l.prix }, new Map([['principal:x', { ...l, lu: true, lueA: Number(l.lueA) > 0 ? Number(l.lueA) : Date.now() }]]), null);
+    if (etL.etat === 'pas-su' && etL.raison === 'offres-inconnues') return { msg: `Prix changé — eBay montre toujours ton seuil (dès ${eurEbay(l.accepte)}), mais pas si les offres y sont activées : regarde l'annonce sur eBay.` + plus, ton: 'warn', lecture };
+    if (etL.etat !== 'connue') return { msg: `Prix changé — l'annonce eBay montre : ${etatEnClair(l)}.` + plus, ton: 'warn', lecture };
     const pct = Number(l.prix) > 0 ? Math.round(Number(l.accepte) / Number(l.prix) * 100) : null;
     const bas = seuilTropBas(Number(l.accepte), Number(l.prix));
     return { msg: `✓ Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}.` + (bas ? ' C\'est moins de la moitié du prix : change-la si besoin.' : '') + plus, ton: (bas || vingt) ? 'warn' : 'ok', lecture };
@@ -9593,6 +9660,23 @@ function resultatRegleOffre({ code, j }) {
   if (code === 409 && j && ['prix-change', 'regle-changee', 'regle-existante', 'refuse-existant'].includes(j.reason)) return { issue: 'a-revoir', reason: j.reason, lecture, prix: j.prix, msg: j.error || '' };
   if (code === 0 || !j || code === 504 || j.reason === 'incertain') return { issue: 'incertain', lecture, msg: (j && j.error) || 'eBay n\'a pas répondu clairement — je ne sais pas si la règle est posée. « Relire chez eBay » avant de recommencer.' };
   return { issue: 'ko', lecture, reason: j.reason || '', msg: j.error || 'eBay a refusé la règle — rien n\'a changé.' };
+}
+// ⚠️ (11 octobre, revue — tour 3) CE QUE LA PUBLICATION A FAIT DE LA RÈGLE :
+// la MÊME classification que la carte (`resultatRegleOffre`, §11). Elle ne
+// connaissait que `verifie` : `null` AVEC une lecture (seuil relu, offres
+// activées ou non pas montré) s'écrivait « pas encore relue » en ambre, pendant
+// que la carte et la ligne du haut disaient « eBay montre ton seuil ».
+// `offreRep` : l'objet `offre` de la réponse ; `envoyee` : ce qui est parti.
+// Rend { issue, ok, msg } — `ok` seulement quand eBay a relu la règle conforme.
+function messageOffreCreation(offreRep, envoyee) {
+  const o = offreRep && typeof offreRep === 'object' ? offreRep : {};
+  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: o.lecture || null, range: o.range === false ? false : true } });
+  const L = res.lecture;
+  const nonNote = o.range === false ? ' VRM n\'a pas pu le noter : « Relire chez eBay » sur la carte.' : '';
+  if (res.issue === 'ok') return { issue: 'ok', ok: !nonNote, msg: `Règle d'offre : eBay accepte dès ${eurEbay(L && L.accepte != null ? L.accepte : envoyee.accepte)}.` + nonNote };
+  if (res.issue === 'ecart') return { issue: 'ecart', ok: false, msg: (L && L.offresActives === true && L.accepte == null ? 'eBay a activé les offres mais n\'a pas gardé le montant' : `eBay n'a pas gardé la règle d'offre (l'annonce montre : ${etatEnClair(L)})`) + ' — définis-la sur la carte de l\'annonce.' + nonNote };
+  if (res.issue === 'offres-inconnues') return { issue: 'offres-inconnues', ok: false, msg: `Règle d'offre : eBay montre ton seuil (dès ${eurEbay(L.accepte != null ? L.accepte : envoyee.accepte)}), mais pas si les offres y sont activées — regarde l'annonce sur eBay.` + nonNote };
+  return { issue: 'non-relu', ok: false, msg: 'Règle d\'offre envoyée avec l\'annonce, pas encore relue chez eBay — « Relire chez eBay » sur sa carte.' };
 }
 // La règle d'offre qu'un brouillon a ENVOYÉE avec sa programmation (eBay ne la
 // relit pas avant le départ) — la liste des programmées ET l'alerte « à
@@ -9639,18 +9723,43 @@ async function lireReglesEbay(comptesEbay) {
   }
   return { map, illisibles };
 }
-// Combien d'annonces ont une règle ACTIVE (lue chez eBay) — sur le compte
-// `ref`, ou sur tous. `null` si une ligne n'a pas pu être lue (« pas su »).
+// Les annonces dont eBay tient une règle (`oui`) — ou en tient PEUT-ÊTRE une
+// (`peutEtre`) — sur le compte `ref`, ou sur tous : `reglesEngagees`, la règle
+// de l'écran (§11). `null` si les règles rangées n'ont pas pu être lues (« pas
+// su ») ; des listes d'annonces illisibles ne cachent rien (tout compte).
+// (11 octobre, revue — tour 3) Elle comptait `offresActives === true` sur la
+// ligne BRUTE : muette sur une règle qu'eBay tient peut-être (seuil relu sans
+// l'état des offres, pose incertaine…), et bavarde sur une annonce terminée ou
+// au prix changé — l'écran et la feuille de déconnexion disaient deux nombres.
 async function compterReglesEbay(comptesEbay, ref) {
   const comptes = Array.isArray(comptesEbay) ? comptesEbay : await lireComptesEbay();
   if (!Array.isArray(comptes)) return null;
   const choisis = ref ? comptes.filter((c) => c.ref === ref) : comptes;
-  if (!choisis.length) return 0;
-  const r = await lireEbayParCompte('ebay_offres', 'items:data->items', choisis);
-  if (!r || r.lignes.some((x) => x.ligne === undefined)) return null;
-  let n = 0;
-  for (const { ligne } of r.lignes) for (const e of Object.values((ligne && ligne.items && typeof ligne.items === 'object') ? ligne.items : {})) if (e && e.lu === true && e.accepte != null && e.offresActives === true) n++;
-  return n;
+  if (!choisis.length) return { oui: 0, peutEtre: 0 };
+  const [R, L, P] = await Promise.all([
+    lireEbayParCompte('ebay_offres', 'items:data->items', choisis),
+    lireEbayParCompte('ebay_listings', 'items:data->items,complet:data->complet,cap:data->>capturedAt', choisis),
+    lireEbayParCompte('ebay_programmees', 'items:data->items,cap:data->>capturedAt', choisis),
+  ]);
+  if (!R || R.lignes.some((x) => x.ligne === undefined)) return null;
+  const de = (X, c) => { if (!X) return undefined; const l = X.lignes.find((y) => y.compte.ref === c.ref); return l ? l.ligne : undefined; };
+  const n = reglesEngagees(choisis.map((c) => {
+    const r = de(R, c), l = de(L, c), p = de(P, c);
+    const caps = [l && Number(l.cap), p && Number(p.cap)];
+    return { ref: c.ref, entrees: r && r.items, annonces: l && Array.isArray(l.items) ? l.items : null, programmees: p && Array.isArray(p.items) ? p.items : null,
+      complet: l ? l.complet : null, cap: caps.every((x) => x > 0) ? Math.min(...caps) : null };
+  }));
+  return { oui: n.oui, peutEtre: n.peutEtre };
+}
+// Ce que la déconnexion d'un compte eBay, et « Fermer mon compte », disent des
+// règles qui RESTENT chez eBay (une source : `compterReglesEbay`). '' : rien.
+function texteReglesQuiRestent(n, apres) {
+  if (n == null) return `Je n'ai pas pu vérifier si tes annonces eBay ont une règle d'offre : regarde eBay → Annonces avant ${apres === 'fermer' ? 'de fermer' : 'de le déconnecter'}.`;
+  const t = [];
+  if (n.oui > 0) t.push(`${n.oui} annonce${n.oui > 1 ? 's' : ''} ${n.oui > 1 ? 'ont' : 'a'} une règle d'offre : eBay continuera d'accepter les offres dès le montant fixé, et VRM ne verra plus ces ventes.`);
+  if (n.peutEtre > 0) t.push(`${n.peutEtre} annonce${n.peutEtre > 1 ? 's' : ''} ${n.peutEtre > 1 ? 'ont' : 'a'} peut-être une règle d'offre chez eBay (VRM ne l'a pas relue) : si elle y est, eBay continuera d'accepter les offres dès son montant, et VRM ne verra plus ces ventes.`);
+  if (!t.length) return '';
+  return t.join(' ') + ` Retire les règles d'abord (eBay → Annonces) si tu ne veux plus vendre ainsi.`;
 }
 // ── LE PRIX D'ACHAT D'UNE PAIRE : UNE LECTURE (§11) ─────────────────────────
 // Celui saisi sur la fiche, sinon celui saisi PAR NUMÉRO (`vinted_buyprice_by_num`,
@@ -9960,7 +10069,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       let achatP;
       try { if (pairSel) achatP = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatP = undefined; }
       const lignes = [
-        `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus sera acceptée par eBay sans te demander : la paire sera vendue à ce prix.`,
+        `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus ${OFFRE_VEND_LA_PAIRE}.`,
         offre.refuse != null && `Toute offre sous ${eurEbay(offre.refuse)} sera refusée par eBay.`,
         !b.item.numero && 'Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. Choisis la paire d\'abord.',
         typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
@@ -9985,10 +10094,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     if (j && j.ok) {
       if (plusieursPub && onCompte) onCompte(comptePub);
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
-      const vo = offre && j.offre ? j.offre.verifie : undefined;
-      const offreMsg = !offre ? '' : (vo === true ? `Règle d'offre : eBay accepte dès ${eurEbay(offre.accepte)}.` : (vo === false ? 'eBay n\'a pas gardé la règle d\'offre — définis-la sur la carte de l\'annonce.' : 'Règle d\'offre pas encore relue.'));
+      const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
-      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg, offreOk: vo === true, avertissements: avert }); if (onPublie) onPublie(comptePub);
+      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert }); if (onPublie) onPublie(comptePub);
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
     }
@@ -10035,7 +10143,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
             ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b> : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
             : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
-          {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
+          {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
@@ -10424,10 +10532,10 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     const nom = nomCompteEbay(c);
     // (9 octobre) Ses RÈGLES D'OFFRE restent posées chez eBay : eBay continuera
     // d'accepter — et VRM ne verra plus ces ventes. On le dit, avec le nombre.
-    const nRegles = await compterReglesEbay(comptesEbay, ref);
-    const texteRegles = nRegles == null
-      ? '\n\nJe n\'ai pas pu vérifier si des annonces de ce compte ont une règle d\'offre : regarde eBay → Annonces avant.'
-      : (nRegles > 0 ? `\n\n${nRegles} annonce${nRegles > 1 ? 's' : ''} de ce compte ${nRegles > 1 ? 'ont' : 'a'} une règle d'offre : eBay continuera d'accepter les offres dès le montant fixé, et VRM ne verra plus ces ventes. Retire les règles d'abord (eBay → Annonces) si tu ne veux plus vendre ainsi.` : '');
+    // (11 octobre, revue — tour 3) La MÊME règle que l'écran : une règle qu'eBay
+    // tient peut-être est dite aussi ; une annonce terminée ne compte plus.
+    const tR = texteReglesQuiRestent(await compterReglesEbay(comptesEbay, ref), 'deconnecter');
+    const texteRegles = tR ? `\n\nSur ce compte : ${tR}` : '';
     const ok = await askConfirm({
       title: `Déconnecter le compte eBay « ${nom} » ?`,
       desc: `Tes autres comptes eBay ne sont pas touchés.\n\nVRM ne lira plus les annonces ni les ventes de « ${nom} », et ne publiera plus rien dessus ; ses ventes sortent aussi des totaux de VRM (chiffre d'affaires compris). Ses annonces restent en ligne sur eBay. Tu pourras le reconnecter : tu retrouveras tout.${texteRegles}`,
@@ -10951,7 +11059,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       else if (refuseLu != null) refuseCle = null;
       const titre = it.title || String(it.itemId);
       const lignes = [
-        `« ${titre} » est à ${eurEbay(prixVuN)} sur eBay${nomCompteConfirm ? ` (compte ${nomCompteConfirm})` : ''}. Toute offre de ${eurEbay(X)} ou plus sera acceptée par eBay sans te demander : la paire sera vendue à ce prix, et l'acheteur devra la payer.`,
+        `« ${titre} » est à ${eurEbay(prixVuN)} sur eBay${nomCompteConfirm ? ` (compte ${nomCompteConfirm})` : ''}. Toute offre de ${eurEbay(X)} ou plus ${OFFRE_VEND_LA_PAIRE}, et l'acheteur devra la payer.`,
       ];
       if (typeof refuseCle === 'number') lignes.push(`Toute offre sous ${eurEbay(refuseCle)} sera refusée par eBay.`);
       else if (refuseCle === null && refuseLu != null) lignes.push(`Le refus sous ${eurEbay(refuseLu)} sera retiré.`);
@@ -10960,7 +11068,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       if (!numero) lignes.push('Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. « Relier à une paire » d\'abord.');
       if (sousAchat) lignes.push(`C'est sous ton prix d'achat (${eurEbay(achat)}), avant frais eBay.`);
       if (tropBas) lignes.push(`C'est ${pctSaisi} % du prix de l'annonce — tu l'as confirmé.`);
-      if (et && et.offresFaites > 0) lignes.push('Une offre déjà faite peut être acceptée dès la pose.');
+      if (et && et.offresFaites > 0) lignes.push(texteOffresDejaFaites(1, 1));
       const ok = await askConfirm({ title: `eBay acceptera seul les offres dès ${eurEbay(X)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, poser la règle', cancel: 'Annuler' });
       if (!ok) return;
       setEnvoiRegle('pose');
@@ -11072,9 +11180,18 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         if (et.etat === 'connue') { attrs['data-regle-accepte'] = Number(et.accepte).toFixed(2); attrs['data-regle-refuse'] = et.refuse != null ? Number(et.refuse).toFixed(2) : ''; if (vieille) attrs['data-regle-age'] = String(age); }
         if (et.etat === 'pas-su') attrs['data-regle-raison'] = et.raison;
         if (bloquee) attrs['data-regle-bloquee'] = bloquee.k;
+        // (11 octobre, revue — tour 3) « Seuil relu, offres activées ou non pas
+        // montré » ne ressemble plus à « jamais lue » : la carte dit le seuil que
+        // eBay MONTRE (relu, ce n'est pas une donnée périmée) et donne SON geste,
+        // le lien vers l'annonce — deux cartes « — » identiques ne disaient pas
+        // laquelle regarder, et la ligne du haut n'avait pas de lien.
+        const seuilMontre = et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu && et.lu.accepte != null;
+        if (seuilMontre) attrs['data-regle-seuil-lu'] = Number(et.lu.accepte).toFixed(2);
         const montant = et.etat === 'connue'
           ? <>eBay accepte dès <b style={{ color: E.text }}>{eurEbay(et.accepte)}</b>{et.refuse != null ? <> · refuse sous {eurEbay(et.refuse)}</> : null}{vieille ? ` · lue il y a ${age} j` : ''}</>
-          : (et.etat === 'aucune' && et.refuse != null && et.offresActives === true ? <>eBay refuse sous {eurEbay(et.refuse)}</> : (et.etat === 'pas-su' ? '—' : null));
+          : (et.etat === 'aucune' && et.refuse != null && et.offresActives === true ? <>eBay refuse sous {eurEbay(et.refuse)}</>
+            : (seuilMontre ? <>eBay montre un seuil dès {eurEbay(et.lu.accepte)} — activées ou non : pas montré{url ? <> · <a href={url} target="_blank" rel="noreferrer" data-regle-offres-inconnues-lien={it.itemId} onClick={(ev) => ev.stopPropagation()} style={{ color: E.accentSoft, fontWeight: 700, textDecoration: 'none' }}>Voir sur eBay ↗</a></> : null}</>
+              : (et.etat === 'pas-su' ? '—' : null)));
         const btnR = { ...btnE, padding: '6px 10px', fontSize: 12, opacity: (gesteBloque || envoiRegle) ? 0.45 : 1, cursor: (gesteBloque || envoiRegle) ? 'default' : 'pointer' };
         return (
           <div {...attrs} style={{ padding: '0 14px 10px 14px', fontSize: 12.5, color: E.muted, lineHeight: 1.45 }}>
@@ -11083,7 +11200,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               {et.etat === 'connue'
                 ? <button type="button" data-regle-modifier={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Modifier</button>
                 : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Définir une règle d'offre</button>}
-              {bloquee && et.etat === 'connue' && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, padding: '6px 10px', fontSize: 12, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
+              {bloquee && regleEngage(et) && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, padding: '6px 10px', fontSize: 12, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
             </div>
             {bloquee && bloquee.t && <div data-regle-bloquee-texte={bloquee.k} style={{ fontSize: 11.5, color: E.warn, marginTop: 4 }}>{bloquee.t}</div>}
           </div>
@@ -11471,8 +11588,12 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     // (9 octobre) Les annonces qui partent avec une RÈGLE D'OFFRE : chaque
     // montant est écrit — eBay vendra à ce prix sans lui demander.
     const avecOffre = lot.filter(({ l }) => l.item && l.item.offre);
+    // (11 octobre, revue — tour 3) La feuille ne disait pas qu'une offre
+    // acceptée VEND la paire — la forme exigée par la décision du 9 octobre, et
+    // ce que disent la carte, le lot et la publication (§11). Avec
+    // « Maintenant », la règle est active dès la confirmation.
     const texteOffres = avecOffre.length
-      ? `\n${avecOffre.length} avec une règle d'offre — eBay acceptera seul les offres dès :` + avecOffre.map(({ l }) => {
+      ? `\n${avecOffre.length} avec une règle d'offre — dès la mise en ligne, toute offre égale ou supérieure au montant ${OFFRE_VEND_LA_PAIRE} :` + avecOffre.map(({ l }) => {
         const p = Number(String(l.item.price).replace(',', '.')); const o = l.item.offre;
         return `\n« ${l.item.title || ''} » ${eurEbay(p)} → dès ${eurEbay(o.accepte)} (${p > 0 ? Math.round(o.accepte / p * 100) : '—'} %)${o.sousMoitie ? ' — moins de la moitié, confirmé dans le brouillon' : ''}`;
       }).join('')
@@ -11921,7 +12042,7 @@ const REGLES_LOT_MAX = 25;
 // changement de prix) — la même source que `etatDe` (§11) : l'aperçu calculait
 // son seuil sur l'ancien prix de la ligne lue, et proposait 85,50 € sur une
 // annonce que la carte disait à 80 €.
-function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, nomRef, plusieursComptes = false, relit = false, onRelire, onLot, onRegle, onDebut, onFini, onInterrompu }) {
+function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, nomRef, plusieursComptes = false, relit = false, onRelire, onRelireBase, onLot, onRegle, onDebut, onFini, onInterrompu }) {
   const E = EBAY_SKIN;
   const [pct, setPct] = React.useState('');
   const [choix, setChoix] = React.useState(() => new Map());   // clé → coché, ce qu'il a changé à la main
@@ -11973,6 +12094,12 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     // relecture rendrait la même chose (`seRelitChezEbay`) — le geste est de
     // regarder l'annonce sur eBay, pas de « la relire d'abord ».
     if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay' };
+    // ⚠️ (11 octobre, revue — tour 3) Seules les raisons qu'une relecture CHEZ
+    // eBAY lève sont « à relire » (`seRelitChezEbay`, la règle de la ligne du
+    // haut, §11). Notre propre lecture ratée proposait « Relire ces 9 annonces
+    // chez eBay » — un bouton qui n'envoyait rien.
+    if (e && e.etat === 'pas-su' && e.raison === 'illisible') return { ...base, statut: 'illisible', note: 'règle actuelle pas lisible dans VRM — rien n\'est remplacé à l\'aveugle' };
+    if (e && e.etat === 'pas-su' && e.raison === 'pas-sur-ce-compte') return { ...base, statut: 'exclue', note: 'eBay ne la montre plus en vente sur ce compte' };
     if (!e || e.etat === 'pas-su') return { ...base, statut: 'a-relire', note: 'règle actuelle pas lue — relis-la d\'abord' };
     if (seuil == null) return { ...base, statut: 'exclue', note: 'prix trop bas' };
     if (e.refuse != null && cents(e.refuse) >= cents(seuil)) return { ...base, statut: 'exclue', note: `eBay refuse déjà sous ${eurEbay(e.refuse)} : baisse d'abord ce refus` };
@@ -11987,7 +12114,8 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
   const selection = lignes.filter(coche);
   const n = selection.length;
   const trop = n > REGLES_LOT_MAX;
-  const aRelire = lignes.filter((l) => l.statut === 'a-relire').map((l) => l.it);
+  const aRelire = lignes.filter((l) => l.statut === 'a-relire' && seRelitChezEbay(l.etat || { etat: 'pas-su', raison: 'jamais' })).map((l) => l.it);
+  const nIllisibles = lignes.filter((l) => l.statut === 'illisible').length;
   const pctReel = (l) => { const v = Math.round(l.seuil / l.prix * 1000) / 10; return String(v).replace('.', ','); };
   const sousAchat = (l) => typeof l.achat === 'number' && l.seuil != null && l.seuil < l.achat;
   const appliquer = async () => {
@@ -11998,15 +12126,20 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     const sA = selection.filter(sousAchat).length;
     const pA = selection.filter((l) => l.numero && l.achat === null).length;
     const r = selection.filter((l) => !l.numero).length;
+    // (11 octobre, revue — tour 3) La conséquence que la feuille de la CARTE
+    // dit déjà, sur la même annonce : une offre faite et en attente peut être
+    // acceptée au moment même du lot (§11 : une phrase, deux feuilles).
+    const f = selection.filter((l) => l.etat && Number(l.etat.offresFaites) > 0).length;
     const parCompte = new Map();
     for (const l of selection) { const ref = l.it._compte || 'principal'; parCompte.set(ref, (parCompte.get(ref) || 0) + 1); }
     const desc = [
-      'Sur chacune, toute offre égale ou supérieure au montant affiché sera acceptée par eBay sans te demander : la paire sera vendue à ce prix.',
+      `Sur chacune, toute offre égale ou supérieure au montant affiché ${OFFRE_VEND_LA_PAIRE}.`,
       k > 0 && `${k} remplace${k > 1 ? 'nt' : ''} une règle existante${jBas ? ` (dont ${jBas} plus basse${jBas > 1 ? 's' : ''})` : ''}.`,
       o > 0 && `${o} où les offres seront activées si elles ne le sont pas déjà.`,
       sA > 0 && `${sA} sous ton prix d'achat (avant frais eBay).`,
       pA > 0 && `${pA} sans prix d'achat saisi.`,
       r > 0 && `${r} sans paire reliée : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted.`,
+      texteOffresDejaFaites(f, n),
       parCompte.size > 1 && `Sur tes comptes ${[...parCompte.entries()].map(([ref, c]) => `${nomRef(ref)} (${c})`).join(', ')}.`,
       'VRM les règle une par une et te dit le résultat de chacune.',
     ].filter(Boolean);
@@ -12049,21 +12182,26 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     }
     const compte = { ok: 0, ecart: 0, 'offres-inconnues': 0, 'non-relu': 0, 'a-revoir': 0, incertain: 0, ko: 0 };
     const refus = new Map();
+    let nonNote = 0;
     for (const x of fige) {
       const r1 = res[x.cle];
       if (!r1) continue;
       compte[r1.issue] = (compte[r1.issue] || 0) + 1;
+      if (r1.nonNote) nonNote++;
       if (r1.issue === 'ko') refus.set(r1.msg, (refus.get(r1.msg) || 0) + 1);
     }
-    setBilan({ total: fige.length, ...compte, nonEnvoyees: fige.filter((x) => !res[x.cle]).length, refus: [...refus.entries()] });
+    setBilan({ total: fige.length, ...compte, nonEnvoyees: fige.filter((x) => !res[x.cle]).length, nonNote, refus: [...refus.entries()] });
     setEnCours(false);
     setChoix(new Map());
     if (onLot) onLot([]);
     if (onFini) await onFini();
   };
   const TEXTE_ISSUE = { ok: '✓ réglée', ecart: 'pas confirmée par eBay', 'offres-inconnues': 'seuil posé ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay', 'non-relu': 'posée par eBay, pas relue', 'a-revoir': 'à revoir : la règle ou le prix a changé sur eBay', incertain: 'sans réponse claire d\'eBay', ko: 'refusée' };
-  const texteIssue = (r) => {
-    if (!r) return '';
+  // ⚠️ (11 octobre, revue — tour 3) eBay l'a fait, VRM n'a pas pu le NOTER
+  // (`nonNote`, la même issue que la carte, §11) : jamais « ✓ réglée » en
+  // couleur de texte — la carte, sur la même réponse, le dit en ambre.
+  const NON_NOTE = 'VRM n\'a pas pu le noter : « Relire chez eBay »';
+  const texteIssue0 = (r) => {
     if (r.issue === 'ko') return `refusée : « ${r.msg} »`;
     if (r.issue === 'ecart' && r.lecture) return `pas confirmée par eBay (l'annonce montre : ${etatEnClair(r.lecture)})`;
     // (11 octobre, revue) « À revoir » dit CE qui a changé : le prix relu chez
@@ -12072,6 +12210,13 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     if (r.issue === 'a-revoir' && r.lecture) return `à revoir : eBay a déjà une règle (${etatEnClair(r.lecture)}) — rien n'a été envoyé`;
     return TEXTE_ISSUE[r.issue];
   };
+  const texteIssue = (r) => {
+    if (!r) return '';
+    if (r.nonNote && r.issue === 'ok') return `posée par eBay — ${NON_NOTE}`;
+    const t = texteIssue0(r);
+    return r.nonNote ? `${t} — ${NON_NOTE}` : t;
+  };
+  const couleurIssue = (r) => (r.issue === 'ok' && !r.nonNote ? E.text : E.warn);
   const bilanTexte = (b) => {
     const pl = (k, s, p) => (k > 1 ? p : s);
     const morceaux = [`${b.ok} sur ${b.total} réglée${pl(b.ok, '', 's')}`];
@@ -12082,6 +12227,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     if (b.incertain) morceaux.push(`${b.incertain} sans réponse claire d'eBay : relis-${pl(b.incertain, 'la', 'les')}`);
     if (b.ko) morceaux.push(`${b.ko} refusée${pl(b.ko, '', 's')} : ${b.refus.map(([m, c]) => `« ${m} »${c > 1 ? ` (×${c})` : ''}`).join(' · ')}`);
     if (b.nonEnvoyees) morceaux.push(`${b.nonEnvoyees} non envoyée${pl(b.nonEnvoyees, '', 's')}`);
+    if (b.nonNote) morceaux.push(`dont ${b.nonNote} que VRM n'a pas pu noter : « Relire chez eBay »`);
     return morceaux.join(' · ') + '.';
   };
   const lienE = { flexShrink: 0, border: `1px solid ${E.border}`, borderRadius: 8, padding: '7px 11px', fontSize: 12.5, fontWeight: 700, color: E.text, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' };
@@ -12105,13 +12251,13 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.it.title || l.it.itemId}</div>
           <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>
-            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' && l.statut !== 'a-voir-ebay' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)} %)</> : null}
+            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' && l.statut !== 'a-voir-ebay' && l.statut !== 'illisible' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)} %)</> : null}
             {/* Une cause, une phrase (§7) : l'issue « offres-inconnues » dit déjà ce que la note dirait. */}
             {l.note && !(r && r.issue === 'offres-inconnues' && l.statut === 'a-voir-ebay') ? ` · ${l.note}` : ''}
             {plusieursComptes ? ` · ${nomRef(l.it._compte || 'principal')}` : ''}
           </div>
           {l.cochable && sousAchat(l) && <div data-regles-sous-achat={String(l.it.itemId)} style={{ fontSize: 11.5, color: E.warn }}>sous ton prix d'achat ({eurEbay(l.achat)})</div>}
-          {r && <div data-regles-issue={r.issue} style={{ fontSize: 11.5, color: r.issue === 'ok' ? E.text : E.warn }}>{texteIssue(r)}</div>}
+          {r && <div data-regles-issue={r.issue} {...(r.nonNote ? { 'data-regles-non-note': '1' } : {})} style={{ fontSize: 11.5, color: couleurIssue(r) }}>{texteIssue(r)}</div>}
         </div>
       </div>
     );
@@ -12128,8 +12274,8 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
           )}
           {!enCours && bilan && (
             <div data-regles-bilan data-regles-total={bilan.total} data-regles-ok={bilan.ok} data-regles-ecart={bilan.ecart} data-regles-offres-inconnues={bilan['offres-inconnues']} data-regles-non-relu={bilan['non-relu']}
-              data-regles-a-revoir={bilan['a-revoir']} data-regles-incertain={bilan.incertain} data-regles-ko={bilan.ko} data-regles-non-envoyees={bilan.nonEnvoyees}
-              style={{ fontSize: 12.5, color: bilan.ok === bilan.total ? E.text : E.warn, lineHeight: 1.5 }}>{bilanTexte(bilan)}</div>
+              data-regles-a-revoir={bilan['a-revoir']} data-regles-incertain={bilan.incertain} data-regles-ko={bilan.ko} data-regles-non-envoyees={bilan.nonEnvoyees} data-regles-non-note={bilan.nonNote || 0}
+              style={{ fontSize: 12.5, color: bilan.ok === bilan.total && !bilan.nonNote ? E.text : E.warn, lineHeight: 1.5 }}>{bilanTexte(bilan)}</div>
           )}
         </div>
       )}
@@ -12149,13 +12295,19 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
               <div key={x.cle} data-regles-lot-ligne={x.itemId} style={{ padding: '7px 0', borderTop: `1px solid ${E.border}` }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.titre}</div>
                 <div style={{ fontSize: 11.5, color: E.muted }}>{eurEbay(x.prix)} → dès {eurEbay(x.seuil)}{plusieursComptes ? ` · ${nomRef(x.compte)}` : ''}</div>
-                {r ? <div data-regles-issue={r.issue} style={{ fontSize: 11.5, color: r.issue === 'ok' ? E.text : E.warn }}>{texteIssue(r)}</div> : <div style={{ fontSize: 11.5, color: E.muted }}>en attente</div>}
+                {r ? <div data-regles-issue={r.issue} {...(r.nonNote ? { 'data-regles-non-note': '1' } : {})} style={{ fontSize: 11.5, color: couleurIssue(r) }}>{texteIssue(r)}</div> : <div style={{ fontSize: 11.5, color: E.muted }}>en attente</div>}
               </div>
             );
           })}
         </div>
       ) : pctOk && (
         <div data-regles-apercu style={{ marginTop: 10 }}>
+          {nIllisibles > 0 && (
+            <div data-regles-toutes-illisibles={nIllisibles} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: E.warn, flex: '1 1 200px', minWidth: 0 }}>{nIllisibles} annonce{nIllisibles > 1 ? 's' : ''} dont VRM n'a pas pu lire la règle actuelle (c'est la lecture de VRM qui a échoué) : rien n'est remplacé à l'aveugle.</span>
+              {onRelireBase && <button type="button" data-regles-toutes-relire-base disabled={relit} onClick={() => onRelireBase()} style={{ ...lienE, opacity: relit ? 0.55 : 1 }}>{relit ? 'Lecture…' : 'Réessayer'}</button>}
+            </div>
+          )}
           {aRelire.length > 0 && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: E.muted, flex: '1 1 200px', minWidth: 0 }}>{aRelire.length} annonce{aRelire.length > 1 ? 's' : ''} dont la règle actuelle n'est pas lue : relis-{aRelire.length > 1 ? 'les' : 'la'} d'abord, rien n'est remplacé à l'aveugle.</span>
@@ -12189,6 +12341,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const [regles, setRegles] = React.useState(undefined);
   const [reglesLocales, setReglesLocales] = React.useState(() => new Map());
   const [prixLocaux, setPrixLocaux] = React.useState(() => new Map());
+  // (11 octobre, revue — tour 3) Les annonces qu'eBay vient de dire ABSENTES de
+  // ce compte (liste complète, « Relire chez eBay ») : gardé tant que l'écran
+  // est ouvert — un rechargement de la base ne doit pas les faire redevenir
+  // « jamais lues », relues sans fin, si la synchro qui suit n'a pas abouti.
+  const [absentesEbay, setAbsentesEbay] = React.useState(() => new Set());
   // Quand VRM a relu les ventes eBay de chaque compte : Map(ref → ms | null
   // jamais | undefined illisible) ; null = pas su du tout.
   const [ventesEbayLues, setVentesEbayLues] = React.useState(undefined);
@@ -12381,17 +12538,49 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // RELIÉ qui a au moins une règle active et dont les ventes ont plus de 6 h
   // (ou n'ont jamais été lues), on les relit — l'un après l'autre. Sans règle,
   // rien ne change.
+  // ⚠️⚠️ (11 octobre, revue — tour 3) « Une règle active » se juge par LA règle
+  // de l'écran (`reglesEngagees` : `etatRegleOffre` + `regleEngage`, §11) —
+  // une règle qu'eBay tient PEUT-ÊTRE compte aussi (seuil relu sans l'état des
+  // offres, pose incertaine, en cours, posée mais pas relue alors qu'eBay a
+  // répondu « Success », programmée). Le filtre brut `offresActives === true`
+  // les laissait toutes de côté : eBay vendait au seuil, VRM ne relisait rien.
   const ventesRelues = React.useRef(false);
   React.useEffect(() => {
-    if (ventesRelues.current || connected !== true || !regles || !(ventesEbayLues instanceof Map) || comptesStatut === undefined) return;
+    if (ventesRelues.current || connected !== true || !regles || items === undefined || !(ventesEbayLues instanceof Map) || comptesStatut === undefined) return;
     ventesRelues.current = true;
-    const avecRegle = new Set();
-    for (const [k, e] of regles.map) if (e && e.lu === true && e.accepte != null && e.offresActives === true) avecRegle.add(k.slice(0, k.lastIndexOf(':')));
+    const parRef = new Map();
+    const de = (ref) => { if (!parRef.has(ref)) parRef.set(ref, { ref, entrees: {}, annonces: Array.isArray(items) ? [] : null, programmees: null, cap: null }); return parRef.get(ref); };
+    for (const [k, e] of regles.map) { const i = k.lastIndexOf(':'); de(k.slice(0, i)).entrees[k.slice(i + 1)] = e; }
+    for (const a of (Array.isArray(items) ? items : [])) { const c = parRef.get(a._compte || 'principal'); if (c) c.annonces.push(a); }
+    const avecRegle = reglesEngagees([...parRef.values()]).refs;
     const relies = new Set(comptesRelies.map((c) => c.ref));
     const vieux = [...avecRegle].filter((ref) => relies.has(ref) && ventesEbayLues.has(ref) && ventesEbayLues.get(ref) !== undefined && (ventesEbayLues.get(ref) == null || Date.now() - ventesEbayLues.get(ref) > 6 * 3600000));
     if (!vieux.length) return;
     (async () => { for (const ref of vieux) await resync(ref); })();
-  }, [connected, regles, ventesEbayLues, comptesStatut, comptesRelies, resync]);
+  }, [connected, regles, items, ventesEbayLues, comptesStatut, comptesRelies, resync]);
+  // ⚠️⚠️ (11 octobre, revue — tour 3) UNE PROGRAMMÉE PARTIE (le planificateur,
+  // « Maintenant » ou à l'heure dite) : eBay la dit EN LIGNE (`programmees.enLigne`,
+  // relu après le planificateur) mais la liste des annonces ne la porte pas
+  // encore — elle sortait des programmées sans entrer ici, avec la règle
+  // d'offre que VRM venait lui-même d'envoyer, et rien sur cet écran ne
+  // relisait la liste. On relit le compte (une synchro : la liste ET la règle,
+  // lue dans son GetItem), une fois par annonce et par ouverture.
+  const partiesVues = React.useRef(new Set());
+  React.useEffect(() => {
+    if (connected !== true || !Array.isArray(items) || !programmees || typeof programmees !== 'object' || !Array.isArray(comptesStatut)) return;
+    const presentes = new Set(items.map((a) => (a._compte || 'principal') + ':' + String(a.itemId)));
+    const relies = new Set(comptesRelies.map((c) => c.ref));
+    const refs = new Set();
+    for (const x of (Array.isArray(programmees.enLigne) ? programmees.enLigne : [])) {
+      if (!x || x.itemId == null) continue;
+      const ref = x._compte || 'principal', cle = ref + ':' + String(x.itemId);
+      if (presentes.has(cle) || partiesVues.current.has(cle)) continue;
+      partiesVues.current.add(cle);
+      if (relies.has(ref)) refs.add(ref);
+    }
+    if (!refs.size) return;
+    (async () => { for (const ref of refs) await resync(ref); })();
+  }, [connected, items, programmees, comptesStatut, comptesRelies, resync]);
   // ── L'ANTI DOUBLE VENTE : la règle partagée, sur ce que l'écran a lu ───────
   const fiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [nuage, items]);
   // ── UNE PAIRE DÉJÀ VENDUE, TOUTES PLATEFORMES (6 octobre) : LE verdict que
@@ -12484,6 +12673,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const etatDe = (it) => {
     if (regles === undefined) return null;                       // en cours : ni ligne, ni bloc (pas de clignotement)
     const cle = cleAnnonce(it);
+    if (absentesEbay.has(cle)) return { etat: 'pas-su', raison: 'pas-sur-ce-compte', risque: false };
     const itP = prixLocaux.has(cle) ? { ...it, price: prixDe(it) } : it;
     const l = reglesLocales.get(cle);
     return l ? etatRegleOffre(itP, new Map([[cle, l]]), null) : etatRegleOffre(itP, regles.map, regles.illisibles);
@@ -12512,6 +12702,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     for (const it of lot) { const ref = it._compte || 'principal'; if (!parCompte.has(ref)) parCompte.set(ref, []); parCompte.get(ref).push(it); }
     const notes = [];
     let ratees = 0;
+    // (11 octobre, revue — tour 3) eBay dit, sur sa liste COMPLÈTE, que
+    // l'annonce n'est plus en vente sur ce compte (terminée, vendue, déplacée) :
+    // un fait mesuré, qui était AVALÉ — la carte restait « en ligne », la ligne
+    // du haut « jamais lue », et « Relire » renvoyait la même relecture sans
+    // fin. On le dit, la carte le porte, et on relit la LISTE de ce compte.
+    const absentes = new Map();   // ref → nombre
     try {
       for (const [ref, liste] of parCompte) {
         if (!relies.has(ref)) { notes.push(`Le compte eBay ${nomRef(ref)} n'est plus connecté à VRM : ses annonces n'ont pas été relues.`); continue; }
@@ -12525,16 +12721,21 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           // rien). On relit la base juste après, et on DIT combien ont raté.
           for (const [id, l] of Object.entries(j.lectures)) {
             if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);
-            else if (l && typeof l === 'object' && l.raison === 'lecture-ratee') ratees++;
+            else if (l && typeof l === 'object' && l.raison === 'pas-sur-ce-compte') { const k = ref + ':' + id; setAbsentesEbay((x) => { const n = new Set(x); n.add(k); return n; }); absentes.set(ref, (absentes.get(ref) || 0) + 1); }
+            else if (l && typeof l === 'object' && (l.raison === 'lecture-ratee' || l.raison === 'pas-su')) ratees++;
           }
         }
       }
       if (ratees) notes.push(`eBay n'a pas rendu ${ratees} annonce${ratees > 1 ? 's' : ''} : VRM garde ce qu'il en savait — réessaie dans un moment.`);
+      for (const [ref, n] of absentes) notes.push(`eBay ne montre plus ${n > 1 ? `${n} de ces annonces` : 'une de ces annonces'} en vente sur ${relies.size > 1 ? `le compte ${nomRef(ref)}` : 'ton compte'} (terminée${n > 1 ? 's' : ''}, vendue${n > 1 ? 's' : ''} ou déplacée${n > 1 ? 's' : ''}) : VRM relit tes annonces eBay.`);
       if (aRelire.length > lot.length) notes.push(`${lot.length} relues sur ${aRelire.length} — relance pour les suivantes.`);
       // Ce que la base en garde (la route vient de le ranger) ; l'état local,
       // posé à l'instant, prime jusqu'au prochain chargement.
       if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); }
     } finally { relireReglesEnCours.current = false; setRelitRegles(false); setRelectureRegles(notes.join(' ')); }
+    // La liste des comptes où eBay ne montre plus une annonce : une synchro
+    // (elle la sort d'ici si elle n'y est plus, et relit sa règle si elle y est).
+    for (const ref of absentes.keys()) await resync(ref);
   };
   // (6 octobre) Ce que le formulaire de mise en vente doit savoir : la paire est
   // déjà EN VENTE sur eBay, ou déjà PROGRAMMÉE (elle n'était pas vue — une
@@ -12736,7 +12937,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
               <PhotoVente src={d.annonce.photo} size={44} />
               <div style={{ flex: '1 1 150px', minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
-                <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}{surCompte(d.annonce)}{(() => { const e = etatDe(d.annonce); return e && e.etat === 'connue' ? <span data-ebay-doublon-regle={id} style={{ color: E.warn, fontWeight: 700 }}> · elle a une règle d'offre : eBay peut la vendre à tout moment</span> : null; })()}</div>
+                <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}{surCompte(d.annonce)}{(() => { const k = regleEngage(etatDe(d.annonce)); return k ? <span data-ebay-doublon-regle={id} data-ebay-doublon-regle-k={k} style={{ color: E.warn, fontWeight: 700 }}>{k === 'oui' ? ' · elle a une règle d\'offre : eBay peut la vendre à tout moment' : ' · elle a peut-être une règle d\'offre chez eBay (pas relue) : eBay peut la vendre à tout moment'}</span> : null; })()}</div>
                 {raison && raison !== 'permis' && !commune && RAISON_RETRAIT_AUTO[raison] && <div data-ebay-auto-raison-texte={raison} style={{ fontSize: 11, color: E.muted, marginTop: 2 }}>Pas retirée toute seule : {RAISON_RETRAIT_AUTO[raison]}.</div>}
                 {inc && <div data-ebay-auto-incertain={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>Le retrait automatique du {new Date(inc.at).toLocaleDateString('fr-FR')} n'a pas eu de réponse claire d'eBay : regarde sur eBay avant de cliquer.</div>}
                 {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
@@ -12837,11 +13038,16 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // chacun (§7) : ce que ça engage, ce qui n'a pas pu être lu, ce qui bloque.
   const etatsVue = new Map(itemsVue.map((it) => [cleAnnonce(it), etatDe(it)]));
   const etatVue = (it) => etatsVue.get(cleAnnonce(it)) || null;
-  const connues = itemsVue.filter((it) => { const e = etatVue(it); return e && e.etat === 'connue'; });
+  const connues = itemsVue.filter((it) => regleEngage(etatVue(it)) === 'oui');
+  // (11 octobre, revue — tour 3) Celles où eBay tient PEUT-ÊTRE une règle (la
+  // même règle que la relecture des ventes, `regleEngage`, §11) : elles
+  // engagent autant, tant que VRM ne sait pas — le bloc les compte à part.
+  const peutEtreRegle = itemsVue.filter((it) => regleEngage(etatVue(it)) === 'peut-etre');
   const vieillesRegles = connues.filter((it) => regleVieille(etatVue(it))).length;
   // La fenêtre des ventes : depuis quand VRM n'a pas relu les ventes eBay des
-  // comptes qui ont une règle active (le plus ancien) — eBay vend sans attendre.
-  const refsRegle = [...new Set(connues.map((it) => it._compte || 'principal'))];
+  // comptes qui ont une règle active — ou peut-être active (le plus ancien) —
+  // eBay vend sans attendre.
+  const refsRegle = [...new Set([...connues, ...peutEtreRegle].map((it) => it._compte || 'principal'))];
   const ventesAge = (() => {
     if (!refsRegle.length || ventesEbayLues === undefined) return { etat: 'en-cours' };
     if (!(ventesEbayLues instanceof Map)) return { etat: 'illisible' };
@@ -12871,20 +13077,30 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   };
   // Les annonces dont la règle n'a pas pu être lue : la raison se dit ICI, une
   // fois (sur la carte elle serait la même partout, §7).
-  const ORDRE_CAUSES_REGLE = ['illisible', 'jamais', 'prix-change', 'ancienne', 'offres-inconnues', 'lecture-ratee', 'apres-ecriture', 'incertain', 'en-cours', 'devise'];
+  const ORDRE_CAUSES_REGLE = ['illisible', 'jamais', 'prix-change', 'ancienne', 'offres-inconnues', 'lecture-ratee', 'apres-ecriture', 'incertain', 'en-cours', 'programmee', 'devise', 'pas-sur-ce-compte'];
   const pasSuRegle = itemsVue.filter((it) => { const e = etatVue(it); return e && e.etat === 'pas-su'; });
   const causesRegle = new Map();
   for (const it of pasSuRegle) { const r = etatVue(it).raison || 'jamais'; causesRegle.set(r, (causesRegle.get(r) || 0) + 1); }
+  // ⚠️⚠️ (11 octobre, revue — tour 3) CHAQUE « pas su » AVEC SON GESTE, et
+  // seulement le sien (`seRelitChezEbay` / `PAS_SU_SANS_RELECTURE`, §11) :
+  //   · ce qu'une relecture chez eBay lève (jamais lue, prix changé, ancienne,
+  //     lecture pas claire, programmée) ⇒ « Relire chez eBay » ;
+  //   · seuil relu, offres activées ou non pas montré ⇒ le lien vers CHAQUE
+  //     annonce (nommée), jamais un « regarde-les » sans lien ;
+  //   · notre propre lecture ratée ⇒ « Réessayer » (relire VRM) — plus
+  //     « Relire chez eBay », qui n'envoyait rien et répondait « rouvre l'écran » ;
+  //   · une autre devise ⇒ dite, sans geste (VRM n'y pose pas de règle) ;
+  //   · plus sur ce compte selon eBay ⇒ dite (l'écran relit déjà la liste).
+  const relisablesRegle = pasSuRegle.filter((it) => seRelitChezEbay(etatVue(it)));
   const causesTexte = (() => {
-    const n = (k) => causesRegle.get(k) || 0;
+    const n = (k) => relisablesRegle.filter((it) => (etatVue(it).raison || 'jamais') === k).length;
     const pasClaire = n('lecture-ratee') + n('apres-ecriture') + n('incertain') + n('en-cours');
     return [
-      n('illisible') && `${n('illisible')} : je n'ai pas pu relire ce que VRM en sait — rouvre l'écran`,
       n('jamais') && `${n('jamais')} jamais lue${n('jamais') > 1 ? 's' : ''}`,
       n('prix-change') && `${n('prix-change')} au prix changé depuis la dernière lecture : la règle a pu tomber ou rester`,
       n('ancienne') && `${n('ancienne')} dont la dernière lecture a plus d'un mois`,
       pasClaire && `${pasClaire} dont la dernière lecture n'est pas claire`,
-      n('devise') && `${n('devise')} dans une autre devise que l'euro`,
+      n('programmee') && `${n('programmee')} partie${n('programmee') > 1 ? 's' : ''} avec une règle programmée, pas encore relue${n('programmee') > 1 ? 's' : ''}`,
     ].filter(Boolean).join(' · ');
   })();
   const risqueRegle = pasSuRegle.some((it) => etatVue(it).risque === true);
@@ -12893,8 +13109,16 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // l'annonce sur eBay), et « Relire chez eBay » ne s'affiche que s'il reste
   // une annonce vraiment pas lue (§11 : `PAS_SU_SANS_RELECTURE`).
   const offresInconnuesRegle = pasSuRegle.filter((it) => etatVue(it).raison === 'offres-inconnues');
-  const nPasLueRegle = pasSuRegle.length - offresInconnuesRegle.length;
-  const lienOffresInconnues = offresInconnuesRegle.length === 1 ? (offresInconnuesRegle[0].url || `https://www.ebay.fr/itm/${offresInconnuesRegle[0].itemId}`) : '';
+  const nPasLueRegle = relisablesRegle.length;
+  const nIllisibleRegle = causesRegle.get('illisible') || 0, nDeviseRegle = causesRegle.get('devise') || 0, nAbsenteRegle = causesRegle.get('pas-sur-ce-compte') || 0;
+  const lienEbayDe = (it) => it.url || `https://www.ebay.fr/itm/${it.itemId}`;
+  // « Réessayer » : relit ce que VRM a rangé (notre base) — jamais eBay.
+  const relireBase = async () => {
+    if (relitRegles || !comptesEbay) return;
+    setRelitRegles(true);
+    try { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); setRelectureRegles(RG.illisibles.size ? 'VRM n\'arrive toujours pas à relire ce qu\'il sait de ces règles — rien n\'est perdu, réessaie dans un moment.' : ''); }
+    finally { setRelitRegles(false); }
+  };
   // Une paire dont la vente n'a pas pu être vérifiée : pas de règle d'offre
   // (dit UNE fois pour toutes les cartes reliées ; une paire vendue ou en
   // vente sur deux comptes se dit sur SA carte, parce que ça distingue).
@@ -12905,7 +13129,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     return null;
   })();
   const pasSuVentes = [...new Set([...(Array.isArray(ventesConnues.pasSu) ? ventesConnues.pasSu : []), ...(vendusVinted === null ? ['tes ventes Vinted'] : [])])];
-  const nonRelieesRegle = dvVue.nonReliees.filter((a) => { const e = etatDe(a); return e && e.etat === 'connue'; }).length;
+  const nonRelieesRegle = dvVue.nonReliees.filter((a) => !!regleEngage(etatDe(a))).length;
+  const nonRelieesPeutEtre = dvVue.nonReliees.some((a) => regleEngage(etatDe(a)) === 'peut-etre');
   // (11 octobre) Pendant un lot, la porte est grisée : fermer le panneau
   // arrêtait le lot sans le dire (le bandeau n'apparaissait qu'au montage
   // suivant), la réponse en vol n'était jamais appliquée — la carte disait
@@ -12918,9 +13143,14 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     <button type="button" data-regles-toutes-ouvrir disabled={porteGrisee} onClick={() => setToutesOuvert((o) => !o)}
       style={{ ...lienE, opacity: porteGrisee ? 0.55 : 1, cursor: porteGrisee ? 'default' : 'pointer' }}>{regles === undefined ? 'Lecture des règles…' : (toutesOuvert ? 'Fermer « Une règle pour toutes »' : 'Une règle pour toutes')}</button>
   );
-  const blocEngagement = connues.length > 0 && (
-    <div data-regles-engagement={connues.length} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
-      <div>Règle d'offre active sur <b>{connues.length} annonce{connues.length > 1 ? 's' : ''}</b> : eBay accepte, sans te demander, toute offre à partir du montant fixé — une offre acceptée est une vente, au prix de l'offre. En dessous, l'offre t'arrive sur eBay.{vieillesRegles > 0 ? ` Dont ${vieillesRegles} lue${vieillesRegles > 1 ? 's' : ''} il y a plus de 7 jours.` : ''}</div>
+  const blocEngagement = (connues.length > 0 || peutEtreRegle.length > 0) && (
+    <div data-regles-engagement={connues.length} data-regles-engagement-peut-etre={peutEtreRegle.length} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
+      <div>
+        {connues.length > 0
+          ? <>Règle d'offre active sur <b>{connues.length} annonce{connues.length > 1 ? 's' : ''}</b>{peutEtreRegle.length > 0 ? <>, et <b>peut-être sur {peutEtreRegle.length} autre{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas)</> : null} : eBay accepte, sans te demander, toute offre à partir du montant fixé</>
+          : <>eBay tient <b>peut-être une règle d'offre sur {peutEtreRegle.length} annonce{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas) : si elle y est, eBay accepte, sans te demander, toute offre à partir de son montant</>}
+        {' '}— une offre acceptée est une vente, au prix de l'offre. En dessous, l'offre t'arrive sur eBay.{vieillesRegles > 0 ? ` Dont ${vieillesRegles} lue${vieillesRegles > 1 ? 's' : ''} il y a plus de 7 jours.` : ''}
+      </div>
       <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 6, color: ventesVieilles ? E.warn : E.muted, fontSize: 12 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
         {' '}<button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button>
@@ -12932,15 +13162,22 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       {!pasSuRegle.length && porteToutes && <div style={{ marginTop: 8 }}>{porteToutes}</div>}
     </div>
   );
+  const lienA = { color: E.accentSoft, fontWeight: 700, textDecoration: 'none' };
   const lignePasSuRegle = pasSuRegle.length > 0 && (
     <div data-regles-pas-su={pasSuRegle.length} data-regles-causes={ORDRE_CAUSES_REGLE.filter((k) => causesRegle.get(k)).map((k) => `${k}:${causesRegle.get(k)}`).join(',')}
       style={{ fontSize: 12, color: risqueRegle ? E.warn : E.muted, lineHeight: 1.5, margin: '0 2px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <span style={{ flex: '1 1 220px', minWidth: 0 }}>
         {nPasLueRegle > 0 && `Règle d'offre pas encore lue pour ${nPasLueRegle} annonce${nPasLueRegle > 1 ? 's' : ''} (${causesTexte}).`}
-        {offresInconnuesRegle.length > 0 && <span data-regles-offres-inconnues-ligne={offresInconnuesRegle.length}>{nPasLueRegle > 0 ? ' ' : ''}{offresInconnuesRegle.length === 1 ? '1 annonce' : `${offresInconnuesRegle.length} annonces`} où eBay montre ton seuil mais pas si les offres y sont activées : regarde-{offresInconnuesRegle.length > 1 ? 'les' : 'la'} sur eBay{lienOffresInconnues ? <> — <a href={lienOffresInconnues} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, textDecoration: 'none' }}>Voir sur eBay ↗</a></> : '.'}</span>}
+        {offresInconnuesRegle.length > 0 && <span data-regles-offres-inconnues-ligne={offresInconnuesRegle.length}>{nPasLueRegle > 0 ? ' ' : ''}{offresInconnuesRegle.length === 1 ? '1 annonce' : `${offresInconnuesRegle.length} annonces`} où eBay montre ton seuil mais pas si les offres y sont activées : regarde-{offresInconnuesRegle.length > 1 ? 'les' : 'la'} sur eBay —{' '}
+          {offresInconnuesRegle.map((it, i) => <React.Fragment key={cleAnnonce(it)}>{i > 0 ? ' · ' : ''}<a href={lienEbayDe(it)} target="_blank" rel="noreferrer" data-regles-offres-inconnues-lien={it.itemId} style={lienA}>{offresInconnuesRegle.length === 1 ? 'Voir sur eBay' : (it.title || it.itemId)} ↗</a></React.Fragment>)}.</span>}
+        {nIllisibleRegle > 0 && <span data-regles-illisibles={nIllisibleRegle}>{(nPasLueRegle || offresInconnuesRegle.length) ? ' ' : ''}Je n'ai pas pu lire ce que VRM sait de la règle d'offre de {nIllisibleRegle === 1 ? '1 annonce' : `${nIllisibleRegle} annonces`} — rien n'est perdu, c'est la lecture de VRM qui a échoué.</span>}
+        {nDeviseRegle > 0 && <span data-regles-devise={nDeviseRegle}>{(nPasLueRegle || offresInconnuesRegle.length || nIllisibleRegle) ? ' ' : ''}{nDeviseRegle === 1 ? '1 annonce' : `${nDeviseRegle} annonces`} dans une autre devise que l'euro : VRM n'y pose pas de règle d'offre.</span>}
+        {nAbsenteRegle > 0 && <span data-regles-absentes={nAbsenteRegle}>{(nPasLueRegle || offresInconnuesRegle.length || nIllisibleRegle || nDeviseRegle) ? ' ' : ''}{nAbsenteRegle === 1 ? '1 annonce' : `${nAbsenteRegle} annonces`} qu'eBay ne montre plus en vente sur ce compte (terminée, vendue ou déplacée).</span>}
       </span>
-      {nPasLueRegle > 0 && <button type="button" data-regles-relire disabled={relitRegles || comptesStatut === undefined} onClick={() => relireRegles(pasSuRegle)}
+      {nPasLueRegle > 0 && <button type="button" data-regles-relire disabled={relitRegles || comptesStatut === undefined} onClick={() => relireRegles(relisablesRegle)}
         style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: (relitRegles || comptesStatut === undefined) ? 0.55 : 1 }}>{relitRegles ? 'Lecture…' : 'Relire chez eBay'}</button>}
+      {nIllisibleRegle > 0 && <button type="button" data-regles-relire-base disabled={relitRegles} onClick={relireBase}
+        style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: relitRegles ? 0.55 : 1 }}>{relitRegles ? 'Lecture…' : 'Réessayer'}</button>}
       {porteToutes}
     </div>
   );
@@ -12959,7 +13196,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'}{nonRelieesPeutEtre ? ' (peut-être)' : ''} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
       </div>
     )}
     {blocEngagement}
@@ -12981,7 +13218,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {toutesOuvert && connected === true && regles !== undefined && (
       <EbayReglesToutes items={itemsVue} etatDe={etatDe} prixDe={prixDe} regleBloquee={regleBloquee} achats={achats} nomRef={nomRef}
-        plusieursComptes={melangeAnnonces} relit={relitRegles} onRelire={relireRegles}
+        plusieursComptes={melangeAnnonces} relit={relitRegles} onRelire={relireRegles} onRelireBase={relireBase}
         onLot={(ids) => setEnLot(new Set(ids))} onRegle={surRegle} onInterrompu={(v) => setLotInterrompu(v)}
         onDebut={() => { setLotInterrompu(null); try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} }}
         onFini={async () => { if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); } }} />
@@ -34366,7 +34603,7 @@ function FermerCompte() {
   const [fin, setFin] = React.useState(null);
   // (9 octobre) Ses RÈGLES D'OFFRE eBay restent posées chez eBay après la
   // fermeture : eBay continuera d'accepter. Compté sur tous ses comptes eBay ;
-  // `undefined` en cours · `null` pas su · nombre.
+  // `undefined` en cours · `null` pas su · { oui, peutEtre } (`compterReglesEbay`).
   const [reglesEbayN, setReglesEbayN] = React.useState(undefined);
   React.useEffect(() => {
     if (!ouvert || info !== undefined) return;
@@ -34420,8 +34657,8 @@ function FermerCompte() {
                 {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
                 {' '}C'est <b style={{ color: C.text }}>définitif</b> : pour garder une copie, fais d'abord une « Sauvegarde complète » (onglet Réglages). Ensuite, retire l'extension VRM de Chrome.
               </div>
-              {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>Je n'ai pas pu vérifier si tes annonces eBay ont une règle d'offre : regarde eBay → Annonces avant de fermer.</div>}
-              {typeof reglesEbayN === 'number' && reglesEbayN > 0 && <div data-fermer-regles-ebay={reglesEbayN} style={{ ...txt, marginTop: 8, color: C.warn }}>Tes règles d'offre eBay ({reglesEbayN} annonce{reglesEbayN > 1 ? 's' : ''}) restent posées sur eBay après la fermeture : eBay continuera d'accepter les offres dès le montant fixé, et VRM ne verra plus ces ventes. Retire-les d'abord (eBay → Annonces) si tu ne veux plus vendre ainsi.</div>}
+              {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
+              {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
               <label style={{ display: 'block', ...txt, marginTop: 10 }}>
                 Pour confirmer, recopie ton adresse : <b style={{ color: C.text }}>{email}</b>
                 <input type="email" autoComplete="off" autoCapitalize="none" value={tape} onChange={(e) => setTape(e.target.value)} placeholder={email}

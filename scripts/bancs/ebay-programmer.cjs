@@ -685,6 +685,10 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).waitFor({ timeout: 5000 });
         const texte = await feuille(pg).innerText();
         dit(/70,00\s*€/.test(texte) && /1 avec une règle d'offre/.test(texte), 'la feuille du lot écrit le montant de la règle (70,00 €) et combien en portent une', texte.replace(/\s+/g, ' ').slice(-160));
+        // (11 octobre, revue — tour 3) La décision du 9 octobre : la confirmation
+        // DIT qu'une offre acceptée vend la paire — la carte, le lot et la
+        // publication le disaient, le planificateur non (« eBay acceptera seul »).
+        dit(/la paire sera vendue à ce prix/.test(texte), 'la feuille du lot dit qu\'une offre acceptée par eBay VEND la paire (comme la carte, le lot et la publication)', texte.replace(/\s+/g, ' ').slice(-220));
         await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click();
         await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
         const p = envois.filter((e) => e.action === 'programmer');

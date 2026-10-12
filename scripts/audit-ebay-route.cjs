@@ -1913,6 +1913,11 @@ const RA = {};
         };
         const pL = variante === 'sync' ? app(JWT_J, { action: 'sync' }) : app(JWT_J, { action: 'regleoffrelire', itemIds: ['110000000301'] });
         await pret;
+        // La pose part APRÈS la lecture tenue : au moins une milliseconde plus
+        // tard (dans le faux, tout tient dans la même milliseconde — deux heures
+        // de départ égales ne disent pas laquelle est la plus récente, et le
+        // contrôle tombait une fois sur quelques-unes sur un code intact).
+        await new Promise((r) => setTimeout(r, 3));
         const res = faireRes();
         await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT_J }, body: POSE('110000000301', 72, 80, NUL) }, res);
         fini(); await pL; global.fetch = f0;
@@ -2015,6 +2020,132 @@ const RA = {};
     const cs = [[7, 80], [40, 80], [39.99, 80], [0.03, 0.05], [72, null], [NaN, 80]];
     const e2 = A ? cs.filter(([a, p]) => A.seuilTropBas(a, p) !== lib.seuilTropBas(a, p)) : cs;
     dit(e2.length === 0, '[R-§11] `seuilTropBas` aussi', e2.map((c) => JSON.stringify(c)).join(' · '));
+  });
+
+  // ══ (11 octobre, revue — tour 3) ═════════════════════════════════════════
+  // [R-prog-regle] Une annonce PROGRAMMÉE part avec sa règle : la route la
+  // RANGE (relue si elle est en ligne maintenant, « programmee » sinon). Elle
+  // n'était ni rangée ni relue : une fois partie, VRM ne la voyait nulle part.
+  await essaie('[R-prog-regle]', async () => {
+    const corpsP = (uuid, numero, scheduleTime) => ({ action: 'programmer', confirme: true, uuid, fraisVus: 0.2, scheduleTime, item: { ...itemC, numero, offre: { accepte: 66, refuse: null } } });
+    avecR();
+    const o = await app(JWT_J, corpsP('C1FFEE0123456789ABCDEF0123456789', '63', ''));
+    const id = o.corps && String(o.corps.itemId || '');
+    const e = (offresDe(J) || {})[id];
+    const iA = auCompte(o.journal).findIndex((x) => x.appel === 'AddFixedPriceItem');
+    const nGet = iA < 0 ? 0 : auCompte(o.journal).slice(iA + 1).filter((x) => x.appel === 'GetItem').length;
+    dit(o.code === 200 && !!e && e.lu === true && e.accepte === 66 && e.par === 'programmation' && nGet === 1 && !!o.corps.offre && o.corps.offre.range === true && !!o.corps.offre.lecture,
+      '[R-prog-regle] programmer « maintenant » avec une règle (66 €) ⇒ relue chez eBay après l\'ajout et RANGÉE, comme une publication', `HTTP ${o.code} · ${JSON.stringify(e)} · ${nGet} GetItem après`);
+    avecR();
+    const p = await app(JWT_J, corpsP('C2FFEE0123456789ABCDEF0123456789', '64', iso(Date.now() + 2 * JOUR)));
+    const e2 = (offresDe(J) || {})[p.corps && String(p.corps.itemId || '')];
+    dit(p.code === 200 && !!e2 && e2.lu === false && e2.raison === 'programmee' && e2.accepte === 66 && !!p.corps.offre && p.corps.offre.programmee === true && p.corps.offre.range === true,
+      '[R-prog-regle] programmée pour plus tard ⇒ rangée « programmee » avec le seuil ENVOYÉ (66 €) — l\'app la compte comme une règle qu\'eBay tiendra', `HTTP ${p.code} · ${JSON.stringify(e2)}`);
+    avecR(); mode.add = 'maintenant';
+    const q = await app(JWT_J, corpsP('C3FFEE0123456789ABCDEF0123456789', '65', iso(Date.now() + 2 * JOUR)));
+    const e3 = (offresDe(J) || {})[q.corps && String(q.corps.itemId || '')];
+    dit(q.code === 200 && q.corps.enLigneMaintenant === true && !!e3 && e3.lu === true && e3.accepte === 66,
+      '[R-prog-regle] eBay a ignoré l\'heure (en ligne MAINTENANT) ⇒ la règle est relue et rangée tout de suite', `HTTP ${q.code} · ${JSON.stringify(e3)}`);
+  });
+  // [R-retire-regle] Une annonce terminée (retirée, programmation annulée) sort
+  // aussi des règles rangées — la déconnexion la comptait encore.
+  await essaie('[R-retire-regle]', async () => {
+    const regles2 = () => lignes.push({ owner: J, id: 'ebay_offres', data: { rev: 1, items: {
+      '110000000301': { lu: true, offresActives: true, accepte: 72, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() - H, par: 'sync' },
+      '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' },
+      '110000000307': { lu: false, raison: 'programmee', accepte: 90, refuse: null, lueA: Date.now() - H, par: 'programmation' } } } });
+    avecR(); regles2();
+    const o = await app(JWT_J, { action: 'retirer', itemId: '110000000301', confirme: true });
+    const its = offresDe(J) || {};
+    dit(o.code === 200 && o.corps.regles === true && !its['110000000301'] && !!its['110000000302'], '[R-retire-regle] retirer une annonce ⇒ sa règle SORT de ebay_offres (les autres restent)', `HTTP ${o.code} · ${Object.keys(its).join(',')}`);
+    avecR(); regles2();
+    const d = await app(JWT_J, { action: 'deprogrammer', itemId: '110000000307', confirme: true });
+    const its2 = offresDe(J) || {};
+    dit(d.code === 200 && d.corps.verifie === true && !its2['110000000307'] && !!its2['110000000301'], '[R-retire-regle] annuler une programmation ⇒ sa règle « programmee » sort aussi', `HTTP ${d.code} · ${Object.keys(its2).join(',')}`);
+    avecR(); regles2(); mode.offresKo = true;
+    const o3 = await app(JWT_J, { action: 'retirer', itemId: '110000000301', confirme: true });
+    mode.offresKo = false;
+    dit(o3.code === 200 && o3.corps.regles === false && ecrit(o3.journal, 'ebay_offres') === null, '[R-retire-regle] ligne des règles illisible ⇒ rien n\'est réécrit (et la réponse le dit)', `HTTP ${o3.code} · regles=${o3.corps.regles}`);
+  });
+  // [R-lire-absente] « Relire chez eBay » sur une liste COMPLÈTE : une annonce
+  // qui n'est plus sur ce compte voit sa règle sortir (la règle de la synchro :
+  // seulement une entrée plus ancienne que la liste).
+  await essaie('[R-lire-absente]', async () => {
+    avecR();
+    lignes.push({ owner: J, id: 'ebay_offres', data: { rev: 1, items: {
+      '110000000999': { lu: true, offresActives: true, accepte: 40, refuse: null, devise: 'EUR', prix: 60, lueA: Date.now() - JOUR, par: 'sync' },
+      '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' } } } });
+    const o = await app(JWT_J, { action: 'regleoffrelire', itemIds: ['110000000999'] });
+    const its = offresDe(J) || {};
+    dit(o.code === 200 && o.corps.lectures['110000000999'].raison === 'pas-sur-ce-compte' && !its['110000000999'] && !!its['110000000302'],
+      '[R-lire-absente] eBay ne la montre plus sur ce compte (liste complète) ⇒ dite, et sa règle rangée SORT (les autres restent)', `HTTP ${o.code} · ${Object.keys(its).join(',')}`);
+  });
+  // [R-engage] (app) UNE règle pour « eBay tient — peut-être — une règle » :
+  // `regleEngage` sur `etatRegleOffre`, et `reglesEngagees` (déconnexion,
+  // fermeture, relecture des ventes) — exécutées, jamais relues.
+  await essaie('[R-engage]', async () => {
+    const noms = ['REGLE_ANCIENNE_MS', 'etatRegleOffre', 'regleEngage', 'reglesEngagees'];
+    const srcs = noms.map((n) => extraire(APP, n));
+    let A = null;
+    if (srcs.every(Boolean)) { const c3 = {}; vm.createContext(c3); try { vm.runInContext(srcs.join('\n') + '\n;this.R = { etatRegleOffre, regleEngage, reglesEngagees };', c3); A = c3.R; } catch (_) {} }
+    dit(!!A, '[R-engage] la règle existe dans l\'app (`regleEngage`, `reglesEngagees`) et se charge', srcs.map((s, i) => s ? '' : noms[i]).filter(Boolean).join(','));
+    if (!A) return;
+    const now = Date.now();
+    const lu = (o) => ({ lu: true, devise: 'EUR', lueA: now - H, offresFaites: null, prix: 80, ...o });
+    const cas = [
+      ['connue', lu({ offresActives: true, accepte: 72 }), 'oui'],
+      ['offres-inconnues', lu({ offresActives: null, accepte: 72 }), 'peut-etre'],
+      ['incertain', { lu: false, raison: 'incertain', lueA: now }, 'peut-etre'],
+      ['en-cours', { lu: false, raison: 'en-cours', lueA: now }, 'peut-etre'],
+      ['apres-ecriture', { lu: false, raison: 'apres-ecriture', lueA: now }, 'peut-etre'],
+      ['programmee', { lu: false, raison: 'programmee', accepte: 70, lueA: now }, 'peut-etre'],
+      ['prix changé sur une règle', lu({ offresActives: true, accepte: 72, prix: 90 }), 'peut-etre'],
+      ['aucune', lu({ offresActives: true, accepte: null }), null],
+      ['offres coupées', lu({ offresActives: false, accepte: 72 }), null],
+      ['lecture ratée', { lu: false, raison: 'lecture-ratee', lueA: now }, null],
+      ['autre devise', lu({ offresActives: true, accepte: 72, devise: 'USD' }), null],
+    ];
+    const faux = cas.filter(([, e, k]) => A.regleEngage(A.etatRegleOffre({ itemId: '1', price: '80' }, new Map([['principal:1', e]]), null, now)) !== k);
+    dit(!faux.length, '[R-engage] connue ⇒ « oui » ; seuil relu sans l\'état des offres, incertaine, en cours, posée pas relue, programmée, prix changé ⇒ « peut-être » ; aucune, offres coupées, lecture ratée, autre devise ⇒ rien', faux.map((c) => c[0]).join(' · '));
+    const E = (o) => lu({ offresActives: true, accepte: 60, ...o });
+    const base = (o) => ({ ref: 'principal', entrees: { '1': E({}), '2': E({ lueA: now - 2 * JOUR }), '3': E({ lueA: now }), '4': { lu: false, raison: 'apres-ecriture', lueA: now - 2 * JOUR } }, annonces: [{ itemId: '1', price: '80' }], programmees: [], cap: now - H / 2, complet: true, ...o });
+    const r1 = A.reglesEngagees([base({})], now);
+    dit(r1.oui === 2 && r1.peutEtre === 0, '[R-engage] liste complète lue APRÈS : une règle d\'annonce terminée (2) ne compte plus ; une règle plus récente que la liste (3) compte ; une écriture pas relue d\'une annonce terminée (4) non plus', JSON.stringify(r1));
+    const r2 = A.reglesEngagees([base({ complet: false })], now), r3 = A.reglesEngagees([base({ annonces: null })], now);
+    dit(r2.oui === 3 && r2.peutEtre === 1 && r3.oui === 3 && r3.peutEtre === 1, '[R-engage] liste incomplète ou illisible ⇒ rien n\'est écarté (« pas su » ne cache rien)', `${JSON.stringify(r2)} · ${JSON.stringify(r3)}`);
+    const r4 = A.reglesEngagees([{ ref: 'principal', entrees: { '1': E({ prix: 80 }) }, annonces: [{ itemId: '1', price: '95' }], programmees: [], cap: now, complet: true }], now);
+    dit(r4.oui === 0 && r4.peutEtre === 1, '[R-engage] le prix de la liste juge « prix changé » ⇒ peut-être (comme la carte)', JSON.stringify(r4));
+  });
+  // [R-apres-prix] (app) Après un changement de prix, « ✓ … reste à » ne
+  // s'écrit que si la carte dit « connue » sur la MÊME lecture.
+  await essaie('[R-apres-prix]', async () => {
+    const noms = ['eurEbay', 'seuilTropBas', 'etatEnClair', 'REGLE_ANCIENNE_MS', 'etatRegleOffre', 'regleApresPrix'];
+    const srcs = noms.map((n) => extraire(APP, n));
+    let A = null;
+    if (srcs.every(Boolean)) { const c3 = {}; vm.createContext(c3); try { vm.runInContext(srcs.join('\n') + '\n;this.R = { regleApresPrix };', c3); A = c3.R; } catch (_) {} }
+    dit(!!A, '[R-apres-prix] `regleApresPrix` se charge', srcs.map((s, i) => s ? '' : noms[i]).filter(Boolean).join(','));
+    if (!A) return;
+    const L = (o) => ({ lecture: { lu: true, accepte: 72, refuse: 60, devise: 'EUR', prix: 85, offresFaites: 2, lueA: Date.now(), ...o }, tombee: false, avant: { accepte: 72, refuse: 60 } });
+    const r0 = A.regleApresPrix(L({ offresActives: true }), []), rN = A.regleApresPrix(L({ offresActives: null }), []), rF = A.regleApresPrix(L({ offresActives: false }), []);
+    dit(r0.ton === 'ok' && /^✓/.test(r0.msg) && rN.ton === 'warn' && !/✓/.test(rN.msg) && rF.ton === 'warn' && !/✓/.test(rF.msg),
+      '[R-apres-prix] offres actives ⇒ « ✓ … reste à 72 € » ; offres activées ou non pas montré, ou coupées ⇒ ambre, sans ✓', `${r0.ton}/${rN.ton}/${rF.ton} · « ${rN.msg} »`);
+  });
+  // [R-publie-offre] (app) Ce que la publication dit de la règle vient de la
+  // MÊME classification que la carte (`resultatRegleOffre`).
+  await essaie('[R-publie-offre]', async () => {
+    const noms = ['eurEbay', 'etatEnClair', 'resultatRegleOffre', 'messageOffreCreation'];
+    const srcs = noms.map((n) => extraire(APP, n));
+    let A = null;
+    if (srcs.every(Boolean)) { const c3 = {}; vm.createContext(c3); try { vm.runInContext(srcs.join('\n') + '\n;this.R = { messageOffreCreation };', c3); A = c3.R; } catch (_) {} }
+    dit(!!A, '[R-publie-offre] `messageOffreCreation` se charge', srcs.map((s, i) => s ? '' : noms[i]).filter(Boolean).join(','));
+    if (!A) return;
+    const lec = (o) => ({ lu: true, accepte: 66, refuse: null, devise: 'EUR', prix: 74, lueA: Date.now(), ...o });
+    const a = A.messageOffreCreation({ verifie: null, lecture: lec({ offresActives: null }), range: true }, { accepte: 66 });
+    const b0 = A.messageOffreCreation({ verifie: null, lecture: null, range: false }, { accepte: 66 });
+    const c = A.messageOffreCreation({ verifie: true, lecture: lec({ offresActives: true }), range: false }, { accepte: 66 });
+    const d = A.messageOffreCreation({ verifie: true, lecture: lec({ offresActives: true }), range: true }, { accepte: 66 });
+    dit(a.issue === 'offres-inconnues' && !a.ok && /66,00/.test(a.msg) && !/pas encore relue/.test(a.msg) && b0.issue === 'non-relu' && !b0.ok && c.issue === 'ok' && !c.ok && d.ok === true,
+      '[R-publie-offre] seuil relu sans l\'état des offres ⇒ « eBay montre ton seuil », jamais « pas encore relue » ; rien relu ⇒ pas relue ; posée mais pas notée ⇒ pas « ok »', JSON.stringify([a.issue, b0.issue, c.ok, d.ok]));
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────

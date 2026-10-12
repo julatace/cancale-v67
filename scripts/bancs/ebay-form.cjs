@@ -53,7 +53,11 @@ const envoisEbay = []; let avertir = false;
     // (9 octobre) La vérification à blanc rend les frais par nom, et — quand le
     // banc le demande — un avertissement d'eBay (une catégorie sans offres).
     if(body.action==='pubverify') return j({ ok:true, fees:'0.35', frais:{ total:0.35, parNom:{ ListingFee:0.35 } }, avertissements: avertir ? ['Les offres ne sont pas disponibles dans cette catégorie (message inventé).'] : [] });
-    if(body.action==='publish') return j({ ok:true, itemId:'110000000001', url:'https://www.ebay.fr/itm/110000000001', sku:'VRM-401' });
+    // (11 octobre, revue — tour 3) Publiée AVEC une règle : la route relit le
+    // seuil (66 €) mais eBay ne montre pas si les offres sont activées
+    // (`verifie:null` AVEC une lecture — la forme réelle de la route).
+    if(body.action==='publish') return j({ ok:true, itemId:'110000000001', url:'https://www.ebay.fr/itm/110000000001', sku:'VRM-401', compte:'', avertissements:[],
+      ...((body.item && body.item.offre) ? { offre: { envoyee:{ accepte: body.item.offre.accepte, refuse: null }, verifie: null, lecture: { lu:true, offresActives:null, accepte: body.item.offre.accepte, refuse:null, devise:'EUR', prix:74, offresFaites:null, lueA: Date.now() }, range: true } } : {}) });
     if(body.action==='pubinfo'){ const cid = body.categoryId || '15709';
       return j({ ok:true, categorie:{ categoryId:cid, suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
       categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
@@ -238,6 +242,17 @@ const envoisEbay = []; let avertir = false;
   if (feuilleV) { await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(600); }
   dit(pubActif && feuilleV && /66,00\s*€/.test(feuilleT), '« Publier » avec une règle : une feuille, même avec un seul compte, qui dit le montant (66,00 €)', `bouton ${pubActif ? 'actif' : 'grisé'} · feuille ${feuilleV}`);
   dit(envoisEbay.filter((x) => x.action === 'publish').length === nPub, '« Annuler » : AUCUN `publish` envoyé');
+  // (11 octobre, revue — tour 3) On publie pour de vrai : la route a RELU le
+  // seuil (66 €), eBay ne montre pas si les offres sont activées. La ligne de
+  // la règle doit le dire comme la carte (`resultatRegleOffre`, §11) — jamais
+  // « pas encore relue » sur un seuil relu.
+  if (pubActif) {
+    await pubBtn.click(); await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 });
+    await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Oui, publier' }).click();
+  }
+  const po = await pg.waitForSelector('[data-publie-offre]', { timeout: 8000 }).then(() => pg.$eval('[data-publie-offre]', (e) => [e.getAttribute('data-publie-offre'), e.getAttribute('data-publie-offre-issue'), e.innerText])).catch(() => [null, null, '']);
+  dit(po[0] === 'warn' && po[1] === 'offres-inconnues' && /66,00\s*€/.test(po[2]) && !/pas encore relue/.test(po[2]),
+    'publiée avec une règle, seuil relu sans l\'état des offres : la ligne dit le seuil RELU (66,00 €) et « regarde sur eBay », en ambre — jamais « pas encore relue »', JSON.stringify(po));
   } catch (e) { dit(false, 'la règle d\'offre à la création se déroule', String((e && e.message) || e).split('\n')[0].slice(0, 200)); }
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 

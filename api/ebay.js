@@ -543,6 +543,7 @@ async function handleRegleOffreLire(b, ctx) {
   if (!ids || !ids.length || ids.length > 20 || ids.some((x) => !ID_EBAY.test(x))) return { status: 400, body: { ok: false, reason: 'annonces', error: 'Liste d\'annonces eBay invalide (1 à 20).' } };
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const tListe = Date.now();
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces eBay — rien n\'a été relu.' } };
   const aMoi = new Set([...L.actives, ...L.programmees].map((x) => x.itemId));
@@ -553,7 +554,13 @@ async function handleRegleOffreLire(b, ctx) {
     const lecture = g.ok ? { ...g.lecture, par: 'relire' } : { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'relire' };
     rendu[id] = lectures[id] = lecture;
   }
-  const range = Object.keys(lectures).length ? await rangerReglesOffre(ctx, lectures) : true;
+  // (11 octobre, revue — tour 3) Une liste COMPLÈTE dit aussi quelles annonces
+  // ne sont plus sur ce compte (terminées, vendues, déplacées) : leurs règles
+  // sortent, avec la règle de la synchro (`garder` : seulement une entrée PLUS
+  // ANCIENNE que la liste). Elles restaient rangées — l'écran les montrait « en
+  // ligne », relisait sans fin, et la déconnexion les comptait encore.
+  const garder = L.complet ? { ids: aMoi, a: tListe } : null;
+  const range = (Object.keys(lectures).length || garder) ? await rangerReglesOffre(ctx, lectures, garder) : true;
   return { status: 200, body: { ok: true, lectures: rendu, range } };
 }
 
@@ -843,8 +850,8 @@ async function handlePublish(b, ctx) {
   if (it.regleOffre && ID_EBAY.test(String(r.itemId))) {
     const demande = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
     const post = await lireRegleOffre(at.token, String(r.itemId));
-    await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok ? { ...post.lecture, par: 'publication' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'publication' } });
-    offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null };
+    const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok ? { ...post.lecture, par: 'publication' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'publication' } });
+    offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
   return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
 }
@@ -954,14 +961,57 @@ async function handleProgrammer(b, ctx) {
   const a = await tradingAddFixedPriceItem(at.token, { ...it, uuid });
   if (sansAck(a)) return { status: 504, body: { ok: false, reason: 'incertain', uuid, error: 'eBay n\'a pas répondu à temps — je ne sais pas si elle est programmée. VRM relit tes annonces eBay avant de redemander quoi que ce soit.' } };
   if (!a.ok) {
-    if ((a.erreurs || []).some((e) => e.code === '488')) return confirmerDoublon(at.token, a, it, quand);
+    if ((a.erreurs || []).some((e) => e.code === '488')) {
+      // Le même envoi a DÉJÀ créé l'annonce (un premier essai resté sans
+      // réponse) : sa règle n'a donc jamais été rangée — on la range maintenant.
+      const d = await confirmerDoublon(at.token, a, it, quand);
+      if (d.status === 200 && d.body && d.body.ok && it.regleOffre) d.body.offre = await rangerRegleProgrammee(ctx, at.token, d.body, it, quand);
+      return d;
+    }
     return { status: 422, body: { ok: false, error: a.err || 'eBay a refusé l\'annonce.', erreurs: a.erreurs } };
   }
   if (!ID_EBAY.test(a.itemId)) return { status: 502, body: { ok: false, reason: 'incertain', uuid, error: 'eBay a répondu sans numéro d\'annonce — je ne sais pas si elle est programmée. Rafraîchis depuis eBay avant de recommencer.' } };
-  // (9 octobre) Une programmée part AVEC sa règle d'offre ; elle n'est PAS
-  // relue (lire une annonce pas encore commencée : non mesuré) — la réponse
-  // dit ce qui a été ENVOYÉ, comme tel.
-  return { status: 200, body: resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, compte: ctx.compte.pseudo || '', avertissements: a.avertissements, ...(it.regleOffre ? { offre: { envoyee: { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse } } } : {}) }) };
+  const corps = resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, compte: ctx.compte.pseudo || '', avertissements: a.avertissements });
+  if (it.regleOffre) corps.offre = await rangerRegleProgrammee(ctx, at.token, corps, it, quand);
+  return { status: 200, body: corps };
+}
+// ⚠️⚠️ (11 octobre, revue — tour 3) UNE ANNONCE PROGRAMMÉE PART AVEC SA RÈGLE
+// D'OFFRE : VRM la RANGE comme une publication. Elle n'était ni rangée ni
+// relue — même mise en ligne « Maintenant » : une fois partie, l'annonce
+// sortait des programmées sans entrer dans Annonces, son seuil (que VRM venait
+// lui-même d'envoyer) n'était plus visible nulle part, et les ventes eBay
+// n'étaient pas relues à l'ouverture (aucune règle connue). Deux cas :
+//   · en ligne MAINTENANT (pas d'heure, ou eBay a ignoré l'heure) : relue
+//     chez eBay et rangée, exactement comme `publish` (`par: 'programmation'`) ;
+//   · programmée pour plus tard : rangée « programmee » avec ce qui a été
+//     ENVOYÉ — l'app la compte comme une règle que eBay tiendra peut-être
+//     (relecture des ventes, déconnexion, fermeture) ; la synchro qui suit son
+//     départ la relit (lecture plus récente : elle remplace).
+// Rend l'objet `offre` de la réponse : `envoyee`, et `verifie`/`lecture` (en
+// ligne) ou `programmee: true` ; `range` dit si VRM a pu le noter.
+async function rangerRegleProgrammee(ctx, token, corps, it, quand) {
+  const envoyee = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
+  const id = String(corps.itemId);
+  if (!ID_EBAY.test(id)) return { envoyee };
+  if (!quand || corps.enLigneMaintenant) {
+    const post = await lireRegleOffre(token, id);
+    const range = await rangerReglesOffre(ctx, { [id]: post.ok ? { ...post.lecture, par: 'programmation' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'programmation' } });
+    return { envoyee, verifie: post.ok ? memeRegle(post.lecture, envoyee, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
+  }
+  const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: corps.debut || quand, lueA: Date.now(), par: 'programmation' } });
+  return { envoyee, programmee: true, range: range === true };
+}
+// Une annonce TERMINÉE (retirée, programmation annulée) sort aussi des règles
+// rangées : sinon, jusqu'à la prochaine synchro, la déconnexion et « Fermer mon
+// compte » comptaient une règle qu'eBay n'applique plus. Lire-fusionner-réécrire
+// gardé (compare-et-échange) : une lecture ratée n'écrit rien — true · false · null.
+async function sortirDesRegles(itemId, ctx) {
+  return modifierDonnee(ligneDe('ebay_offres', ctx), ctx.owner, (d) => {
+    const items = (d && d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : null;
+    if (!items || !Object.prototype.hasOwnProperty.call(items, itemId)) return undefined;
+    const { [itemId]: _parti, ...reste } = items;
+    return { ...d, items: reste, capturedAt: Date.now() };
+  });
 }
 // La réponse commune d'une annonce programmée (ou mise en ligne).
 // ⚠️ eBay PEUT ignorer l'heure : si le StartTime qu'il rend est antérieur de
@@ -1034,7 +1084,9 @@ async function handleDeprogrammer(b, ctx) {
   if (!L2.ok) return { status: 200, body: { ok: true, verifie: null } };
   if (L2.programmees.some((x) => x.itemId === itemId)) return { status: 409, body: { ok: false, reason: 'toujours-programmee', error: 'eBay a répondu « fait », mais elle est toujours programmée chez lui. Annule-la dans le Seller Hub.' } };
   if (L2.actives.some((x) => x.itemId === itemId)) return { status: 409, body: { ok: false, reason: 'en-ligne', error: 'Elle est maintenant EN LIGNE sur eBay — retire-la avec « Retirer d\'eBay ».' } };
-  return { status: 200, body: { ok: true, verifie: true } };
+  // Plus programmée, pas en ligne : sa règle (rangée « programmee ») sort aussi.
+  const regles = await sortirDesRegles(itemId, ctx);
+  return { status: 200, body: { ok: true, verifie: true, regles: regles === true } };
 }
 
 // ── DÉPLACER UNE PROGRAMMATION (Trading ReviseFixedPriceItem + ScheduleTime) ─
@@ -1238,6 +1290,9 @@ async function handleRetirer(b, ctx) {
   // ouverture — en occupant les places d'une vraie vente (revue du 6 octobre).
   // Lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien.
   const listes = await sortirDesAnnonces(itemId, ctx);
+  // (11 octobre, revue — tour 3) …et des règles rangées : une annonce terminée
+  // n'a plus de règle qu'eBay applique.
+  const regles = await sortirDesRegles(itemId, ctx);
   let journal = null;
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
@@ -1249,7 +1304,7 @@ async function handleRetirer(b, ctx) {
       journal = await storeData(ligneDe('ebay_retraits_auto', ctx), { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, ctx.owner);
     }
   }
-  return { status: 200, body: { ok: true, fin, listes, ...(auto ? { auto: true, journal } : {}) } };
+  return { status: 200, body: { ok: true, fin, listes, regles: regles === true, ...(auto ? { auto: true, journal } : {}) } };
 }
 
 // ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────

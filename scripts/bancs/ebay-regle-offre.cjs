@@ -99,6 +99,7 @@ const preparer = (c) => {
   cfg = c || {};
   const offresP = OFFRES_P(), offresK2 = OFFRES_K2();
   if (cfg.offresP) cfg.offresP(offresP);
+  if (cfg.offresK2) cfg.offresK2(offresK2);
   const annP = ANN_P(), annK2 = ANN_K2();
   if (cfg.annonces) cfg.annonces(annP, annK2);
   rows = [
@@ -115,6 +116,8 @@ const preparer = (c) => {
     { id: 'ebay_offres', data: { items: offresP, capturedAt: Date.now() } },
     { id: 'ebay_offres_' + K2, data: { items: offresK2, capturedAt: Date.now() } },
   ];
+  // (tour 3) Une ligne de plus, ou une ligne changée (brouillons, programmées).
+  if (cfg.rows) cfg.rows(rows);
   ebay = {};
   for (const a of annP) ebay[a.itemId] = { compte: 'principal', prix: Number(a.price), regle: { offresActives: false, accepte: null, refuse: null, offresFaites: null } };
   for (const a of annK2) ebay[a.itemId] = { compte: K2, prix: Number(a.price), regle: { offresActives: false, accepte: null, refuse: null, offresFaites: null } };
@@ -211,6 +214,8 @@ async function ouvrir(b, vp, c) {
       if (cfg.sync500) return j({ ok: false, error: 'panne' }, 500);
       const r = rows.find((x) => x.id === 'ebay_orders' + (compteDe(body) === 'principal' ? '' : '_' + body.compte));
       if (r) r.data = { ...r.data, capturedAt: Date.now() };
+      // (tour 3) Ce que la synchro range de plus (une annonce partie, sa règle).
+      if (cfg.apresSync) cfg.apresSync(compteDe(body));
       return j({ ok: true });
     }
     if (body.action === 'regleoffrelire') {
@@ -389,8 +394,10 @@ async function finPage(pg, errs, quoi) {
           dit(await couleur(pg, '[data-regles-pas-su]') === C_MUTED, `[2] ${T} sans risque (A4 retirée), la ligne « pas su » reste DISCRÈTE`, await couleur(pg, '[data-regles-pas-su]')); await ctx.close(); }
         { const { ctx, pg } = await ouvrir(b, vp, { retraitAuto: true }); await allerAnnonces(pg);
           dit(await pg.locator('[data-regles-engagement]').count() === 1 && await pg.locator('[data-regles-fenetre]').count() === 1 && await pg.locator('[data-regles-vers-retrait]').count() === 0, `[2] ${T} retrait automatique ALLUMÉ : la fenêtre est TOUJOURS dite, sans le lien`); await ctx.close(); }
-        { const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { delete o[A.A1]; delete o[A.A5]; delete o[A.A6]; } }); await allerAnnonces(pg);
-          dit(await pg.locator('[data-regles-engagement]').count() === 0, `[2] ${T} aucune règle connue ⇒ aucun bloc d'engagement`); await ctx.close(); }
+        // (tour 3) A4 (prix changé, sa règle rangée était active) est une règle
+        // qu'eBay tient PEUT-ÊTRE : elle compte. Sans aucune des deux ⇒ aucun bloc.
+        { const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { delete o[A.A1]; delete o[A.A4]; delete o[A.A5]; delete o[A.A6]; } }); await allerAnnonces(pg);
+          dit(await pg.locator('[data-regles-engagement]').count() === 0, `[2] ${T} aucune règle connue, aucune peut-être ⇒ aucun bloc d'engagement`); await ctx.close(); }
         { const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A7] = entree({ offresActives: true, accepte: 40, refuse: null, prix: 50 }); } }); await allerAnnonces(pg);
           const k = await pg.$eval('[data-ebay-non-reliees-regles]', (e) => e.getAttribute('data-ebay-non-reliees-regles')).catch(() => null);
           const haut = await pg.evaluate(() => { const out = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (n.parentElement && n.parentElement.closest('[data-ebay-annonce]')) continue; out.push(n.textContent); } return out.join(' '); });
@@ -826,8 +833,20 @@ async function finPage(pg, errs, quoi) {
         const tous = Object.values(e);
         dit(tous.length === 10 && tous.every((x) => x.etat === 'pas-su' && x.raison === 'illisible' && !/€/.test(x.txt) && !/aucune/i.test(x.txt)), `[13] ${T} lecture des règles en panne : TOUTES « pas su » (illisible), aucun montant, jamais « aucune »`, JSON.stringify(tous.map((x) => x.etat + '/' + x.raison)));
         dit(await pg.locator('[data-regles-engagement]').count() === 0 && await pg.locator('[data-regles-pas-su]').count() === 1, `[13] ${T} pas de bloc d'engagement ; la ligne « pas su » UNE fois`);
-        await pg.click('[data-regles-relire]'); await pg.waitForTimeout(800);
-        dit(!bruts.some((x) => /regleoffrelire/.test(x)), `[13] ${T} « Relire chez eBay » n'envoie RIEN (c'est notre lecture qui a raté : rouvrir l'écran)`);
+        // (11 octobre, revue — tour 3) Notre propre lecture ratée : pas de
+        // « Relire chez eBay » (il n'envoyait rien et répondait « rouvre
+        // l'écran ») — « Réessayer » relit la base, jamais eBay.
+        const nRelire = await pg.locator('[data-regles-relire]').count();
+        const nBase = await pg.locator('[data-regles-relire-base]').count();
+        const lect0 = apiEbay;
+        if (nBase) { await pg.click('[data-regles-relire-base]'); await pg.waitForTimeout(800); }
+        dit(nRelire === 0 && nBase === 1 && !bruts.some((x) => /regleoffrelire/.test(x)) && apiEbay === lect0, `[13] ${T} « Relire chez eBay » n'est PAS proposé ; « Réessayer » relit VRM — rien ne part chez eBay`, `relire ×${nRelire} · réessayer ×${nBase} · api ${apiEbay - lect0}`);
+        await pg.click('[data-regles-toutes-ouvrir]'); await pg.waitForSelector('[data-regles-toutes]', { timeout: 5000 });
+        await pg.fill('[data-regles-pct]', '90'); await pg.waitForTimeout(300);
+        const lotRelire = await pg.locator('[data-regles-toutes-relire]').count();
+        const lotIll = await pg.$eval('[data-regles-toutes-illisibles]', (x) => x.getAttribute('data-regles-toutes-illisibles')).catch(() => null);
+        const nIll = await pg.locator('[data-regles-ligne][data-regles-statut="illisible"]').count();
+        dit(lotRelire === 0 && nIll > 0 && lotIll === String(nIll), `[13] ${T} « Une règle pour toutes » ne propose pas « Relire ces annonces chez eBay » (un bouton qui ne faisait rien) : il dit que VRM n'a pas pu lire, sans rien remplacer`, `relire ×${lotRelire} · illisibles ${lotIll} (lignes ${nIll})`);
         await finPage(pg, errs, `[13] ${T}`);
         await ctx.close();
       });
@@ -1014,6 +1033,202 @@ async function finPage(pg, errs, quoi) {
         dit(avant && avant.raison === 'prix-change' && e[A.A4] && e[A.A4].etat === 'pas-su' && e[A.A4].raison === 'prix-change' && coul === C_WARN && note.trim().length > 0,
           `[15] ${T} la relecture de A4 rate chez eBay : la carte garde « prix changé » (risque dit en ambre), jamais « lecture ratée » par-dessus — et l'écran dit que la relecture a raté`, `${avant && avant.raison} → ${e[A.A4] && e[A.A4].raison} · ${coul} · « ${note} »`);
         await finPage(pg, errs, `[15] ${T} relecture ratée`);
+        await ctx.close();
+      });
+
+      // ── 16. REVUE DU 11 OCTOBRE, TOUR 3 ───────────────────────────────
+      // Une règle qu'eBay tient PEUT-ÊTRE (seuil relu sans l'état des offres,
+      // pose incertaine / en cours / posée mais pas relue) engage autant qu'une
+      // règle connue : ventes relues, bloc, déconnexion, alerte — la MÊME règle
+      // partout (`regleEngage`). Et chaque « pas su » avec SON geste.
+      const sansAutres16 = (o) => { delete o[A.A4]; delete o[A.A5]; delete o[A.A6]; };
+      const peutEtre16 = {
+        'offres-inconnues': () => entree({ offresActives: null, accepte: 72, refuse: 60, prix: 80 }),
+        'apres-ecriture': () => ({ lu: false, raison: 'apres-ecriture', lueA: Date.now() - H, par: 'regle' }),
+        incertain: () => ({ lu: false, raison: 'incertain', lueA: Date.now() - H, par: 'regle' }),
+        'en-cours': () => ({ lu: false, raison: 'en-cours', lueA: Date.now() - H, par: 'regle' }),
+      };
+      if (bloc(16)) await essaie(`[16] ${T} une règle peut-être active engage`, async () => {
+        for (const [raison, e0] of Object.entries(peutEtre16)) {
+          const { ctx, pg, errs } = await ouvrir(b, vp, { ventesAgeP: 3 * JOUR, offresP: (o) => { sansAutres16(o); o[A.A1] = e0(); } });
+          await allerAnnonces(pg);
+          for (let i = 0; i < 120 && !bruts.some((x) => /"action":"sync"/.test(x)); i++) await pg.waitForTimeout(25);
+          await pg.waitForTimeout(300);
+          const syncs = bruts.filter((x) => /"action":"sync"/.test(x));
+          const eng = await pg.$$eval('[data-regles-engagement]', (l) => l.map((x) => [x.getAttribute('data-regles-engagement'), x.getAttribute('data-regles-engagement-peut-etre')]));
+          const btn = await pg.locator('[data-regles-relire-ventes]').count();
+          dit(syncs.length === 1 && syncs[0] === '{"action":"sync"}' && eng.length === 1 && eng[0][0] === '0' && eng[0][1] === '1' && btn === 1,
+            `[16] ${T} A1 « ${raison} » (eBay tient PEUT-ÊTRE la règle) : ses ventes eBay sont relues à l'ouverture, « ce que ça engage » la compte (0 connue · 1 peut-être) avec « Relire mes ventes eBay »`, `syncs=${JSON.stringify(syncs)} · bloc=${JSON.stringify(eng)} · bouton ×${btn}`);
+          if (raison === 'offres-inconnues') await finPage(pg, errs, `[16] ${T} peut-être`);
+          await ctx.close();
+        }
+      });
+      // La déconnexion d'un compte eBay dit ce que l'écran dit — les règles
+      // connues ET celles qu'eBay tient peut-être ; jamais une annonce terminée.
+      const deco16 = async (pg) => {
+        await sousOnglet(pg, 'Compte eBay');
+        await pg.waitForSelector('[data-ebay-deconnecter="principal"]', { timeout: 15000 });
+        await pg.click('[data-ebay-deconnecter="principal"]');
+        await feuille(pg).waitFor({ timeout: 8000 });
+        const t = (await feuille(pg).innerText()).replace(/\s+/g, ' ');
+        await feuille(pg).getByRole('button', { name: 'Annuler' }).click().catch(() => {});
+        return t;
+      };
+      const nb16 = (t, re) => { const m = re.exec(t); return m ? Number(m[1]) : 0; };
+      if (bloc(16)) await essaie(`[16] ${T} déconnexion = l'écran`, async () => {
+        for (const raison of ['offres-inconnues', 'apres-ecriture']) {
+          const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { sansAutres16(o); o[A.A1] = peutEtre16[raison](); } });
+          await allerAnnonces(pg);
+          const t = await deco16(pg);
+          dit(nb16(t, /(\d+) annonces?(?: de ce compte)? (?:ont|a) peut-être une règle d'offre/) === 1 && !/(\d+) annonces?(?: de ce compte)? (?:ont|a) une règle d'offre/.test(t),
+            `[16] ${T} A1 « ${raison} » : la feuille « Déconnecter le compte eBay » dit qu'eBay tient PEUT-ÊTRE une règle (1), jamais « aucune » ni « active »`, t.slice(t.indexOf('Tu pourras'), t.indexOf('Tu pourras') + 260));
+          await ctx.close();
+        }
+        // A5 retirée d'eBay (sortie de la liste, l'entrée rangée reste) ; A4 au
+        // prix changé (peut-être) : la feuille dit les MÊMES nombres que l'écran.
+        const { ctx, pg } = await ouvrir(b, vp, { annonces: (p) => { const i = p.findIndex((x) => x.itemId === A.A5); if (i >= 0) p.splice(i, 1); } });
+        await allerAnnonces(pg);
+        const eng = await pg.$eval('[data-regles-engagement]', (x) => [x.getAttribute('data-regles-engagement'), x.getAttribute('data-regles-engagement-peut-etre')]).catch(() => [null, null]);
+        const t = await deco16(pg);
+        const oui = nb16(t, /(\d+) annonces?(?: de ce compte)? (?:ont|a) une règle d'offre/), pe = nb16(t, /(\d+) annonces?(?: de ce compte)? (?:ont|a) peut-être une règle d'offre/);
+        dit(eng[0] === '2' && eng[1] === '1' && oui === 2 && pe === 1,
+          `[16] ${T} A5 terminée sur eBay (encore rangée), A4 au prix changé : l'écran dit 2 actives + 1 peut-être, la feuille de déconnexion AUSSI (jamais « 4 », le compte brut)`, `écran ${JSON.stringify(eng)} · feuille ${oui} + ${pe} peut-être`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} alerte « vendue sur Vinted » : la règle peut-être`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A5] = entree({ offresActives: null, accepte: 54, refuse: null, prix: 60 }); } });
+        await allerAnnonces(pg);
+        const k = await pg.$eval(`[data-ebay-a-retirer] [data-ebay-doublon-regle="${A.A5}"]`, (x) => x.getAttribute('data-ebay-doublon-regle-k') || 'oui').catch(() => null);
+        dit(k === 'peut-etre', `[16] ${T} A5 vendue sur Vinted, seuil relu sans l'état des offres : l'alerte « encore en vente sur eBay » dit qu'elle a PEUT-ÊTRE une règle d'offre`, String(k));
+        // …et « Retirer la règle » reste à un clic sur la paire bloquée.
+        const n = await carte(pg, A.A5).locator('[data-regle-retirer-direct]').count();
+        const d = await desactive(pg, `[data-regle-retirer-direct="${A.A5}"]`);
+        dit(n === 1 && d === false, `[16] ${T} A5 (vendue, « Définir » grisé) : « Retirer la règle » est là, actif`, `×${n} · désactivé=${d}`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} deux comptes : retirer reste possible`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp, { annonces: (p) => { p[1].sku = 'VRM-45'; }, offresP: (o) => { o[A.A2] = entree({ offresActives: null, accepte: 81, refuse: null, prix: 90 }); } });
+        await allerAnnonces(pg);
+        const e = (await etats(pg))[A.A2];
+        const n0 = regleoffres().length;
+        const btn = carte(pg, A.A2).locator('[data-regle-retirer-direct]');
+        const nb = await btn.count();
+        if (nb) { const r0 = repondus; await btn.first().click(); await finEnvoi(pg, A.A2, r0); }
+        const env = regleoffres().slice(n0);
+        dit(e && e.bloquee === 'deux-comptes' && nb === 1 && env.length === 1 && env[0] === `{"action":"regleoffre","itemId":"${A.A2}","accepte":null,"refuse":null,"confirme":true}`,
+          `[16] ${T} A2 en vente sur deux comptes, seuil relu (81 €) sans l'état des offres : « Retirer la règle » est sur sa carte, un clic retire — au compte de L'ANNONCE`, `${e && e.bloquee} · ×${nb} · ${env.join(' ')}`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} lot : une offre déjà faite`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A2] = entree({ offresActives: true, accepte: null, refuse: null, prix: 90, offresFaites: 3 }); } });
+        await allerAnnonces(pg); await ouvrirToutes(pg, 90);
+        const coche = await pg.$eval(`[data-regles-choix="${A.A2}"]`, (x) => x.checked).catch(() => null);
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        const t = (await feuille(pg).innerText()).replace(/\s+/g, ' ');
+        await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
+        dit(coche === true && /offre déjà faite peut être acceptée dès la pose/i.test(t) && regleoffres().length === 0,
+          `[16] ${T} « Une règle pour toutes » avec A2 (3 offres déjà faites) : la feuille dit, comme celle de la carte, qu'une offre déjà faite peut être acceptée dès la pose`, t.slice(0, 260));
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} ✏️ prix : « reste à » seulement si les offres sont actives`, async () => {
+        for (const actives of [null, false]) {
+          const { ctx, pg } = await ouvrir(b, vp, { scen: { ['revise:' + A.A1]: [{ body: { ok: true, ack: 'Success', regle: { lecture: { lu: true, offresActives: actives, accepte: 72, refuse: 60, devise: 'EUR', prix: 85, offresFaites: 2, lueA: Date.now() }, tombee: false, avant: { accepte: 72, refuse: 60 } } } }] } });
+          await allerAnnonces(pg);
+          await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 });
+          await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 });
+          await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`);
+          await pg.waitForSelector(`[data-ebay-revise-msg="${A.A1}"]`, { timeout: 8000 }).catch(() => {});
+          await pg.waitForTimeout(300);
+          const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
+          const c = await couleur(pg, `[data-ebay-revise-msg="${A.A1}"]`);
+          const e = (await etats(pg))[A.A1];
+          dit(!/✓/.test(msg) && c === C_WARN && e && e.etat !== 'connue',
+            `[16] ${T} prix changé, eBay relit le seuil avec offres ${actives === null ? 'activées ou non : pas montré' : 'coupées'} : aucun « ✓ … reste à », message ambre — la carte dit « ${actives === null ? 'pas su' : 'aucune'} » sur la même lecture`, `${msg} · ${c} · ${e && e.etat}`);
+          await ctx.close();
+        }
+      });
+      if (bloc(16)) await essaie(`[16] ${T} relire : une annonce qu'eBay ne montre plus`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, { ebay: (st) => { delete st[A.A3]; } });
+        await allerAnnonces(pg);
+        const n0 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        await pg.click('[data-regles-relire]'); await finRelire(pg, n0);
+        for (let i = 0; i < 160 && !bruts.some((x) => /"action":"sync"/.test(x)); i++) await pg.waitForTimeout(25);
+        await pg.waitForTimeout(400);
+        const e = (await etats(pg))[A.A3];
+        const note = await pg.$eval('[data-regles-relecture]', (x) => x.innerText).catch(() => '');
+        const syncs = bruts.filter((x) => /"action":"sync"/.test(x));
+        const n1 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        const relire = await pg.locator('[data-regles-relire]').count();
+        if (relire) { await pg.click('[data-regles-relire]'); await pg.waitForTimeout(800); }
+        const encore = bruts.filter((x) => /regleoffrelire/.test(x)).slice(n1);
+        dit(e && e.raison === 'pas-sur-ce-compte' && note.trim().length > 0 && syncs.includes('{"action":"sync"}') && !encore.some((x) => x.includes(A.A3)),
+          `[16] ${T} eBay dit A3 absente de ce compte (liste complète) : la carte le porte, l'écran le DIT, relit la liste du compte, et ne la renvoie plus relire`, `${e && e.raison} · « ${note.slice(0, 120)} » · syncs ${JSON.stringify(syncs)} · relances ${JSON.stringify(encore)}`);
+        await finPage(pg, errs, `[16] ${T} absente`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} offres activées ou non : chacune nommée, avec son lien`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A1] = entree({ offresActives: null, accepte: 72, refuse: 60, prix: 80 }); o[A.A6] = entree({ offresActives: null, accepte: 95, refuse: null, prix: 100 }); } });
+        await allerAnnonces(pg);
+        const cartes = await pg.$$eval('[data-regle-offres-inconnues-lien]', (l) => l.map((x) => [x.getAttribute('data-regle-offres-inconnues-lien'), x.getAttribute('href')]));
+        const ligne = await pg.$$eval('[data-regles-pas-su] [data-regles-offres-inconnues-lien]', (l) => l.map((x) => [x.getAttribute('data-regles-offres-inconnues-lien'), x.getAttribute('href')]));
+        const lu = await pg.$$eval('[data-regle-seuil-lu]', (l) => l.map((x) => [x.getAttribute('data-regle-offre-ligne'), x.getAttribute('data-regle-seuil-lu')]));
+        const ok = (arr) => [A.A1, A.A6].every((id) => arr.some(([i, h]) => i === id && h && h.includes('/itm/' + id)));
+        dit(ok(cartes) && ok(ligne) && lu.length === 2,
+          `[16] ${T} A1 et A6 : seuil relu, offres activées ou non pas montré — chaque carte dit son seuil et porte SON lien, et la ligne du haut les nomme avec leur lien (plus un « regarde-les » sans lien)`, `cartes ${JSON.stringify(cartes)} · ligne ${JSON.stringify(ligne)} · seuils ${JSON.stringify(lu)}`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} autre devise : pas de « Relire chez eBay »`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp, {
+          offresP: (o) => { delete o[A.A4]; o[A.A3] = entree({ offresActives: false, accepte: null, refuse: null, prix: 120 }); o[A.A2] = entree({ offresActives: true, accepte: null, refuse: null, prix: 90, devise: 'USD' }); },
+          offresK2: (o) => { o[A.B3] = entree({ offresActives: true, accepte: null, refuse: null, prix: 80 }); },
+          ebay: (st) => { st[A.A4].regle = { offresActives: false, accepte: null, refuse: null, offresFaites: null }; },
+        });
+        await allerAnnonces(pg);
+        const e = (await etats(pg))[A.A2];
+        const relire = await pg.locator('[data-regles-relire]').count();
+        const dev = await pg.$eval('[data-regles-devise]', (x) => x.getAttribute('data-regles-devise')).catch(() => null);
+        const ps = await pg.$eval('[data-regles-pas-su]', (x) => x.getAttribute('data-regles-pas-su')).catch(() => null);
+        dit(e && e.raison === 'devise' && ps === '2' && dev === '1' && relire === 1,
+          `[16] ${T} A2 dans une autre devise : la ligne la dit, sans geste ; « Relire chez eBay » ne vaut que pour A4 (jamais lue) — le clic n'enverra jamais A2`, `${e && e.raison} · pas su ${ps} · devise ${dev} · relire ×${relire}`);
+        const n0 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        if (relire) { await pg.click('[data-regles-relire]'); await finRelire(pg, n0); }
+        const env = bruts.filter((x) => /regleoffrelire/.test(x)).slice(n0);
+        const relire2 = await pg.locator('[data-regles-relire]').count();
+        dit(env.length === 1 && !env[0].includes(A.A2) && relire2 === 0, `[16] ${T} après la relecture de A4, il ne reste que la devise : plus de « Relire chez eBay »`, `${env.join(' ')} · relire ×${relire2}`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} lot : posée par eBay mais pas notée`, async () => {
+        const L0 = (o) => ({ lu: true, devise: 'EUR', lueA: Date.now(), offresFaites: null, ...o });
+        const { ctx, pg } = await ouvrir(b, vp, { scen: { [A.A2]: [{ body: { ok: true, verifie: true, lecture: L0({ offresActives: true, accepte: 81, refuse: null, prix: 90 }), avertissements: [], range: false } }] } });
+        await allerAnnonces(pg); await ouvrirToutes(pg, 90);
+        for (const [id, v] of Object.entries(await lignesApercu(pg))) if (v.coche && id !== A.A2) await pg.click(`[data-regles-ligne="${id}"] [data-regles-choix]`);
+        await pg.waitForTimeout(200);
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        await feuille(pg).getByRole('button', { name: /Oui, (la )?régler/ }).click();
+        await pg.waitForSelector('[data-regles-bilan]', { timeout: 15000 }); await pg.waitForTimeout(300);
+        const i = await pg.$eval(`[data-regles-ligne="${A.A2}"] [data-regles-issue]`, (x) => [x.innerText, getComputedStyle(x).color, x.getAttribute('data-regles-non-note')]).catch(() => ['', '', null]);
+        const bil = await pg.$eval('[data-regles-bilan]', (x) => [x.innerText, getComputedStyle(x).color, x.getAttribute('data-regles-non-note')]).catch(() => ['', '', null]);
+        dit(!/✓/.test(i[0]) && i[1] === C_WARN && i[2] === '1' && bil[1] === C_WARN && bil[2] === '1',
+          `[16] ${T} eBay a posé la règle, VRM n'a pas pu la noter : la ligne ne dit pas « ✓ réglée » (ambre, « Relire chez eBay »), le bilan non plus — la voix de la carte (§11)`, `ligne « ${i[0]} » ${i[1]} · bilan « ${bil[0]} » ${bil[1]}`);
+        await ctx.close();
+      });
+      if (bloc(16)) await essaie(`[16] ${T} une programmée partie avec sa règle`, async () => {
+        const X = '130000000009';
+        const br = { b1: { id: 'b1', etatBrouillon: 'programmee', titre: 'Nike Dunk Low gris taille 42', prix: '80', numero: '49', offreAccepte: '70', categorie: { id: '15709', nom: 'Baskets', requis: [] }, photos: [], programme: { itemId: X, at: Date.now() - 2 * JOUR, debut: new Date(Date.now() - JOUR).toISOString(), compte: 'principal', sku: 'VRM-49' } } };
+        const { ctx, pg, errs } = await ouvrir(b, vp, {
+          offresP: (o) => { sansAutres16(o); o[X] = { lu: false, raison: 'programmee', accepte: 70, refuse: null, debut: br.b1.programme.debut, lueA: Date.now() - 2 * JOUR, par: 'programmation' }; },
+          rows: (r) => { r.push({ id: 'ebay_brouillons', data: { items: br } }); const pr = r.find((x) => x.id === 'ebay_programmees'); pr.data = { items: [], enLigne: [{ itemId: X, sku: 'VRM-49' }], complet: true, capturedAt: Date.now() - 10 * 60000 }; },
+          // La synchro range ce qu'eBay montre : l'annonce partie, et sa règle relue.
+          apresSync: (c) => { if (c !== 'principal') return; const l = rows.find((x) => x.id === 'ebay_listings'); if (l && !l.data.items.some((a) => a.itemId === X)) l.data.items.push(ann(X, 'Nike Dunk Low gris taille 42', '80.0', 'VRM-49')); ebay[X] = { compte: 'principal', prix: 80, regle: { offresActives: true, accepte: 70, refuse: null, offresFaites: null } }; ranger('principal', X, lecture(X)); },
+        });
+        await allerAnnonces(pg);
+        await pg.waitForSelector(`[data-ebay-annonce="${X}"]`, { timeout: 12000 }).catch(() => {});
+        await pg.waitForTimeout(300);
+        const syncs = bruts.filter((x) => /"action":"sync"/.test(x));
+        const e = (await etats(pg))[X];
+        dit(syncs.includes('{"action":"sync"}') && e && e.etat === 'connue' && e.accepte === '70.00',
+          `[16] ${T} une programmée partie avec sa règle (70 €) : l'écran relit la liste du compte, l'annonce apparaît, sa règle lue (connue, 70 €) — elle n'est plus invisible nulle part`, `syncs ${JSON.stringify(syncs)} · ${JSON.stringify(e && { etat: e.etat, accepte: e.accepte })}`);
+        await finPage(pg, errs, `[16] ${T} programmée partie`);
         await ctx.close();
       });
     }

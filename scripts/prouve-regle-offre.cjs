@@ -34,6 +34,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '�
 // Les mutations : [nom, fichier, ancre, remplacement, contrôles qui doivent rougir]
 const API = 'api/ebay.js';
 const LIB = 'api/_lib/ebay.js';
+const APP = 'src/App.jsx';
 const MUTATIONS = [
   ['seuil-prix', API, "  if (!v2.ok) return { status: 409, body: { ok: false, reason: v2.code, prix: pre.annonce.prix, error: v2.err } };", '', ['R-prix']],
   ['confirme', API, "  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", "  if (false) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", ['R-conf']],
@@ -75,6 +76,21 @@ const MUTATIONS = [
   ['garder-sans-age', API, ' && (Number(items[k] && items[k].lueA) || 0) < garder.a) delete items[k];', ') delete items[k];', ['R-course']],
   // un montant qui s'arrondit à 0 redevient « valable » (« > 0 »).
   ['montant-zero', LIB, '  return typeof v === \'number\' && Number.isFinite(v) && v <= MONTANT_MAX && Math.round(v * 100) >= 1', '  return typeof v === \'number\' && Number.isFinite(v) && v <= MONTANT_MAX && v > 0', ['R-mont', 'R-crea']],
+  // ── (11 octobre, revue — tour 3) ──
+  // une annonce programmée avec sa règle n'est de nouveau ni rangée ni relue.
+  ['prog-non-rangee', API, '  if (it.regleOffre) corps.offre = await rangerRegleProgrammee(ctx, at.token, corps, it, quand);', '  if (it.regleOffre) corps.offre = { envoyee: { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse } };', ['R-prog-regle']],
+  // retirer une annonce laisse sa règle rangée (la déconnexion la compte encore).
+  ['retirer-garde-regle', API, "  // n'a plus de règle qu'eBay applique.\n  const regles = await sortirDesRegles(itemId, ctx);", "  // n'a plus de règle qu'eBay applique.\n  const regles = true;", ['R-retire-regle']],
+  // « Relire chez eBay » ne sort plus la règle d'une annonce qu'eBay ne montre plus.
+  ['lire-sans-garder', API, '  const garder = L.complet ? { ids: aMoi, a: tListe } : null;', '  const garder = null;', ['R-lire-absente']],
+  // (app) « règle active » redevient « connue » seule (le filtre brut d'avant).
+  ['engage-connue-seule', APP, "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));", "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : null));", ['R-engage']],
+  // (app) une règle d'annonce terminée compte de nouveau (la liste n'est plus lue).
+  ['engage-sans-liste', APP, '      if (filtre && !prix.has(id) && (Number(e.lueA) || 0) < Number(c.cap) - 10 * 60000) continue;\n', '', ['R-engage']],
+  // (app) « ✓ … reste à » sur un seuil relu, offres activées ou non pas montré.
+  ['apres-prix-brut', APP, "    const etL = etatRegleOffre({ itemId: 'x', price: l.prix }", "    const etL = { etat: 'connue' } || etatRegleOffre({ itemId: 'x', price: l.prix }", ['R-apres-prix']],
+  // (app) la publication ignore la lecture : « pas encore relue » sur un seuil relu.
+  ['publie-sans-lecture', APP, "  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: o.lecture || null,", "  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: null,", ['R-publie-offre']],
 ];
 
 // Copie de l'arbre courant (api/, src/, scripts/ sans fixtures), node_modules en lien.

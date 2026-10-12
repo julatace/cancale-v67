@@ -101,6 +101,33 @@ const MUTATIONS = [
   ['issue-a-revoir', [["    const r = r0 && (r0.issue === 'a-revoir' || (l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil))) ? r0 : null;", '    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;']], [15], { exiges: [/chaque ligne affiche son issue/], interdits: [/la carte ET le champ Prix de ✏️/] }],
   // une relecture RATÉE reposée localement par-dessus ce que VRM savait.
   ['relire-ratee-locale', [["            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);", "            if (l && typeof l === 'object' && (l.lu === true || (l.raison && l.raison !== 'pas-sur-ce-compte' && l.raison !== 'pas-su'))) surRegle(ref + ':' + id, l);"]], [15], { exiges: [/la relecture de A4 rate/] }],
+  // ── Revue du 11 octobre, tour 3 ──
+  // la relecture des ventes à l'ouverture ne compte que les règles « connues » (le filtre brut d'avant).
+  ['ventes-relues-brut', [['    const avecRegle = reglesEngagees([...parRef.values()]).refs;', "    const avecRegle = new Set([...regles.map].filter(([, e]) => e && e.lu === true && e.accepte != null && e.offresActives === true).map(([k]) => k.slice(0, k.lastIndexOf(':'))));"]], [16], { exiges: [/ses ventes eBay sont relues à l'ouverture/] }],
+  // « ce que ça engage » ne compte plus les règles qu'eBay tient peut-être.
+  ['bloc-connue-seule', [["  const peutEtreRegle = itemsVue.filter((it) => regleEngage(etatVue(it)) === 'peut-etre');", '  const peutEtreRegle = [];']], [16], { exiges: [/ses ventes eBay sont relues à l'ouverture/], interdits: [/la feuille « Déconnecter le compte eBay » dit/] }],
+  // la déconnexion compte de nouveau la ligne BRUTE (offres actives sur toutes les entrées).
+  ['compter-brut', [['  return { oui: n.oui, peutEtre: n.peutEtre };\n}', "  let brut = 0; for (const x of R.lignes) for (const e of Object.values((x.ligne && x.ligne.items) || {})) if (e && e.lu === true && e.accepte != null && e.offresActives === true) brut++;\n  return { oui: brut, peutEtre: 0 };\n}"]], [16], { exiges: [/la feuille « Déconnecter le compte eBay » dit/, /la feuille de déconnexion AUSSI/] }],
+  // « Retirer la règle » sur une paire bloquée seulement quand la règle est « connue ».
+  ['retirer-direct-connue', [["              {bloquee && regleEngage(et) && <button type=\"button\" data-regle-retirer-direct={it.itemId}", "              {bloquee && et.etat === 'connue' && <button type=\"button\" data-regle-retirer-direct={it.itemId}"]], [16], { exiges: [/« Retirer la règle » est là, actif/, /« Retirer la règle » est sur sa carte/] }],
+  // la feuille du lot ne dit plus qu'une offre déjà faite peut être acceptée.
+  ['lot-sans-offres-faites', [['      texteOffresDejaFaites(f, n),\n', '']], [16], { exiges: [/qu'une offre déjà faite peut être acceptée dès la pose/] }],
+  // « pas sur ce compte » de nouveau avalé par « Relire chez eBay ».
+  ['relire-absente-avalee', [["            else if (l && typeof l === 'object' && l.raison === 'pas-sur-ce-compte') {", "            else if (false) {"]], [16], { exiges: [/eBay dit A3 absente de ce compte/] }],
+  // la carte ne montre plus le seuil relu ni son lien (offres activées ou non).
+  ['offres-inconnues-sans-lien', [["        const seuilMontre = et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu && et.lu.accepte != null;", '        const seuilMontre = false;']], [16], { exiges: [/chaque carte dit son seuil et porte SON lien/] }],
+  // « Relire chez eBay » compte de nouveau l'autre devise et notre lecture ratée.
+  ['devise-relire', [['  const nPasLueRegle = relisablesRegle.length;', '  const nPasLueRegle = pasSuRegle.length - offresInconnuesRegle.length;']], [13, 16], { exiges: [/il ne reste que la devise : plus de « Relire chez eBay »/, /« Relire chez eBay » n'est PAS proposé/] }],
+  // le lot repasse « ✓ réglée » sur une règle que VRM n'a pas pu noter.
+  ['lot-non-note', [["  const couleurIssue = (r) => (r.issue === 'ok' && !r.nonNote ? E.text : E.warn);", "  const couleurIssue = (r) => (r.issue === 'ok' ? E.text : E.warn);"], ["    if (r.nonNote && r.issue === 'ok') return `posée par eBay — ${NON_NOTE}`;\n", '']], [16], { exiges: [/VRM n'a pas pu la noter : la ligne ne dit pas « ✓ réglée »/] }],
+  // une programmée partie n'est de nouveau relue nulle part.
+  ['partie-sans-relecture', [['    if (!refs.size) return;\n    (async () => { for (const ref of refs) await resync(ref); })();\n  }, [connected, items, programmees,', '    return;\n  }, [connected, items, programmees,']], [16], { exiges: [/une programmée partie avec sa règle/] }],
+  // « Une règle pour toutes » repropose « Relire ces annonces chez eBay » sur notre lecture ratée.
+  ['lot-illisible-relire', [["    if (e && e.etat === 'pas-su' && e.raison === 'illisible') return { ...base, statut: 'illisible', note: 'règle actuelle pas lisible dans VRM — rien n\\'est remplacé à l\\'aveugle' };\n", '']], [13], { exiges: [/« Une règle pour toutes » ne propose pas « Relire ces annonces chez eBay »/] }],
+  // (le planificateur, banc ebay-programmer) la feuille ne dit plus qu'une offre acceptée vend la paire.
+  ['planif-vend', [["      ? `\\n${avecOffre.length} avec une règle d'offre — dès la mise en ligne, toute offre égale ou supérieure au montant ${OFFRE_VEND_LA_PAIRE} :`", "      ? `\\n${avecOffre.length} avec une règle d'offre — eBay acceptera seul les offres dès :`"]], null, { banc: 'ebay-programmer.cjs', exiges: [/la feuille du lot dit qu'une offre acceptée par eBay VEND la paire/] }],
+  // (la publication, banc ebay-form) la ligne de la règle ignore la lecture.
+  ['publie-pas-relue', [["  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: o.lecture || null,", "  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: null,"]], null, { banc: 'ebay-form.cjs', exiges: [/publiée avec une règle, seuil relu sans l'état des offres/] }],
 ];
 
 function copier(dest) {
@@ -109,7 +136,7 @@ function copier(dest) {
   // `src/App.jsx` importe aussi `api/_lib/` et `supabase/migrations/` : ils voyagent avec.
   for (const d of ['src', 'public', 'api', 'supabase']) fs.cpSync(path.join(RACINE, d), path.join(dest, d), { recursive: true });
   for (const f of ['index.html', 'package.json', 'vite.config.js']) fs.copyFileSync(path.join(RACINE, f), path.join(dest, f));
-  for (const f of ['ebay-regle-offre.cjs', '_meta.cjs']) fs.copyFileSync(path.join(RACINE, 'scripts', 'bancs', f), path.join(dest, 'scripts', 'bancs', f));
+  for (const f of ['ebay-regle-offre.cjs', 'ebay-programmer.cjs', 'ebay-form.cjs', '_meta.cjs']) fs.copyFileSync(path.join(RACINE, 'scripts', 'bancs', f), path.join(dest, 'scripts', 'bancs', f));
   try { fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(dest, 'node_modules')); } catch (_) {}
 }
 function appliquer(dest, rempl) {
@@ -124,7 +151,7 @@ function appliquer(dest, rempl) {
   return '';
 }
 const construire = (dest) => cp.spawnSync(process.execPath, [VITE, 'build', '--logLevel', 'error'], { cwd: dest, encoding: 'utf8', timeout: 600000, maxBuffer: 64 * 1024 * 1024 });
-const banc = (dest, args) => cp.spawnSync(process.execPath, [path.join(dest, 'scripts', 'bancs', 'ebay-regle-offre.cjs'), ...args], { cwd: dest, encoding: 'utf8', timeout: 900000, maxBuffer: 64 * 1024 * 1024 });
+const banc = (dest, args, nomBanc) => cp.spawnSync(process.execPath, [path.join(dest, 'scripts', 'bancs', nomBanc || 'ebay-regle-offre.cjs'), ...args], { cwd: dest, encoding: 'utf8', timeout: 900000, maxBuffer: 64 * 1024 * 1024 });
 
 for (const [nom, rempl, blocs, precis] of MUTATIONS) {
   if (SEULE && SEULE !== nom) continue;
@@ -134,6 +161,16 @@ for (const [nom, rempl, blocs, precis] of MUTATIONS) {
   if (err) { dit(false, `mutation « ${nom} » non appliquée`, err); continue; }
   const b = construire(dest);
   if (b.status !== 0) { dit(false, `mutation « ${nom} » : le build de la copie a échoué`, ((b.stderr || '') + (b.stdout || '')).split('\n').slice(0, 3).join(' | ')); continue; }
+  // (tour 3) Une mutation peut viser un AUTRE banc (le planificateur, la
+  // publication) : on le lance tel quel ; un contrôle rouge s'y écrit « KO » ou « ❌ ».
+  if (precis && precis.banc) {
+    const r2 = banc(dest, [], precis.banc);
+    const s2 = (r2.stdout || '') + (r2.stderr || '');
+    const kos2 = s2.split('\n').filter((l) => /^(KO\s|❌)/.test(l));
+    dit(r2.status !== 0 && (precis.exiges || []).every((re) => kos2.some((l) => re.test(l))), `mutation « ${nom} » : le banc ${precis.banc} passe au ROUGE sur ${(precis.exiges || []).map((re) => re.source.slice(0, 50)).join(' · ')}`, `sortie ${r2.status} · ${kos2.slice(0, 2).join(' | ').slice(0, 200)}`);
+    fs.rmSync(dest, { recursive: true, force: true });
+    continue;
+  }
   const r = banc(dest, ['--blocs', blocs.join(','), '--taille', '1512']);
   const s = (r.stdout || '') + (r.stderr || '');
   const rouges = blocs.map((n) => [n, (s.match(new RegExp('^KO  \\[' + n + '\\]', 'gm')) || []).length]);
