@@ -9647,7 +9647,7 @@ function regleApresPrix(regle, erreurs) {
     const refusReste = lec && lec.refuse != null;
     const tete = av.accepte != null
       ? `Prix changé — ta règle d'offre (dès ${eurEbay(av.accepte)}) n'est plus sur l'annonce eBay`
-      : `Prix changé — eBay n'accepte plus automatiquement les offres sur cette annonce`;
+      : `Prix changé — eBay n'a plus de règle d'offre sur cette annonce`;
     const refusTxt = refusReste ? ` (eBay garde le refus des offres sous ${eurEbay(lec.refuse)})` : '';
     return { msg: `${tete}${refusTxt} : repose-la si tu la veux (« Définir une règle d'offre »).` + plus, ton: 'warn', lecture };
   }
