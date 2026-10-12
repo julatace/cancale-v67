@@ -91,3 +91,24 @@ Aucun appel réel eBay/Vinted, aucune annonce créée ou retirée par ces essais
 
 Julien reporte les informations légales à la fin. Ne pas inventer d'identité
 ni considérer le site prêt à ouvrir : K1/K2 et la suite restent à construire.
+
+### Validation de la fusion K0 et première partie K2
+
+Le banc `ebay-annonces` est maintenant entièrement vert sur le build corrigé ;
+celui de programmation est vert aussi. La fusion est conservée sur GitHub dans
+la PR brouillon #488 (base : lot de préparation #487).
+
+K2 commencé : état de la paire exigé avant publication et vérification ; CDATA
+échappée sans perdre la description ; commandes paginées par date de modification,
+fusionnées avec l'historique et mises à jour par version de la ligne. Une page
+manquante ou une lecture de base ratée n'écrase rien. Une projection explicite
+retire les adresses et emails acheteurs, y compris des anciennes captures, au
+premier passage réussi ; aucune migration de données aveugle. Le prochain lien
+de pagination est limité à la route officielle des commandes, sans identifiants
+URL. La capture n'est annoncée rangée que si l'écriture gardée a réussi.
+
+Preuves : audit de route 423 contrôles ; audit commandes (vraies fonctions,
+services simulés) couvre conservation, remboursements actualisés, fuite d'adresse,
+page en panne, pagination hostile, boucle et plafond. K2 n'est pas terminé :
+connexion à trois états, notifications de suppression signées et métadonnées
+transport restent à construire.

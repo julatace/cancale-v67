@@ -41,6 +41,7 @@ const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.princip
 // Vinted) : on ne publie rien. On mesure ce qu'eBay expose VRAIMENT pour son
 // compte, on range, et on renvoie un résumé (comptes + échantillon) — pas de
 // schéma inventé (§6).
+import { lireCommandesEbay, fusionnerCommandes } from './_lib/ebay-commandes.js';
 const EBAY_API = 'https://api.ebay.com';
 async function ebayJson(url, token, extra) {
   try {
@@ -691,7 +692,7 @@ function itemXml(it) {
     // L'identité de la paire (`VRM-{n°}`). ⚠️ Posée par `avecSku` à partir du
     // NUMÉRO, jamais recopiée d'un `sku` envoyé par le navigateur.
     (it.sku ? `<SKU>${esc(it.sku)}</SKU>` : '') +
-    `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
+    `<Description><![CDATA[${String(it.description || it.title || '').replace(/\]\]>/g, ']]]]><![CDATA[>')}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
     `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
     `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +
@@ -699,7 +700,7 @@ function itemXml(it) {
     (it.scheduleTime ? `<ScheduleTime>${esc(it.scheduleTime)}</ScheduleTime>` : '') +
     '<Currency>EUR</Currency><Country>FR</Country>' +
     `<Location>${esc(it.location || 'France')}</Location>` +
-    `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` +
+    `<ConditionID>${esc(it.conditionId)}</ConditionID>` +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
     `<DispatchTimeMax>${parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
@@ -884,6 +885,7 @@ function numerotationRefus(b, num) {
 }
 async function handlePublish(b, ctx) {
   const it0 = b.item || {};
+  if (!ETAT_OK.test(String(it0.conditionId || ''))) return { status: 400, body: { ok: false, reason: 'etat', error: 'Choisis l’état de la paire avant de vérifier ou publier sur eBay.' } };
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   const s = avecSku(it0);
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
@@ -951,6 +953,7 @@ const ETAT_OK = /^\d{3,5}$/;
 // annonce alors le frais de programmation.
 async function handleVerify(b, ctx) {
   const it0 = b.item || {};
+  if (!ETAT_OK.test(String(it0.conditionId || ''))) return { status: 400, body: { ok: false, reason: 'etat', error: 'Choisis l’état de la paire avant de vérifier ou publier sur eBay.' } };
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   // Le MÊME payload que la publication (§11) : SKU compris.
   const s = avecSku(it0);
@@ -1521,8 +1524,11 @@ async function handleSync(ctx) {
   // découpé par conteneur (`listeVendeur`) : une programmée n'est jamais
   // comptée « en ligne ».
   const tListe = Date.now();   // la liste parle d'eBay À CETTE HEURE (`garder`)
+  const anciennesCommandes = await lireDonnee(ligneDe('ebay_orders', ctx), ctx.owner);
   const [orders, inv, liste] = await Promise.all([
-    ebayJson(`${EBAY_API}/sell/fulfillment/v1/order?limit=50`, token),
+    anciennesCommandes === undefined
+      ? Promise.resolve({ ok: false, status: 503, error: 'Dernière capture des commandes illisible : rien ne sera remplacé.' })
+      : lireCommandesEbay(ebayJson, token, anciennesCommandes && anciennesCommandes.capturedAt),
     // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
     // header Accept-Language »). Ne concerne que les annonces créées par API.
     ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
@@ -1567,7 +1573,11 @@ async function handleSync(ctx) {
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  if (orders.ok && orders.data) await storeData(ligneDe('ebay_orders', ctx), { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, ctx.owner);
+  let rangeCommandes = null;
+  if (orders.ok && orders.data) rangeCommandes = await modifierDonnee(ligneDe('ebay_orders', ctx), ctx.owner, d => ({
+    orders: fusionnerCommandes(d && d.orders, orders.data.orders), status: orders.status,
+    capturedAt: Math.max(Number(d && d.capturedAt) || 0, orders.capturedAt),
+  }));
   if (inv.ok && inv.data) await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
@@ -1577,10 +1587,10 @@ async function handleSync(ctx) {
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data), stock: !!(inv.ok && inv.data), regles: rangeRegles === true },
+    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data && rangeCommandes === true), stock: !!(inv.ok && inv.data), regles: rangeRegles === true },
     listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
-    orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
+    orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), error: orders.ok ? (rangeCommandes === true ? undefined : 'Commandes lues mais non enregistrées : dernière capture conservée.') : orders.error },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
   } };
 }

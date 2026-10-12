@@ -9479,3 +9479,21 @@ aveuglément. Les INFO « RLS sans policy » des tables serveur sont attendus.
 
 La migration 013 a aussi été contrôlée sur Postgres 17.6 jetable :
 126 contrôles verts ; aucune application ni renumérotation en production.
+
+## Reprise Codex — 12 octobre, socle eBay K2 commencé
+
+La fusion K0 est conservée en PR #488, avec vrais parents et sans supprimer les
+preuves par bordereau ni la migration 013. Banc annonces vert après harmonisation
+des conditions affichées de retrait automatique ; banc programmation vert.
+
+`api/_lib/ebay-commandes.js` projette les commandes sans adresses ni emails,
+les pagine par `lastmodifieddate` (90 jours au premier passage, recouvrement de
+2 minutes ensuite), conserve l'historique et actualise les commandes modifiées.
+Les pages échouées, boucles, liens hors route et le plafond ne remplacent pas
+la capture. `handleSync` fusionne par `modifierDonnee` et dit quand le rangement
+n'a pas réussi. Les anciennes adresses disparaissent lors de la prochaine sync
+complète ; aucun appel réel eBay n'a été fait par Codex.
+
+Publication et vérification exigent un état explicite ; `]]>` dans une description
+est encodé sans perte. Audit route : 423 contrôles verts, audit commandes vert.
+Connexion mesurée et suppression signée restent à implémenter (K2 en cours).

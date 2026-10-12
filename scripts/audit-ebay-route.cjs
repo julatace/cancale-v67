@@ -357,7 +357,14 @@ global.fetch = async (url, opts = {}) => {
       if (mode.envoi === 'refus') return rep({ errors: [{ errorId: 150020, longMessage: 'Offre refusée par eBay. Bearer at-J v^1.1#SECRET-QUI-FUIRAIT' }] }, 400);
       return rep({ offers: [{ offerId: 'o1', offerStatus: 'PENDING' }, { offerId: 'o2', offerStatus: 'PENDING' }] });
     }
-    if (u.includes('/sell/fulfillment/v1/order')) return mode.commandes === 'ko' ? rep({ errors: [] }, 500) : rep({ orders: [{ orderId: '01-0001', lineItems: [{ sku: 'VRM-24' }] }], total: 1 });
+    if (u.includes('/sell/fulfillment/v1/order')) {
+      if (mode.commandesPages) {
+        const page = Number(new URL(u).searchParams.get('offset') || 0) / 50;
+        const d = mode.commandesPages[page];
+        return d ? rep(d) : rep({ errors: [] }, 503);
+      }
+      return mode.commandes === 'ko' ? rep({ errors: [] }, 500) : rep({ orders: [{ orderId: '01-0001', lineItems: [{ sku: 'VRM-24' }] }], total: 1 });
+    }
     return rep({ orders: [], inventoryItems: [], total: 0 });
   }
   if (u.includes('/rest/v1/rpc/vrm_acces_pour')) {
@@ -732,6 +739,23 @@ const RA = {};
     dit(faux.length === 0, "l'app ne lit un numéro QUE dans un SKU « VRM-… » entier", faux.map(([s]) => s).join(' · '));
   });
   const item = { title: 'Nike Dunk Low panda T42', categoryId: '15709', price: '100', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true };
+  await essaie('état exigé avant tout appel et description CDATA conservée', async () => {
+    for (const action of ['publish', 'pubverify']) {
+      for (const conditionId of [undefined, '', 'occasion']) {
+        remettre();
+        const o = await app(JWT_J, { action, item: { ...item, conditionId } });
+        dit(o.code === 400 && o.corps.reason === 'etat' && auCompte(o.journal).length === 0,
+          `${action} sans état explicite valide : refus avant tout appel eBay`);
+      }
+    }
+    remettre();
+    const description = 'Avant ]]> après <balise> & fin';
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, description } });
+    const add = auCompte(o.journal).find(x => x.appel === 'AddFixedPriceItem');
+    const contenu = add && /<Description>([\s\S]*?)<\/Description>/.exec(add.corps);
+    const decode = contenu && [...contenu[1].matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)].map(x => x[1]).join('');
+    dit(o.code === 200 && decode === description, 'une description avec ]]> reste identique dans un XML valide');
+  });
   await essaie('publish avec numéro', async () => {
     remettre();
     const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '401' } });
@@ -1234,6 +1258,25 @@ const RA = {};
     const o = await app(JWT_J, { action: 'sync' });
     dit(ecrit(o.journal, 'ebay_orders') === null && ecrit(o.journal, 'ebay_listings') !== null,
       'eBay ne rend pas les commandes ⇒ elles gardent leur dernière capture, les annonces lues sont rangées quand même');
+  });
+
+  await essaie('sync commandes paginées et privées', async () => {
+    remettre();
+    const ancien = { orderId: 'historique', creationDate: '2026-01-01T12:00:00Z', fulfillmentStartInstructions: [{ adresse: 'SECRET_ADRESSE_OLD' }] };
+    lignes = lignes.filter(x => !(x.owner === J && x.id === 'ebay_orders'));
+    lignes.push({ owner: J, id: 'ebay_orders', data: { orders: [ancien], capturedAt: Date.now() - 3600000 } });
+    mode.commandesPages = [
+      { orders: [{ orderId: 'page1', buyer: { username: 'acheteur', email: 'SECRET_EMAIL' }, lineItems: [{ sku: 'VRM-1' }], fulfillmentStartInstructions: [{ adresse: 'SECRET_ADRESSE' }] }], total: 2, next: 'https://api.ebay.com/sell/fulfillment/v1/order?offset=50' },
+      { orders: [{ orderId: 'page2', orderPaymentStatus: 'FULLY_REFUNDED' }], total: 2 },
+    ];
+    const o = await app(JWT_J, { action: 'sync' });
+    const range = lignes.find(x => x.owner === J && x.id === 'ebay_orders');
+    dit(o.corps.lu.commandes === true && range.data.orders.length === 3, 'sync : toutes les pages et l’historique précédent restent rangés');
+    dit(!JSON.stringify(range.data).includes('SECRET_') && !JSON.stringify(o.corps).includes('SECRET_'), 'sync : aucune adresse ni email acheteur dans la base ou la réponse, anciens champs nettoyés');
+    const avant = JSON.stringify(range.data);
+    remettre(); mode.commandesPages = [{ orders: [{orderId: 'partiel'}], next: 'https://api.ebay.com/sell/fulfillment/v1/order?offset=50' }];
+    const rate = await app(JWT_J, {action: 'sync'});
+    dit(rate.corps.lu.commandes === false && JSON.stringify(range.data) === avant && ecrit(rate.journal, 'ebay_orders') === null, 'sync : deuxième page en panne conserve toute la capture précédente');
   });
 
   // ── 9. ANNULER · DÉPLACER ──────────────────────────────────────────────────
