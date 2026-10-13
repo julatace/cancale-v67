@@ -29,6 +29,8 @@
 import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';
+import { verifierEvenementEbay, defiEbay } from './_lib/agent-evenements.js';
+import { anonymiserCompteEbay } from './_lib/ebay-suppression.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -179,11 +181,12 @@ export const prixTexte = (p) => {
 };
 
 // ── Corps BRUT (la signature Stripe porte sur l'octet près) ─────────────────
-async function corpsBrut(req) {
+async function corpsBrut(req, maximum = 1048576) {
   // ⚠️ On lit le FLUX d'abord : toucher `req.body` sur Vercel déclenche son
   //    analyse JSON, et un JSON re-sérialisé ne correspond plus à la signature.
-  const morceaux = [];
-  try { for await (const c of req) morceaux.push(Buffer.isBuffer(c) ? c : Buffer.from(c)); } catch (_) {}
+  const morceaux = []; let taille = 0, trop = false;
+  try { for await (const c of req) { const b = Buffer.isBuffer(c) ? c : Buffer.from(c); taille += b.length; if (taille > maximum) { trop = true; morceaux.length = 0; } else if (!trop) morceaux.push(b); } } catch (_) {}
+  if (trop) return null;
   if (morceaux.length) return Buffer.concat(morceaux);
   const b = req.rawBody || req.body;
   if (Buffer.isBuffer(b)) return b;
@@ -802,6 +805,19 @@ async function fermerCompte(req, res) {
     } else etapes.abonnement = 'deja-fini';
   }
 
+  // Arrêter et effacer l'agent sous le verrou SQL AVANT les autres données.
+  // La pierre tombale empêche une tâche déjà en vol de recréer ses lignes.
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_agent_effacer_vendeur`, {
+      method: 'POST', headers: { ...sbCle(SERVICE), 'content-type': 'application/json' },
+      body: JSON.stringify({ p_owner: u.id }), signal: AbortSignal.timeout(10000),
+    });
+    const j = r.ok ? await r.json().catch(() => null) : null;
+    if (!j || !Number.isInteger(j.file) || !Number.isInteger(j.coffre) || !Number.isInteger(j.titulaires))
+      return repondre(res, 502, { ok: false, erreur: 'agent', etapes, message: 'L’effacement de ton agent n’a pas pu être confirmé. Ton compte de connexion est conservé : relance « Fermer mon compte ».' });
+    etapes.agent = 'efface';
+  } catch (_) { return repondre(res, 502, { ok: false, erreur: 'agent', etapes, message: 'L’effacement de ton agent n’a pas pu être confirmé. Ton compte de connexion est conservé : relance « Fermer mon compte ».' }); }
+
   // 2) Ses sessions. 3) Ses données. 4) Ses photos. 5) Son compte de connexion.
   //    Chaque étape n'a lieu que si la précédente a réussi : un échec laisse un
   //    compte qu'il peut rouvrir pour relancer, jamais des données orphelines.
@@ -854,10 +870,29 @@ function sante(req, res) {
   });
 }
 
+// Adresse publique fixe : le défi ne dépend ni de Host ni d'une réécriture.
+async function suppressionEbay(req,res) {
+  const endpoint=process.env.EBAY_DELETION_URL || 'https://vrm.center/api/ebay-deletion';
+  if(req.method==='GET') {
+    const code=req.query && (req.query.challenge_code || req.query.challengeCode);
+    if(!code) return repondre(res,200,{ok:true,ready:!!process.env.EBAY_VERIF_TOKEN});
+    if(!process.env.EBAY_VERIF_TOKEN) return repondre(res,503,{ok:false,reason:'no-verif-token'});
+    return repondre(res,200,{challengeResponse:defiEbay(code,endpoint)});
+  }
+  if(req.method!=='POST') return repondre(res,405,{ok:false});
+  const brut=await corpsBrut(req,262144);
+  const r=await verifierEvenementEbay(brut,req.headers && req.headers['x-ebay-signature']);
+  if(!r.ok) return repondre(res,r.status,{ok:false});
+  if(!(await anonymiserCompteEbay(r.payload))) console.warn('[ebay-deletion] anonymisation non effectuée ; vérification serveur requise');
+  // Une panne de base ne doit pas faire désactiver les clés de tous les vendeurs.
+  return res.status(204).end();
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if (mode === 'ebay-deletion') return suppressionEbay(req,res);
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });

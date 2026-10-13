@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "referenceBlob": "325b0d21af73702ba2e9e5050b765e2bdd129ed7",
+  "instructions": "Appliquer les remplacements exacts au App.jsx COMPLET contenant déjà le dernier K1 et les corrections photos. Refuser toute occurrence absente ou multiple. Ces fichiers ne sont pas encore raccordés au runtime : build et bancs requis, ainsi que choix clair après lecture du cloud. Ne jamais remplacer App.jsx par la vieille référence entière.",
+  "edits": [
+    {
+      "old": "import * as photosVinted from \"./photosVinted.js\";",
+      "new": "import * as photosVinted from \"./photosVinted.js\";\nimport { MINERAL } from \"./themeMineral.js\";\nimport \"./styles-mineral.css\";"
+    },
+    {
+      "old": "let C = THEMES.light;",
+      "new": "Object.assign(THEMES.light, MINERAL);\nlet C = THEMES.light;"
+    },
+    {
+      "old": "function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {\n  const bg=outline?'transparent':(danger?C.danger:(color||C.accent));\n  const col=outline?(color||C.accent):(color?'#fff':C.onAccent);\n  return (\n    <button type=\"button\" onClick={onClick} disabled={!!disabled} style={{\n      background:bg,color:col,\n      border:outline?`1.5px solid ${color||C.accent}`:'none',\n      borderRadius:5,padding:small?'6px 14px':'10px 22px',\n      fontSize:small?12:15,fontWeight:500,\n      cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,\n      fontFamily:'inherit',...style,\n    }}>{children}</button>\n  );\n}",
+      "new": "function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {\n  const tonal = danger ? C.danger : (color || C.accent);\n  return (\n    <button className=\"vrm-button\" type=\"button\" onClick={onClick} disabled={!!disabled} style={{\n      background:outline ? 'transparent' : tonal,\n      color:outline ? tonal : (color || danger ? '#fff' : C.onAccent),\n      border:`1px solid ${outline ? C.border : tonal}`,\n      fontSize:small?12.5:13,\n      cursor:disabled?'not-allowed':'pointer',\n      ...style,\n    }}>{children}</button>\n  );\n}"
+    },
+    {
+      "old": "const EBAY_SKIN = {\n  bg: '#000000', card: '#1C1C1E', card2: '#2C2C2E', border: '#3A3A3C',\n  text: '#FFFFFF', muted: '#8E8E93', accent: '#3665F3', accentSoft: '#5B86FF',\n  onAccent: '#FFFFFF', warn: '#FFB340', danger: '#FF453A', shadow: 'none',\n};",
+      "new": "// Tous les espaces suivent le thème choisi, y compris eBay.\nconst EBAY_SKIN = Object.defineProperties({}, Object.fromEntries(\n  Object.keys(THEMES.light).map(k => [k, { enumerable:true, get:() => C[k] }])\n));"
+    }
+  ]
+}

@@ -477,7 +477,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
   await essaie('retrait automatique (corps envoyé)', async () => {
     const envoyes = [];
     const ctx = { console, JSON, Set, String, Array,
-      fetch: async (u, o) => { envoyes.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; }, enTeteSession: () => ({}), toast: () => {} };
+      fetch: async (u, o) => { envoyes.push(JSON.parse(o.body)); return { status: 200, json: async () => ({ ok: true }) }; }, corpsCompteEbay: () => ({}), enTeteSession: () => ({}), toast: () => {} };
     vm.createContext(ctx);
     vm.runInContext('let __retraitEbayAutoEnVol = false; const __retraitEbayAutoTentes = new Set();\n'
       + ['cleNum', 'NUM_OK', 'skuEbayDe', 'retirerEbayAuto'].map((n) => extraire(APP, n)).join('\n') + '\n;this.F = retirerEbayAuto;', ctx);

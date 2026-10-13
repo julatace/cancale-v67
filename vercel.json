@@ -20,7 +20,7 @@
     },
     {
       "source": "/api/ebay-deletion",
-      "destination": "/api/ebay?mode=deletion"
+      "destination": "/api/compte?mode=ebay-deletion"
     },
     {
       "source": "/api/sante",
@@ -62,5 +62,16 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/ebay.js": {
+      "maxDuration": 60
+    },
+    "api/ship-reminders.js": {
+      "maxDuration": 60
+    },
+    "api/compte.js": {
+      "maxDuration": 60
+    }
+  }
 }

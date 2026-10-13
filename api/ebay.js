@@ -22,18 +22,32 @@
 import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee } from './_lib/ebay.js';
+import { jetonApplication, keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
+  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
+  montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
+
 import { numeroExterne } from './_lib/numerotation.js';
+
+// ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
+// COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
+// désigne SES lignes : '' pour le principal, `_{cle}` pour les suivants. Les
+// jetons et les lignes de données sont ceux de CE compte, jamais d'un autre.
+const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
+const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
+const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
 // Vinted) : on ne publie rien. On mesure ce qu'eBay expose VRAIMENT pour son
 // compte, on range, et on renvoie un résumé (comptes + échantillon) — pas de
 // schéma inventé (§6).
+import { metadataTransport } from './_lib/ebay-metadata-transport.js';
+import { politiqueTransport } from './_lib/ebay-transport.js';
+import { lireCommandesEbay, fusionnerCommandes } from './_lib/ebay-commandes.js';
 const EBAY_API = 'https://api.ebay.com';
-async function ebayJson(url, token, extra) {
+async function ebayJson(url, token, extra, options = {}) {
   try {
-    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(Math.max(1, Math.min(10000, options.fin ? options.fin - Date.now() : 10000))), headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
@@ -105,9 +119,21 @@ function erreursTrading(xml) {
       severite: /warning/i.test(g('SeverityCode')) ? 'Warning' : 'Error',
       message: messageEbaySur(dexml(g('LongMessage') || g('ShortMessage'))),
       params,
+      // (9 octobre) La CLASSE de l'erreur : `RequestError` = eBay a refusé la
+      // requête (rien n'est appliqué) · `SystemError` = panne d'eBay (rien
+      // n'est prouvé, il a pu écrire avant de tomber) · '' = pas dit.
+      classe: String(g('ErrorClassification')).trim(),
     });
   }
   return out;
+}
+// La CLASSE d'un échec : 'refus' seulement si TOUTES les erreurs de sévérité
+// Error sont des RequestError (eBay a refusé la requête : rien n'est appliqué).
+// Une SystemError, une classe absente, ou pas d'erreur lisible : 'incertain'
+// (eBay est peut-être tombé APRÈS avoir écrit) — jamais « rien n'a changé ».
+function classeEchec(r) {
+  const errs = (r && Array.isArray(r.erreurs) ? r.erreurs : []).filter((e) => e.severite === 'Error');
+  return errs.length && errs.every((e) => e.classe === 'RequestError') ? 'refus' : 'incertain';
 }
 
 // Appel Trading générique (XML) : le XML brut + l'Ack + TOUTES les erreurs.
@@ -117,13 +143,13 @@ function erreursTrading(xml) {
 //   `avertissements` : les messages de sévérité Warning (eBay a accepté, mais
 //                      il a quelque chose à dire) ;
 //   `erreurs`        : la liste complète `{code, severite, message, params}`.
-async function tradingCall(token, callName, inner) {
+async function tradingCall(token, callName, inner, options = {}) {
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
   try {
     const r = await fetch(`${EBAY_API}/ws/api.dll`, {
-      method: 'POST',
-      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
+      method: 'POST', signal: AbortSignal.timeout(Math.max(1, Math.min(10000, options.fin ? options.fin - Date.now() : 10000))),
+      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': String(callName === 'GetOrders' && options.compatibilite === 1455 ? 1455 : 1149), 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body,
     });
     const xml = await r.text();
@@ -185,7 +211,7 @@ const pagesDe = (bloc) => { const n = Number((/<TotalNumberOfPages>(\d+)<\/Total
 // Pagination : 200 par page, 5 pages au plus par liste ; au-delà
 // `complet:false` (une identité absente d'une liste incomplète n'est PAS
 // prouvée absente).
-async function listeVendeur(token) {
+async function listeVendeur(token, options = {}) {
   const actives = [], programmees = [];
   let pagesA = 1, pagesS = 1, ack = '', status = 0;
   for (let p = 1; p <= 5; p++) {
@@ -194,7 +220,8 @@ async function listeVendeur(token) {
     const pagination = `<Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>${p}</PageNumber></Pagination>`;
     const inner = (vouluA ? `<ActiveList><Include>true</Include>${pagination}</ActiveList>` : '')
       + (vouluS ? `<ScheduledList><Include>true</Include>${pagination}</ScheduledList>` : '');
-    const r = await tradingCall(token, 'GetMyeBaySelling', inner);
+    if (options.fin && Date.now() >= options.fin) return { ok: false, status: 503, error: 'Délai de lecture des annonces atteint : dernière capture conservée.' };
+    const r = await tradingCall(token, 'GetMyeBaySelling', inner, options);
     status = r.status; ack = r.ack || ack;
     if (r.status === 0) return { ok: false, status: 503, error: 'eBay injoignable' };
     if (!r.ok) return { ok: false, status: r.status >= 400 ? r.status : 502, error: r.err || 'eBay n\'a pas rendu tes annonces.' };
@@ -206,8 +233,12 @@ async function listeVendeur(token) {
 
 // Détail COMPLET d'une annonce (description, catégorie, état, photos,
 // caractéristiques). Pour capter « tout ».
-async function tradingGetItem(token, itemId) {
-  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
+async function tradingGetItem(token, itemId, options = {}) {
+  // (11 octobre, revue) L'heure de la lecture est celle où la question PART
+  // chez eBay, jamais celle où la réponse arrive : une réponse lente ne doit pas
+  // se croire plus fraîche qu'une pose faite pendant qu'elle voyageait.
+  const t0 = Date.now();
+  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`, options);
   if (!res.ok) return { _err: res.err || res.ack || res.error || ('status ' + res.status) };
   const xml = res.xml;
   const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(xml); return x ? x[1].trim() : ''; };
@@ -222,7 +253,352 @@ async function tradingGetItem(token, itemId) {
     condition: g('ConditionDisplayName'),
     photos,
     specifics: specs,
+    // (9 octobre) La règle d'offre lue dans LA MÊME réponse (zéro appel de
+    // plus). ⚠️ Elle ne va JAMAIS dans `ebay_listings` : la synchro la retire
+    // du détail et la range dans `ebay_offres` (une ligne, un propriétaire).
+    _regle: lectureRegleDe(xml, itemId, t0),
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// LA RÈGLE D'OFFRE (9 octobre) — « au-dessus, ça accepte » : c'est eBAY qui
+// accepte, au seuil que Julien fixe, annonce par annonce, sur SON clic.
+// Julien : « je veux juste définir une règle sur chaque annonce et à chaque
+// offre au-dessus ça accepte ». Le réglage NATIF d'eBay (Offre directe) :
+// `ListingDetails.BestOfferAutoAcceptPrice` (eBay accepte toute offre ≥ X) et,
+// en option, `ListingDetails.MinimumBestOfferPrice` (eBay refuse toute offre
+// < Y). VRM n'appelle JAMAIS une route d'acceptation : il pose un seuil sur
+// l'annonce, par `ReviseFixedPriceItem` (ou à la création, dans `itemXml`).
+// Vinted n'est pas touché (§3 du dossier : retiré le 5 octobre).
+// ⚠️ Rien de ceci n'a été envoyé à eBay pour de vrai : noms et places des
+// éléments viennent de la doc d'eBay. C'est la RELECTURE après chaque écriture
+// qui dit ce qu'eBay tient — jamais l'écran qui le suppose.
+// ════════════════════════════════════════════════════════════════════════════
+const eur = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+const montantXml = (v) => (Math.round(v * 100) / 100).toFixed(2);
+// La règle lue, en clair — UNE fonction pour les messages d'écart, de 409 et
+// d'incertain (la même que l'app, §11).
+function etatEnClair(l) {
+  if (!l) return 'pas lue';
+  if (l.offresActives === false) return 'offres coupées';
+  if (l.accepte != null) return `eBay accepte dès ${eur(l.accepte)}` + (l.refuse != null ? ` · refuse sous ${eur(l.refuse)}` : '') + (l.offresActives == null ? ' (offres activées ou non : pas lu)' : '');
+  if (l.refuse != null) return `eBay refuse sous ${eur(l.refuse)}, sans montant d'acceptation`;
+  if (l.offresActives === true) return 'offres activées, sans montant d\'acceptation';
+  return 'aucune règle';
+}
+// LA RÈGLE D'OFFRE D'UNE ANNONCE, lue dans la réponse d'un GetItem fait avec le
+// jeton DU VENDEUR (seul lui voit les seuils — doc eBay). UNE lecture pour la
+// synchro, la relecture après une pose, « Relire chez eBay », la relecture
+// après un changement de prix et après une publication (§11).
+// Rend null quand la réponse ne prouve pas qu'on a lu L'annonce entière (pas
+// d'<Item>, autre ItemID, pas de prix, montant illisible) : « pas su », jamais
+// « aucune ».
+// ⚠️⚠️ (11 octobre, revue) `lueA` = l'heure où la question est PARTIE chez eBay
+// (`t0`), jamais celle de la réponse. Datée à l'arrivée, une lecture partie
+// AVANT une pose et revenue APRÈS se croyait plus récente que la relecture de
+// la pose, et la réécrivait : la base disait « aucune » sur une annonce qu'eBay
+// vendait dès 72 € (reproduit sur la synchro ET « Relire chez eBay »). Ce
+// qu'elle dit d'eBay date du départ de la question, pas de son retour.
+function montantXmlLu(src, t) {
+  const m = new RegExp('<' + t + '(\\s[^>]*)?>([^<]*)</' + t + '>').exec(String(src || ''));
+  if (!m) return { v: null, dev: '' };
+  const n = Number(String(m[2]).trim());
+  return { v: Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN, dev: ((/currencyID="([A-Z]{3})"/.exec(m[1] || '') || [])[1]) || '' };
+}
+function lectureRegleDe(xml, itemId, t0) {
+  const b0 = (/<Item>([\s\S]*)<\/Item>/.exec(String(xml || '')) || [])[1];
+  if (b0 == null) return null;
+  const blk = b0.replace(/<Variations>[\s\S]*?<\/Variations>/g, '');
+  if (lireBalise(blk, 'ItemID') !== String(itemId)) return null;
+  const ss = conteneur(blk, 'SellingStatus') || '', ld = conteneur(blk, 'ListingDetails') || '', bo = conteneur(blk, 'BestOfferDetails');
+  // ⚠️ Jamais `BuyItNowPrice` comme prix : sur une annonce à prix fixe, eBay le
+  //    rend souvent à 0.0.
+  let p = montantXmlLu(ss, 'CurrentPrice'); if (p.v == null) p = montantXmlLu(blk, 'StartPrice');
+  if (p.v == null || Number.isNaN(p.v) || !(p.v > 0)) return null;     // pas de prix : réponse incomplète
+  const a = montantXmlLu(ld, 'BestOfferAutoAcceptPrice'), r = montantXmlLu(ld, 'MinimumBestOfferPrice');
+  if (Number.isNaN(a.v) || Number.isNaN(r.v)) return null;
+  const en = bo == null ? null : (/<BestOfferEnabled>\s*true\s*<\/BestOfferEnabled>/i.test(bo) ? true : (/<BestOfferEnabled>\s*false\s*<\/BestOfferEnabled>/i.test(bo) ? false : null));
+  // BestOfferCount = le TOTAL des offres faites sur l'objet (doc eBay), jamais
+  // « celles en attente » : l'écran ne le présente pas autrement.
+  const nb = bo == null ? null : (/<BestOfferCount>\s*(\d+)\s*<\/BestOfferCount>/.exec(bo) || [])[1];
+  const deviseAnnonce = p.dev || lireBalise(blk, 'Currency') || '';
+  return {
+    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Number.isFinite(t0) ? t0 : Date.now() },
+    annonce: { prix: p.v, devise: deviseAnnonce, type: lireBalise(blk, 'ListingType'), statut: lireBalise(ss, 'ListingStatus'), sku: lireBalise(blk, 'SKU') },
+  };
+}
+// GetItem SANS DetailLevel ni OutputSelector : la doc dit que les seuils sont
+// rendus dès « DetailLevel none » ; un OutputSelector mal écrit rendrait une
+// annonce tronquée qu'on lirait « aucune règle » — on ne prend pas ce risque.
+async function lireRegleOffre(token, itemId) {
+  const t0 = Date.now();
+  const r = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
+  if (sansAck(r) || !r.ok) return { ok: false };
+  const l = lectureRegleDe(r.xml, itemId, t0);
+  return l ? { ok: true, ...l } : { ok: false };
+}
+// La relecture APRÈS une écriture : eBay peut mettre un instant à montrer la
+// révision [non mesuré]. Si la première relecture ne montre pas ce qui a été
+// demandé, on attend puis on relit UNE fois. Délai lu dans
+// process.env.EBAY_RELECTURE_MS (défaut 2000 ; l'audit le met à 20).
+const cents = (v) => (v == null ? null : Math.round(Number(v) * 100));
+// (tour 4, #0) Deux lectures de règle identiques (seuil, refus, offres) : sert à
+// savoir si, APRÈS une écriture, eBay montre ENCORE l'état d'avant (propagation
+// non faite) — auquel cas la relecture ne confirme rien et ne doit pas être
+// rangée comme un fait.
+const eqLecRegle = (a, c) => !!a && !!c && cents(a.accepte) === cents(c.accepte) && cents(a.refuse) === cents(c.refuse) && (a.offresActives === c.offresActives);
+// Trois issues : true (eBay montre la demande) · false (eBay montre autre chose)
+// · null (montants conformes mais on ne sait pas si les offres sont actives).
+function memeRegle(lu, demande, pre) {
+  if (!lu) return null;
+  if (demande.accepte === null) return lu.accepte == null && lu.refuse == null;
+  const refAttendu = ('refuse' in demande) ? (demande.refuse == null ? null : demande.refuse) : (pre ? pre.refuse : null);
+  if (cents(lu.accepte) !== cents(demande.accepte) || cents(lu.refuse) !== cents(refAttendu)) return false;
+  if (lu.offresActives === true) return true;
+  return lu.offresActives === false ? false : null;
+}
+async function relireApres(token, itemId, demande, pre) {
+  let post = await lireRegleOffre(token, itemId);
+  if (post.ok && memeRegle(post.lecture, demande, pre) === false) {
+    await new Promise((ok) => setTimeout(ok, Number(process.env.EBAY_RELECTURE_MS) || 2000));
+    const p2 = await lireRegleOffre(token, itemId);
+    if (p2.ok) post = p2;
+  }
+  return post;
+}
+// ── LE RANGEMENT : `ebay_offres{suffixe}`, une ligne DÉDIÉE par compte eBay ──
+// Jamais `main`, jamais dans `ebay_listings` (la synchro réécrit
+// `ebay_listings` en entier : une règle rangée là serait écrasée).
+// Trois issues : true écrit · false écriture ratée · null pas su (la LECTURE de
+// la ligne a échoué ⇒ RIEN n'est écrit : repartir d'un objet vide effacerait
+// les règles lues des autres annonces — la famille « lecture KO, écriture OK »).
+// ⚠️ Une entrée n'en remplace une autre que si elle est au moins aussi RÉCENTE
+// (`lueA` = l'heure où la question est PARTIE chez eBay, `lectureRegleDe`) :
+// une synchro lancée avant une pose ne réécrit pas, après elle, la lecture
+// d'avant. Seule exception : `_force: true` (jamais rangé), posé par la requête
+// qui a écrit le marqueur « en-cours » pour le remplacer.
+// ⚠️⚠️ (11 octobre, revue) UNE LECTURE RATÉE NE REMPLACE RIEN. Un GetItem qui
+// hoquette pendant la synchro ou « Relire chez eBay » rangeait « pas lue » par
+// -dessus une règle CONNUE (plus récente, donc gagnante) : VRM oubliait une
+// règle qu'eBay appliquait toujours — la ligne « pas su » passait en gris,
+// l'annonce sortait de « ce que ça engage », et les ventes eBay n'étaient plus
+// relues à l'ouverture pour ce compte, pendant qu'eBay vendait au seuil. Rien
+// lu ne vaut pas rien : « lecture ratée » ne remplit qu'une place VIDE.
+// (Une écriture incertaine — « en-cours », « incertain », « apres-ecriture » —
+// n'est PAS une lecture ratée : elle dit qu'eBay a peut-être changé.)
+// ⚠️ `garder` = { ids, a } : les annonces d'une liste COMPLÈTE, lue à l'heure
+// `a`. Une entrée absente de la liste n'en sort que si elle est PLUS ANCIENNE
+// que la liste : une annonce publiée (ou une règle posée) pendant que la
+// synchro relisait n'était pas dans une liste lue avant elle, et sa règle
+// était effacée — l'annonce redevenait « jamais lue ».
+// ⚠️⚠️ (11 octobre) Et l'écriture ne réécrit plus une copie PÉRIMÉE des autres
+// annonces : deux gestes sur deux cartes du même compte (poser sur la Nike,
+// retirer sur la Samba, à 50 ms) relisaient la même version, et le second
+// écrit remettait la Nike à « aucune » — eBay la vendait dès 72 €, VRM ne la
+// comptait plus dans « ce que ça engage » ni dans la relecture des ventes.
+// `modifierDonnee` compare-et-échange : une écriture concurrente fait relire
+// et refaire la fusion sur ce que l'autre a écrit.
+const REGLES_MAX = 300;
+async function rangerReglesOffre(ctx, lectures, garder) {
+  return modifierDonnee(ligneDe('ebay_offres', ctx), ctx.owner, (d) => {
+    const items = { ...((d && d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : {}) };
+    for (const [k, v0] of Object.entries(lectures || {})) {
+      if (!ID_EBAY.test(k) || !v0 || typeof v0 !== 'object') continue;
+      const { _force, ...v } = v0;
+      const avant = items[k];
+      if (!_force && avant && v.lu !== true && v.raison === 'lecture-ratee') continue;
+      if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;
+      items[k] = v;
+    }
+    if (garder && garder.ids instanceof Set && Number.isFinite(garder.a)) {
+      for (const k of Object.keys(items)) if (!garder.ids.has(k) && !(lectures && lectures[k]) && (Number(items[k] && items[k].lueA) || 0) < garder.a) delete items[k];
+    }
+    const cles = Object.keys(items).sort((x, y) => (Number(items[y].lueA) || 0) - (Number(items[x].lueA) || 0)).slice(0, REGLES_MAX);
+    return { items: Object.fromEntries(cles.map((k) => [k, items[k]])), capturedAt: Date.now() };
+  });
+}
+// Une règle « attendue » envoyée par l'écran (ce que Julien VOYAIT) :
+// 'inconnu' (état « pas su »), ou { accepte: null|montant, refuse: null|montant }.
+const attenduOk = (a) => a === 'inconnu' || (!!a && typeof a === 'object' && !Array.isArray(a)
+  && (a.accepte === null || montantOk(a.accepte)) && (a.refuse === null || montantOk(a.refuse)));
+
+// ── POSER, CHANGER, RETIRER LA RÈGLE D'OFFRE D'UNE ANNONCE EN LIGNE ─────────
+// Requêtes (le navigateur n'envoie JAMAIS de prix à appliquer ; `prixVu` et
+// `attendu` sont des GARDES : ce que Julien a vu quand il a confirmé) :
+//   pose    : { action:'regleoffre', itemId, accepte, [refuse], prixVu, attendu, [sousMoitie:true], confirme:true, [compte] }
+//   retrait : { action:'regleoffre', itemId, accepte:null, refuse:null, confirme:true, [compte] }
+// `refuse` nombre ⇒ poser/changer le refus ; `null` ⇒ le retirer ; clé ABSENTE
+// ⇒ garder celui d'eBay (il est RENVOYÉ dans le même appel : un ListingDetails
+// envoyé sans lui peut le faire sauter, article 880 d'eBay, avertissement 21992).
+// Toutes les gardes passent AVANT le moindre appel d'écriture chez eBay, et la
+// base est marquée « en cours » AVANT d'écrire chez eBay : elle ne garde
+// jamais l'ancien état d'une annonce qu'eBay a peut-être changée.
+async function handleRegleOffre(b, ctx) {
+  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\'offre : rien n\'a été envoyé à eBay.' } };
+  const itemId = String(b.itemId || '').trim();
+  if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
+  if (b.accepte === undefined) return { status: 400, body: { ok: false, reason: 'montant', error: 'Un montant en euros, par exemple 72 ou 72,50.' } };
+  const pose = b.accepte !== null;
+  const aRefuse = Object.prototype.hasOwnProperty.call(b, 'refuse');
+  // Un retrait retire TOUT (acceptation ET refus) : retirer réduit le risque.
+  // (Un refus SANS acceptation est refusé par `valideRegleOffre`.)
+  const refuseB = aRefuse ? b.refuse : (pose ? undefined : null);
+  const v = valideRegleOffre({ accepte: b.accepte, refuse: refuseB, prix: null });
+  if (!v.ok) return { status: 400, body: { ok: false, reason: v.code, error: v.err } };
+  const accepte = v.accepte, refuse = v.refuse;
+  const prixVu = b.prixVu;
+  if (pose) {
+    if (!(typeof prixVu === 'number' && Number.isFinite(prixVu) && prixVu > 0)) return { status: 400, body: { ok: false, reason: 'prix-vu', error: 'Le prix affiché manque : rouvre l\'écran — rien n\'a été envoyé.' } };
+    if (!attenduOk(b.attendu)) return { status: 400, body: { ok: false, reason: 'attendu', error: 'Je ne sais pas quelle règle tu voyais : rouvre l\'écran — rien n\'a été envoyé.' } };
+    if (seuilTropBas(accepte, prixVu) && b.sousMoitie !== true) return { status: 400, body: { ok: false, reason: 'sous-moitie', prix: prixVu, error: `${eur(accepte)}, c'est moins de la moitié du prix (${eur(prixVu)}) : confirme-le explicitement — rien n'a été envoyé.` } };
+  }
+  const demande = pose ? { accepte, ...(refuse !== undefined ? { refuse } : {}) } : { accepte: null, refuse: null };
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  // ── L'annonce est-elle EN VENTE SUR CE COMPTE ? Relue chez eBay, avec SON
+  // jeton : une annonce d'un autre compte ne désigne rien ici.
+  const L = await listeVendeur(at.token);
+  if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces eBay — rien n\'a été envoyé.' } };
+  if (L.programmees.some((x) => x.itemId === itemId)) return { status: 409, body: { ok: false, reason: 'programmee', error: pose
+    ? 'Elle n\'est pas encore en ligne : pose la règle dans son brouillon avant de la programmer, ou quand elle sera en ligne.'
+    : 'Elle n\'est pas encore en ligne : annule sa programmation (le brouillon garde la règle, tu pourras la changer), ou retire la règle dès qu\'elle sera en ligne.' } };
+  if (!L.actives.some((x) => x.itemId === itemId)) {
+    if (L.complet) return { status: 409, body: { ok: false, reason: 'pas-sur-ce-compte', compte: ctx.compte.pseudo || '', error: `Cette annonce n'est pas en vente sur ton compte eBay ${nomCompte(ctx.compte) || 'principal'} — rien n'a été envoyé.` } };
+    return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Tu as plus de 1 000 annonces sur ce compte eBay : je n\'ai pas pu vérifier que celle-ci y est — rien n\'a été envoyé.' } };
+  }
+  // ── L'annonce telle qu'eBay la tient MAINTENANT (prix, état, règle). ──
+  const pre = await lireRegleOffre(at.token, itemId);
+  if (!pre.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire l\'annonce chez eBay (prix, état) — rien n\'a été envoyé.' } };
+  if (!/^(FixedPriceItem|StoresFixedPrice)$/.test(pre.annonce.type)) return { status: 409, body: { ok: false, reason: 'format', error: 'Ce n\'est pas une annonce à prix fixe : eBay n\'y propose pas d\'offres.' } };
+  if (pre.annonce.statut && pre.annonce.statut !== 'Active') return { status: 409, body: { ok: false, reason: 'plus-en-vente', error: 'Elle n\'est plus en vente sur eBay — rien n\'a été envoyé.' } };
+  if (pre.annonce.devise !== 'EUR') return { status: 409, body: { ok: false, reason: 'devise', error: 'Annonce dans une autre devise que l\'euro : VRM ne pose pas de règle dessus.' } };
+  const P = pre.lecture;
+  const rangerPre = () => rangerReglesOffre(ctx, { [itemId]: { ...P, par: 'regle' } });
+  // Le prix que Julien a VU n'est plus celui d'eBay : rien ne part.
+  if (pose && cents(prixVu) !== cents(pre.annonce.prix)) {
+    await rangerPre();
+    return { status: 409, body: { ok: false, reason: 'prix-change', prix: pre.annonce.prix, lecture: P, error: `Le prix sur eBay est maintenant de ${eur(pre.annonce.prix)} (VRM affichait ${eur(prixVu)}) : rien n'a été envoyé. Revois le montant.` } };
+  }
+  // Contre LE PRIX D'eBAY, maintenant (eBay refuse un seuil égal ou supérieur).
+  const v2 = valideRegleOffre({ accepte, refuse, prix: pre.annonce.prix });
+  if (!v2.ok) return { status: 409, body: { ok: false, reason: v2.code, prix: pre.annonce.prix, error: v2.err } };
+  // Idempotence : aucune révision inutile (eBay en compte 250 par jour et par annonce).
+  const inchange = pose
+    ? (P.offresActives === true && cents(P.accepte) === cents(accepte) && (refuse === undefined || cents(P.refuse) === cents(refuse)))
+    : (P.accepte == null && P.refuse == null);
+  if (inchange) {
+    const range = await rangerPre();
+    return { status: 200, body: { ok: true, inchange: true, verifie: true, lecture: P, avertissements: [], range } };
+  }
+  // La règle a changé chez eBay depuis ce que Julien a VU : rien ne part.
+  if (pose) {
+    const a = b.attendu;
+    if (a && typeof a === 'object' && (cents(a.accepte) !== cents(P.accepte) || cents(a.refuse) !== cents(P.refuse))) {
+      await rangerPre();
+      return { status: 409, body: { ok: false, reason: 'regle-changee', lecture: P, error: `La règle sur eBay a changé depuis : ${etatEnClair(P)}. Rien n'a été envoyé — revois-la.` } };
+    }
+    if (a === 'inconnu' && (P.accepte != null || P.refuse != null)) {
+      await rangerPre();
+      return { status: 409, body: { ok: false, reason: 'regle-existante', lecture: P, error: `eBay a déjà une règle sur cette annonce : ${etatEnClair(P)}. Rien n'a été envoyé — dis-moi si tu la remplaces.` } };
+    }
+    if (refuse === undefined && P.refuse != null && cents(P.refuse) >= cents(accepte)) {
+      return { status: 409, body: { ok: false, reason: 'refuse-existant', refuse: P.refuse, lecture: P, error: `eBay refuse déjà les offres sous ${eur(P.refuse)} : la règle doit être au-dessus. Rien n'a été envoyé.` } };
+    }
+  }
+  // ── LE MARQUEUR, AVANT d'écrire chez eBay. ──
+  const m = await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'en-cours', lueA: Date.now(), par: 'regle', _force: true } });
+  if (m !== true) return { status: 503, body: { ok: false, reason: 'note', error: 'Je n\'ai pas pu le noter dans VRM — rien n\'a été envoyé à eBay. Réessaie dans un moment.' } };
+  // ── L'ÉCRITURE ──
+  let inner;
+  if (pose) {
+    const yRefus = refuse != null ? refuse : (refuse === undefined && P.refuse != null ? P.refuse : null);
+    inner = `<Item><ItemID>${itemId}</ItemID>`
+      + (P.offresActives !== true ? '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>' : '')
+      + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">${montantXml(accepte)}</BestOfferAutoAcceptPrice>`
+      + (yRefus != null ? `<MinimumBestOfferPrice currencyID="EUR">${montantXml(yRefus)}</MinimumBestOfferPrice>` : '')
+      + '</ListingDetails></Item>'
+      + (refuse === null && P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
+  } else {
+    // Retirer la règle, c'est « les offres t'arrivent, c'est toi qui décides » :
+    // on ne touche PAS à BestOfferEnabled.
+    inner = `<Item><ItemID>${itemId}</ItemID></Item>`
+      + (P.accepte != null ? '<DeletedField>Item.ListingDetails.BestOfferAutoAcceptPrice</DeletedField>' : '')
+      + (P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
+  }
+  const r = await tradingCall(at.token, 'ReviseFixedPriceItem', inner);
+  // (tour 4, #0) Une relecture qui montre ENCORE l'état d'avant l'écriture
+  // (`eqLecRegle(post.lecture, P)` sans confirmer la demande) est une
+  // PROPAGATION non faite, pas un fait : on range un RISQUE (la raison du KO —
+  // « apres-ecriture » ou « incertain »), jamais le fait « aucune ». eBay a
+  // dit « Success » (ou n'a pas répondu) : il applique peut-être la règle qu'on
+  // vient d'écrire. Rangé en risque ⇒ `etatRegleOffre` le compte « peut-être ».
+  const rangerPost = (post, raisonKo) => {
+    const conf = post.ok && memeRegle(post.lecture, demande, P) === true;
+    const nonBouge = post.ok && !conf && eqLecRegle(post.lecture, P);
+    const v = (!post.ok || nonBouge)
+      ? { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true }
+      : { ...post.lecture, par: 'regle', _force: true };
+    return rangerReglesOffre(ctx, { [itemId]: v });
+  };
+  if (r.ok) {
+    const post = await relireApres(at.token, itemId, demande, P);
+    const range = await rangerPost(post, 'apres-ecriture');
+    if (!post.ok) return { status: 200, body: { ok: true, verifie: null, lecture: null, avertissements: r.avertissements, erreurs: r.erreurs, range } };
+    const vf = memeRegle(post.lecture, demande, P);
+    // eBay a accepté (« Success ») mais montre ENCORE l'état d'avant : la règle
+    // n'est pas confirmée. On ne rend PAS cette lecture (ce serait « aucune »
+    // dans la carte) : « pas encore relue », un risque — comme le marqueur rangé.
+    if (vf !== true && eqLecRegle(post.lecture, P)) return { status: 200, body: { ok: true, verifie: null, lecture: null, nonConfirme: true, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
+    return { status: 200, body: { ok: true, verifie: vf, lecture: post.lecture, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
+  }
+  if (sansAck(r) || classeEchec(r) === 'incertain') {
+    // Pas de réponse claire, ou panne d'eBay : il a peut-être écrit. On relit.
+    const post = await relireApres(at.token, itemId, demande, P);
+    const range = await rangerPost(post, 'incertain');
+    if (post.ok && memeRegle(post.lecture, demande, P) === true) return { status: 200, body: { ok: true, verifie: true, apresIncertain: true, lecture: post.lecture, avertissements: r.avertissements || [], range } };
+    if (post.ok) {
+      // eBay montre encore l'état d'avant ⇒ on ne rend pas cette lecture (sinon
+      // la carte la rangerait comme un fait « aucune ») : le geste reste « relis-la ».
+      const nb = eqLecRegle(post.lecture, P);
+      return { status: 504, body: { ok: false, reason: 'incertain', lecture: nb ? null : post.lecture, erreurs: r.erreurs, range, error: nb
+        ? 'eBay n\'a pas répondu clairement, et l\'annonce montre encore son état d\'avant — je ne sais pas si la règle est posée. « Relire chez eBay » dans un moment avant de recommencer.'
+        : `eBay n'a pas répondu clairement. L'annonce montre aujourd'hui : ${etatEnClair(post.lecture)}. Relis-la dans un moment avant de recommencer.` } };
+    }
+    return { status: 504, body: { ok: false, reason: 'incertain', erreurs: r.erreurs, range, error: 'eBay n\'a pas répondu clairement — je ne sais pas si la règle est posée. « Relire chez eBay » avant de recommencer.' } };
+  }
+  // RequestError : la requête est refusée, rien n'est appliqué. Une relecture
+  // (sans attente) remplace le marqueur ; ratée ⇒ ce qu'on a lu avant.
+  const post = await lireRegleOffre(at.token, itemId);
+  await rangerReglesOffre(ctx, { [itemId]: { ...(post.ok ? post.lecture : P), par: 'regle', _force: true } });
+  return { status: 422, body: { ok: false, reason: 'refus', error: messageEbaySur(r.err) || 'eBay a refusé la règle — rien n\'a changé.', erreurs: r.erreurs, lecture: post.ok ? post.lecture : P } };
+}
+
+// ── « RELIRE CHEZ eBAY » : la règle de 1 à 20 annonces, l'une après l'autre ─
+async function handleRegleOffreLire(b, ctx) {
+  const brut = b.itemIds;
+  const ids = Array.isArray(brut) ? [...new Set(brut.map((x) => String(x == null ? '' : x).trim()))] : null;
+  if (!ids || !ids.length || ids.length > 20 || ids.some((x) => !ID_EBAY.test(x))) return { status: 400, body: { ok: false, reason: 'annonces', error: 'Liste d\'annonces eBay invalide (1 à 20).' } };
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const tListe = Date.now();
+  const L = await listeVendeur(at.token);
+  if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces eBay — rien n\'a été relu.' } };
+  const aMoi = new Set([...L.actives, ...L.programmees].map((x) => x.itemId));
+  const rendu = {}, lectures = {};
+  for (const id of ids) {
+    if (!aMoi.has(id)) { rendu[id] = { lu: false, raison: L.complet ? 'pas-sur-ce-compte' : 'pas-su' }; continue; }
+    const g = await lireRegleOffre(at.token, id);
+    const lecture = g.ok ? { ...g.lecture, par: 'relire' } : { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'relire' };
+    rendu[id] = lectures[id] = lecture;
+  }
+  // (11 octobre, revue — tour 3) Une liste COMPLÈTE dit aussi quelles annonces
+  // ne sont plus sur ce compte (terminées, vendues, déplacées) : leurs règles
+  // sortent, avec la règle de la synchro (`garder` : seulement une entrée PLUS
+  // ANCIENNE que la liste). Elles restaient rangées — l'écran les montrait « en
+  // ligne », relisait sans fin, et la déconnexion les comptait encore.
+  const garder = L.complet ? { ids: aMoi, a: tListe } : null;
+  const range = (Object.keys(lectures).length || garder) ? await rangerReglesOffre(ctx, lectures, garder) : true;
+  return { status: 200, body: { ok: true, lectures: rendu, range } };
 }
 
 // MODIFIER prix / stock d'une annonce existante (léger et sûr, prévu pour ça).
@@ -233,20 +609,63 @@ async function tradingReviseInventoryStatus(token, itemId, price, qty) {
   return tradingCall(token, 'ReviseInventoryStatus', `<InventoryStatus>${inv}</InventoryStatus>`);
 }
 
-async function handleRevise(b, owner) {
+// (9 octobre) Un changement de PRIX dit ce qu'il advient de la règle d'offre.
+// `ReviseInventoryStatus` ne peut pas porter les seuils, et ce qu'eBay en fait
+// n'est pas documenté (les effacer, les garder, ou refuser le prix : 23004).
+// On relit après, et on dit ce qu'on voit — jamais d'avance « eBay la retire ».
+// Une modification de stock seul ne touche à rien de tout ça.
+async function handleRevise(b, ctx) {
   const itemId = String(b.itemId || '').trim();
   if (!/^\d+$/.test(itemId)) return { status: 400, body: { ok: false, error: 'itemId invalide' } };
   if ((b.price == null || b.price === '') && (b.quantity == null || b.quantity === '')) return { status: 400, body: { ok: false, error: 'rien à modifier' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const prixChange = !(b.price == null || b.price === '');
+  let avant = undefined, aRegle = false;
+  if (prixChange) {
+    const ligne = await lireDonnee(ligneDe('ebay_offres', ctx), ctx.owner);
+    avant = ligne === undefined ? undefined : ((ligne && ligne.items && ligne.items[itemId]) || null);
+    aRegle = !!(avant && avant.lu === true && (avant.accepte != null || avant.refuse != null));
+    // Une annonce à règle connue : le marqueur AVANT de toucher au prix.
+    if (aRegle) {
+      const m = await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'en-cours', lueA: Date.now(), par: 'revise', _force: true } });
+      if (m !== true) return { status: 503, body: { ok: false, reason: 'note', error: 'Je n\'ai pas pu le noter dans VRM — rien n\'a été envoyé à eBay. Réessaie dans un moment.' } };
+    }
+  }
   const r = await tradingReviseInventoryStatus(at.token, itemId, b.price, b.quantity);
   // Sans <Ack> (réseau coupé, passerelle 5xx), eBay n'a rien dit : le prix a pu
   // changer. « Incertain », jamais « refusé » (revue du 6 octobre — le reste
   // de la route l'avait appris, `revise` non).
-  if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si le prix a changé. Regarde l\'annonce sur eBay avant de recommencer.' } };
+  if (sansAck(r)) {
+    if (prixChange && avant && typeof avant === 'object') await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'incertain', lueA: Date.now(), par: 'revise', _force: aRegle } });
+    return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si le prix a changé. Regarde l\'annonce sur eBay avant de recommencer.' } };
+  }
   // Trading renvoie HTTP 200 même sur refus (erreur dans le corps) → vrai code 422.
-  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack } };
-  return { status: 200, body: { ok: true, ack: r.ack } };
+  if (!r.ok) {
+    if (aRegle) {
+      const post = await lireRegleOffre(at.token, itemId);
+      await rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'revise', _force: true } : (classeEchec(r) === 'refus' ? { ...avant, _force: true } : { lu: false, raison: 'incertain', lueA: Date.now(), par: 'revise', _force: true }) });
+    }
+    return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack, erreurs: r.erreurs } };
+  }
+  if (!prixChange) return { status: 200, body: { ok: true, ack: r.ack } };
+  const post = await lireRegleOffre(at.token, itemId);
+  // ⚠️ (tour 4, #10) Un changement de PRIX (`ReviseInventoryStatus`) ne peut PAS
+  // créer de règle d'offre. Quand l'annonce n'avait AUCUNE règle avant
+  // (`!aRegle`) et que la relecture qui suit échoue, ne RIEN ranger : écrire
+  // « apres-ecriture » inventerait « eBay tient peut-être une règle » (risque)
+  // sur une annonce qui n'en a jamais eu — une fausse alerte sous un
+  // « ✓ Modifié ». On ne marque « apres-ecriture » (relecture ratée, la règle a
+  // pu tomber) que s'il y avait une règle connue AVANT.
+  if (post.ok) await rangerReglesOffre(ctx, { [itemId]: { ...post.lecture, par: 'revise', _force: aRegle } });
+  else if (aRegle) await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: true } });
+  return { status: 200, body: { ok: true, ack: r.ack, avertissements: r.avertissements, erreurs: r.erreurs,
+    regle: {
+      lecture: post.ok ? post.lecture : null,
+      // « pas su » ne devient jamais « pas tombée ».
+      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),
+      avant: aRegle ? { accepte: avant.accepte, refuse: avant.refuse } : null,
+    } } };
 }
 
 // ── PUBLIER une nouvelle annonce (Trading AddFixedPriceItem) ────────────────
@@ -276,7 +695,7 @@ function itemXml(it) {
     // L'identité de la paire (`VRM-{n°}`). ⚠️ Posée par `avecSku` à partir du
     // NUMÉRO, jamais recopiée d'un `sku` envoyé par le navigateur.
     (it.sku ? `<SKU>${esc(it.sku)}</SKU>` : '') +
-    `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
+    `<Description><![CDATA[${String(it.description || it.title || '').replace(/\]\]>/g, ']]]]><![CDATA[>')}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
     `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
     `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +
@@ -284,7 +703,7 @@ function itemXml(it) {
     (it.scheduleTime ? `<ScheduleTime>${esc(it.scheduleTime)}</ScheduleTime>` : '') +
     '<Currency>EUR</Currency><Country>FR</Country>' +
     `<Location>${esc(it.location || 'France')}</Location>` +
-    `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` +
+    `<ConditionID>${esc(it.conditionId)}</ConditionID>` +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
     `<DispatchTimeMax>${parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
@@ -305,6 +724,16 @@ function itemXml(it) {
         '</ShippingServiceOptions></ShippingDetails>') +
     '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
     '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
+    // (9 octobre) La RÈGLE D'OFFRE d'une nouvelle annonce : c'est eBay qui
+    // accepte au seuil fixé. ⚠️ Posée par la route (`regleDeItem`), validée
+    // contre le prix — jamais recopiée du navigateur (`avecSku` la jette).
+    // Sans règle : RIEN n'est émis, le XML est celui d'avant au caractère près.
+    (it.regleOffre
+      ? '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>'
+        + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">${montantXml(it.regleOffre.accepte)}</BestOfferAutoAcceptPrice>`
+        + (it.regleOffre.refuse != null ? `<MinimumBestOfferPrice currencyID="EUR">${montantXml(it.regleOffre.refuse)}</MinimumBestOfferPrice>` : '')
+        + '</ListingDetails>'
+      : '') +
     (it.uuid ? `<UUID>${esc(it.uuid)}</UUID>` : '') +
     '</Item>';
 }
@@ -371,30 +800,71 @@ async function tradingVerifyAddFixedPriceItem(token, it) {
 // seule la route les pose, après les avoir validés.
 function avecSku(it) {
   const brut = it && it.numero != null ? String(it.numero).trim() : '';
-  const propre = { ...it, scheduleTime: '', uuid: '' };
+  const propre = { ...it, scheduleTime: '', uuid: '', regleOffre: null };
   if (!brut) return { item: { ...propre, sku: '' } };
   const sku = skuDe(brut);
   if (!sku) return { err: 'Numéro de paire illisible : rien n\'a été envoyé à eBay.' };
   return { item: { ...propre, sku } };
 }
+// La règle d'offre d'une NOUVELLE annonce (`item.offre`), validée par la
+// route contre le prix de l'item (l'annonce n'existe pas encore chez eBay).
+// Rend `{regle}` (null = aucune) ou `{err, reason?}` : rien ne part.
+function regleDeItem(it0) {
+  const o = it0 ? it0.offre : undefined;
+  if (o === undefined || o === null) return { regle: null };
+  if (typeof o !== 'object' || Array.isArray(o)) return { err: 'Règle d\'offre mal formée : rien n\'a été envoyé à eBay.' };
+  const prix = Number(String(it0.price).replace(',', '.'));
+  if (!Number.isFinite(prix) || !(prix > 0)) return { err: 'Règle d\'offre : le prix de l\'annonce est illisible. Rien n\'a été envoyé à eBay.' };
+  const v = valideRegleOffre({ accepte: o.accepte === undefined ? null : o.accepte, refuse: o.refuse === undefined ? null : o.refuse, prix });
+  if (!v.ok) return { err: 'Règle d\'offre : ' + v.err + ' Rien n\'a été envoyé à eBay.' };
+  if (v.accepte != null && seuilTropBas(v.accepte, prix) && o.sousMoitie !== true) return { err: 'Règle d\'offre : moins de la moitié du prix, et pas confirmé. Rien n\'a été envoyé à eBay.', reason: 'sous-moitie' };
+  return { regle: v.accepte == null ? null : { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse } };
+}
 // La paire (son SKU) est-elle DÉJÀ sur eBay, en ligne ou programmée ? Rend la
 // réponse de refus à renvoyer, ou null si elle n'y est pas. Liste illisible ou
 // incomplète ⇒ refus « pas su » : une absence non prouvée ne laisse rien partir.
-// ⚠️ (relecture du 11 octobre) Après la remise à zéro des numéros (migration
-// 013), le SKU d'une annonce se LIT avec le marqueur : « VRM-22 » posé AVANT la
-// coupure désigne l'ancienne B22, pas la nouvelle 22 (la refuser bloquait la
-// nouvelle paire) ; « VRM-553 », numéro provisoire devenu 3, désigne la 3 (le
-// laisser passer créait une seconde annonce eBay de la même paire).
-async function dejaChezEbay(token, sku, verbe, mk) {
-  const L = await listeVendeur(token);
-  if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } };
-  if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Tu as plus de 1 000 annonces sur eBay : je n\'ai pas pu toutes les relire pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } };
-  const voulu = numDeSku(sku);
-  const meme = (x) => !!voulu && numeroExterne(numDeSku(x.sku), x.itemId, 'ebayAnnonces', null, mk) === voulu;
-  const prog = L.programmees.find(meme);
-  if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
-  const act = L.actives.find(meme);
-  if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, error: `La paire ${sku} est déjà en vente sur eBay — rien n'a été ${verbe}.` } };
+// ⚠️⚠️ SUR TOUS SES COMPTES eBAY (9 octobre) : une paire en vente — ou
+// programmée — sur N'IMPORTE lequel de ses comptes ne part pas sur un autre.
+// Chaque compte actif est relu CHEZ eBAY, avec SON jeton ; « pas su » sur UN
+// seul (jeton mort, eBay muet, registre illisible) ⇒ rien ne part, et la
+// réponse nomme le compte qui manque.
+async function comptesAVerifier(ctx, tokenCourant) {
+  const cloison = await baseCloisonnee();
+  if (!cloison) return { ok: true, liste: [{ compte: ctx.compte, token: tokenCourant }] };
+  const reg = await lireComptes(ctx.owner);
+  if (reg === undefined) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire la liste de tes comptes eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } } };
+  const liste = [];
+  for (const c of comptesActifs(reg)) {
+    const memeQueCourant = c.suffixe === (ctx.compte.suffixe || '');
+    if (memeQueCourant) { liste.push({ compte: { ...ctx.compte, pseudo: ctx.compte.pseudo || c.pseudo }, token: tokenCourant }); continue; }
+    // Le principal sous-entendu n'est un compte que s'il est relié.
+    if (c.implicite) {
+      const has = await hasRefresh(ctx.owner, '');
+      if (has === null) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } } };
+      if (!has) continue;
+    }
+    const at = await accessToken(ctx.owner, c.suffixe);
+    if (!at.ok) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', compte: c.pseudo || '', error: `Je n'ai pas pu relire ton compte eBay ${nomCompte(c) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé. Reconnecte-le, ou déconnecte-le s'il n'est plus à toi.` } } };
+    liste.push({ compte: c, token: at.token });
+  }
+  return { ok: true, liste };
+}
+async function dejaChezEbay(ctx, tokenCourant, sku, verbe, mk) {
+  const v = await comptesAVerifier(ctx, tokenCourant);
+  if (!v.ok) return v.err;
+  const plusieurs = v.liste.length > 1;
+  for (const { compte, token } of v.liste) {
+    const ou = plusieurs && nomCompte(compte) ? ` (compte eBay ${nomCompte(compte)})` : '';
+    const L = await listeVendeur(token);
+    if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE } };
+    if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` } };
+    const voulu = numDeSku(sku);
+    const meme = (x) => !!voulu && numeroExterne(numDeSku(x.sku), x.itemId, 'ebayAnnonces', null, mk) === voulu;
+    const prog = L.programmees.find(meme);
+    if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${ou}${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
+    const act = L.actives.find(meme);
+    if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), error: `La paire ${sku} est déjà en vente sur eBay${ou} — rien n'a été ${verbe}.` } };
+  }
   return null;
 }
 // LA NUMÉROTATION DE CE VENDEUR (migration 013), relue au moment d'écrire chez
@@ -416,30 +886,43 @@ function numerotationRefus(b, num) {
   if (v != null && Number(b.numerotation) !== v) return { status: 409, body: { ok: false, reason: 'numerotation-perimee', error: 'Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le — rien n\'a été envoyé à eBay.' } };
   return null;
 }
-async function handlePublish(b, owner) {
+async function handlePublish(b, ctx) {
   const it0 = b.item || {};
+  if (!ETAT_OK.test(String(it0.conditionId || ''))) return { status: 400, body: { ok: false, reason: 'etat', error: 'Choisis l’état de la paire avant de vérifier ou publier sur eBay.' } };
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   const s = avecSku(it0);
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
-  const it = s.item;
+  const ro = regleDeItem(it0);
+  if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
+  const it = { ...s.item, regleOffre: ro.regle };
   let num = { ok: true, mk: null };
-  if (it.sku) { num = await numerotationVendeur(owner); const ref = numerotationRefus(b, num); if (ref) return ref; }
-  const at = await accessToken(owner);
+  if (it.sku) { num = await numerotationVendeur(ctx.owner); const ref = numerotationRefus(b, num); if (ref) return ref; }
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE (la règle de `programmer`, 6 octobre). Publier
   // n'avait AUCUNE garde : une paire déjà en vente, ou programmée pour ce
   // soir, repartait en seconde annonce (prouvé : deux annonces VRM-30). Relue
   // chez eBay, en ligne ET programmées ; sans SKU, rien à comparer.
   if (it.sku) {
-    const deja = await dejaChezEbay(at.token, it.sku, 'publié', num.mk);
-    if (deja) return deja;
+    const deja = await dejaChezEbay(ctx, at.token, it.sku, 'publié', num.mk);
+    if (deja) { await rangerRetrouvee(ctx, at.token, deja, it); return deja; }
   }
   const r = await tradingAddFixedPriceItem(at.token, it);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si l\'annonce a été créée. Rafraîchis depuis eBay avant de recommencer.' } };
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
-  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, avertissements: r.avertissements } };
+  // (9 octobre) Publiée AVEC une règle d'offre : on relit chez eBay ce qu'il en
+  // a gardé (une catégorie qui n'accepte pas le seuil le perd sans refuser
+  // l'annonce [non mesuré]). Sans règle : aucun appel de plus.
+  let offre;
+  if (it.regleOffre && ID_EBAY.test(String(r.itemId))) {
+    const demande = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
+    const post = await lireRegleOffre(at.token, String(r.itemId));
+    const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok ? { ...post.lecture, par: 'publication' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'publication' } });
+    offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
+  }
+  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
 }
 
 // ── L'HEURE DE PROGRAMMATION, VALIDÉE PAR LE SERVEUR ─────────────────────────
@@ -471,19 +954,22 @@ const ETAT_OK = /^\d{3,5}$/;
 // une information à corriger, pas une panne. Réseau/jeton KO → vrai code
 // d'échec. Avec `scheduleTime` : la même validation que `programmer`, et eBay
 // annonce alors le frais de programmation.
-async function handleVerify(b, owner) {
+async function handleVerify(b, ctx) {
   const it0 = b.item || {};
+  if (!ETAT_OK.test(String(it0.conditionId || ''))) return { status: 400, body: { ok: false, reason: 'etat', error: 'Choisis l’état de la paire avant de vérifier ou publier sur eBay.' } };
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   // Le MÊME payload que la publication (§11) : SKU compris.
   const s = avecSku(it0);
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
+  const ro = regleDeItem(it0);
+  if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
   let quand = '';
   if (b.scheduleTime != null && b.scheduleTime !== '') {
     quand = heureProgrammation(b.scheduleTime);
     if (!quand) return { status: 400, body: { ok: false, reason: 'heure', error: 'Heure de mise en ligne refusée : entre 15 minutes et 3 semaines à l\'avance.' } };
   }
-  const it = { ...s.item, scheduleTime: quand };
-  const at = await accessToken(owner);
+  const it = { ...s.item, regleOffre: ro.regle, scheduleTime: quand };
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingVerifyAddFixedPriceItem(at.token, it);
   if (r.status === 0) return { status: 503, body: { ok: false, error: r.error || 'eBay injoignable' } };
@@ -509,7 +995,7 @@ async function handleVerify(b, owner) {
 // est LA vérité qu'on rend — jamais l'heure qu'on a demandée.
 const UUID_EBAY = /^[0-9A-F]{32}$/;
 const PAS_SU_LISTE = 'Je n\'ai pas pu relire tes annonces eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.';
-async function handleProgrammer(b, owner) {
+async function handleProgrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la programmation : rien n\'a été envoyé à eBay.' } };
   const it0 = b.item || {};
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '' || !ETAT_OK.test(String(it0.conditionId || ''))) {
@@ -517,6 +1003,8 @@ async function handleProgrammer(b, owner) {
   }
   const s = avecSku(it0);
   if (s.err || !s.item.sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Pour programmer, la paire doit avoir son N° : sans lui, VRM ne saurait pas la retrouver si elle se vend ailleurs avant l\'heure.' } };
+  const ro = regleDeItem(it0);
+  if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
   let quand = '';
   if (b.scheduleTime != null && b.scheduleTime !== '') {
     quand = heureProgrammation(b.scheduleTime);
@@ -526,15 +1014,15 @@ async function handleProgrammer(b, owner) {
   if (!UUID_EBAY.test(uuid)) return { status: 400, body: { ok: false, reason: 'uuid', error: 'Envoi mal formé (identifiant d\'envoi) : rien n\'a été envoyé.' } };
   const fraisVus = typeof b.fraisVus === 'number' ? b.fraisVus : NaN;
   if (!(Number.isFinite(fraisVus) && fraisVus >= 0)) return { status: 400, body: { ok: false, reason: 'frais-vus', error: 'Vérifie d\'abord les frais : rien n\'a été envoyé.' } };
-  const it = { ...s.item, scheduleTime: quand };
-  const num = await numerotationVendeur(owner);
+  const it = { ...s.item, regleOffre: ro.regle, scheduleTime: quand };
+  const num = await numerotationVendeur(ctx.owner);
   { const ref = numerotationRefus(b, num); if (ref) return ref; }
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
-  // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant (une liste
-  // INCOMPLÈTE ne prouve pas l'absence d'une paire : on ne programme pas).
-  const deja = await dejaChezEbay(at.token, it.sku, 'envoyé', num.mk);
-  if (deja) return deja;
+  // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant, sur TOUS ses
+  // comptes (une liste INCOMPLÈTE ne prouve pas l'absence : on ne programme pas).
+  const deja = await dejaChezEbay(ctx, at.token, it.sku, 'envoyé', num.mk);
+  if (deja) { await rangerRetrouvee(ctx, at.token, deja, it); return deja; }
   // ── LES FRAIS, revérifiés juste avant (sans UUID). ──
   const v = await tradingVerifyAddFixedPriceItem(at.token, it);
   if (v.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable — rien n\'a été envoyé.' } };
@@ -545,11 +1033,80 @@ async function handleProgrammer(b, owner) {
   const a = await tradingAddFixedPriceItem(at.token, { ...it, uuid });
   if (sansAck(a)) return { status: 504, body: { ok: false, reason: 'incertain', uuid, error: 'eBay n\'a pas répondu à temps — je ne sais pas si elle est programmée. VRM relit tes annonces eBay avant de redemander quoi que ce soit.' } };
   if (!a.ok) {
-    if ((a.erreurs || []).some((e) => e.code === '488')) return confirmerDoublon(at.token, a, it, quand);
+    if ((a.erreurs || []).some((e) => e.code === '488')) {
+      // Le même envoi a DÉJÀ créé l'annonce (un premier essai resté sans
+      // réponse) : sa règle n'a donc jamais été rangée — on la range maintenant.
+      const d = await confirmerDoublon(at.token, a, it, quand);
+      if (d.status === 200 && d.body && d.body.ok && it.regleOffre) d.body.offre = await rangerRegleProgrammee(ctx, at.token, d.body, it, quand);
+      return d;
+    }
     return { status: 422, body: { ok: false, error: a.err || 'eBay a refusé l\'annonce.', erreurs: a.erreurs } };
   }
   if (!ID_EBAY.test(a.itemId)) return { status: 502, body: { ok: false, reason: 'incertain', uuid, error: 'eBay a répondu sans numéro d\'annonce — je ne sais pas si elle est programmée. Rafraîchis depuis eBay avant de recommencer.' } };
-  return { status: 200, body: resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, avertissements: a.avertissements }) };
+  const corps = resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, compte: ctx.compte.pseudo || '', avertissements: a.avertissements });
+  if (it.regleOffre) corps.offre = await rangerRegleProgrammee(ctx, at.token, corps, it, quand);
+  return { status: 200, body: corps };
+}
+// ⚠️⚠️ (11 octobre, revue — tour 3) UNE ANNONCE PROGRAMMÉE PART AVEC SA RÈGLE
+// D'OFFRE : VRM la RANGE comme une publication. Elle n'était ni rangée ni
+// relue — même mise en ligne « Maintenant » : une fois partie, l'annonce
+// sortait des programmées sans entrer dans Annonces, son seuil (que VRM venait
+// lui-même d'envoyer) n'était plus visible nulle part, et les ventes eBay
+// n'étaient pas relues à l'ouverture (aucune règle connue). Deux cas :
+//   · en ligne MAINTENANT (pas d'heure, ou eBay a ignoré l'heure) : relue
+//     chez eBay et rangée, exactement comme `publish` (`par: 'programmation'`) ;
+//   · programmée pour plus tard : rangée « programmee » avec ce qui a été
+//     ENVOYÉ — l'app la compte comme une règle que eBay tiendra peut-être
+//     (relecture des ventes, déconnexion, fermeture) ; la synchro qui suit son
+//     départ la relit (lecture plus récente : elle remplace).
+// Rend l'objet `offre` de la réponse : `envoyee`, et `verifie`/`lecture` (en
+// ligne) ou `programmee: true` ; `range` dit si VRM a pu le noter.
+async function rangerRegleProgrammee(ctx, token, corps, it, quand) {
+  const envoyee = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
+  const id = String(corps.itemId);
+  if (!ID_EBAY.test(id)) return { envoyee };
+  if (!quand || corps.enLigneMaintenant) {
+    const post = await lireRegleOffre(token, id);
+    const range = await rangerReglesOffre(ctx, { [id]: post.ok ? { ...post.lecture, par: 'programmation' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'programmation' } });
+    return { envoyee, verifie: post.ok ? memeRegle(post.lecture, envoyee, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
+  }
+  const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: corps.debut || quand, lueA: Date.now(), par: 'programmation' } });
+  return { envoyee, programmee: true, range: range === true };
+}
+// ⚠️ (tour 4, #2) L'ANNONCE EST RETROUVÉE PAR SON SKU, SA RÈGLE DOIT ÊTRE RANGÉE.
+// Après un premier envoi resté sans réponse, l'annonce existe chez eBay avec sa
+// règle. Au second essai, `dejaChezEbay` la reconnaît (« deja-programmee » /
+// « deja-en-ligne ») et REND 409 AVANT la branche 488 qui rangeait : la règle
+// n'était alors rangée nulle part (ni « ce que ça engage », ni la relecture des
+// ventes, ni la déconnexion, ni « Fermer mon compte »). On la range ici, comme
+// `rangerRegleProgrammee` : en ligne ⇒ relue chez eBay (`par:'programmation'`) ;
+// programmée ⇒ « programmee » avec ce qui a été envoyé (la synchro qui suit la
+// relit). `deja.body.offre` porte le résultat pour l'app. Jamais sur « pas su ».
+async function rangerRetrouvee(ctx, token, deja, it) {
+  const body = (deja && deja.body) || {};
+  const id = String(body.itemId || '');
+  if (!it.regleOffre || !/^deja-/.test(String(body.reason || '')) || !ID_EBAY.test(id)) return;
+  const envoyee = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
+  if (body.reason === 'deja-en-ligne') {
+    const post = await lireRegleOffre(token, id);
+    const range = await rangerReglesOffre(ctx, { [id]: post.ok ? { ...post.lecture, par: 'programmation' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'programmation' } });
+    body.offre = { envoyee, verifie: post.ok ? memeRegle(post.lecture, envoyee, null) : null, lecture: post.ok ? post.lecture : null, range: range === true, retrouvee: true };
+  } else {
+    const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: body.debut || null, lueA: Date.now(), par: 'programmation' } });
+    body.offre = { envoyee, programmee: true, range: range === true, retrouvee: true };
+  }
+}
+// Une annonce TERMINÉE (retirée, programmation annulée) sort aussi des règles
+// rangées : sinon, jusqu'à la prochaine synchro, la déconnexion et « Fermer mon
+// compte » comptaient une règle qu'eBay n'applique plus. Lire-fusionner-réécrire
+// gardé (compare-et-échange) : une lecture ratée n'écrit rien — true · false · null.
+async function sortirDesRegles(itemId, ctx) {
+  return modifierDonnee(ligneDe('ebay_offres', ctx), ctx.owner, (d) => {
+    const items = (d && d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : null;
+    if (!items || !Object.prototype.hasOwnProperty.call(items, itemId)) return undefined;
+    const { [itemId]: _parti, ...reste } = items;
+    return { ...d, items: reste, capturedAt: Date.now() };
+  });
 }
 // La réponse commune d'une annonce programmée (ou mise en ligne).
 // ⚠️ eBay PEUT ignorer l'heure : si le StartTime qu'il rend est antérieur de
@@ -586,14 +1143,14 @@ async function confirmerDoublon(token, a, it, quand) {
 // réponse rend aussi les identités EN LIGNE (ItemID + SKU) : c'est ce qui dit
 // qu'une programmée est bien partie à l'heure.
 const resumeProgrammee = (x) => ({ itemId: x.itemId, sku: x.sku, title: x.title, price: x.price, debut: x.depuis || null, fin: x.fin || null, photo: x.photo, url: x.url || (x.itemId ? `https://www.ebay.fr/itm/${x.itemId}` : '') });
-async function handleProgrammees(owner) {
-  const at = await accessToken(owner);
+async function handleProgrammees(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: L.status || 502, body: { ok: false, error: L.error || 'eBay n\'a pas rendu tes annonces programmées.' } };
   const items = L.programmees.map(resumeProgrammee);
   const enLigne = L.actives.map((x) => ({ itemId: x.itemId, sku: x.sku }));
-  const range = await storeData('ebay_programmees', { items, enLigne, complet: L.complet, capturedAt: Date.now() }, owner);
+  const range = await storeData(ligneDe('ebay_programmees', ctx), { items, enLigne, complet: L.complet, capturedAt: Date.now() }, ctx.owner);
   return { status: 200, body: { ok: true, items, enLigne, complet: L.complet, range } };
 }
 
@@ -603,11 +1160,11 @@ async function handleProgrammees(owner) {
 // TELLE QUELLE — sur un refus, l'écran envoie l'annuler dans le Seller Hub.
 // Elle n'agit QUE sur une annonce présente dans la liste des programmées
 // relue à l'instant : une annonce déjà en ligne va à « Retirer d'eBay ».
-async function handleDeprogrammer(b, owner) {
+async function handleDeprogrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme l\'annulation : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces programmées — rien n\'a été envoyé.' } };
@@ -622,7 +1179,9 @@ async function handleDeprogrammer(b, owner) {
   if (!L2.ok) return { status: 200, body: { ok: true, verifie: null } };
   if (L2.programmees.some((x) => x.itemId === itemId)) return { status: 409, body: { ok: false, reason: 'toujours-programmee', error: 'eBay a répondu « fait », mais elle est toujours programmée chez lui. Annule-la dans le Seller Hub.' } };
   if (L2.actives.some((x) => x.itemId === itemId)) return { status: 409, body: { ok: false, reason: 'en-ligne', error: 'Elle est maintenant EN LIGNE sur eBay — retire-la avec « Retirer d\'eBay ».' } };
-  return { status: 200, body: { ok: true, verifie: true } };
+  // Plus programmée, pas en ligne : sa règle (rangée « programmee ») sort aussi.
+  const regles = await sortirDesRegles(itemId, ctx);
+  return { status: 200, body: { ok: true, verifie: true, regles: regles === true } };
 }
 
 // ── DÉPLACER UNE PROGRAMMATION (Trading ReviseFixedPriceItem + ScheduleTime) ─
@@ -630,13 +1189,13 @@ async function handleDeprogrammer(b, owner) {
 // le Seller Hub verrouille la DERNIÈRE HEURE : on refuse donc à moins d'1 h du
 // départ (relu chez eBay, pas d'après l'écran). L'heure retenue est relue.
 const DERNIERE_HEURE_MS = 60 * 60 * 1000;
-async function handleReprogrammer(b, owner) {
+async function handleReprogrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le changement d\'heure : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const quand = heureProgrammation(b.scheduleTime);
   if (!quand) return { status: 400, body: { ok: false, reason: 'heure', error: 'Nouvelle heure refusée : entre 15 minutes et 3 semaines à l\'avance.' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces programmées — rien n\'a été envoyé.' } };
@@ -658,8 +1217,8 @@ async function handleReprogrammer(b, owner) {
 // Un lot peut buter dessus : on lit la limite AVANT de proposer un lot. Ce que
 // la réponse dit est une LIMITE, pas ce qu'il reste ce mois-ci (non exposé
 // ici) : l'écran le dit comme tel. Absent ⇒ null, jamais 0.
-async function handleLimites(owner) {
-  const at = await accessToken(owner);
+async function handleLimites(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await ebayJson(`${EBAY_API}/sell/account/v1/privilege`, at.token);
   if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'eBay n\'a pas autorisé VRM à lire tes limites de vente.' } };
@@ -680,7 +1239,7 @@ async function handleLimites(owner) {
 // Pour les annonces publiées AVANT le SKU (ses 2 annonces actives, mesuré le
 // 5 octobre). C'est SON clic qui choisit le numéro, jamais une suggestion
 // appliquée toute seule (§5). Réversible : il peut la relier à un autre numéro.
-async function handleSku(b, owner) {
+async function handleSku(b, ctx) {
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const sku = skuDe(b.numero);
@@ -690,13 +1249,13 @@ async function handleSku(b, owner) {
   // NOUVELLE 12 réécrirait le MÊME texte : rien ne permettrait plus de les
   // distinguer, et le retrait automatique terminerait l'annonce d'une paire
   // qu'il a encore (ou celle d'une autre). On refuse, et on dit pourquoi.
-  { const num = await numerotationVendeur(owner);
+  { const num = await numerotationVendeur(ctx.owner);
     if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
     const voulu = numDeSku(sku);
     if (num.mk && /^\d+$/.test(voulu) && numeroExterne(voulu, itemId, 'ebayAnnonces', null, num.mk) !== voulu) {
       return { status: 409, body: { ok: false, reason: 'numero-ambigu', error: `Cette annonce eBay portait déjà « ${sku} » à la remise à zéro de tes numéros : elle désigne l'ANCIENNE paire. Pour la nouvelle ${voulu}, termine cette annonce et republie la paire — rien n'a été envoyé à eBay.` } };
     } }
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', `<Item><ItemID>${itemId}</ItemID><SKU>${esc(sku)}</SKU></Item>`);
   if (r.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable — la référence n\'a pas été posée, réessaie.' } };
@@ -730,8 +1289,8 @@ async function eligiblesOffre(token) {
   }
   return { ok: true, ids, complet: !url };
 }
-async function handleOffreInfo(owner) {
-  const at = await accessToken(owner);
+async function handleOffreInfo(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const e = await eligiblesOffre(at.token);
   if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: e.error } };
@@ -743,7 +1302,7 @@ function texteOffre(m) {
   const t = String(m == null ? '' : m).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim();
   return t.length > 2000 ? null : t;
 }
-async function handleOffre(b, owner) {
+async function handleOffre(b, ctx) {
   // ⚠️ Une offre acceptée VEND la paire : sans confirmation explicite, rien ne
   //    part — pas même la vérification chez eBay.
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme l\'envoi de l\'offre : rien n\'a été envoyé.' } };
@@ -753,7 +1312,7 @@ async function handleOffre(b, owner) {
   if (!Number.isInteger(remise) || remise < 5 || remise > 50) return { status: 400, body: { ok: false, reason: 'remise', error: 'La remise doit être un nombre entier entre 5 et 50 %.' } };
   const message = texteOffre(b.message);
   if (message === null) return { status: 400, body: { ok: false, reason: 'message', error: 'Message trop long (2 000 caractères au plus).' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // On REVÉRIFIE chez eBay, au moment d'envoyer : l'écran a pu être ouvert il y
   // a une heure. « Pas su » ⇒ on n'envoie pas.
@@ -800,13 +1359,14 @@ const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
 // Retire une annonce de la liste rangée `ebay_listings`. Trois issues : true
 // (retirée), false (l'écriture a échoué), null (pas su : lecture ratée, ou
 // aucune liste rangée) — on n'écrit jamais depuis une lecture ratée.
-async function sortirDesAnnonces(itemId, owner) {
-  const d = await lireDonnee('ebay_listings', owner);
+async function sortirDesAnnonces(itemId, ctx) {
+  const id = ligneDe('ebay_listings', ctx);
+  const d = await lireDonnee(id, ctx.owner);
   if (d === undefined || !d || !Array.isArray(d.items)) return null;
   if (!d.items.some((x) => x && String(x.itemId) === itemId)) return true;
-  return storeData('ebay_listings', { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, owner);
+  return storeData(id, { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, ctx.owner);
 }
-async function handleRetirer(b, owner) {
+async function handleRetirer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
@@ -815,7 +1375,7 @@ async function handleRetirer(b, owner) {
   let marqueur = null;
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
-    const v = await lireReglageVendeur('vrm_ebay_retrait_auto', owner);
+    const v = await lireReglageVendeur('vrm_ebay_retrait_auto', ctx.owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
     // La remise à zéro des numéros (migration 013) : l'annonce qui portait un
@@ -823,11 +1383,11 @@ async function handleRetirer(b, owner) {
     // chez CE vendeur ; illisible ⇒ rien n'est retiré (pas su ne vaut pas
     // « aucune coupure » : la vente de la nouvelle 230 retirerait l'annonce de
     // l'ancienne 230).
-    const mkTxt = await lireReglageVendeur('vrm_numerotation', owner);
+    const mkTxt = await lireReglageVendeur('vrm_numerotation', ctx.owner);
     if (mkTxt === undefined) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
     if (mkTxt) { try { marqueur = JSON.parse(mkTxt); } catch (_) { return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Ta numérotation est illisible — rien n\'a été envoyé à eBay.' } }; } }
   }
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   if (auto) {
     const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
@@ -845,19 +1405,22 @@ async function handleRetirer(b, owner) {
   // affichée et le retrait automatique reprenait la même annonce à chaque
   // ouverture — en occupant les places d'une vraie vente (revue du 6 octobre).
   // Lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien.
-  const listes = await sortirDesAnnonces(itemId, owner);
+  const listes = await sortirDesAnnonces(itemId, ctx);
+  // (11 octobre, revue — tour 3) …et des règles rangées : une annonce terminée
+  // n'a plus de règle qu'eBay applique.
+  const regles = await sortirDesRegles(itemId, ctx);
   let journal = null;
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
     // pas « rien », sinon un hoquet effacerait l'historique de ses retraits).
-    const j = await lireDonnee('ebay_retraits_auto', owner);
+    const j = await lireDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner);
     journal = false;
     if (j !== undefined) {
       const l = (j && Array.isArray(j.items)) ? j.items : [];
-      journal = await storeData('ebay_retraits_auto', { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, owner);
+      journal = await storeData(ligneDe('ebay_retraits_auto', ctx), { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, ctx.owner);
     }
   }
-  return { status: 200, body: { ok: true, fin, listes, ...(auto ? { auto: true, journal } : {}) } };
+  return { status: 200, body: { ok: true, fin, listes, regles: regles === true, ...(auto ? { auto: true, journal } : {}) } };
 }
 
 // ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────
@@ -867,8 +1430,8 @@ async function handleRetirer(b, owner) {
 // part. Absent ⇒ `null` (l'app écrit « — »), jamais 0. Nécessite le droit
 // `sell.finances` : un jeton accordé avant que ce droit existe répond 403 →
 // on dit « reconnecte-toi », on n'invente rien.
-async function handleFinances(owner) {
-  const at = await accessToken(owner);
+async function handleFinances(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await ebayJson(`${EBAY_API}/sell/finances/v1/seller_funds_summary`, at.token, { 'Accept-Language': 'fr-FR' });
   if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'Reconnecte-toi à eBay pour voir ton solde à virer (l\'accès « paiements » n\'a pas encore été autorisé).' } };
@@ -877,15 +1440,15 @@ async function handleFinances(owner) {
   const amt = (o) => (o && o.value != null && isFinite(Number(o.value))) ? Number(o.value) : null;
   const d = r.data;
   const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || 'EUR', capturedAt: Date.now() };
-  await storeData('ebay_finances', out, owner);
+  await storeData(ligneDe('ebay_finances', ctx), out, ctx.owner);
   return { status: 200, body: out };
 }
 
 // ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
 //    une annonce — la catégorie, ses attributs obligatoires, et les règles/
 //    emplacements du compte. On mesure AVANT d'écrire le publieur (§6).
-async function handlePubInfo(b, owner) {
-  const at = await accessToken(owner);
+async function handlePubInfo(b, ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const token = at.token;
   const MKT = 'EBAY_FR';
@@ -955,31 +1518,62 @@ async function handlePubInfo(b, owner) {
   } };
 }
 
-async function handleSync(owner) {
-  const at = await accessToken(owner);
+async function handleSync(ctx) {
+  const fin = Date.now() + 45000;
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
   const token = at.token;
   // On appelle chaque source séparément : un échec n'empêche pas les autres.
   // Les annonces EN LIGNE et PROGRAMMÉES viennent d'UN SEUL GetMyeBaySelling,
   // découpé par conteneur (`listeVendeur`) : une programmée n'est jamais
   // comptée « en ligne ».
-  const [orders, inv, liste] = await Promise.all([
-    ebayJson(`${EBAY_API}/sell/fulfillment/v1/order?limit=50`, token),
+  const tListe = Date.now();   // la liste parle d'eBay À CETTE HEURE (`garder`)
+  const anciennesCommandes = await lireDonnee(ligneDe('ebay_orders', ctx), ctx.owner);
+  const [orders, inv, liste, transport] = await Promise.all([
+    anciennesCommandes === undefined
+      ? Promise.resolve({ ok: false, status: 503, error: 'Dernière capture des commandes illisible : rien ne sera remplacé.' })
+      : lireCommandesEbay(ebayJson, token, anciennesCommandes && anciennesCommandes.capturedAt, Date.now(), fin),
     // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
     // header Accept-Language »). Ne concerne que les annonces créées par API.
     ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
-    listeVendeur(token),
+    listeVendeur(token, { fin }),
+    metadataTransport(ebayJson,jetonApplication),
   ]);
   // ── DÉTAIL COMPLET par annonce (photos, description, catégorie, état,
   //    caractéristiques) : « capter tout ». On borne à 20 GetItem par sync
   //    (limites d'API) — largement assez pour son stock, et extensible.
   const lst = liste.ok ? liste.actives : [];
   const detailDiag = [];
+  // (9 octobre) La règle d'offre de chaque annonce, lue dans CE MÊME GetItem
+  // (zéro appel de plus) et rangée dans `ebay_offres` — jamais dans
+  // `ebay_listings` (§11 : une ligne, un propriétaire).
+  const lecturesRegle = {};
   for (const it of lst.slice(0, 20)) {
     if (!it.itemId) continue;
-    const d = await tradingGetItem(token, it.itemId);
-    if (d && !d._err) { it.detail = d; if (!it.photo && d.photos && d.photos[0]) it.photo = d.photos[0]; }
-    else if (d && d._err && detailDiag.length < 3) detailDiag.push({ itemId: it.itemId, err: d._err });
+    if (Date.now() >= fin - 5000) { detailDiag.push({ error: 'Lecture des détails incomplète : délai atteint.' }); break; }
+    const d = await tradingGetItem(token, it.itemId, { fin: fin - 5000 });
+    if (d && !d._err) {
+      const { _regle, ...detail } = d;
+      it.detail = detail; if (!it.photo && detail.photos && detail.photos[0]) it.photo = detail.photos[0];
+      lecturesRegle[it.itemId] = _regle ? { ..._regle.lecture, par: 'sync' } : { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'sync' };
+    } else {
+      lecturesRegle[it.itemId] = { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'sync' };
+      if (d && d._err && detailDiag.length < 3) detailDiag.push({ itemId: it.itemId, err: d._err });
+    }
+  }
+  if (orders.ok && orders.data) {
+    orders.data.orders = fusionnerCommandes(anciennesCommandes && anciennesCommandes.orders, orders.data.orders);
+    const precedent = new Map((anciennesCommandes && Array.isArray(anciennesCommandes.orders) ? anciennesCommandes.orders : []).map(o => [o.orderId,o.transport]));
+    let lues = 0;
+    for (const o of orders.data.orders) {
+      if (String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID') continue;
+      const avant = precedent.get(o.orderId);
+      if (avant && ['EBAY_ONLY','aucune'].includes(avant.politiqueEtiquette)) {
+        o.transport = { ...o.transport, politiqueEtiquette: avant.politiqueEtiquette, politiqueLueLe: avant.politiqueLueLe, servicePaye: avant.servicePaye };
+      } else if (lues < 10 && Date.now() < fin - 5000) {
+        o.transport = { ...o.transport, ...(await politiqueTransport(o,token,(jeton,nom,xml,options)=>tradingCall(jeton,nom,xml,{...options,fin:fin-5000}))) }; lues++;
+      }
+    }
   }
   // Range ce qu'on a (fusion par id).
   // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN » (5 octobre). Chaque lecture ratée
@@ -989,48 +1583,68 @@ async function handleSync(owner) {
   //    en vente sur eBay. Une source qui n'a pas répondu garde sa dernière
   //    capture.
   const at2 = Date.now();
+  let rangeRegles = null, rangeAnnonces = null, rangeProgrammees = null, rangeStock = null;
   if (liste.ok) {
-    await storeData('ebay_listings', { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, owner);
-    await storeData('ebay_programmees', { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, owner);
+    rangeAnnonces = await modifierDonnee(ligneDe('ebay_listings', ctx), ctx.owner, d => {
+      if (Number(d && d.capturedAt) > tListe) return undefined;
+      const anciennes = new Map((d && Array.isArray(d.items) ? d.items : []).map(x => [String(x.itemId),x]));
+      const nouvelles = new Map(lst.map(x => [String(x.itemId), { ...(anciennes.get(String(x.itemId)) || {}), ...x }]));
+      if (!liste.complet) for (const [id,x] of anciennes) if (!nouvelles.has(id)) nouvelles.set(id,x);
+      return { items: [...nouvelles.values()], ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: tListe };
+    });
+    rangeProgrammees = await modifierDonnee(ligneDe('ebay_programmees', ctx), ctx.owner, d => {
+      if (Number(d && d.capturedAt) > tListe) return undefined;
+      const nouvelles = new Map(liste.programmees.map(x => [String(x.itemId), resumeProgrammee(x)]));
+      const enLigne = new Map(lst.map(x => [String(x.itemId), { itemId: x.itemId, sku: x.sku }]));
+      if (!liste.complet) {
+        for (const x of d && Array.isArray(d.items) ? d.items : []) if (!nouvelles.has(String(x.itemId))) nouvelles.set(String(x.itemId),x);
+        for (const x of d && Array.isArray(d.enLigne) ? d.enLigne : []) if (!enLigne.has(String(x.itemId))) enLigne.set(String(x.itemId),x);
+      }
+      return { items: [...nouvelles.values()], enLigne: [...enLigne.values()], complet: liste.complet, capturedAt: tListe };
+    });
+    // Les règles : lire-fusionner-réécrire GARDÉ (une lecture ratée de la ligne
+    // n'écrit rien). Une liste COMPLÈTE dit quelles annonces n'existent plus :
+    // leurs règles sortent ; une liste incomplète ne prouve aucune absence.
+    const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
+    rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  if (orders.ok && orders.data) await storeData('ebay_orders', { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, owner);
-  if (inv.ok && inv.data) await storeData('ebay_inventory', { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, owner);
+  let rangeCommandes = null;
+  if (orders.ok && orders.data) rangeCommandes = await modifierDonnee(ligneDe('ebay_orders', ctx), ctx.owner, d => ({
+    orders: fusionnerCommandes(d && d.orders, orders.data.orders), status: orders.status,
+    capturedAt: Math.max(Number(d && d.capturedAt) || 0, orders.capturedAt),
+  }));
+  if (inv.ok && inv.data) rangeStock = await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
+  // Le principal dont l'identité n'est pas encore apprise : on la demande à
+  // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
+  // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
+  if (ctx.compte.principal) await apprendrePrincipal(ctx.owner, token).catch(() => null);
   // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data), stock: !!(inv.ok && inv.data) },
-    listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
+    lu: { annonces: !!(liste.ok && rangeAnnonces === true), programmees: !!(liste.ok && rangeProgrammees === true), commandes: !!(orders.ok && orders.data && rangeCommandes === true), stock: !!(inv.ok && inv.data && rangeStock === true), regles: rangeRegles === true },
+    listings: { status: liste.status, ack: liste.ack, complet: liste.ok ? liste.complet : null, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
-    orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
+    orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), error: orders.ok ? (rangeCommandes === true ? undefined : 'Commandes lues mais non enregistrées : dernière capture conservée.') : orders.error },
+    transport: { lu: transport.ok, error: transport.ok ? undefined : transport.error },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
   } };
 }
 
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
-const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
-function deletionUrl(req) {
-  if (process.env.EBAY_DELETION_URL) return process.env.EBAY_DELETION_URL;
-  const host = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center';
-  return `https://${host}/api/ebay-deletion`;   // l'URL publique stable, pas le chemin interne
-}
 async function handleDeletion(req, res) {
-  if (req.method === 'GET') {
-    const code = (req.query && (req.query.challenge_code || req.query.challengeCode)) || '';
-    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken() }); return; }
-    if (!verifToken()) { res.status(503).json({ ok: false, reason: 'no-verif-token', error: 'EBAY_VERIF_TOKEN non configuré sur Vercel.' }); return; }
-    const hash = crypto.createHash('sha256');
-    hash.update(String(code)); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
-    res.status(200).json({ challengeResponse: hash.digest('hex') });
-    return;
-  }
-  if (req.method === 'POST') { res.status(200).json({ ok: true }); return; }
-  res.status(405).json({ ok: false, error: 'GET/POST' });
+  // Ancienne porte conservée : même vérification, jamais un POST non signé.
+  const { default: compte } = await import('./compte.js');
+  const query = req.query;
+  try { req.query = { ...(query || {}), mode: 'ebay-deletion' }; return await compte(req,res); }
+  finally { req.query = query; }
 }
 
 // ── RETOUR DE CONSENTEMENT (eBay renvoie le navigateur ici) ─────────────────
-function retour(res, statut, reason) {
-  const q = 'ebay=' + statut + (reason ? '&raison=' + encodeURIComponent(reason) : '');
+function retour(res, statut, reason, plus) {
+  const q = 'ebay=' + statut + (reason ? '&raison=' + encodeURIComponent(reason) : '')
+    + (plus && plus.compte ? '&compte=' + encodeURIComponent(String(plus.compte).slice(0, 64)) : '')
+    + (plus && plus.nouveau ? '&nouveau=1' : '');
   res.setHeader('Location', '/?' + q);
   res.status(302).end();
 }
@@ -1067,19 +1681,24 @@ const lireCookieEtat = (req) => {
   const v = m ? m[1].trim() : '';
   return NONCE_ETAT.test(v) ? v : '';
 };
-const macEtat = (owner, ts, nonce) => crypto.createHmac('sha256', 'vrm-ebay-consentement|' + (process.env.EBAY_CERT_ID || ''))
-  .update(String(owner) + '|' + String(ts) + '|' + String(nonce)).digest('hex').slice(0, 40);
-function signerEtat(owner, nonce) { const o = String(owner).toLowerCase(); const ts = Date.now().toString(36); return ts + '.' + o + '.' + macEtat(o, ts, nonce); }
-// Le vendeur porté par un `state` valide POUR CE NAVIGATEUR (son nonce), ou ''
-// (nonce absent, forme, âge ou signature faux).
-function vendeurDeEtat(state, nonce) {
-  if (!NONCE_ETAT.test(String(nonce || ''))) return '';
-  const m = /^([0-9a-z]{6,12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{40})$/.exec(String(state || ''));
-  if (!m || !process.env.EBAY_CERT_ID) return '';
+// (9 octobre) Le state porte aussi l'INTENTION : « Connecter un AUTRE compte »
+// (`.a` en fin de state). Elle entre dans la signature — on ne la change pas
+// en route ; un state sans elle est exactement celui d'avant.
+const macEtat = (owner, ts, nonce, ajout) => crypto.createHmac('sha256', 'vrm-ebay-consentement|' + (process.env.EBAY_CERT_ID || ''))
+  .update(String(owner) + '|' + String(ts) + '|' + String(nonce) + (ajout ? '|ajout' : '')).digest('hex').slice(0, 40);
+function signerEtat(owner, nonce, ajout) { const o = String(owner).toLowerCase(); const ts = Date.now().toString(36); return ts + '.' + o + '.' + macEtat(o, ts, nonce, !!ajout) + (ajout ? '.a' : ''); }
+// Le vendeur porté par un `state` valide POUR CE NAVIGATEUR (son nonce), et son
+// intention — `{ vendeur, ajout }`, ou null (nonce absent, forme, âge ou
+// signature faux).
+function lireEtat(state, nonce) {
+  if (!NONCE_ETAT.test(String(nonce || ''))) return null;
+  const m = /^([0-9a-z]{6,12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{40})(\.a)?$/.exec(String(state || ''));
+  if (!m || !process.env.EBAY_CERT_ID) return null;
   const age = Date.now() - parseInt(m[1], 36);
-  if (!(age >= -60000 && age <= ETAT_VALIDITE_MS)) return '';
-  const attendu = Buffer.from(macEtat(m[2], m[1], nonce)), recu = Buffer.from(m[3]);
-  return (attendu.length === recu.length && crypto.timingSafeEqual(attendu, recu)) ? m[2] : '';
+  if (!(age >= -60000 && age <= ETAT_VALIDITE_MS)) return null;
+  const ajout = !!m[4];
+  const attendu = Buffer.from(macEtat(m[2], m[1], nonce, ajout)), recu = Buffer.from(m[3]);
+  return (attendu.length === recu.length && crypto.timingSafeEqual(attendu, recu)) ? { vendeur: m[2], ajout } : null;
 }
 // Le propriétaire de l'INSTALLATION. Ne sert plus qu'à une base PAS ENCORE
 // cloisonnée : il n'y a alors qu'un jeu de données (les jetons eBay de
@@ -1095,11 +1714,15 @@ async function handleCallback(req, res) {
   // Le nonce est consommé QUOI QU'IL ARRIVE : un retour, un seul.
   const nonce = lireCookieEtat(req);
   res.setHeader('Set-Cookie', cookieEtat('', 0));
-  const vendeur = vendeurDeEtat(q.state, nonce);
-  if (!vendeur) { retour(res, 'erreur', 'demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur'); return; }
+  const etat = lireEtat(q.state, nonce);
+  if (!etat) { retour(res, 'erreur', 'demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur'); return; }
   try {
-    const r = await exchangeCode(code, vendeur);
-    retour(res, r.ok ? 'connecte' : 'erreur', r.ok ? '' : (r.reason || (r.error || '').slice(0, 60)));
+    // (9 octobre) QUEL compte eBay vient de se connecter : même identité ⇒ ses
+    // jetons sont rafraîchis ; nouvelle ⇒ ajoutée ; illisible ⇒ refus (sauf le
+    // tout premier compte). Voir `rangerConnexion`.
+    const r = await rangerConnexion(code, etat.vendeur, { ajout: etat.ajout });
+    if (r.ok) retour(res, 'connecte', '', { compte: r.compte && r.compte.pseudo, nouveau: r.nouveau && !(r.compte && r.compte.principal) });
+    else retour(res, 'erreur', r.reason || (r.error || '').slice(0, 60));
   } catch (_) { retour(res, 'erreur', 'echange impossible'); }
 }
 
@@ -1137,9 +1760,15 @@ async function handleApp(req, res) {
   try {
     if (action === 'authurl') {
       if (!ruName()) { res.status(503).json({ ok: false, reason: 'no-runame', error: 'Le RuName (EBAY_RUNAME) n\'est pas configuré.' }); return; }
+      // « Connecter un AUTRE compte eBay » : `prompt=login` (sinon eBay
+      // reconnecterait en silence le compte déjà ouvert dans ce navigateur), et
+      // l'intention signée dans le state. Base pas encore cloisonnée : un seul
+      // compte, comme avant.
+      const ajout = b.ajout === true;
+      if (ajout && !cloison) { res.status(409).json({ ok: false, reason: 'un-seul-compte', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée.' }); return; }
       const nonce = crypto.randomBytes(16).toString('hex');
       res.setHeader('Set-Cookie', cookieEtat(nonce, Math.round(ETAT_VALIDITE_MS / 1000)));
-      res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce)) });
+      res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce, ajout), { ajout }) });
       return;
     }
     if (action === 'apptoken') {
@@ -1148,38 +1777,78 @@ async function handleApp(req, res) {
       return;
     }
     if (action === 'exchange') {
-      const r = await exchangeCode(String(b.code || '').trim(), owner);
-      res.status(r.status).json(r.ok ? { ok: true, connected: true } : { ok: false, reason: r.reason, error: r.error, detail: r.detail || '' });
+      const r = await rangerConnexion(String(b.code || '').trim(), owner, { ajout: b.ajout === true });
+      res.status(r.status).json(r.ok ? { ok: true, connected: true, compte: r.compte || null, nouveau: !!r.nouveau } : { ok: false, reason: r.reason, error: r.error, detail: r.detail || '' });
       return;
     }
     if (action === 'status') {
-      const has = await hasRefresh(owner);
+      const has = await hasRefresh(owner, '');
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }
-      res.status(200).json({ ok: true, connected: !!has });
+      if (!cloison) {
+        const at = has ? await accessToken(owner, '') : null;
+        const relie = !has ? false : at.ok ? true : at.reason === 'revoque' ? false : null;
+        res.status(200).json({ ok: true, connected: relie, raison: at && !at.ok ? at.reason : null }); return;
+      }
+      // (9 octobre) Ses comptes eBay, chacun avec son état — jamais un jeton.
+      // Le principal relié dont l'identité n'est pas encore apprise : on la
+      // demande à eBay maintenant (une fois ; ensuite elle est rangée).
+      let reg = await lireComptes(owner);
+      if (reg && has && !reg.comptes.some((x) => x.principal)) {
+        if ((await apprendrePrincipal(owner).catch(() => null)) === true) reg = await lireComptes(owner);
+      }
+      if (reg === undefined) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire tes comptes eBay (base injoignable).' }); return; }
+      const comptes = [];
+      for (const c of comptesActifs(reg)) {
+        const present = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
+        if (c.implicite && present === false) continue;
+        const at = present === true ? await accessToken(owner, c.suffixe) : null;
+        const relie = present === null ? null : !present ? false : at.ok ? true : at.reason === 'revoque' ? false : null;
+        const etat = relie === true ? 'ok' : relie === null ? 'pas-su' : at && at.reason === 'revoque' ? 'refuse' : 'absent';
+        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, etat, ajouteLe: c.ajouteLe || null });
+      }
+      res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true) ? true : comptes.some(c => c.relie === null) ? null : false, comptes });
       return;
     }
-    // Toutes les autres actions agissent sur le compte eBay de CE vendeur. Ce
-    // qui engage (offre, retrait, programmation, annulation, déplacement) exige
-    // en plus `confirme:true` — vérifié AVANT tout appel à eBay.
+    if (action === 'deconnecter') {
+      // ⚠️ Ses jetons partent : confirmation exigée ICI (pas seulement à
+      // l'écran). Les autres comptes ne sont pas touchés.
+      if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'Confirme la déconnexion : rien n\'a changé.' }); return; }
+      if (!cloison) { res.status(409).json({ ok: false, reason: 'un-seul-compte', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée.' }); return; }
+      const rc = await resoudreCompte(b.compte, owner);
+      if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
+      const r = await deconnecterCompte(rc.compte, owner);
+      res.status(r.status).json(r.ok ? { ok: true, compte: rc.compte.pseudo || '', registre: r.registre } : { ok: false, reason: r.reason, error: r.error });
+      return;
+    }
+    // Toutes les autres actions agissent sur UN compte eBay de CE vendeur —
+    // `compte` (absent ⇒ le principal), VALIDÉ contre SON registre AVANT tout
+    // appel à eBay : un compte inconnu, déconnecté ou d'un autre vendeur ne
+    // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
+    // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
-      sync: () => handleSync(owner),
-      revise: () => handleRevise(b, owner),
-      pubinfo: () => handlePubInfo(b, owner),
-      pubverify: () => handleVerify(b, owner),
-      finances: () => handleFinances(owner),
-      publish: () => handlePublish(b, owner),
-      sku: () => handleSku(b, owner),
-      offreinfo: () => handleOffreInfo(owner),
-      offre: () => handleOffre(b, owner),
-      retirer: () => handleRetirer(b, owner),
-      programmer: () => handleProgrammer(b, owner),
-      programmees: () => handleProgrammees(owner),
-      deprogrammer: () => handleDeprogrammer(b, owner),
-      reprogrammer: () => handleReprogrammer(b, owner),
-      limites: () => handleLimites(owner),
+      sync: (ctx) => handleSync(ctx),
+      revise: (ctx) => handleRevise(b, ctx),
+      pubinfo: (ctx) => handlePubInfo(b, ctx),
+      pubverify: (ctx) => handleVerify(b, ctx),
+      finances: (ctx) => handleFinances(ctx),
+      publish: (ctx) => handlePublish(b, ctx),
+      sku: (ctx) => handleSku(b, ctx),
+      offreinfo: (ctx) => handleOffreInfo(ctx),
+      offre: (ctx) => handleOffre(b, ctx),
+      retirer: (ctx) => handleRetirer(b, ctx),
+      programmer: (ctx) => handleProgrammer(b, ctx),
+      programmees: (ctx) => handleProgrammees(ctx),
+      deprogrammer: (ctx) => handleDeprogrammer(b, ctx),
+      reprogrammer: (ctx) => handleReprogrammer(b, ctx),
+      limites: (ctx) => handleLimites(ctx),
+      // (9 octobre) La règle d'offre : c'est eBay qui accepte, au seuil fixé.
+      regleoffre: (ctx) => handleRegleOffre(b, ctx),
+      regleoffrelire: (ctx) => handleRegleOffreLire(b, ctx),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
-    const r = await ACTIONS[action]();
+    const rc = await resoudreCompte(b.compte, owner);
+    if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
+    const r = await ACTIONS[action]({ owner, compte: rc.compte });
     res.status(r.status).json(r.body);
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

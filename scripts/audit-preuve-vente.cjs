@@ -217,7 +217,7 @@ function chargeApp(lignes, ko = () => false) {
   let src = ['PAGE_SB', 'lireTout', 'PAS_UNE_VENTE'].map((n) => extraire(APP, n)).join('\n');
   const bloc = BLOC_RE.exec(APP);
   if (bloc) src += '\n' + bloc[1];
-  for (const n of ['lirePreuvesVenteVinted', 'lireVentesVintedProuvees']) { try { src += '\n' + extraire(APP, n); } catch (_) {} }
+  for (const n of ['etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'lirePreuvesVenteVinted', 'lireVentesVintedProuvees']) { try { src += '\n' + extraire(APP, n); } catch (_) {} }
   src += '\n;this.R = { lirePreuves: typeof lirePreuvesVenteVinted === "function" ? lirePreuvesVenteVinted : null, lireVendus: typeof lireVentesVintedProuvees === "function" ? lireVentesVintedProuvees : null };';
   vm.runInContext(src, ctx);
   const R = ctx.R;
