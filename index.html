@@ -364,6 +364,6 @@
      de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
      yeux de l'utilisateur à chaque ouverture. -->
 <script>try{var z=localStorage.getItem('vrm_zoom'),f=parseFloat(z);
-if(f&&f!==1){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
+if(f&&f!==1&&!(matchMedia('(max-width: 767px)').matches&&f<1)){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.setProperty('--vrm-zoom',String(f));d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
 <script type="module" src="/src/main.jsx"></script></body>
 </html>

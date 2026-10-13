@@ -7133,7 +7133,7 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
 function Card({children,style={}}) {
   // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
   // pas être découpée dedans au cutter.
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
+  return <div className="vrm-surface" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:8,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
@@ -7938,6 +7938,8 @@ const PLUS_TABS=[
      paramètres, ça prend de la place pour rien »). L'écran reste monté et
      joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
 ];
+const NAV_GESTION = ['cat_bord', 'garage', 'dashboard', 'compta'].map(id => PLUS_TABS.find(t => t.id===id));
+const NAV_OUTILS = PLUS_TABS.filter(t => !NAV_GESTION.includes(t));
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
 // requêtes multiples, donc on donne une progression PLAUSIBLE plutôt qu'un
@@ -8403,7 +8405,7 @@ function ScreenHead({ icon, title, desc, right }) {
        tous les jours. L'icône rejoint le titre sur sa ligne (elle nomme déjà
        l'écran dans la barre de navigation) et le filet redevient une simple
        séparation. Mesuré : 40 px rendus au contenu, en haut de chaque page. */
-    <div style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
+    <div className="vrm-screen-head" style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
       {/* ⚠️ LA RANGÉE DU TITRE RÉSERVE LA PLACE DE L'ÎLE D'ACTIONS. Depuis
           qu'elle flotte en haut à droite (fixe), les boutons qu'un écran pose
           sur sa propre ligne de titre passaient DESSOUS : sur Factures,
@@ -8580,59 +8582,34 @@ const NAV_LARGEUR = 236;
 // Barre latérale : TOUS les écrans visibles d'un coup, pas quatre plus un
 // « Plus ». Sur un grand écran, cacher la moitié de la navigation derrière un
 // bouton n'a aucune raison d'être — c'est une contrainte de téléphone.
+// Les commandes du quotidien sont visibles ; les outils occasionnels restent
+// accessibles dans des groupes repliables, sans remplir le rail de 16 entrées.
 function SideBar({ tab, setTab }) {
-  // ⚠️ HIÉRARCHIE VISUELLE (Julien : « trop chargé »). Le groupe du quotidien est
-  // PRIMAIRE (icônes + texte un peu plus grands) ; les deux autres sont secondaires
-  // (plus discrets), pour qu'une liste de 15 n'ait pas l'air d'un mur d'égaux.
-  const groupes = [
-    { titre: 'Au quotidien', items: BOTTOM_TABS, primaire: true },
-    { titre: 'Dans Vinted',  items: VINTED_TABS },
-    { titre: 'Le reste',     items: PLUS_TABS },
-  ];
+  const bouton = (t) => (
+    <button key={t.id} type="button" className="vrm-sidebar-link" onClick={() => setTab(t.id)} aria-current={tab===t.id?'page':undefined}
+      style={{color:tab===t.id?C.onChrome:C.chromeMuted}}>
+      <Icon name={t.icon} size={19}/><span>{t.label}</span>
+    </button>
+  );
   return (
-    <nav aria-label="Navigation principale" style={{
-      position:'fixed',left:0,top:0,bottom:0,width:NAV_LARGEUR,zIndex:60,
-      display:'flex',flexDirection:'column',gap:2,
-      background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,
-      padding:'16px 12px 14px',overflowY:'auto'}}>
-      {/* ⚠️ LA MARQUE EST ÉCRITE UNE SEULE FOIS. Le carré porte déjà les trois
-          lettres : le poser à côté du mot revenait à écrire « VRM VRM » en haut
-          de chaque écran (§5.68 l'avait corrigé dans l'en-tête, pas ici). */}
-      <div style={{display:'flex',alignItems:'center',padding:'6px 8px 20px'}}>
-        <VrmLogo size={38}/>
+    <nav className="vrm-sidebar" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+      <div className="vrm-sidebar-brand"><VrmWord height={26} color={C.onChrome} accent={C.onChrome}/></div>
+      <div className="vrm-sidebar-group">
+        <div className="vrm-sidebar-label">Plateformes</div>
+        {BOTTOM_TABS.map(bouton)}
       </div>
-      {groupes.map((g,gi) => (
-        <div key={g.titre} style={{marginBottom:gi<groupes.length-1?14:6}}>
-          <div className="vrm-label" style={{color:C.chromeMuted,padding:'2px 10px 7px',fontSize:10,letterSpacing:1.1,opacity:.8}}>{g.titre}</div>
-          {g.items.map(t => {
-            const on = tab === t.id;
-            const gros = !!g.primaire;
-            return (
-              <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
-                style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                  padding:gros?'10px 10px':'8px 10px',marginBottom:2,borderRadius:8,border:'none',cursor:'pointer',fontFamily:'inherit',
-                  position:'relative',
-                  // ⚠️ L'onglet actif est un LISERÉ, plus un pavé plein d'accent.
-                  // La couleur d'accent doit rester rare : posée en aplat sur la
-                  // navigation, elle était la tache la plus forte de l'écran à
-                  // longueur de journée, donc elle ne signalait plus rien.
-                  background:on?'rgba(255,255,255,.10)':'transparent',
-                  color:on?C.onChrome:(gros?C.onChrome:C.chromeMuted),
-                  fontSize:gros?14:13,fontWeight:on?600:(gros?500:450),transition:'background .15s ease,color .15s ease'}}>
-                {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:7,bottom:7,width:3,borderRadius:5,background:C.accent}}/>}
-                <Icon name={t.icon} size={gros?20:18} style={{opacity:on?1:(gros?.8:.6),flexShrink:0,color:on?C.accent:undefined}}/>
-                <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="vrm-sidebar-group">
+        <div className="vrm-sidebar-label">Gestion</div>
+        {NAV_GESTION.map(bouton)}
+      </div>
+      {[{titre:'Détails Vinted',items:VINTED_TABS},{titre:'Autres outils',items:NAV_OUTILS}].map(g => (
+        <details className="vrm-sidebar-group" key={g.titre} open={g.items.some(t=>t.id===tab)}>
+          <summary className="vrm-sidebar-label">{g.titre}</summary>
+          {g.items.map(bouton)}
+        </details>
       ))}
-      <div style={{flex:1}}/>
-      <button type="button" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}
-        style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
-          padding:'9px 10px',borderRadius:8,border:`1px solid ${C.chromeLine}`,cursor:'pointer',fontFamily:'inherit',
-          background:tab==='settings'?C.chromeLine:'transparent',color:C.chromeMuted,fontSize:13,fontWeight:500}}>
-        <Icon name="gear" size={18}/><span>Réglages</span>
+      <button type="button" className="vrm-sidebar-link vrm-sidebar-settings" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}>
+        <Icon name="gear" size={19}/><span>Réglages</span>
       </button>
     </nav>
   );
@@ -8658,20 +8635,35 @@ function SideBar({ tab, setTab }) {
 //    deux fois la même chose sur le même écran.
 function MenuEcrans({ tab, setTab, dark = false }) {
   const [open, setOpen] = React.useState(false);
+  const declencheur = React.useRef(null);
+  const panneau = React.useRef(null);
   React.useEffect(() => { setOpen(false); }, [tab]);
   React.useEffect(() => {
     if (!open) return;
-    const esc = e => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
+    const frame = requestAnimationFrame(() => panneau.current?.querySelector('[role="menuitem"]')?.focus());
+    const clavier = e => {
+      if (e.key === 'Escape') { setOpen(false); return; }
+      if (e.key !== 'Tab') return;
+      const boutons = [...(panneau.current?.querySelectorAll('button') || [])];
+      const premier = boutons[0], dernier = boutons[boutons.length - 1];
+      if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); }
+      else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); }
+    };
+    window.addEventListener('keydown', clavier);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('keydown', clavier);
+      declencheur.current?.focus();
+    };
   }, [open]);
   const groupes = [
+    { titre: 'Gestion', items: NAV_GESTION },
     { titre: 'Dans Vinted', items: VINTED_TABS },
-    { titre: 'Le reste', items: PLUS_TABS },
+    { titre: 'Autres outils', items: NAV_OUTILS },
   ];
   return (
     <>
-      <button type="button" onClick={()=>setOpen(o=>!o)} aria-label="Tous les écrans" aria-expanded={open}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} aria-label="Tous les écrans" aria-expanded={open}
         style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
           borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
           color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
@@ -8684,13 +8676,17 @@ function MenuEcrans({ tab, setTab, dark = false }) {
           {/* Le panneau descend DU HAUT, sous le bouton qui l'a ouvert : une
               feuille qui monte du bas pour un bouton du haut, le geste et le
               mouvement se contredisent. */}
-          <div onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
+          <div ref={panneau} className="vrm-mobile-menu" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
             style={{position:'absolute',left:0,right:0,top:0,background:C.chrome,color:C.onChrome,
               borderBottom:`1px solid ${C.chromeLine}`,boxShadow:'0 14px 40px rgba(21,17,16,.28)',
               padding:'calc(8px + env(safe-area-inset-top)) 10px 12px',
               animation:'cancaleSheet .2s cubic-bezier(.32,.72,0,1)',maxHeight:'86vh',overflowY:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 8px'}}>
+              <span style={{fontSize:19,fontWeight:600}}>Ton espace</span>
+              <button type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)} style={{border:0,background:'transparent',color:C.onChrome,cursor:'pointer',padding:8}}><Icon name="close" size={20}/></button>
+            </div>
             {groupes.map(g => (
-              <div key={g.titre} style={{marginBottom:4}}>
+              <div className="vrm-menu-group" key={g.titre} style={{marginBottom:4}}>
                 <div className="vrm-label" style={{color:C.chromeMuted,padding:'9px 8px 5px'}}>{g.titre}</div>
                 {g.items.map(t => { const on = tab === t.id; return (
                   <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setOpen(false); }}
@@ -8741,7 +8737,7 @@ function BottomBar({tab,setTab}) {
     // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
     // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <>
-    <nav style={{flexShrink:0,zIndex:60,display:kbOpen?'none':'flex',overflowX:'hidden',
+    <nav className="vrm-mobile-nav" aria-label="Navigation principale" style={{flexShrink:0,zIndex:60,display:kbOpen?'none':'flex',overflowX:'hidden',
       /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
          signature, comme la barre latérale sur ordinateur. */
       background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
@@ -8763,7 +8759,7 @@ function BottomBar({tab,setTab}) {
             transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
             <Icon name={t.icon} size={23} style={{strokeWidth:on?2:1.7}}/>
           </span>
-          <span style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
+          <span className="vrm-nav-label" style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
             overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
         </button>
       );}); })()}
@@ -10123,7 +10119,7 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" aria-label={libelle} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
@@ -10578,7 +10574,7 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 function PlatSubNav({ sub, setSub, sections, dark }) {
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   return (
-    <div className="vrm-rangee" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
+    <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
       {sections.map(([id,label,point])=>{ const on = sub===id; return (
         <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id}
           style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
@@ -10591,7 +10587,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
           {point && !on ? <span data-point="" aria-label="nouveau" style={{width:7,height:7,borderRadius:999,background:T.accent,flexShrink:0}}/> : null}
         </button>
       );})}
-    </div>
+    </nav>
   );
 }
 // Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
@@ -10613,7 +10609,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
   const eti = { fontSize:10.5, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
   return (
     <div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
-      <div style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
+      <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
@@ -10885,7 +10881,7 @@ function PlatResume({ cases, note, dark, baseKO }) {
   const eti = { fontSize: 10.5, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: 600 };
   return (
     <div style={{ padding: '12px 16px 0', background: dark ? EBAY_SKIN.bg : 'transparent' }} data-plat-resume="1">
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', border: `1px solid ${T.border}`, background: T.card, borderRadius: 12, padding: '12px 15px', boxShadow: dark ? 'none' : (C.shadow || 'none') }}>
+      <div className="vrm-summary-strip" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', border: `1px solid ${T.border}`, background: T.card, borderRadius: 12, padding: '12px 15px', boxShadow: dark ? 'none' : (C.shadow || 'none') }}>
         {cases.map(([lib, val, sourd]) => (
           <div key={lib} style={{ flex: '1 1 90px', minWidth: 0 }}>
             <div style={eti}>{lib}</div>
@@ -26859,7 +26855,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
              quatre gros blocs empilés prenaient un écran entier sur téléphone. */
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div className="vrm-summary-strip" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est
@@ -27554,10 +27550,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <div className="vrm-sale-row" key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
-               <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+               <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div style={{flex:'1 1 auto',minWidth:0}}>
@@ -27589,7 +27585,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         champ « N° ? » juste dessous porte la même information. */}
                   </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
+                <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
@@ -27600,7 +27596,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ou finalisée, une vente n'a plus de bordereau à afficher
                       (« il ne devrait même pas y en avoir », Julien). */}
                   {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
-                    <div style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
+                    <div className="vrm-sale-action" style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
                       <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                         aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
                         onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
@@ -33891,13 +33887,17 @@ const applyZoom = (z) => {
     // On remet à zéro AVANT de mesurer : sinon on lit une largeur déjà zoomée
     // et on la redivise, ce qui compose les zooms à chaque appel.
     d.style.zoom = ''; d.style.minWidth = '';
+    d.style.setProperty('--vrm-zoom', '1');
     const f = parseFloat(z);
-    if (f && f !== 1) {
+    // Un téléphone garde sa largeur réelle et des commandes lisibles, même
+    // lorsqu'un ancien réglage « Minus » est encore enregistré sur l'appareil.
+    const telephone = window.matchMedia('(max-width: 767px)').matches;
+    if (f && f !== 1 && !(telephone && f < 1)) {
       const w = d.clientWidth;              // largeur réelle, zoom retiré
       d.style.zoom = z;
+      d.style.setProperty('--vrm-zoom', String(f));
       d.style.minWidth = Math.round(w / f) + 'px';
     }
-    localStorage.setItem(ZOOM_KEY, z);
   } catch (_) {}
 };
 
@@ -34688,17 +34688,26 @@ function DetourageSetting() {
 
 function ZoomSetting() {
   const [z, setZ] = React.useState(readZoom);
-  const choisir = (v) => { setZ(v); applyZoom(v); };
+  const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
+  React.useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const maj = () => setTelephone(mq.matches);
+    mq.addEventListener('change', maj);
+    return () => mq.removeEventListener('change', maj);
+  }, []);
+  const choisir = (v) => { setZ(v); try { localStorage.setItem(ZOOM_KEY, v); } catch (_) {} applyZoom(v); };
+  const choix = telephone ? ZOOMS.filter(([v]) => Number(v) >= 1) : ZOOMS;
+  const selection = telephone && Number(z) < 1 ? '1' : z;
   return (
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
       <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>
       <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
-        Dézoome toute l'app : plus de choses tiennent à l'écran. Réglage propre à cet appareil.
+        {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
       </div>
       <div role="group" aria-label="Taille de l'affichage"
         style={{display:'flex',gap:4,background:C.bg,borderRadius:8,padding:3,border:`1px solid ${C.border}`,marginTop:11}}>
-        {ZOOMS.map(([v, label]) => {
-          const on = v === z;
+        {choix.map(([v, label]) => {
+          const on = v === selection;
           return (
             <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on}
               style={{flex:1,border:'none',borderRadius:8,padding:'8px 4px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
@@ -36302,7 +36311,8 @@ function AppCoeur() {
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
   // sinon la page dépasse ou laisse une bande vide.
   React.useEffect(()=>{
-    const onResize=()=>{ const z=readZoom(); if(z!=='1') applyZoom(z); };
+    const onResize=()=>applyZoom(readZoom());
+    onResize();
     window.addEventListener('resize',onResize);
     window.addEventListener('orientationchange',onResize);
     return ()=>{ window.removeEventListener('resize',onResize); window.removeEventListener('orientationchange',onResize); };
@@ -37534,7 +37544,7 @@ function AppCoeur() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div style={{height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -37611,7 +37621,7 @@ function AppCoeur() {
           en `fixed`, le titre de l'écran remonte et partage la ligne avec les
           actions, comme dans une vraie application. Sur téléphone il porte le
           menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      <header ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
+      <header className="vrm-app-header" ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
         padding: ordi ? '7px 10px' : '11px 16px',
         // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
         // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
@@ -37633,18 +37643,18 @@ function AppCoeur() {
         // pour que l'écran soit d'un seul tenant (Julien : « améliore tout » —
         // plus de barre claire au-dessus d'un contenu noir). Fond + bordure
         // seulement : les puces/icônes restent lisibles sur noir.
-        background: (!ordi && tab==='plat_ebay') ? '#000000' : (C.glass||C.surface),
+        background: C.glass||C.surface,
         backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom: ordi ? undefined : `1px solid ${(tab==='plat_ebay') ? '#1C1C1E' : C.border}`}}>
+        borderBottom: ordi ? undefined : `1px solid ${C.border}`}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
+        <div className="vrm-header-brand" style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={tab==='plat_ebay'}/>}
+          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark}/>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
-          <div
+          <div className="vrm-header-logo"
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
             title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
@@ -37680,11 +37690,11 @@ function AppCoeur() {
                 l'extension — c'est là qu'on le cherche quand on en a besoin. */}
           </div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+        <div className="vrm-header-actions" style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
           <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
-            <span title={
+            <button type="button" className="vrm-sync-status" aria-label="Voir la synchronisation" onClick={()=>setTab('settings')} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
@@ -37701,7 +37711,7 @@ function AppCoeur() {
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
                   cloche, rouage — huit éléments. L'icône de nuage dit déjà si
                   c'est synchronisé ; l'heure exacte est dans Réglages. */}
-            </span>
+            </button>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
           <div style={{display:'flex',gap:6}}>
@@ -37727,7 +37737,7 @@ function AppCoeur() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
-            {(() => { const eD = !ordi && tab==='plat_ebay'; const ink = eD ? '#fff' : C.text; const bd = eD ? '#3A3A3C' : C.border; return (<>
+            {(() => { const eD = dark; const ink = C.text; const bd = C.border; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
@@ -37740,7 +37750,7 @@ function AppCoeur() {
               <Icon name="bell2" size={17}/>
               {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${eD?'#000':C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
             </button>
-            <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
+            <button className="vrm-header-settings" type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="gear" size={17}/>
             </button>
@@ -37884,7 +37894,7 @@ function AppCoeur() {
           voyait comme un décalage. 1180 occupe l'espace disponible sans que la
           ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
-      <main data-defile="1" style={{
+      <main className="vrm-main" data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -38216,10 +38226,6 @@ function AppCoeur() {
            et le conteneur racine qui forçait encore Nunito par-dessus Inter. */
         html, body, #root { max-width: 100%; overflow-x: hidden; margin: 0; }
         * { box-sizing: border-box; }
-        @media (max-width: 600px) {
-          table { font-size: 11px !important; }
-          table td, table th { padding: 6px 4px !important; }
-        }
       `}</style>
     </div>
   );

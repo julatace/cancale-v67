@@ -18,10 +18,110 @@
 .vrm-button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
 .vrm-button:active:not(:disabled) { transform:translateY(1px); }
 .vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#A63F23); outline-offset:3px; }
+
+/* Une navigation par plateforme et des pages composées dans le même gabarit. */
+.vrm-sidebar {
+  position:fixed; inset:0 auto 0 0; z-index:60; display:flex;
+  flex-direction:column; padding:28px 18px 20px; overflow-y:auto;
+}
+.vrm-sidebar-brand { padding:4px 12px 30px; }
+.vrm-sidebar-group { margin-bottom:22px; }
+.vrm-sidebar-label {
+  padding:0 12px 10px; font-size:10px; font-weight:600; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--vrm-muted); line-height:1.5;
+}
+summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
+.vrm-sidebar-link {
+  display:flex; align-items:center; gap:12px; width:100%; min-height:44px;
+  padding:10px 12px; border:0; border-radius:8px; background:transparent;
+  text-align:left; font-size:13px; font-weight:500; color:var(--vrm-muted);
+}
+.vrm-sidebar-link svg { flex-shrink:0; }
+.vrm-sidebar-link span { min-width:0; }
+.vrm-sidebar-link[aria-current="page"] { background:var(--vrm-surface); color:var(--vrm-ink); font-weight:600; }
+.vrm-sidebar-settings { margin-top:auto; border-top:1px solid var(--vrm-line); border-radius:0; padding-top:18px; }
+.vrm-screen-head { border-bottom:0 !important; padding-bottom:0 !important; margin-bottom:22px !important; }
+.vrm-screen-head h2 { font-size:32px !important; line-height:1.15 !important; letter-spacing:-.035em !important; }
+.vrm-screen-head .vrm-tete-row > div:first-child > span[aria-hidden] { display:none; }
+.vrm-surface { border-radius:12px !important; box-shadow:none !important; }
+.vrm-summary-strip {
+  background:transparent !important; border:0 !important; border-radius:0 !important;
+  box-shadow:none !important; padding-block:8px 20px !important;
+}
+.vrm-summary-strip > :first-child { box-shadow:none !important; padding-left:0 !important; }
+.vrm-platform-tabs {
+  border-bottom:1px solid var(--vrm-line); gap:24px !important;
+  padding-bottom:0 !important; margin-inline:16px;
+}
+.vrm-platform-tabs button {
+  background:transparent !important; color:var(--vrm-muted) !important; border:0 !important;
+  border-bottom:2px solid transparent !important; border-radius:0 !important;
+  padding:12px 0 !important; min-height:48px; font-weight:500 !important;
+}
+.vrm-platform-tabs button[aria-current="page"] { color:var(--vrm-ink) !important; border-bottom-color:var(--vrm-ink) !important; font-weight:600 !important; }
+.vrm-sync-status { display:flex; align-items:center; justify-content:center; background:transparent; border:0; padding:6px; }
+@media(hover:hover) and (pointer:fine) {
+  .vrm-sidebar-link:hover { background:var(--vrm-surface); }
+}
 @media(hover:hover) and (pointer:fine) {
   .vrm-button:hover:not(:disabled) { box-shadow:0 2px 5px rgba(32,33,31,.09); filter:none; }
 }
 @media(prefers-reduced-motion:reduce) {
   .vrm-button { transition:none; }
   .vrm-button:active:not(:disabled) { transform:none; }
+}
+
+/* Téléphone et tablette : dimensions réelles, commandes accessibles au doigt.
+   Ces règles restent dans la coque de l'app, hors de la page publique. */
+@media (max-width: 1023px) {
+  .vrm-app-shell { height:calc(100dvh / var(--vrm-zoom, 1)) !important; min-height:0; }
+  .vrm-app-header { flex-shrink:0; padding:8px 12px !important; }
+  .vrm-header-actions { gap:8px !important; }
+  .vrm-header-brand { gap:8px !important; }
+  .vrm-header-logo, .vrm-header-logo > img, .vrm-header-logo > svg {
+    width:32px !important; height:32px !important;
+  }
+  .vrm-app-header button { min-width:44px; min-height:44px; }
+  .vrm-app-header button[aria-label] { padding:8px !important; }
+  .vrm-app-header [data-etat-actions] { width:44px; padding:8px !important; justify-content:center; }
+  .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display:none; }
+  .vrm-app-header [data-etat-actions] > span[aria-hidden] { display:none; }
+  .vrm-app-header [data-etat-actions]::after { content:'i'; display:grid; place-items:center; width:18px; height:18px; border:1.5px solid currentColor; border-radius:50%; font-size:12px; font-weight:600; }
+  .vrm-header-settings { display:none; }
+  .vrm-mobile-nav { padding-inline:4px; }
+  .vrm-mobile-nav button { min-height:64px; }
+  .vrm-mobile-nav .vrm-nav-label { font-size:11px !important; letter-spacing:0 !important; }
+  .vrm-main { scroll-padding-block:16px; }
+  .vrm-main button:not([role="switch"]) { min-height:44px !important; }
+  .vrm-main button[aria-label] { min-width:44px; }
+  .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .vrm-main textarea, .vrm-main select {
+    font-size:16px !important; min-height:44px; max-width:100%;
+  }
+  .vrm-main .vrm-rangee { padding-block:4px; gap:8px !important; scroll-padding-inline:12px; }
+  .vrm-main .vrm-rangee > button { flex-shrink:0; }
+  .vrm-main .vrm-tete-row { gap:10px !important; }
+  .vrm-mobile-menu { max-height:calc(100dvh - 24px) !important; overscroll-behavior:contain; }
+  .vrm-mobile-menu button { min-height:48px; }
+  .vrm-menu-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+  .vrm-menu-group > .vrm-label { grid-column:1/-1; padding:14px 10px 5px !important; }
+  .vrm-menu-group > button { min-height:56px; font-size:13px !important; }
+}
+@media (max-width: 767px) {
+  .vrm-main .vrm-tete-row h2 { font-size:28px !important; line-height:1.15 !important; }
+  .vrm-sale-row { padding:16px 14px !important; gap:12px !important; }
+  .vrm-sale-overview { display:grid !important; grid-template-columns:88px minmax(0,1fr); gap:10px 12px !important; }
+  .vrm-sale-photo { width:88px !important; height:88px !important; border-radius:8px !important; }
+  .vrm-sale-price {
+    grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:baseline;
+    gap:6px 12px; text-align:left !important;
+  }
+  .vrm-sale-price > .vrm-display { font-size:22px !important; }
+  .vrm-sale-action { flex:1 1 100%; margin-top:4px !important; }
+  .vrm-sale-action > * { width:100%; }
+  .vrm-sale-action button { width:100%; justify-content:center; }
+  .vrm-main table { font-size:14px; }
+  .vrm-main table td, .vrm-main table th { padding:10px 8px; }
+  .vrm-app-header { padding-inline:max(12px, env(safe-area-inset-left)) !important; }
+  .vrm-header-actions { gap:6px !important; }
 }
