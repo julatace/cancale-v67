@@ -184,11 +184,22 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // y figurer, le compte ne porte que les ventes prouvées (1), et le côté pas
     // encore su est DIT. ⚠️ Et l'AUTRE sens : il ne doit PLUS être dans les
     // ventes Vinted (sinon on n'a fait que le dupliquer).
-    dit(/Ventes Leboncoin/.test(lbcTxt) && /New Balance 990/.test(lbcTxt),'la vente Leboncoin PROUVÉE est affichée dans l\'espace Leboncoin',lbcTxt?'':'espace Leboncoin non lu');
+    // ⚠️ 13 oct. : la compaction mobile (#500) a renommé l'en-tête « Ventes
+    //    Leboncoin (N) » → résumé « CA FINALISÉ · N » et « À confirmer (N) » →
+    //    « Transactions à confirmer (N) ». La vente PROUVÉE s'affiche toujours
+    //    (vérifié au rendu) ; ces contrôles suivent le VRAI invariant (la vente
+    //    est montrée, 1 finalisée, le côté « à confirmer » est dit), pas l'ancien
+    //    libellé — sinon ils criaient au loup sur un écran qui marche.
+    dit(/New Balance 990/.test(lbcTxt),'la vente Leboncoin PROUVÉE est affichée dans l\'espace Leboncoin',lbcTxt?'':'espace Leboncoin non lu');
     dit(!/Ventes Leboncoin/.test(venteTxt),'les ventes Leboncoin ne sont PLUS dans les ventes Vinted (§11)');
     dit(!/Rolex/i.test(lbcTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
-    dit(/Ventes Leboncoin \(1\)/.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)');
-    dit(/À confirmer \(\d/.test(lbcTxt),'le côté pas encore su est DIT (replié « À confirmer (N) »), pas compté comme vente');
+    // Le compteur « CA FINALISÉ · 1 » est REPLIÉ sur téléphone (#500, « Fold
+    // platform figures on phones ») : on ne le juge qu'au bureau, où il est
+    // visible. Sur téléphone, « seule la vente prouvée compte » est déjà couvert
+    // par « la vente est affichée » + « Rolex (achat) jamais montré » + « à
+    // confirmer (N) » ci-dessus/dessous.
+    if (W >= 1024) dit(/CA FINALIS[^\n]*\b1\b/i.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)',(lbcTxt.match(/CA FINALIS[^\n]*/i)||[''])[0]);
+    dit(/à confirmer \(\d/i.test(lbcTxt),'le côté pas encore su est DIT (« à confirmer (N) »), pas compté comme vente');
     // ── §6 CA PAR PLATEFORME + PAR COMPTE (tableau de bord) ─────────────────
     // Julien : « un CA global, un CA par application, et décomposer par compte ».
     // La décomposition vit sur la MÊME source que le total (§11) — donc chaque
