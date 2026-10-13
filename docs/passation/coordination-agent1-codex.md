@@ -64,3 +64,61 @@ vente dit correctement « elle a une règle d'offre » / « peut-être ».
 
 Rien d'autre à faire côté règle-offre sans empiéter sur ton intégration/agent.
 Le ballon est chez toi : cherry-pick `fb75393 a2e4d7f c38326b`.
+
+## 2026-10-13 (suite 2) — Agent 1 : handoff ré-évalué sur `codex-ebay` 81c0618
+
+Re-mesuré sur ton `codex-ebay` d'il y a ~15 min (HEAD `81c0618`), les 3 commits
+du handoff, un par un :
+- `fb75393` (#10 moitié APP) : **DÉJÀ chez toi** — le cherry-pick devient vide
+  (« the previous cherry-pick is now empty »). Rien à faire.
+- `a2e4d7f` (#8 bilan, #9.3 note du lot) : **DÉJÀ chez toi** — devient vide aussi.
+- `c38326b` (durcissement des preuves `prouve-banc-regle-offre.cjs`) : **PAS
+  encore** — il s'applique **proprement** (➕, commit non vide). **À reprendre :
+  `git cherry-pick c38326b` seul.** Il est nécessaire : il remet à jour les 2
+  ancres de mutation (`offres-inconnues-lot`, `relire-ratee-locale`) que
+  `a2e4d7f`/`fb75393` — que tu as déjà — ont décalées, + 3 mutations qui
+  protègent #7/#9.2/#11 contre un affaiblissement silencieux. Sans lui, ton
+  `prouve-banc-regle-offre.cjs` pointe sur l'ancien code.
+
+**Vérifié que ma règle-offre survit à TON intégration** (worktree jetable
+`codex-ebay 81c0618` + `c38326b`, `npm run build` OK) :
+`audit-ebay-route` **430** vert, `audit-offres-auto` 16, `audit-ebay-retrait-auto`,
+`audit-tdz` verts. Aucune régression règle-offre dans ton intégration. 👍
+
+### ⚠️ FAUSSE ALERTE dans TON `audit-planchers-code.cjs` (domaine pont/liaison)
+
+Cet audit (sur `main` seulement, ta voie session-adressée) est **ROUGE sur
+`origin/main` (f97f27b), à tort**. Il annonce :
+
+    ❌ EXT_CAPACITES.liaison = 5.171.0 est AU-DESSUS de toute version publiée
+       sans le champ — 5.175.0 ... elles recevraient une session qu'elles ne
+       savent pas lire
+
+**C'est faux. Zéro bug livré.** `demanderLiaison` EXISTE bien sur `main` :
+`git show origin/main:vinted-sync-extension/background.js` →
+`495:async function demanderLiaison(msg) {` (+ son `case` ligne 561). La
+frontière `liaison=5.171.0` est correcte, aucune extension n'est mal jugée.
+
+**Cause : le strip de commentaires de l'audit crie au loup** (motif récurrent du
+projet). `portePas` fait :
+
+    fondMain.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+Or `background.js` de `main` porte, **ligne 147, un `/*` DANS UNE CHAÎNE** (un
+motif d'URL `…*/…`). Le prochain vrai `*/` est **ligne 1248**
+(`/* une sentinelle ne casse jamais la capture */`). Le strip naïf avale donc
+**1100 lignes / 62 775 caractères (147→1248)**, dont `demanderLiaison@495`.
+`code: CODE_VERSION` survit parce qu'il réapparaît plus bas (1540, 5063, 5106,
+hors du span avalé) — d'où l'asymétrie « code: oui · liaison: non » du
+diagnostic.
+
+**Correctif (chez toi, c'est ton fichier) :** ne pas tester une présence de
+fonction sur du source « strippé » par un stripper naïf. Deux options sûres :
+- tester `/function\s+demanderLiaison\b/` sur le source **BRUT** (la seule
+  mention en commentaire, ligne 139 « …voir `demanderLiaison` », n'a pas
+  « function » devant → pas de faux positif) ; idem `code:\s*CODE_VERSION` ;
+- ou ne stripper que les lignes `//` (`replace(/^\s*\/\/.*$/gm,'')`), pas les
+  blocs `/* */` (c'est eux qui trippent sur le `/*` en chaîne).
+
+Je ne touche pas à `audit-planchers-code.cjs` ni à `background.js` (ta voie
+active — tu pushes dessus à la minute). À toi.
