@@ -6922,16 +6922,15 @@ function Cell({value, onChange, align="left", mono=false}) {
 
 /* ── UI ──────────────────────────────────────────────── */
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
-  const bg=outline?'transparent':(danger?C.danger:(color||C.accent));
-  const col=outline?(color||C.accent):(color?'#fff':C.onAccent);
+  const tonal = danger ? C.danger : (color || C.accent);
   return (
-    <button type="button" onClick={onClick} disabled={!!disabled} style={{
-      background:bg,color:col,
-      border:outline?`1.5px solid ${color||C.accent}`:'none',
-      borderRadius:5,padding:small?'6px 14px':'10px 22px',
-      fontSize:small?12:15,fontWeight:500,
-      cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,
-      fontFamily:'inherit',...style,
+    <button className="vrm-button" type="button" onClick={onClick} disabled={!!disabled} style={{
+      background:outline ? 'transparent' : tonal,
+      color:outline ? tonal : (color || danger ? '#fff' : C.onAccent),
+      border:`1px solid ${outline ? C.border : tonal}`,
+      fontSize:small?12.5:13,
+      cursor:disabled?'not-allowed':'pointer',
+      ...style,
     }}>{children}</button>
   );
 }
@@ -8618,7 +8617,7 @@ function SideBar({ tab, setTab }) {
                   // navigation, elle était la tache la plus forte de l'écran à
                   // longueur de journée, donc elle ne signalait plus rien.
                   background:on?'rgba(255,255,255,.10)':'transparent',
-                  color:on?'#fff':(gros?C.onChrome:C.chromeMuted),
+                  color:on?C.onChrome:(gros?C.onChrome:C.chromeMuted),
                   fontSize:gros?14:13,fontWeight:on?600:(gros?500:450),transition:'background .15s ease,color .15s ease'}}>
                 {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:7,bottom:7,width:3,borderRadius:5,background:C.accent}}/>}
                 <Icon name={t.icon} size={gros?20:18} style={{opacity:on?1:(gros?.8:.6),flexShrink:0,color:on?C.accent:undefined}}/>
@@ -11078,11 +11077,10 @@ function ebayTitre(base, taille, max) {
 // cartes gris iOS (#1C1C1E) bien détachées, champs un cran plus clairs (#2C2C2E),
 // texte blanc, gris iOS (#8E8E93), bleu eBay des boutons (#3665F3). Cartes PLATES
 // (pas d'ombre, pas de bordure) — c'est le contraste gris/noir qui détache.
-const EBAY_SKIN = {
-  bg: '#000000', card: '#1C1C1E', card2: '#2C2C2E', border: '#3A3A3C',
-  text: '#FFFFFF', muted: '#8E8E93', accent: '#3665F3', accentSoft: '#5B86FF',
-  onAccent: '#FFFFFF', warn: '#FFB340', danger: '#FF453A', shadow: 'none',
-};
+// Tous les espaces suivent le thème choisi, y compris eBay.
+const EBAY_SKIN = Object.defineProperties({}, Object.fromEntries(
+  Object.keys(THEMES.light).map(k => [k, { enumerable:true, get:() => C[k] }])
+));
 // eBay ne NUMÉROTE pas ses sections : un GROS titre blanc, une carte grise plate.
 function BlocEbay({ n, titre: t, right, children }) {
   const C = EBAY_SKIN;
@@ -36232,32 +36230,14 @@ function AppCoeur() {
       if (m) m.setAttribute('content', t.bg);
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
-  // ⚠️ BASCULE UNIQUE VERS LE CLAIR (28 sept. — « je veux tout en blanc comme la
-  //    démo »). Le mode sombre reste un CHOIX possible (toggle dans Réglages),
-  //    mais la direction visuelle par défaut passe au clair. Le thème étant
-  //    synchronisé dans le nuage, on ne peut pas juste changer le défaut : la
-  //    valeur cloud (sombre) réécraserait au rechargement. On force donc le
-  //    clair UNE fois, APRÈS que le nuage a répondu (sinon il gagnerait), et on
-  //    l'écrit côté cloud (`save` pousse) pour que tous les appareils suivent.
-  //    Le drapeau est LOCAL à l'appareil (hors SYNC_KEYS) : une fois basculé, on
-  //    ne reforce plus — si tu remets le sombre, ça tient.
+  // La direction Minéral remplace les anciennes bascules contradictoires.
+  // Appliquer une fois après synchronisation, puis respecter le choix utilisateur.
   useEffect(() => onCloudReady(() => {
     try {
-      if (localStorage.getItem('vrm_bascule_clair_v1') === '1') return;
-      localStorage.setItem('vrm_bascule_clair_v1', '1');
-      if (load('vinted_dark', false)) { setDark(false); save('vinted_dark', false); }
-    } catch (_) {}
-  }), []);
-  // ⚠️ NOUVELLE IDENTITÉ « MENTHE » (Julien, 29 sept. : « rien ne doit être comme
-  //    avant »). L'identité principale est désormais le SOMBRE bleu nuit + menthe.
-  //    On bascule vers le sombre UNE fois, après le nuage (même mécanique que la
-  //    bascule claire ci-dessus), et on pousse au cloud. Drapeau LOCAL : si tu
-  //    repasses en clair ensuite, ça tient — on ne reforce plus.
-  useEffect(() => onCloudReady(() => {
-    try {
-      if (localStorage.getItem('vrm_bascule_menthe_v1') === '1') return;
-      localStorage.setItem('vrm_bascule_menthe_v1', '1');
-      if (!load('vinted_dark', false)) { setDark(true); save('vinted_dark', true); }
+      if (localStorage.getItem('vrm_bascule_mineral_v1') === '1') return;
+      setDark(false);
+      save('vinted_dark', false);
+      localStorage.setItem('vrm_bascule_mineral_v1', '1');
     } catch (_) {}
   }), []);
   const [catalog,setCatalog]=useState(()=>{
