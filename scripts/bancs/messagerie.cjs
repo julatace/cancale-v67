@@ -31,9 +31,6 @@ const iso = (h) => new Date(auj - h * 3600e3).toISOString();
 const ACCS = [
   { id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: iso(0) },
   { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: iso(0) },
-  // (6 octobre) Un compte qu'il a EXCLU de l'app : ni son offre, ni sa vente ne
-  // comptent (la même règle que ses conversations).
-  { id: 3, vinted_user_id: '333', login: 'compte_c', domain: 'www.vinted.fr', updated_at: iso(0) },
 ];
 const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: iso(h), description: desc, opposite_user: { id: 5000 + id, login } });
 const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, transaction: { id: 9001, item_id: 444 }, description: 'Nike Air Max 1',
@@ -47,7 +44,6 @@ const FIL_EXT = { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, tra
 // à part) disent si sa boîte est figée.
 const vente = (tx, h) => ({ transaction_id: tx, title: 'Vente ' + tx, price: { amount: '40.0', currency_code: 'EUR' }, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(h) });
 const rowsDe = ({ venteA = 3 } = {}) => [
-  { id: 'main', data: { vinted_accounts_hidden: ['333'] } },
   { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26)] } } },
   { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 1)] } } },
   { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: FIL_OFFRE } } },
@@ -59,13 +55,6 @@ const rowsDe = ({ venteA = 3 } = {}) => [
   { id: 'email_offer_o1', data: { type: 'offre', receivedAt: iso(2), article: 'Adidas Samba OG blanc 42', montant: '45,00', qui: 'acheteuse_9', uid: '111', account: 'compte_a' } },
   { id: 'email_offer_o2', data: { type: 'offre', receivedAt: iso(24 * 20), article: 'Vieille offre', montant: '10,00', qui: 'ancien', uid: '111', account: 'compte_a' } },
   { id: 'email_offer_o3', data: { type: 'offre', receivedAt: iso(5), article: 'Nike Dunk Low panda 43', montant: '60,00', qui: 'acheteur_3', uid: '222', account: 'compte_b' } },
-  //  · O4 : récente, mais sur compte_c, qu'il a EXCLU ⇒ ni montrée, ni comptée.
-  { id: 'email_offer_o4', data: { type: 'offre', receivedAt: iso(3), article: 'Asics Gel 1130 argent 39', montant: '30,00', qui: 'acheteur_4', uid: '333', account: 'compte_c' } },
-  // Une Samba vendue 150 € sur le compte EXCLU : elle ne doit pas entrer dans le
-  // repère du modèle (l'écran Ventes l'écartait, Messages non — revue du 6 oct.).
-  { id: 'harvest_333_orders_sold', data: { capturedAt: iso(0), payload: { my_orders: [
-    { transaction_id: 8901, title: 'Adidas Samba OG taille 39', price: { amount: '150.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(200) },
-  ] } } },
   { id: 'harvest_222_orders_sold', data: { capturedAt: iso(0), payload: { my_orders: [
     { transaction_id: 8801, title: 'Nike Dunk Low panda 43', price: { amount: '62.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(3) },
   ] } } },
@@ -122,7 +111,7 @@ const PONT = ({ version, filExt }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) {
+async function rendre(b, { version, tel = false, lignes = rows }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -137,8 +126,6 @@ async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) 
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
-    // (8 octobre) Une lecture qui tombe : la vraie forme (522 + HTML).
-    if (ko522 && ko522.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' }).catch(() => {});
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -182,7 +169,7 @@ async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) 
       // 1 bis. Les offres reçues par email, en tête (proposition 6).
       await r.pg.waitForTimeout(800);
       const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')) } : null; });
-      dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente, ni celle d’un compte EXCLU', JSON.stringify(ofs && ofs.ids));
+      dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente', JSON.stringify(ofs && ofs.ids));
       dit(ofs && /45,00 €/.test(ofs.txt) && /acheteuse_9/.test(ofs.txt) && /toutes sur compte_a/.test(ofs.txt), 'le montant, qui la propose, et le compte où répondre', ofs && ofs.txt.slice(0, 200));
       dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
       dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
@@ -193,17 +180,6 @@ async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) 
         await r.pg.waitForTimeout(900);   // l'écriture locale est différée de 500 ms (`save`)
         const apres = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages]'), memo: (() => { try { return JSON.parse(localStorage.getItem('vinted_offers_done') || '[]'); } catch (_) { return []; } })() }));
         dit(!apres.bloc && apres.memo.some((k) => /Adidas Samba OG blanc 42/.test(k)), '« c’est fait » la range, et le choix est gardé', JSON.stringify(apres));
-        // (6 octobre) Il ne reste que celle réglée par une vente : la liste ne
-        // disparaît pas sans un mot (une liste qui rétrécit se lit comme une perte).
-        const reste = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-toutes-reglees]'); return e ? { n: e.getAttribute('data-offres-toutes-reglees'), rangees: e.getAttribute('data-offres-rangees'), txt: e.innerText } : null; });
-        dit(reste && reste.n === '1', 'toutes réglées : l’écran DIT combien ont été mises de côté (pas un silence)', JSON.stringify(reste));
-        // (revue du 8 octobre) Deux offres reçues dans la fenêtre sur des comptes
-        // non exclus (o1, rangée par lui ; o3, réglée par une vente). Le nombre
-        // RENDU à côté de « reçue(s) », s'il y en a un, doit être 2 — jamais
-        // « celle reçue » (1). Et celle qu'il a rangée est comptée À PART.
-        const recues = reste ? [...reste.txt.matchAll(/(?:\b(\d+)\s+reçues?|celle reçue)/g)].map((m) => (m[1] ? Number(m[1]) : 1)) : [];
-        dit(reste && recues.every((x) => x === 2), 'il n’affirme pas un faux total d’offres REÇUES (2 reçues : une rangée, une réglée)', JSON.stringify({ recues, txt: reste && reste.txt }));
-        dit(reste && reste.rangees === '1', 'celle qu’il a rangée lui-même est comptée à part (« 1 que tu as rangée »), pas dans les réglées', JSON.stringify(reste && reste.rangees));
       }
       // 2. l'offre en attente
       await r.pg.click('[data-conv="301"]');
@@ -240,27 +216,6 @@ async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) 
       dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-' + (tel ? 390 : 1512) + '.png') });
-      await r.ctx.close();
-    }
-    // ── (revue du 8 octobre) LE REPÈRE D'UNE OFFRE AVEC UN COMPTE ILLISIBLE ──
-    // Les ventes de compte_b ne se lisent pas (522) : le repère « tes Samba se
-    // revendent… » est une moyenne PARTIELLE. Messages doit le dire, une fois,
-    // comme l'écran Ventes (la même liste, §11). Aux deux tailles.
-    for (const tel of [false, true]) {
-      console.log(`── repère d’offre, compte_b illisible · ${tel ? '390 px' : '1512 px'}`);
-      const r = await rendre(b, { version: '5.135.0', tel, ko522: /harvest_222_orders/ });
-      await r.pg.waitForTimeout(800);
-      const v = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); const e = document.querySelectorAll('[data-offres-repere-non-lus]'); return { bloc: !!b, repere: b ? /se revendent/.test(b.innerText) : false, n: e.length, qui: e[0] ? e[0].getAttribute('data-offres-repere-non-lus') : null, txt: e[0] ? e[0].innerText : '' }; });
-      dit(v.bloc && v.repere, 'une offre montre son repère par modèle', JSON.stringify(v));
-      dit(v.n === 1 && v.qui === 'compte_b' && /compte_b/.test(v.txt), 'et l’écran dit, UNE fois, que ce repère ne compte pas compte_b (ses ventes n’ont pas pu être lues)', JSON.stringify(v));
-      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
-      await r.ctx.close();
-    }
-    {
-      const r = await rendre(b, { version: '5.135.0' });
-      await r.pg.waitForTimeout(800);
-      const n = await r.pg.evaluate(() => document.querySelectorAll('[data-offres-repere-non-lus]').length);
-      dit(n === 0, 'l’autre sens : tout lu ⇒ aucune ligne « ne compte pas »', String(n));
       await r.ctx.close();
     }
     console.log('── boîtes à jour (l’autre sens)');

@@ -160,11 +160,14 @@ async function lireCommandesEbay() {
   ]);
   if (reg === undefined || !Array.isArray(rows)) return null;
   const ids = new Set(comptesActifs(normaliserRegistre(reg)).map((c) => 'ebay_orders' + c.suffixe));
-  const out = [], vus = new Set();
+  const out = [], vus = new Set(), lus=new Set();
   for (const r of rows) {
-    if (!r || !ids.has(r.id) || !Array.isArray(r.orders)) continue;
+    if(!r || !ids.has(r.id))continue;
+    if(!Array.isArray(r.orders))return null;
+    lus.add(r.id);
     for (const o of r.orders) { const k = o && o.orderId; if (k && vus.has(k)) continue; if (k) vus.add(k); out.push(o); }
   }
+  if([...ids].some(id=>!lus.has(id) && (id!=='ebay_orders' || Array.isArray(reg?.comptes) && reg.comptes.some(c=>c.principal && !c.deconnecteLe))))return null;
   return out;
 }
 const MAIN_BILAN = ['vinted_sales_hidden', 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment'];

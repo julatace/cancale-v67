@@ -44,7 +44,7 @@ function decls(APP, noms) {
   }
   return { src: out.join('\n'), manquants: noms.filter((x) => !trouve.has(x)) };
 }
-const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'CLE_COMPTE_EBAY', 'corpsCompteEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
+const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay','skuEbayDe','traductionAnnonce','numeroExterne','numEbayLu','numLigneEbay', 'CLE_COMPTE_EBAY', 'corpsCompteEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
   'etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'capListeVentes', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
   'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe', 'LISTE_VENTES_FRAICHE_MS', 'noterRetraitAutoIncertain'];
@@ -53,7 +53,7 @@ const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'CLE_COMPTE_EBAY', 'corpsCompt
 // ouverture de l'app, les annonces déjà tentées.
 function charger(APP, env, dit) {
   const { src, manquants } = decls(APP, NOMS);
-  const ctx = { console, Promise, Date, Math, JSON, Set, Map, Object, String, Number, Array, ...env };
+  const ctx = {archiveNumeros:()=>'',marqueurNumerotation:()=>null,coupureNumerotation:()=>null, console, Promise, Date, Math, JSON, Set, Map, Object, String, Number, Array, ...env };
   vm.createContext(ctx);
   try { vm.runInContext(src, ctx); } catch (e) { dit(false, 'les règles se chargent', String(e && e.message).slice(0, 140)); return null; }
   const R2 = {};
@@ -180,7 +180,7 @@ async function controles(APP, journal) {
       // a 2 h — sauf scénario « liste ancienne ».
       _harvestSeen: { A_orders_sold: opts.capListe != null ? opts.capListe : MAINTENANT - 2 * 3600000 },
       enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
-      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b); if (opts.apresAppel) opts.apresAppel(appels); return { json: async () => (opts.reponse ? opts.reponse(b) : { ok: true }) }; },
+      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b); if (opts.apresAppel) opts.apresAppel(appels); return {ok:true,status:200,json: async () => (opts.reponse ? opts.reponse(b) : { ok: true }) }; },
     };
     const F = charger(APP, env, dit); if (!F) return null;
     if (!F.passageRetraitEbayAuto) { dit(false, `${quoi} : \`passageRetraitEbayAuto\` existe (le passage de la coque, exécutable)`); return null; }
@@ -260,7 +260,7 @@ async function controles(APP, journal) {
     const appels = [], toasts = [];
     const F = charger(APP, {
       lireTout: async () => tx, fetchHarvestOrders: async () => ({ my_orders: vts }), enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
-      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b.itemId); const k = Number(String(b.itemId).slice(-2)); return { json: async () => (k <= 45 ? { ok: false, error: 'eBay : The auction has already been closed.' } : { ok: true, journal: false }) }; },
+      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b.itemId); const k = Number(String(b.itemId).slice(-2)); return {ok:true,status:200,json: async () => (k <= 45 ? { ok: false, error: 'eBay : The auction has already been closed.' } : { ok: true, journal: false }) }; },
     }, dit);
     if (!F || !F.retirerEbayAuto) return;
     const liste = ann.map((a) => ({ annonce: a, numero: numDe(a.sku) }));
@@ -292,7 +292,7 @@ async function controles(APP, journal) {
     }
     const toasts = [];
     const F = charger(APP, { enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)), load: (k, d) => d, localStorage: { setItem: () => {} },
-      fetch: async () => ({ status: 409, json: async () => ({ ok: false, reason: 'sku-change', error: 'Le SKU de cette annonce a changé chez eBay.' }) }) }, dit);
+      fetch: async () => ({ ok:false,status:409,json: async () => ({ ok: false, reason: 'sku-change', error: 'Le SKU de cette annonce a changé chez eBay.' }) }) }, dit);
     if (!F || !F.retirerEbayAuto) return;
     await F.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
     dit(toasts.some((t) => /N°22/.test(t) && /pas été retirée/.test(t) && /SKU/.test(t) && /à retirer/.test(t)), 'un refus CERTAIN se dit aussi, avec sa raison (elle reste dans « à retirer »)', JSON.stringify(toasts));
@@ -302,7 +302,7 @@ async function controles(APP, journal) {
     // (… rien n'a été envoyé à eBay) »).
     const t2 = [];
     const F2 = charger(APP, { enTeteSession: () => ({}), toast: (m) => t2.push(String(m)), load: (k, d) => d, localStorage: { setItem: () => {} },
-      fetch: async () => ({ status: 403, json: async () => ({ ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' }) }) }, dit);
+      fetch: async () => ({ ok:false,status:403,json: async () => ({ ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' }) }) }, dit);
     if (!F2 || !F2.retirerEbayAuto) return;
     await F2.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
     dit(t2.some((t) => /N°22/.test(t) && /éteint/.test(t)) && !t2.some((t) => /eBay a refusé/i.test(t)),
@@ -335,7 +335,7 @@ async function controles(APP, journal) {
     'la coque lance LE passage, avec l\'annulation du passage et l\'interrupteur relus avant chaque appel');
   dit(/lireAnnoncesVintedEnLigne\(vintedAccounts\)/.test(sansCommentaires) && /lireVentesVintedProuvees\(vintedAccounts\)/.test(sansCommentaires),
     'la coque lit les annonces en vente et la preuve sur TOUS ses comptes (écartés compris), comme l\'écran eBay');
-  dit(/lireVentesVintedProuvees\(comptes\)/.test(sansCommentaires) && /await lireAnnoncesVintedEnLigne\(comptes\)/.test(sansCommentaires),
+  dit(/lirePreuvesVenteVinted\(/.test(sansCommentaires) && /await lireAnnoncesVintedEnLigne\(comptes\)/.test(sansCommentaires),
     'l\'écran eBay lit avec les MÊMES fonctions (une règle, deux lecteurs)');
   dit(!/retirerEbayAuto\(dvE\./.test(sansCommentaires), 'plus aucun retrait automatique lancé directement sur la liste de l\'alerte (sans la règle stricte)');
   dit(/comptesBloques:comptesBloquesVinted\(\)/.test(sansCommentaires), 'la coque passe les comptes que Vinted a bloqués (`vinted_accounts_blocked`) au passage');

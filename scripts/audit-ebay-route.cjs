@@ -165,8 +165,8 @@ function itemComplet(a, avecSeuils, sansBestOffer, rg) {
   const r = rg || regleDe(a); const dev = a.devise || 'EUR';
   const bo = (sansBestOffer || r.actives === null) ? '' : `<BestOfferDetails><BestOfferEnabled>${r.actives ? 'true' : 'false'}</BestOfferEnabled>${r.offresFaites != null ? `<BestOfferCount>${r.offresFaites}</BestOfferCount>` : ''}</BestOfferDetails>`;
   const seuils = avecSeuils ? `${r.accepte != null ? `<BestOfferAutoAcceptPrice currencyID="${dev}">${r.accepte}</BestOfferAutoAcceptPrice>` : ''}${r.refuse != null ? `<MinimumBestOfferPrice currencyID="${dev}">${r.refuse}</MinimumBestOfferPrice>` : ''}` : '';
-  return `<Item><ItemID>${a.itemId}</ItemID>${a.sku ? `<SKU>${a.sku}</SKU>` : ''}<ListingType>${a.type || 'FixedPriceItem'}</ListingType><Currency>${dev}</Currency><StartPrice currencyID="${dev}">${a.prix}</StartPrice>`
-    + `<SellingStatus><CurrentPrice currencyID="${dev}">${a.prix}</CurrentPrice><ConvertedCurrentPrice currencyID="EUR">1.0</ConvertedCurrentPrice><ListingStatus>${a.statut || 'Active'}</ListingStatus></SellingStatus>`
+  return `<Item><ItemID>${a.itemId}</ItemID>${a.sku ? `<SKU>${a.sku}</SKU>` : ''}<Quantity>${a.quantity ?? 1}</Quantity><ListingType>${a.type || 'FixedPriceItem'}</ListingType><Currency>${dev}</Currency><StartPrice currencyID="${dev}">${a.prix}</StartPrice>`
+    + `<SellingStatus><CurrentPrice currencyID="${dev}">${a.prix}</CurrentPrice><ConvertedCurrentPrice currencyID="EUR">1.0</ConvertedCurrentPrice><QuantitySold>${a.sold ?? 0}</QuantitySold><ListingStatus>${a.statut || 'Active'}</ListingStatus></SellingStatus>`
     + bo + `<ListingDetails><StartTime>${a.debut}</StartTime>${a.fin ? `<EndTime>${a.fin}</EndTime>` : ''}${seuils}</ListingDetails><Description>x</Description></Item>`;
 }
 const baliseA = (s, t) => { const m = new RegExp('<' + t + '(?:\\s[^>]*)?>([^<]*)</' + t + '>').exec(s || ''); return m ? m[1] : null; };
@@ -235,9 +235,10 @@ global.fetch = async (url, opts = {}) => {
         const ou = ouEst(id);
         if (!ou) return xml(XML_OK('<Item><Description>x</Description></Item>'));
         let rg = null;
+        if(apres && mode.getitemApres==='toujours-ancien')rg=apres.regle;
         if (apres && mode.getitemApres === 'ancien-puis-nouveau' && !apres.servi) { apres.servi = true; rg = apres.regle; }
         const sansBo = mode.getitem === 'sans-bestoffer' || (!!apres && mode.getitemApres === 'sans-bestoffer');
-        return xml(XML_OK(itemComplet(ou.a, ou.jeton === jeton, sansBo, rg)));
+        const item=itemComplet(ou.a,ou.jeton===jeton,sansBo,rg);return xml(XML_OK(mode.getitem==='description-piegee'?item.replace('<Description>x</Description>','').replace('</ItemID>','</ItemID><Description><![CDATA[<SellingStatus><CurrentPrice currencyID="EUR">0.01</CurrentPrice></SellingStatus><ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">0.01</BestOfferAutoAcceptPrice></ListingDetails>]]></Description>'):item));
       }
       if (appel === 'VerifyAddFixedPriceItem') {
         if (mode.verif === 'refus') return xml(XML_ECHEC(ERR('21916672', 'Error', 'La photo est trop petite.')));
@@ -285,6 +286,13 @@ global.fetch = async (url, opts = {}) => {
         if (mode.trading === 'reseau') throw new Error('ECONNRESET');
         if (mode.trading === 'refus') return xml(XML_REFUS);
         const id = balise(corps, 'ItemID'); const st = balise(corps, 'ScheduleTime');
+        const price=baliseA(corps,'StartPrice'),quantity=balise(corps,'Quantity');
+        if(price || quantity){
+          const a=compte.actives.find(x=>x.itemId===id);if(!a)return xml(XML_ECHEC(ERR('21916590','Error','Objet non détenu',[],'RequestError')));
+          if(price){const change=Number(a.prix)!==Number(price);a.prix=price;if(change && mode.prix==='efface' && a.regle){a.regle.accepte=null;a.regle.refuse=null;}}
+          if(quantity)a.quantity=Number(quantity);
+          return xml(XML_OK());
+        }
         // (9 octobre) LA RÈGLE D'OFFRE : seuils, activation, champs supprimés.
         const enAcc = baliseA(corps, 'BestOfferAutoAcceptPrice'), enMin = baliseA(corps, 'MinimumBestOfferPrice'), enBo = baliseA(corps, 'BestOfferEnabled');
         const dels = []; { const re = /<DeletedField>([^<]*)<\/DeletedField>/g; let mm; while ((mm = re.exec(corps))) dels.push(mm[1]); }
@@ -536,7 +544,7 @@ const RA = {};
   }
 
   // ── 1. Session obligatoire ─────────────────────────────────────────────────
-  const TOUTES = ['sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire'];
+  const TOUTES = ['sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire','commande','transporteurs','expedier','messageacheteur','messages','repondre','offresrecues','repondreoffre','modifierannonce','terminerannonce'];
   for (const action of TOUTES) {
     await essaie('sans session : ' + action, async () => {
       const o = await app('', { action, item: { title: 'x' }, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true, price: '10' });
@@ -1668,7 +1676,7 @@ const RA = {};
     avecR(); mode.regle = '503-avant';
     const o2 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it2 = (offresDe(J) || {})['110000000301'];
-    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture && o2.corps.lecture.accepte === null && it2 && it2.lu === true, '[R-ack] 503 AVANT d\'écrire ⇒ 504 « incertain » avec ce qu\'eBay montre (aucune), rangé — jamais « refusé »', `HTTP ${o2.code}`);
+    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture && o2.corps.lecture.lu===false && it2?.lu===false && it2?.observee?.accepte===null, '[R-ack] 503 AVANT d\'écrire ⇒ 504 « incertain » conservé incertain avec la dernière observation — jamais « refusé »', `HTTP ${o2.code}`);
     for (const r of ['503-apres', 'reseau-apres']) {
       avecR(); mode.regle = r; mode.getitemApres = 'ko';
       const o3 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
@@ -1708,7 +1716,7 @@ const RA = {};
     avecR(); mode.regle = 'warning-partiel';
     const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it = (offresDe(J) || {})['110000000301'];
-    dit(o.code === 200 && o.corps.verifie === false && it && it.offresActives === true && it.accepte === null, '[R-partiel] eBay active les offres mais ignore le montant ⇒ « pas vérifiée », rangé tel qu\'eBay le montre', JSON.stringify(it));
+    dit(o.code === 200 && o.corps.verifie === false && it?.lu===false && it?.observee?.offresActives===true && it?.observee?.accepte===null, '[R-partiel] eBay active les offres mais ignore le montant ⇒ « pas vérifiée », conservé incertain avec la dernière observation', JSON.stringify(it));
   });
   // L'autre moitié : les MONTANTS sont là, mais les offres sont COUPÉES — le
   // seuil ne joue pas. Des montants conformes ne suffisent pas à « vérifiée ».
@@ -1716,14 +1724,24 @@ const RA = {};
     avecR(); mode.regle = 'montant-sans-offres';
     const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it = (offresDe(J) || {})['110000000301'];
-    dit(o.code === 200 && o.corps.verifie === false && it && it.offresActives === false && it.accepte === 72, '[R-partiel] eBay garde le montant mais coupe les offres ⇒ « pas vérifiée » (le seuil ne joue pas), rangé tel qu\'eBay le montre', `verifie=${o.corps && o.corps.verifie} · ${JSON.stringify(it)}`);
+    dit(o.code === 200 && o.corps.verifie === false && it?.lu===false && it?.observee?.offresActives===false && it?.observee?.accepte===72, '[R-partiel] eBay garde le montant mais coupe les offres ⇒ « pas vérifiée » (le seuil ne joue pas), conservé incertain avec la dernière observation', `verifie=${o.corps && o.corps.verifie} · ${JSON.stringify(it)}`);
   });
   await essaie('[R-ecart]', async () => {
     avecR(); mode.regle = 'ignore';
     const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it = (offresDe(J) || {})['110000000301'];
-    dit(o.code === 200 && o.corps.verifie === false && o.corps.lecture && o.corps.lecture.accepte === null && it && it.accepte === null && getsApres(o.journal) === 2,
+    dit(o.code === 200 && o.corps.verifie === false && o.corps.lecture && o.corps.lecture.lu===false && it?.lu===false && it?.observee?.accepte===null && getsApres(o.journal) === 2,
       '[R-ecart] eBay dit « fait » mais n\'a rien appliqué ⇒ « pas vérifiée », après une relecture DIFFÉRÉE (2 GetItem)', `verifie=${o.corps && o.corps.verifie} · ${getsApres(o.journal)} GetItem après`);
+  });
+  await essaie('[Suite-incertain]',async()=>{
+    for(const modeEcriture of ['success','503-apres']){
+      avecR();mode.getitemApres='toujours-ancien';mode.regle=modeEcriture;
+      const o=await app(JWT_J,POSE('110000000301',72,80,NUL));const range=offresDe(J)?.['110000000301'];
+      dit(Number(RA_('110000000301').regle.accepte)===72 && range?.lu===false && ['incertain','apres-ecriture'].includes(range.raison) && o.corps.lecture?.lu===false,'[Suite-incertain] eBay tient 72 mais deux lectures restent anciennes : le doute est conservé en base et dans la réponse ('+modeEcriture+')');
+    }
+    avecR();mode.getitem='description-piegee';
+    const o=await app(JWT_J,POSE('110000000301',72,80,NUL));
+    dit(o.code===200 && o.corps.verifie===true && o.corps.lecture.prix===80,'[Suite-XML] les balises financières dans une description CDATA ne deviennent pas des prix ou seuils');
   });
   await essaie('[R-delai]', async () => {
     avecR(); mode.getitemApres = 'ancien-puis-nouveau';
@@ -2168,6 +2186,21 @@ const RA = {};
   // [R-engage] (app) UNE règle pour « eBay tient — peut-être — une règle » :
   // `regleEngage` sur `etatRegleOffre`, et `reglesEngagees` (déconnexion,
   // fermeture, relecture des ventes) — exécutées, jamais relues.
+  await essaie('[Suite-edition]',async()=>{
+    avecR();const body={action:'modifierannonce',itemId:'110000000302',price:'95',expectedPrice:'90',confirme:true};
+    const o=await app(JWT_J,body);dit(o.code===200 && o.corps.ok && Number(RA_('110000000302').prix)===95 && o.corps.regle.lecture.prix===95,'[Suite-edition] l’édition complète conserve la relecture de la règle après changement de prix',JSON.stringify({code:o.code,body:o.corps,prix:RA_('110000000302').prix}));
+    avecR();const old=await app(JWT_J,{...body,expectedPrice:'85'});dit(old.code===409 && revs(old.journal).length===0 && Number(RA_('110000000302').prix)===90,'[Suite-edition] un prix périmé est refusé sans aucune révision');
+    avecR();RA_('110000000301').sold=2;RA_('110000000301').quantity=3;
+    const stock=await app(JWT_J,{action:'modifierannonce',itemId:'110000000301',quantity:'2',expectedQuantity:1,confirme:true});
+    dit(stock.code===200 && RA_('110000000301').quantity===4 && Number(RA_('110000000301').prix)===80,'[Suite-edition] le stock disponible tient compte des unités vendues, sans modifier le prix');
+    avecR();const refusal=await app(JWT_J,{...body,confirme:false});dit(refusal.code===400 && auCompte(refusal.journal).length===0,'[Suite-edition] annuler ou omettre la confirmation ne contacte pas eBay');
+  });
+  await essaie('[Suite-devises]',async()=>{
+    const context={};vm.createContext(context);vm.runInContext(extraire(APP,'caEbayPayees')+';this.ca=caEbayPayees;',context);
+    const order=(value,currency)=>({orderPaymentStatus:'PAID',pricingSummary:{total:{value,currency}}});
+    dit(context.ca([order('25','EUR'),order('50','EUR')])===75,'[Suite-devises] les commandes payées en EUR donnent le montant exact');
+    dit(context.ca([order('25','EUR'),order('50','USD')])===null && context.ca([order('25',undefined)])===null && context.ca([order('inconnu','EUR')])===null,'[Suite-devises] ni dollars ni devise ou montant inconnus ne deviennent des euros');
+  });
   await essaie('[R-engage]', async () => {
     const noms = ['REGLE_ANCIENNE_MS', 'etatRegleOffre', 'regleEngage', 'reglesEngagees'];
     const srcs = noms.map((n) => extraire(APP, n));
@@ -2192,6 +2225,9 @@ const RA = {};
     ];
     const faux = cas.filter(([, e, k]) => A.regleEngage(A.etatRegleOffre({ itemId: '1', price: '80' }, new Map([['principal:1', e]]), null, now)) !== k);
     dit(!faux.length, '[R-engage] connue ⇒ « oui » ; seuil relu sans l\'état des offres, incertaine, en cours, posée pas relue, programmée, prix changé ⇒ « peut-être » ; aucune, offres coupées, lecture ratée, autre devise ⇒ rien', faux.map((c) => c[0]).join(' · '));
+    const local=extraire(APP,'localApresRegle');const context={Date,Number};vm.createContext(context);vm.runInContext(local+';this.local=localApresRegle;',context);
+    const e=context.local({issue:'ecart',lecture:{lu:false,raison:'apres-ecriture'}}).entree;
+    dit(e.lu===false && A.regleEngage(A.etatRegleOffre({itemId:'1',price:80},new Map([['principal:1',e]]),null,now))==='peut-etre','[Suite-carte] une lecture incertaine ne devient pas « aucune règle » sur la carte');
     const E = (o) => lu({ offresActives: true, accepte: 60, ...o });
     const base = (o) => ({ ref: 'principal', entrees: { '1': E({}), '2': E({ lueA: now - 2 * JOUR }), '3': E({ lueA: now }), '4': { lu: false, raison: 'apres-ecriture', lueA: now - 2 * JOUR } }, annonces: [{ itemId: '1', price: '80' }], programmees: [], cap: now - H / 2, complet: true, ...o });
     const r1 = A.reglesEngagees([base({})], now);

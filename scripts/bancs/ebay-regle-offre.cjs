@@ -57,7 +57,9 @@ const CAPTURES = path.join(os.tmpdir(), 'banc-ebay-regle-offre');
 fs.mkdirSync(CAPTURES, { recursive: true });
 
 // Les couleurs de la peau eBay (EBAY_SKIN), telles que le navigateur les calcule.
-const C_TEXT = 'rgb(255, 255, 255)', C_WARN = 'rgb(255, 179, 64)', C_MUTED = 'rgb(142, 142, 147)';
+const palette=require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'../../src/themeMineral.js'),'utf8').replace('export const MINERAL','const MINERAL')+'; MINERAL;');
+const rgb=h=>'rgb('+[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)).join(', ')+')';
+const C_TEXT=rgb(palette.text),C_WARN=rgb(palette.warn),C_MUTED=rgb(palette.muted);
 const H = 3600000, JOUR = 86400000;
 const K1 = 'aaaaaaaaaaaaaaa1', K2 = 'bbbbbbbbbbbbbbb2';
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
@@ -68,7 +70,7 @@ const FICHES = Object.fromEntries(Object.entries(PAIRES).map(([n, [t, b]]) => [S
 const LISTINGS_V = () => ({ capturedAt: new Date().toISOString(), payload: { items: Object.entries(PAIRES).map(([n, [t]]) => ({ id: idV(n), title: t, price: { amount: '60.0', currency_code: 'EUR' }, brand_title: t.split(' ')[0], is_closed: n === '47', is_hidden: false, is_draft: false, photo: { url: `https://img.test/v${idV(n)}.jpg` } })) } });
 const TXN = { id: 'harvest_111_txn_8047', data: { payload: { transaction: { id: 8047, item_id: 9047, status: 450, status_title: 'Commande finalisée' } } } };
 const VENTES = { id: 'harvest_111_orders_sold', data: { capturedAt: new Date().toISOString(), payload: { my_orders: [{ transaction_id: 8047, title: PAIRES[47][0], price: { amount: '60.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: new Date(Date.now() - 2 * JOUR).toISOString() }] } } };
-const ann = (itemId, title, price, sku) => ({ itemId, title, price, sku, qty: '1', observateurs: 0, photo: '', url: 'https://www.ebay.fr/itm/' + itemId });
+const ann = (itemId, title, price, sku) => ({ itemId,currency:'EUR',title,price,sku,qty: '1', observateurs: 0, photo: '', url: 'https://www.ebay.fr/itm/' + itemId });
 const A = { A1: '130000000001', A2: '130000000002', A3: '130000000003', A4: '130000000004', A5: '130000000005', A6: '130000000006', A7: '130000000007', B1: '130000000101', B2: '130000000102', B3: '130000000103' };
 const ANN_P = () => [ann(A.A1, 'Nike Air Max 1 bleu taille 44', '80.0', 'VRM-41'), ann(A.A2, 'Adidas Samba blanc taille 42', '90.0', 'VRM-42'), ann(A.A3, 'Salomon XT-6 noir taille 43', '120.0', ''),
   ann(A.A4, 'Asics Gel 1130 argent taille 39', '70.0', 'VRM-44'), ann(A.A5, 'Reebok Club C blanc taille 42', '60.0', 'VRM-47'), ann(A.A6, 'Converse Chuck 70 noir taille 43', '100.0', 'VRM-48'), ann(A.A7, 'Vans Old Skool noir taille 41', '50.0', '')];
@@ -161,6 +163,12 @@ const projette = (row, sel) => {
   return out;
 };
 
+async function validerRevision(pg,id){
+ await pg.click(`[data-ebay-revise-enregistrer="${id}"]`);
+ const confirmation=pg.getByRole('button',{name:'Modifier sur eBay',exact:true});
+ try{await confirmation.waitFor({timeout:800});}catch(_){return;}
+ await confirmation.click();
+}
 async function ouvrir(b, vp, c) {
   preparer(c);
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
@@ -203,7 +211,7 @@ async function ouvrir(b, vp, c) {
     apiEbay++;
     const brut = req.postData() || '{}';
     let body = {}; try { body = JSON.parse(brut); } catch (_) {}
-    if (['regleoffre', 'regleoffrelire', 'sync', 'revise'].includes(body.action)) { envois.push(body); bruts.push(brut); }
+    if (['regleoffre','regleoffrelire','sync','revise','modifierannonce'].includes(body.action)) { envois.push(body); bruts.push(brut); }
     if (body.action === 'status') {
       if (cfg.statusDelai) await attendre(cfg.statusDelai);
       if (cfg.status500) return j({ ok: false, error: 'panne' }, 500);
@@ -230,7 +238,7 @@ async function ouvrir(b, vp, c) {
       }
       return j({ ok: true, lectures, range: true });
     }
-    if (body.action === 'revise') {
+    if(body.action==='revise' || body.action==='modifierannonce') {
       const id = String(body.itemId); const s = ebay[id];
       const sc = scen['revise:' + id] && scen['revise:' + id].shift();
       if (sc && sc.status && sc.status !== 200) return j(sc.body, sc.status);
@@ -752,14 +760,14 @@ async function finPage(pg, errs, quoi) {
         await allerAnnonces(pg);
         const ouvrirEdit = async () => { await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
         await ouvrirEdit();
-        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '72'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(500);
+        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '72'); await validerRevision(pg,A.A1); await pg.waitForTimeout(500);
         const msg1 = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
-        dit(!bruts.some((x) => /"action":"revise"/.test(x)) && /règle d'offre accepte dès 72,00/.test(msg1), `[11] ${T} un prix à ou sous la règle (72 €) : rien n'est envoyé, et c'est dit`, msg1);
+        dit(!bruts.some((x) => /"action":"(?:revise|modifierannonce)"/.test(x)) && /règle d'offre accepte dès 72,00/.test(msg1), `[11] ${T} un prix à ou sous la règle (72 €) : rien n'est envoyé, et c'est dit`, msg1);
         await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await pg.waitForTimeout(200);
         const rap = await pg.$eval(`[data-regle-rappel="${A.A1}"]`, (e) => e.innerText).catch(() => '');
         dit(/85 %/.test(rap), `[11] ${T} le rappel dit le pourcentage du NOUVEAU prix (72 / 85 = 85 %)`, rap);
-        await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(1200);
-        const rv = bruts.filter((x) => /"action":"revise"/.test(x));
+        await validerRevision(pg,A.A1); await pg.waitForTimeout(1200);
+        const rv = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x));
         const msg2 = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
         const c2 = await couleur(pg, `[data-ebay-revise-msg="${A.A1}"]`);
         dit(/"price":"85"/.test(rv[0] || '') && /^✓/.test(msg2) && /72,00\s*€/.test(msg2) && c2 === C_TEXT, `[11] ${T} la règle a tenu : « ✓ … reste à 72,00 € », en couleur de texte`, `${rv[0]} · ${msg2}`);
@@ -775,18 +783,18 @@ async function finPage(pg, errs, quoi) {
         await allerAnnonces(pg);
         const ouvrirEdit = async () => { if (!await pg.locator(`[data-ebay-revise-ouvrir="${A.A1}"]`).count()) await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
         await ouvrirEdit();
-        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(700);
+        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await validerRevision(pg,A.A1); await pg.waitForTimeout(700);
         const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
         const e = await etats(pg);
         dit(!/^✓/.test(msg) && await couleur(pg, `[data-ebay-revise-msg="${A.A1}"]`) === C_WARN && e[A.A1].etat === 'aucune', `[11] ${T} règle tombée : message ambre, sans ✓, la carte passe « aucune »`, `${msg} · ${e[A.A1].etat}`);
         await pg.waitForTimeout(1500);
         await ouvrirEdit();
-        await pg.fill(`[data-ebay-revise-stock="${A.A1}"]`, '2'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(900);
-        const rv = bruts.filter((x) => /"action":"revise"/.test(x));
+        await pg.fill(`[data-ebay-revise-stock="${A.A1}"]`, '2'); await validerRevision(pg,A.A1); await pg.waitForTimeout(900);
+        const rv = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x));
         dit(rv[1] && !/"price"/.test(rv[1]), `[11] ${T} le stock seul : le corps n'a PAS de prix`, rv[1]);
         await pg.waitForTimeout(1500);
         await ouvrirEdit();
-        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '83'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(900);
+        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '83'); await validerRevision(pg,A.A1); await pg.waitForTimeout(900);
         const m3 = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (x) => x.innerText).catch(() => '');
         dit(/doit rester au-dessus de ta règle d'offre/.test(m3) && !/Invalid AutoAccept/.test(m3), `[11] ${T} refus 23004 : traduit, pas le message anglais d'eBay`, m3);
         await ctx.close();
@@ -801,13 +809,13 @@ async function finPage(pg, errs, quoi) {
         await pg.click(`[data-ebay-revise-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A2}"]`, { timeout: 5000 });
         const vus = [];
         for (const tape of ['72 €', '0', 'abc']) {
-          await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, tape); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`); await pg.waitForTimeout(400);
+          await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, tape); await validerRevision(pg,A.A2); await pg.waitForTimeout(400);
           vus.push([tape, await pg.$eval(`[data-ebay-revise-msg="${A.A2}"]`, (e) => e.innerText).catch(() => '')]);
         }
-        const rv = bruts.filter((x) => /"action":"revise"/.test(x));
+        const rv = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x));
         dit(rv.length === 0 && vus.every(([, m]) => /rien n'a été envoyé/.test(m) && !/✓/.test(m)), `[11] ${T} un prix tapé illisible (« 72 € », « 0 », « abc ») : rien n'est envoyé, c'est dit, aucun ✓`, `${rv.length} envoi(s) · ${JSON.stringify(vus)}`);
-        await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, '88'); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`); await pg.waitForTimeout(900);
-        const rv2 = bruts.filter((x) => /"action":"revise"/.test(x));
+        await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, '88'); await validerRevision(pg,A.A2); await pg.waitForTimeout(900);
+        const rv2 = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x));
         dit(rv2.length === 1 && /"price":"88"/.test(rv2[0]), `[11] ${T} et un prix lisible part, lui (« 88 »)`, rv2[0]);
         await ctx.close();
       });
@@ -957,11 +965,11 @@ async function finPage(pg, errs, quoi) {
           const champ = await pg.inputValue(`[data-ebay-revise-prix="${A.A2}"]`);
           const champN = Number(String(champ).trim().replace(',', '.'));
           dit(prixCarte === prixEbay.toFixed(2) && Math.round(champN * 100) === prixEbay * 100, `[15] ${T} eBay à ${prixEbay} € (la liste dit 90) : la carte ET le champ Prix de ✏️ disent ${prixEbay} €`, `carte ${prixCarte} · champ « ${champ} »`);
-          const n0 = bruts.filter((x) => /"action":"revise"/.test(x)).length;
-          await pg.fill(`[data-ebay-revise-stock="${A.A2}"]`, '2'); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`);
-          for (let i = 0; i < 400 && bruts.filter((x) => /"action":"revise"/.test(x)).length === n0; i++) await pg.waitForTimeout(25);
+          const n0 = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x)).length;
+          await pg.fill(`[data-ebay-revise-stock="${A.A2}"]`, '2'); await validerRevision(pg,A.A2);
+          for (let i = 0; i < 400 && bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x)).length === n0; i++) await pg.waitForTimeout(25);
           await pg.waitForSelector(`[data-ebay-revise-msg="${A.A2}"]`, { timeout: 8000 }).catch(() => {});
-          const rv = bruts.filter((x) => /"action":"revise"/.test(x)).slice(n0);
+          const rv = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x)).slice(n0);
           dit(rv.length === 1 && !/"price"/.test(rv[0]) && /"quantity":"2"/.test(rv[0]) && ebay[A.A2].prix === prixEbay, `[15] ${T} eBay à ${prixEbay} € : changer le STOCK seul n'envoie AUCUN prix — eBay reste à ${prixEbay} €`, `${rv.join(' ')} · eBay ${ebay[A.A2].prix}`);
           await finPage(pg, errs, `[15] ${T} ✏️ ${prixEbay} €`);
           await ctx.close();
@@ -1066,7 +1074,7 @@ async function finPage(pg, errs, quoi) {
       // La déconnexion d'un compte eBay dit ce que l'écran dit — les règles
       // connues ET celles qu'eBay tient peut-être ; jamais une annonce terminée.
       const deco16 = async (pg) => {
-        await sousOnglet(pg, 'Compte eBay');
+        await sousOnglet(pg, 'Compte');
         await pg.waitForSelector('[data-ebay-deconnecter="principal"]', { timeout: 15000 });
         await pg.click('[data-ebay-deconnecter="principal"]');
         await feuille(pg).waitFor({ timeout: 8000 });
@@ -1136,7 +1144,7 @@ async function finPage(pg, errs, quoi) {
           await allerAnnonces(pg);
           await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 });
           await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 });
-          await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`);
+          await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await validerRevision(pg,A.A1);
           await pg.waitForSelector(`[data-ebay-revise-msg="${A.A1}"]`, { timeout: 8000 }).catch(() => {});
           await pg.waitForTimeout(300);
           const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');

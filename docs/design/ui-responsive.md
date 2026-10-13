@@ -159,3 +159,11 @@ Le banc revendeurs vérifie les trois plateformes à 320, 390 et 1512 px, les
 logos locaux, l'accès aux chiffres et la saisie d'un objectif réel.
 La jauge précise « Vinted, ventes finalisées et en cours du mois » : son montant
 historique `liveStats.caMois` ne mesure pas le seul CA finalisé de la carte.
+
+La suite eBay conserve ces espaces de travail avec plusieurs comptes : les
+ventes mélangées nomment leur compte, et les actions de messages/offres choisissent
+un compte explicitement. Les règles d'offre natives sont opt-in ; les états
+incertains restent visibles. Les totaux eBay en euros refusent les montants ou
+devises inconnus, et les cartes gardent la devise captée. L'édition prix/stock
+omet les champs inchangés et garde les contrôles de concurrence et de quantité.
+Voir `../passation/notes/agent-ebay/suite-2026-10-13.md` pour le périmètre de l'agent.

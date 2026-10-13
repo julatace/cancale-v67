@@ -151,7 +151,7 @@ async function ouvrir(b, vp) {
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
 const sousOnglet = async (pg, nom) => { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 8000 }); await pg.waitForTimeout(900); };
 const choisirVue = async (pg, val) => { await pg.selectOption('#vrm-sel-compte-ebay', val); await pg.waitForTimeout(700); };
-const resume = (pg) => pg.$eval('[data-plat-resume]', (e) => e.innerText).catch(() => '');
+const resume=async pg=>{const summary=pg.locator('.vrm-platform-summary');const ferme=!await summary.evaluate(e=>e.open);if(ferme)await summary.locator('summary').click();const texte=await pg.$eval('[data-plat-resume]',e=>e.innerText);if(ferme)await summary.locator('summary').click();return texte;};
 const ventes = (pg) => pg.$$eval('[data-ebay-vente]', (l) => l.map((e) => ({ id: e.getAttribute('data-ebay-vente'), c: e.getAttribute('data-ebay-compte'), t: e.innerText })));
 const annonces = (pg) => pg.$$eval('[data-ebay-annonce]', (l) => l.map((e) => ({ id: e.getAttribute('data-ebay-annonce'), c: e.getAttribute('data-ebay-compte'), nom: (e.querySelector('[data-ebay-carte-compte]') || {}).textContent || '' })));
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -266,7 +266,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
       });
       await essaie('déconnecter le compte 3', async () => {
         await choisirVue(pg, K3);
-        await sousOnglet(pg, 'Compte eBay');
+        await sousOnglet(pg, 'Compte');
         await pg.waitForSelector('[data-ebay-comptes]', { timeout: 10000 });
         const n = await pg.$eval('[data-ebay-comptes]', (e) => e.getAttribute('data-ebay-comptes'));
         dit(n === '3' && (await pg.$$('[data-ebay-connecter-autre]')).length === 1, '« Compte eBay » liste ses 3 comptes, et propose « Connecter un autre compte eBay »', n);

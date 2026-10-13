@@ -547,7 +547,9 @@ async function handleRegleOffreLire(b, ctx) {
   for (const id of ids) {
     if (!aMoi.has(id)) { rendu[id] = { lu: false, raison: L.complet ? 'pas-sur-ce-compte' : 'pas-su' }; continue; }
     const g = await lireRegleOffre(at.token, id);
-    const lecture = g.ok ? { ...g.lecture, par: 'relire' } : { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'relire' };
+    const attendue=b.attendues?.[id];
+    const discordant=attendue && attenduOk(attendue) && g.ok && memeRegle(g.lecture,attendue,null)===false;
+    const lecture=g.ok && !discordant?{...g.lecture,par:'relire'}:{lu:false,raison:discordant?'apres-ecriture':'lecture-ratee',lueA:Date.now(),par:'relire',...(discordant?{observee:g.lecture}:{})};
     rendu[id] = lectures[id] = lecture;
   }
   // (11 octobre, revue — tour 3) Une liste COMPLÈTE dit aussi quelles annonces
@@ -869,7 +871,7 @@ async function handlePublish(b, ctx) {
   if (it.regleOffre && ID_EBAY.test(String(r.itemId))) {
     const demande = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
     const post = await lireRegleOffre(at.token, String(r.itemId));
-    const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok ? { ...post.lecture, par: 'publication' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'publication' } });
+    const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok && memeRegle(post.lecture,demande,null)!==false?{...post.lecture,par:'publication'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'publication',observee:post.ok?post.lecture:null} });
     offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
   return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
@@ -1016,7 +1018,7 @@ async function rangerRegleProgrammee(ctx, token, corps, it, quand) {
   if (!ID_EBAY.test(id)) return { envoyee };
   if (!quand || corps.enLigneMaintenant) {
     const post = await lireRegleOffre(token, id);
-    const range = await rangerReglesOffre(ctx, { [id]: post.ok ? { ...post.lecture, par: 'programmation' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'programmation' } });
+    const range = await rangerReglesOffre(ctx, { [id]: post.ok && memeRegle(post.lecture,envoyee,null)!==false?{...post.lecture,par:'programmation'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'programmation',observee:post.ok?post.lecture:null} });
     return { envoyee, verifie: post.ok ? memeRegle(post.lecture, envoyee, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
   const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: corps.debut || quand, lueA: Date.now(), par: 'programmation' } });
@@ -1624,6 +1626,28 @@ async function handleCallback(req, res) {
   } catch (_) { retour(res, 'erreur', 'echange impossible'); }
 }
 
+// L'édition complète garde les contrôles de stock/identité et relit les règles natives.
+async function handleModifierAnnonceGestion(b,ctx){
+ if(b.price==null)return gestionEbay.modifierAnnonce(b,ctx);
+ if(!ID_EBAY.test(String(b.itemId || '')) || !/^\d+(?:[.,]\d{1,2})?$/.test(String(b.price)) || !(Number(String(b.price).replace(',','.'))>0))return {status:400,body:{ok:false,error:'Annonce ou prix invalide.'}};
+ if(b.confirme!==true)return {status:400,body:{ok:false,reason:'confirmation',error:'Confirme la modification.'}};
+ const at=await jetonDe(ctx);if(!at.ok)return {status:at.status || 502,body:{ok:false,error:at.error,reason:at.reason}};
+ const pre=await lireRegleOffre(at.token,String(b.itemId));if(!pre.ok)return {status:503,body:{ok:false,error:'La règle d’offre de cette annonce n’a pas pu être relue. Rien n’a été modifié.'}};
+ const P=pre.lecture,active=P.accepte!=null || P.refuse!=null;
+ if(P.offresActives===true && P.accepte!=null && Number(String(b.price).replace(',','.'))<=P.accepte)return {status:409,body:{ok:false,error:'Le prix doit rester au-dessus du seuil d’offre existant. Modifie ou retire la règle avant de baisser le prix.'}};
+ if(active && await rangerReglesOffre(ctx,{[b.itemId]:{lu:false,raison:'en-cours',lueA:Date.now(),par:'revise',_force:true}})!==true)return {status:503,body:{ok:false,error:'La modification n’a pas pu être préparée dans VRM. Rien n’a été envoyé.'}};
+ const r=await gestionEbay.modifierAnnonce(b,ctx);
+ if(!r.body?.ok){
+  if(active){const incertain=r.body?.reason==='incertain';await rangerReglesOffre(ctx,{[b.itemId]:incertain?{lu:false,raison:'incertain',lueA:Date.now(),par:'revise',_force:true}:{...P,par:'revise',_force:true}});}
+  return r;
+ }
+ const post=await lireRegleOffre(at.token,String(b.itemId));
+ const lecture=post.ok?post.lecture:active?{lu:false,raison:'apres-ecriture',lueA:Date.now()}:P;
+ await rangerReglesOffre(ctx,{[b.itemId]:{...lecture,par:'revise',_force:active}});
+ r.body.regle={lecture:post.ok?post.lecture:null,avant:active?{accepte:P.accepte,refuse:P.refuse}:null,tombee:active?(post.ok?((P.accepte!=null && post.lecture.accepte==null)||(P.refuse!=null && post.lecture.refuse==null)):null):false};
+ return r;
+}
+
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
 
@@ -1727,8 +1751,8 @@ async function handleApp(req, res) {
       repondre:(ctx)=>gestionEbay.repondre(b,ctx),
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
-      modifierannonce:(ctx)=>gestionEbay.modifierAnnonce(b,ctx),
-      terminerannonce:(ctx)=>gestionEbay.terminerAnnonce(b,ctx),
+      modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
+      terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
       sync: (ctx) => handleSync(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),

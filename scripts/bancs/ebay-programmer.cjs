@@ -418,6 +418,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await pg.waitForTimeout(300);
         dit(!envois.some((e) => e.action === 'programmer'), 'Annuler la confirmation n\'envoie RIEN à eBay');
         await pg.click('[data-planif-confirmer]');
+        await pg.clock.runFor(500);
         await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click({ timeout: 5000 });
         await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
         const p = envois.filter((e) => e.action === 'programmer');
@@ -688,7 +689,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         // (11 octobre, revue — tour 3) La décision du 9 octobre : la confirmation
         // DIT qu'une offre acceptée vend la paire — la carte, le lot et la
         // publication le disaient, le planificateur non (« eBay acceptera seul »).
-        dit(/la paire sera vendue à ce prix/.test(texte), 'la feuille du lot dit qu\'une offre acceptée par eBay VEND la paire (comme la carte, le lot et la publication)', texte.replace(/\s+/g, ' ').slice(-220));
+        dit(/la vente sera engagée à ce prix/.test(texte) && /paiement restera à vérifier/.test(texte), 'la feuille du lot distingue l’offre acceptée du paiement à vérifier', texte.replace(/\s+/g, ' ').slice(-220));
         await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click();
         await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
         const p = envois.filter((e) => e.action === 'programmer');
