@@ -101,5 +101,51 @@ essaie('autre sens', () => {
     "`vinted_offres_auto` reste synchronisé (les extensions 5.130 à 5.150 retomberaient sinon sur l'interrupteur local)");
 });
 
+// ── 5. eBay : c'est eBAY qui accepte (9 octobre) ────────────────────────────
+// Julien, 9 octobre : « je veux juste définir une règle sur chaque annonce et à
+// chaque offre au-dessus ça accepte » — puis « eBay seulement ». Le réglage
+// NATIF d'eBay (seuil `BestOfferAutoAcceptPrice` posé sur l'annonce, sur SON
+// clic) : c'est eBay qui accepte. Ce qui doit rester vrai, dans le code des
+// routes (sans commentaires) :
+//   · aucun appel à une route d'acceptation (`RespondToBestOffer`, une route de
+//     négociation qui accepte ou répond à une offre) ;
+//   · aucune voie Inventory (`bestOfferTerms` / `autoAcceptPrice`) : une seule
+//     voie d'écriture du seuil (§11) ;
+//   · le seuil ne s'écrit QUE dans `api/ebay.js` (la route qui exige la
+//     session, la confirmation et relit chez eBay).
+// `--fichier-api chemin` : ajoute un fichier `api/` muté (preuve : il passe au rouge).
+essaie('eBay', () => {
+  const dossiers = ['api', path.join('api', '_lib')];
+  const fichiers = [];
+  for (const d of dossiers) {
+    let noms = [];
+    try { noms = fs.readdirSync(path.join(RACINE, d)); } catch (_) {}
+    for (const n of noms) if (/\.js$/.test(n)) fichiers.push(path.join(d, n));
+  }
+  const iMut = process.argv.indexOf('--fichier-api');
+  const extra = iMut > 0 ? path.resolve(process.argv[iMut + 1]) : '';
+  const lus = fichiers.map((rel) => ({ rel, code: sansCommentaires(lire(rel), false) }));
+  if (extra) lus.push({ rel: 'api/' + path.basename(extra), code: sansCommentaires(fs.readFileSync(extra, 'utf8'), false) });
+  dit(lus.some((f) => /^api[\\/]ebay\.js$/.test(f.rel)), 'la route eBay est lue (api/ebay.js)', lus.length + ' fichier(s)');
+  const fautes = [];
+  for (const f of lus) {
+    for (const [re, quoi] of [[/RespondToBestOffer/, 'RespondToBestOffer'], [/negotiation\/v1\/[^'"`\s]*(accept|respond)/i, 'route de négociation qui accepte'], [/respond_to_offer/i, 'respond_to_offer'],
+      [/\bbestOfferTerms\b/, 'bestOfferTerms (voie Inventory)'], [/\bautoAcceptPrice\b/, 'autoAcceptPrice (voie Inventory)']]) {
+      const m = re.exec(f.code);
+      if(m && quoi==='RespondToBestOffer' && f.rel==='api/_lib/ebay-gestion.js'){
+        const ast=parser.parse(f.code,{sourceType:'module'});let manuel=null;
+        const visite=node=>{if(!node || typeof node!=='object')return;if(node.type==='FunctionDeclaration' && node.id?.name==='repondreOffre' && node.start<=m.index && node.end>m.index)manuel=f.code.slice(node.start,node.end);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visite);else if(value && typeof value==='object')visite(value);};visite(ast);
+        if(manuel && /b\.confirme\s*!==\s*true/.test(manuel) && /jeton\(owner\)/.test(manuel) && /lire\('GetBestOffers'/.test(manuel))continue;
+      }
+      if (m) fautes.push(`${f.rel} l.${ligneDe(f.code, m.index)} : ${quoi}`);
+    }
+  }
+  dit(fautes.length === 0, "aucune acceptation programmée ni voie Inventory : la réponse à une offre précise exige confirmation, jeton du vendeur et relecture", fautes.slice(0, 3).join(' · '));
+  const ailleurs = lus.filter((f) => !/^api[\\/]ebay\.js$/.test(f.rel) && /BestOfferAutoAcceptPrice/.test(f.code)).map((f) => f.rel);
+  dit(ailleurs.length === 0, "le seuil d'acceptation ne s'écrit que dans api/ebay.js", ailleurs.join(', '));
+  const eb = (lus.find((f) => /^api[\\/]ebay\.js$/.test(f.rel)) || {}).code || '';
+  dit(/BestOfferAutoAcceptPrice/.test(eb) && /ReviseFixedPriceItem/.test(eb), "l'autre sens : la route pose bien le seuil natif d'eBay (sur SON clic, par ReviseFixedPriceItem)");
+});
+
 console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — rien n'accepte une offre tout seul`);
 process.exit(ko ? 1 : 0);

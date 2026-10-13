@@ -101,7 +101,10 @@ const brancher = async (pg, etat = {}) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) }).catch(() => {});
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    // (6 octobre) `compteKO` : un SECOND compte dont les ventes et achats ne se
+    // lisent pas (la vraie forme : 522 + HTML) — le repère par modèle doit le dire.
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(etat.compteKO ? [...ACCOUNTS, { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: auj.toISOString() }] : ACCOUNTS);
+    if (etat.compteKO && /harvest_222_/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' }).catch(() => {});
     if (/_txn_/.test(u) && /like\./.test(u)) {
       if (etat.txnLent) await new Promise((ok) => setTimeout(ok, etat.txnLent));
       if (etat.txnKO) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' }).catch(() => {});
@@ -428,6 +431,37 @@ const brancher = async (pg, etat = {}) => {
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
     } catch (e) { dit(false, 'le scénario « lecture tombée formulaire ouvert » se déroule', String(e.message).slice(0, 160)); }
+    // ── 5. Le repère par modèle NOMME un compte qu'il n'a pas pu lire ────────
+    // (revue du 6 octobre) Les ventes et achats d'un compte illisible étaient
+    // omis SANS LE DIRE : la moyenne se présentait comme complète (§5).
+    console.log('── Repère par modèle, un compte illisible');
+    try {
+      const { ctx, pg, errs } = await ouvrirPage({ width: 1512, height: 950 }, { compteKO: true });
+      if (!(await pg.$('[data-repere-modeles]'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 });
+      await pg.waitForTimeout(400);
+      await pg.click('[data-repere-modeles] summary');
+      await pg.waitForTimeout(1800);
+      const rp = await pg.evaluate(() => ({
+        nonLus: (document.querySelector('[data-repere-non-lus]') || { getAttribute: () => null }).getAttribute('data-repere-non-lus'),
+        samba: (document.querySelector('[data-repere-modele="samba"]') || {}).innerText || '',
+      }));
+      dit(rp.nonLus === 'compte_b', 'un compte dont les ventes ou achats n’ont pas pu être lus est NOMMÉ sous le repère (jamais une moyenne qui se dit complète)', String(rp.nonLus));
+      // (revue du 8 octobre) §7 : une cause, une phrase. Le bandeau « compte non
+      // chargé » du même écran nomme déjà compte_b AVEC le geste ; le repère ne
+      // redit que ce qui distingue. On compte le geste rendu, pas un libellé.
+      const gestes = await pg.evaluate(() => (document.body.innerText.match(/Ouvre (?:ce|ces) comptes? sur vinted\.fr/g) || []).length);
+      dit(gestes === 1, 'le geste « ouvre ce compte sur vinted.fr » n’est dit qu’UNE fois pour un compte illisible (pas une seconde fois sous le repère)', `${gestes} fois`);
+      dit(/revendue 60,00 € \(3\)/.test(rp.samba), 'et ce qui EST lu reste dit (Samba du compte lisible)', rp.samba.replace(/\n/g, ' '));
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+      const n = await ouvrirPage({ width: 1512, height: 950 }, {});
+      if (!(await n.pg.$('[data-repere-modeles]'))) await n.pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 });
+      await n.pg.waitForTimeout(400);
+      await n.pg.click('[data-repere-modeles] summary');
+      await n.pg.waitForTimeout(1800);
+      dit(!(await n.pg.$('[data-repere-non-lus]')), 'l’autre sens : tout lu ⇒ aucune ligne « pas pu être lus »');
+      await n.ctx.close();
+    } catch (e) { dit(false, 'le scénario « repère, compte illisible » se déroule', String(e.message).slice(0, 160)); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ rapport : ${ko} rouge(s)` : '\n✅ rapport : tout est vert');

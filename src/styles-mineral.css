@@ -326,3 +326,20 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
  .vrm-ann-card .vrm-ann-price-line { align-items:center !important; margin:0; }
  .vrm-ann-card .vrm-ann-price-line > span:last-child { padding:0 4px !important; }
 }
+
+/* Les chiffres rétablis de Ma journée restent compacts sur téléphone. */
+.vrm-day-history { margin-bottom:14px; }
+@media(max-width:767px) {
+ .vrm-day-greeting { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; margin-bottom:10px !important; align-items:baseline; }
+ .vrm-day-greeting > div:first-child { grid-column:2; grid-row:1; font-size:10px !important; }
+ .vrm-day-greeting > div:nth-child(2) { grid-column:1; grid-row:1; font-size:13px !important; margin-top:0 !important; }
+ .vrm-day-greeting > div:nth-child(3) { grid-column:1 / -1; font-size:11px !important; margin-top:0 !important; }
+ .vrm-day-money { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:14px; padding:14px !important; margin-bottom:10px !important; }
+ .vrm-day-money > div:first-child { grid-column:1; grid-row:1; }
+ .vrm-day-money > [data-vendu-mois] { grid-column:1; grid-row:2; font-size:28px !important; margin-top:5px !important; }
+ .vrm-day-money > div:nth-child(3) { grid-column:1; grid-row:3; font-size:11px !important; gap:3px !important; }
+ .vrm-day-money > [data-recu-mois] { grid-column:2; grid-row:1 / 4; display:flex !important; flex-direction:column; align-items:flex-start !important; gap:4px !important; border-top:0 !important; border-left:1px solid var(--vrm-line); padding:0 0 0 14px !important; margin:0 !important; }
+ .vrm-day-money > [data-recu-mois] > .vrm-display { font-size:25px !important; }
+ .vrm-day-money > [data-recu-mois] > span:last-child { font-size:10.5px !important; line-height:1.35; }
+ .vrm-day-history > summary { padding:9px 0; font-size:11px; }
+}

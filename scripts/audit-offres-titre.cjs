@@ -110,7 +110,11 @@ console.log('\n── ET L\'AUTRE SENS : CE QUI EST VRAIMENT RÉGLÉ SORT BIEN')
   const vieille = essaie('la règle s\'exécute', () => regle([offre('x', '111', 30)], [], new Set(), cle)) || { gardees: [], reglees: [] };
   dit(vieille.gardees.length === 0, 'une offre de plus de 14 jours ne compte plus');
 
-  const faite = essaie('la règle s\'exécute', () => regle([offre('y', '111', 1)], [], new Set([cle(offre('y', '111', 1))]), cle)) || { gardees: [], reglees: [] };
+  // ⚠️ UNE offre, pas deux appels à `offre()` : chacun estampille l'heure à la
+  //    milliseconde, et deux heures différentes donnent deux clés — le contrôle
+  //    tombait au rouge une fois sur quelques-unes, sur une règle intacte.
+  const oFaite = offre('y', '111', 1);
+  const faite = essaie('la règle s\'exécute', () => regle([oFaite], [], new Set([cle(oFaite)]), cle)) || { gardees: [], reglees: [] };
   dit(faite.gardees.length === 0, 'et une offre marquée « traité » non plus');
 
   const sansVente = essaie('la règle s\'exécute', () => regle([offre('z', '111', 1)], [], new Set(), cle)) || { gardees: [], reglees: [] };

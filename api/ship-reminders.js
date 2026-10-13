@@ -24,6 +24,7 @@ import { aExpedier } from './widget.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
+import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -147,6 +148,28 @@ async function getRowProjete(id, cles) {
     return rows[0] || null;
   } catch (_) { return undefined; }
 }
+// Les commandes eBay de TOUS ses comptes eBay actifs (9 octobre, plusieurs
+// comptes par vendeur) : le registre `ebay_comptes` dit lesquels, chaque compte
+// a SA ligne (`ebay_orders`, `ebay_orders_{clé}`). La MÊME règle que l'app et
+// la route (`comptesActifs`, §11) : un compte déconnecté n'y entre plus.
+// `null` = pas su (registre ou commandes illisibles) — jamais `[]` à sa place.
+async function lireCommandesEbay() {
+  const [reg, rows] = await Promise.all([
+    getRowProjete('ebay_comptes', ['comptes']),
+    fetchPaginated(scoped('app_data?id=like.ebay_orders%25&select=id,orders:data->orders')),
+  ]);
+  if (reg === undefined || !Array.isArray(rows)) return null;
+  const ids = new Set(comptesActifs(normaliserRegistre(reg)).map((c) => 'ebay_orders' + c.suffixe));
+  const out = [], vus = new Set(), lus=new Set();
+  for (const r of rows) {
+    if(!r || !ids.has(r.id))continue;
+    if(!Array.isArray(r.orders))return null;
+    lus.add(r.id);
+    for (const o of r.orders) { const k = o && o.orderId; if (k && vus.has(k)) continue; if (k) vus.add(k); out.push(o); }
+  }
+  if([...ids].some(id=>!lus.has(id) && (id!=='ebay_orders' || Array.isArray(reg?.comptes) && reg.comptes.some(c=>c.principal && !c.deconnecteLe))))return null;
+  return out;
+}
 const MAIN_BILAN = ['vinted_sales_hidden', 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -162,7 +185,7 @@ async function lireDonneesBilan() {
     // l'extension, et QUAND elle a été lue (data.capturedAt — `updated_at` ment).
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
     getRowProjete('lbc_ventes', ['ventes']),
-    getRowProjete('ebay_orders', ['orders']),
+    lireCommandesEbay(),
     // Les dates de versement : trois scalaires par transaction (§4.4), paginé (§4.5).
     fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at')),
   ]);
@@ -184,7 +207,7 @@ async function lireDonneesBilan() {
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
-    ebay: ebayL === undefined ? null : (Array.isArray(ebayL && ebayL.orders) ? ebayL.orders : []),
+    ebay: ebayL,
     versements: versementsDeLignes(txn),
     main: mm,
   };

@@ -365,8 +365,15 @@
     @keyframes vrmLogoSpin{from{transform:perspective(420px) rotateY(-200deg) scale(.86);opacity:0}60%{opacity:1}to{transform:perspective(420px) rotateY(0) scale(1);opacity:1}}
     .vrm-logo-anim{animation:vrmLogoSpin .85s cubic-bezier(.22,1,.36,1) both;backface-visibility:hidden;transform-style:preserve-3d;}
 
-    /* Accessibilité : anneau de focus visible seulement au clavier (pas au clic). */
-    :focus-visible{outline:2.5px solid #0f6b4f;outline-offset:2px;border-radius:8px;}
+    /* Accessibilité : anneau de focus visible seulement au clavier (pas au clic).
+       ⚠️ (11 octobre) Il portait encore le VERT de l'ancienne palette menthe
+       (#0f6b4f), et, posé après la règle aux couleurs de la marque plus haut,
+       il l'écrasait partout : chaque champ qu'il remplit s'entourait de vert
+       (vu au rendu, panneau « règle d'offre » d'eBay). §7 : une seule couleur
+       d'accent, le bleu de la marque — et le sombre suit le CHOIX (`data-theme`),
+       pas la préférence du système. */
+    :focus-visible{outline:2.5px solid rgba(36,88,230,.6);outline-offset:2px;border-radius:8px;}
+    :root[data-theme="dark"] :focus-visible{outline-color:rgba(61,123,255,.65);}
     button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
     /* Respect du réglage système « réduire les animations ». */
     @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}

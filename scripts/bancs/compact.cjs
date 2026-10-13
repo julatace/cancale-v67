@@ -66,7 +66,8 @@ async function brancher(p){
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto(base+'/?tab=journee');await p.locator('main').waitFor();
-  const home=await p.locator('main').innerText();check(!/Bonsoir|Bonjour|sans prix d’achat|ventes masquées|ventes repérées/i.test(home),'accueil sans blocs inutiles');
+  const home=await p.locator('main').innerText();check(!/sans prix d’achat|ventes masquées|ventes repérées/i.test(home),'accueil sans rappels inutiles');
+  if(await p.locator('.vrm-day-greeting').count())check(await p.locator('.vrm-day-greeting').evaluate(e=>e.getBoundingClientRect().height)<=56,'accueil compact après rétablissement des chiffres');
   for(const tab of ['cat_ventes','plat_leboncoin','plat_ebay']){
     await p.goto(base+'/?tab='+tab);await p.locator('.vrm-sale-row').first().waitFor();
     const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect();return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height};});

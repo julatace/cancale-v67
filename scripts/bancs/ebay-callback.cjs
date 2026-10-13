@@ -25,7 +25,14 @@ global.fetch = async (url, opts = {}) => {
     if (ebayMode === 'bad') return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
     return new Response(JSON.stringify({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 7200, refresh_token_expires_in: 47304000 }), { status: 200 });
   }
-  if (u.includes('/rest/v1/app_data')) return new Response('', { status: supaWriteOk ? 201 : 500 });
+  // §6.3 : une LECTURE rend un tableau JSON (PostgREST), une écriture 201. Depuis
+  // le 9 octobre (plusieurs comptes eBay), le retour RELIT la liste des comptes
+  // et le compte principal avant de ranger : servir '' à une lecture, c'était
+  // mesurer une base qui ne répond pas (« pas su » ⇒ rien n'est rangé).
+  if (u.includes('/rest/v1/app_data')) {
+    if (String((opts && opts.method) || 'GET').toUpperCase() === 'GET') return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    return new Response('', { status: supaWriteOk ? 201 : 500 });
+  }
   return new Response('{}', { status: 200 });
 };
 const faireRes = () => { const r = { code: null, headers: {} }; r.status = (n) => { r.code = n; return r; }; r.setHeader = (k, v) => { r.headers[k] = v; return r; }; r.json = (o) => { r.body = o; return r; }; r.end = () => r; return r; };

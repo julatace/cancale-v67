@@ -397,7 +397,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     // (relecture du 11 octobre, mutations du relecteur) Ce qui était prouvé par RIEN :
     const numForBord = corps('const numForBord = (b) => {', '\n  };');
     dit(/if \(b\.numero && numeroEmailAdmis\(b, numeros\)\) return String\(b\.numero\);/.test(numForBord) && !/if \(b\.numero\) return/.test(numForBord), 'le N° TAMPONNÉ sur un bordereau ne reprend celui d\'un email qu\'après `numeroEmailAdmis`');
-    dit(/desc=\{pending\.map\(b=>\(b\.numero&&numeroEmailAdmis\(b,numeros\)\?/.test(A), 'la carte « repérée via bordereau » ne montre le N° d\'un email qu\'après `numeroEmailAdmis`');
+    dit(!/desc=\{pending/.test(A) || /desc=\{pending\.map\(b=>\(b\.numero&&numeroEmailAdmis\(b,numeros\)\?/.test(A), 'la carte « repérée via bordereau » ne montre le N° d\'un email qu\'après `numeroEmailAdmis`');
     const tE = ROUTE.slice(ROUTE.indexOf('export async function traiterEmail'));
     dit(/\{ const jn = await numeroDEmail\(data\.numero, data\.article, \{[^}]*\}\);\s*data\.numero = jn\.numero;/.test(tE), 'serveur : le N° d\'un BORDEREAU passe par `numeroDEmail` avant d\'être rangé (et tamponné)');
     dit(/\{ const jn = await numeroDEmail\(data\.numero, data\.designation\);\s*data\.numero = jn\.numero;/.test(tE), 'serveur : le N° d\'une VENTE passe par `numeroDEmail` avant d\'être rangé');
@@ -477,10 +477,10 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
   await essaie('retrait automatique (corps envoyé)', async () => {
     const envoyes = [];
     const ctx = { console, JSON, Set, String, Array,
-      fetch: async (u, o) => { envoyes.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; }, enTeteSession: () => ({}), toast: () => {} };
+      fetch: async (u, o) => { envoyes.push(JSON.parse(o.body)); return {ok:true,status:200,json: async () => ({ ok: true }) }; }, enTeteSession: () => ({}), toast: () => {} };
     vm.createContext(ctx);
     vm.runInContext('let __retraitEbayAutoEnVol = false; const __retraitEbayAutoTentes = new Set();\n'
-      + ['cleNum', 'NUM_OK', 'skuEbayDe', 'retirerEbayAuto'].map((n) => extraire(APP, n)).join('\n') + '\n;this.F = retirerEbayAuto;', ctx);
+      + ['cleNum', 'NUM_OK', 'skuEbayDe','CLE_COMPTE_EBAY','corpsCompteEbay','EBAY_DEJA_TERMINEE', 'retirerEbayAuto'].map((n) => extraire(APP, n)).join('\n') + '\n;this.F = retirerEbayAuto;', ctx);
     await ctx.F([{ numero: 'B22', annonce: { itemId: '110000000001', sku: 'VRM-22', title: 'x' } }, { numero: '1', annonce: { itemId: '128127336988', sku: 'VRM-553', title: 'y' } }]);
     dit(envoyes.length === 2 && envoyes[0].sku === 'VRM-B22' && envoyes[1].sku === 'VRM-1', 'le retrait automatique envoie le SKU de la paire JUGÉE vendue (« VRM-B22 », « VRM-1 »), jamais la chaîne lue chez eBay', envoyes.map((x) => x.sku).join(', '));
   });

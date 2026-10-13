@@ -19,11 +19,12 @@ const styleUI=C=>({input:{width:'100%',padding:'9px 10px',border:`1px solid ${C.
 const Erreur=({message})=>message?<p role="status" style={{fontSize:12,lineHeight:1.5}}>{message}</p>:null;
 const corpsLisible=body=>/<(?:div|p|span|br|a)\b/i.test(body || '')?String(body).replace(/<br\s*\/?\s*>|<\/p>/gi,'\n').replace(/<\/?[a-z][^>]*>/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&'):body;
 
-export function EbayCommande({order,headers,confirm,theme:C}){
+export function EbayCommande({order,compte='principal',headers,confirm,theme:C}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const S=styleUI(C),[open,setOpen]=useState(false),[data,setData]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[carriers,setCarriers]=useState(null),[carrier,setCarrier]=useState(''),[tracking,setTracking]=useState(''),[body,setBody]=useState(''),[subject,setSubject]=useState('À propos de votre commande');
- async function relire(){setBusy(true);setMessage('');try{setData(await appelerEbay('commande',{orderId:order.orderId},headers));}catch(e){setMessage(e.message);}finally{setBusy(false);}}
+ async function relire(){setBusy(true);setMessage('');try{setData(await call('commande',{orderId:order.orderId},headers));}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{if(open && !data)relire();},[open]);
- async function transporteurs(){if(carriers)return;try{const j=await appelerEbay('transporteurs',{},headers);setCarriers(j.carriers || []);}catch(e){setMessage(e.message);}}
+ async function transporteurs(){if(carriers)return;try{const j=await call('transporteurs',{},headers);setCarriers(j.carriers || []);}catch(e){setMessage(e.message);}}
  const frais=data?.order?.pricingSummary,ship=data?.order?.fulfillmentStartInstructions?.[0]?.shippingStep?.shipTo;
  const adresse=ship?.contactAddress;
  const paiement=data?.order?.orderPaymentStatus,annulation=data?.order?.cancelStatus?.cancelState;
@@ -44,7 +45,7 @@ export function EbayCommande({order,headers,confirm,theme:C}){
       <label style={S.label}>Numéro de suivi<input aria-label="Numéro de suivi eBay" value={tracking} onChange={e=>setTracking(e.target.value)} style={S.input}/></label>
       <button type="button" disabled={busy || !carrier || !tracking.trim() || data.fulfillments===null} style={S.button} onClick={async()=>{
        if(!await confirm({title:'Confirmer l’expédition ?',desc:`Commande ${order.orderId}\n${carrier} · ${tracking}\n\nJe confirme avoir remis le colis au transporteur. eBay et l’acheteur recevront ce suivi.`,ok:'Enregistrer le suivi',cancel:'Annuler'}))return;
-       setBusy(true);setMessage('');try{const j=await appelerEbay('expedier',{orderId:order.orderId,shippingCarrierCode:carrier,trackingNumber:tracking,confirme:true},headers,{write:true});await relire();setMessage(j.deja?'Ce suivi était déjà enregistré.':'Expédition enregistrée sur eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
+       setBusy(true);setMessage('');try{const j=await call('expedier',{orderId:order.orderId,shippingCarrierCode:carrier,trackingNumber:tracking,confirme:true},headers,{write:true});await relire();setMessage(j.deja?'Ce suivi était déjà enregistré.':'Expédition enregistrée sur eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
       }}>Enregistrer le suivi</button>
      </div>
     </details>}
@@ -53,7 +54,7 @@ export function EbayCommande({order,headers,confirm,theme:C}){
      <label style={S.label}>Message<textarea aria-label="Message à l’acheteur eBay" maxLength={2000} rows={4} value={body} onChange={e=>setBody(e.target.value)} style={S.input}/></label>
      <button type="button" style={S.button} disabled={busy || !body.trim() || !subject.trim()} onClick={async()=>{
       if(!await confirm({title:`Envoyer à ${data.order.buyer?.username || 'l’acheteur'} ?`,desc:`Commande ${order.orderId}\n${subject}\n\n${body}`,ok:'Envoyer le message',cancel:'Annuler'}))return;
-      setBusy(true);setMessage('');try{await appelerEbay('messageacheteur',{orderId:order.orderId,subject,body,confirme:true},headers,{write:true});setBody('');setMessage('Message accepté par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
+      setBusy(true);setMessage('');try{await call('messageacheteur',{orderId:order.orderId,subject,body,confirme:true},headers,{write:true});setBody('');setMessage('Message accepté par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
      }}>Envoyer le message</button>
     </div></details>
    </>}
@@ -62,10 +63,11 @@ export function EbayCommande({order,headers,confirm,theme:C}){
  </details>;
 }
 
-export function EbayMessages({headers,confirm,theme:C}){
+export function EbayMessages({compte='principal',headers,confirm,theme:C}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const selection=useRef(null);
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState('');
- async function charger(next=1){setBusy(true);setMessage('');try{const j=await appelerEbay('messages',{page:next},headers);if(!Array.isArray(j.messages))throw new Error('Les messages ne sont pas lisibles.');setRows(p=>next===1?j.messages:[...new Map([...(p || []),...j.messages].map(m=>[m.id,m])).values()]);setPage(next);setPages(j.totalPages);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
+ async function charger(next=1){setBusy(true);setMessage('');try{const j=await call('messages',{page:next},headers);if(!Array.isArray(j.messages))throw new Error('Les messages ne sont pas lisibles.');setRows(p=>next===1?j.messages:[...new Map([...(p || []),...j.messages].map(m=>[m.id,m])).values()]);setPage(next);setPages(j.totalPages);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
  const affiches=(rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre}`.toLowerCase().includes(search.toLowerCase()));
  return <section><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><button type="button" disabled={busy} onClick={()=>charger()} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
@@ -81,21 +83,22 @@ export function EbayMessages({headers,confirm,theme:C}){
     <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:14,display:'grid',alignContent:'start',gap:10}}><div style={{padding:12,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(selected.body)}</div>{(selected.responses || []).map((r,i)=><div key={i} style={{padding:12,borderRadius:10,background:C.bg,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(r)}</div>)}</div>
     <div style={{padding:12,borderTop:`1px solid ${C.border}`,display:'grid',gap:8}}><Erreur message={message}/><textarea aria-label="Réponse au message eBay" maxLength={2000} value={body} onChange={e=>setBody(e.target.value)} rows={3} placeholder="Écrire une réponse…" style={S.input}/><button type="button" style={S.button} disabled={busy || !body.trim() || !selected.itemId} onClick={async()=>{
      const m=selected,texte=body;if(!await confirm({title:`Répondre à ${m.sender || 'cet acheteur'} ?`,desc:`${m.titre || m.subject}\n\n${texte}`,ok:'Envoyer la réponse',cancel:'Annuler'}))return;
-     setBusy(true);setMessage('');try{await appelerEbay('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});setSelected(p=>p?.id===m.id?{...p,responses:[...p.responses,texte]}:p);if(selection.current===m.id){setBody('');setMessage('Réponse acceptée par eBay.');}}catch(e){if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
+     setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});setSelected(p=>p?.id===m.id?{...p,responses:[...p.responses,texte]}:p);if(selection.current===m.id){setBody('');setMessage('Réponse acceptée par eBay.');}}catch(e){if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
     }}>Envoyer la réponse</button>{!selected.itemId && <small style={{color:C.muted}}>Cet échange n’a pas d’annonce identifiée. Le contact des acheteurs d’une commande reste disponible dans Ventes.</small>}</div>
    </div></div></ResponsiveChatPortal>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
   </div></div>
  </section>;
 }
 
-export function EbayOffres({headers,confirm,theme:C,onAnnonces}){
+export function EbayOffres({compte='principal',headers,confirm,theme:C,onAnnonces}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const S=styleUI(C),[rows,setRows]=useState(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[prices,setPrices]=useState({}),[page,setPage]=useState(1),[pages,setPages]=useState(null);
- async function charger(next=1){setBusy(true);setMessage('');try{const j=await appelerEbay('offresrecues',{page:next},headers);if(!Array.isArray(j.offres))throw new Error('Les offres ne sont pas lisibles.');setRows(p=>next===1?j.offres:[...new Map([...(p || []),...j.offres].map(o=>[o.id,o])).values()]);setPage(next);setPages(j.totalPages);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
+ async function charger(next=1){setBusy(true);setMessage('');try{const j=await call('offresrecues',{page:next},headers);if(!Array.isArray(j.offres))throw new Error('Les offres ne sont pas lisibles.');setRows(p=>next===1?j.offres:[...new Map([...(p || []),...j.offres].map(o=>[o.id,o])).values()]);setPage(next);setPages(j.totalPages);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
  async function agir(o,decision){const prix=prices[o.id];if(decision==='Counter' && (!/^\d+(?:[.,]\d{1,2})?$/.test(String(prix || '')) || Number(String(prix).replace(',','.'))<=0)){setMessage('Indique un prix valide.');return;}
   const action=decision==='Accept'?'Accepter':decision==='Decline'?'Refuser':'Proposer';
   if(!await confirm({title:`${action} ${decision==='Counter'?montant(String(prix).replace(',','.'),o.currency):montant(o.price,o.currency)} ?`,desc:`${o.titre}\nAcheteur : ${o.buyer || '—'}\nQuantité : ${o.quantity}\n\n${decision==='Accept'?'Cette décision accepte le prix proposé ; elle ne prouve pas le paiement.':'La réponse sera transmise à l’acheteur sur eBay.'}`,ok:action,cancel:'Annuler'}))return;
-  setBusy(true);setMessage('');try{await appelerEbay('repondreoffre',{itemId:o.itemId,offerId:o.id,decision,price:prix,expectedPrice:o.price,currency:o.currency,confirme:true},headers,{write:true});await charger();setMessage('Réponse à l’offre acceptée par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
+  setBusy(true);setMessage('');try{await call('repondreoffre',{itemId:o.itemId,offerId:o.id,decision,price:prix,expectedPrice:o.price,currency:o.currency,confirme:true},headers,{write:true});await charger();setMessage('Réponse à l’offre acceptée par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
  }
  return <section><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 style={{margin:0,fontSize:22,color:C.text}}>Offres eBay</h2><button type="button" onClick={()=>charger()} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
   {rows===null && busy && <p style={{fontSize:12,color:C.muted}}>Lecture des offres…</p>}{rows && !rows.length && <p style={{fontSize:12,color:C.muted}}>Aucune offre reçue en attente.</p>}
