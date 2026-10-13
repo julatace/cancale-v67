@@ -1359,12 +1359,18 @@ const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
 // Retire une annonce de la liste rangée `ebay_listings`. Trois issues : true
 // (retirée), false (l'écriture a échoué), null (pas su : lecture ratée, ou
 // aucune liste rangée) — on n'écrit jamais depuis une lecture ratée.
+// ⚠️ COMPARE-ET-ÉCHANGE (comme `sortirDesRegles`) : `handleSync` réécrit TOUTE
+// la ligne `ebay_listings`, et un retrait (manuel ou automatique) peut tomber
+// EN MÊME TEMPS. Un lire-fusionner-réécrire nu perdait alors le retrait (la
+// synchro réécrivait la liste complète, l'annonce retirée y revenait) — ou
+// l'inverse. `modifierDonnee` relit et réécrit sous la version (`data.rev`) :
+// une lecture ratée n'écrit rien (`null`), rien à retirer ⇒ aucune écriture.
 async function sortirDesAnnonces(itemId, ctx) {
-  const id = ligneDe('ebay_listings', ctx);
-  const d = await lireDonnee(id, ctx.owner);
-  if (d === undefined || !d || !Array.isArray(d.items)) return null;
-  if (!d.items.some((x) => x && String(x.itemId) === itemId)) return true;
-  return storeData(id, { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, ctx.owner);
+  return modifierDonnee(ligneDe('ebay_listings', ctx), ctx.owner, (d) => {
+    if (!d || !Array.isArray(d.items)) return undefined;
+    if (!d.items.some((x) => x && String(x.itemId) === itemId)) return undefined;
+    return { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) };
+  });
 }
 async function handleRetirer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
