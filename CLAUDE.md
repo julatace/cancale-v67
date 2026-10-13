@@ -9544,3 +9544,18 @@ Formulaire : état à choisir, aucun défaut Occasion, remise à blanc par paire
 catégorie incompatible ; vérifier/publier bloqués sans choix. Serveur et règle
 de brouillon exigent l'état. Route 428 contrôles, transport et bancs formulaire /
 comptes (sync partielle, refus, panne) verts, build vert. Agent toujours éteint.
+
+## Reprise Cloud Codex — 13 octobre, mémoire du gel K1
+
+Gel persistant par compte et ancre fixe : `src/vintedPublication.js`.
+Lire la section datée de `docs/passation/journal-codex.md` avant de reprendre.
+Les petites lignes `vrm_vinted_publication_*` et les liens par `(uid,tx)` sont
+hors de `main` pour résister aux appareils concurrents. Les liens synchronisés
+dans `main.vrm_ventes_reliees` sont un miroir : jamais la source du dégel.
+Ils gardent l'ID de la fiche et le numéro externe vérifiés, pas le titre.
+Le gel n'expire pas. Une panne conserve la mémoire et bloque la publication.
+Formulaire et planificateur relisent avant envoi. Ma journée signale les ventes
+non reliées après 72 h. La règle du retrait automatique existant est inchangée.
+17 scénarios K1 / 8 mutations ; banc K1 28 contrôles à 390/1512 px ; 97 audits
+hors SQL et build verts. K1 a encore ses alertes élargies/cartes à compléter.
+K4/K5 non construits dans ce lot ; moteur éteint, K14 gelé, branche pour revue.

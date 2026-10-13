@@ -208,3 +208,59 @@ normaux de programmation et l'action déjà portée par un lien ne sont plus ré
 Deux contrôles de la vraie fonction app couvrent désormais règle absente/règle
 existante avec relecture ratée. Build vert, audit route 430/0, offres auto 16/0,
 banc règle d'offre blocs 8+18 à 390 et 1512 px : 24/0.
+
+### 13 octobre — reprise Cloud, gel persistant K1 (premier lot)
+
+Reprise réelle de `claude/codex-ebay` / PR #488 à `498b7f9`, avec les transferts
+et `f97f27b` déjà intégrés. Copie Cloud isolée de l'ancien worktree local qui
+portait encore des modifications non commitées ; celles-ci n'ont pas été touchées.
+
+`src/vintedPublication.js` porte la règle et la mémoire K1, séparées des règles
+autorisant un retrait automatique. Ancre unique `vrm_vinted_publication_activation`
+créée sans écrasement puis relue : la fenêtre activation moins 30 jours ne glisse
+pas. Les lignes `vrm_vinted_publication_<uid>` conservent les ventes non identifiées
+par compte, même à J+100 ou après disparition de la vente de la capture. Seule
+une identité, un lien déclaré ou un état explicite de retour/remboursement les
+résout. Anciennes ventes : registre distinct, sans gel. Identités contradictoires :
+gel, aucune source choisie au hasard. Conversation seule sans vente : rien.
+
+Une lecture ratée/absente/mal formée, une capture plus ancienne ou une écriture
+conditionnelle refusée restent `pas su`. La mémoire précédente est conservée.
+La création ou modification concurrente est relue une fois, sans boucle ni
+écrasement aveugle. La session vendeur est vérifiée avant/après chaque opération.
+Le plafond d'un lecteur paginé strict rend maintenant `null`, pas une liste
+potentiellement tronquée.
+
+Formulaire et planificateur partagent la garde par compte d'origine et relisent
+avant chaque envoi, après la confirmation. Une relecture vieille de 30 min exige
+une confirmation du risque. Numéro ambigu ou compte d'origine inconnu : bloqué.
+Une identité sans état bloque la paire, sans autoriser de retrait automatique.
+Le lien manuel choisit une fiche précise (ID), vérifie son numéro externe unique
+sur le bon compte dans le nuage, puis le revérifie après confirmation. Lien
+immuable par `(uid, tx)`, rangé dans `vrm_ventes_reliees_<uid>_<tx>` ; miroir
+`vrm_ventes_reliees` dans SYNC_KEYS, rattrapé par le chargement Cloud habituel.
+Le miroir n'est jamais la vérité utilisée pour dégeler : un appareil ancien ne
+peut pas perdre les liens en remplaçant `main`. L'identité conserve l'ID de paire
+après une renumérotation, jamais le titre ou un ancien numéro réutilisé.
+
+Après 72 h, Ma journée montre le lien vers eBay → Annonces et compte ce travail
+dans son en-tête. Une panne de lecture conserve la liste précédente.
+
+Validation : build Vite 6.4.4 vert ; 97 audits hors SQL verts (corpus/mocks,
+fetch réseau désactivé ; Chromium temporaire via BANC_CHROMIUM). Audit eBay
+430/0, preuve de vente 92/0, variables et retrait automatique verts.
+`audit-vinted-publication.mjs` : 17 scénarios, 8 mutations détectées.
+`ebay-gel-publication.cjs` : 28 contrôles rendus à 390/1512 px (gel, compte non
+gelé actif, planification bloquée, ancre conservée après navigation/rechargement,
+lien posé qui lève le gel et bloque la paire vendue, Ma journée, panne, 0 appel
+engageant). Captures inspectées. Le même banc échoue sur le build de `498b7f9`
+sur le gel absent. Le banc annonces existant reste vert. Pas de nouvelle passe
+SQL : aucune migration SQL dans ce lot, résultats SQL précédents conservés.
+
+K1 n'est pas annoncé entièrement fini : restent les alertes élargies aux liens
+manuels/lots et les détails de fraîcheur sur chaque carte. La nouvelle famille
+de retrait et `vue_le` sont K8 ; aucune preuve ni règle du retrait automatique
+actuel n'a été élargie. K4/K5, Studio et sessions/équipe restent en chantier.
+Aucun appel réel eBay/Vinted, aucune donnée de test en production, aucun achat
+d'étiquette, aucune activation du moteur, aucun merge vers main ni déploiement.
+K14 reste gelé. Les informations légales restent reportées par Julien.
