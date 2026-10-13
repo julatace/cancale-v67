@@ -50,7 +50,7 @@
 //     dans git), devant un service worker qui reprend les réponses du vrai
 //     code : session morte → reconnectée ; deux copies → rien ; « Se
 //     déconnecter » puis reconnexion à VRM → reconnectée.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { execFileSync } = require('child_process');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -296,7 +296,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     console.log('── extension ABSENTE (autre navigateur)');
     { const r = await rendre(b, { mode: 'absente' }); const v = await r.lire();

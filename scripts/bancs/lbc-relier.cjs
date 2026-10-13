@@ -9,7 +9,7 @@
 //   · l'EXTENSION applique la même règle : le VRAI `adRefKeys` de background.js,
 //     exécuté dans un vm, rend ce N° pour cette annonce (§11 — sinon l'app
 //     relie et le panneau ne relie pas).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -81,7 +81,7 @@ const projette = (row, sel) => {
   } catch (e) { dit(false, 'adRefKeys s’exécute', String(e.message).slice(0, 120)); }
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
       const ctx = await b.newContext({ viewport: vp, acceptDownloads: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });

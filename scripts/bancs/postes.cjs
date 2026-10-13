@@ -15,7 +15,7 @@
 // contrôles tombaient sur un artefact. Il attend que le RÉSEAU se taise et que
 // l'écran ne bouge plus (plafond 20 s : une liste qui n'arrive jamais reste
 // rouge).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -37,7 +37,7 @@ const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path
 srv.listen(4379);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

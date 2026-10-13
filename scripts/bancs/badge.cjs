@@ -112,7 +112,7 @@ const survoler = async (pg) => { await pg.mouse.move(1512 - 16 - 22, 900 - 16 - 
 const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 22); await pg.waitForTimeout(200); };
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const nav = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(),
     args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   fs.mkdirSync(SORTIE, { recursive: true });
 

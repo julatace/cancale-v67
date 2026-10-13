@@ -34,7 +34,7 @@
 //   4. que le PDF se génère, même avec un emoji dans un titre (les polices
 //      standard de pdf-lib ne savent pas l'écrire : tout l'export échouait), et
 //      qu'il contienne bien les deux registres.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -98,7 +98,7 @@ const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toStr
 (async () => {
   let b; const pdfDemandes = [];
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
       const ctx = await b.newContext({ viewport: vp, acceptDownloads: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });

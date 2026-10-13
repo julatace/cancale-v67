@@ -1,6 +1,6 @@
 // COMBIEN COÛTE L'ÉCRAN VENTES ? Il fait 19 844 px de haut au banc : on mesure
 // le nombre de nœuds, le temps de rendu, et ce que coûte un filtre.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -41,7 +41,7 @@ const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path
 srv.listen(4411);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   for(const [W,H,tag] of [[390,844,'iPhone'],[1512,950,'ordinateur']]){
   const pg=await b.newPage({viewport:{width:W,height:H}});
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

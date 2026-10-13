@@ -16,7 +16,7 @@
 // Le banc rejoue le signal de l'extension (`vrm:ext`, la même forme que
 // bridge.js) et juge sur le DOM : nœuds conservés, squelettes comptés,
 // requêtes comptées, attribut d'alerte présent.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -107,7 +107,7 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
       // ── 1. Une vente arrive pendant qu'il regarde Ventes ─────────────────

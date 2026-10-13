@@ -34,7 +34,7 @@ const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'b
 const RACINE = path.join(__dirname, '..', '..');
 const { faireFond, projette } = require(path.join(RACINE, 'scripts/_fond-vm.cjs'));
 const { metaVersData } = require('./_meta.cjs');
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const DIST = path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4913;
 
@@ -146,7 +146,7 @@ async function fileApp(b, lignes, vp, pont) {
   await new Promise((ok) => srv.listen(PORT, ok));
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const ATTENDU = { A: ['12'], B: ['12', '13'], C: ['12', '13'] };
     const NOMS = { A: 'bordereau seul (vente vivante) ⇒ la N°13 est vendue', B: 'transaction figée « payée » + vente remboursée ⇒ la N°13 est revenue', C: 'rien de vendu' };
     for (const cas of ['A', 'B', 'C']) {

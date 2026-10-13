@@ -1,5 +1,5 @@
 // Banc : aucun écran vide, aucun débordement horizontal, aucune erreur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -98,7 +98,7 @@ srv.listen(4322);
 const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   for(const [W,H,tag] of [[390,844,'390 px'],[1512,950,'1512 px']]){
     const pg=await b.newPage({viewport:{width:W,height:H}});
     const errs=[];

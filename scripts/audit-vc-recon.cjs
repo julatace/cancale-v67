@@ -11,7 +11,7 @@
 // sort ; puis il exécute le VRAI relais `vc.js` avec un faux `chrome.runtime`, et
 // le VRAI `storeVcRecon` dans un `vm` (un relevé sans rien de neuf ne lit ni
 // n'écrit la base).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const racine = path.join(__dirname, '..');
 const EXT = path.join(racine, 'vinted-sync-extension');
@@ -29,7 +29,7 @@ const COMMANDE = JSON.stringify({ order: { id: 987654321, status: 'shipped', buy
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+    b = await chromium.launch({ executablePath: require('./_chromium.cjs').executablePath(), args: ['--no-sandbox'] });
     const pg = await b.newPage();
     await pg.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>' }));
     await pg.route('https://fr.vestiairecollective.com/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: COMMANDE }));

@@ -3,7 +3,7 @@
 // base : 6 colis rangés ici, dont **3 portent un QR** — et le bloc n'affichait
 // que le code. Le QR, seul moyen de retrait d'un casier Pickup, ne s'affichait
 // nulle part. §26 : un bloc conditionnel ne vaut que RENDU, avec des données.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -86,7 +86,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // Sans au moins un QR ET un code dans la base servie, les contrôles QR/code
   // ci-dessous seraient VIDES (« 0 pour 0 ») — verts sans rien prouver.
   dit(avecQR>0 && avecCode>0, 'la base servie porte un colis oublié avec QR et un avec code', avecQR+' QR · '+avecCode+' code(s)');
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

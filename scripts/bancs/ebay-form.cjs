@@ -4,7 +4,7 @@
 // demande de Julien), on choisit le MODE DE LIVRAISON, et eBay vérifie avant de
 // publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
 // ici c'est le RENDU + le flux « comme dans l'app ».
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -28,7 +28,7 @@ const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 (async()=>{
-  const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath:require('../_chromium.cjs').executablePath(), args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
   const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);

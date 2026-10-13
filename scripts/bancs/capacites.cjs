@@ -26,7 +26,7 @@
 // pont absent · pont ancien · pont à jour. L'état « muet » (présent, sans
 // version) est le plus en retard de tous, et c'était le seul à ne rien
 // déclencher — il est testé ici aussi.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -86,7 +86,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
 const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   // `diagVer` : ce que la ligne de diagnostic dit de la version qui a capté en
   // DERNIER — `undefined` la ligne n'existe pas · 'KO' la lecture échoue ·
   // sinon la version. C'est un CONSTAT, jamais une capacité (voir ci-dessous).

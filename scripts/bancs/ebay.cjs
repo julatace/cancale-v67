@@ -29,7 +29,7 @@
 //   · `copy()` annonçait « Titre copié » sans rien copier — une promesse rejetée
 //     ne passe pas par `catch`, et ce fichier n'avait même pas de repli ;
 //   · le remplissage s'arrêtait au bout de 90 s EN SILENCE.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs'), http = require('http'), path = require('path');
 const EXT = path.join(__dirname, '..', '..', 'vinted-sync-extension', 'ebay.js');
 const SRC = fs.readFileSync(EXT, 'utf8');
@@ -86,7 +86,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   });
   await new Promise((res) => srv.listen(4488, res));
 
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   const ouvrir = async (chemin) => {
     const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });

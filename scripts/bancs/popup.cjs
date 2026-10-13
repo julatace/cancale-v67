@@ -120,7 +120,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const nav = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(),
     args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // ── 1. PAS CONNECTÉ — l'état d'un nouveau venu ───────────────────────────

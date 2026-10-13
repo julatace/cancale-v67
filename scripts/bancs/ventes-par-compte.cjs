@@ -9,7 +9,7 @@
 //  • compte_alpha (3 ventes) devant compte_beta (1) ⇒ leader = compte_alpha ;
 //  • le compte EXCLU (compte_gamma, 5 ventes) n'apparaît NULLE PART ;
 //  • un seul compte vendeur ⇒ pas de « qui vend le mieux » (rien à comparer).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -104,7 +104,7 @@ const lireVentes = async (pg) => {
 async function main() {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 780 }, { width: 1512, height: 950 }]) {
       const T = vp.width < 600 ? '📱' : '🖥️';
 

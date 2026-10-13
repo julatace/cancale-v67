@@ -23,7 +23,7 @@
 // ⚠️ IL FAUT RENDRE L'ÉCRAN VENTES D'ABORD. C'est lui le propriétaire (§11) :
 // il publie `vinted_urssaf_mois`, le tableau de bord consomme. Ouvrir le
 // tableau de bord seul mesurerait un écran qui n'a pas encore sa source.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -63,7 +63,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
 const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s| | /g,'').replace(/€/g,'').replace(',','.')); return isFinite(n)?n:null; };
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

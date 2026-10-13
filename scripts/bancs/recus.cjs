@@ -12,7 +12,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -60,7 +60,7 @@ const projette = (row, sel) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));

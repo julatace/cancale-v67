@@ -24,7 +24,7 @@
 //
 // ⚠️ Les valeurs servies ici sont SYNTHÉTIQUES (aucune donnée réelle ne monte
 //    dans le dépôt, §6) : ce qui est mesuré est la RÈGLE, pas leur contenu.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -93,7 +93,7 @@ const MENSONGES = [
 ];
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // `reglagesKO` : SEULES les quatre lignes de réglages échouent. Tout le reste
   // répond — y compris les ÉCRITURES, qui sont comptées.

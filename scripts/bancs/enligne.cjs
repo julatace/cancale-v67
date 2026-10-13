@@ -29,7 +29,7 @@
 //      extension connectée à VRM ; et les lectures publiques illisibles se disent.
 // Ce qui est jugé : les cartes (`data-carte-annonce`), les attributs `data-*` et
 // les nombres rendus — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -188,7 +188,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
   const veut = (k) => !process.env.SECTIONS || process.env.SECTIONS.split(',').includes(String(k));
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     for (const tel of [false, true]) {
       const t = tel ? '390 px' : '1512 px';

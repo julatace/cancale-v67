@@ -3,7 +3,7 @@
 // jamais relevé (le geste) · lecture ratée (la phrase de panne). Et JAMAIS un
 // chiffre d'affaires Vestiaire : rien n'est capté tant que la forme d'une vente
 // n'a pas été vue.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -25,7 +25,7 @@ srv.listen(PORT);
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--no-sandbox', '--no-proxy-server'] });
     for (const etat of ['lu', 'jamais', 'panne']) {
       console.log(`── ${etat}`);
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

@@ -44,7 +44,7 @@ srv.listen(0, '127.0.0.1', async () => {
   //    ~100 caractères) l'empêche d'ouvrir sa prise et il meurt (SIGTRAP, vu le
   //    11 octobre). Laisser TMPDIR par défaut ; OUT peut être n'importe où.
   let nav;
-  try { nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--hide-scrollbars', '--disable-gpu-compositing'] }); }
+  try { nav = await chromium.launch({ executablePath: require('./_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--hide-scrollbars', '--disable-gpu-compositing'] }); }
   catch (e) { console.log('Chromium ne démarre pas : ' + String(e.message).split('\n')[0]); srv.close(); process.exitCode = 1; return; }
   try {
     fs.mkdirSync(OUT, { recursive: true });

@@ -20,7 +20,7 @@
 //      UNE fois, qui nomme ce compte (et pas `compte_b`, à jour) ; l'autre
 //      sens : boîtes à jour ⇒ aucune ligne. Mesuré sur sa base : deux comptes
 //      figés sur une page ancienne de leur messagerie (27 juillet / 2 octobre).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -150,7 +150,7 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const tel of [false, true]) {
       console.log(`── extension à jour (5.135) · ${tel ? '390 px' : '1512 px'}`);
       const r = await rendre(b, { version: '5.135.0', tel });

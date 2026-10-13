@@ -15,7 +15,7 @@
 //   · un UUID dans un chemin devient `{uuid}` (il partait à moitié en clair).
 // Sur le code d'avant : le compteur ne partait pas, et le texte de la
 // conversation partait en entier (preuve par le comportement, §6.1).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const racine = path.join(__dirname, '..');
 const INJ = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc-inject.js'), 'utf8');
@@ -35,7 +35,7 @@ const COMPTES = JSON.stringify({ linked_accounts: [{ user_id: U1, email: 'moi@ex
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+    b = await chromium.launch({ executablePath: require('./_chromium.cjs').executablePath(), args: ['--no-sandbox'] });
     const pg = await b.newPage();
     // Fourre-tout d'abord, routes précises ensuite (§6.6 : la dernière gagne).
     await pg.route('https://www.leboncoin.fr/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>' }));

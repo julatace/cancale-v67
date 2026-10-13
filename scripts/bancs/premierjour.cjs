@@ -183,7 +183,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
 
 (async () => {
   const srv = await ecouter();
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const nav = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(),
     args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // ── 1. LE PRÉNOM ──────────────────────────────────────────────────────────

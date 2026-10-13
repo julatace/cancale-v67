@@ -150,7 +150,7 @@ const MUETS = ['angeled92', 'tomj606', 'arthuror2'];
 const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vente', 'recentes'];
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 982 }]) {
     const T = `${vp.width}px`;
     // ── 1. Réglages → Notifications ───────────────────────────────────────

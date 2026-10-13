@@ -21,7 +21,7 @@
 // sens : en marche normale, l'app ne doit PAS crier à la panne. Un contrôle qui
 // n'aurait que la première moitié serait vert sur une app qui alerte tout le
 // temps.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -88,7 +88,7 @@ const MENSONGES=[
 const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes données/i;
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const rendre=async(panne,t,depuisJours)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
