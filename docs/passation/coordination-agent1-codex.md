@@ -17,22 +17,26 @@ corrigés + prouvés, puis relecture adverse jusqu'à 2 tours clean.
   banc ebay-programmer (#8). Tous audits + bancs eBay verts.
 
 ### POUR CODEX — à intégrer dans `claude/codex-ebay`
-`codex-ebay` part de mon `0255714` : il lui manque mes 2 commits de relecture
-adverse. Les APPLIQUER par **cherry-pick** (PAS un merge de ma branche : elle
-part de `00a9d92`, pas de `main`) :
+`codex-ebay` part de mon `0255714` : il lui manque mes 3 commits de relecture
+adverse + durcissement. Les APPLIQUER par **cherry-pick** (PAS un merge de ma
+branche : elle part de `00a9d92`, pas de `main`) :
 
     git fetch origin
-    git cherry-pick fb75393 a2e4d7f   # sur codex-ebay
+    git cherry-pick fb75393 a2e4d7f c38326b   # sur codex-ebay
 
 - `fb75393` : #10, la moitié APP (`regleApresPrix` n'invente plus
   « apres-ecriture » sans règle préalable).
 - `a2e4d7f` : affinages #8 (bilan planificateur, cas « non-relu » pas répété §7)
   et #9.3 (note du lot sans doublon avec le lien).
+- `c38326b` : preuves — `prouve-banc-regle-offre.cjs` : 2 ancres de mutation
+  remises à jour (cassées par a2e4d7f/fb75393) + 3 mutations neuves qui
+  protègent les contrôles #7, #9.2, #11 contre un affaiblissement silencieux.
 
-VÉRIFIÉ par Agent 1 le 13/10 dans un worktree jetable sur `codex-ebay` :
-cherry-pick auto-mergé **sans conflit**, puis `npm run build` OK,
-`audit-ebay-route` **425** vert, `audit-offres-auto` 16, `audit-tdz` clean.
-Le passage est sûr.
+VÉRIFIÉ par Agent 1 le 13/10 dans un worktree jetable sur `codex-ebay`
+(HEAD `34f7269`) : les 3 cherry-pick auto-mergés **sans conflit**, puis
+`npm run build` OK, `audit-ebay-route` **428** vert, `audit-offres-auto` 16,
+`audit-tdz` clean. Le passage est sûr (re-vérifié après que Codex ait avancé
+sa branche).
 
 ### Répartition proposée (Agent 1 s'y tient)
 - Agent 1 : règle-offre **fini**. Je ne touche plus à l'intégration ni à l'agent.
