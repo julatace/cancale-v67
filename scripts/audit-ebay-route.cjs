@@ -2335,6 +2335,10 @@ const RA = {};
     if (srcs.every(Boolean)) { const c3 = {}; vm.createContext(c3); try { vm.runInContext(srcs.join('\n') + '\n;this.R = { regleApresPrix };', c3); A = c3.R; } catch (_) {} }
     dit(!!A, '[R-apres-prix] `regleApresPrix` se charge', srcs.map((s, i) => s ? '' : noms[i]).filter(Boolean).join(','));
     if (!A) return;
+    const aucune=A.regleApresPrix({lecture:null,avant:null},[]);
+    const connue=A.regleApresPrix({lecture:null,avant:{accepte:72,refuse:60}},[]);
+    dit(aucune.lecture===undefined && aucune.ton==='ok', '[R-apres-prix] relecture ratée sans règle préalable : aucun risque de règle inventé dans l’app');
+    dit(connue.lecture && connue.lecture.raison==='apres-ecriture' && connue.ton==='warn', '[R-apres-prix] relecture ratée avec règle préalable : risque conservé et relecture proposée');
     const L = (o) => ({ lecture: { lu: true, accepte: 72, refuse: 60, devise: 'EUR', prix: 85, offresFaites: 2, lueA: Date.now(), ...o }, tombee: false, avant: { accepte: 72, refuse: 60 } });
     const r0 = A.regleApresPrix(L({ offresActives: true }), []), rN = A.regleApresPrix(L({ offresActives: null }), []), rF = A.regleApresPrix(L({ offresActives: false }), []);
     dit(r0.ton === 'ok' && /^✓/.test(r0.msg) && rN.ton === 'warn' && !/✓/.test(rN.msg) && rF.ton === 'warn' && !/✓/.test(rF.msg),

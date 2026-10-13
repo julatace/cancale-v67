@@ -198,3 +198,13 @@ Sources :
 - https://developer.ebay.com/api-docs/commerce/notification/static/release-notes.html
 
 K1 et la suite Agent restent à implémenter ; ne pas allumer `agent_ebay`.
+
+### Relais des corrections de l'agent 1 — 13 octobre
+
+Julien a transmis `fb75393` puis `a2e4d7f`. Cherry-picks appliqués dans cet ordre,
+sans conflit (copies locales a19eeb9 / ae8a851). La moitié app du changement de
+prix ne crée plus un risque de règle lorsqu'aucune règle n'existait ; les messages
+normaux de programmation et l'action déjà portée par un lien ne sont plus répétés.
+Deux contrôles de la vraie fonction app couvrent désormais règle absente/règle
+existante avec relecture ratée. Build vert, audit route 430/0, offres auto 16/0,
+banc règle d'offre blocs 8+18 à 390 et 1512 px : 24/0.
