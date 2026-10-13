@@ -29169,12 +29169,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           )}
                         </div>
                         <AchatRelie entry={e} numero={num}/>
-                        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',fontSize:11.5}}>
-                          <button type="button" onClick={()=>openPicker(item)} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Relier un achat</button>
-                          {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
-                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Passeport de la paire</button>
-                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Marquer vendue</button>
-                          {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                        {/* ── 13 oct. (Julien : « l'ergonomie des boutons… c'est
+                            catastrophique ») ── Les actions de gestion étaient du
+                            TEXTE bleu nu : on ne voyait pas que c'était des boutons.
+                            Elles deviennent des puces bordées, clairement tappables,
+                            avec une cible de clic correcte. L'ACCENT reste réservé à
+                            la seule action « argent » (baisser le prix) — §7, une
+                            teinte d'accent, rare. */}
+                        <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center',fontSize:11.5}}>
+                          {(()=>{ const actBtn={border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'7px 11px',minHeight:0,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}; return (<>
+                          <button type="button" onClick={()=>openPicker(item)} style={actBtn}>Relier un achat</button>
+                          {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={actBtn}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
+                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={actBtn}>Passeport de la paire</button>
+                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={actBtn}>Marquer vendue</button>
+                          {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...actBtn,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,textDecoration:'none',display:'inline-block'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                          </>); })()}
                         </div>
                         {/* La FILE vers les autres places (ce qui SERA préparé),
                             distincte de la présence ci-dessus (ce qui EST publié). */}
