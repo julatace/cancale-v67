@@ -250,3 +250,79 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ebay-order-actions > summary { padding:7px 0; cursor:pointer; color:var(--vrm-muted); }
 .vrm-platform-tabs > button > span:last-child { min-width:0; }
 @media(max-width:767px) { .vrm-platform-tabs > button > span:last-child { white-space:normal; text-align:center; line-height:1.15; } }
+
+/* Espaces de travail : une hiérarchie commune, des actions proches de l'article. */
+.vrm-market-space { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:0; padding-top:8px; }
+.vrm-market-space > * { grid-column:1 / -1; min-width:0; }
+.vrm-market-space > .vrm-market-heading { grid-column:1; }
+.vrm-market-heading { display:flex; align-items:center; gap:12px; padding:16px; }
+.vrm-market-heading h1 { margin:0; font-size:27px; line-height:1.15; font-weight:650; letter-spacing:-.8px; color:var(--vrm-ink); }
+.vrm-market-heading .vrm-brand-icon { width:32px; height:32px; object-fit:contain; }
+.vrm-market-space > .vrm-platform-summary { grid-column:2; padding-right:16px; }
+.vrm-market-space .vrm-summary-strip { border:0 !important; background:transparent !important; box-shadow:none !important; padding:4px 0 !important; gap:24px !important; }
+.vrm-market-space .vrm-platform-summary > div { padding:0 !important; }
+.vrm-market-space .vrm-summary-strip > div { flex:0 1 auto !important; min-width:90px !important; }
+.vrm-market-space .vrm-summary-strip .vrm-display { font-size:18px !important; }
+.vrm-market-space .vrm-platform-summary > div > div:not(.vrm-summary-strip) { max-width:420px; }
+.vrm-market-space .vrm-platform-tabs { grid-column:1 / -1; margin:0 16px 6px; padding:5px !important; gap:4px !important; border:1px solid var(--vrm-line); border-radius:12px; background:var(--vrm-surface) !important; overflow:visible; }
+.vrm-market-space .vrm-platform-tabs button { padding:9px 16px !important; min-height:40px; border:0 !important; border-radius:8px !important; font-size:12px; transition:background .15s,color .15s; }
+.vrm-market-space .vrm-platform-tabs button[aria-current="page"] { background:var(--vrm-ink) !important; color:var(--vrm-bg) !important; box-shadow:0 1px 3px #00000014; }
+.vrm-market-space .vrm-platform-tabs button:not([aria-current]):hover { background:var(--vrm-bg) !important; color:var(--vrm-ink) !important; }
+.vrm-summary-accessible { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.vrm-ann-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,410px),1fr)) !important; gap:16px !important; }
+.vrm-ann-card { border-radius:12px !important; box-shadow:0 1px 2px #00000005 !important; transition:border-color .15s; }
+.vrm-ann-overview { padding:16px !important; gap:16px !important; }
+.vrm-ann-overview > a { width:120px !important; height:160px !important; border:0 !important; border-radius:10px !important; }
+.vrm-ann-overview > div { gap:5px !important; }
+.vrm-ann-card [data-titre] { font-size:15px !important; line-height:1.4 !important; font-weight:600 !important; }
+.vrm-ann-price-line { margin:3px 0 2px; }
+.vrm-ann-card [data-prix] { font-size:23px !important; letter-spacing:-.6px; }
+.vrm-ann-card [data-chiffres] { gap:7px 14px !important; padding:6px 0 !important; border-top:1px solid var(--vrm-line); margin-top:5px !important; }
+.vrm-ann-actions { padding:0 16px !important; background:var(--vrm-surface); }
+.vrm-ann-actions > summary { padding:10px 0; gap:7px; color:var(--vrm-ink) !important; min-height:40px; }
+.vrm-ann-actions[open] > div { padding-bottom:14px; }
+.vrm-action-chevron { margin-left:auto; transition:transform .15s; font-size:16px; }
+.vrm-ann-actions[open] .vrm-action-chevron { transform:rotate(180deg); }
+.vrm-sale-row:hover { background:var(--vrm-surface); }
+.vrm-sales-filters { gap:4px !important; }
+.vrm-sales-filters button[aria-pressed="true"] { background:var(--vrm-ink) !important; color:var(--vrm-bg) !important; }
+.vrm-ebay-order-actions { margin:0 14px 10px; font-size:12px; }
+.vrm-ebay-order-actions > summary { padding:8px 0; cursor:pointer; color:var(--vrm-muted); }
+@media(max-width:767px) {
+ .vrm-market-space { padding-top:0; }
+ .vrm-market-heading { gap:9px; padding:12px 16px 10px; }
+ .vrm-market-heading h1 { font-size:21px; letter-spacing:-.5px; }
+ .vrm-market-heading .vrm-brand-icon { width:26px; height:26px; }
+ .vrm-market-space > .vrm-platform-summary { align-self:center; padding-right:16px; }
+ .vrm-market-space .vrm-platform-summary > summary { padding:8px 0; font-size:11px; }
+ .vrm-market-space > .vrm-platform-summary[open] { grid-column:1 / -1; padding:0 16px 8px; }
+ .vrm-market-space .vrm-platform-summary[open] .vrm-summary-strip { flex-wrap:nowrap !important; justify-content:space-between; gap:12px !important; }
+ .vrm-market-space .vrm-summary-strip > div { min-width:0 !important; }
+ .vrm-market-space .vrm-summary-strip .vrm-display { font-size:16px !important; }
+ .vrm-main .vrm-market-space .vrm-platform-tabs { margin:0 12px 4px; padding:4px !important; gap:3px !important; }
+ .vrm-main .vrm-market-space .vrm-platform-tabs > button { padding:6px 2px !important; min-height:49px !important; border-radius:8px !important; gap:3px !important; }
+ .vrm-market-space .vrm-section-icon svg { width:16px; height:16px; }
+ .vrm-ann-grid { gap:12px !important; }
+ .vrm-ann-card .vrm-ann-overview { padding:12px !important; gap:12px !important; }
+ .vrm-ann-card .vrm-ann-overview > a { width:80px !important; height:116px !important; }
+ .vrm-ann-card [data-titre] { font-size:13px !important; line-height:1.35 !important; }
+ .vrm-ann-card [data-prix] { font-size:19px !important; }
+ .vrm-ann-card [data-chiffres] { gap:4px 10px !important; padding:4px 0 !important; }
+ .vrm-ann-actions { padding:0 12px !important; }
+}
+.vrm-ann-toolbar { align-items:center; }
+.vrm-ann-search { display:flex; align-items:center; gap:8px; flex:1 1 220px; padding-left:12px; border:1px solid var(--vrm-line); border-radius:10px; background:var(--vrm-surface); color:var(--vrm-muted); }
+.vrm-ann-search > input { flex:1; width:100%; border:0 !important; background:transparent !important; padding-left:0 !important; }
+.vrm-ann-search > button { flex-shrink:0; width:40px; height:40px; border:0; background:transparent; color:var(--vrm-muted); padding:0; }
+.vrm-ann-toolbar > select { max-width:100%; }
+.vrm-finance-goal > div { margin-bottom:0 !important; padding:16px !important; }
+.vrm-finance-goal [role="progressbar"] { height:6px !important; }
+@media(max-width:767px) {
+ .vrm-ann-toolbar { display:grid !important; grid-template-columns:minmax(0,1fr) 44px auto; gap:8px !important; }
+ .vrm-ann-search { grid-column:1 / -1; }
+ .vrm-ann-toolbar > select { grid-column:1; grid-row:2; min-width:0; width:100%; font-size:12px !important; }
+ .vrm-ann-toolbar > button { grid-column:2; grid-row:2; }
+ .vrm-ann-toolbar > div:last-child { grid-column:3; grid-row:2; }
+ .vrm-ann-card .vrm-ann-price-line { align-items:center !important; margin:0; }
+ .vrm-ann-card .vrm-ann-price-line > span:last-child { padding:0 4px !important; }
+}

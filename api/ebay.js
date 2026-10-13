@@ -509,7 +509,7 @@ async function handleRegleOffre(b, ctx) {
       + (P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
   }
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', inner);
-  const lectureApres=(post,raison)=>post.ok && memeRegle(post.lecture,demande,P)===true?post.lecture:{lu:false,raison,lueA:Date.now(),observee:post.ok?post.lecture:null};
+  const lectureApres=(post,raison)=>post.ok && memeRegle(post.lecture,demande,P)!==false?post.lecture:{lu:false,raison,lueA:Date.now(),observee:post.ok?post.lecture:null};
   const rangerPost=(post,raison)=>rangerReglesOffre(ctx,{[itemId]:{...lectureApres(post,raison),par:'regle',_force:true}});
   if (r.ok) {
     const post = await relireApres(at.token, itemId, demande, P);
