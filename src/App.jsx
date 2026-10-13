@@ -36160,8 +36160,22 @@ function AppCoeur() {
   //    l'onglet (`battementExt`), qui prévient ses abonnés : rien à relire ici.
   //    « Pas su » ⇒ '' : on ne met rien en avant à tort. Le filtre des comptes
   //    qu'on peut montrer est appliqué plus bas (`compteConnecte`).
+  // ⚠️⚠️ ET LE FLOU NE VAUT QUE QUAND DES ACTIONS SONT POSSIBLES (Julien,
+  //    13 octobre : « en lecture seule je veux que TOUT soit affiché ; au
+  //    contraire, connecté à une extension, j'ai la possibilité de flouter les
+  //    autres comptes — avec les photos, floutées, jamais masquées »). On met
+  //    donc le compte en avant d'office sur le MÊME signal que la pastille
+  //    « Actions possibles · {compte} » (`etatActionsExt(...).niveau === 'ok'`,
+  //    §11), pas sur la simple présence du cookie Vinted. En LECTURE SEULE
+  //    (téléphone, extension pas connectée à VRM, pause Vinted, cookie pas su,
+  //    autre compte) `etatActionsExt` ne vaut pas 'ok' ⇒ compteChrome '' ⇒
+  //    `selEff` vide ⇒ AUCUN flou, tout reste affiché. Le flou (STYLE_FLOU :
+  //    blur + grayscale sur toute la carte, photo comprise) n'apparaît donc
+  //    qu'en mode actionnable — et « Tous les comptes » l'éteint toujours.
+  //    'verif' (on demande encore) n'est pas 'ok' : « pas su » ne floute pas.
+  const sansSouris = useSansSouris();
   const [compteChrome,setCompteChrome]=useState('');
-  React.useEffect(()=>{ const lire=()=>{ const v=vintedDeChrome(); setCompteChrome(v?v.uid:''); }; lire(); return onVmrExt(lire); },[]);
+  React.useEffect(()=>{ const lire=()=>{ const et=etatActionsExt(sansSouris); const v=et&&et.niveau==='ok'?et.vinted:null; setCompteChrome(v&&v.uid?String(v.uid):''); }; lire(); return onVmrExt(lire); },[sansSouris]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
