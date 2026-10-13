@@ -28535,6 +28535,105 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div>
             <ScreenHead icon="sun" title="Ma journée"/>
 
+            {/* ═══ RÉTABLI LE 13 OCTOBRE (retiré par #500) ════════════════════
+                codex avait enlevé de Ma journée le bonjour, VENDU/REÇU du mois et
+                l'argent en attente/à virer — l'info que Julien regarde en premier
+                sur son téléphone. On les remet, en CARTE CLAIRE (cohérent avec le
+                thème actuel, plus l'ancien bloc sombre), en gardant toute la
+                logique §5/§11 (chiffres sûrs, « vendu » ≠ « reçu », escrow ≠
+                dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
+                plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
+            {!baseKO && !premierJour && (
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
+                <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
+                {!loading && jobs.length>0 && <div style={{fontSize:13,color:C.muted,marginTop:3}}><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</div>}
+              </div>
+            )}
+
+            {/* ⚠️ Rétabli (retiré par #500) : si le serveur ne peut plus envoyer
+                AUCUNE notification, il faut le voir ICI — compter sur les notifs
+                pour ne pas ouvrir l'app et n'apprendre la panne qu'en l'ouvrant
+                serait le pire des deux mondes. Le bandeau s'auto-masque dès que
+                tout va bien. */}
+            {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
+
+            {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
+                claire : le gros chiffre en encre, l'accent réservé au lien. */}
+            {!baseKO && !premierJour && !loading && sales.items && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                style={{width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none',display:'block',padding:'18px 18px 16px'}}>
+                <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Vendu en {moisNom}</div>
+                <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display" style={{fontSize:'clamp(34px, 10vw, 48px)',fontWeight:800,letterSpacing:-1,marginTop:6,lineHeight:1,color:C.text,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={moisEur}/></div>
+                <div style={{fontSize:13,color:C.muted,marginTop:6,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
+                  <span><b style={{color:C.text,fontWeight:700}}>{moisN}</b> vente{moisN>1?'s':''} ce mois-ci</span>
+                  <span style={{opacity:.5}}>·</span>
+                  <span style={{color:C.accent,fontWeight:600}}>voir mes ventes ›</span>
+                </div>
+                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                  <span style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Reçu en {moisNom}</span>
+                  <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
+                  <span style={{fontSize:12,color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré')}</span>
+                </div>
+              </button>
+            )}
+
+            {/* Vendu AUJOURD'HUI — le soir, la première chose qu'on veut voir. */}
+            {jourN>0 && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                <div data-vendu-jour={Math.round(jourEur*100)} style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
+                  <span style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
+                  <span style={{fontSize:15,fontWeight:600,color:C.text}}>{jourN} vente{jourN>1?'s':''}</span>
+                </div>
+              </button>
+            )}
+
+            {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
+            {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
+              <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
+                  <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
+                  </div>
+                </div>
+                <BarresVenduRecu jours={jours14}/>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+                  <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
+                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
+                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
+                </div>
+              </div>
+            )}
+
+            {/* ARGENT EN ATTENTE / DISPONIBLE À VIRER (§5.14 : deux notions,
+                deux montants, jamais confondus ; escrow réel sinon estimation). */}
+            {!baseKO && !premierJour && (()=>{
+              const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
+              const val=escrow?escrow.total:inRouteSum;
+              if(loading||val<=0) return null;
+              return (
+              <div style={{marginBottom:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:13,color:C.muted,fontWeight:500}}>en attente</span></div>
+                  <div style={{fontSize:12,color:C.muted,marginTop:1}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
+                  {escrow && escrow.dispo > 0 && (
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>
+                      et <b style={{color:C.text,fontWeight:700}}>{escrow.dispo.toFixed(2).replace('.',',')} €</b> déjà disponibles à virer
+                      {escrow.accounts>1?` · sur ${escrow.accounts} porte-monnaie`:''}
+                      {escrow.plusVieuxJours>7?` · le plus ancien lu il y a ${escrow.plusVieuxJours} j`:''}
+                    </div>
+                  )}
+                </div>
+                <span aria-hidden="true" style={{color:C.muted,fontSize:22,fontWeight:700}}>›</span>
+              </div>
+              );
+            })()}
+
             {loading && <Skeleton variant="card" count={4}/>}
 
             {/* ⚠️⚠️ LE MENSONGE LE PLUS COÛTEUX POSSIBLE. Base injoignable, cet
