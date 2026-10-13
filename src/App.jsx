@@ -8263,6 +8263,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
 }
 function PeriodePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
+  const panneauId = React.useId();
   // ⚠️ Julien : « je veux pouvoir sélectionner un mois — juin par exemple — et
   // que l'app fasse la somme du 1er au dernier jour de juin ». Les raccourcis
   // « Ce mois » / « Mois dernier » ne couvraient que les deux derniers : pour
@@ -8310,16 +8311,21 @@ function PeriodePicker({ value, onChange }) {
   return (
     <div style={{ marginBottom:12 }}>
       <div className="vrm-rangee" style={{ display:'flex', gap:6, alignItems:'center', WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2 }}>
-        <button type="button" onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
+        <button type="button" aria-expanded={open} aria-controls={panneauId} onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
           <Icon name="calendar" size={14} style={{marginRight:5}}/>{libellePeriode(value)}
         </button>
-        {presets.map(p=>(
+        {presets.slice(0,2).map(p=>(
           <button key={p.k} type="button" onClick={()=>{ onChange(p.f()); setOpen(false); }} style={chip(null, value && value.label===p.f().label)}>{p.lab}</button>
         ))}
         {actif && <button type="button" onClick={()=>{ onChange(null); setOpen(false); }} style={{ ...chip(null,false), color:C.muted }}>✕</button>}
       </div>
       {open && (
-        <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:10, padding:'10px 12px' }}>
+        <div id={panneauId} style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:10, padding:'10px 12px' }}>
+          <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12}}>
+            {presets.slice(2).map(p=>(
+              <button key={p.k} type="button" onClick={()=>{ onChange(p.f()); setOpen(false); }} style={chip(null, value && value.label===p.f().label)}>{p.lab}</button>
+            ))}
+          </div>
           <div style={{ display:'flex', gap:6, marginBottom:10 }}>
             {[['mois','Un mois entier'],['jours','Jour à jour']].map(([k,lab])=>(
               <button key={k} type="button" onClick={()=>setVue(k)}

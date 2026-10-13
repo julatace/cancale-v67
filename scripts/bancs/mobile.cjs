@@ -79,6 +79,10 @@ async function brancher(p){
         check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===88,largeur+' photo de vente agrandie');
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
+        check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
+        await p.getByRole('button',{name:'Toute la période',exact:true}).tap();
+        await p.getByRole('button',{name:'7 jours',exact:true}).tap();
+        check(await p.getByRole('button',{name:'7 derniers jours',exact:true}).isVisible(),largeur+' période secondaire sélectionnable');
       }
     }
     await p.getByRole('button',{name:'Tous les écrans',exact:true}).tap();
