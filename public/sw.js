@@ -4,7 +4,7 @@
 // ⚠️ v5 (3 octobre) : la v4 gardait les fichiers de TOUS les déploiements —
 // mesuré +1,1 Mo par déploiement, jamais purgé (13 à 21 déploiements par jour).
 // Changer le nom fait jeter la v4 entière à l'activation, chez tout le monde.
-const CACHE = 'vrm-shell-v5';
+const CACHE = 'vrm-shell-v6';
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
