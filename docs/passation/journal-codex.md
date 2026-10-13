@@ -112,3 +112,44 @@ services simulés) couvre conservation, remboursements actualisés, fuite d'adre
 page en panne, pagination hostile, boucle et plafond. K2 n'est pas terminé :
 connexion à trois états, notifications de suppression signées et métadonnées
 transport restent à construire.
+
+### 13 octobre — connexion mesurée et suppression signée (K2)
+
+`status` renouvelle désormais le jeton de chaque compte pour mesurer sa connexion :
+`ok`, `refuse` (invalid_grant), `pas-su` (panne), au lieu d'affirmer « relié »
+sur sa seule présence. Le navigateur conserve le troisième état, attend la lecture,
+compte seulement les comptes réellement reliés et dit le refus. Les droits rendus
+par OAuth et l'expiration exacte sont rangés à la prochaine connexion ; absence
+de scope retourné = inconnue. Les jetons d'application privés ne vont jamais dans
+la réponse du diagnostic public.
+
+La route publique de suppression passe par `compte.js` (corps brut), sans nouvelle
+fonction Vercel. L'ancienne porte délègue au même contrôle. Signature ECDSA/SHA1
+vérifiée sur le brut puis sur le JSON re-sérialisé comme le SDK eBay ; cache public
+mémoire/base, dix nouveaux kid par heure et par instance, clé de repli optionnelle
+`EBAY_NOTIF_PUBLIC_KEY_KID` / `EBAY_NOTIF_PUBLIC_KEY_PEM`. Signature fausse = 412 et
+aucun effacement ; clé inaccessible = 500 ; signature valide = 204 même si la base
+est en panne. Une panne d'anonymisation est signalée dans les logs sans identité.
+K4 doit compléter le quota global entre instances et la purge du coffre lors
+de cette suppression.
+
+L'identité EIAS signée sélectionne le seul compte vendeur à déconnecter. Les
+commandes contenant le pseudo acheteur signé sont anonymisées au nom de chaque
+propriétaire ; autres comptes et autres acheteurs restent intacts. Une lecture
+ratée ne remplace rien. La fermeture VRM appelle désormais la fonction SQL 014
+d'effacement de l'agent avant les autres suppressions ; si elle échoue, compte
+et données sont conservés pour relancer.
+
+Preuves : route eBay 425 contrôles ; banc comptes multiples avec refus/panne sur
+mobile vert ; banc suppression signé vert (vecteur réel du SDK, faux corps,
+panne base) ; audit signature (50 kid forgés ⇒ 10 lectures max) ; audit suppression
+à deux vendeurs ; fermeture 27/0 ; abonnement 91/0 ; variables et fonctions API
+verts. Le build passe. Aucun appel réel vendeur ni déploiement de ce lot.
+
+Sources de contrat :
+- https://github.com/eBay/event-notification-nodejs-sdk/blob/main/lib/validator.js
+- https://github.com/eBay/event-notification-nodejs-sdk/blob/main/test/test.json
+- https://developer.ebay.com/develop/guides/sell/marketplace-user-account-deletion
+
+La suite K2 (politique d'étiquette 1455, Metadata transport, délais et bilan de
+synchro visible) et K1 (gel de publication par compte sans preuve) restent en cours.

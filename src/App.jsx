@@ -12633,7 +12633,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const lireStatut = React.useCallback(() => {
     return fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(j => {
-        setConnected(j && j.ok ? !!j.connected : null);
+        setConnected(j && j.ok ? (j.connected === null ? null : !!j.connected) : null);
         setComptesStatut(j && j.ok ? (Array.isArray(j.comptes) ? j.comptes : null) : null);
       }).catch(() => { setConnected(null); setComptesStatut(null); });
   }, []);
@@ -12754,11 +12754,11 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
           Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.
         </div>
-      ) : connected === true ? (
+      ) : connected === undefined ? (<div style={{ fontSize: 13, color: C.muted }}>Je vérifie ta connexion chez eBay…</div>) : connected === true ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
             <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-              ✓ <b>{Array.isArray(comptesStatut) && comptesStatut.length >= 2 ? `Tes ${comptesStatut.length} comptes eBay sont reliés.` : 'Ton compte eBay est relié.'}</b> VRM lit tes annonces et tes ventes eBay ici — plus besoin d'ouvrir l'appli eBay.
+              ✓ <b>{Array.isArray(comptesStatut) && comptesStatut.length >= 2 ? `${comptesStatut.filter(c => c.relie === true).length} de tes ${comptesStatut.length} comptes eBay sont reliés.` : 'Ton compte eBay est relié.'}</b> VRM lit tes annonces et tes ventes eBay ici — plus besoin d'ouvrir l'appli eBay.
             </div>
             <button type="button" onClick={synchroniser} disabled={syncing}
               style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 10, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
@@ -12777,7 +12777,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                   <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}</div>
-                      <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'état pas lu'}</div>
+                      <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.etat === 'refuse' ? 'eBay a refusé la connexion — reconnecte ce compte' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'je n’ai pas pu vérifier la connexion'}</div>
                       {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
                     </div>
                     <button type="button" data-ebay-deconnecter={ref} disabled={etat === '…'} onClick={() => deconnecter(c)}
@@ -12899,13 +12899,13 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       ) : (
         <>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>
-            Tout est prêt côté clés. Autorise ton compte vendeur sur la page d'eBay — <b>aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
+            {Array.isArray(comptesStatut) && comptesStatut.some(c => c.etat === 'refuse') ? 'eBay a refusé la connexion de ton compte — reconnecte-le.' : connected === null ? 'Je n’ai pas pu vérifier ta connexion. Tu peux réessayer dans un moment.' : 'Autorise ton compte vendeur sur la page d’eBay.'} <b>Aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
           </div>
           <button type="button" onClick={() => connecter(false)} disabled={busy}
             style={{ border: 'none', borderRadius: 10, background: C.accent, color: '#fff', padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Ouverture d\'eBay…' : 'Connecter mon compte eBay'}
           </button>
-          {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>(État du compte non lisible pour l'instant — la base n'a pas répondu.)</div>}
+          {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>Je n’ai pas pu vérifier ta connexion chez eBay. Réessaie dans un moment.</div>}
         </>
       )}
     </div>
@@ -14639,9 +14639,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(j => {
         if (stop) return;
-        setConnected(j && j.ok ? !!j.connected : null);
+        setConnected(j && j.ok ? (j.connected === null ? null : !!j.connected) : null);
         // Une route d'avant (sans `comptes`) : le principal seul, relié si `connected`.
-        setComptesStatut(j && j.ok ? (Array.isArray(j.comptes) ? j.comptes : [{ cle: '', pseudo: '', principal: true, relie: !!j.connected }]) : null);
+        setComptesStatut(j && j.ok ? (Array.isArray(j.comptes) ? j.comptes : [{ cle: '', pseudo: '', principal: true, relie: j.connected === null ? null : !!j.connected }]) : null);
       }).catch(() => { if (!stop) { setConnected(null); setComptesStatut(null); } });
     return () => { stop = true; }; }, [comptesEbay]);
   // Quelles annonces eBay accepte-t-il d'offrir aux observateurs ? Compte par

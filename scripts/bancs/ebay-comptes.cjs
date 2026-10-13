@@ -99,7 +99,7 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function ouvrir(b, vp) {
+async function ouvrir(b, vp, etat = 'ok') {
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -133,7 +133,7 @@ async function ouvrir(b, vp) {
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (_) {}
     if (['publish', 'deconnecter', 'programmer', 'retirer'].includes(body.action)) envois.push(body);
     // La route rend SES comptes : ceux du registre, sans les déconnectés.
-    if (body.action === 'status') return j({ ok: true, connected: true, comptes: registre().filter((c) => !c.deconnecteLe).map((c) => ({ cle: c.cle, pseudo: c.pseudo, principal: !!c.principal, relie: true })) });
+    if (body.action === 'status') return j({ ok: true, connected: etat === 'pas-su' ? null : etat !== 'refuse', comptes: registre().filter((c) => !c.deconnecteLe).map((c) => ({ cle: c.cle, pseudo: c.pseudo, principal: !!c.principal, etat, relie: etat === 'pas-su' ? null : etat !== 'refuse' })) });
     if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }], attributs: [], attributsObligatoires: [] });
     if (body.action === 'publish') return j({ ok: true, itemId: '120000000777', url: 'https://www.ebay.fr/itm/120000000777', sku: body.item && body.item.numero ? 'VRM-' + body.item.numero : null });
     if (body.action === 'deconnecter') {
@@ -310,6 +310,16 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit((await pg.$$('[data-ebay-publier-compte]')).length === 0, 'et pas de choix de compte à la publication');
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    }
+    for (const etat of ['refuse','pas-su']) {
+      const {ctx,pg,errs}=await ouvrir(b,{width:390,height:844},etat);
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, {waitUntil:'domcontentloaded'});
+      await sousOnglet(pg,'Compte eBay');await pg.waitForTimeout(1200);
+      const texte=await pg.evaluate(()=>document.body.innerText);
+      dit(etat==='refuse' ? /eBay a refusé la connexion/.test(texte) : /Je n’ai pas pu vérifier ta connexion/.test(texte), `connexion ${etat} : cause affichée honnêtement`);
+      dit(!/Ton compte eBay est relié|comptes eBay sont reliés/.test(texte), `connexion ${etat} : aucune réussite inventée`);
+      dit(errs.length===0, `connexion ${etat} : aucune erreur de page`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

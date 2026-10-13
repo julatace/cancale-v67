@@ -56,6 +56,13 @@ global.fetch = async (url, opts = {}) => {
     base.utilisateurs.delete(u.split('/admin/users/')[1]);
     return rep({}, 200);
   }
+  if (u.includes('/rest/v1/rpc/vrm_agent_effacer_vendeur')) {
+    if (pannes.has('agent')) return rep({}, 503);
+    const {p_owner}=JSON.parse(opts.body);
+    if (p_owner!==A) return rep({}, 403);
+    base.agentEfface=p_owner;
+    return rep({file:0,coffre:0,titulaires:0});
+  }
   if (u.includes('/rest/v1/rpc/vrm_acces')) {
     if (pannes.has('rpc')) return rep('<html>522</html>', 522);
     const qui = JETONS[jwt];
@@ -150,6 +157,11 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(r.code === 503 && rienTouche(), 'la base ne dit pas s’il est le propriétaire : refus (« pas su » n’efface rien)', `HTTP ${r.code}`);
   });
 
+  await essaie('agent en panne', async () => {
+    reset(); pannes.add('agent');
+    const r=await fermer('aa.bb.A',{confirmation:'vendeuse.a@exemple.test'});
+    dit(r.code===502 && base.utilisateurs.has(A) && base.app_data.some(l=>l.owner===A) && deletes.length===0, 'mémoire agent non effacée : compte et données conservés, échec dit');
+  });
   console.log('\n── La fermeture : SES données, et seulement les siennes');
   await essaie('fermeture A', async () => {
     reset();
@@ -158,6 +170,7 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(!base.app_data.some((l) => l.owner === A) && !base.vinted_accounts.some((l) => l.owner === A) && !base.detourage_usage.some((l) => l.owner === A), 'ses données, ses comptes Vinted et ses compteurs sont effacés');
     dit(!base.stockage.some((x) => x.startsWith(A + '/')), 'ses photos détourées sont effacées');
     dit(!base.utilisateurs.has(A), 'son compte de connexion est supprimé, EN DERNIER');
+    dit(base.agentEfface===A && r.corps.etapes.agent==='efface', 'la mémoire de l’agent et son coffre sont effacés par la fonction SQL pour A');
     dit(intactB(), 'l’autre vendeur est INTACT (lignes, comptes Vinted, compteurs, photos, compte, abonnement)');
     const rest = deletes.filter((x) => x.includes('/rest/v1/'));
     dit(rest.length === 3 && rest.every((x) => new RegExp(`/rest/v1/(app_data|vinted_accounts|detourage_usage)\\?owner=eq\\.${A}$`).test(x)), 'chaque suppression porte owner=eq.<lui> et RIEN d’autre', rest.map((x) => x.split('/rest/v1/')[1]).join(' · '));

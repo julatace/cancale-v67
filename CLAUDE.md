@@ -9497,3 +9497,26 @@ complète ; aucun appel réel eBay n'a été fait par Codex.
 Publication et vérification exigent un état explicite ; `]]>` dans une description
 est encodé sans perte. Audit route : 423 contrôles verts, audit commandes vert.
 Connexion mesurée et suppression signée restent à implémenter (K2 en cours).
+
+## Reprise Codex — 13 octobre, connexion eBay et suppression signée (K2 en cours)
+
+Le statut par compte est mesuré par renouvellement OAuth : `ok` / `refuse`
+(invalid_grant) / `pas-su`. Une panne ne déconnecte pas. L'app attend la réponse,
+préserve `null` et ne compte que les comptes vraiment reliés. Les scopes rendus
+et l'expiration sont rangés lors du prochain consentement (inconnus si absents).
+
+`/api/ebay-deletion` est réécrit vers `compte.js?mode=ebay-deletion`, corps brut.
+L'ancienne porte d'ebay.js délègue au même contrôle. ECDSA/SHA1 selon le SDK eBay,
+cache mémoire + table 014, format du kid et frein 10 nouveaux par heure/instance.
+K4 reste responsable du quota GLOBAL entre instances. Repli de clé publique
+optionnel : `EBAY_NOTIF_PUBLIC_KEY_KID`, `EBAY_NOTIF_PUBLIC_KEY_PEM`. Aucun secret
+renvoyé. 412 sur falsification ; 204 après signature valide même base en panne.
+L'anonymisation en échec est signalée sans données personnelles dans les logs.
+L'identité EIAS sélectionne le compte ; les autres restent intacts. K4 doit encore
+purger coffre et titulaire de ce compte. Fermeture VRM : RPC 014
+`vrm_agent_effacer_vendeur` avant les autres données, sous l'identité de session.
+
+Preuves : audit route 425 ; banc comptes avec refus/panne mobile vert ; signature
+(vecteur officiel, faux corps, 50 kid forgés), suppression deux vendeurs verts ;
+fermeture 27/0 ; abonnement 91/0 ; build/variables/fonctions API verts. Pas d'appel
+réel eBay/Vinted. K2 pas terminé : Metadata, politique 1455, bilan de sync, délais.

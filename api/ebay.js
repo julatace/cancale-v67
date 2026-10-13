@@ -1596,24 +1596,12 @@ async function handleSync(ctx) {
 }
 
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
-const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
-function deletionUrl(req) {
-  if (process.env.EBAY_DELETION_URL) return process.env.EBAY_DELETION_URL;
-  const host = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center';
-  return `https://${host}/api/ebay-deletion`;   // l'URL publique stable, pas le chemin interne
-}
 async function handleDeletion(req, res) {
-  if (req.method === 'GET') {
-    const code = (req.query && (req.query.challenge_code || req.query.challengeCode)) || '';
-    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken() }); return; }
-    if (!verifToken()) { res.status(503).json({ ok: false, reason: 'no-verif-token', error: 'EBAY_VERIF_TOKEN non configuré sur Vercel.' }); return; }
-    const hash = crypto.createHash('sha256');
-    hash.update(String(code)); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
-    res.status(200).json({ challengeResponse: hash.digest('hex') });
-    return;
-  }
-  if (req.method === 'POST') { res.status(200).json({ ok: true }); return; }
-  res.status(405).json({ ok: false, error: 'GET/POST' });
+  // Ancienne porte conservée : même vérification, jamais un POST non signé.
+  const { default: compte } = await import('./compte.js');
+  const query = req.query;
+  try { req.query = { ...(query || {}), mode: 'ebay-deletion' }; return await compte(req,res); }
+  finally { req.query = query; }
 }
 
 // ── RETOUR DE CONSENTEMENT (eBay renvoie le navigateur ici) ─────────────────
@@ -1760,7 +1748,11 @@ async function handleApp(req, res) {
     if (action === 'status') {
       const has = await hasRefresh(owner, '');
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }
-      if (!cloison) { res.status(200).json({ ok: true, connected: !!has }); return; }
+      if (!cloison) {
+        const at = has ? await accessToken(owner, '') : null;
+        const relie = !has ? false : at.ok ? true : at.reason === 'revoque' ? false : null;
+        res.status(200).json({ ok: true, connected: relie, raison: at && !at.ok ? at.reason : null }); return;
+      }
       // (9 octobre) Ses comptes eBay, chacun avec son état — jamais un jeton.
       // Le principal relié dont l'identité n'est pas encore apprise : on la
       // demande à eBay maintenant (une fois ; ensuite elle est rangée).
@@ -1771,11 +1763,14 @@ async function handleApp(req, res) {
       if (reg === undefined) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire tes comptes eBay (base injoignable).' }); return; }
       const comptes = [];
       for (const c of comptesActifs(reg)) {
-        const relie = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
-        if (c.implicite && !relie) continue;
-        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null });
+        const present = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
+        if (c.implicite && present === false) continue;
+        const at = present === true ? await accessToken(owner, c.suffixe) : null;
+        const relie = present === null ? null : !present ? false : at.ok ? true : at.reason === 'revoque' ? false : null;
+        const etat = relie === true ? 'ok' : relie === null ? 'pas-su' : at && at.reason === 'revoque' ? 'refuse' : 'absent';
+        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, etat, ajouteLe: c.ajouteLe || null });
       }
-      res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true), comptes });
+      res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true) ? true : comptes.some(c => c.relie === null) ? null : false, comptes });
       return;
     }
     if (action === 'deconnecter') {

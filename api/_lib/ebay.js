@@ -74,6 +74,23 @@ async function appToken() {
   return { ok: true, status: 200, works: true, expires_in: j.expires_in || null };
 }
 
+// Jeton d'application privé, pour Metadata et la vérification des sonnettes.
+let __jetonApplication = null;
+async function jetonApplication() {
+  if (!keysReady()) return { ok: false, status: 503 };
+  const contexte = appId() + ':' + certId();
+  if (__jetonApplication && __jetonApplication.contexte === contexte && __jetonApplication.jusqua > Date.now()) return { ok: true, token: __jetonApplication.token };
+  try {
+    const r = await fetch(EBAY_TOKEN_URL, { method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}` });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.access_token) return { ok: false, status: 502 };
+    __jetonApplication = { contexte, token: j.access_token, jusqua: Date.now() + Math.max(0, (Number(j.expires_in) || 0) - 60) * 1000 };
+    return { ok: true, token: j.access_token };
+  } catch (_) { return { ok: false, status: 502 }; }
+}
+
 // ── À QUI APPARTIENT UNE LIGNE eBAY ? (5 octobre, chaque vendeur son eBay) ────
 // Julien : « tout doit être adaptable en fonction de la personne en face ».
 // Jusqu'ici `ebay_tokens` et les lignes `ebay_*` étaient celles de
@@ -215,8 +232,8 @@ function comptesActifs(reg) {
 
 // Range le refresh_token côté serveur, chez CE vendeur, dans la ligne de CE
 // compte eBay (`suffixe` : '' pour le principal).
-async function storeRefresh(refresh, expiresInDays, owner, suffixe = '') {
-  return ecrireLignes([{ id: TOKENS_ID + (suffixe || ''), data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null } }], owner);
+async function storeRefresh(refresh, expiresInDays, owner, suffixe = '', portees = null) {
+  return ecrireLignes([{ id: TOKENS_ID + (suffixe || ''), data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null, portees, refuseLe: null, expireLe: Number.isFinite(expiresInDays) && expiresInDays > 0 ? Date.now() + expiresInDays * 86400000 : null } }], owner);
 }
 
 // L'échange seul (rien n'est rangé) : `{ok, refresh, access, jours}`.
@@ -231,7 +248,7 @@ async function echangerCode(code) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, status: r.status >= 500 ? 502 : r.status, error: 'eBay a refusé l\'échange', detail: (j && (j.error_description || j.error)) || '' };
   if (!j.refresh_token) return { ok: false, status: 502, error: 'eBay n\'a pas renvoyé de refresh_token' };
-  return { ok: true, refresh: j.refresh_token, access: j.access_token || '', jours: j.refresh_token_expires_in ? Math.round(j.refresh_token_expires_in / 86400) : null };
+  return { ok: true, refresh: j.refresh_token, access: j.access_token || '', jours: Number(j.refresh_token_expires_in) > 0 ? Number(j.refresh_token_expires_in) / 86400 : null, portees: typeof j.scope === 'string' ? j.scope.split(/\s+/).filter(Boolean) : null };
 }
 const RANGE_KO = { ok: false, status: 500, reason: 'store-failed', error: 'Jetons reçus mais impossible de les ranger (SUPABASE_SERVICE_KEY manquante ou base injoignable).' };
 
@@ -241,7 +258,7 @@ const RANGE_KO = { ok: false, status: 500, reason: 'store-failed', error: 'Jeton
 async function exchangeCode(code, owner) {
   const e = await echangerCode(code);
   if (!e.ok) return e;
-  const stored = await storeRefresh(e.refresh, e.jours, owner, '');
+  const stored = await storeRefresh(e.refresh, e.jours, owner, '', e.portees);
   if (!stored) return RANGE_KO;
   return { ok: true, status: 200, connected: true };
 }
@@ -281,7 +298,7 @@ async function rangerConnexion(code, owner, opts = {}) {
   // L'écriture des jetons d'abord : un registre écrit sur des jetons perdus
   // annoncerait un compte relié qui ne l'est pas.
   const ranger = async (suffixe, entreesNeuves, compte, nouveau) => {
-    if (!(await storeRefresh(e.refresh, e.jours, owner, suffixe))) return RANGE_KO;
+    if (!(await storeRefresh(e.refresh, e.jours, owner, suffixe, e.portees))) return RANGE_KO;
     if (entreesNeuves) {
       const w = await modifierComptes(owner, (l) => entreesNeuves(l));
       if (w !== true) return { ok: false, status: 502, reason: 'registre-ko', error: 'Le compte eBay est relié, mais je n\'ai pas pu le noter dans la liste de tes comptes — réessaie la connexion.' };
@@ -293,7 +310,7 @@ async function rangerConnexion(code, owner, opts = {}) {
   if (!id) {
     // Le tout premier compte (aucune entrée) : comportement d'avant.
     if (!ajout && entrees.length === 0) {
-      if (!(await storeRefresh(e.refresh, e.jours, owner, ''))) return RANGE_KO;
+      if (!(await storeRefresh(e.refresh, e.jours, owner, '', e.portees))) return RANGE_KO;
       return { ok: true, status: 200, connected: true, compte: { cle: '', pseudo: '', principal: true }, nouveau: !refP };
     }
     return REFUS_IDENTITE;
@@ -417,15 +434,21 @@ async function accessToken(owner, suffixe = '') {
   // droit (comme `sell.finances`) que le jeton actuel n'a pas encore : eBay
   // répond `invalid_scope` et plus RIEN ne se lit. Le nouveau droit s'obtient
   // en se reconnectant (nouveau consentement), pas en le réclamant au refresh.
-  const r = await fetch(EBAY_TOKEN_URL, {
-    method: 'POST',
-    headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.access_token) return { ok: false, status: r.status >= 500 ? 502 : (r.status || 502),
-    reason: 'refresh-failed', error: 'Impossible de rafraîchir le jeton eBay', detail: (j && (j.error_description || j.error)) || '' };
-  return { ok: true, token: j.access_token, expires_in: j.expires_in || null };
+  try {
+    const r = await fetch(EBAY_TOKEN_URL, {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) {
+      const revoque = j && j.error === 'invalid_grant';
+      return { ok: false, status: revoque ? 401 : (r.status >= 500 ? 502 : (r.status || 502)),
+        reason: revoque ? 'revoque' : 'refresh-failed', error: revoque ? 'eBay a refusé ta connexion — reconnecte ce compte.' : 'Impossible de vérifier ta connexion eBay', detail: (j && (j.error_description || j.error)) || '' };
+    }
+    return { ok: true, token: j.access_token, expires_in: j.expires_in || null };
+  } catch (_) { return { ok: false, status: 502, reason: 'refresh-failed', error: 'Impossible de vérifier ta connexion eBay (réseau).' }; }
+
 }
 
 // Range n'importe quelle donnée captée (fusion par id), chez CE vendeur.
@@ -568,6 +591,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
+export { jetonApplication, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

@@ -196,6 +196,7 @@ global.fetch = async (url, opts = {}) => {
       // Le jeton d'accès dépend du refresh_token : c'est ce qui montre QUEL
       // compte eBay sert chaque appel.
       const rt = decodeURIComponent((/refresh_token=([^&]*)/.exec(corps) || [])[1] || '');
+      if (mode.refreshPanne && /grant_type=refresh_token/.test(corps)) return rep({error:'temporarily_unavailable'},503);
       const code = decodeURIComponent((/code=([^&]*)/.exec(corps) || [])[1] || '');
       if (/grant_type=authorization_code/.test(corps)) {
         // Chaque code dit QUEL compte eBay vient de consentir (son jeton d'accès).
@@ -1418,6 +1419,20 @@ const RA = {};
     dit(/ebay=connecte/.test(r3.loc) && jetons(B, 'ebay_tokens') === 'rt-de-B',
       "l'autre sens : le TOUT PREMIER compte d'un vendeur garde le comportement d'avant (principal), même sans identité", r3.loc);
   });
+  await essaie('statut mesuré chez eBay, refus distinct d’une panne', async () => {
+    remettre(); remettreBase();
+    await app(JWT_J,{action:'status'}); // identité principale apprise
+    const tokens=lignes.find(x=>x.owner===J && x.id==='ebay_tokens');
+    tokens.data.refresh_token='rt-mort';
+    const refuse=await app(JWT_J,{action:'status'});
+    dit(refuse.corps.connected===false && refuse.corps.comptes[0].etat==='refuse' && refuse.corps.comptes[0].relie===false, 'jeton présent mais refus invalid_grant : compte refusé, jamais « relié »');
+    tokens.data.refresh_token='rt-de-J'; mode.refreshPanne=true;
+    const avant=JSON.stringify(tokens.data);
+    const panne=await app(JWT_J,{action:'status'});
+    dit(panne.corps.connected===null && panne.corps.comptes[0].etat==='pas-su' && panne.corps.comptes[0].relie===null && JSON.stringify(tokens.data)===avant, 'eBay en panne : état pas su, connexion conservée, jamais « refusé »');
+    remettre(); remettreBase();
+  });
+
   await essaie('multi : principal illisible ⇒ on n\'ajoute pas', async () => {
     remettre(); remettreBase();
     lignes.find((x) => x.owner === J && x.id === 'ebay_tokens').data.refresh_token = 'rt-mort';
