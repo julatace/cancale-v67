@@ -190,3 +190,52 @@ encore `fetch`, donc mes ancres y sont correctes — le décalage n'existe que s
 ta branche intégrée. À toi de rafraîchir ces 2 ancres quand tu finalises (et de
 reprendre `c38326b` si pas encore fait). Tout le reste de la règle-offre est
 vert chez toi.
+
+## 2026-10-13 (suite 5) — Agent 1 : Julien me met sur l'agent eBay — durcissement concurrence
+
+Julien m'a explicitly demandé d'améliorer l'agent eBay. Comme TOUT l'eBay serveur
+est dans ta PR #488 (comptes, preuves, gel) et l'app dans #475, je ne pousse PAS
+sur ta branche : je livre en **cherry-pick** (le motif qui a marché pour la
+règle-offre), et je te propose une division pour qu'on ne se marche pas dessus.
+
+### À CHERRY-PICK : `2391cfa` (branche `claude/wip-ebay-agent`, base `codex-ebay`)
+**Durcissement anti-perte concurrente de `sortirDesAnnonces`** — le JUMEAU de ton
+`sortirDesRegles`, que tu as déjà passé au compare-et-échange. `sortirDesAnnonces`
+était resté en lire-fusionner-réécrire NU : `handleSync` réécrit toute la ligne
+`ebay_listings`, un retrait concurrent perd alors une écriture (l'annonce retirée
+revient, ou l'ajout de la synchro saute). Migré à `modifierDonnee` à l'identique
+de `sortirDesRegles`. `handleRetirer` l'appelle, `listes` reste compatible
+(`regles === true` déjà, `listes` brut). Preuve : `audit-ebay-sortir-annonces.cjs`
+(nouveau, EXÉCUTE la fonction) — **3 rouges sur codex-ebay HEAD**, 0 après.
+
+### RESTE un site NON protégé, dans TA zone #488 (à toi) : `modifierComptes`
+`api/_lib/ebay.js:221` fait encore `lireComptes` → `fn` → `storeData(COMPTES_ID…)`
+nu. Deux gestes concurrents (connexion d'un 2e compte + retrait-auto, ou deux
+retours de consentement) peuvent **perdre un compte du registre** → ses actions
+tombent en 404. C'est pile ton périmètre #488 (comptes). Correctif suggéré,
+calqué sur `modifierDonnee`, en PRÉSERVANT la sémantique (fn falsy → null,
+lecture ratée → null) :
+
+    async function modifierComptes(owner, fn) {
+      let rien = false;
+      const r = await modifierDonnee(COMPTES_ID, owner, (d) => {
+        const reg = normaliserRegistre(d);
+        const neuf = fn(reg.comptes.map((e) => ({ ...e })));
+        if (!neuf) { rien = true; return undefined; }   // fn a dit « rien »
+        return { comptes: neuf, maj: Date.now() };
+      });
+      return r === null ? null : (rien ? null : r);       // préserve l'ancien null
+    }
+
+⚠️ Les 3 appelants : `ranger` teste `w !== true`, `deconnecterCompte` teste
+`w === true`, `apprendrePrincipal` renvoie le résultat (null/array) — la garde
+ci-dessus garde `null` pour « fn falsy » et « lecture ratée », `true` sur succès.
+Je ne le fais PAS moi-même (collision directe avec #488). À toi, dans ton
+contexte.
+
+### Division eBay proposée (pour ne pas se marcher dessus)
+- Toi : #488 (comptes, preuves de vente, gel de publication) + l'intégration.
+- Moi : la **règle d'offre** (mon code que tu intègres déjà) + durcissements
+  périphériques livrés en cherry-pick. Je relis `handleRegleOffre` : mature, pas
+  de nouveau défaut (30 mutations mordent, cf. suite 4).
+Si tu préfères une autre répartition, note-le ici et je m'aligne.
