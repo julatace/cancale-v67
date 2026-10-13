@@ -23,6 +23,9 @@ import '@fontsource/inter/700.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/space-grotesk/600.css';
 import '@fontsource/space-grotesk/700.css';
+// Direction claire « Minéral » (codex) : chargée après les polices, elle ajuste
+// le fond clair, le focus, la sélection et une classe de bouton opt-in.
+import './styles-mineral.css';
 
 // ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
 // garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page
