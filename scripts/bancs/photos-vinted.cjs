@@ -634,6 +634,34 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
     }
 
     const V1512 = { width: 1512, height: 950 };
+    // ── V. VITESSE : mur connu ⇒ plus de requête directe perdue avant chaque photo ──
+    // Julien, 13 octobre : « ça apparaît à certains endroits mais ça prend du
+    // temps à charger ». Chaque vignette tentait le direct (voué à échouer en
+    // CORP) AVANT de demander l'extension. Une fois PROUVÉ, cette session, que
+    // le direct ne passe jamais mais que l'extension réussit, une vignette NEUVE
+    // va droit au secours : zéro requête directe de plus au CDN (dest=image),
+    // et l'affichage ne paie plus l'échec direct. Les requêtes du SECOURS, elles,
+    // atteignent le CDN hors page (dest='') — on ne compte QUE les directes.
+    console.log('\n── V. mur connu : un écran neuf ne retente plus le direct — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('V', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true });
+      // 1) Un premier écran établit le mur (direct échoue, l'extension réussit).
+      await ouvrir(pg, 'plat_vinted', 6000);
+      await versPhotos(pg);
+      let m = await mesurer(pg);
+      dit(m.ecran >= 2 && m.affichees === m.ecran, 'V : le premier écran affiche ses photos (par le secours)', detail(m));
+      // 2) Mur établi : journal du CDN remis à zéro, puis un écran NEUF.
+      cdnEtat.vues = [];
+      await section(pg, 'annonces', 6000);
+      await versPhotos(pg);
+      m = await mesurer(pg);
+      const directes = cdnEtat.vues.filter((v) => v.dest === 'image').length;
+      dit(m.ecran >= 2 && m.affichees === m.ecran, 'V : l’écran neuf affiche ses photos (par le secours)', detail(m));
+      dit(directes === 0, 'V : mur connu ⇒ AUCUNE requête directe au CDN pour les photos de l’écran neuf', `${directes} requête(s) directe(s) au CDN`);
+      dit(errs.length === 0, 'V : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
     // ── G. Des liens morts, l'extension rend les autres ───────────────────────
     // TROIS refusées (le seuil de la phrase) : c'est la photo récupérée par
     // l'extension À L'ÉCRAN qui doit la faire taire, pas le nombre.

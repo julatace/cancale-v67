@@ -232,6 +232,25 @@ function toutNotifier() {
 // ── Ce qu'un composant appelle ──────────────────────────────────────────────
 export function etat(url) { const e = entrees.get(url); return e ? e.etat : 'natif'; }
 export function blobDe(url) { const e = entrees.get(url); return (e && e.blob) || null; }
+// ── LE MUR CONNU : on saute la tentative directe quand elle est VAINE ────────
+// Ce navigateur n'a JAMAIS chargé une photo Vinted en direct cette session, et
+// l'extension, elle, y arrive au moins une fois : re-tenter le direct à chaque
+// vignette n'ajoute qu'une requête PERDUE au CDN avant le secours, et c'est ce
+// qui fait « ça prend du temps » (Julien, 13 octobre). On demande alors le
+// secours tout de suite. Zéro requête de plus à l'extension (le secours aurait
+// eu lieu de toute façon), et MOINS de charge sur le CDN.
+// Auto-correcteur : le témoin teste toujours le direct ; dès qu'un chargement
+// direct repasse (`chargeNatif` → `vus.okNatif`), `murNatif()` redevient faux et
+// on retente le direct d'abord. Mesuré « sans échec direct » ⇒ jamais ce mur.
+export function murNatif() { return vus.okNatif.size === 0 && vus.secoursOk.size > 0; }
+// L'état de DÉPART d'une photo au premier rendu (avant toute entrée) : « attente »
+// — donc on ne dessine pas un <img> direct voué à échouer — quand le mur est connu
+// et que l'extension est là ; « natif » sinon (on doit encore tester le direct).
+export function etatRendu(url) {
+  const e = entrees.get(url);
+  if (e) return e.etat;
+  return (secoursIci() === 'oui' && murNatif()) ? 'attente' : 'natif';
+}
 // L'extension peut-elle encore essayer CETTE photo, sans signal neuf ?
 const secourable = (e) => !e.refus && e.delais < MAX_DELAIS;
 // Morte = elle ne s'affichera pas ICI sans signal neuf : le secours a échoué,
@@ -266,6 +285,13 @@ export function monter(url, fn) {
   e.refs++;
   if (fn) e.abonnes.add(fn);
   toucher(url);
+  // Mur connu (ci-dessus) : une vignette NEUVE part directement en « attente »
+  // (le secours), sans tenter le direct voué à échouer. Seulement une entrée
+  // vierge (aucun échec, aucun chargement direct, aucun blob) : on ne touche
+  // jamais une photo qui a déjà une histoire.
+  if (e.etat === 'natif' && !e.echecAt && !e.natifOk && !e.blob && secoursIci() === 'oui' && murNatif()) {
+    e.etat = 'attente';
+  }
   // Une photo perdue qu'on RE-montre plus d'une minute après son échec : un
   // nouvel essai (219150e réessayait à CHAQUE affichage ; ici, une fois par minute).
   // Une photo que l'extension avait rendue sans octets lui est REDEMANDÉE si
