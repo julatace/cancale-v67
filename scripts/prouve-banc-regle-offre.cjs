@@ -94,13 +94,13 @@ const MUTATIONS = [
   // la ligne du haut la compte de nouveau parmi les « pas encore lues » (et propose « Relire »).
   ['offres-inconnues-ligne', [['  const nPasLueRegle = pasSuRegle.length - offresInconnuesRegle.length;', '  const nPasLueRegle = pasSuRegle.length;']], [15], { exiges: [/ne propose plus « Relire chez eBay »/], interdits: [/ne renvoie PAS relire/] }],
   // « Une règle pour toutes » la remet « à relire d'abord ».
-  ['offres-inconnues-lot', [["    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay' };\n", '']], [15], { exiges: [/elle n'est ni « à relire d'abord »/] }],
+  ['offres-inconnues-lot', [["    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas' };\n", '']], [15], { exiges: [/elle n'est ni « à relire d'abord »/] }],
   // la garde repart à « inconnu » sur un seuil relu (le 409 « eBay a déjà une règle » sans fin).
   ['attendu-inconnu', [["const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune' || (et.etat === 'pas-su' && et.raison === 'offres-inconnues')) && et.lu)", "const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune') && et.lu)"]], [15], { exiges: [/le panneau montre le seuil LU/] }],
   // une issue « à revoir » de nouveau cachée dès que le montant de la ligne change.
   ['issue-a-revoir', [["    const r = r0 && (r0.issue === 'a-revoir' || (l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil))) ? r0 : null;", '    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;']], [15], { exiges: [/chaque ligne affiche son issue/], interdits: [/la carte ET le champ Prix de ✏️/] }],
   // une relecture RATÉE reposée localement par-dessus ce que VRM savait.
-  ['relire-ratee-locale', [["            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);", "            if (l && typeof l === 'object' && (l.lu === true || (l.raison && l.raison !== 'pas-sur-ce-compte' && l.raison !== 'pas-su'))) surRegle(ref + ':' + id, l);"]], [15], { exiges: [/la relecture de A4 rate/] }],
+  ['relire-ratee-locale', [["            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l, Number.isFinite(Number(l.prix)) ? Number(l.prix) : undefined);", "            if (l && typeof l === 'object' && (l.lu === true || (l.raison && l.raison !== 'pas-sur-ce-compte' && l.raison !== 'pas-su'))) surRegle(ref + ':' + id, l, Number.isFinite(Number(l.prix)) ? Number(l.prix) : undefined);"]], [15], { exiges: [/la relecture de A4 rate/] }],
   // ── Revue du 11 octobre, tour 3 ──
   // la relecture des ventes à l'ouverture ne compte que les règles « connues » (le filtre brut d'avant).
   ['ventes-relues-brut', [['    const avecRegle = reglesEngagees([...parRef.values()]).refs;', "    const avecRegle = new Set([...regles.map].filter(([, e]) => e && e.lu === true && e.accepte != null && e.offresActives === true).map(([k]) => k.slice(0, k.lastIndexOf(':'))));"]], [16], { exiges: [/ses ventes eBay sont relues à l'ouverture/] }],
@@ -128,6 +128,15 @@ const MUTATIONS = [
   ['planif-vend', [["      ? `\\n${avecOffre.length} avec une règle d'offre — dès la mise en ligne, toute offre égale ou supérieure au montant ${OFFRE_VEND_LA_PAIRE} :`", "      ? `\\n${avecOffre.length} avec une règle d'offre — eBay acceptera seul les offres dès :`"]], null, { banc: 'ebay-programmer.cjs', exiges: [/la feuille du lot dit qu'une offre acceptée par eBay VEND la paire/] }],
   // (la publication, banc ebay-form) la ligne de la règle ignore la lecture.
   ['publie-pas-relue', [["  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: o.lecture || null,", "  const res = resultatRegleOffre({ code: 200, j: { ok: true, verifie: o.verifie, lecture: null,"]], null, { banc: 'ebay-form.cjs', exiges: [/publiée avec une règle, seuil relu sans l'état des offres/] }],
+  // (tour 4, #7) « Relire chez eBay » ne propage plus le prix relu : prix-change
+  //   ne se lève jamais quand la liste est en retard.
+  ['relire-sans-prix', [["            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l, Number.isFinite(Number(l.prix)) ? Number(l.prix) : undefined);", "            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);"]], [18], { exiges: [/« Relire chez eBay » le LÈVE/] }],
+  // (tour 4, #9.2) la branche offres-inconnues ne porte plus offresFaites : le
+  //   panneau ne prévient plus qu'une offre déjà faite peut être acceptée.
+  ['offres-inconnues-sans-faites', [["  if (avaitRegle && e.offresActives == null) return { etat: 'pas-su', raison: 'offres-inconnues', risque: true, offresFaites, lu };", "  if (avaitRegle && e.offresActives == null) return { etat: 'pas-su', raison: 'offres-inconnues', risque: true, lu };"]], [18], { exiges: [/offresFaites porté/] }],
+  // (tour 4, #11) une pose non notée (range:false) redevient « connue » locale :
+  //   la carte ment (la base ne la porte pas) et renvoie vers un bouton absent.
+  ['nonnote-connue', [["  if (res && res.nonNote && res.issue !== 'a-revoir') return { entree: { lu: false, raison: 'apres-ecriture', lueA: Date.now() }, prix };\n", '']], [8], { exiges: [/posée mais pas notée/] }],
 ];
 
 function copier(dest) {
