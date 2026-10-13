@@ -40,7 +40,7 @@ async function brancher(p){
       selection=selection.map(x=>{
         const out={...x,cap:maintenant,updated_at:maintenant};
         for(const champ of select.split(',')){
-          const m=/^([^:]+):data->(.+)$/.exec(champ);if(!m)continue;
+          const m=/^([^:]+):data->>?(.+)$/.exec(champ);if(!m)continue;
           let v=x.data;for(const cle of m[2].split(/->>?/))v=v==null?undefined:v[cle];
           out[m[1]]=v;
         }return out;
@@ -76,7 +76,7 @@ async function brancher(p){
       check(geometrie.nav.bottom<=844.5&&geometrie.main.bottom<=geometrie.nav.top+.5,largeur+' '+tab+' navigation hors du contenu');
       if(tab==='cat_ventes'){
         await p.locator('.vrm-sale-row').first().waitFor();
-        check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===88,largeur+' photo de vente agrandie');
+        check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===64,largeur+' photo de vente compacte');
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');

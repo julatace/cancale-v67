@@ -29,6 +29,7 @@
 import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';
+import { lirePhoto } from './_lib/photos.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -840,6 +841,20 @@ async function fermerCompte(req, res) {
   return repondre(res, ok ? 200 : 502, { ok, etapes, message });
 }
 
+// La session est vérifiée avant toute lecture du CDN.
+async function photo(req, res) {
+  const vendeur = await vendeurExige(req,res);
+  if (!vendeur) return;
+  const corps = await lireCorpsJson(req);
+  const r = await lirePhoto(corps && corps.url);
+  if (r.status!==200) return repondre(res,r.status,{erreur:'photo indisponible'});
+  res.setHeader('Content-Type',r.type);
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Cache-Control','private, max-age=3600');
+  res.setHeader('Vary','Authorization');
+  return res.status(200).send(r.octets);
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -858,6 +873,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
