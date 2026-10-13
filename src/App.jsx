@@ -11712,7 +11712,12 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         // (`verifie:false`), ou quand la règle part avec une programmée (pas
         // encore relue). On ne garde que ce qui demande une suite (`!ok`).
         const mo = j.offre ? messageOffreCreation(j.offre, (j.offre && j.offre.envoyee) || {}) : null;
-        bilan.programmees.push({ d: l.d, debut: j.debut, enLigne, regleMsg: mo && !mo.ok ? mo.msg : '' });
+        // On ne surface QUE ce qui demande une suite : eBay a changé/abandonné
+        // la règle (ecart) ou n'en montre pas l'activation (offres-inconnues).
+        // « non-relu » (programmée-pour-plus-tard : la règle part, pas encore
+        // relue) est le cas NORMAL — la carte le dira ; le répéter par annonce
+        // dans le bilan serait la même phrase N fois (§7).
+        bilan.programmees.push({ d: l.d, debut: j.debut, enLigne, regleMsg: mo && !mo.ok && mo.issue !== 'non-relu' ? mo.msg : '' });
         await modifierBrouillonsEbay((items) => { if (items[l.d.id]) items[l.d.id] = { ...items[l.d.id], etatBrouillon: enLigne ? 'en-ligne' : 'programmee', programme: { itemId: j.itemId, debut: j.debut || null, fin: j.fin || null, demande: l.h.utc || null, sku: l.sku, enLigneMaintenant: !!j.enLigneMaintenant, at: Date.now(), compte: compteLot, pseudo: plusieursPub ? nomCompteLot : '' }, ...(plusieursPub ? { compte: compteLot } : {}), envoi: { ok: true, at: Date.now() } }; return items; });
       } else if (repris || incertain(r)) {
         // ⚠️ Un REFUS au second essai (frais, vérification, liste illisible)
@@ -12158,7 +12163,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     // (11 octobre, revue) Seuil RELU, offres activées ou non pas montré : une
     // relecture rendrait la même chose (`seRelitChezEbay`) — le geste est de
     // regarder l'annonce sur eBay, pas de « la relire d'abord ».
-    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay' };
+    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas' };
     // ⚠️ (11 octobre, revue — tour 3) Seules les raisons qu'une relecture CHEZ
     // eBAY lève sont « à relire » (`seRelitChezEbay`, la règle de la ligne du
     // haut, §11). Notre propre lecture ratée proposait « Relire ces 9 annonces
