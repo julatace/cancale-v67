@@ -1,6 +1,7 @@
 // Banc : aucun écran vide, aucun débordement horizontal, aucune erreur.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -12,7 +13,7 @@ const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts');
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')]; const txn=FX('txn');
+const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')]; const txn=FX('txn');
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
 // ⚠️ SANS ÇA, CE BANC MESURE UNE FICTION. Il rendait la ligne BRUTE
 // (`{id,data}`) pour une requête qui demande une projection
@@ -80,6 +81,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       if (t3 === 'image' || t3 === 'media' || t3 === 'font') return r3.abort();
       return r3.continue();
     });
+    // 11 oct. : quand une photo Vinted ne s'affiche pas, l'app SONDE le CDN
+    // (une requête `fetch`, pas une image — src/photosVinted.js). Les fixtures
+    // portent de vraies adresses : le CDN de Vinted est coupé en entier.
+    await pg.route('**://*.vinted.net/**', (r4) => r4.abort());
     await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});

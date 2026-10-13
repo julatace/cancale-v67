@@ -68,12 +68,12 @@ function extraire(src, nom, quoi) {
 }
 
 // ── LES RÈGLES DE L'APP ──────────────────────────────────────────────────────
-const NOMS_APP = ['cleNum', 'refVRMDe', 'NUM_OK', 'lbcAnnulee', 'motsDeTitre', 'pointureDe', 'suggestionsPaires',
+const NOMS_APP = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'motsDeTitre', 'pointureDe', 'suggestionsPaires',
   'numDeTitreLbc', 'clesAnnonceLbc', 'comptesLbcProuves', 'annonceLbcALui', 'doublesVenteLbc'];
 const srcApp = NOMS_APP.map((n) => extraire(APP, n, 'App.jsx')).join('\n');
 const ctxApp = {};
 vm.createContext(ctxApp);
-essaie('les règles de l\'app se chargent', () => vm.runInContext(srcApp + `\n;this.R = { cleNum, suggestionsPaires, clesAnnonceLbc, comptesLbcProuves, annonceLbcALui, doublesVenteLbc };`, ctxApp));
+essaie('les règles de l\'app se chargent', () => vm.runInContext('const load = (k, d) => d;\n' + srcApp + `\n;this.R = { cleNum, suggestionsPaires, clesAnnonceLbc, comptesLbcProuves, annonceLbcALui, doublesVenteLbc };`, ctxApp));
 const R = ctxApp.R || {};
 
 // ── LES RÈGLES DE L'EXTENSION ────────────────────────────────────────────────

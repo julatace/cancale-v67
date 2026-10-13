@@ -20,6 +20,7 @@
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
+import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
@@ -33,6 +34,7 @@ import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessTok
 const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
 const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
 const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
+import { numeroExterne } from './_lib/numerotation.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -72,7 +74,8 @@ const skuDe = (numero) => { const c = cleNum(numero); return (c && NUM_OK.test(c
 // N°30 (il a pu le retaper dans le Seller Hub). Comparer la chaîne brute
 // laissait programmer — ou publier — une seconde annonce pour la même paire.
 const numDeSku = (sku) => { const m = /^\s*VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})\s*$/i.exec(String(sku == null ? '' : sku)); const c = m ? cleNum(m[1]) : ''; return c && NUM_OK.test(c) ? c : ''; };
-const memePaire = (skuLu, sku) => { const n = numDeSku(skuLu); return !!n && n === numDeSku(sku); };
+// (`memePaire` est retiré : deux SKU se comparent par le N° QU'ILS DÉSIGNENT,
+// lu avec le marqueur de la remise à zéro — `numeroExterne`, dans `dejaChezEbay`.)
 // Une écriture chez eBay SANS <Ack> (réseau coupé, passerelle 5xx en HTML) :
 // eBay n'a rien dit de ce qu'il a fait ⇒ « incertain », jamais « refusé ».
 // Mesuré (revue du 6 octobre) : un 503 HTML APRÈS création de l'annonce était
@@ -173,6 +176,7 @@ function extraireItem(blk) {
     itemId: g('ItemID'),
     title: g('Title'),
     price: g('CurrentPrice') || g('BuyItNowPrice') || g('StartPrice'),
+    currency:(/<(?:CurrentPrice|BuyItNowPrice|StartPrice)[^>]*currencyID=["']([A-Z]{3})["']/.exec(blk) || [])[1] || null,
     qty: g('QuantityAvailable') || g('Quantity'),
     vendus: g('QuantitySold'),
     vues: wc,
@@ -298,27 +302,18 @@ function montantXmlLu(src, t) {
   const n = Number(String(m[2]).trim());
   return { v: Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN, dev: ((/currencyID="([A-Z]{3})"/.exec(m[1] || '') || [])[1]) || '' };
 }
-function lectureRegleDe(xml, itemId, t0) {
-  const b0 = (/<Item>([\s\S]*)<\/Item>/.exec(String(xml || '')) || [])[1];
-  if (b0 == null) return null;
-  const blk = b0.replace(/<Variations>[\s\S]*?<\/Variations>/g, '');
-  if (lireBalise(blk, 'ItemID') !== String(itemId)) return null;
-  const ss = conteneur(blk, 'SellingStatus') || '', ld = conteneur(blk, 'ListingDetails') || '', bo = conteneur(blk, 'BestOfferDetails');
-  // ⚠️ Jamais `BuyItNowPrice` comme prix : sur une annonce à prix fixe, eBay le
-  //    rend souvent à 0.0.
-  let p = montantXmlLu(ss, 'CurrentPrice'); if (p.v == null) p = montantXmlLu(blk, 'StartPrice');
-  if (p.v == null || Number.isNaN(p.v) || !(p.v > 0)) return null;     // pas de prix : réponse incomplète
-  const a = montantXmlLu(ld, 'BestOfferAutoAcceptPrice'), r = montantXmlLu(ld, 'MinimumBestOfferPrice');
-  if (Number.isNaN(a.v) || Number.isNaN(r.v)) return null;
-  const en = bo == null ? null : (/<BestOfferEnabled>\s*true\s*<\/BestOfferEnabled>/i.test(bo) ? true : (/<BestOfferEnabled>\s*false\s*<\/BestOfferEnabled>/i.test(bo) ? false : null));
-  // BestOfferCount = le TOTAL des offres faites sur l'objet (doc eBay), jamais
-  // « celles en attente » : l'écran ne le présente pas autrement.
-  const nb = bo == null ? null : (/<BestOfferCount>\s*(\d+)\s*<\/BestOfferCount>/.exec(bo) || [])[1];
-  const deviseAnnonce = p.dev || lireBalise(blk, 'Currency') || '';
-  return {
-    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Number.isFinite(t0) ? t0 : Date.now() },
-    annonce: { prix: p.v, devise: deviseAnnonce, type: lireBalise(blk, 'ListingType'), statut: lireBalise(ss, 'ListingStatus'), sku: lireBalise(blk, 'SKU') },
-  };
+function lectureRegleDe(xml,itemId,t0){
+ const item=lireXmlEbay(xml,'GetItem')?.Item;
+ const text=v=>v && typeof v==='object'?String(v['#text'] ?? ''):String(v ?? '');
+ if(!item || text(item.ItemID)!==String(itemId))return null;
+ const amount=v=>v==null?{v:null,dev:''}:{v:text(v).trim() && Number.isFinite(Number(text(v)))?Math.round(Number(text(v))*100)/100:NaN,dev:typeof v==='object'?v['@_currencyID'] || '':''};
+ const ss=item.SellingStatus || {},ld=item.ListingDetails || {},bo=item.BestOfferDetails;
+ let price=amount(ss.CurrentPrice);if(price.v==null)price=amount(item.StartPrice);
+ const accept=amount(ld.BestOfferAutoAcceptPrice),refuse=amount(ld.MinimumBestOfferPrice);
+ if(!(price.v>0) || Number.isNaN(accept.v) || Number.isNaN(refuse.v))return null;
+ const enabled=text(bo?.BestOfferEnabled).toLowerCase(),count=text(bo?.BestOfferCount);
+ const currency=price.dev || text(item.Currency);
+ return {lecture:{lu:true,offresActives:enabled==='true'?true:enabled==='false'?false:null,accepte:accept.v,refuse:refuse.v,devise:accept.dev || refuse.dev || currency,prix:price.v,offresFaites:/^\d+$/.test(count)?Number(count):null,lueA:Number.isFinite(t0)?t0:Date.now()},annonce:{prix:price.v,devise:currency,type:text(item.ListingType),statut:text(ss.ListingStatus),sku:text(item.SKU)}};
 }
 // GetItem SANS DetailLevel ni OutputSelector : la doc dit que les seuils sont
 // rendus dès « DetailLevel none » ; un OutputSelector mal écrit rendrait une
@@ -514,19 +509,20 @@ async function handleRegleOffre(b, ctx) {
       + (P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
   }
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', inner);
-  const rangerPost = (post, raisonKo) => rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'regle', _force: true } : { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });
+  const lectureApres=(post,raison)=>post.ok && memeRegle(post.lecture,demande,P)===true?post.lecture:{lu:false,raison,lueA:Date.now(),observee:post.ok?post.lecture:null};
+  const rangerPost=(post,raison)=>rangerReglesOffre(ctx,{[itemId]:{...lectureApres(post,raison),par:'regle',_force:true}});
   if (r.ok) {
     const post = await relireApres(at.token, itemId, demande, P);
     const range = await rangerPost(post, 'apres-ecriture');
     if (!post.ok) return { status: 200, body: { ok: true, verifie: null, lecture: null, avertissements: r.avertissements, erreurs: r.erreurs, range } };
-    return { status: 200, body: { ok: true, verifie: memeRegle(post.lecture, demande, P), lecture: post.lecture, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
+    return { status: 200, body: { ok: true, verifie: memeRegle(post.lecture, demande, P), lecture: lectureApres(post,'apres-ecriture'), avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
   }
   if (sansAck(r) || classeEchec(r) === 'incertain') {
     // Pas de réponse claire, ou panne d'eBay : il a peut-être écrit. On relit.
     const post = await relireApres(at.token, itemId, demande, P);
     const range = await rangerPost(post, 'incertain');
     if (post.ok && memeRegle(post.lecture, demande, P) === true) return { status: 200, body: { ok: true, verifie: true, apresIncertain: true, lecture: post.lecture, avertissements: r.avertissements || [], range } };
-    if (post.ok) return { status: 504, body: { ok: false, reason: 'incertain', lecture: post.lecture, erreurs: r.erreurs, range, error: `eBay n'a pas répondu clairement. L'annonce montre aujourd'hui : ${etatEnClair(post.lecture)}. Relis-la dans un moment avant de recommencer.` } };
+    if (post.ok) return { status: 504, body: { ok: false, reason: 'incertain', lecture: lectureApres(post,'incertain'), erreurs: r.erreurs, range, error: `eBay n'a pas répondu clairement. L'annonce montre aujourd'hui : ${etatEnClair(post.lecture)}. Relis-la dans un moment avant de recommencer.` } };
     return { status: 504, body: { ok: false, reason: 'incertain', erreurs: r.erreurs, range, error: 'eBay n\'a pas répondu clairement — je ne sais pas si la règle est posée. « Relire chez eBay » avant de recommencer.' } };
   }
   // RequestError : la requête est refusée, rien n'est appliqué. Une relecture
@@ -613,12 +609,12 @@ async function handleRevise(b, ctx) {
   }
   if (!prixChange) return { status: 200, body: { ok: true, ack: r.ack } };
   const post = await lireRegleOffre(at.token, itemId);
-  await rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'revise', _force: aRegle } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'revise', _force: aRegle } });
+  await rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'revise', _force: aRegle } : (!aRegle && avant?.lu===true?{...avant,par:'revise'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'revise',_force:aRegle}) });
   return { status: 200, body: { ok: true, ack: r.ack, avertissements: r.avertissements, erreurs: r.erreurs,
     regle: {
       lecture: post.ok ? post.lecture : null,
       // « pas su » ne devient jamais « pas tombée ».
-      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),
+      tombee: aRegle ? (post.ok ? (avant.accepte!=null && post.lecture.accepte==null) || (avant.refuse!=null && post.lecture.refuse==null) : null) : ((avant && avant.lu === true) ? false : null),
       avant: aRegle ? { accepte: avant.accepte, refuse: avant.refuse } : null,
     } } };
 }
@@ -804,20 +800,41 @@ async function comptesAVerifier(ctx, tokenCourant) {
   }
   return { ok: true, liste };
 }
-async function dejaChezEbay(ctx, tokenCourant, sku, verbe) {
+async function dejaChezEbay(ctx, tokenCourant, sku, verbe, mk) {
   const v = await comptesAVerifier(ctx, tokenCourant);
   if (!v.ok) return v.err;
   const plusieurs = v.liste.length > 1;
+  const voulu=numDeSku(sku);
+  const meme=x=>!!voulu && numeroExterne(numDeSku(x.sku),x.itemId,'ebayAnnonces',null,mk)===voulu;
   for (const { compte, token } of v.liste) {
     const ou = plusieurs && nomCompte(compte) ? ` (compte eBay ${nomCompte(compte)})` : '';
     const L = await listeVendeur(token);
     if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE } };
     if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` } };
-    const prog = L.programmees.find((x) => memePaire(x.sku, sku));
+    const prog = L.programmees.find(meme);
     if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${ou}${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
-    const act = L.actives.find((x) => memePaire(x.sku, sku));
+    const act = L.actives.find(meme);
     if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), error: `La paire ${sku} est déjà en vente sur eBay${ou} — rien n'a été ${verbe}.` } };
   }
+  return null;
+}
+// LA NUMÉROTATION DE CE VENDEUR (migration 013), relue au moment d'écrire chez
+// eBay. Trois états : `{ok:true, mk:null}` aucune remise à zéro · `{ok:true, mk}`
+// · `{ok:false}` pas su (on n'écrit rien : la paire « 22 » n'a pas le même sens
+// avant et après la coupure).
+async function numerotationVendeur(owner) {
+  const t = await lireReglageVendeur('vrm_numerotation', owner);
+  if (t === undefined) return { ok: false };
+  if (!t) return { ok: true, mk: null };
+  try { const o = JSON.parse(t); return o && typeof o === 'object' && !Array.isArray(o) ? { ok: true, mk: o } : { ok: false }; } catch (_) { return { ok: false }; }
+}
+// Un écran ouvert AVANT la remise à zéro publie sous ses numéros d'avant
+// (« 553 », devenu 3) : le SKU désignerait une AUTRE paire. L'app envoie la
+// version de numérotation qu'elle a lue ; celle de la base fait foi.
+function numerotationRefus(b, num) {
+  if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+  const v = num.mk && Number.isFinite(Number(num.mk.version)) ? Number(num.mk.version) : null;
+  if (v != null && Number(b.numerotation) !== v) return { status: 409, body: { ok: false, reason: 'numerotation-perimee', error: 'Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le — rien n\'a été envoyé à eBay.' } };
   return null;
 }
 async function handlePublish(b, ctx) {
@@ -828,6 +845,8 @@ async function handlePublish(b, ctx) {
   const ro = regleDeItem(it0);
   if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
   const it = { ...s.item, regleOffre: ro.regle };
+  let num={ok:true,mk:null};
+  if(it.sku){num=await numerotationVendeur(ctx.owner);const ref=numerotationRefus(b,num);if(ref)return ref;}
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE (la règle de `programmer`, 6 octobre). Publier
@@ -835,7 +854,7 @@ async function handlePublish(b, ctx) {
   // soir, repartait en seconde annonce (prouvé : deux annonces VRM-30). Relue
   // chez eBay, en ligne ET programmées ; sans SKU, rien à comparer.
   if (it.sku) {
-    const deja = await dejaChezEbay(ctx, at.token, it.sku, 'publié');
+    const deja = await dejaChezEbay(ctx, at.token, it.sku, 'publié', num.mk);
     if (deja) return deja;
   }
   const r = await tradingAddFixedPriceItem(at.token, it);
@@ -945,11 +964,13 @@ async function handleProgrammer(b, ctx) {
   const fraisVus = typeof b.fraisVus === 'number' ? b.fraisVus : NaN;
   if (!(Number.isFinite(fraisVus) && fraisVus >= 0)) return { status: 400, body: { ok: false, reason: 'frais-vus', error: 'Vérifie d\'abord les frais : rien n\'a été envoyé.' } };
   const it = { ...s.item, regleOffre: ro.regle, scheduleTime: quand };
+  const num=await numerotationVendeur(ctx.owner);
+  {const ref=numerotationRefus(b,num);if(ref)return ref;}
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant, sur TOUS ses
   // comptes (une liste INCOMPLÈTE ne prouve pas l'absence : on ne programme pas).
-  const deja = await dejaChezEbay(ctx, at.token, it.sku, 'envoyé');
+  const deja = await dejaChezEbay(ctx, at.token, it.sku, 'envoyé', num.mk);
   if (deja) return deja;
   // ── LES FRAIS, revérifiés juste avant (sans UUID). ──
   const v = await tradingVerifyAddFixedPriceItem(at.token, it);
@@ -1149,6 +1170,17 @@ async function handleSku(b, ctx) {
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const sku = skuDe(b.numero);
   if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible (125, ou B125) : rien n\'a été envoyé à eBay.' } };
+  // (relecture du 11 octobre) Une annonce qui portait « VRM-12 » à la remise à
+  // zéro désigne l'ANCIENNE paire B12 tant qu'elle porte ce SKU. La relier à la
+  // NOUVELLE 12 réécrirait le MÊME texte : rien ne permettrait plus de les
+  // distinguer, et le retrait automatique terminerait l'annonce d'une paire
+  // qu'il a encore (ou celle d'une autre). On refuse, et on dit pourquoi.
+  { const num = await numerotationVendeur(ctx.owner);
+    if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+    const voulu = numDeSku(sku);
+    if (num.mk && /^\d+$/.test(voulu) && numeroExterne(voulu, itemId, 'ebayAnnonces', null, num.mk) !== voulu) {
+      return { status: 409, body: { ok: false, reason: 'numero-ambigu', error: `Cette annonce eBay portait déjà « ${sku} » à la remise à zéro de tes numéros : elle désigne l'ANCIENNE paire. Pour la nouvelle ${voulu}, termine cette annonce et republie la paire — rien n'a été envoyé à eBay.` } };
+    } }
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', `<Item><ItemID>${itemId}</ItemID><SKU>${esc(sku)}</SKU></Item>`);
@@ -1266,11 +1298,20 @@ async function handleRetirer(b, ctx) {
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const auto = b.auto === true;
   const skuAttendu = String(b.sku || '').trim();
+  let marqueur = null;
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
     const v = await lireReglageVendeur('vrm_ebay_retrait_auto', ctx.owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
+    // La remise à zéro des numéros (migration 013) : l'annonce qui portait un
+    // ancien numéro à la coupure parle de l'ANCIENNE paire. Le marqueur est relu
+    // chez CE vendeur ; illisible ⇒ rien n'est retiré (pas su ne vaut pas
+    // « aucune coupure » : la vente de la nouvelle 230 retirerait l'annonce de
+    // l'ancienne 230).
+    const mkTxt = await lireReglageVendeur('vrm_numerotation', ctx.owner);
+    if (mkTxt === undefined) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+    if (mkTxt) { try { marqueur = JSON.parse(mkTxt); } catch (_) { return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Ta numérotation est illisible — rien n\'a été envoyé à eBay.' } }; } }
   }
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
@@ -1278,7 +1319,8 @@ async function handleRetirer(b, ctx) {
     const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
     if (g.status === 0 || !g.ok) return { status: 503, body: { ok: false, reason: 'sku-pas-su', error: 'eBay n\'a pas dit quelle paire porte cette annonce — rien n\'a été retiré.' } };
     const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
-    if (!memePaire(skuEbay, skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
+    const lu = numeroExterne(numDeSku(skuEbay), itemId, 'ebayAnnonces', null, marqueur);
+    if (!lu || lu !== numDeSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
   }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
@@ -1583,6 +1625,8 @@ async function handleCallback(req, res) {
 }
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
+const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
+
 async function handleApp(req, res) {
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: keysReady(), canConsent: canConsent(), env: 'production' });
@@ -1675,6 +1719,16 @@ async function handleApp(req, res) {
     // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
     // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
+      commande:(ctx)=>gestionEbay.commande(b,ctx),
+      transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
+      expedier:(ctx)=>gestionEbay.expedier(b,ctx),
+      messageacheteur:(ctx)=>gestionEbay.contacterAcheteur(b,ctx),
+      messages:(ctx)=>gestionEbay.messages(b,ctx),
+      repondre:(ctx)=>gestionEbay.repondre(b,ctx),
+      offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
+      repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
+      modifierannonce:(ctx)=>gestionEbay.modifierAnnonce(b,ctx),
+      terminerannonce:(ctx)=>gestionEbay.terminerAnnonce(b,ctx),
       sync: (ctx) => handleSync(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),

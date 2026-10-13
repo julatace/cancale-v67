@@ -23,7 +23,10 @@ const NUMS = {
 const DETAILS = { '111': { description:'Basket Nike', photos:['https://img.example/1.jpg','https://img.example/2.jpg','https://img.example/3.jpg'] } };
 const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // Annonces captées : 111 active (is_closed=false), 222 fermée (vendue).
-const LISTINGS = { data:{ payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
+// Un dressing capté porte TOUJOURS sa date (`storeHarvest` la pose) : sans elle,
+// la règle « en ligne » (11 octobre) ne peut pas dire de quand date la lecture,
+// et la paire passe « à confirmer » (§6.3 : servir la forme réelle).
+const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 // Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
 const envoisEbay = []; let avertir = false;

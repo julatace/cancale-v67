@@ -236,7 +236,9 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('la saisie se valide sur Entrée ou à la sortie du champ')
     : nok('la saisie se valide sur Entrée ou à la sortie du champ');
   // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.
-  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n \}\); recordUsed\(n\); return; \}/.test(SRC)
+  // (10 octobre) la pose porte aussi sa date (`manuelAt`, migration 013) : la
+  // RÈGLE est que l'écriture vient après les contrôles, pas son orthographe.
+  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n(, manuelAt)? \}\); recordUsed\(n\);( await demanderPrixAchat\(item, n\);)? return; \}/.test(SRC)
     ? ok('le numéro n\'est écrit qu\'après les contrôles de collision')
     : nok('le numéro n\'est écrit qu\'après les contrôles de collision');
 }
@@ -398,8 +400,13 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('les numéros déjà posés sur des ventes sont indexés par identité',
           '`numVentesParIdentite` absent : une annonce captée après sa vente prendra un numéro neuf');
 
-  const i = SRC.indexOf('let num = numVentesParIdentite');
-  i >= 0
+  // (10 octobre) le numéro réutilisé passe d'abord par `numeroReprenable` (un
+  // numéro d'archive ne se redonne jamais) : la règle — la vente AVANT le neuf —
+  // est la même. On exige que la réutilisation précède `prochainLibre`.
+  const mi = /let num = (numeroReprenable\()?numVentesParIdentite/.exec(SRC);
+  const i = mi ? mi.index : -1;
+  const neuf = i >= 0 ? SRC.indexOf('if (!num) num = prochainLibre(', i) : -1;
+  i >= 0 && neuf > i && neuf - i < 2000
     ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
     : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
           'la réutilisation par vente ne passe pas avant l\'attribution');

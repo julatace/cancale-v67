@@ -232,12 +232,18 @@ console.log('\n── ET « CITÉE DANS UNE TRANSACTION » N\'EST PAS « VENDUE 
       try {
         const c = { console: { log() {} } }; vm.createContext(c);
         // On sert des lignes en mémoire : la règle est jugée sur ce qu'elle REND.
+        // (11 octobre, 5.167) La preuve vit maintenant dans un bloc partagé avec
+        // l'app (`<preuve-vente-regle>`) : on le charge avec elle — un banc sert
+        // la forme que le code utilise (§6.3). Les bordereaux : aucun ici.
+        const bloc = (/\/\/ <preuve-vente-regle>[^\n]*\n([\s\S]*?)\/\/ <\/preuve-vente-regle>/.exec(EXT) || [])[1] || '';
         vm.runInContext(`
           const RANGS = __RANGS__;
-          async function sbGetTout(){ return RANGS; }
+          async function sbGetTout(q){ return /_label_/.test(q) ? [] : RANGS; }
+          async function sbGet(){ return []; }
           ${fn[0]}
           globalThis.P = lireVentesProuvees;
           ${/const PAS_UNE_VENTE = [^\n]*/.exec(EXT)[0]}
+          ${bloc}
         `.replace('__RANGS__', JSON.stringify([
           { it: '111', ti: '' },                                      // conversation
           { it: '222', ti: 'Commande finalisée' },                    // vendue

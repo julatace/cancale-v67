@@ -97,6 +97,9 @@ const projette = (r, sel) => {
     if (src === 'id' || src === 'owner') { out[alias] = r[src]; continue; }
     if (src === 'data') { out[alias] = r.data; continue; }
     let v = r.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    // `->>` rend du TEXTE chez PostgREST (un objet arrive en JSON, un booléen
+    // en « true ») — la forme que lit la route (§6.3).
+    if (v != null && /->>[^>]*$/.test(src) && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
     out[alias] = v == null ? null : v;
   }
   return out;
@@ -207,6 +210,7 @@ global.fetch = async (url, opts = {}) => {
       return rep({ error: 'invalid_grant' }, 400);
     }
     if (u.includes('/ws/api.dll')) {
+      const xml=s=>new Response(s.replace(/<R(?=\s|>)/,'<'+appel+'Response').replace(/<\/R>/,'</'+appel+'Response>'),{status:200,headers:{'content-type':'text/xml'}});
       const compte = ebay[jeton] || { actives: [], programmees: [], pagesProg: 1 };
       if (appel === 'GetUser') {
         const idn = IDENTITES[jeton];
@@ -865,6 +869,87 @@ const RA = {};
     remettre(); remettreBase();
     o = await app(JWT_B, AUTO);
     dit(!fin(o), 'un AUTRE vendeur ne retire rien chez Julien, même en « automatique »', `HTTP ${o.code}`);
+    // ── La remise à zéro des numéros (migration 013, 10 octobre) : l'annonce qui
+    //    portait « VRM-22 » à la coupure est l'ANCIENNE paire (B22). La vente de
+    //    la NOUVELLE 22 sur Vinted ne doit pas la retirer.
+    // Le marqueur garde, PAR ANNONCE, le numéro qu'elle portait à la coupure et ce qu'il devient.
+    const MK = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00.000Z', ebayAnnonces: { 110000000001: { 22: 'B22' } }, renum: {} };
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 409 && o.corps.reason === 'sku-change' && !fin(o), 'remise à zéro : « VRM-22 » d\'une annonce d\'avant la coupure est la B22 — la vente de la NOUVELLE 22 ne la retire pas', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, { ...AUTO, sku: 'VRM-B22' });
+    dit(o.code === 200 && fin(o), 'et l\'autre sens : l\'ANCIENNE paire (B22) prouvée vendue la retire bien', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: { ...MK, ebayAnnonces: { 110000000999: { 22: 'B22' } } } } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 200 && fin(o), 'une annonce mise en ligne APRÈS la coupure (absente de la liste) : « VRM-22 » est bien la nouvelle 22', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: { ...MK, annule: true } } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 200 && fin(o), 'remise à zéro ANNULÉE (retour arrière) : les SKU se relisent comme avant', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: 'illisible{' } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 503 && o.corps.reason === 'numerotation-pas-su' && !fin(o), 'marqueur illisible ⇒ « pas su » ne vaut pas « aucune coupure » : rien n\'est retiré', `HTTP ${o.code}`);
+    // ── (relecture du 11 octobre) Sa forme réelle : ses annonces eBay portent un
+    //    numéro PROVISOIRE donné après la coupure (« VRM-553 », devenu 3). Lu
+    //    « B553 » — une paire qui n'existe pas —, la vente de la 3 ne la retirait
+    //    pas (409 sku-change).
+    const MK3 = { ...MK, renum: { 553: '3' }, ebayAnnonces: { 110000000001: { 553: '3' } } };
+    remettre(); remettreBase(); ebay['at-J'].actives[0].sku = 'VRM-553';
+    lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK3 } });
+    o = await app(JWT_J, { ...AUTO, sku: 'VRM-3' });
+    dit(o.code === 200 && fin(o), 'l\'annonce « VRM-553 » (numéro provisoire devenu 3) : la vente de la paire 3 la retire', `HTTP ${o.code} · ${appels(o.journal)}`);
+    // ── Une annonce d'avant RELIÉE après la coupure à une nouvelle paire (son SKU
+    //    réécrit) se lit telle quelle : la vente de l'ANCIENNE paire du même
+    //    chiffre ne la termine pas (avant : « VRM-B22 » la terminait).
+    remettre(); remettreBase(); ebay['at-J'].actives[0].sku = 'VRM-3';
+    lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, { ...AUTO, sku: 'VRM-B3' });
+    dit(o.code === 409 && !fin(o), 'annonce reliée APRÈS la coupure (« VRM-22 » → « VRM-3 ») : la vente de la B3 ne la retire PAS', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); ebay['at-J'].actives[0].sku = 'VRM-3';
+    lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, { ...AUTO, sku: 'VRM-3' });
+    dit(o.code === 200 && fin(o), 'et la vente de la NOUVELLE 3 la retire', `HTTP ${o.code}`);
+    remettre(); remettreBase();
+  });
+  // ── (relecture du 11 octobre) RELIER une annonce d'avant à la nouvelle paire
+  //    du MÊME chiffre réécrirait le même SKU : plus rien ne distinguerait la
+  //    nouvelle 22 de l'ancienne B22. Refusé avant eBay, avec la raison.
+  await essaie('relier après la coupure', async () => {
+    const MK = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00.000Z', ebayAnnonces: { 110000000001: { 22: 'B22' } }, renum: {} };
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_numerotation: MK } });
+    let o = await app(JWT_J, { action: 'sku', itemId: '110000000001', numero: '22' });
+    dit(o.code === 409 && o.corps.reason === 'numero-ambigu' && !auCompte(o.journal).some((x) => x.appel === 'ReviseFixedPriceItem'),
+      'relier l\'annonce « VRM-22 » d\'avant à la NOUVELLE 22 : refusé, rien n\'est envoyé à eBay', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_numerotation: MK } });
+    o = await app(JWT_J, { action: 'sku', itemId: '110000000001', numero: '3' });
+    dit(o.code === 200 && auCompte(o.journal).some((x) => x.appel === 'ReviseFixedPriceItem'), 'la relier à une AUTRE paire (3) : envoyé', `HTTP ${o.code}`);
+    remettre(); remettreBase(); mode.mainKo = true;
+    o = await app(JWT_J, { action: 'sku', itemId: '110000000001', numero: '3' });
+    dit(o.code === 503 && !auCompte(o.journal).some((x) => x.appel === 'ReviseFixedPriceItem'), 'numérotation illisible : rien n\'est envoyé', `HTTP ${o.code}`);
+    remettre(); remettreBase();
+  });
+  // ── (relecture du 11 octobre) PUBLIER / PROGRAMMER lisent le marqueur.
+  await essaie('publier après la coupure', async () => {
+    const MK = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00.000Z', ebayAnnonces: { 110000000001: { 22: 'B22' }, 110000000900: { 553: '3' } }, renum: { 553: '3' } };
+    const base = () => { remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_numerotation: MK } }); };
+    base();
+    let o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '22' } });
+    dit(o.code === 200 && o.corps.ok === true, 'publier la NOUVELLE 22 pendant que l\'annonce d\'avant « VRM-22 » (la B22) est en ligne : elle part', `HTTP ${o.code} · ${o.corps && (o.corps.reason || o.corps.error)}`);
+    base(); ebay['at-J'].actives.push(annonce('110000000900', 'Autry', 'VRM-553', '60.0', '2026-10-10T08:10:00.000Z'));
+    o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '3' } });
+    dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && o.corps.itemId === '110000000900' && !auCompte(o.journal).some((x) => /AddFixed/.test(x.appel)),
+      'publier la 3 pendant que « VRM-553 » (numéro provisoire devenu 3) est en ligne : 409, pas de seconde annonce', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
+    base();
+    o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '553' } });
+    dit(o.code === 409 && o.corps.reason === 'numerotation-perimee' && chezEbay(o.journal).length === 0,
+      'un écran d\'AVANT la remise à zéro (aucune version, numéro provisoire 553) : refusé, rien ne part chez eBay', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
+    base();
+    o = await app(JWT_J, { action: 'programmer', confirme: true, uuid: 'A'.repeat(32), fraisVus: 0.2, scheduleTime: iso(Date.now() + 2 * JOUR), item: { ...item, numero: '30' }, numerotation: 1 });
+    dit(o.code === 409 && o.corps.reason === 'numerotation-perimee' && chezEbay(o.journal).length === 0, 'programmer depuis un écran d\'une autre version : refusé, rien ne part', `HTTP ${o.code}`);
+    base(); mode.mainKo = true;
+    o = await app(JWT_J, { action: 'publish', numerotation: 2, item: { ...item, numero: '30' } });
+    dit(o.code === 503 && o.corps.reason === 'numerotation-pas-su' && chezEbay(o.journal).length === 0, 'numérotation illisible : rien n\'est publié', `HTTP ${o.code}`);
+    remettre(); remettreBase();                        // les blocs suivants partent d'une base sans marqueur
   });
 
   // ── 6. LES FRAIS, PAR NOM ; LES ERREURS, TOUTES ────────────────────────────
@@ -2103,7 +2188,7 @@ const RA = {};
       ['aucune', lu({ offresActives: true, accepte: null }), null],
       ['offres coupées', lu({ offresActives: false, accepte: 72 }), null],
       ['lecture ratée', { lu: false, raison: 'lecture-ratee', lueA: now }, null],
-      ['autre devise', lu({ offresActives: true, accepte: 72, devise: 'USD' }), null],
+      ['autre devise', lu({ offresActives: true, accepte: 72, devise: 'USD' }), 'oui'],
     ];
     const faux = cas.filter(([, e, k]) => A.regleEngage(A.etatRegleOffre({ itemId: '1', price: '80' }, new Map([['principal:1', e]]), null, now)) !== k);
     dit(!faux.length, '[R-engage] connue ⇒ « oui » ; seuil relu sans l\'état des offres, incertaine, en cours, posée pas relue, programmée, prix changé ⇒ « peut-être » ; aucune, offres coupées, lecture ratée, autre devise ⇒ rien', faux.map((c) => c[0]).join(' · '));

@@ -132,10 +132,15 @@ essaie('eBay', () => {
     for (const [re, quoi] of [[/RespondToBestOffer/, 'RespondToBestOffer'], [/negotiation\/v1\/[^'"`\s]*(accept|respond)/i, 'route de négociation qui accepte'], [/respond_to_offer/i, 'respond_to_offer'],
       [/\bbestOfferTerms\b/, 'bestOfferTerms (voie Inventory)'], [/\bautoAcceptPrice\b/, 'autoAcceptPrice (voie Inventory)']]) {
       const m = re.exec(f.code);
+      if(m && quoi==='RespondToBestOffer' && f.rel==='api/_lib/ebay-gestion.js'){
+        const ast=parser.parse(f.code,{sourceType:'module'});let manuel=null;
+        const visite=node=>{if(!node || typeof node!=='object')return;if(node.type==='FunctionDeclaration' && node.id?.name==='repondreOffre' && node.start<=m.index && node.end>m.index)manuel=f.code.slice(node.start,node.end);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visite);else if(value && typeof value==='object')visite(value);};visite(ast);
+        if(manuel && /b\.confirme\s*!==\s*true/.test(manuel) && /jeton\(owner\)/.test(manuel) && /lire\('GetBestOffers'/.test(manuel))continue;
+      }
       if (m) fautes.push(`${f.rel} l.${ligneDe(f.code, m.index)} : ${quoi}`);
     }
   }
-  dit(fautes.length === 0, "aucune route n'appelle une acceptation d'offre ni la voie Inventory : c'est eBay qui accepte, au seuil posé sur l'annonce", fautes.slice(0, 3).join(' · '));
+  dit(fautes.length === 0, "aucune acceptation programmée ni voie Inventory : la réponse à une offre précise exige confirmation, jeton du vendeur et relecture", fautes.slice(0, 3).join(' · '));
   const ailleurs = lus.filter((f) => !/^api[\\/]ebay\.js$/.test(f.rel) && /BestOfferAutoAcceptPrice/.test(f.code)).map((f) => f.rel);
   dit(ailleurs.length === 0, "le seuil d'acceptation ne s'écrit que dans api/ebay.js", ailleurs.join(', '));
   const eb = (lus.find((f) => /^api[\\/]ebay\.js$/.test(f.rel)) || {}).code || '';

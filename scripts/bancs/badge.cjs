@@ -64,8 +64,15 @@ async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFo
       runtime: {
         id: 'ext',
         getURL: (p) => location.origin + '/' + p,
+        getManifest: () => ({ version: e.__manif || 'essai' }),
         lastError: null,
-        sendMessage: (msg, cb) => { window.__envoyes.push(msg); setTimeout(() => cb && cb(msg.action === 'etat' ? e : { ok: true }), 0); },
+        sendMessage: (msg, cb) => {
+          window.__envoyes.push(msg);
+          // Un service worker qui ne connaît pas la liaison (code d'avant) : le
+          // port se ferme sans réponse.
+          if (msg.action === 'lierAvecVRM' && e.__lierMuet) { setTimeout(() => { window.chrome.runtime.lastError = { message: 'The message port closed before a response was received.' }; cb && cb(undefined); window.chrome.runtime.lastError = null; }, 0); return; }
+          setTimeout(() => cb && cb(msg.action === 'etat' ? e : { ok: true }), 0);
+        },
       },
       storage: { onChanged: { addListener() {} } },
     };
@@ -125,11 +132,40 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     dit(l.carteVisible && /Pas connecté/i.test(l.carte), 'au survol, la carte dit « pas connecté »', l.carte.replace(/\n/g, ' · ').slice(0, 160));
     await cliquer(pg);
     l = await lire(pg);
-    dit(/popup\.html\?mode=carte$/.test(l.iframe || ''), 'le clic ouvre la connexion dans un iframe de l’extension', l.iframe);
+    // 11 octobre (Julien : « quand j'appuie sur se connecter ça doit envoyer
+    // directement dans l'application VRM ») : le logo OUVRE VRM à chaque fois ;
+    // pas connecté, VRM s'ouvre avec l'identifiant de l'extension et la connecte.
+    dit(l.envoyes.includes('lierAvecVRM') && !l.iframe, 'pas connecté : le clic OUVRE VRM (qui connecte l’extension) — rien à taper dans le site', JSON.stringify({ envoyes: l.envoyes, iframe: l.iframe }));
     dit(l.champsPage === 0, 'et AUCUN champ (mot de passe compris) dans le DOM du site', 'champs : ' + l.champsPage);
-    dit(!l.envoyes.includes('ouvrirVRM'), 'pas connecté : il n’ouvre pas VRM à la place');
+    await ctx.close();
+  });
+  await essaie('déconnecté, service worker d’avant', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.deconnecte, { __lierMuet: true }));
+    await cliquer(pg); await pg.waitForTimeout(200);
+    const l = await lire(pg);
+    dit(/popup\.html\?mode=carte$/.test(l.iframe || '') && l.champsPage === 0, 'en secours (un service worker qui ne connaît pas la liaison) : la connexion s’ouvre dans un iframe de l’extension, jamais dans le site', JSON.stringify({ iframe: l.iframe, champs: l.champsPage }));
     await pg.screenshot({ path: path.join(SORTIE, 'badge-connexion.png') });
     await ctx.close();
+  });
+
+  // ── 1bis. CODE PÉRIMÉ (11 octobre) ───────────────────────────────────────
+  // Le manifeste dit 5.171, le service worker exécute un code d'avant (⟳ jamais
+  // cliqué) : la carte disait « recharge la page » — ce qui ne change RIEN.
+  console.log('\n── Code périmé : le manifeste neuf, le service worker d’avant');
+  await essaie('périmé', async () => {
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.171.0', version: '5.171.0' }));
+    await survoler(pg); await pg.waitForTimeout(200);
+    const l = await lire(pg);
+    const cadres = await pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));
+    dit(/ancienne version/.test(l.carte) && /⟳/.test(l.carte) && l.point, 'la carte le dit (« elle tourne encore sur son ancienne version… ⟳ »), pastille allumée', l.carte.replace(/\n/g, ' · ').slice(0, 220));
+    dit(cadres.some((u) => /popup\.html\?mode=reparer$/.test(u || '')), 'et elle pose la page de réparation de l’extension (qui vérifie avant ⟳)', JSON.stringify(cadres));
+    await ctx.close();
+    const ok2 = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.171.0', version: '5.171.0', code: '5.171.0' }));
+    await survoler(ok2.pg); await ok2.pg.waitForTimeout(200);
+    const l2 = await lire(ok2.pg);
+    const c2 = await ok2.pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));
+    dit(!/ancienne version/.test(l2.carte) && !c2.some((u) => /mode=reparer/.test(u || '')) && !l2.point, 'autre sens : le code du manifeste — ni alerte, ni réparation', JSON.stringify({ carte: l2.carte.slice(0, 80), cadres: c2 }));
+    await ok2.ctx.close();
   });
 
   // ── 2. CONNECTÉ, TOUT CIRCULE ─────────────────────────────────────────────

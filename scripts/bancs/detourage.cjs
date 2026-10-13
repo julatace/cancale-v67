@@ -181,7 +181,8 @@ async function appeler({ methode = 'POST', qui = PROPRIO, corps = {}, query = {}
 
     // ── Le compteur se lit, jamais inventé ───────────────────────────────
     r = await appeler({ methode: 'GET', query: { usage: '1' } });
-    dit(r.code === 200 && r.corps.n === 1 && r.corps.plafond === 150 && r.corps.ready === true, 'GET ?usage=1 : ce qu’il a détouré ce mois-ci, et le plafond', JSON.stringify(r.corps));
+    const libDet = await import('file://' + path.join(RACINE, 'api', '_lib', 'detourage.js'));
+    dit(r.code === 200 && r.corps.n === 1 && r.corps.plafond === 100 && libDet.PLAFOND_DEFAUT === 100 && r.corps.ready === true, "GET ?usage=1 : ce qu’il a détouré ce mois-ci, et le plafond par défaut (100 photos par mois, plus 150)", JSON.stringify(r.corps));
 
     // ── L'IA, elle, ne bouge pas ─────────────────────────────────────────
     base();

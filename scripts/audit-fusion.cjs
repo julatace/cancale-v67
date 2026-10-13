@@ -46,7 +46,11 @@ function faireCtx() {
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
       tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
-      storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
+      storage: { local: (() => { const m = {}; const rend = (v, cb) => { if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); }; return {
+        get(k, cb) { const cles = k == null ? Object.keys(m) : Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k)); const out = {}; for (const c of cles) if (m[c] !== undefined) out[c] = JSON.parse(JSON.stringify(m[c])); return rend(out, cb); },
+        set(o, cb) { for (const c of Object.keys(o || {})) m[c] = JSON.parse(JSON.stringify(o[c])); return rend(undefined, cb); },
+        remove(k, cb) { for (const c of [].concat(k)) delete m[c]; return rend(undefined, cb); },
+      }; })(), onChanged: { addListener() {} } },
     },
     fetch: async (url, opts = {}) => {
       const u = metaVersData(String(url));
@@ -149,6 +153,19 @@ const CAS = [
     garde: (d) => (d.paths || []).includes('/api/v2/inbox') && (d.paths || []).includes('/compte/export')
       && d.reponses && d.reponses['GET /api/v2/inbox'] && d.reponses['POST /api/v2/data_export'] },
 
+  // 10 octobre (5.165) : les annonces qu'il a SUPPRIMÉES sur Vinted (une ligne
+  // par compte). Il en supprime des dizaines à la suite pour tout reposter : une
+  // lecture ratée qui repartirait de vide effacerait toutes les précédentes —
+  // et elles réapparaîtraient « en ligne » dans l'app.
+  { id: 'harvest_9_supprimees', avant: { uid: '9', ids: { '9900000001': '2026-10-09T18:30:00.000Z', '9900000002': '2026-10-09T18:31:00.000Z' } },
+    quoi: 'les suppressions déjà rangées',
+    geste: async (c) => {
+      const st = {};
+      c.chrome.storage.local = { get: async (k) => ({ [k]: st[k] }), set: async (o) => { Object.assign(st, JSON.parse(JSON.stringify(o))); }, remove: async () => {} };
+      c.activeAccountId = async () => '9';
+      await c.noterSuppression('www.vinted.fr', '10010527192', 200, new Date().toISOString());
+    },
+    garde: (d) => d.ids && d.ids['9900000001'] && d.ids['9900000002'] && d.ids['10010527192'] },
   { id: 'lbc_accounts', avant: { accounts: { a1: { login: 'x' }, a2: { login: 'y' } } },
     quoi: 'ses comptes Leboncoin déjà vus',
     geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),

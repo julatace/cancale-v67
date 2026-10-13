@@ -10,7 +10,10 @@
 //    mesure combien sont EN VOL en même temps ;
 //  · `chrome.storage.local` à état (le budget, la pause, les mémos y vivent) ;
 //  · `chrome.scripting.executeScript` exécute VRAIMENT la fonction injectée :
-//    ses `fetch('/api/…')` relatifs sont des requêtes de la PAGE Vinted.
+//    ses `fetch('/api/…')` relatifs sont des requêtes de la PAGE de l'onglet —
+//    Vinted, ou l'autre site si l'onglet a navigué (`onglets[i].url` est lu à
+//    chaque injection, `location` la suit ; une requête partie hors de Vinted
+//    est notée dans `j.horsVinted` et reçoit la réponse de ce site : 403).
 //  Aucune donnée réelle : tout est inventé (le dépôt est public).
 //  `--src chemin` (dans `process.argv`) exécute une autre copie du fichier —
 //  c'est la preuve sur le code d'AVANT (§6.1).
@@ -63,7 +66,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }] } = {}) {
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
-  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} } };
+  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0 };
   const rep = (status, body, ctype = 'application/json') => {
     const texte = typeof body === 'string' ? body : JSON.stringify(body == null ? null : body);
     return { ok: status >= 200 && status < 400, status, headers: { get: () => ctype },
@@ -95,6 +98,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {} },
       tabs: { onUpdated: { addListener() {} }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => onglets,
+        get: async (id) => { const t = onglets.find((o) => o && o.id === id); if (!t) throw new Error('No tab with id: ' + id); return copie(t); },
         sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); }, create: dual({}) },
       storage: { local: {
         get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = copie(store[c]); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
@@ -102,14 +106,27 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
         remove(k, cb) { for (const c of [].concat(k)) delete store[c]; if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
       }, onChanged: { addListener() {} } },
       webNavigation: { onCompleted: { addListener() {} } },
-      scripting: { executeScript: async ({ func, args }) => [{ result: await func(...(args || [])) }] },
+      scripting: { executeScript: async ({ target, func, args }) => {
+        // Le document COURANT de l'onglet (aucune épingle d'origine, comme Chrome).
+        const t = onglets.find((o) => o && target && o.id === target.tabId) || onglets[0];
+        j.injections++;
+        try { ctx.location = new URL((t && t.url) || 'https://www.vinted.fr/'); } catch (_) { ctx.location = undefined; }
+        return [{ result: await func(...(args || [])) }];
+      } },
       windows: { onRemoved: { addListener() {} } },
       contextMenus: { create() {}, onClicked: { addListener() {} }, removeAll: dual(undefined) },
     },
     fetch: async (url, opts = {}) => {
       const u0 = String(url);
-      // Une requête relative vient de la PAGE Vinted (fonction injectée).
-      if (/^\//.test(u0)) return appelVinted('https://www.vinted.fr' + u0, opts, 'page');
+      // Une requête relative vient de la PAGE de l'onglet (fonction injectée).
+      if (/^\//.test(u0)) {
+        const o = ctx.location && ctx.location.origin;
+        if (o && !/(^|\.)vinted\.(fr|com|it|de)$/.test(ctx.location.hostname)) {
+          j.horsVinted.push({ url: o + u0, headers: copie(opts.headers || {}), credentials: opts.credentials });
+          return rep(403, '<html>Access denied</html>', 'text/html');
+        }
+        return appelVinted('https://www.vinted.fr' + u0, opts, 'page');
+      }
       if (/^https:\/\/[^/]*vinted\.(fr|com|it|de)\//.test(u0)) return appelVinted(u0, opts, 'fond');
       if (!/\/rest\/v1\//.test(u0)) return rep(404, {});
       if ((opts.method || 'GET') === 'POST') {
@@ -123,9 +140,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (/app_data\?select=owner&limit=1/.test(u)) return rep(400, { message: 'column app_data.owner does not exist' });
       if (lectureKO(u)) return rep(522, '<html>522</html>', 'text/html');
       const sel = (/[?&]select=([^&]+)/.exec(u) || [])[1] || '';
-      const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u);
+      const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u), dans = /[?&]id=in\.\(([^)]*)\)/.exec(u);
       const sortie = [];
       if (eq) { if (lignes[eq[1]] !== undefined) sortie.push({ id: eq[1], data: lignes[eq[1]] }); }
+      else if (dans) { for (const k of dans[1].split(',')) if (lignes[k] !== undefined) sortie.push({ id: k, data: lignes[k] }); }
       else if (like) {
         const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/%/g, '.*') + '$');
         for (const k of Object.keys(lignes)) if (re.test(k)) sortie.push({ id: k, data: lignes[k] });

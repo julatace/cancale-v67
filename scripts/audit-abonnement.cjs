@@ -1,6 +1,7 @@
 // Audit : l'abonnement Stripe ne se contourne pas, ne se perd pas, et ne fait
 // jamais payer le propriétaire (api/compte.js, demande du 4 octobre :
-// « 9,99 € par mois pour tout le monde sauf moi »).
+// « 9,99 € par mois pour tout le monde sauf moi » — 12,99 € depuis le
+// 11 octobre, décision de Julien après l'étude des coûts).
 //
 // §4.10 : une route serveur n'est vérifiée que si on l'EXÉCUTE. Ce banc charge
 // le VRAI api/compte.js avec un faux Stripe et une fausse base, et vérifie :
@@ -36,9 +37,12 @@ const SECRET = 'whsec_banc_abonnement';
 const JETONS = { 'aa.bb.A': { id: A, email: 'a@exemple.test' }, 'aa.bb.B': { id: B, email: 'b@exemple.test' }, 'aa.bb.P': { id: PROPRIO, email: 'p@exemple.test' } };
 
 // ── Fausse base + faux Stripe ───────────────────────────────────────────────
-let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains, subsStripe, facturesStripe, panneFactures;
+let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains, subsStripe, facturesStripe, panneFactures, prixStripe;
+// Le prix rangé chez Stripe sous `vrm_mensuel`, tel que Stripe le rend (centimes
+// entiers). Par défaut : celui des CGV (12,99 € par mois).
+const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1299, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
 const reset = () => {
-  base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false;
+  base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false; prixStripe = PRIX_STRIPE_CGV;
   subsStripe = {}; facturesStripe = []; panneFactures = false;
   obligatoire = false; panneRpc = false; appData = {}; lecturesSubs = []; ecrituresData = []; mains = [];
   if (oublierAcces) oublierAcces();
@@ -69,8 +73,18 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('/rest/v1/app_data')) {
     const own = /owner=eq\.([^&]+)/.exec(u), id = /id=eq\.([^&]+)/.exec(u);
     if (m === 'POST') {
-      for (const l of JSON.parse(opts.body)) { ecrituresData.push({ url: u, ...l }); appData[`${l.owner || ''}|${l.id}`] = l; }
-      return rep('', 201);
+      // §6.3 : servir la FORME que PostgREST rend. Avec `return=representation`
+      // il rend les lignes réellement écrites (et `ignore-duplicates` n'écrase
+      // pas une ligne existante : rien n'est rendu pour elle). `push_subs`
+      // s'écrit ainsi depuis le 11 octobre (écriture conditionnelle).
+      const prefer = String(h.Prefer || h.prefer || '');
+      const rendus = [];
+      for (const l of JSON.parse(opts.body)) {
+        const cle = `${l.owner || ''}|${l.id}`;
+        if (/ignore-duplicates/.test(prefer) && appData[cle]) continue;
+        ecrituresData.push({ url: u, ...l }); appData[cle] = l; rendus.push(l);
+      }
+      return /return=representation/.test(prefer) ? rep(rendus, 201) : rep('', 201);
     }
     if (/select=owner&limit=1/.test(u)) return rep([]);                      // base cloisonnée
     if (id && id[1] === 'main') return rep(mains);
@@ -105,7 +119,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
     appelsStripe.push({ m, chemin, corps: opts.body || u.split('?')[1] || '', h });
-    if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } }] });
+    if (chemin === 'prices') return prixStripe === 'panne' ? rep({ error: { message: 'panne' } }, 500) : rep({ data: prixStripe ? [prixStripe] : [] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
     if (chemin === 'billing_portal/sessions') return rep({ url: 'https://billing.stripe.com/p/session/banc' });
     // ⚠️ Le faux Stripe rend TOUTES les factures qu'on lui a données, quel que
@@ -115,6 +129,7 @@ global.fetch = async (url, opts = {}) => {
     if (chemin.startsWith('customers/')) return rep({ id: chemin.split('/')[1], invoice_settings: { default_payment_method: { card: { brand: 'mastercard', last4: '5555', exp_month: 1, exp_year: 2030 } } } });
     if (chemin.startsWith('subscriptions/')) {
       const id = chemin.split('/')[1];
+      if (subsStripe[id] === 'panne') return rep({ error: { message: 'panne' } }, 500);
       if (subsStripe[id]) {
         if (m === 'POST') {
           const p = new URLSearchParams(opts.body || '');
@@ -228,7 +243,7 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     dit(/client_reference_id=11111111-1111-4111-8111-111111111111/.test(corps) && /subscription_data\[metadata\]\[owner\]=11111111/.test(corps) && !/22222222/.test(corps),
       'l’abonnement est rattaché au vendeur PROUVÉ par sa session — jamais à un identifiant envoyé par le navigateur', corps.slice(0, 160));
     dit(/success_url=https:\/\/vrm\.center\//.test(corps) && !/site-pirate/.test(corps), 'l’adresse de retour est fixe (jamais l’origine de la requête)');
-    dit(/price\]=price_banc/.test(corps) && /mode=subscription/.test(corps), 'abonnement au prix de la clé vrm_mensuel (9,99 €/mois)');
+    dit(/price\]=price_banc/.test(corps) && /mode=subscription/.test(corps), 'abonnement au prix de la clé vrm_mensuel (12,99 €/mois, celui des CGV)');
   });
   await essaie('checkout sans session', async () => {
     reset(); const r = faireRes();
@@ -245,6 +260,149 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     const r = faireRes();
     await compte(req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' } }), r);
     dit(r.code === 409 && !appelsStripe.some((x) => x.chemin === 'checkout/sessions'), 'déjà abonné : pas de second abonnement', `HTTP ${r.code}`);
+  });
+
+  // ⚠️⚠️ 11 OCTOBRE : 12,99 € (décision de Julien). Les CGV le disent ; le prix
+  //    PRÉLEVÉ est celui rangé chez Stripe sous `vrm_mensuel`, que seul Julien
+  //    recrée dans son tableau de bord. Tant qu'il ne l'a pas fait, Stripe
+  //    facturerait 9,99 € à quelqu'un qui vient d'accepter des CGV à 12,99 €.
+  //    La donnée déclenche (le montant que Stripe RENVOIE), jamais une phrase.
+  console.log('\n── Le prix facturé est celui des CGV, sinon le paiement reste fermé');
+  const payer = async () => {
+    const r = faireRes();
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' }, corps: JSON.stringify({ cgv: true }) });
+    q.body = { cgv: true };
+    await compte(q, r);
+    return { r, session: appelsStripe.some((x) => x.chemin === 'checkout/sessions') };
+  };
+  // Le texte des CGV tel que l'APP l'écrit (PRIX_CGV_LISIBLE) : c'est contre lui
+  // que le propriétaire compare le prix de Stripe — on le lit dans le source, on
+  // ne le recopie pas (audit-lancement vérifie qu'il est celui des CGV).
+  const PRIX_CGV_APP = (/const PRIX_CGV_LISIBLE\s*=\s*'([^']+)'/.exec(require('fs').readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8')) || [])[1] || '';
+  const avecWarn = async (f) => {
+    const vu = [], av = console.warn;
+    console.warn = (...a) => { vu.push(a.map(String).join(' ')); };
+    try { return { res: await f(), warn: vu.join('\n') }; } finally { console.warn = av; }
+  };
+  await essaie('prix 9,99 chez Stripe', async () => {
+    reset(); prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };
+    const { res: { r, session }, warn } = await avecWarn(payer);
+    const m = (r.corps && r.corps.message) || '';
+    dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session,
+      'Stripe dit encore 9,99 € (prix pas recréé) : le paiement ne s’ouvre PAS, aucune session Stripe', `HTTP ${r.code} · ${r.corps && r.corps.erreur} · session ${session}`);
+    // ⚠️ Revue du 11 octobre : ce refus ne part qu'à un VENDEUR (le propriétaire
+    //    a eu 409 avant) — il ne nomme donc PAS le montant réglé chez Stripe. Il
+    //    disait « le prix réglé chez Stripe (9,99 € / mois)… » sous le bouton.
+    dit(!/\d+,\d{2}/.test(m) && /rien n'a été prélevé/i.test(m) && /pas encore ouvert/i.test(m),
+      '  le vendeur lit « pas encore ouvert, rien n’a été prélevé » — sans le montant réglé chez Stripe (ni aucun montant)', m);
+    dit(/9,99 € \/ mois/.test(warn) && warn.includes('≠ CGV ' + PRIX_CGV_APP) && /vrm_mensuel/.test(warn),
+      '  le détail (les deux prix, le geste) reste dans les journaux du serveur', warn.slice(0, 200));
+  });
+  for (const [nom, prix] of [
+    ['en dollars', { ...PRIX_STRIPE_CGV, currency: 'usd' }],
+    ['par an', { ...PRIX_STRIPE_CGV, recurring: { interval: 'year', interval_count: 1 } }],
+    ['tous les 3 mois', { ...PRIX_STRIPE_CGV, recurring: { interval: 'month', interval_count: 3 } }],
+    ['sans montant unitaire (prix par paliers)', { ...PRIX_STRIPE_CGV, unit_amount: null, billing_scheme: 'tiered' }],
+    ['ponctuel (pas un abonnement)', { id: 'price_banc', unit_amount: 1299, currency: 'eur', type: 'one_time' }],
+  ]) {
+    await essaie('prix ' + nom, async () => {
+      reset(); prixStripe = prix;
+      const { r, session } = await payer();
+      dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session, `12,99 ${nom} : pas le prix des CGV → paiement fermé`, `HTTP ${r.code} · session ${session}`);
+    });
+  }
+  await essaie('prix conforme', async () => {
+    reset();
+    const { r, session } = await payer();
+    dit(r.code === 200 && session && /checkout\.stripe\.com/.test((r.corps && r.corps.url) || ''), 'l’autre sens : 12,99 € par mois en euros → le paiement s’ouvre', `HTTP ${r.code}`);
+  });
+  await essaie('carte : prix relayé seulement s’il est celui des CGV', async () => {
+    reset(); prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };
+    const ra = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.A' } }), ra);
+    dit(ra.code === 200 && ra.corps.prix === null && ra.corps.prixConforme === false && ra.corps.prixStripe === null,
+      'Stripe à 9,99 € : la carte ne relaie PAS ce prix (l’app dirait 9,99 € à côté de CGV à 12,99 €), dit « pas conforme », et ne montre le montant Stripe qu’au propriétaire', JSON.stringify({ prix: ra.corps.prix, prixConforme: ra.corps.prixConforme, prixStripe: ra.corps.prixStripe }));
+    const rp = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.P' } }), rp);
+    dit(rp.code === 200 && rp.corps.prixConforme === false && rp.corps.prixStripe && rp.corps.prixStripe.montant === 9.99,
+      '  le propriétaire, lui, reçoit le montant réglé chez Stripe (c’est lui qui le corrige)', JSON.stringify(rp.corps.prixStripe));
+    reset();
+    const rb = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.A' } }), rb);
+    dit(rb.code === 200 && rb.corps.prix && rb.corps.prix.montant === 12.99 && rb.corps.prixConforme === true && rb.corps.prixStripe === null,
+      '  Stripe à 12,99 € : le prix est relayé, « conforme »', JSON.stringify({ prix: rb.corps.prix, prixConforme: rb.corps.prixConforme }));
+    reset(); prixStripe = 'panne';
+    const rn = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.P' } }), rn);
+    dit(rn.code === 200 && rn.corps.prix === null && rn.corps.prixConforme === null && rn.corps.prixStripe === null,
+      '  Stripe muet : « pas su » (null) — jamais « pas conforme »', JSON.stringify({ prix: rn.corps.prix, prixConforme: rn.corps.prixConforme }));
+  });
+
+  // ⚠️⚠️ REVUE DU 11 OCTOBRE : l'alerte du propriétaire sert à guider SON geste
+  //    dans Stripe. L'app reformatait le prix en ignorant la devise et le rythme :
+  //    « 12,99 € / mois n'est pas 12,99 € / mois » pour un prix en dollars, tous
+  //    les 3 mois ou par semaine, et « 0,00 € » pour un prix sans montant fixe.
+  //    Le serveur rend le TEXTE (`prixStripe.texte`) et l'app l'affiche tel quel.
+  //    La règle : un prix non conforme ne s'écrit JAMAIS comme celui des CGV, et
+  //    n'invente aucun montant.
+  console.log('\n── Le propriétaire lit le vrai prix de Stripe (montant, devise, rythme)');
+  await essaie('prixTexte des CGV', async () => {
+    const mod = await import('file://' + path.join(RACINE, 'api', 'compte.js'));
+    const t = typeof mod.prixTexte === 'function' ? mod.prixTexte(mod.PRIX_CGV) : null;
+    dit(!!PRIX_CGV_APP && t === PRIX_CGV_APP, 'le prix des CGV s’écrit côté serveur exactement comme dans l’app', `serveur « ${t} » · app « ${PRIX_CGV_APP} »`);
+  });
+  for (const [nom, prix, attendu] of [
+    ['9,99 € par mois', { ...PRIX_STRIPE_CGV, unit_amount: 999 }, /^9,99 € \/ mois$/],
+    ['en dollars', { ...PRIX_STRIPE_CGV, currency: 'usd' }, /USD/],
+    ['tous les 3 mois', { ...PRIX_STRIPE_CGV, recurring: { interval: 'month', interval_count: 3 } }, /tous les 3 mois/],
+    ['par semaine', { ...PRIX_STRIPE_CGV, recurring: { interval: 'week', interval_count: 1 } }, /semaine/],
+    ['par jour', { ...PRIX_STRIPE_CGV, recurring: { interval: 'day', interval_count: 1 } }, /jour/],
+    ['par an', { ...PRIX_STRIPE_CGV, recurring: { interval: 'year', interval_count: 1 } }, /\/ an$/],
+    ['sans montant unitaire (paliers)', { ...PRIX_STRIPE_CGV, unit_amount: null, billing_scheme: 'tiered' }, /sans montant fixe/],
+    ['ponctuel', { id: 'price_banc', unit_amount: 1299, currency: 'eur', type: 'one_time' }, /en une fois/],
+  ]) {
+    await essaie('texte ' + nom, async () => {
+      reset(); prixStripe = prix;
+      const rp = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.P' } }), rp);
+      const t = rp.corps && rp.corps.prixStripe && rp.corps.prixStripe.texte;
+      dit(rp.code === 200 && rp.corps.prixConforme === false && typeof t === 'string' && t !== PRIX_CGV_APP && attendu.test(t) && !/0,00|\?/.test(t),
+        `prix Stripe ${nom} : le texte rendu au propriétaire diffère de celui des CGV, et le dit`, `« ${t} »`);
+      if (nom === 'sans montant unitaire (paliers)') dit(rp.corps.prixStripe && rp.corps.prixStripe.montant === null, '  sans montant unitaire : montant `null` (pas su), jamais 0', JSON.stringify(rp.corps.prixStripe));
+    });
+  }
+
+  // ⚠️ REVUE DU 11 OCTOBRE : un abonnement Stripe garde le prix auquel il a été
+  //    souscrit. La carte « Abonné · … » disait le prix de l'OFFRE (ou, quand le
+  //    serveur ne le relayait pas, celui des CGV) — 12,99 € au-dessus de
+  //    factures à 9,99 €. Le serveur lit le prix de SON abonnement.
+  console.log('\n── Le prix de SON abonnement, pas celui de l’offre du moment');
+  const SUB_A = (prixArticle, extra = {}) => ({ id: 'sub_A', status: 'active', customer: 'cus_A', metadata: { owner: A }, items: { data: [{ current_period_end: 1800000000, quantity: 1, price: prixArticle }] }, ...extra });
+  const aboDe = async (jwt) => { const r = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer ' + jwt } }), r); return r; };
+  await essaie('prix de son abonnement', async () => {
+    reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
+    subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
+    const r = await aboDe('aa.bb.A');
+    dit(r.code === 200 && r.corps.prixAbonnement && r.corps.prixAbonnement.texte === '9,99 € / mois' && r.corps.prix && r.corps.prix.montant === 12.99,
+      'abonné à 9,99 € quand l’offre est à 12,99 € : `prixAbonnement` dit 9,99 € (le prix qu’il paie), `prix` reste celui de l’offre', JSON.stringify({ prixAbonnement: r.corps.prixAbonnement, prix: r.corps.prix }));
+    reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
+    subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
+    prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };
+    const r2 = await aboDe('aa.bb.A');
+    dit(r2.code === 200 && r2.corps.prix === null && r2.corps.prixConforme === false && r2.corps.prixAbonnement && r2.corps.prixAbonnement.texte === '9,99 € / mois',
+      '  pendant la transition (offre ≠ CGV) : le prix de l’offre n’est pas relayé, celui de SON abonnement si', JSON.stringify({ prix: r2.corps.prix, prixAbonnement: r2.corps.prixAbonnement }));
+  });
+  for (const [nom, prep] of [
+    ['abonnement d’un AUTRE client Stripe', () => { subsStripe.sub_A = SUB_A({ unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } }, { customer: 'cus_autre' }); }],
+    ['Stripe muet sur l’abonnement', () => { subsStripe.sub_A = 'panne'; }],
+    ['deux articles (on ne choisit pas)', () => { subsStripe.sub_A = SUB_A(null, { items: { data: [{ quantity: 1, price: { unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } } }, { quantity: 1, price: { unit_amount: 300, currency: 'eur', recurring: { interval: 'month' } } }] } }); }],
+  ]) {
+    await essaie('prixAbonnement ' + nom, async () => {
+      reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' }; prep();
+      const r = await aboDe('aa.bb.A');
+      dit(r.code === 200 && r.corps.prixAbonnement === null && r.corps.actif === true, `${nom} : « pas su » (null) — la carte dira « Abonné » sans montant, jamais un prix deviné`, `HTTP ${r.code} · ${JSON.stringify(r.corps.prixAbonnement)}`);
+    });
+  }
+  await essaie('prixAbonnement résilié', async () => {
+    reset(); base[A] = { owner: A, statut: 'canceled', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
+    const r = await aboDe('aa.bb.A');
+    dit(r.code === 200 && r.corps.prixAbonnement === null && !appelsStripe.some((x) => x.chemin.startsWith('subscriptions/')),
+      'abonnement terminé : aucun prix d’abonnement, et Stripe n’est pas interrogé pour rien', JSON.stringify(appelsStripe.map((x) => x.chemin)));
   });
 
   console.log('\n── Le prélèvement qui échoue : 14 jours de grâce, comptés depuis le PREMIER échec');
@@ -381,10 +539,10 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
       default_payment_method: { card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2027 } }, items: { data: [{ current_period_end: 1800000000 }] } };
     subsStripe.sub_B = { id: 'sub_B', object: 'subscription', status: 'active', customer: 'cus_B', livemode: false, cancel_at_period_end: false, metadata: { owner: B }, items: { data: [{ current_period_end: 1800000000 }] } };
     facturesStripe = [
-      { id: 'in_1', customer: 'cus_A', status: 'paid', total: 999, currency: 'eur', created: 1791100000, number: 'VRM-1', invoice_pdf: 'https://pay.stripe.com/invoice/x/pdf', hosted_invoice_url: 'https://invoice.stripe.com/i/x' },
-      { id: 'in_B', customer: 'cus_B', status: 'paid', total: 999, currency: 'eur', created: 1791100000, invoice_pdf: 'https://pay.stripe.com/invoice/b/pdf' },
-      { id: 'in_brouillon', customer: 'cus_A', status: 'draft', total: 999, currency: 'eur', created: 1791200000 },
-      { id: 'in_lien', customer: 'cus_A', status: 'paid', total: 999, currency: 'eur', created: 1788500000, invoice_pdf: 'https://site-pirate.example/f.pdf', hosted_invoice_url: 'javascript:alert(1)' },
+      { id: 'in_1', customer: 'cus_A', status: 'paid', total: 1299, currency: 'eur', created: 1791100000, number: 'VRM-1', invoice_pdf: 'https://pay.stripe.com/invoice/x/pdf', hosted_invoice_url: 'https://invoice.stripe.com/i/x' },
+      { id: 'in_B', customer: 'cus_B', status: 'paid', total: 1299, currency: 'eur', created: 1791100000, invoice_pdf: 'https://pay.stripe.com/invoice/b/pdf' },
+      { id: 'in_brouillon', customer: 'cus_A', status: 'draft', total: 1299, currency: 'eur', created: 1791200000 },
+      { id: 'in_lien', customer: 'cus_A', status: 'paid', total: 1299, currency: 'eur', created: 1788500000, invoice_pdf: 'https://site-pirate.example/f.pdf', hosted_invoice_url: 'javascript:alert(1)' },
     ];
   };
   await essaie('factures', async () => {
@@ -395,7 +553,7 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     const appel = appelsStripe.find((x) => x.chemin === 'invoices');
     dit(appel && /customer=cus_A/.test(appel.corps), '  Stripe est interrogé avec le client lu dans SA ligne (pas un paramètre du navigateur)', appel && appel.corps);
     const f1 = ids && r.corps.factures[0], f2 = ids && r.corps.factures[1];
-    dit(f1 && f1.montant === 9.99 && f1.pdf === 'https://pay.stripe.com/invoice/x/pdf' && f1.statut === 'paid', '  montant (9,99, pas 999), statut et PDF Stripe', JSON.stringify(f1));
+    dit(f1 && f1.montant === 12.99 && f1.pdf === 'https://pay.stripe.com/invoice/x/pdf' && f1.statut === 'paid', '  montant (12,99, pas 1299), statut et PDF Stripe', JSON.stringify(f1));
     dit(f2 && f2.pdf === null && f2.page === null, '  un lien qui ne mène pas chez Stripe n’est jamais transmis', JSON.stringify(f2));
     dit(r.corps && r.corps.carte && r.corps.carte.fin === '4242' && r.corps.carte.marque === 'visa', '  la carte de l’abonnement (marque, 4 derniers chiffres)', JSON.stringify(r.corps && r.corps.carte));
   });

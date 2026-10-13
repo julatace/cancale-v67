@@ -49,11 +49,11 @@
       var d = JSON.parse(localStorage.getItem('vinted_dark') || 'false') === true;
       document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
       var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', d ? '#07090D' : '#F4F6FA');
+      if (m) m.setAttribute('content', d ? '#07090D' : '#F4F3EF');
     } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   </script>
   <style>
-    body{margin:0;padding:0;background:#F4F6FA;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#F4F3EF;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
        mais c'est ce qui fait la différence entre « feuille de papier » et
@@ -65,7 +65,7 @@
        ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#07090D) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
     html[data-theme="dark"]  body{ background:#07090D; background-image:none; }
-    html[data-theme="light"] body{ background:#F4F6FA; background-image:none; }
+    html[data-theme="light"] body{ background:#F4F3EF; background-image:none; }
     /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
        Il n'était posé nulle part : la date d'« Import des emails » dans
        Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
@@ -73,6 +73,26 @@
     html[data-theme="light"] { color-scheme: light; }
     @media (prefers-color-scheme: dark){ body{background:#07090D;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
+    /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
+       réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque
+       règle). --vrm-ease-ios était déjà la courbe de l'appui et des feuilles ;
+       --vrm-ease-out est la courbe d'ENTRÉE (sortie douce, sans rebond). */
+    :root{
+      --vrm-ease-ios:cubic-bezier(.32,.72,0,1);
+      --vrm-ease-out:cubic-bezier(.22,1,.36,1);
+      --vrm-dur-appui:.12s; --vrm-dur-etat:.2s; --vrm-dur-ecran:.28s;
+    }
+    /* ⚠️ LATENCE DU TOUCHER : sans `touch-action:manipulation`, iOS attend
+       ~300 ms après chaque tap (au cas où ce serait un double-tap pour zoomer).
+       `manipulation` garde le pan ET le pincer-pour-zoomer (le zoom du viewport,
+       gardé pour l'accessibilité, reste intact) et ne supprime QUE ce délai :
+       chaque bouton répond au doigt sans retard. C'est le détail qui sépare
+       « site web » de « app installée » sur son iPhone. */
+    button,a[role="button"],a.vrm-btn,input,select,textarea,[role="tab"],[role="switch"]{touch-action:manipulation;}
+    /* Un appui long sur un bouton ne doit PAS sélectionner son texte ni ouvrir
+       le menu « copier » d'iOS (un bouton n'est pas du texte). Réservé aux
+       boutons : les montants, eux, restent copiables. */
+    button,a[role="button"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
     /* ⚠️ COQUE APP-SHELL : la hauteur est bornée à l'écran et c'est le CONTENU
        (`<main>`) qui défile, jamais le document. La barre du bas vit HORS du
        défilement — elle ne peut donc plus « flotter au milieu de l'écran »
@@ -91,8 +111,8 @@
     body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv05" 1,"ss01" 1;}
 
     /* 2) RÉPONSE AU TOUCHER : léger enfoncement au clic, comme une app native. */
-    button,a[role="button"]{transition:transform .12s cubic-bezier(.32,.72,0,1),box-shadow .2s ease,background-color .2s ease,border-color .2s ease,opacity .2s ease;}
-    button:active:not(:disabled),a[role="button"]:active{transform:scale(.975);}
+    button,a[role="button"]{transition:transform var(--vrm-dur-appui) var(--vrm-ease-ios),box-shadow var(--vrm-dur-etat) ease,background-color var(--vrm-dur-etat) ease,border-color var(--vrm-dur-etat) ease,opacity var(--vrm-dur-etat) ease;}
+    button:active:not(:disabled),a[role="button"]:active{transform:scale(.97);}
 
     /* 3) TITRES ET MONTANTS : police d'AFFICHAGE, resserrée.
           Le contraste tenu entre un affichage serré (-0.03em) et des
@@ -200,6 +220,10 @@
     /* Sa largeur RÉELLE est publiée par l'app (`--vrm-ile`) : elle change
        avec la pastille « Actions possibles · compte ». 208 px en repli. */
     @media (min-width: 1024px){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
+    /* La phrase des photos Vinted, posée en tête de page sur la coque : même
+       réserve (son geste passait sous l'île — revue du 11 octobre). */
+    .vrm-sous-ile{ padding-right: 16px; }
+    @media (min-width: 1024px){ .vrm-sous-ile{ padding-right: var(--vrm-ile, 208px); } }
     .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
     @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     /* Carrousel photo (dernières ventes) : on fait défiler au doigt sur
@@ -216,9 +240,22 @@
        plutôt que d'un rectangle colorié. Réservé aux actions qui comptent. */
     .vrm-btn-primary{
       position:relative;overflow:hidden;
-      background-image:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0) 55%);
-      box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 2px 8px -2px rgba(6,26,18,.35);
+      background-image:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 52%);
+      /* Deux couches d'ombre : un contact serré + une diffusion colorée large.
+         C'est ce qui fait qu'un bouton d'action a l'air POSÉ sur la page. */
+      box-shadow:0 1px 0 rgba(255,255,255,.24) inset,0 1px 2px rgba(10,12,18,.18),0 6px 16px -6px rgba(10,12,18,.34);
+      transition:transform .16s cubic-bezier(.23,1,.32,1),box-shadow .2s cubic-bezier(.23,1,.32,1),filter .16s ease;
     }
+    /* Au survol (souris seulement), le bouton principal SE SOULÈVE légèrement —
+       le micro-détail « premium » qui donne envie de cliquer. Au doigt, rien. */
+    @media (hover:hover) and (pointer:fine){
+      .vrm-btn-primary:hover:not(:disabled){
+        transform:translateY(-1px);
+        box-shadow:0 1px 0 rgba(255,255,255,.24) inset,0 2px 4px rgba(10,12,18,.16),0 12px 26px -8px rgba(10,12,18,.4);
+        filter:brightness(1.05) saturate(1.02);
+      }
+    }
+    .vrm-btn-primary:active:not(:disabled){ transform:translateY(0) scale(.975); }
 
     @media (hover:hover) and (pointer:fine){
       *:hover > .vrm-logo-edit{ opacity:1; }
@@ -272,7 +309,39 @@
        piégées dessous, et sur téléphone la barre du bas (z 60) passait PAR-DESSUS
        leurs boutons : « CSV » et « PDF » étaient introuvables. `backwards` fait
        le même fondu à l'entrée et ne laisse rien une fois fini. */
-    main > *{animation:cancaleEnter .24s ease backwards;}
+    /* Courbe d'entrée d'écran : sortie douce (ease-out-quint) plutôt qu'un `ease`
+       symétrique — le changement d'onglet « se pose » au lieu de simplement
+       apparaître. Opacité SEULE (jamais transform : §commentaire plus haut sur
+       les enfants position:fixed). */
+    main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+
+    /* ── CARTES VIVANTES SOUS LE DOIGT ──────────────────────────────────────
+       Le même soin que les boutons (jolis au repos, morts sous le doigt),
+       étendu aux cartes. Classe OPT-IN `.vrm-card` : une légère élévation au
+       survol, SUR SOURIS seulement (sur mobile un survol reste « collé » après
+       un tap). §7 : ombre d'ENCRE à deux couches, AUCUNE couleur d'accent — on
+       ne peint rien, on soulève. Le repos n'est pas touché (aucun décalage de
+       mise en page), donc sans risque sur les écrans déjà composés. */
+    .vrm-card{transition:transform var(--vrm-dur-etat) var(--vrm-ease-out),box-shadow var(--vrm-dur-etat) var(--vrm-ease-out);will-change:transform;}
+    @media (hover:hover) and (pointer:fine){
+      .vrm-card:hover{transform:translateY(-2px);box-shadow:0 1px 2px rgba(3,5,10,.3),0 14px 30px -12px rgba(3,5,10,.5);}
+    }
+    :root[data-theme="light"] .vrm-card:hover{box-shadow:0 1px 2px rgba(16,21,27,.08),0 16px 32px -14px rgba(16,21,27,.18);}
+    .vrm-card:active{transform:translateY(-1px);}
+
+    /* ── CASCADE D'ENTRÉE ────────────────────────────────────────────────────
+       Les enfants directs d'un conteneur `.vrm-stagger` arrivent l'un après
+       l'autre (fondu + petite montée), UNE fois au montage. À réserver à un
+       conteneur monté une fois — pas une liste qui se réordonne en direct
+       (sinon ça rejouerait à chaque changement de donnée, §Emil). `backwards`,
+       JAMAIS `both` : pas de contexte d'empilement laissé derrière (§comment). */
+    @keyframes vrmMonte{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .vrm-stagger > *{animation:vrmMonte var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+    .vrm-stagger > *:nth-child(1){animation-delay:40ms}
+    .vrm-stagger > *:nth-child(2){animation-delay:90ms}
+    .vrm-stagger > *:nth-child(3){animation-delay:140ms}
+    .vrm-stagger > *:nth-child(4){animation-delay:190ms}
+    .vrm-stagger > *:nth-child(n+5){animation-delay:230ms}
 
     /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
        Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
@@ -307,7 +376,7 @@
     :root[data-theme="dark"] :focus-visible{outline-color:rgba(61,123,255,.65);}
     button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
     /* Respect du réglage système « réduire les animations ». */
-    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}button:active:not(:disabled){transform:none!important;}}
+    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
   </style>
 </head>
 <body><div id="root"></div>
@@ -315,6 +384,6 @@
      de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
      yeux de l'utilisateur à chaque ouverture. -->
 <script>try{var z=localStorage.getItem('vrm_zoom'),f=parseFloat(z);
-if(f&&f!==1){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
+if(f&&f!==1&&!(matchMedia('(max-width: 767px)').matches&&f<1)){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.setProperty('--vrm-zoom',String(f));d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
 <script type="module" src="/src/main.jsx"></script></body>
 </html>

@@ -27,7 +27,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist');   // ⚠️ JAMAIS un che
 // absolu : la méthode de preuve (§6.1) copie le banc dans /tmp/avN et le lance
 // DEPUIS cet arbre. Un `/home/...` en dur relirait le dépôt courant et la
 // preuve serait truquée — c'est arrivé aux quatorze bancs de rendu.
-const PORT = 4501;
+const PORT = Number(process.env.BANC_PORT) || 4501;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 
 const SESSION = {
@@ -73,7 +73,7 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null } = {}) {
   // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
   //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
@@ -96,20 +96,33 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //   pont = null              → aucune extension ici (téléphone, autre navigateur)
   //   pont = 'muette'          → elle est là mais ne répond pas (« pas su »)
   //   pont = {connecte, email} → elle répond
+  // `version` : celle que le pont annonce. Avant la 5.171 l'extension n'entend
+  // pas le canal adressé : l'app ne peut PAS la connecter elle-même (revue du
+  // 11 octobre). `__posts` note ce que l'app poste dans la page ; une ancienne
+  // extension comprend `session: null` (elle oublie sa session).
   if (pont) {
-    await pg.addInitScript((p) => {
+    await pg.addInitScript(([p, version]) => {
+      window.__posts = [];
       window.addEventListener('message', (ev) => {
         if (ev.source !== window || !ev.data || typeof ev.data !== 'object') return;
         const d = ev.data;
-        if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'); return; }
+        if (d.__vmr === 'session') { window.__posts.push(d.session === null ? 'null' : 'session'); if (d.session === null && p && typeof p === 'object') p.connecte = false; return; }
+        if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version }, '*'); return; }
+        // `p.etat` : elle répond aussi à « état » (une 5.129+ dont le code tourne,
+        // comme la VRAIE 5.164) — elle dit sous quel compte VRM elle écrit.
+        if (d.__vmr === 'etat' && d.reqId && p && typeof p === 'object' && p.etat) {
+          window.postMessage({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version,
+            vrm: { ok: true, connecte: !!p.connecte, email: p.connecte ? (p.email || '') : '', user_id: p.connecte ? (p.user_id || null) : null, cloisonne: true }, vinted: null, cmds: {} } }, '*');
+          return;
+        }
         if (d.__vmr === 'authEtat' && d.reqId && p !== 'muette') {
           window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId,
-            etat: { ok: true, connecte: !!p.connecte, email: p.email || '', cloisonne: true } }, '*');
+            etat: { ok: true, connecte: !!p.connecte, email: p.connecte ? (p.email || '') : '', cloisonne: true } }, '*');
         }
       });
-      window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*');
-      setTimeout(() => window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'), 400);
-    }, pont);
+      window.postMessage({ __vmr: 'ready', version }, '*');
+      setTimeout(() => window.postMessage({ __vmr: 'ready', version }, '*'), 400);
+    }, [pont, version]);
   }
 
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
@@ -129,7 +142,9 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comptes) });
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await pg.route('**/api/**', (r) => (/mode=session-extension/.test(r.request().url())
+    ? r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, session: { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3, user_id: SESSION.user.id, email: SESSION.user.email } }) })
+    : r.fulfill({ status: 200, contentType: 'application/json', body: '{}' })));
   // Déterminisme : aucune image du CDN Vinted (un hoquet réseau a déjà tué un banc).
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
   await pg.route('**://*.vinted.com/**', (r) => r.abort());
@@ -141,6 +156,12 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //    5 octobre : une extension qui se réveille met parfois 3 s à répondre,
   //    et l'app la déclarait muette à tort) : on laisse ce délai s'écouler.
   await pg.waitForTimeout(pont === 'muette' ? 8000 : 5000);
+  let clique = null;
+  if (clic) { const el = await pg.$(clic); clique = !!el; if (el) { await el.click().catch(() => {}); await pg.waitForTimeout(2500); } }
+  const posts = await pg.evaluate(() => window.__posts || []);
+  const voie = await pg.evaluate(() => { const el = document.querySelector('[data-etape]'); return el ? el.getAttribute('data-voie') : null; });
+  const gestes = await pg.evaluate(() => Array.from(document.querySelectorAll('[data-premiers-geste]')).map((x) => x.getAttribute('data-premiers-geste')));
+  const carte = await pg.evaluate(() => { const el = document.querySelector('[data-etape]'); return el ? el.innerText : ''; });
 
   const txt = await pg.evaluate(() => document.body.innerText);
   // ⚠️ On lit aussi les href : un geste qui se CLIQUE ne se voit pas dans
@@ -157,7 +178,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // sur toute la page attraperait n'importe quel prénom écrit ailleurs.
   const bonjour = (/^(?:Bonjour|Bon après-midi|Bonsoir).*$/m.exec(txt) || [''])[0].trim();
   await ctx.close();
-  return { txt, liens, bonjour, erreurs, etat };
+  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique };
 }
 
 (async () => {
@@ -266,6 +287,49 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // on propose de réessayer. C'est le geste qui est exigé, pas sa formulation.
   dit(/recharge/i.test(muette.txt), 'mais on dit quoi faire (recharger) plutôt que de se taire',
     muette.txt.split('\n').slice(-2).join(' · '));
+
+  // ── 4 bis (b). UNE EXTENSION QUI NE SAIT PAS RECEVOIR LA CONNEXION DE VRM ──
+  // ⚠️⚠️ Revue du 11 octobre : à une 5.164 (celle qu'il a installée), la carte
+  //    promettait « je la connecte d'ici, sans rien à taper » et « je la
+  //    reconnecte… rien à taper » — l'app ne lui envoie plus RIEN (canal
+  //    adressé : 5.171), et « Se connecter avec VRM » nommait un bouton que sa
+  //    fenêtre n'a pas. On juge l'état décidé (`data-voie`) et ses gestes.
+  console.log('\n── Extension 5.164 qui ne dit PAS sous quel compte elle écrit (pas d’« état ») : aucune promesse, le vrai geste');
+  const vieillePas = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.164.0' });
+  dit(vieillePas.etat === 'pasconnectee' && vieillePas.voie === 'retard', 'pas connectée, 5.164 : l’app sait qu’elle ne peut PAS la connecter', `${vieillePas.etat} · voie ${vieillePas.voie}`);
+  dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(vieillePas.carte), 'aucune promesse « je la connecte… rien à taper »', vieillePas.carte.slice(0, 300).replace(/\n/g, ' · '));
+  dit(!/Se connecter avec VRM/.test(vieillePas.carte), 'aucun bouton que sa fenêtre n’a pas (« Se connecter avec VRM »)');
+  dit(vieillePas.gestes.includes('maj') && /mot de passe/i.test(vieillePas.carte), 'les deux vrais gestes : la mise à jour (le zip) ou le mot de passe VRM', JSON.stringify(vieillePas.gestes));
+  {
+    const vieilleAutre = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' }, version: '5.164.0' });
+    dit(vieilleAutre.etat === 'autrecompte' && vieilleAutre.voie === 'retard', 'autre compte, 5.164 : l’app sait qu’elle ne peut pas la reconnecter', `${vieilleAutre.etat} · voie ${vieilleAutre.voie}`);
+    dit(!/rien à taper|je la reconnecte à/i.test(vieilleAutre.carte), 'aucune promesse « je la reconnecte… rien à taper »', vieilleAutre.carte.slice(0, 400).replace(/\n/g, ' · '));
+    dit(vieilleAutre.gestes.includes('maj') && vieilleAutre.gestes.includes('deconnecter'), 'gestes : la mise à jour, ou la déconnecter d’ici', JSON.stringify(vieilleAutre.gestes));
+    dit(vieilleAutre.posts.length === 0, 'et RIEN n’est posté dans la page tant qu’il n’a pas cliqué', JSON.stringify(vieilleAutre.posts));
+  }
+  const deco = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' }, version: '5.164.0', clic: '[data-premiers-geste="deconnecter"]' });
+  dit(deco.clique && deco.posts.length === 1 && deco.posts[0] === 'null', 'son clic « Déconnecter l’extension de ce Chrome » lui fait oublier sa session (l’ancien message, session: null) — une fois', JSON.stringify({ clique: deco.clique, posts: deco.posts }));
+  dit(deco.etat === 'pasconnectee', 'et la carte passe à l’étape suivante (la connecter au mot de passe VRM)', `état rendu = ${deco.etat}`);
+  // ⚠️⚠️ Collision de numéros (11 octobre) : `main` a publié une 5.170 SANS le
+  //    canal adressé. Avec une frontière à 5.169, la carte lui promettait « je la
+  //    connecte d'ici, sans rien à taper » — l'app ne pouvait rien lui envoyer.
+  const prod = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.170.0' });
+  dit(prod.etat === 'pasconnectee' && prod.voie === 'retard', 'pas connectée, 5.170 de production : l’app sait qu’elle ne peut PAS la connecter', `${prod.etat} · voie ${prod.voie}`);
+  dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(prod.carte), '5.170 : aucune promesse « je la connecte… rien à taper »', prod.carte.slice(0, 300).replace(/\n/g, ' · '));
+  // ⚠️⚠️ Relecture croisée de la 5.174 : la VRAIE 5.164 (et la 5.170 de
+  //    production) répondent à « état » — l'app la connecte alors par l'ancien
+  //    message de la page, avec une session fabriquée pour elle (voie 'page').
+  //    La promesse « sans rien à taper » est tenue (une session part) ; sa
+  //    fenêtre n'a pas « Se connecter avec VRM » : le secours dit son mot de passe.
+  for (const ver of ['5.164.0', '5.170.0']) {
+    const r = await rendre(nav, { comptes: [], pont: { connecte: false, etat: true }, version: ver });
+    dit(r.etat === 'pasconnectee' && r.voie === 'page', `pas connectée, ${ver} qui répond à « état » : l’app SAIT la connecter (voie « page »)`, `${r.etat} · voie ${r.voie}`);
+    dit(r.posts.filter((x) => x === 'session').length === 1, `${ver} : la promesse est TENUE — une session lui est postée (fabriquée pour elle)`, JSON.stringify(r.posts));
+    dit(!/Se connecter avec VRM/.test(r.carte) && /mot de passe/i.test(r.carte), `${ver} : le secours nomme ce que SA fenêtre a (email + mot de passe VRM), pas « Se connecter avec VRM »`, r.carte.slice(0, 400).replace(/\n/g, ' · '));
+  }
+  // L'autre sens : une 5.171 (canal adressé) garde la promesse — l'app LA tient.
+  const neuve = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.171.0' });
+  dit(neuve.etat === 'pasconnectee' && neuve.voie === 'app' && /sans rien à taper/i.test(neuve.carte), 'autre sens : une 5.171 garde « je la connecte d’ici, sans rien à taper »', `${neuve.etat} · voie ${neuve.voie}`);
 
   // ── 4 ter. LES DEUX ÉCRANS D'ACCUEIL DISENT LA MÊME CHOSE (§11) ───────────
   // Il y avait DEUX onboardings : le tableau de bord récitait « 3 étapes »
