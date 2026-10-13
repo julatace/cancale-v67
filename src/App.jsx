@@ -9634,7 +9634,14 @@ function regleApresPrix(regle, erreurs) {
   const vingt = (erreurs || []).some((e) => e && String(e.code) === '21992');
   const plus = vingt ? ' eBay signale que le refus automatique a sauté.' : '';
   if (!regle || typeof regle !== 'object') return { msg: plus.trim(), ton: plus ? 'warn' : 'ok', lecture: undefined };
-  const lecture = regle.lecture && typeof regle.lecture === 'object' ? { ...regle.lecture } : { lu: false, raison: 'apres-ecriture', lueA: Date.now() };
+  // ⚠️ (tour 4, #10) Un changement de PRIX ne crée pas de règle. Quand la
+  // relecture échoue (`lecture` null) ET qu'il n'y avait AUCUNE règle avant
+  // (`regle.avant` absent), on ne pose PAS « apres-ecriture » (risque) : ce
+  // serait inventer « eBay tient peut-être une règle » sur une annonce qui n'en
+  // a jamais eu, sous un « ✓ Modifié ». `undefined` ⇒ l'état local ne change
+  // pas (la carte reste « aucune »/« jamais »). Le risque n'est légitime que
+  // s'il y avait une règle AVANT (elle a pu tomber).
+  const lecture = regle.lecture && typeof regle.lecture === 'object' ? { ...regle.lecture } : (regle.avant ? { lu: false, raison: 'apres-ecriture', lueA: Date.now() } : undefined);
   if (regle.tombee === true) {
     // ⚠️ (tour 4, défaut #5) La phrase tient compte du REFUS
     //    (`MinimumBestOfferPrice`), pas seulement de l'acceptation :
@@ -9670,7 +9677,7 @@ function regleApresPrix(regle, erreurs) {
     if (refusTombe) return { msg: `Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}, mais le refus des offres basses (sous ${eurEbay(regle.avant.refuse)}) n'est plus sur l'annonce eBay.` + (bas ? ' Et le seuil est moins de la moitié du prix : change-le si besoin.' : '') + plus, ton: 'warn', lecture };
     return { msg: `✓ Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}.` + (bas ? ' C\'est moins de la moitié du prix : change-la si besoin.' : '') + plus, ton: (bas || vingt) ? 'warn' : 'ok', lecture };
   }
-  if (!l && regle.avant) return { msg: 'Prix changé — je n\'ai pas pu relire ta règle d\'offre : « Relire chez eBay ».' + plus, ton: 'warn', lecture };
+  if (!l && regle.avant) return { msg: 'Prix changé — je n\'ai pas pu relire ta règle d\'offre : « Relire chez eBay » plus haut.' + plus, ton: 'warn', lecture };
   return { msg: plus.trim(), ton: plus ? 'warn' : 'ok', lecture };
 }
 // LES ISSUES D'UNE POSE / D'UN RETRAIT (la carte ET le geste groupé, §11) —

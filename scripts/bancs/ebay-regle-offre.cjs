@@ -1323,6 +1323,14 @@ async function finPage(pg, errs, quoi) {
           `[18] ${T} lot : une annonce « seuil lu, offres inconnues » porte son lien « Voir sur eBay »`, `statut=${st} · lien=${lien}`);
         await ctx.close();
       });
+      // (tour 4, #10) La moitié APP (`regleApresPrix` ne pose plus
+      // « apres-ecriture » sans règle préalable) est un affinage d'état
+      // TRANSITOIRE : `onSaved` relit aussitôt la base, qui fait foi. Le défaut
+      // dominant et sa correction vivent dans la ROUTE — prouvés par
+      // `audit-ebay-route [R-revise-sans-regle]` + la mutation
+      // `revise-invente-regle`. Pas de contrôle de rendu ici : il ne pourrait
+      // pas échouer (la relecture écrase l'état local), et un contrôle qui ne
+      // peut pas échouer est pire qu'absent (§6.5).
 
       // ── 17. DEVISE ÉTRANGÈRE (#4/#6) ────────────────────────────────────
       // VRM ne POSE pas de règle en devise (la route refuse une feuille en
