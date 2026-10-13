@@ -1,0 +1,867 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 2361028..ae500fa 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -9544,3 +9544,18 @@ Formulaire : état à choisir, aucun défaut Occasion, remise à blanc par paire
+ catégorie incompatible ; vérifier/publier bloqués sans choix. Serveur et règle
+ de brouillon exigent l'état. Route 428 contrôles, transport et bancs formulaire /
+ comptes (sync partielle, refus, panne) verts, build vert. Agent toujours éteint.
++
++## Reprise Cloud Codex — 13 octobre, mémoire du gel K1
++
++Gel persistant par compte et ancre fixe : `src/vintedPublication.js`.
++Lire la section datée de `docs/passation/journal-codex.md` avant de reprendre.
++Les petites lignes `vrm_vinted_publication_*` et les liens par `(uid,tx)` sont
++hors de `main` pour résister aux appareils concurrents. Les liens synchronisés
++dans `main.vrm_ventes_reliees` sont un miroir : jamais la source du dégel.
++Ils gardent l'ID de la fiche et le numéro externe vérifiés, pas le titre.
++Le gel n'expire pas. Une panne conserve la mémoire et bloque la publication.
++Formulaire et planificateur relisent avant envoi. Ma journée signale les ventes
++non reliées après 72 h. La règle du retrait automatique existant est inchangée.
++17 scénarios K1 / 8 mutations ; banc K1 28 contrôles à 390/1512 px ; 97 audits
++hors SQL et build verts. K1 a encore ses alertes élargies/cartes à compléter.
++K4/K5 non construits dans ce lot ; moteur éteint, K14 gelé, branche pour revue.
+diff --git a/docs/passation/journal-codex.md b/docs/passation/journal-codex.md
+index 7825376..2754783 100644
+--- a/docs/passation/journal-codex.md
++++ b/docs/passation/journal-codex.md
+@@ -208,3 +208,59 @@ normaux de programmation et l'action déjà portée par un lien ne sont plus ré
+ Deux contrôles de la vraie fonction app couvrent désormais règle absente/règle
+ existante avec relecture ratée. Build vert, audit route 430/0, offres auto 16/0,
+ banc règle d'offre blocs 8+18 à 390 et 1512 px : 24/0.
++
++### 13 octobre — reprise Cloud, gel persistant K1 (premier lot)
++
++Reprise réelle de `claude/codex-ebay` / PR #488 à `498b7f9`, avec les transferts
++et `f97f27b` déjà intégrés. Copie Cloud isolée de l'ancien worktree local qui
++portait encore des modifications non commitées ; celles-ci n'ont pas été touchées.
++
++`src/vintedPublication.js` porte la règle et la mémoire K1, séparées des règles
++autorisant un retrait automatique. Ancre unique `vrm_vinted_publication_activation`
++créée sans écrasement puis relue : la fenêtre activation moins 30 jours ne glisse
++pas. Les lignes `vrm_vinted_publication_<uid>` conservent les ventes non identifiées
++par compte, même à J+100 ou après disparition de la vente de la capture. Seule
++une identité, un lien déclaré ou un état explicite de retour/remboursement les
++résout. Anciennes ventes : registre distinct, sans gel. Identités contradictoires :
++gel, aucune source choisie au hasard. Conversation seule sans vente : rien.
++
++Une lecture ratée/absente/mal formée, une capture plus ancienne ou une écriture
++conditionnelle refusée restent `pas su`. La mémoire précédente est conservée.
++La création ou modification concurrente est relue une fois, sans boucle ni
++écrasement aveugle. La session vendeur est vérifiée avant/après chaque opération.
++Le plafond d'un lecteur paginé strict rend maintenant `null`, pas une liste
++potentiellement tronquée.
++
++Formulaire et planificateur partagent la garde par compte d'origine et relisent
++avant chaque envoi, après la confirmation. Une relecture vieille de 30 min exige
++une confirmation du risque. Numéro ambigu ou compte d'origine inconnu : bloqué.
++Une identité sans état bloque la paire, sans autoriser de retrait automatique.
++Le lien manuel choisit une fiche précise (ID), vérifie son numéro externe unique
++sur le bon compte dans le nuage, puis le revérifie après confirmation. Lien
++immuable par `(uid, tx)`, rangé dans `vrm_ventes_reliees_<uid>_<tx>` ; miroir
++`vrm_ventes_reliees` dans SYNC_KEYS, rattrapé par le chargement Cloud habituel.
++Le miroir n'est jamais la vérité utilisée pour dégeler : un appareil ancien ne
++peut pas perdre les liens en remplaçant `main`. L'identité conserve l'ID de paire
++après une renumérotation, jamais le titre ou un ancien numéro réutilisé.
++
++Après 72 h, Ma journée montre le lien vers eBay → Annonces et compte ce travail
++dans son en-tête. Une panne de lecture conserve la liste précédente.
++
++Validation : build Vite 6.4.4 vert ; 97 audits hors SQL verts (corpus/mocks,
++fetch réseau désactivé ; Chromium temporaire via BANC_CHROMIUM). Audit eBay
++430/0, preuve de vente 92/0, variables et retrait automatique verts.
++`audit-vinted-publication.mjs` : 17 scénarios, 8 mutations détectées.
++`ebay-gel-publication.cjs` : 28 contrôles rendus à 390/1512 px (gel, compte non
++gelé actif, planification bloquée, ancre conservée après navigation/rechargement,
++lien posé qui lève le gel et bloque la paire vendue, Ma journée, panne, 0 appel
++engageant). Captures inspectées. Le même banc échoue sur le build de `498b7f9`
++sur le gel absent. Le banc annonces existant reste vert. Pas de nouvelle passe
++SQL : aucune migration SQL dans ce lot, résultats SQL précédents conservés.
++
++K1 n'est pas annoncé entièrement fini : restent les alertes élargies aux liens
++manuels/lots et les détails de fraîcheur sur chaque carte. La nouvelle famille
++de retrait et `vue_le` sont K8 ; aucune preuve ni règle du retrait automatique
++actuel n'a été élargie. K4/K5, Studio et sessions/équipe restent en chantier.
++Aucun appel réel eBay/Vinted, aucune donnée de test en production, aucun achat
++d'étiquette, aucune activation du moteur, aucun merge vers main ni déploiement.
++K14 reste gelé. Les informations légales restent reportées par Julien.
+diff --git a/scripts/audit-vinted-publication.mjs b/scripts/audit-vinted-publication.mjs
+new file mode 100644
+index 0000000..f96fab1
+--- /dev/null
++++ b/scripts/audit-vinted-publication.mjs
+@@ -0,0 +1,147 @@
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { spawnSync } from 'node:child_process';
++import { pathToFileURL } from 'node:url';
++const moduleUrl = new URL('../src/vintedPublication.js', import.meta.url);
++if (process.argv.includes('--prouve')) {
++  const original = fs.readFileSync(moduleUrl, 'utf8');
++  const mutations = {
++    'gel-retire': ["if (p.length) return", "if (false) return"],
++    'gel-expire': ["const p = Object.values(e.pending || {});", "const p = Object.values(e.pending || {}).filter(v => Date.now() - v.depuis < 72 * 3600000);"],
++    'capture-vide-efface': ["const pending = objet(precedent.pending) ? { ...precedent.pending } : {};", "const pending = {};"],
++    'autre-compte-identite': ["m[1] !== uid || (r.tx", "false || (r.tx"],
++    'ancre-glissante': ["return objet(r?.data) && Number.isFinite(r.data.at) ? r.data.at : undefined;", "return maintenant;"],
++    'cas-ignore': ["const relu = ok ? await store.lire(id) : undefined;", "const relu = { data: next };"],
++    'numero-multiple-accepte': ["if (ids.length > 1)", "if (false)"],
++    'marqueur-inconnu-accepte': ["if (!marqueurLu)", "if (false)"],
++  };
++  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-k1-mutations-'));
++  try {
++    for (const [name, [before, after]] of Object.entries(mutations)) {
++      assert.ok(original.includes(before), 'ancre mutation ' + name);
++      const file = path.join(temp, name + '.mjs');
++      fs.writeFileSync(file, original.replace(before, after).replace("'../api/_lib/numerotation.js'", JSON.stringify(new URL('../api/_lib/numerotation.js', import.meta.url).href)));
++      const r = spawnSync(process.execPath, [new URL(import.meta.url).pathname], { encoding: 'utf8', env: { ...process.env, VRM_K1_MODULE: file } });
++      assert.notEqual(r.status, 0, 'mutation reste verte : ' + name);
++      assert.match(r.stderr, /AssertionError/, 'mutation échoue pour une autre raison : ' + name);
++      console.log('OK mutation détectée : ' + name);
++    }
++  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
++  process.exit(0);
++}
++const { calculerGelK1, activationK1, memoriserGelK1, gardePublicationK1, JOUR_K1 } = await import(process.env.VRM_K1_MODULE ? pathToFileURL(process.env.VRM_K1_MODULE).href : moduleUrl.href);
++const now = Date.parse('2026-10-13T06:00:00Z');
++const sale = (tx, days = 1, status = 'À expédier') => ({ transaction_id: tx, date: new Date(now - days * JOUR_K1).toISOString(), status });
++const base = { activation: now, uid: '111', ventes: [sale('91')], transactions: [], bordereaux: [], maintenant: now };
++let n = 0;
++function test(name, fn) { return Promise.resolve().then(fn).then(() => { n++; console.log('OK ' + name); }); }
++const fiches = { '701': { numero: '1', accountId: '111' }, '702': { numero: '10', accountId: '222' } };
++const garde = (etats, pairId = '701', numero = '1', extra = {}) => gardePublicationK1({ etats, fiches, pairId, numero, marqueurLu: true, ...extra });
++const memory = () => {
++  const rows = new Map(); let writes = 0;
++  return { rows, get writes() { return writes; },
++    lire: async id => rows.has(id) ? structuredClone(rows.get(id)) : null,
++    creer: async (id, data) => { writes++; if (!rows.has(id)) rows.set(id, { data: structuredClone(data), updated_at: String(writes) }); return true; },
++    remplacer: async (id, data, version) => { writes++; if (rows.get(id)?.updated_at !== version) return false; rows.set(id, { data: structuredClone(data), updated_at: String(writes) }); return true; },
++  };
++};
++await test('vente sans identité : gel du seul compte, même titre partout', () => {
++  const a = calculerGelK1(base);
++  assert.equal(Object.keys(a.pending).length, 1);
++  assert.equal(garde({ '111': a, '222': { pending: {} } })?.k, 'compte-gele');
++  assert.equal(garde({ '111': a, '222': { pending: {} } }, '702', '10'), null);
++});
++await test('J+4 et J+100 : aucune expiration, même après disparition de la capture', () => {
++  const a = calculerGelK1(base);
++  for (const days of [4, 100]) assert.equal(Object.keys(calculerGelK1({ ...base, precedent: a, ventes: [], maintenant: now + days * JOUR_K1 }).pending).length, 1);
++  assert.equal(garde({ '111': { ...a, pending: { '91': { ...a.pending['91'], depuis: now - 100 * JOUR_K1 } } } })?.k, 'compte-gele');
++});
++await test('ancre fixe : historique ancien sans gel, fenêtre ne glisse jamais', () => {
++  const a = calculerGelK1({ ...base, ventes: [sale('92', 31), sale('91', 29)] });
++  assert.deepEqual(Object.keys(a.pending), ['91']); assert.deepEqual(Object.keys(a.anciens), ['92']);
++  assert.deepEqual(Object.keys(calculerGelK1({ ...base, precedent: a, ventes: [], maintenant: now + 100 * JOUR_K1 }).pending), ['91']);
++});
++await test('date ou état inconnus : gel, jamais une absence de vente', () => {
++  assert.equal(Object.keys(calculerGelK1({ ...base, ventes: [{ transaction_id: '91' }] }).pending).length, 1);
++});
++await test('identité sans état : paire bloquée, compte dégelé, zéro preuve auto', () => {
++  const a = calculerGelK1({ ...base, transactions: [{ id: 'harvest_111_txn_91', it: '701', ti: '' }] });
++  assert.equal(Object.keys(a.pending).length, 0); assert.equal(garde({ '111': a })?.k, 'vente-probable'); assert.equal(a.preuves, undefined);
++  const b = calculerGelK1({ ...base, precedent: a, ventes: [], transactions: [] });
++  assert.equal(garde({ '111': b })?.k, 'vente-probable');
++});
++await test('conversation seule sans vente : aucune preuve, aucun gel', () => {
++  const a = calculerGelK1({ ...base, ventes: [], transactions: [{ id: 'harvest_111_txn_91', it: '701', ti: '' }] });
++  assert.equal(garde({ '111': a }), null);
++});
++await test('bordereau seul, lot et autre compte : identités exactes', () => {
++  const a = calculerGelK1({ ...base, bordereaux: [{ id: 'harvest_111_label_91', it: '701' }] });
++  assert.equal(garde({ '111': a })?.k, 'vente-probable');
++  const lot = calculerGelK1({ ...base, bordereaux: [{ id: 'harvest_111_label_91', items: [{ id: '701' }, { item_id: '703' }] }] });
++  assert.deepEqual(lot.probables.sort(), ['701', '703']);
++  const autre = calculerGelK1({ ...base, bordereaux: [{ id: 'harvest_222_label_91', it: '701' }, { id: 'harvest_111_label_latest', tx: '91', it: '701' }, { id: 'harvest_111_label_91', tx: '92', it: '701' }] });
++  assert.equal(garde({ '111': autre })?.k, 'compte-gele');
++});
++await test('remboursement lu résout le gel et la paire, sans effacer les autres', () => {
++  const a = calculerGelK1({ ...base, ventes: [sale('91'), sale('92')], bordereaux: [{ id: 'harvest_111_label_91', it: '701' }] });
++  const b = calculerGelK1({ ...base, precedent: a, ventes: [sale('91', 1, 'Remboursement effectué')] });
++  assert.deepEqual(Object.keys(b.pending), ['92']); assert.equal(b.probables.includes('701'), false);
++});
++await test('sources contradictoires : compte gelé, jamais une identité choisie au hasard', () => {
++  const a = calculerGelK1({ ...base, transactions: [{ id: 'harvest_111_txn_91', it: '701', ti: 'Payée' }], bordereaux: [{ id: 'harvest_111_label_91', it: '703' }] });
++  assert.equal(garde({ '111': a })?.k, 'compte-gele');
++  assert.equal(garde({ '111': calculerGelK1({ ...base, precedent: a, ventes: [], transactions: [], bordereaux: [] }) })?.k, 'compte-gele');
++});
++await test('lien manuel : compte dégelé, paire vendue bloquée ; autre compte rejeté', () => {
++  const lien = { uid: '111', tx: '91', numero: '1', itemId: '701', at: now };
++  const a = calculerGelK1({ ...base, liens: { '111:91': lien } });
++  assert.equal(Object.keys(a.pending).length, 0); assert.equal(garde({ '111': a })?.k, 'vente-probable');
++  assert.equal(garde({ '111': a }, '701', '10', { fiches: { '701': { numero: '10', accountId: '111' } } })?.k, 'vente-probable');
++  assert.equal(garde({ '111': a }, '703', '1', { fiches: { '703': { numero: '1', accountId: '111' } } }), null); // ancien numéro seul : jamais une identité
++  assert.equal(Object.keys(calculerGelK1({ ...base, liens: { '111:91': { ...lien, uid: '222' } } }).pending).length, 1);
++});
++await test('numéro multiple, origine inconnue ou marqueur pas su : aucune décision positive', () => {
++  assert.equal(garde({}, '701', '1', { marqueurLu: false })?.k, 'gel-pas-su');
++  assert.equal(garde({ '111': { pending: {} } }, '701', '1', { marqueurLu: false })?.k, 'gel-pas-su');
++  assert.equal(garde({}, '701', '1', { fiches: { '701': { numero: '1' } } })?.k, 'gel-pas-su');
++  assert.equal(garde({}, '701', '1', { fiches: { ...fiches, '703': { numero: '1' } } })?.k, 'numero-ambigu');
++  assert.equal(garde({}, '701', '10')?.k, 'numero-ambigu');
++});
++await test('activation concurrente et appareil tardif : même ancre', async () => {
++  const store = memory(); const a = await Promise.all([activationK1(store, now), activationK1(store, now + JOUR_K1)]);
++  assert.equal(a[0], a[1]); assert.equal(await activationK1(store, now + 100 * JOUR_K1), a[0]);
++});
++await test('créations concurrentes du gel : relecture bornée, deux états sûrs', async () => {
++  const store = memory();
++  const sources = { transactions: [], bordereaux: [], ordres: [{ id: 'harvest_111_orders_sold', cap: new Date(now).toISOString(), v: [sale('91')] }] };
++  const args = { store, activation: now, uid: '111', sources, maintenant: now, liens: {} };
++  const res = await Promise.all([memoriserGelK1(args), memoriserGelK1({ ...args, maintenant: now + 1 })]);
++  assert.equal(res.every(r => !r.inconnu), true);
++  assert.deepEqual(res[0].pending, res[1].pending);
++});
++await test('activation illisible : zéro création de repli', async () => {
++  let writes = 0; assert.equal(await activationK1({ lire: async () => undefined, creer: async () => writes++ }, now), undefined); assert.equal(writes, 0);
++});
++const sources = { transactions: [], bordereaux: [], ordres: [{ id: 'harvest_111_orders_sold', cap: new Date(now).toISOString(), v: [sale('91')] }] };
++await test('mémoire rangée et relue ; panne conserve la précédente sans écriture', async () => {
++  const store = memory(); const args = { store, activation: now, uid: '111', sources, maintenant: now, liens: {} };
++  const a = await memoriserGelK1(args); assert.equal(a.inconnu, false); const before = store.writes;
++  for (const s of [null, { ...sources, ordres: [] }, { ...sources, ordres: [{ id: 'harvest_111_orders_sold', v: null }] }]) assert.equal((await memoriserGelK1({ ...args, sources: s })).inconnu, true);
++  assert.equal(store.writes, before); assert.deepEqual(Object.keys(store.rows.get('vrm_vinted_publication_111').data.pending), ['91']);
++});
++await test('capture plus ancienne et CAS refusé : mémoire intacte, publication gelée', async () => {
++  const store = memory(); const args = { store, activation: now, uid: '111', sources, maintenant: now, liens: {} };
++  await memoriserGelK1(args); const before = store.writes;
++  const ancien = { ...sources, ordres: [{ ...sources.ordres[0], cap: new Date(now - 1).toISOString(), v: [] }] };
++  assert.equal((await memoriserGelK1({ ...args, sources: ancien })).inconnu, true); assert.equal(store.writes, before);
++  store.remplacer = async () => false;
++  assert.equal((await memoriserGelK1({ ...args, sources: { ...sources, ordres: [{ ...sources.ordres[0], v: [sale('91'), sale('92')] }] } })).inconnu, true);
++  assert.deepEqual(Object.keys(store.rows.get('vrm_vinted_publication_111').data.pending), ['91']);
++});
++await test('création ignorée par concurrence : le candidat local ne devient pas vérité', async () => {
++  let first = true; const store = { lire: async () => first ? (first = false, null) : { data: { pending: { '92': {} } } }, creer: async () => true };
++  assert.equal((await memoriserGelK1({ store, activation: now, uid: '111', sources, maintenant: now, liens: {} })).inconnu, true);
++});
++console.log(`${n} scénarios K1 sans échec — sources simulées, aucun appel réel.`);
+diff --git a/scripts/bancs/ebay-gel-publication.cjs b/scripts/bancs/ebay-gel-publication.cjs
+new file mode 100644
+index 0000000..2b13a8d
+--- /dev/null
++++ b/scripts/bancs/ebay-gel-publication.cjs
+@@ -0,0 +1,136 @@
++// K1 rendu : données inventées, réseau extérieur entièrement simulé.
++// Sert le build courant sur BANC_PORT (défaut 4847).
++const { chromium } = require('playwright');
++const assert = require('node:assert/strict');
++const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
++const { projette } = require('../_fond-vm.cjs');
++const { metaVersData } = require('./_meta.cjs');
++const PORT = Number(process.env.BANC_PORT || 4847);
++const now = Date.now(), iso = new Date(now).toISOString();
++const accounts = ['111', '222'].map((uid, i) => ({ id: i + 1, vinted_user_id: uid, login: 'compte_' + uid, domain: 'www.vinted.fr', updated_at: iso }));
++const main = { vrm_numerotation: { version: 1 }, vinted_annonce_numeros: {
++  '701': { numero: '1', accountId: '111', title: 'Paire identique taille 42', photo: 'https://img.test/701.jpg' },
++  '702': { numero: '10', accountId: '222', title: 'Paire identique taille 42', photo: 'https://img.test/702.jpg' },
++} };
++const fixture = () => [
++  { id: 'main', data: structuredClone(main), updated_at: iso },
++  ...accounts.map((a, i) => ({ id: `harvest_${a.vinted_user_id}_listings`, data: { capturedAt: iso, payload: { items: [{ id: 701 + i, title: 'Paire identique taille 42', price: { amount: '90', currency_code: 'EUR' }, photo: { url: `https://img.test/${701 + i}.jpg` } }] } } })),
++  ...accounts.map((a, i) => ({ id: `harvest_${a.vinted_user_id}_orders_sold`, data: { capturedAt: iso, payload: { my_orders: i ? [] : [{ transaction_id: '91', status: 'À expédier', date: new Date(now - 4 * 86400000).toISOString() }] } } })),
++  { id: 'ebay_listings', data: { capturedAt: iso, items: [] } },
++  { id: 'ebay_orders', data: { capturedAt: iso, orders: [] } },
++  { id: 'ebay_programmees', data: { items: [] } },
++  { id: 'ebay_brouillons', data: { items: { d1: { id: 'd1', pairId: '701', numero: '1', titre: 'Brouillon N°1', prix: '90', quantite: '1', etat: '3000', photos: ['https://img.test/701.jpg'], categorie: { id: '123', nom: 'Chaussures', requis: [] }, aspects: {}, etatBrouillon: 'brouillon' } } } },
++  { id: 'lbc_ventes', data: { ventes: {} } },
++];
++(async () => {
++  const root = path.resolve(__dirname, '../../dist');
++  const server = http.createServer((req, res) => {
++    const file = path.join(root, req.url.split('?')[0] === '/' ? 'index.html' : req.url.split('?')[0]);
++    if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
++    const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2' };
++    res.setHeader('content-type', types[path.extname(file)] || 'application/octet-stream'); fs.createReadStream(file).pipe(res);
++  });
++  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); });
++  const browser = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--no-sandbox', '--no-proxy-server', '--disable-dev-shm-usage', '--use-angle=swiftshader'] });
++  let checks = 0;
++  try {
++    for (const width of [390, 1512]) {
++      const rows = fixture(); let panne = false; const envois = [];
++      const ctx = await browser.newContext({ viewport: { width, height: 950 }, reducedMotion: 'reduce' });
++      const pg = await ctx.newPage(); const errors = [];
++      pg.on('pageerror', e => errors.push(e.message));
++      await pg.addInitScript(() => localStorage.setItem('vrm_acces_direct', '1'));
++      // Tout ce qui n'est pas le serveur du build est un mock, y compris images.
++      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/, r => r.abort());
++      await pg.route('**/rest/v1/**', async route => {
++        const req = route.request();
++        const u = new URL(metaVersData(req.url()));
++        const reply = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(data) });
++        if (u.pathname.endsWith('/vinted_accounts')) return reply(accounts);
++        if (u.searchParams.get('select') === 'owner') return reply({}, 400);
++        const id = u.searchParams.get('id') || '';
++        if (panne && req.method() === 'GET' && /orders_sold|_txn_|_label_/.test(req.url())) return reply({}, 503);
++        if (req.method() === 'POST') {
++          const incoming = [].concat(req.postDataJSON()); const saved = [];
++          for (const row of incoming) {
++            const current = rows.find(r => r.id === row.id);
++            if (current && /ignore-duplicates/.test(req.headers().prefer || '')) continue;
++            if (current) Object.assign(current, row); else rows.push(row);
++            saved.push(row);
++          }
++          return reply(saved);
++        }
++        if (req.method() === 'PATCH') {
++          const current = rows.find(r => 'eq.' + r.id === id && (!u.searchParams.get('updated_at') || 'eq.' + r.updated_at === u.searchParams.get('updated_at')));
++          if (!current) return reply([]);
++          Object.assign(current, req.postDataJSON()); return reply([current]);
++        }
++        let out = rows;
++        if (id.startsWith('eq.')) out = rows.filter(r => r.id === id.slice(3));
++        if (id.startsWith('in.')) out = rows.filter(r => id.slice(4, -1).split(',').includes(r.id));
++        if (id.startsWith('like.')) { const re = new RegExp('^' + id.slice(5).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*') + '$'); out = rows.filter(r => re.test(r.id)); }
++        return reply(out.map(r => projette(r, u.searchParams.get('select') || 'id,data')));
++      });
++      await pg.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
++      await pg.route('**/api/ebay**', r => {
++        const b = r.request().method() === 'POST' ? r.request().postDataJSON() : {};
++        if (['publish', 'retirer', 'programmer', 'offre'].includes(b.action)) envois.push(b);
++        const data = b.action === 'status' ? { ok: true, connected: true } : b.action === 'pubinfo' ? { ok: true, categorie: { categoryId: '123', categoryName: 'Chaussures' }, attributs: [], conditions: [{ id: '3000', label: 'Occasion' }] } : { ok: true, ready: true, canConsent: true };
++        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
++      });
++      const choisir = async n => {
++        await pg.getByRole('button', { name: new RegExp('N°' + n + '\\b.*Paire identique') }).click();
++        await pg.getByRole('button', { name: 'Trouver la catégorie eBay', exact: true }).click();
++        await pg.locator('[data-ebay-etat-paire]').selectOption('3000');
++      };
++      const annonces = async () => {
++        const compte = pg.getByRole('button', { name: 'Compte eBay', exact: true });
++        await compte.waitFor();
++        await compte.locator('..').getByRole('button', { name: 'Annonces', exact: true }).click();
++      };
++      await pg.goto(`http://127.0.0.1:${PORT}/?tab=plat_ebay`);
++      await annonces();
++      await pg.waitForSelector('[data-ebay-gel-publication="1"]').catch(async e => { console.log('Écran initial', await pg.locator('body').innerText(), errors); await pg.screenshot({ path: '/tmp/vrm-k1-debug.png', fullPage: true }); throw e; }); checks++;
++      const anchor = rows.find(r => r.id === 'vrm_vinted_publication_activation').data.at;
++      await pg.screenshot({ path: `/tmp/vrm-k1-gel-${width}.png`, fullPage: true });
++      await pg.locator('[data-brouillon-choix="d1"]').check();
++      await pg.locator('[data-brouillons-programmer]').click();
++      const planif = pg.locator('[data-planif]');
++      await planif.waitFor();
++      assert.match(await planif.innerText(), /n’est pas encore reliée/); checks++;
++      await planif.getByRole('button', { name: /Fermer/ }).click();
++      await pg.goto(`http://127.0.0.1:${PORT}/?tab=journee`);
++      await pg.waitForSelector('[data-journee-ventes-non-reliees="1"]'); checks++;
++      assert.equal((await pg.locator('body').innerText()).includes('Rien d\'urgent'), false); checks++;
++      await pg.goto(`http://127.0.0.1:${PORT}/?tab=plat_ebay`); await annonces();
++      await pg.waitForSelector('[data-ebay-gel-publication="1"]');
++      await pg.getByRole('button', { name: 'Vendre une paire sur eBay', exact: true }).click();
++      await choisir('1');
++      await pg.waitForSelector('[data-publier-garde="compte-gele"]').catch(async e => { console.log('Garde réelle:', await pg.locator('[data-publier-garde]').allTextContents(), await pg.locator('[data-publier-garde]').evaluateAll(xs => xs.map(x => x.dataset)), rows.filter(r => /publication/.test(r.id))); await pg.screenshot({ path: '/tmp/vrm-k1-debug.png', fullPage: true }); throw e; });
++      assert.equal(await pg.locator('[data-publier-ebay]').isDisabled(), true); checks++;
++      await pg.getByRole('button', { name: 'Changer', exact: true }).click();
++      await choisir('10');
++      assert.equal(await pg.locator('[data-publier-garde]').count(), 0); assert.equal(await pg.locator('[data-publier-ebay]').isEnabled(), true); checks += 2;
++      await pg.goto(`http://127.0.0.1:${PORT}/?tab=plat_ebay`); await annonces();
++      await pg.waitForSelector('[data-ebay-gel-publication="1"]');
++      assert.equal(rows.find(r => r.id === 'vrm_vinted_publication_activation').data.at, anchor); checks++;
++      await pg.getByLabel('Paire de la vente 91').selectOption('701');
++      await pg.getByRole('button', { name: 'Relier cette vente', exact: true }).first().click();
++      await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Relier cette vente', exact: true }).click();
++      await pg.waitForFunction(() => !document.querySelector('[data-ebay-gel-vente="111:91"]'));
++      assert.equal(rows.find(r => r.id === 'vrm_ventes_reliees_111_91').data.numero, '1'); checks++;
++      await pg.getByRole('button', { name: 'Vendre une paire sur eBay', exact: true }).click();
++      await choisir('1');
++      await pg.waitForSelector('[data-publier-garde="vente-probable"]'); checks++;
++      panne = true; await pg.goto(`http://127.0.0.1:${PORT}/?tab=plat_ebay`); await annonces();
++      await pg.getByRole('button', { name: 'Vendre une paire sur eBay', exact: true }).click();
++      await choisir('10');
++      await pg.waitForSelector('[data-publier-garde="gel-pas-su"]'); checks++;
++      assert.equal(envois.length, 0); assert.deepEqual(errors, []); checks += 2;
++      assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); checks++;
++      await pg.screenshot({ path: `/tmp/vrm-k1-${width}.png`, fullPage: true });
++      await ctx.close(); console.log(`OK K1 rendu ${width}px`);
++    }
++    console.log(`${checks} contrôles sans échec. Aucun appel vendeur réel.`);
++  } finally { await browser.close(); server.close(); }
++})().catch(e => { console.error(e); process.exitCode = 1; });
+diff --git a/src/App.jsx b/src/App.jsx
+index 2292c7d..325b0d2 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -4,6 +4,7 @@ import { VAPID_PUBLIC_KEY } from "./vapid.js";
+ import { noterPlantage, viderPlantages } from "./plantages.js";
+ import * as photosVinted from "./photosVinted.js";
+ import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
++import { activationK1, memoriserGelK1, gardePublicationK1 } from './vintedPublication.js';
+ // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
+ // décide à qui appartient un email) — jamais une seconde normalisation ici.
+ import { normAdresse } from "../api/_lib/proprietaire-email.js";
+@@ -953,6 +954,7 @@ const SYNC_KEYS = [
+   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
+   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
+   'vrm_ebay_retrait_auto',
++  'vrm_ventes_reliees', // miroir des identités manuelles K1, jamais preuve de retrait auto
+   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
+   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
+   'vrm_ebay_baisses',
+@@ -2079,6 +2081,7 @@ const lireTout = async (query, opts = {}) => {
+     if (!Array.isArray(lot)) return (p === 0 || opts.strict) ? null : out;
+     out.push(...lot);
+     if (lot.length < PAGE_SB) break;
++    if (opts.strict && p === max - 1) return null; // plafond atteint : liste possiblement tronquée
+   }
+   return out;
+ };
+@@ -12174,6 +12177,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+   const gardePublier = () => {
+     const d = brouillonCourant();
+     const n = d.numero ? cleNum(d.numero) : '';
++    const gel = ventes && ventes.publication && ventes.publication.garde(d.pairId, n);
++    if (gel) return gel;
+     if (!n) return null;
+     const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(n) : null;
+     if (ou) return { k: 'vendue', t: `La paire N°${n} est déjà vendue sur ${ou} — rien ne sera publié.` };
+@@ -12224,6 +12229,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+       });
+       if (!ok) return;
+     }
++    // Relire après les confirmations, avant tout envoi. Un autre appareil ou
++    // l'extension a pu ranger une vente pendant que la feuille était ouverte.
++    if (ventes && ventes.publication) {
++      const g1 = await ventes.publication.verifier(b.item.pairId || (pairSel && pairSel.id) || brouillon?.pairId, b.item.numero);
++      if (g1) { setRes({ err: g1.t }); return; }
++    }
+     setBusy(true); setRes(null); setCheck(null);
+     // `appelEbay` ne lève jamais : une coupure (code 0) ou une réponse illisible
+     // n'est PAS « impossible » — la requête a pu arriver, l'annonce exister.
+@@ -12551,6 +12562,90 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
+   }
+   return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos };
+ };
++// K1 : les petites lignes de mémoire restent hors du remplacement intégral
++// de `main`. L'ancre et chaque lien se créent sans écraser ; le gel utilise
++// une écriture conditionnelle. Aucun secret ni PDF n'est lu ici.
++const requeteMemoK1 = async (query, options = {}) => {
++  try {
++    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${query}`, { ...options, headers: sbAuth({ 'Content-Type': 'application/json', ...(options.headers || {}) }), signal: AbortSignal.timeout(5000) });
++    if (!r.ok) return undefined;
++    return await r.json();
++  } catch (_) { return undefined; }
++};
++const storePublicationK1 = {
++  lire: async id => {
++    const rows = await requeteMemoK1(`id=eq.${encodeURIComponent(id)}&select=id,data,updated_at`);
++    return Array.isArray(rows) ? (rows.length === 0 ? null : rows.length === 1 ? rows[0] : undefined) : undefined;
++  },
++  creer: async (id, data) => Array.isArray(await requeteMemoK1(`on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify([withOwner({ id, data })]) })),
++  remplacer: async (id, data, version) => {
++    if (!version) return false;
++    const rows = await requeteMemoK1(`id=eq.${encodeURIComponent(id)}&updated_at=eq.${encodeURIComponent(version)}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(withOwner({ data })) });
++    return Array.isArray(rows) && rows.length === 1;
++  },
++};
++const acteurPublicationK1 = () => AUTH.user?.id || 'lecture-directe';
++const storePublicationSessionK1 = acteur => Object.fromEntries(Object.entries(storePublicationK1).map(([nom, fn]) => [nom, async (...args) => {
++  if (acteurPublicationK1() !== acteur) return nom === 'lire' ? undefined : false;
++  const r = await fn(...args);
++  return acteurPublicationK1() === acteur ? r : (nom === 'lire' ? undefined : false);
++}]));
++async function lireLiensPublicationK1() {
++  // Pagination bornée : atteindre le plafond signifie pas su, jamais complet.
++  const out = {};
++  for (let page = 0; page < 20; page++) {
++    const rows = await requeteMemoK1('id=like.vrm_ventes_reliees_%25&select=id,data&order=id.asc', { headers: { Range: `${page * 500}-${page * 500 + 499}`, 'Range-Unit': 'items' } });
++    if (!Array.isArray(rows)) return null;
++    for (const r of rows) {
++      const m = /^vrm_ventes_reliees_(\d+)_(\d+)$/.exec(String(r.id || ''));
++      if (!m || !r.data || r.data.uid !== m[1] || r.data.tx !== m[2]) return null;
++      out[m[1] + ':' + m[2]] = r.data;
++    }
++    if (rows.length < 500) return out;
++  }
++  return null;
++}
++async function lirePublicationK1(comptes, preuve, acteur = acteurPublicationK1()) {
++  if (!isCloudReady() || !Array.isArray(comptes)) return null;
++  const store = storePublicationSessionK1(acteur);
++  const activation = await activationK1(store, Date.now());
++  if (activation === undefined) return null;
++  const liens = await lireLiensPublicationK1();
++  if (liens === null || acteurPublicationK1() !== acteur) return null;
++  const etats = {};
++  for (const uid of comptes) etats[uid] = await memoriserGelK1({ store, activation, uid, sources: preuve && preuve.sourcesK1, maintenant: Date.now(), liens });
++  if (acteurPublicationK1() !== acteur) return null;
++  return { etats, liens, activation };
++}
++
++function VentesNonRelieesK1({ onNav, onCount }) {
++  const [ventes, setVentes] = React.useState([]);
++  const [ko, setKo] = React.useState(false);
++  React.useEffect(() => {
++    let stop = false;
++    const lire = async () => {
++      const rows = await requeteMemoK1('id=like.vrm_vinted_publication_%25&select=id,data&limit=501');
++      if (stop) return;
++      if (!Array.isArray(rows) || rows.length >= 501) { setKo(true); return; }
++      setKo(false);
++      const liste = rows.filter(r => /^vrm_vinted_publication_\d+$/.test(r.id)).flatMap(r => Object.values(r.data?.pending || {})).filter(v => Date.now() - (Date.parse(v.date || '') || v.depuis) >= 72 * 3600000);
++      setVentes(liste);
++      if (onCount) onCount(liste.length);
++    };
++    const off = onCloudReady(lire);
++    const maj = e => { if (e.detail?.k === 'vrm_ventes_reliees') lire(); };
++    window.addEventListener('vrm:save', maj);
++    return () => { stop = true; off(); window.removeEventListener('vrm:save', maj); };
++  }, [onCount]);
++  if (!ventes.length && !ko) return null;
++  const noms = Object.fromEntries((load('vinted_accounts', []) || []).map(a => [String(a.vinted_user_id), a.login || String(a.vinted_user_id)]));
++  return <div data-journee-ventes-non-reliees={ventes.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '14px 16px', marginBottom: 14, fontSize: 13, lineHeight: 1.5 }}>
++    {ko && <p>Je n’ai pas pu relire les ventes non reliées — la liste précédente est conservée.</p>}
++    {ventes.map(v => <p key={v.uid + ':' + v.tx}>La vente {v.tx} de {noms[v.uid] || v.uid} n’est reliée à aucune paire depuis plus de 72 h — relie-la pour publier les paires de ce compte sur eBay.</p>)}
++    <button onClick={() => onNav && onNav('plat_ebay')}>Relier les ventes dans eBay → Annonces</button>
++  </div>;
++}
++
+ function useEbayPaires(comptes) {
+   const [paires, setPaires] = React.useState([]);
+   const [enLigne, setEnLigne] = React.useState(undefined);
+@@ -13667,13 +13762,15 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
+     if (p) return { d, raison: `déjà programmée sur eBay${p.debut && Number.isFinite(Date.parse(p.debut)) ? ` (${quandParisTexte(Date.parse(p.debut))})` : ''}` };
+     const ou = vendusPartout && vendusPartout.get(cleNum(d.numero));
+     if (ou) return { d, raison: `déjà vendue sur ${ou}` };
++    const gel = ventes && ventes.publication && ventes.publication.garde(d.pairId, d.numero);
++    if (gel) return { d, raison: gel.t };
+     // Une paire, une annonce — AUSSI à l'intérieur du lot : deux brouillons du
+     // même N° partiraient avec deux identifiants d'envoi (le 488 d'eBay ne
+     // protège pas). Le premier part, les suivants sont écartés et c'est dit.
+     if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon de la même paire est déjà dans ce lot' };
+     dansLeLot.add(sku);
+     return { d, item: b.item, sku };
+-  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout]);
++  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout, ventes && ventes.publication]);
+   const ordonnes = React.useMemo(() => {
+     const ok = analyse.filter((x) => x.item);
+     if (rythme.ordre === 'numero') return [...ok].sort((a, b) => triNum(a.d.numero, b.d.numero));
+@@ -13771,6 +13868,10 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
+     setEnvoi({ en: 0, total: lot.length });
+     for (let i = 0; i < lot.length; i++) {
+       const { l, v } = lot[i];
++      if (ventes && ventes.publication) {
++        const gel = await ventes.publication.verifier(l.d.pairId, l.d.numero);
++        if (gel) { bilan.refusees.push({ d: l.d, err: gel.t }); continue; }
++      }
+       setEnvoi({ en: i + 1, total: lot.length });
+       // (6 octobre) L'UUID déjà RANGÉ en base est GARDÉ : la copie de l'écran
+       // peut être périmée (un essai « incertain » qui l'a rangé, un autre
+@@ -14548,6 +14649,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+   // pour cette ligne : on le DIT, sinon « pas encore reliées » disparaît en
+   // silence — l'écran d'une panne serait celui où tout est relié (§4.1).
+   const [sansPreuveKO, setSansPreuveKO] = React.useState([]);
++  const [memoPublication, setMemoPublication] = React.useState(undefined);
++  const [publicationKO, setPublicationKO] = React.useState(false);
++  const [lienNumero, setLienNumero] = React.useState({});
++  const [lienMessage, setLienMessage] = React.useState({});
+   // Le geste de la ligne « pas reliées » suit l'extension de CE navigateur (sa
+   // version, sa session VRM) et l'appareil (téléphone : rien à générer ici).
+   const sansSouris = useSansSouris();
+@@ -14725,11 +14830,21 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+   // sont lues pour « pas encore reliées » que s'il y a ici une annonce reliée
+   // (en ligne ou programmée) qu'une double vente pourrait toucher (§4.4).
+   const avecSku = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku))) || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
+-  const clePreuve = avecSku ? comptesPreuve.join(',') : '';
++  const clePreuve = comptesPreuve.join(',');
+   React.useEffect(() => {
+     if (!aVerifier) return;
+     let stop = false;
+-    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
++    const acteur = acteurPublicationK1();
++    lirePreuvesVenteVinted({ comptes: comptesPreuve }).then(async (p) => {
++      const memo = await lirePublicationK1(comptesPreuve, p, acteur);
++      if (!stop) {
++        setVendusVinted(p ? p.vendus : null);
++        setSansPreuve(p ? p.sansPreuve : null);
++        setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []);
++        setPublicationKO(memo === null);
++        if (memo !== null) setMemoPublication(avant => ({ ...memo, etats: Object.fromEntries(Object.entries(memo.etats).map(([u, e]) => [u, e.inconnu ? { ...(avant?.etats?.[u] || {}), ...e } : e])) })); // panne : mémoire précédente intacte
++      }
++    });
+     (async () => {
+       try {
+         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+@@ -14741,7 +14856,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+       } catch (_) { if (!stop) setVentesLbc(null); }
+     })();
+     return () => { stop = true; };
+-  }, [aVerifier, items, clePreuve, preuveRelue]);
++  }, [aVerifier, items, clePreuve, preuveRelue, nuage]);
+   // Après une publication / modif : on resynchronise depuis eBay puis on relit.
+   // (9 octobre) Chaque compte relié est relu, l'un après l'autre — ou seulement
+   // celui qu'on vient de toucher (`ref`).
+@@ -14814,13 +14929,37 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+   const fiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [nuage, items]);
+   // ── UNE PAIRE DÉJÀ VENDUE, TOUTES PLATEFORMES (6 octobre) : LE verdict que
+   //    consomment le planificateur, le formulaire et l'alerte « à annuler » (§11).
+-  const ventesConnues = React.useMemo(() => numerosDejaVendus({
++  const nomsPublication = React.useMemo(() => Object.fromEntries((comptes || []).map(a => [String(a.vinted_user_id), a.login || String(a.vinted_user_id)])), [comptes]);
++  const gardeK1 = (memo, id, n) => gardePublicationK1({ etats: memo && memo.etats, fiches: load('vinted_annonce_numeros', {}) || {}, pairId: id, numero: n, noms: nomsPublication, marqueurLu: isCloudReady() });
++  const publication = {
++    garde: (id, n) => gardeK1(publicationKO ? null : memoPublication, id, n),
++    verifier: async (id, n) => {
++      const acteur = acteurPublicationK1();
++      const p = await lirePreuvesVenteVinted({ comptes: comptesPreuve });
++      const memo = await lirePublicationK1(comptesPreuve, p, acteur);
++      setPublicationKO(memo === null);
++      if (memo !== null) setMemoPublication(avant => ({ ...memo, etats: Object.fromEntries(Object.entries(memo.etats).map(([u, e]) => [u, e.inconnu ? { ...(avant?.etats?.[u] || {}), ...e } : e])) }));
++      const g = gardeK1(memo, id, n);
++      if (g) return g;
++      const fichesRelues = load('vinted_annonce_numeros', {}) || {};
++      const origine = id || Object.keys(fichesRelues).find(k => cleNum(fichesRelues[k]?.numero) === cleNum(n));
++      const uid = String(fichesRelues[origine]?.accountId || '');
++      const cap = memo?.etats?.[uid]?.cap;
++      if (uid && (!Number.isFinite(cap) || Date.now() - cap > 30 * 60000)) {
++        const ok = await askConfirm({ title: 'Publier avec des ventes Vinted anciennes ?', desc: `Les ventes de ${nomsPublication[uid] || uid} n’ont pas été relues depuis 30 minutes. Une paire peut s’être vendue depuis. Passe sur ce compte dans Vinted pour les relire, ou confirme ce risque.`, ok: 'Continuer', cancel: 'Annuler' });
++        if (!ok) return { k: 'ventes-anciennes', t: 'Publication annulée — relis tes ventes sur Vinted puis recommence.' };
++      }
++      return null;
++    },
++  };
++  const ventesBase = React.useMemo(() => numerosDejaVendus({
+     numeros: fiches,
+     autres: Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {}).map((d) => d && { numero: d.numero, id: d.pairId }),
+     enLigne,
+     vendusVinted, commandes, ventesLbc, itemsLbc: lbcItems,
+     liensLbc: load('vrm_lbc_liens', {}) || {},
+   }), [fiches, brouillons, enLigne, vendusVinted, commandes, ventesLbc, lbcItems]);
++  const ventesConnues = { ...ventesBase, publication };
+   // Une vente Leboncoin qui ne se relie pas sans son annonce : on lit les
+   // annonces (une fois par session, comme le tableau de bord) — `null` = pas su.
+   React.useEffect(() => {
+@@ -15272,7 +15411,55 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+   // geste suit l'extension de CE navigateur (`extSait`, trois états) — jamais
+   // la promesse qu'elle le fera si elle ne sait pas le faire.
+   const nSansPreuve = (relieesEbay || progReliees) && Array.isArray(sansPreuve) ? sansPreuve.length : 0;
+-  const ligneSansPreuve = nSansPreuve > 0 && (() => {
++  const relierVenteK1 = async v => {
++    const store = storePublicationSessionK1(acteurPublicationK1());
++    const key = v.uid + ':' + v.tx;
++    const pairId = String(lienNumero[key] || '');
++    const numero = cleNum((load('vinted_annonce_numeros', {}) || {})[pairId]?.numero);
++    const main = await store.lire(SUPABASE_ROW);
++    const actuelles = main && main.data && main.data.vinted_annonce_numeros;
++    const ids = Object.keys(actuelles || {}).filter(id => cleNum(actuelles[id]?.numero) === numero && String(actuelles[id]?.accountId || '') === v.uid);
++    const tous = Object.keys(actuelles || {}).filter(id => cleNum(actuelles[id]?.numero) === numero);
++    if (!numero || !main || !actuelles || ids.length !== 1 || tous.length !== 1 || ids[0] !== pairId) { setLienMessage(m => ({ ...m, [key]: 'Je n’ai pas pu vérifier une fiche unique sur ce compte — rien n’est relié.' })); return; }
++    // Les numéros saisis sont ceux du nuage actuel, jamais un ancien SKU.
++    const ok = await askConfirm({ title: `Relier la vente à la paire N°${numero} ?`, desc: `Tu déclares que la transaction Vinted ${v.tx} de ${nomsPublication[v.uid] || v.uid} concerne exactement la paire N°${numero}. Cette paire ne pourra plus être publiée sur eBay. Aucun retrait automatique ne sera déclenché.`, ok: 'Relier cette vente', cancel: 'Annuler' });
++    if (!ok) return;
++    const encore = await store.lire(SUPABASE_ROW);
++    const fichesEncore = encore?.data?.vinted_annonce_numeros;
++    if (!fichesEncore || cleNum(fichesEncore[pairId]?.numero) !== numero || String(fichesEncore[pairId]?.accountId || '') !== v.uid || Object.values(fichesEncore).filter(f => cleNum(f?.numero) === numero).length !== 1) { setLienMessage(m => ({ ...m, [key]: 'La numérotation a changé pendant la confirmation — rien n’est relié. Rouvre la paire.' })); return; }
++    const id = `vrm_ventes_reliees_${v.uid}_${v.tx}`;
++    const lien = { uid: v.uid, tx: v.tx, numero, itemId: ids[0], at: Date.now() };
++    if (!await store.creer(id, lien)) { setLienMessage(m => ({ ...m, [key]: 'Enregistrement impossible — le gel reste en place.' })); return; }
++    const relu = await store.lire(id);
++    if (!relu || relu.data?.numero !== numero || relu.data?.itemId !== ids[0]) { setLienMessage(m => ({ ...m, [key]: 'Le lien n’a pas pu être confirmé, ou un autre appareil l’a déjà reliée — relis cet écran.' })); return; }
++    save('vrm_ventes_reliees', { ...(load('vrm_ventes_reliees', {}) || {}), [key]: relu.data });
++    setLienMessage(m => ({ ...m, [key]: `Vente reliée à la N°${numero}.` }));
++    setPreuveRelue(n => n + 1);
++  };
++  const gelsK1 = Object.entries(memoPublication?.etats || {}).flatMap(([uid, e]) => Object.values(e.pending || {}).map(v => ({ ...v, uid })));
++  const anciennesK1 = Object.entries(memoPublication?.etats || {}).flatMap(([uid, e]) => Object.values(e.anciens || {}).map(v => ({ ...v, uid })));
++  const lectureGelKO = publicationKO || Object.values(memoPublication?.etats || {}).some(e => e.inconnu);
++  const ligneGelK1 = (gelsK1.length > 0 || anciennesK1.length > 0 || lectureGelKO) && (
++    <div data-ebay-gel-publication={gelsK1.length} style={{ ...bloc(), fontSize: 12.5, lineHeight: 1.5 }}>
++      {lectureGelKO && <p>Les ventes n’ont pas pu être vérifiées. La mémoire précédente est conservée ; la publication et la programmation restent bloquées pour les comptes non vérifiés.</p>}
++      {gelsK1.length > 0 && <p><b>Publication suspendue sur les comptes avec une vente non reliée.</b> Le gel reste jusqu’à l’identification de la vente, même après 72 heures.</p>}
++      {anciennesK1.length > 0 && <p>Ventes antérieures à l’activation moins 30 jours : à relier, sans gel du compte.</p>}
++      {[...gelsK1, ...anciennesK1].map(v => {
++        const key = v.uid + ':' + v.tx;
++        const uniques = Object.keys(fiches).filter(id => String(fiches[id]?.accountId || '') === v.uid && cleNum(fiches[id]?.numero) && Object.values(fiches).filter(f => cleNum(f?.numero) === cleNum(fiches[id].numero)).length === 1);
++        return <div key={key} data-ebay-gel-vente={key} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 8 }}>
++          <span>{nomsPublication[v.uid] || v.uid} · vente {v.tx}{v.date ? ` · ${quandParisTexte(Date.parse(v.date))}` : ''}</span>
++          <select aria-label={`Paire de la vente ${v.tx}`} value={lienNumero[key] || ''} onChange={e => setLienNumero(m => ({ ...m, [key]: e.target.value }))} style={{ color: E.text, background: E.card, border: `1px solid ${E.border}`, borderRadius: 8, padding: '8px 10px', maxWidth: '100%', fontFamily: 'inherit', fontSize: 13 }}>
++            <option value="">Choisir le N° de la paire</option>
++            {uniques.map(id => <option key={id} value={id}>N°{cleNum(fiches[id].numero)}</option>)}
++          </select>
++          <button disabled={!lienNumero[key]} onClick={() => relierVenteK1(v)} style={{ ...lienE, border: `1px solid ${E.border}`, background: 'transparent', borderRadius: 8, padding: '8px 12px', opacity: lienNumero[key] ? 1 : 0.45, cursor: lienNumero[key] ? 'pointer' : 'default' }}>Relier cette vente</button>
++          {lienMessage[key] && <span role="status">{lienMessage[key]}</span>}
++        </div>;
++      })}
++    </div>
++  );
++  const ligneSansPreuve = <>{ligneGelK1}{nSansPreuve > 0 && (() => {
+     const parCompte = new Map();
+     for (const v of sansPreuve) parCompte.set(v.uid, (parCompte.get(v.uid) || 0) + 1);
+     const nom = nomCompte;
+@@ -15343,7 +15530,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
+         </div>
+       </div>
+     );
+-  })();
++  })()}</>;
+   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
+   if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+   if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+@@ -21247,7 +21434,7 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
+     if (rows === null) return null;
+     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
+     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
+-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
++    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item,items:data->items', { strict: true });
+     if (bords === null) return null;
+     const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
+     const ordresLus = [];
+@@ -21315,7 +21502,7 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
+     }
+     vendus.preuves = detailAuto.preuves;
+     vendus.revenues = detailAuto.revenues;
+-    return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
++    return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items, sourcesK1: { transactions: rows, bordereaux: bords, ordres: ordresLus } };
+   } catch (_) { return null; }
+ };
+ const lireVentesVintedProuvees = async (comptes) => {
+@@ -22493,6 +22680,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
+   );
+ }
+ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
++  const [gelsJourK1, setGelsJourK1] = React.useState(0);
+   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
+   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
+   // un autre ajouté gardent la même longueur).
+@@ -28633,7 +28821,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                       (§7). Le bloc de la coque annonce la panne, la ligne
+                       dit de quoi la liste est vide : sous le bonjour, plus
+                       rien — surtout pas « rien d'urgent ». */}
+-                  {jobs.length>0 ? <><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</>
++                  {jobs.length + gelsJourK1 > 0 ? <><b style={{color:C.text}}>{jobs.length + gelsJourK1} chose{jobs.length + gelsJourK1 > 1 ? 's' : ''}</b> à faire aujourd'hui.</>
+                     : baseKO ? null
+                     /* ⚠️ « ta boutique tourne » à quelqu'un dont AUCUN compte
+                        n'est branché : sa boutique ne tourne pas, elle n'existe
+@@ -28717,6 +28905,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                 seul dès que la clé est posée. */}
+             <NotifsMuettes onNav={onNav}/>
+             <ExtEnRetard onNav={onNav}/>
++            <VentesNonRelieesK1 onNav={onNav} onCount={setGelsJourK1}/>
+ 
+             {/* RÉSULTAT DU JOUR : ce que tu as vendu aujourd'hui. Placé tout en
+                 haut parce que c'est la première chose qu'on veut savoir en
+diff --git a/src/vintedPublication.js b/src/vintedPublication.js
+new file mode 100644
+index 0000000..fd42871
+--- /dev/null
++++ b/src/vintedPublication.js
+@@ -0,0 +1,118 @@
++// K1 : mémoire du gel, distincte des preuves autorisant un retrait automatique.
++// Les lectures/écritures sont injectées : mêmes règles dans l'app et les mocks.
++import { cleNum } from '../api/_lib/numerotation.js';
++
++export const ACTIVATION_K1 = 'vrm_vinted_publication_activation';
++export const JOUR_K1 = 86400000;
++const objet = v => !!v && typeof v === 'object' && !Array.isArray(v);
++const identifiant = v => /^\d+$/.test(String(v || ''));
++const retour = o => /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i.test(String(o.status || '')) || o.transaction_user_status === 'failed';
++
++// Aucune disparition de la capture, ni aucun délai, ne résout une vente.
++export function calculerGelK1({ precedent = {}, activation, uid, ventes, transactions, bordereaux, liens = {}, maintenant }) {
++  const pending = objet(precedent.pending) ? { ...precedent.pending } : {};
++  const anciens = objet(precedent.anciens) ? { ...precedent.anciens } : {};
++  const connues = new Map((Array.isArray(ventes) ? ventes : []).filter(o => o && identifiant(o.transaction_id)).map(o => [String(o.transaction_id), o]));
++  const identites = new Map(Object.entries(objet(precedent.identites) ? precedent.identites : {}));
++  const ambiguites = objet(precedent.ambiguites) ? { ...precedent.ambiguites } : {};
++  const poserIdentite = (tx, ids) => {
++    const avant = identites.get(tx) || [];
++    if (avant.length && !ids.some(id => avant.includes(id))) ambiguites[tx] = true;
++    identites.set(tx, [...new Set([...avant, ...ids])]);
++  };
++  for (const r of transactions || []) {
++    const m = /^harvest_(\d+)_txn_(\d+)$/.exec(String(r.id || ''));
++    if (m && m[1] === uid && !connues.has(m[2]) && retour({ status: r.ti })) {
++      identites.delete(m[2]); delete ambiguites[m[2]]; delete pending[m[2]]; delete anciens[m[2]]; continue;
++    }
++    if (m && m[1] === uid && identifiant(r.it) && (String(r.ti || '').trim() || connues.has(m[2]) || pending[m[2]])) poserIdentite(m[2], [String(r.it)]);
++  }
++  for (const r of bordereaux || []) {
++    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String(r.id || ''));
++    if (!m || m[1] !== uid || (r.tx != null && String(r.tx) !== m[2])) continue;
++    const ids = [r.it, ...(Array.isArray(r.items) ? r.items.map(x => objet(x) ? x.id || x.item_id : x) : [])].filter(identifiant).map(String);
++    if (ids.length) poserIdentite(m[2], [...new Set(ids)]);
++  }
++  for (const [tx, o] of connues) {
++    if (retour(o)) { delete pending[tx]; delete anciens[tx]; continue; }
++    // État vide : pas su, même si la ligne dit transaction_user_status=seller.
++    const at = Date.parse(o.date || '');
++    const v = { uid, tx, date: o.date || null, depuis: pending[tx]?.depuis || maintenant, conv: o.conversation_id == null ? '' : String(o.conversation_id), statut: String(o.status || '') };
++    if (Number.isFinite(at) && at < activation - 30 * JOUR_K1 && !pending[tx]) anciens[tx] = v;
++    else pending[tx] = v;
++  }
++  const probables = new Set(), manuels = new Set();
++  for (const registre of [pending, anciens]) for (const tx of Object.keys(registre)) {
++    const o = connues.get(tx);
++    const ids = identites.get(tx);
++    const lien = liens[uid + ':' + tx];
++    // Le lien posé est une identité, pas un état de vente. Il ne nourrit
++    // que la garde de publication ; jamais la liste de retrait automatique.
++    if (objet(lien) && lien.uid === uid && lien.tx === tx && identifiant(lien.itemId) && cleNum(lien.numero) && Number.isFinite(lien.at)) {
++      manuels.add(String(lien.itemId)); delete registre[tx];
++    } else if (ids?.length && !ambiguites[tx]) {
++      ids.forEach(id => probables.add(id)); delete registre[tx];
++    } else if (o && retour(o)) delete registre[tx];
++  }
++  // Une identité rangée après disparition de la vente reste probable.
++  for (const ids of identites.values()) for (const id of ids) probables.add(id);
++  for (const o of connues.values()) if (retour(o)) {
++    for (const id of identites.get(String(o.transaction_id)) || []) probables.delete(id);
++  }
++  for (const lien of Object.values(liens)) if (objet(lien) && lien.uid === uid && identifiant(lien.itemId) && !retour(connues.get(lien.tx) || {})) manuels.add(String(lien.itemId));
++  return { pending, anciens, identites: Object.fromEntries(identites), ambiguites, probables: [...probables], manuels: [...manuels], cap: precedent.cap || null };
++}
++
++// L'ancre est créée une seule fois et relue même si un autre appareil l'a
++// créée en même temps. Une lecture ratée interdit toute création de repli.
++export async function activationK1(store, maintenant) {
++  let r = await store.lire(ACTIVATION_K1);
++  if (r === undefined) return undefined;
++  if (r === null) {
++    if (!await store.creer(ACTIVATION_K1, { at: maintenant })) return undefined;
++    r = await store.lire(ACTIVATION_K1);
++  }
++  return objet(r?.data) && Number.isFinite(r.data.at) ? r.data.at : undefined;
++}
++
++export async function memoriserGelK1({ store, activation, uid, sources, maintenant, liens, essai = 0 }) {
++  const id = 'vrm_vinted_publication_' + uid;
++  const lu = await store.lire(id);
++  if (lu === undefined || !Number.isFinite(activation) || !sources) return { ...(lu?.data || {}), inconnu: true };
++  const ligne = sources.ordres.find(r => r.id === `harvest_${uid}_orders_sold`);
++  if (!ligne || !Array.isArray(ligne.v)) return { ...(lu?.data || {}), inconnu: true };
++  if (lu && (!objet(lu.data) || !objet(lu.data.pending) || !objet(lu.data.anciens))) return { inconnu: true };
++  const cap = Date.parse(ligne.cap || '');
++  if (!Number.isFinite(cap) || (lu?.data.cap && cap < lu.data.cap)) return { ...(lu?.data || {}), inconnu: true };
++  const next = calculerGelK1({ precedent: lu?.data, activation, uid, ventes: ligne.v, transactions: sources.transactions, bordereaux: sources.bordereaux, liens, maintenant });
++  next.cap = cap;
++  if (JSON.stringify(next) === JSON.stringify(lu?.data)) return { ...next, inconnu: false };
++  const ok = lu ? await store.remplacer(id, next, lu.updated_at) : await store.creer(id, next);
++  // Une création concurrente peut avoir été ignorée. Seul ce qui a été
++  // réellement relu est utilisable, jamais le candidat local non enregistré.
++  const relu = ok ? await store.lire(id) : undefined;
++  if (!relu || JSON.stringify(relu.data) !== JSON.stringify(next)) {
++    if (essai === 0) return memoriserGelK1({ store, activation, uid, sources, maintenant, liens, essai: 1 });
++    return { ...(lu?.data || next), inconnu: true };
++  }
++  return { ...next, inconnu: false };
++}
++
++export function gardePublicationK1({ etats, fiches, pairId, numero, noms = {}, marqueurLu }) {
++  if (!marqueurLu) return { k: 'gel-pas-su', t: 'Je n’ai pas pu relire la numérotation : rien ne sera publié ni programmé.' };
++  const n = cleNum(numero);
++  const ids = Object.keys(fiches || {}).filter(id => cleNum(fiches[id]?.numero) === n && n);
++  if (ids.length > 1) return { k: 'numero-ambigu', t: `Le N°${n} désigne plusieurs fiches — vérifie le carton avant de publier.` };
++  const id = pairId ? String(pairId) : ids[0];
++  if (pairId && n && (!fiches[id] || cleNum(fiches[id].numero) !== n)) return { k: 'numero-ambigu', t: 'Le numéro de cette fiche a changé — rouvre la paire avant de publier.' };
++  const uid = String(fiches?.[id]?.accountId || '');
++  // Une annonce entièrement libre sans identité ne permet aucune décision.
++  // Un N° seul ne doit pas servir à contourner un compte d'origine inconnu.
++  if (!uid) return n || id ? { k: 'gel-pas-su', t: 'Je n’ai pas pu identifier le compte Vinted d’origine de cette paire — rien ne sera publié ni programmé.' } : null;
++  const e = etats?.[uid];
++  if (!e || e.inconnu) return { k: 'gel-pas-su', t: `Je n’ai pas pu vérifier les ventes de ${noms[uid] || uid} — rien ne sera publié ni programmé pour ce compte.` };
++  const p = Object.values(e.pending || {});
++  if (p.length) return { k: 'compte-gele', t: `${p.length} vente${p.length > 1 ? 's' : ''} de ${noms[uid] || uid} n’est pas encore reliée à une paire — relie-la dans la liste ci-dessous pour publier les paires de ce compte.` };
++  if ((e.probables || []).includes(id) || (e.manuels || []).includes(id)) return { k: 'vente-probable', t: `La paire N°${n} est liée à une vente Vinted — rien ne sera publié ni programmé.` };
++  return null;
++}
