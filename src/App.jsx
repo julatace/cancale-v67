@@ -10612,6 +10612,9 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
+function EntetePlateforme({nom,plateforme}) {
+  return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
+}
 function PlatSubNav({ sub, setSub, sections, dark }) {
   const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
@@ -10640,7 +10643,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 function ResumePlateforme({children}) {
   const [open,setOpen]=useState(()=>window.matchMedia('(min-width:768px)').matches);
   useEffect(()=>{const mq=window.matchMedia('(min-width:768px)');const change=()=>setOpen(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
-  return <details className="vrm-platform-summary" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>Chiffres de la plateforme</summary>{children}</details>;
+  return <details className="vrm-platform-summary" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary><span className="vrm-summary-short">Chiffres</span><span className="vrm-summary-accessible"> de la plateforme</span></summary>{children}</details>;
 }
 function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
@@ -13342,7 +13345,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     } else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est retirée. Regarde sur eBay avant de recommencer.' }));
     else setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay a refusé le retrait.' }));
   };
-  const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;
+  const wrap = (kids) => <div style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>{kids}</div>;
   const head = (n) => <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Annonces eBay{n != null ? ` (${n})` : ''}</div>;
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
@@ -13660,7 +13663,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
 function EbayAchats() {
   const E = EBAY_SKIN;
   return (
-    <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>
+    <div style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>
       <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Achats eBay</div>
       <div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
         Tes achats eBay ne sont pas encore récupérés : la connexion eBay porte tes <b style={{ color: E.text }}>ventes</b> et tes <b style={{ color: E.text }}>annonces</b>, pas le côté acheteur. Dès que ce sera possible, ils s'afficheront ici — comme pour Vinted.
@@ -14484,6 +14487,33 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             cause font croire à trois problèmes. */}
         <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
       </div>
+      {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
+      <div className="vrm-finance-goal"><Card>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
+          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
+        </div>
+        {objEdit ? (
+          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
+            <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:16,fontFamily:'inherit',outline:'none'}}/>
+            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+          </div>
+        ) : objectif>0 && caMoisCourant==null ? (
+          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
+        ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
+          <>
+            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+              <span className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caMoisCourant)}</span>
+              <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
+            </div>
+            <div role="progressbar" aria-label="Progression vers l’objectif du mois" aria-valuemin={0} aria-valuemax={objectif} aria-valuenow={Math.min(caMoisCourant,objectif)} aria-valuetext={`${fmt(caMoisCourant)} sur ${fmt(objectif)}`} style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
+            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · Vinted, ventes finalisées et en cours du mois</div>
+          </>
+        ); })() : (
+          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
+        )}
+      </Card></div>
+
       <details className="vrm-finance-stock"><summary>Stock et volume de ventes</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
@@ -14980,33 +15010,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.45}}>Sur tes ventes reliées à une paire (marque et pointure lues sur la fiche). Utile pour racheter les bons modèles.</div>
         </Card>
       )}
-
-      {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
-      <Card>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
-        </div>
-        {objEdit ? (
-          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
-            <input type="number" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:16,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{ const n=Math.max(0,+objTmp||0); setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
-          </div>
-        ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
-        ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
-          <>
-            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-              <span className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caMoisCourant)}</span>
-              <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
-            </div>
-            <div style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'🎉 Objectif atteint !':`${pct}% de ton objectif`} · CA de ce mois (par date de vente)</div>
-          </>
-        ); })() : (
-          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
-        )}
-      </Card>
 
       {/* Graphique du CA par date de vente (cliquable) */}
       {caHistoryVente.length>0&&(()=>{
@@ -28458,20 +28461,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" />
         <NoAcc/>
-        {listings.items?.length>0 && <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+            <div className="vrm-ann-search"><Icon name="search" size={17}/>
             <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
+            {annSearch && <button type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
             <select aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
-              <option value="oldest">Date d'ajout (ancienne → récente)</option>
+              <option value="oldest">Les plus anciennes</option>
               <option value="recent">Ordre Vinted</option>
               <option value="price_desc">Prix ↓</option>
               <option value="price_asc">Prix ↑</option>
-              {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
-              {annStats.hasView && <option value="views">Plus vues 👁</option>}
+              {annStats.hasFav && <option value="favs">Plus de favoris</option>}
+              {annStats.hasView && <option value="views">Plus de vues</option>}
               {annStats.hasView && <option value="boost">Vues sans favoris</option>}
-              {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
+              {annStats.sleeping>0 && <option value="sleeping">En ligne depuis longtemps</option>}
               <option value="nonum">Sans numéro</option>
             </select>
             {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
@@ -29116,20 +29121,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const val = { fontSize:12, fontWeight:600, color:C.text };
             return (
               <div className="vrm-ann-card" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
-                <div style={{display:'flex',gap:10,padding:10}}>
+                <div className="vrm-ann-overview" style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
                   <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
-                    <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                    <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
+                    <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
                       <span style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>
                         <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
                     </div>
-                    <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
@@ -29155,7 +29160,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const rempli = (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details className="vrm-ann-actions" style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>Actions · achat lié · publier ailleurs</summary>
+                      <summary aria-label={`Gérer ${it.title || 'cette annonce'}`} style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}><Icon name="gear" size={15}/> Gérer l’annonce <span className="vrm-action-chevron" aria-hidden="true">⌄</span></summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
@@ -37751,7 +37756,7 @@ function AppCoeur() {
             cartes de l'aperçu changent la section (onSub) au lieu d'envoyer
             ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
             « Dans Vinted »), donc rien n'est perdu (§4.11). */}
-        {tab==='plat_vinted'&&(<>
+        {tab==='plat_vinted'&&(<section className="vrm-market-space" aria-label="Vinted"><EntetePlateforme nom="Vinted" plateforme="vinted"/>
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
@@ -37765,8 +37770,8 @@ function AppCoeur() {
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
-        </>)}
-        {tab==='plat_leboncoin'&&(<>
+        </section>)}
+        {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -37789,8 +37794,8 @@ function AppCoeur() {
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
           {platSub==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
-        </>)}
-        {tab==='plat_ebay'&&(<>
+        </section>)}
+        {tab==='plat_ebay'&&(<section className="vrm-market-space" aria-label="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
@@ -37805,7 +37810,7 @@ function AppCoeur() {
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')}/>}</div>}
-        </>)}
+        </section>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
