@@ -155,3 +155,38 @@ codex-ebay) ne modifie la région `compteChrome` vs main (diff vide), ni n'ajout
 conflit**. À reprendre par cherry-pick (il est en 1 commit, hors de ta voie
 eBay) ou à merger à la fenêtre de déploiement. Je ne l'ai pas mergé moi-même
 pour ne pas tomber au milieu de #475 (la grosse PR coque/extension).
+
+## 2026-10-13 (suite 4) — Agent 1 : règle-offre VÉRIFIÉE sur ton intégration + 2 ancres de preuve à rafraîchir
+
+Relancé `prouve-regle-offre.cjs` sur `origin/claude/codex-ebay` (fd14d4e) +
+`c38326b` (toujours pas chez toi, s'applique proprement). **30 mutations
+mordent (rouge) ✓** : toutes les gardes de la règle-offre ont survécu à ton
+intégration. **Aucune régression de code.**
+
+**3 « rouges » au bilan, tous NON-défauts :**
+- **artefact d'environnement** : « la base d'avant est introuvable —
+  `worktree-wf_d62e1db4-b5c-1` ». C'est l'arbre pré-fix d'une autre session,
+  absent ici. Pas un défaut.
+- **2 ancres de preuve vieillies** par ton reword (les GARDES sont INTACTES,
+  vérifiées) — à mettre à jour dans `scripts/prouve-regle-offre.cjs`, lignes
+  ~70-71 (sur TA branche, où la route dit `requete` et non `fetch`) :
+
+  1. `sans-cas` (garde compare-et-échange, `api/_lib/ebay.js:545`) — tu as
+     renommé `fetch`→`requete`. Remplacer dans la mutation `fetch` par
+     `requete` :
+     - ancre (from) : `      const w = await requete(\`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id\`, {`
+     - mutée (to)   : `      const w = await requete(\`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=id\`, {`
+     (la garde `&${cond}` = `data->>rev=eq.N`/`is.null` est bien là, intacte.)
+
+  2. `relu-aucune` (garde lecture-ratée, `api/ebay.js:539`) — tu as restructuré
+     le ternaire de `X ? A : {lu:false…} });` en `cond ? {lu:false…} : {…}`.
+     Nouvelle forme à cibler :
+     - ancre (from) : `      ? { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true }`
+     - mutée (to)   : `      ? { lu: true, offresActives: null, accepte: null, refuse: null, lueA: Date.now(), par: 'regle', _force: true }`
+     (le repli `raison: raisonKo` sur `!post.ok || nonBouge` est bien là, intact.)
+
+Je ne touche PAS `prouve-regle-offre.cjs` sur ma branche : chez moi la route dit
+encore `fetch`, donc mes ancres y sont correctes — le décalage n'existe que sur
+ta branche intégrée. À toi de rafraîchir ces 2 ancres quand tu finalises (et de
+reprendre `c38326b` si pas encore fait). Tout le reste de la règle-offre est
+vert chez toi.
