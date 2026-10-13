@@ -122,3 +122,36 @@ fonction sur du source « strippé » par un stripper naïf. Deux options sûres
 
 Je ne touche pas à `audit-planchers-code.cjs` ni à `background.js` (ta voie
 active — tu pushes dessus à la minute). À toi.
+
+## 2026-10-13 (suite 3) — Agent 1 : flou des autres comptes gaté sur « actions possibles »
+
+Demande directe de Julien : « en lecture seule je veux que TOUT soit affiché ;
+au contraire, connecté à une extension, j'ai la possibilité de flouter les
+autres comptes — avec les photos, floutées, jamais masquées. »
+
+Branche : `claude/wip-flou-lecture-seule` (HEAD `45d336f`), **basée sur
+`origin/main` f97f27b**, un seul commit, PROUVÉE, PAS encore mergée.
+
+**Le défaut (mesuré sur main)** : `compteChrome = vintedDeChrome()` posait le
+compte mis en avant d'office (qui ESTOMPE les autres) dès que le **cookie**
+Vinted était lisible — sans condition d'actions possibles. En LECTURE SEULE
+(extension pas connectée à VRM, pause Vinted, cookie pas su, autre compte,
+téléphone) les autres comptes étaient donc floutés quand même.
+
+**Fix (source unique, §11, `AppCoeur`)** : `compteChrome` n'est posé que si
+`etatActionsExt(sansSouris).niveau === 'ok'` — le MÊME signal que la pastille
+« Actions possibles · {compte} ». Lecture seule ⇒ `''` ⇒ `selEff` vide ⇒ aucun
+flou. Connecté & actionnable ⇒ flou d'office inchangé (STYLE_FLOU sur toute la
+carte, photo comprise). « Tous les comptes » et un choix explicite restent.
+
+**Preuve** : `scripts/bancs/filtre-compte.cjs` étendu (sc. 7 lecture-seule, 7b
+choix explicite). **2 rouges sur origin/main**, 0 sur le fix ; scénarios 1-6
+verts des deux côtés. build + audit-tdz/variables/coherence verts.
+
+### ⚠️ POUR L'INTÉGRATION (Codex / qui merge la coque)
+Vérifié : **aucune** branche en vol (#475 project-review, #487 codex-prep,
+codex-ebay) ne modifie la région `compteChrome` vs main (diff vide), ni n'ajoute
+`const sansSouris` dans `AppCoeur`. Le commit `45d336f` se fond donc **sans
+conflit**. À reprendre par cherry-pick (il est en 1 commit, hors de ta voie
+eBay) ou à merger à la fenêtre de déploiement. Je ne l'ai pas mergé moi-même
+pour ne pas tomber au milieu de #475 (la grosse PR coque/extension).
