@@ -439,3 +439,145 @@ quand même. `messagerie.cjs` reste vert (sans mock, `TRAD_OK` faux → rien).
 
 Aucune entrée d'`EXT_CAPACITES` : c'est le navigateur qui traduit, l'app ne
 promet rien de l'extension.
+
+---
+
+## Bilan de l'étape G — ce qui est livré, ce qui reste et pourquoi (12 octobre)
+
+**Livré et en ligne cette passe (chaîne de preuve complète, PR mergée, déploiement
+READY sur vrm.center, `/api/sante` ok) :**
+- **G1** prix d'achat au numérotage (#479) · **G11** copier le prix payé (#480) ·
+  **G24** compte qui vend le mieux (#482) · **G22** favoris sans vente → remise
+  native (#483) · **G34** saisie vocale (#484) · **G9** codes de retrait hors
+  ligne (#485) · **G35** traduction des messages (#486).
+
+**Déjà en production (mesuré, rien à refaire) :** 14, 21 (Argent) · 3, 6
+(Alertes) · 13, 25 (Ventes) · 16, 4 (Terrain) · 15 récap comptable (Comptes).
+
+**Mesuré impossible / data-starved (documenté, pas inventé) :**
+- **18** (alerte « achat à vérifier avant date limite ») : 0 délai de protection
+  acheteur dans ses 1581 achats, pas d'état « livré en attente de validation » —
+  on ne peut pas inventer le délai de Vinted.
+- **23** (coût de boost par paire) : aucune trace de boost rattachable à une paire
+  en base (§5.132) — un coût de compte, jamais réparti.
+
+**Différés — chacun exige une DÉCISION de Julien ou une ressource qu'une session
+autonome ne peut pas se donner (le projet interdit d'inventer une règle qu'il n'a
+pas tranchée, et d'expédier de l'irréversible sur son outil de gagne-pain) :**
+- **2** (double vente notifiée app fermée) : push SERVEUR, et le versant eBay est
+  la ligne de l'Agent 1. Cross-lane.
+- **10** (rappel la veille au soir) : demande un SECOND cron Vercel. Un cron refusé
+  au déploiement bloque TOUS les déploiements (leçon #250) — à ne pas tenter sans
+  que Julien l'ait validé (il est noté « à trancher » dans CLAUDE.md, section
+  Bilan de la semaine).
+- **33 Studio** : le **détourage est déjà en prod** (Photoroom, clé vendeur, §2.9).
+  Le « cadre guide + modèle LOCAL dans la page » est sous **licence commerciale**
+  (noté dans la passation) — pas de modèle sans clé ni licence libre mesuré, donc
+  pas construit (§2.9 : ni SA clé, ni un coût caché).
+- **17 double vérification de connexion (2FA)** : aucun MFA aujourd'hui (mesuré :
+  0 `factors`/`totp`/`enroll`). Buildable avec le MFA natif de Supabase, MAIS :
+  (a) Julien est seul utilisateur et **un mauvais enrôlement le VERROUILLE hors de
+  son propre outil** — irréversible sans plan de récupération ; (b) ça touche le
+  flux d'auth que la ligne « session adressée » de l'extension fait mûrir. Il faut
+  SON feu vert + un chemin de récupération décidé avec lui. Différé, pas abandonné.
+- **37 mode équipe** : aucun code équipe aujourd'hui (mesuré). C'est de l'auth +
+  RLS (migration 020+), **testable seulement sur une branche Supabase** (§2.3,
+  jamais la prod), et il reste des choix PRODUIT non tranchés : quel périmètre
+  exact (« colis et codes » = quels écrans ?), comment un membre s'authentifie
+  (login séparé ? invitation par email — or les adresses ne sont pas encore
+  PROUVÉES, pas de SMTP), comment on révoque. Ça se superpose à l'isolation
+  multi-vendeur encore en cours. À cadrer avec lui avant d'écrire une ligne.
+- **5 Vitesse (écrans à la demande)** : **les gros découpages sont déjà faits** —
+  `App.jsx` est en `React.lazy` derrière l'accueil (`main.jsx`), `three` (720 Ko)
+  et `pdf-lib` sont en `import()` dynamique. Le reste, c'est découper le fichier
+  **unique de ~37 000 lignes** par écran : un refactor « en dernier, seul » (dit
+  tel quel dans la passation) qui est un champ de mines TDZ (§4.6, le défaut le
+  plus fréquent du projet) et dont chaque interaction d'écran devrait être
+  revalidée. Le livrer en autonome sans Julien pour valider risquerait exactement
+  la casse silencieuse que le projet craint le plus. À faire incrémentalement,
+  écran par écran, avec un banc par écran — pas en une passe aveugle.
+
+**⇒ Tout ce qui est sûrement constructible en autonomie est livré.** Les 5 items
+restants (2, 10, 17, 33, 37) attendent une décision de Julien ou une ressource
+(cron validé, licence, branche + SMTP), et Vitesse 5 est le gros refactor final à
+mener écran par écran. Rien n'a été inventé ni expédié à l'aveugle.
+
+---
+
+## Répartition proposée des tâches restantes (13 octobre) — Agent 2
+
+Julien demande de répartir le travail restant entre les agents (codex, Agent 1,
+moi). Aucune session Claude pair n'est joignable en direct depuis cette machine
+en ce moment (peer-messaging ne voit personne) ; cette note EST le canal de
+coordination. **Pour éviter les conflits sur `src/App.jsx` (fichier unique,
+~37 000 lignes), un seul agent le touche à la fois — c'est moi (Agent 2).**
+
+**MOI — Agent 2** (lane : `src/Accueil*`, reste de `src/App.jsx` HORS `Ebay*`,
+extension 5.176→5.189, migrations 020+) :
+- **Vitesse 5** (écrans à la demande), en cours : première tranche = sortir le
+  gros bloc 3D (`Room3D` + `RoomPerspective`, ~1250 lignes) dans
+  `src/Room3D.jsx` en `React.lazy` (dépendances mesurées : seulement `C`, `Icon`,
+  `load`, `save` en props ; `three` déjà dynamique). Preuve : taille du bundle +
+  `garage3d.cjs` + `verif_visuel.cjs` + `audit-tdz`. Écran par écran ensuite.
+- **H** (revue complète) de mon domaine, quand l'Agent 1 a fini D.
+
+**AGENT 1** (lane : `api/ebay*`, `Ebay*` dans App.jsx, migrations 014/015,
+frontière session/connexion, `scripts/*ebay*`) :
+- ⚠️ **`audit-planchers-code` est ROUGE sur `main`** : la 5.175 publiée est sous
+  la frontière `EXT_CAPACITES.liaison = 5.171` → une 5.175 serait dite
+  « périmée » ou recevrait une session qu'elle ne sait pas lire. Remède documenté
+  par la ligne connexion : **monter les quatre frontières ensemble**
+  (`EXT_CAPACITES.liaison`, `CODE_DANS_ETAT`, bridge.js, vrm-badge.js). **À faire
+  avant d'autres publications d'extension.**
+- Étape **D** (règle d'offre eBay), migration 014/015 (agent eBay).
+- Item **2** (double vente notifiée app fermée) : versant push SERVEUR + eBay.
+
+**CODEX** (si Julien le lance) — pour ne PAS entrer en conflit avec App.jsx :
+- Idéalement du travail hors `src/App.jsx` : revue/renforcement des **bancs et
+  audits** (`scripts/`), ou la **spec** (pas le code) des items différés 17/37.
+- **Ne pas** modifier `src/App.jsx` ni le domaine eBay en parallèle de nous.
+
+**Différés — attendent une DÉCISION de Julien** (aucun agent ne les code sans) :
+- **17** 2FA : méthode + plan anti-verrouillage (il est seul utilisateur).
+- **37** mode équipe : périmètre d'accès + mécanisme d'invitation (adresses non
+  prouvées, pas de SMTP).
+- **10** rappel la veille : valider un 2ᵉ cron Vercel (un cron refusé bloque tous
+  les déploiements).
+- **33** modèle de détourage local : licence commerciale.
+
+---
+
+## Vitesse 5 — 1ʳᵉ tranche : le Stock 3D chargé à la demande (13 octobre)
+
+**Mesuré d'abord :** les gros découpages existaient déjà (`App.jsx` en `React.lazy`
+derrière l'accueil ; `three` et `pdf-lib` en `import()`). Le plus gros bloc encore
+DANS le bundle initial était le Stock 3D (`Room3D` + `RoomPerspective`, ~1250
+lignes). Dépendances de niveau module mesurées (scan des identifiants libres, pas
+deviné) : `C`, `Icon`, `load`, `save`, `FURN_TYPES`, `GARAGE_AMBIANCES`, plus les
+hooks nommés `useState/useEffect/useRef` — tout le reste est local ou en props,
+`three` déjà dynamique.
+
+**Livré :** `src/Room3D.jsx` (nouveau), importé en `const Room3D =
+React.lazy(() => import('./Room3D.jsx'))`, rendu derrière `<React.Suspense>` à
+l'ouverture du Stock. Les 6 identifiants de module passent en **props** (pas
+d'import circulaire avec App.jsx) ; `RoomPerspective` (le repli 2.5D) part dans
+le même fichier et sert de repli interne de Room3D (plus de prop `fallback`
+construite côté App). Aucun changement de comportement.
+
+**Mesuré après :** chunk `Room3D-*.js` = **46 Ko** sorti du bundle ; App initiale
+**1 535 Ko → 1 485 Ko**.
+
+**Preuves :** `garage3d.cjs` (rend le Stock 3D : montage, sonde caméra, survol,
+clic droit, surlignage, molette, clavier, double-clic — tout vert via le chunk
+paresseux) + `verif_visuel.cjs` (conforme aux deux tailles) + `audit-tdz` vert.
+La chaîne de preuve est un vrai rouge→vert : à chaque dépendance oubliée le banc
+TOMBAIT au garde-fou d'écran (`useState is not defined`, puis `FURN_TYPES is not
+defined`) — c'est `garage3d.cjs` qui l'a attrapé, pas le build (un bundle ne lève
+pas sur un global manquant). `audit-variables/icones/coherence/chiffres/boutons/
+bancs` verts.
+
+⚠️ **Prochaines tranches** (écran par écran, un banc par écran, jamais en passe
+aveugle) : les autres gros écrans restent dans App.jsx — ils closurent beaucoup
+d'état/d'helpers, donc chaque extraction demande le même scan d'identifiants
+libres + un banc de rendu. Le Stock 3D était le plus isolé (tout en props),
+d'où le premier choix.
