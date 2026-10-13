@@ -129,6 +129,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
       'PhotoVente :: secours': 'octets raster du secours serveur, convertis en data:image (type et taille vérifiés)',
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',

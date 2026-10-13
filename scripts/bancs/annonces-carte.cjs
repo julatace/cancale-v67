@@ -120,6 +120,8 @@ const projette = (row, sel) => {
       });
       await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(4000);
+      if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});}
+      const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: el.outerHTML, boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
