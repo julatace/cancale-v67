@@ -175,3 +175,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-sale-footer .vrm-sale-details { margin-top:0; }
 .vrm-sale-footer .vrm-sale-details[open] { flex-basis:100%; }
 @media(max-width:767px) { .vrm-sale-footer { margin-left:74px; } }
+
+.vrm-platform-summary > summary { display:none; }
+@media(max-width:767px) {
+  .vrm-platform-summary > summary { display:list-item; cursor:pointer; font-size:11px; color:var(--vrm-muted); padding:9px 16px; }
+}

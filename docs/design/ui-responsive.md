@@ -60,7 +60,8 @@ colis et « Expédier » à droite. Les rappels de ventes déduites de bordereau
 ventes masquées, prix d'achat absents et pertes globales sont retirés. Les ventes
 masquées restent masquées et les pertes individuelles restent sur les ventes.
 La saisie des coûts et la gestion des ventes masquées restent dans les paramètres.
-Les totaux et graphiques de Ventes sont accessibles dans Analyse.
+Les totaux et graphiques de Ventes sont accessibles dans Analyse. Sur téléphone,
+les chiffres en tête de chaque plateforme sont aussi repliés.
 
 Sur téléphone, les photos font 64 × 84 px. Les informations sont à droite ;
 numéro, coût et actions secondaires sont dans Modifier. Leboncoin et eBay

@@ -10613,6 +10613,12 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
 // la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
+// Sur téléphone, les chiffres laissent la première place aux articles.
+function ResumePlateforme({children}) {
+  const [open,setOpen]=useState(()=>window.matchMedia('(min-width:768px)').matches);
+  useEffect(()=>{const mq=window.matchMedia('(min-width:768px)');const change=()=>setOpen(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
+  return <details className="vrm-platform-summary" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>Chiffres de la plateforme</summary>{children}</details>;
+}
 function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
@@ -10627,14 +10633,14 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
   const box = { flex:'1 1 90px', minWidth:0 };
   const eti = { fontSize:10.5, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
   return (
-    <div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
+    <ResumePlateforme><div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
       <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
       <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/>
-    </div>
+    </div></ResumePlateforme>
   );
 }
 // Les VENTES Leboncoin (prouvées `isSeller`), avec leur bordereau. Vivent dans
@@ -10912,7 +10918,7 @@ function PlatResume({ cases, note, dark, baseKO }) {
   const T = dark ? EBAY_SKIN : C;
   const eti = { fontSize: 10.5, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: 600 };
   return (
-    <div style={{ padding: '12px 16px 0', background: dark ? EBAY_SKIN.bg : 'transparent' }} data-plat-resume="1">
+    <ResumePlateforme><div style={{ padding: '12px 16px 0', background: dark ? EBAY_SKIN.bg : 'transparent' }} data-plat-resume="1">
       <div className="vrm-summary-strip" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', border: `1px solid ${T.border}`, background: T.card, borderRadius: 12, padding: '12px 15px', boxShadow: dark ? 'none' : (C.shadow || 'none') }}>
         {cases.map(([lib, val, sourd]) => (
           <div key={lib} style={{ flex: '1 1 90px', minWidth: 0 }}>
@@ -10922,7 +10928,7 @@ function PlatResume({ cases, note, dark, baseKO }) {
         ))}
       </div>
       {note && <div style={{ fontSize: 11.5, color: T.muted, marginTop: 6, lineHeight: 1.45 }}>{note}</div>}
-    </div>
+    </div></ResumePlateforme>
   );
 }
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = false }) {

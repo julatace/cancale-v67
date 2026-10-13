@@ -71,6 +71,7 @@ async function brancher(p){
     await p.goto(base+'/?tab='+tab);await p.locator('.vrm-sale-row').first().waitFor();
     const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect();return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height};});
     check(pos.w===64 && pos.h===84 && pos.right>pos.left,'photo portrait à gauche '+tab);if(pos.row>=200){console.log(pos);await p.screenshot({path:'/tmp/compact-height.png'});}check(pos.row<200,'ligne compacte '+tab);
+    if(tab!=='cat_ventes')check(!(await p.locator('.vrm-platform-summary').evaluate(e=>e.open)),'chiffres repliés sur téléphone '+tab);
     if(tab!=='cat_ventes')check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo affichée '+tab);
     if(tab==='plat_ebay'){
       await p.getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'NOT_FULFILLED reste à expédier');
@@ -111,6 +112,7 @@ async function brancher(p){
   check(!(await p.getByRole('button',{name:'Autoriser les paiements'}).isVisible()),'paiements repliés, connexion claire');
   await p.getByText('Solde et paramètres du compte',{exact:true}).click();await p.getByRole('button',{name:'Autoriser les paiements'}).waitFor();check(await p.getByText('Compte eBay relié',{exact:true}).isVisible(),'scope paiements distinct de connexion');
   await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Actualisation indisponible. Les dernières données restent affichées.',{exact:true}).waitFor();check(true,'échec actualisation expliqué');
+  await p.setViewportSize({width:1512,height:950});await p.waitForFunction(()=>document.querySelector('.vrm-platform-summary')?.open);check(true,'chiffres visibles sur ordinateur après rotation');
   check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles compacts réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
