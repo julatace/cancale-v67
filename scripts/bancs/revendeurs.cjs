@@ -1,0 +1,90 @@
+// Mise en page mobile, données synthétiques, aucune requête distante.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const http = require('node:http');
+const { chromium } = require('playwright');
+const { metaVersData } = require('./_meta.cjs');
+const dist = path.resolve(__dirname, '../../dist');
+const maintenant = new Date().toISOString();
+const compte = { id:1, vinted_user_id:'111', login:'compte_de_banc', updated_at:maintenant };
+const ventes = [
+  { transaction_id:9001, title:'New Balance 550 crème et forêt taille 42', price:{amount:'95',currency_code:'EUR'}, status:'Paiement validé', date:maintenant },
+  { transaction_id:9002, title:'Nike P-6000 argent avec un titre volontairement long taille 43', price:{amount:'120',currency_code:'EUR'}, status:'Commande finalisée', date:maintenant },
+];
+const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
+const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
+ventes[0].photo={url:'https://images1.vinted.net/test.png'};
+rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
+{id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
+{id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
+{id:'ebay_listings',data:{items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
+const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
+const server = http.createServer((q,r)=>{
+  let fichier = new URL(q.url,'http://localhost').pathname;
+  if (!path.extname(fichier)) fichier='/index.html';
+  const p=path.join(dist,fichier);
+  if (!p.startsWith(dist+path.sep)||!fs.existsSync(p)||!fs.statSync(p).isFile()) {r.writeHead(404);return r.end();}
+  r.writeHead(200,{'content-type':mime[path.extname(p)]||'application/octet-stream'});fs.createReadStream(p).pipe(r);
+});
+let n=0;
+const check=(v,label)=>{assert.ok(v,label);console.log('OK '+label);n++;};
+async function brancher(p){
+  await p.addInitScript(()=>{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vrm_zoom','0.65');});
+  await p.route('**/*',async r=>{
+    const url = new URL(r.request().url());
+    if(url.pathname.includes('/rest/v1/')){
+      const u=new URL(metaVersData(url.href));
+      const json=d=>r.fulfill({contentType:'application/json',body:JSON.stringify(d)});
+      if(u.searchParams.get('select')==='owner')return r.fulfill({status:400,contentType:'application/json',body:'{}'});
+      if(u.pathname.endsWith('/vinted_accounts'))return json([compte]);
+      if(r.request().method()!=='GET')return json([]);
+      const filtre=u.searchParams.get('id')||'';
+      const re=filtre.startsWith('like.')?new RegExp('^'+filtre.slice(5).replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$'):null;
+      let selection=rows.filter(x=>re?re.test(x.id):filtre==='eq.'+x.id || (filtre.startsWith('in.(') && filtre.slice(4,-1).split(',').includes(x.id)));
+      const select=u.searchParams.get('select')||'';
+      selection=selection.map(x=>{
+        const out={...x,cap:maintenant,updated_at:maintenant};
+        for(const champ of select.split(',')){
+          const m=/^([^:]+):data->>?(.+)$/.exec(champ);if(!m)continue;
+          let v=x.data;for(const cle of m[2].split(/->>?/))v=v==null?undefined:v[cle];
+          out[m[1]]=v;
+        }return out;
+      });return json(selection);
+    }
+    if(url.pathname==='/api/compte' && url.searchParams.get('mode')==='photo')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
+    if(url.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{}'});
+    if(url.hostname==='127.0.0.1')return r.continue();
+    return r.abort();
+  });
+}
+(async()=>{
+ let b;
+ try{
+  rows.find(x=>x.id==='lbc_ventes').data.ventes={
+   pending:{txId:10,isSeller:true,title:'Colis à préparer',stepLabel:'À expédier',label:{voucherUrl:'https://example.test/label.pdf'}},
+   shipped:{txId:11,isSeller:true,title:'Colis en route',parcelStatus:'in_transit',label:{voucherUrl:'https://example.test/old.pdf'}},
+   finished:{txId:12,isSeller:true,title:'Colis finalisé',stepStatus:'done',stepLabel:'Terminé',label:{voucherUrl:'https://example.test/final.pdf'}}};
+  await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
+  b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
+  const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[];
+  await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true};
+   if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
+   if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
+   if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
+   return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
+  });
+  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
+  check(writes.length===0,'ouvrir les messages ne transmet rien');
+  await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByText('Oui, disponible.',{exact:true}).isVisible(),'historique de réponses visible');
+  await p.getByLabel('Réponse au message eBay').fill('Merci pour votre message');await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===0,'annuler la réponse ne transmet rien');
+  await p.screenshot({path:'/tmp/reply-before.png'});console.log('DEBUG avant confirmation',await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).isEnabled());await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();console.log('DEBUG ouverte');await p.getByRole('button',{name:'Annuler',exact:true}).waitFor();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();console.log('DEBUG confirmée',writes);await p.screenshot({path:'/tmp/reply-debug.png'});console.log(await p.locator('main').innerText());await p.waitForFunction(()=>document.body.textContent.includes('Refus simulé eBay'));check(writes.length===1 && writes[0].messageId==='m1','réponse associée au message exact');check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','refus conserve le brouillon');
+  await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('button',{name:'Offres',exact:true}).click();await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');
+  await p.getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
+  await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
+  check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
+  for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
+  check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles revendeurs réussis.');
+ }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}
+})().catch(e=>{console.error(e);process.exitCode=1;});
