@@ -125,3 +125,58 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-header { padding-inline:max(12px, env(safe-area-inset-left)) !important; }
   .vrm-header-actions { gap:6px !important; }
 }
+
+/* Écrans de travail compacts : l'identité et l'action restent côte à côte. */
+.vrm-sale-details { margin-top:4px; color:var(--vrm-muted); }
+.vrm-sale-details > summary { cursor:pointer; font-size:11px; padding:6px 0; min-height:28px; }
+.vrm-sale-details[open] > summary { margin-bottom:8px; }
+.vrm-shared-sale:last-child { border-bottom:0 !important; }
+.vrm-sale-invoice { font-size:11px; align-self:flex-start; }
+.vrm-day-task-note { font-size:11px !important; }
+@media(max-width:767px) {
+  .vrm-main .vrm-screen-head { margin-bottom:12px !important; }
+  .vrm-main .vrm-tete-row h2 { font-size:23px !important; }
+  .vrm-main .vrm-summary-strip { padding-block:4px 12px !important; }
+  .vrm-sale-row { padding:10px 12px !important; gap:4px !important; }
+  .vrm-sale-overview { grid-template-columns:64px minmax(0,1fr); gap:4px 10px !important; }
+  .vrm-sale-photo { grid-row:1 / span 2; width:64px !important; height:84px !important; border-radius:6px !important; }
+  .vrm-sale-photo > * { width:100% !important; height:100% !important; }
+  .vrm-sale-info { grid-column:2; }
+  .vrm-sale-title { font-size:12px !important; line-height:1.3 !important; }
+  .vrm-sale-meta { font-size:10.5px !important; gap:3px 6px !important; margin-top:3px !important; }
+  .vrm-sale-price { grid-column:2; align-items:center; gap:3px 8px !important; }
+  .vrm-sale-price > .vrm-display { font-size:16px !important; }
+  .vrm-sale-action { flex:0 1 auto; margin-top:0 !important; margin-left:auto; }
+  .vrm-sale-action > *, .vrm-sale-action button { width:auto; }
+  .vrm-sale-action button { font-size:11px !important; padding:6px 9px !important; }
+  .vrm-sale-details > summary { min-height:36px; padding:9px 0; }
+  .vrm-day-task { padding:9px 11px !important; gap:10px !important; }
+  .vrm-day-task-title { font-size:13px !important; font-weight:600 !important; }
+  .vrm-day-task-note { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.35 !important; }
+  .vrm-day-task img { width:30px !important; height:40px !important; border-radius:5px !important; }
+}
+
+.vrm-sale-invoice { font-size:11px; padding-left:84px; color:var(--vrm-muted); }
+.vrm-ebay-settings { margin-top:10px; }
+.vrm-ebay-settings > summary { cursor:pointer; padding:8px 0; font-size:12px; }
+@media(max-width:767px) {
+  .vrm-sale-invoice { padding-left:76px; margin-top:0; }
+  .vrm-main .vrm-sale-invoice button { min-height:36px !important; }
+  .vrm-main .vrm-tete-row h2 { font-size:23px !important; }
+}
+
+.vrm-label-help { font-size:11px; color:var(--vrm-muted); margin-bottom:6px; }
+.vrm-label-help > summary { cursor:pointer; padding:6px 0; }
+.vrm-sale-details > summary { box-sizing:border-box; }
+@media(max-width:767px) { .vrm-sale-details > summary { padding:6px 0; } }
+
+.vrm-sale-footer { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
+.vrm-sale-footer .vrm-sale-invoice { flex:1; padding-left:0; }
+.vrm-sale-footer .vrm-sale-details { margin-top:0; }
+.vrm-sale-footer .vrm-sale-details[open] { flex-basis:100%; }
+@media(max-width:767px) { .vrm-sale-footer { margin-left:74px; } }
+
+.vrm-platform-summary > summary { display:none; }
+@media(max-width:767px) {
+  .vrm-platform-summary > summary { display:list-item; cursor:pointer; font-size:11px; color:var(--vrm-muted); padding:9px 16px; }
+}
