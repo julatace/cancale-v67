@@ -20238,7 +20238,14 @@ function ComptaPro({ liveStats, onNav }) {
 
 /* ── Comptabilité (onglet dédié, tous comptes agrégés) ──────────────────── */
 // Couleur stable par compte (pour l'étiquette "d'où vient" chaque ligne).
-const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
+// ⚠️ §7 : une pastille d'IDENTITÉ de compte ne doit JAMAIS emprunter une
+//   couleur SÉMANTIQUE (danger rouge = « deux paires sous un numéro », warn
+//   ambre, accent bleu) — sinon un compte sain porte un point rouge qui se lit
+//   comme une alarme, et « une fausse alerte fait cesser de lire les vraies ».
+//   L'ancienne palette violait 3 fois (bleu≈accent, rouge≈danger, ambre≈warn).
+//   Ces 8 teintes sont toutes loin des couleurs réservées (des deux thèmes) et
+//   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
+const ACCT_COLORS = ['#9b51e0','#27ae60','#00b8a9','#e056fd','#9acd32','#17a9c9','#6c5ce7','#e8529a'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
@@ -29310,8 +29317,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 1er oct. — « trop chargé » : les places tiennent dans UNE carte,
                 une ligne chacune (nom · combien · Toutes / Aucune). La phrase
                 commune dessous, en petit. */}
-            <div data-places="" style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 12px 10px',boxShadow:C.shadow||'none'}}>
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,paddingTop:2}}>Publier aussi ailleurs</div>
+            {/* ── 13 oct. — « trop de texte, mal agencé » (Julien). CE RÉGLAGE
+                (où publier en plus de Vinted) SE LIT UNE FOIS : il descend
+                derrière un dépliant FERMÉ par défaut, au lieu d'un encart
+                permanent de 4-5 lignes posé entre les contrôles et la première
+                annonce. Le geste du quotidien reste la puce sous chaque carte ;
+                ici il n'y a que le réglage en masse (Toutes/Aucune) et
+                l'explication. Le résumé de la ligne (place N/total) est VISIBLE
+                sans ouvrir. `data-places` reste sur le contenu : le banc le
+                trouve par cet attribut (invariant : aucune case eBay). */}
+            <details data-places-wrap style={{marginBottom:12}}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+                <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>Publier aussi ailleurs</span>
+                <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
+                <span className="vrm-chevron" style={{fontSize:14,color:C.muted}}>›</span>
+              </summary>
+              <div data-places="" style={{marginTop:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 12px 10px',boxShadow:C.shadow||'none'}}>
               <div style={{display:'flex',flexWrap:'wrap',columnGap:22}}>
               {lignes.map((l, i) => (
                 <div key={l.pl.cle} style={{padding:'6px 0',flex:'1 1 260px',minWidth:0}}>
@@ -29332,7 +29354,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
               </div>
               {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,paddingTop:6}}>{phrase(lignes[0], false)}</div>}
-            </div>
+              </div>
+            </details>
           </>);
         })()}
         {/* ══ LA CARTE D'ANNONCE (3 octobre) ══════════════════════════════════
@@ -36175,8 +36198,22 @@ function AppCoeur() {
   //    l'onglet (`battementExt`), qui prévient ses abonnés : rien à relire ici.
   //    « Pas su » ⇒ '' : on ne met rien en avant à tort. Le filtre des comptes
   //    qu'on peut montrer est appliqué plus bas (`compteConnecte`).
+  // ⚠️⚠️ ET LE FLOU NE VAUT QUE QUAND DES ACTIONS SONT POSSIBLES (Julien,
+  //    13 octobre : « en lecture seule je veux que TOUT soit affiché ; au
+  //    contraire, connecté à une extension, j'ai la possibilité de flouter les
+  //    autres comptes — avec les photos, floutées, jamais masquées »). On met
+  //    donc le compte en avant d'office sur le MÊME signal que la pastille
+  //    « Actions possibles · {compte} » (`etatActionsExt(...).niveau === 'ok'`,
+  //    §11), pas sur la simple présence du cookie Vinted. En LECTURE SEULE
+  //    (téléphone, extension pas connectée à VRM, pause Vinted, cookie pas su,
+  //    autre compte) `etatActionsExt` ne vaut pas 'ok' ⇒ compteChrome '' ⇒
+  //    `selEff` vide ⇒ AUCUN flou, tout reste affiché. Le flou (STYLE_FLOU :
+  //    blur + grayscale sur toute la carte, photo comprise) n'apparaît donc
+  //    qu'en mode actionnable — et « Tous les comptes » l'éteint toujours.
+  //    'verif' (on demande encore) n'est pas 'ok' : « pas su » ne floute pas.
+  const sansSouris = useSansSouris();
   const [compteChrome,setCompteChrome]=useState('');
-  React.useEffect(()=>{ const lire=()=>{ const v=vintedDeChrome(); setCompteChrome(v?v.uid:''); }; lire(); return onVmrExt(lire); },[]);
+  React.useEffect(()=>{ const lire=()=>{ const et=etatActionsExt(sansSouris); const v=et&&et.niveau==='ok'?et.vinted:null; setCompteChrome(v&&v.uid?String(v.uid):''); }; lire(); return onVmrExt(lire); },[sansSouris]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);

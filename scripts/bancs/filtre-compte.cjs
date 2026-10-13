@@ -77,7 +77,11 @@ const projette = (row, sel) => {
 
 // Le pont, dans la VRAIE forme de ses deux réponses.
 //   `chrome` : uid du compte ouvert dans Chrome · null (aucun) · 'passu' · 'muette'.
-const PONT = ({ chrome }) => {
+//   `lecture` : LECTURE SEULE — le cookie Vinted est ouvert (donc `vinted` est
+//     renseigné, un naïf voudrait le mettre en avant), mais l'extension n'est
+//     PAS connectée à VRM (`vrm.connecte:false`) ⇒ aucune action possible. C'est
+//     le cas que Julien veut voir « tout affiché, rien de flouté » (13 octobre).
+const PONT = ({ chrome, lecture }) => {
   const version = '5.163.0';
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
@@ -85,11 +89,11 @@ const PONT = ({ chrome }) => {
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
     if (chrome === 'muette') return;
     // authEtat : la session VRM de l'extension — JAMAIS le compte Vinted.
-    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: true, expiree: false, email: 'vendeur@exemple.test', user_id: 'u1', cloisonne: false } });
+    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: !lecture, expiree: false, email: 'vendeur@exemple.test', user_id: 'u1', cloisonne: false } });
     if (d.__vmr === 'etat') {
       const passu = chrome === 'passu';
       const lo = { 111: 'compte_a', 222: 'compte_b', 333: 'compte_c', 999: 'compte_achat' };
-      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' },
+      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: !lecture, email: 'vendeur@exemple.test', user_id: 'u1' },
         vinted: !passu && chrome ? { uid: String(chrome), login: lo[chrome] || '' } : null, cmds: {} }, passu ? { vintedPasSu: true } : {}) });
     }
     if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
@@ -97,13 +101,13 @@ const PONT = ({ chrome }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { chrome = null, tel = false, onglet = 'plat_vinted', inboxKO = [] } = {}) {
+async function rendre(b, { chrome = null, tel = false, onglet = 'plat_vinted', inboxKO = [], lecture = false } = {}) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_hidden', '["333"]'); } catch (_) {} });
-  await pg.addInitScript(PONT, { chrome });
+  await pg.addInitScript(PONT, { chrome, lecture });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -272,6 +276,33 @@ const messagerie = (pg) => pg.evaluate(() => {
       dit(sw.sw <= sw.cw + 1, 'la liste et sa note ne font pas déborder l’écran', `${sw.sw} > ${sw.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'filtre-compte-messages-390.png') });
+      await r.ctx.close();
+    });
+
+    console.log('── 7. LECTURE SEULE : cookie Vinted ouvert sur compte_a, mais extension PAS connectée à VRM → TOUT affiché, rien de flouté');
+    await essaie('7', async () => {
+      // Le défaut (Julien, 13 octobre) : le compte du cookie était mis en avant
+      // d'office — donc les AUTRES comptes floutés — même sans aucune action
+      // possible. En lecture seule, rien ne doit être estompé.
+      const r = await rendre(b, { chrome: '111', lecture: true });
+      const l = await lireListe(r.pg);
+      const f = await lignesFloues(r.pg, /Vente 8\d01/);
+      dit(f.floues.length === 0, 'AUCUNE vente d’un autre compte n’est floutée en lecture seule (tout affiché)', JSON.stringify(f));
+      dit(l && l.val === '*' && l.note === null, 'la liste vaut « Tous les comptes », sans note d’estompage', JSON.stringify(l));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.pg.screenshot({ path: path.join(os.tmpdir(), 'filtre-compte-lecture-1512.png') });
+      await r.ctx.close();
+    });
+
+    console.log('── 7b. LECTURE SEULE + choix EXPLICITE : son choix reste honoré (il peut filtrer)');
+    await essaie('7b', async () => {
+      // « Tout affiché » vaut pour le défaut d'office ; un filtre qu'il POSE
+      // lui-même en lecture seule reste le sien (il l'éteint par « Tous »).
+      const r = await rendre(b, { chrome: '111', lecture: true });
+      await r.pg.selectOption('#vrm-sel-compte', '222');
+      await r.pg.waitForTimeout(500);
+      const f = await lignesFloues(r.pg, /Vente 8\d01/);
+      dit(f.floues.includes('Vente 8101') && !f.floues.includes('Vente 8201'), 'son choix explicite estompe compte_a, garde compte_b — même en lecture seule', JSON.stringify(f));
       await r.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
