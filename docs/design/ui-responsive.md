@@ -142,3 +142,20 @@ bancs : toutes les écritures et données sont simulées.
 node scripts/bancs/ebay-gestion.mjs
 node scripts/bancs/revendeurs.cjs
 ```
+
+### Composition des espaces — suite du 13 octobre
+
+Vinted, Leboncoin et eBay partagent un espace identifié, une navigation groupée
+et des chiffres secondaires accessibles depuis un dépliant sur téléphone.
+Les cartes d'annonces donnent l'ordre nom → prix → coût/marge → activité ; les
+photos prennent plus de place sur ordinateur et gardent le format portrait sur
+mobile. Le bouton « Gérer l'annonce » regroupe les actions secondaires. La
+recherche, son effacement et le tri restent au-dessus de la liste.
+L'objectif mensuel existant est remonté près des résultats, avec progression
+accessible au lecteur d'écran ; aucun calcul de ventes ou bénéfices ne change.
+Le banc annonces-carte ouvre explicitement les outils de stock pour vérifier
+les actions qui y sont rangées, et peut enregistrer le premier écran replié.
+Le banc revendeurs vérifie les trois plateformes à 320, 390 et 1512 px, les
+logos locaux, l'accès aux chiffres et la saisie d'un objectif réel.
+La jauge précise « Vinted, ventes finalisées et en cours du mois » : son montant
+historique `liveStats.caMois` ne mesure pas le seul CA finalisé de la carte.
