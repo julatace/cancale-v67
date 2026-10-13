@@ -501,3 +501,46 @@ pas tranchée, et d'expédier de l'irréversible sur son outil de gagne-pain) :*
 restants (2, 10, 17, 33, 37) attendent une décision de Julien ou une ressource
 (cron validé, licence, branche + SMTP), et Vitesse 5 est le gros refactor final à
 mener écran par écran. Rien n'a été inventé ni expédié à l'aveugle.
+
+---
+
+## Répartition proposée des tâches restantes (13 octobre) — Agent 2
+
+Julien demande de répartir le travail restant entre les agents (codex, Agent 1,
+moi). Aucune session Claude pair n'est joignable en direct depuis cette machine
+en ce moment (peer-messaging ne voit personne) ; cette note EST le canal de
+coordination. **Pour éviter les conflits sur `src/App.jsx` (fichier unique,
+~37 000 lignes), un seul agent le touche à la fois — c'est moi (Agent 2).**
+
+**MOI — Agent 2** (lane : `src/Accueil*`, reste de `src/App.jsx` HORS `Ebay*`,
+extension 5.176→5.189, migrations 020+) :
+- **Vitesse 5** (écrans à la demande), en cours : première tranche = sortir le
+  gros bloc 3D (`Room3D` + `RoomPerspective`, ~1250 lignes) dans
+  `src/Room3D.jsx` en `React.lazy` (dépendances mesurées : seulement `C`, `Icon`,
+  `load`, `save` en props ; `three` déjà dynamique). Preuve : taille du bundle +
+  `garage3d.cjs` + `verif_visuel.cjs` + `audit-tdz`. Écran par écran ensuite.
+- **H** (revue complète) de mon domaine, quand l'Agent 1 a fini D.
+
+**AGENT 1** (lane : `api/ebay*`, `Ebay*` dans App.jsx, migrations 014/015,
+frontière session/connexion, `scripts/*ebay*`) :
+- ⚠️ **`audit-planchers-code` est ROUGE sur `main`** : la 5.175 publiée est sous
+  la frontière `EXT_CAPACITES.liaison = 5.171` → une 5.175 serait dite
+  « périmée » ou recevrait une session qu'elle ne sait pas lire. Remède documenté
+  par la ligne connexion : **monter les quatre frontières ensemble**
+  (`EXT_CAPACITES.liaison`, `CODE_DANS_ETAT`, bridge.js, vrm-badge.js). **À faire
+  avant d'autres publications d'extension.**
+- Étape **D** (règle d'offre eBay), migration 014/015 (agent eBay).
+- Item **2** (double vente notifiée app fermée) : versant push SERVEUR + eBay.
+
+**CODEX** (si Julien le lance) — pour ne PAS entrer en conflit avec App.jsx :
+- Idéalement du travail hors `src/App.jsx` : revue/renforcement des **bancs et
+  audits** (`scripts/`), ou la **spec** (pas le code) des items différés 17/37.
+- **Ne pas** modifier `src/App.jsx` ni le domaine eBay en parallèle de nous.
+
+**Différés — attendent une DÉCISION de Julien** (aucun agent ne les code sans) :
+- **17** 2FA : méthode + plan anti-verrouillage (il est seul utilisateur).
+- **37** mode équipe : périmètre d'accès + mécanisme d'invitation (adresses non
+  prouvées, pas de SMTP).
+- **10** rappel la veille : valider un 2ᵉ cron Vercel (un cron refusé bloque tous
+  les déploiements).
+- **33** modèle de détourage local : licence commerciale.
