@@ -4460,7 +4460,8 @@ const extractEventText = (e, entity_type) => {
         const texte=String(v).trim();
         // Champs qui portent typiquement un code / numéro de suivi / retrait.
         if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(texte)) {
-          seen.add(texte); parts.push(`${k}: ${texte}`);
+          const label=/pickup|retrait|pin/i.test(k)?'Code de retrait':/tracking|suivi/i.test(k)?'Suivi':/reference|référence/i.test(k)?'Référence':k;
+          seen.add(texte); parts.push(`${label}: ${texte}`);
         }
       } else if (v && typeof v === 'object') scan(v, depth + 1);
     }
