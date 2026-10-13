@@ -99,7 +99,7 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function ouvrir(b, vp, etat = 'ok') {
+async function ouvrir(b, vp, etat = 'ok', syncPartielle = false) {
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -134,6 +134,7 @@ async function ouvrir(b, vp, etat = 'ok') {
     if (['publish', 'deconnecter', 'programmer', 'retirer'].includes(body.action)) envois.push(body);
     // La route rend SES comptes : ceux du registre, sans les déconnectés.
     if (body.action === 'status') return j({ ok: true, connected: etat === 'pas-su' ? null : etat !== 'refuse', comptes: registre().filter((c) => !c.deconnecteLe).map((c) => ({ cle: c.cle, pseudo: c.pseudo, principal: !!c.principal, etat, relie: etat === 'pas-su' ? null : etat !== 'refuse' })) });
+    if (body.action === 'sync') return j({ok:true,lu:{annonces:true,programmees:true,commandes:!syncPartielle,stock:true,regles:true}});
     if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }], attributs: [], attributsObligatoires: [] });
     if (body.action === 'publish') return j({ ok: true, itemId: '120000000777', url: 'https://www.ebay.fr/itm/120000000777', sku: body.item && body.item.numero ? 'VRM-' + body.item.numero : null });
     if (body.action === 'deconnecter') {
@@ -229,6 +230,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '92');
+        await pg.getByLabel('État', {exact:true}).selectOption('3000');
         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
         await pg.locator('button:has-text("Publier sur eBay")').click({ timeout: 5000 });
         await feuille(pg).getByRole('button', { name: 'Oui, publier' }).waitFor({ timeout: 5000 });
@@ -310,6 +312,17 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit((await pg.$$('[data-ebay-publier-compte]')).length === 0, 'et pas de choix de compte à la publication');
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    }
+    {
+      const {ctx,pg,errs}=await ouvrir(b,{width:390,height:844},'ok',true);
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, {waitUntil:'domcontentloaded'});
+      await sousOnglet(pg,'Compte eBay');await pg.waitForTimeout(800);
+      await pg.getByRole('button',{name:'↻ Rafraîchir depuis eBay',exact:true}).click();
+      await pg.waitForTimeout(1200);
+      const bilan=pg.locator('[data-ebay-bilan-sync]');
+      dit(await bilan.getAttribute('data-ebay-bilan-sync')==='partiel' && /sauf ventes.*dernières données conservées/.test(await bilan.innerText()), 'synchro partielle : les ventes non relues sont dites, dernières données conservées');
+      dit(errs.length===0,'synchro partielle : aucune erreur de page');
       await ctx.close();
     }
     for (const etat of ['refuse','pas-su']) {

@@ -11339,6 +11339,7 @@ function itemDeBrouillon(d) {
   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
   if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
   if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
+  if (!/^\d{3,5}$/.test(String(d.etat || ''))) return { err: 'Choisis l’état de la paire.' };
   // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
   // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
   // qu'un faux.
@@ -11361,7 +11362,7 @@ function itemDeBrouillon(d) {
       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
     }
   }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat, description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -11915,6 +11916,7 @@ const prixAchatDe = (fiche, buyByNum) => {
 // §11) ; `enLigne` / `vendusVinted` : les annonces Vinted en vente / prouvées
 // vendues (Set ; `undefined` en cours ; `null` pas su).
 function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = null, onBrouillon, ventes = null, enLigne, vendusVinted, comptesPub = [], compteDefaut = 'principal', onCompte }) {
+  const etatChampId = React.useId();
   const C = EBAY_SKIN;   // peau eBay : tout ce formulaire est au look de l'appli eBay (§ ci-dessus)
   const [ouvert, setOuvert] = React.useState(false);
   // ── SUR QUEL COMPTE eBAY (9 octobre) ── pré-choisi sur le compte affiché (un
@@ -11933,7 +11935,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [titre, setTitre] = React.useState('');
   const [prix, setPrix] = React.useState('');
   const [qty, setQty] = React.useState('1');
-  const [cond, setCond] = React.useState('3000');
+  const [cond, setCond] = React.useState('');
   const [desc, setDesc] = React.useState('');
   const [photos, setPhotos] = React.useState('');
   const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
@@ -12013,7 +12015,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // TOUTES ses photos captées — plus aucun lien à coller. Le titre reste
   // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
   const choisirPaire = (p) => {
-    setPairId(p.id); setPickerOpen(false); setPairQ('');
+    setPairId(p.id); setCond(''); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
     setDesc(p.desc || '');                                 // sa description Vinted, reprise automatiquement
@@ -12039,12 +12041,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     if (!c) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
     const { attributs, conditions } = c;
     setCat(c);
-    // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
-    // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
-    if (conditions && !conditions.some(c => c.id === cond)) {
-      const occ = conditions.find(c => c.id === '3000');
-      setCond((occ || conditions[0]).id);
-    }
+    // Changer de catégorie ne doit jamais déclarer une paire « Occasion »
+    // sans son choix. Une valeur non autorisée redevient à choisir.
+    if (conditions) setCond(avant => conditions.some(c => c.id === avant) ? avant : '');
     // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
     const src = pairSel ? pairSel.title : titre;
     const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
@@ -12120,7 +12119,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setBrouillonId(d.id); setNumeroBrouillon(d.numero ? String(d.numero) : '');
     setPairId(d.pairId || null); setPickerOpen(false);
     setTitre(String(d.titre || '')); setPrix(String(d.prix == null ? '' : d.prix)); setQty(String(d.quantite || '1'));
-    setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
+    setCond(String(d.etat || '')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
     setAsp(d.aspects || {}); setRes(null); setCheck(null); setBrouillonMsg('');
     setCompteChoisi(d.compte ? String(d.compte) : null);
     setOffreA(String(d.offreAccepte || '')); setOffreR(String(d.offreRefuse || '')); setOffreBasOk(d.offreSousMoitie === true);
@@ -12243,7 +12242,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
-  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
+  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCond(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
   const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
@@ -12407,7 +12406,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             <BlocEbay n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
               <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire. VRM a pré-rempli ce qu'il pouvait prouver ; complète le reste.</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                <div><label htmlFor={etatChampId} style={lab}>État</label><select id={etatChampId} data-ebay-etat-paire="1" value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}><option value="">Choisis l’état de la paire</option>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
                 {(cat.attributs || []).filter(a => a.requis).map(a => (
                   <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accent }}>✳</span></label>{champAttr(a)}</div>
                 ))}
@@ -12468,6 +12467,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
             </BlocEbay>
 
+            {!cond && <div data-ebay-etat-manquant="1" style={{ fontSize: 12, color: C.warn }}>Choisis l’état de la paire pour vérifier ou publier sur eBay.</div>}
             {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
             {/* Les frais LUS PAR NOM (5 octobre) : le total est `ListingFee`,
                 jamais la somme de tous les frais (elle doublait). Absent ⇒ « — ». */}
@@ -12477,8 +12477,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 12.5, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
-              <button type="button" data-publier-ebay="1" onClick={publier} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
+              <button type="button" onClick={verifier} disabled={verif || busy || !cond} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy || !cond) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy || !cond) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
+              <button type="button" data-publier-ebay="1" onClick={publier} disabled={busy || verif || !!garde || !cond} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde || !cond) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde || !cond) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
           {/* ENREGISTRER EN BROUILLON (5 octobre) : rien ne part chez eBay. Il
@@ -12613,6 +12613,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [comptesStatut, setComptesStatut] = React.useState(undefined);
   const [busy, setBusy] = React.useState(false);
   const [retour, setRetour] = React.useState('');
+  const [bilanSync, setBilanSync] = React.useState(null);
   const [deconnexion, setDeconnexion] = React.useState({});   // ref → '…' | message
   React.useEffect(() => {
     try {
@@ -12718,9 +12719,20 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     // Chaque compte relié de la vue, l'un après l'autre (une synchro = des
     // lectures chez eBay ; jamais en rafale).
     const liste = (Array.isArray(comptesStatut) ? comptesStatut : []).filter((c) => c.relie === true && dansVueEbay({ _compte: c.principal ? 'principal' : c.cle }, vue));
-    for (const c of (liste.length ? liste : [{ principal: true }])) {
-      try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync', ...(c.principal ? {} : corpsCompteEbay(c.cle)) }) }); } catch (_) {}
+    const bilans = [];
+    const aLire = Array.isArray(comptesStatut) ? liste : [{ principal: true }];
+    for (const c of aLire) {
+      const nom = nomCompteEbay(c);
+      try {
+        const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync', ...(c.principal ? {} : corpsCompteEbay(c.cle)) }) });
+        const j = await r.json().catch(() => null);
+        const causes = [['annonces', 'annonces'], ['programmees', 'programmées'], ['commandes', 'ventes'], ['stock', 'stock'], ['regles', 'règles d’offre']];
+        const manquent = r.ok && j && j.ok ? causes.filter(([k]) => !j.lu || j.lu[k] !== true).map(([,mot]) => mot) : ['connexion eBay'];
+        if (j && j.listings && j.listings.complet === false) manquent.push('liste complète des annonces');
+        bilans.push({ nom, manquent });
+      } catch (_) { bilans.push({ nom, manquent: ['connexion eBay'] }); }
     }
+    setBilanSync({ at: Date.now(), bilans });
     signalerComptesEbay();   // la synchro du principal a pu apprendre son pseudo
     await lireData();
     setSyncing(false);
@@ -12744,6 +12756,10 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     <div style={boite()}>
       <div style={{ ...eti, marginBottom: 6 }}>Compte eBay · connexion</div>
       {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
+      {bilanSync && <div data-ebay-bilan-sync={bilanSync.bilans.length && bilanSync.bilans.every(x => !x.manquent.length) ? 'lu' : 'partiel'} style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+        {!bilanSync.bilans.length ? 'Aucune connexion vérifiée dans cette vue : rien n’a été relu sur un autre compte.' : bilanSync.bilans.map(x => `${x.nom} : relu chez eBay à ${new Date(bilanSync.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}${x.manquent.length ? `, sauf ${x.manquent.join(', ')} — dernières données conservées` : ''}.`).join(' ')}
+      </div>}
+
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
       ) : !st.ready ? (

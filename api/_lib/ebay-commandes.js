@@ -1,3 +1,4 @@
+import { faitsTransport } from './ebay-transport.js';
 // Commandes eBay : seule cette projection se range et revient au navigateur.
 // Une page manquante ne permet jamais de remplacer la dernière capture.
 const texte = v => typeof v === 'string' ? v : undefined;
@@ -6,6 +7,7 @@ const objet = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== 
 export function commandeMinimale(o) {
   if (!o || !texte(o.orderId)) return null;
   return objet({
+    transport: faitsTransport(o),
     orderId: o.orderId, legacyOrderId: texte(o.legacyOrderId), creationDate: texte(o.creationDate), lastModifiedDate: texte(o.lastModifiedDate),
     orderPaymentStatus: texte(o.orderPaymentStatus), orderFulfillmentStatus: texte(o.orderFulfillmentStatus), salesRecordReference: texte(o.salesRecordReference),
     buyer: o.buyer && texte(o.buyer.username) ? { username: o.buyer.username } : undefined,
@@ -30,7 +32,7 @@ export function fusionnerCommandes(anciennes, nouvelles) {
   }
   return [...index.values()].sort((a,b) => (Date.parse(b.creationDate) || 0) - (Date.parse(a.creationDate) || 0));
 }
-export async function lireCommandesEbay(lire, token, depuis, maintenant = Date.now()) {
+export async function lireCommandesEbay(lire, token, depuis, maintenant = Date.now(), fin = Date.now() + 45000) {
   const capture = Number(depuis);
   const debut = Number.isFinite(capture) && capture > 0 ? Math.max(capture - 120000, maintenant - 90 * 86400000) : maintenant - 90 * 86400000;
   if (debut > maintenant) return { ok: false, status: 503, error: 'Date de capture des commandes incohérente.' };
@@ -38,9 +40,10 @@ export async function lireCommandesEbay(lire, token, depuis, maintenant = Date.n
   let url = `https://api.ebay.com/sell/fulfillment/v1/order?limit=50&filter=${filter}`;
   const vus = new Set(), orders = [];
   for (let page = 0; page < 20; page++) {
+    if (Date.now() >= fin) return { ok: false, status: 503, error: 'Délai de lecture des commandes atteint : dernière capture conservée.' };
     if (vus.has(url)) return { ok: false, status: 502, error: 'Pagination eBay répétée.' };
     vus.add(url);
-    const r = await lire(url, token);
+    const r = await lire(url, token, undefined, { fin });
     if (!r.ok || !r.data || !Array.isArray(r.data.orders)) return { ok: false, status: r.status || 502, error: 'Une page de commandes eBay n’a pas pu être lue.' };
     orders.push(...r.data.orders);
     if (!r.data.next) {

@@ -155,6 +155,9 @@ const envoisEbay = []; let avertir = false;
   // L'ÉTAT vient de la liste d'eBay pour la catégorie (Sell Metadata), pas d'une liste en dur.
   const etats = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/^état/i.test(x.textContent.trim())); if(!l)return ''; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?[...s.options].map(o=>o.textContent).join('|'):''; });
   dit(/occasion/i.test(etats) && /Neuf sans emballage/i.test(etats), 'la liste d\'états vient d\'eBay pour la catégorie', etats.slice(0,60));
+  dit(await pg.getByLabel('État', {exact:true}).inputValue() === '', 'état non choisi : aucune déclaration Occasion implicite');
+  dit(await pg.locator('[data-publier-ebay]').isDisabled(), 'état non choisi : publication bloquée');
+  await pg.getByLabel('État', {exact:true}).selectOption('3000');
   // Même interface qu'eBay : les caractéristiques à valeurs sont des LISTES
   // déroulantes portant les valeurs d'eBay, et la pointure de la paire s'y
   // sélectionne (valeur autorisée par eBay).

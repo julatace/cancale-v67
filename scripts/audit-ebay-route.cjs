@@ -191,7 +191,7 @@ global.fetch = async (url, opts = {}) => {
     const appel = h['X-EBAY-API-CALL-NAME'] || '';
     const jeton = h['X-EBAY-API-IAF-TOKEN'] || String(h.Authorization || '').replace(/^Bearer\s+/, '') || '';
     const corps = String(opts.body || '');
-    journal.push({ ou: 'ebay', m, u: u.replace(/\?.*$/, ''), appel, corps, jeton, marche: h['X-EBAY-C-MARKETPLACE-ID'] || '', seq: ++seq });
+    journal.push({ ou: 'ebay', m, u: u.replace(/\?.*$/, ''), appel, corps, jeton, marche: h['X-EBAY-C-MARKETPLACE-ID'] || '', compatibilite:h['X-EBAY-API-COMPATIBILITY-LEVEL'], seq: ++seq });
     if (u.includes('/identity/v1/oauth2/token')) {
       // Le jeton d'accès dépend du refresh_token : c'est ce qui montre QUEL
       // compte eBay sert chaque appel.
@@ -217,9 +217,14 @@ global.fetch = async (url, opts = {}) => {
         if (mode.getuser === 'ko' || !idn) return xml(mode.getuser === 'ko' ? XML_REFUS : XML_OK(''));
         return xml(XML_OK(`<User><UserID>${idn[0]}</UserID><EIASToken>${idn[1]}</EIASToken><Status>Confirmed</Status></User>`));
       }
+      if (appel === 'GetOrders') {
+        const id=balise(corps,'OrderID');
+        return xml(XML_OK(`<OrderArray><Order><OrderID>${id}</OrderID><ShippingDetails><ShippingLabelPolicy>EBAY_ONLY</ShippingLabelPolicy></ShippingDetails></Order></OrderArray>`));
+      }
       if (appel === 'GetMyeBaySelling') {
         if (mode.liste === 'ko' || (mode.listeKoPour && mode.listeKoPour === jeton)) return xml(XML_REFUS);
         if (mode.liste === 'reseau') throw new Error('ECONNRESET');
+        if (mode.liste === 'pend') { mode.signalPresent = !!opts.signal; return new Promise((resolve,reject) => { if (!opts.signal) return reject(new Error('signal absent')); opts.signal.addEventListener('abort', () => reject(new Error('délai atteint')), {once:true}); }); }
         return xml(repListe(compte, corps));
       }
       if (appel === 'GetItem') {
@@ -535,8 +540,9 @@ const RA = {};
     await essaie('np écriture', async () => {
       const o = await app(JWT_J, { action: 'sync' });
       const w = o.journal.find((x) => x.ou === 'base' && /ebay_listings/.test(x.corps));
-      dit(!!w && /on_conflict=owner,id/.test(w.u) && /"owner":"11111111/.test(w.corps),
-        'base non cloisonnée : l\'écriture garde la forme d\'avant (VRM_OWNER_UID, cible owner,id)', w ? w.u : 'aucune écriture');
+      const insertionGardee = w && w.m === 'POST' && /\/rest\/v1\/app_data$/.test(w.u);
+      dit(!!w && (insertionGardee || /on_conflict=owner,id/.test(w.u)) && /"owner":"11111111/.test(w.corps),
+        'base non cloisonnée : le propriétaire reste VRM_OWNER_UID, insertion gardée ou cible owner,id (jamais un autre vendeur)', w ? w.u : 'aucune écriture');
     });
     console.log(`NC ok=${ok} ko=${ko}`);
     process.exit(ko ? 1 : 0);
@@ -1248,6 +1254,16 @@ const RA = {};
     dit(!!a1 && a1.observateurs === 3 && a1.vues === '3' && !!a2 && a2.observateurs === null, 'les observateurs sont rangés en nombre — absents ⇒ null, jamais 0');
     dit(sansJeton(o), 'la réponse de la synchro ne transporte aucun jeton');
   });
+  await essaie('eBay suspendu : délai effectif et capture conservée', async () => {
+    remettre();mode.liste='pend';
+    const timeout=AbortSignal.timeout, delais=[];
+    AbortSignal.timeout=ms=>{delais.push(ms);return timeout(Math.min(ms,25));};
+    const vivant=setTimeout(()=>{},2000);
+    try {
+      const o=await app(JWT_J,{action:'sync'});
+      dit(mode.signalPresent===true && delais.some(ms=>ms===10000) && o.corps.lu.annonces===false && ecrit(o.journal,'ebay_listings')===null, 'eBay ne répond jamais : requête interrompue sous délai, anciennes annonces non remplacées');
+    } finally { clearTimeout(vivant);AbortSignal.timeout=timeout;remettre(); }
+  });
   await essaie('sync annonces illisibles', async () => {
     remettre(); mode.liste = 'ko';
     const o = await app(JWT_J, { action: 'sync' });
@@ -1261,6 +1277,17 @@ const RA = {};
       'eBay ne rend pas les commandes ⇒ elles gardent leur dernière capture, les annonces lues sont rangées quand même');
   });
 
+  await essaie('politique transport dédiée à 1455', async () => {
+    remettre();
+    mode.commandesPages=[{orders:[{orderId:'01-1455',orderPaymentStatus:'PAID',fulfillmentStartInstructions:[{fulfillmentInstructionsType:'SHIP_TO',shippingStep:{shipTo:{fullName:'SECRET_NOM',contactAddress:{countryCode:'FR',addressLine1:'SECRET_RUE'}}}}]}],total:1}];
+    const o=await app(JWT_J,{action:'sync'});
+    const lus=auCompte(o.journal).filter(x=>x.appel==='GetOrders');
+    const autres=auCompte(o.journal).filter(x=>x.appel && x.appel!=='GetOrders');
+    const commandes=lignes.find(x=>x.owner===J && x.id==='ebay_orders');
+    const c=commandes && commandes.data.orders.find(x=>x.orderId==='01-1455');
+    dit(lus.length===1 && lus[0].compatibilite==='1455' && autres.every(x=>x.compatibilite==='1149'), 'GetOrders seul au niveau 1455 ; tous les autres appels restent à 1149');
+    dit(c && c.transport.politiqueEtiquette==='EBAY_ONLY' && c.transport.pays==='FR' && !JSON.stringify(commandes.data).includes('SECRET_'), 'politique, pays et noms des champs rangés, jamais les valeurs d’adresse');
+  });
   await essaie('sync commandes paginées et privées', async () => {
     remettre();
     const ancien = { orderId: 'historique', creationDate: '2026-01-01T12:00:00Z', fulfillmentStartInstructions: [{ adresse: 'SECRET_ADRESSE_OLD' }] };

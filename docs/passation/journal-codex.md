@@ -153,3 +153,48 @@ Sources de contrat :
 
 La suite K2 (politique d'étiquette 1455, Metadata transport, délais et bilan de
 synchro visible) et K1 (gel de publication par compte sans preuve) restent en cours.
+
+### 13 octobre — transport et bilan de synchronisation K2
+
+La politique d'étiquette se lit par GetOrders dédié à 1455, sur l'identifiant de
+commande exact. Autres appels Trading : 1149. Champ absent dans une commande
+retrouvée = `aucune` ; refus, autre commande ou politique inconnue = `null` ;
+`EBAY_ONLY` reste contraignant. Aucun bordereau n'est acheté. Les faits rangés
+sont pays, noms des champs d'adresse, présence de retrait/programme et service,
+jamais les valeurs d'adresse. Lecture bornée des commandes payées encore sans
+politique ; les captures précédentes restent à lire aux synchronisations suivantes.
+
+Metadata transport FR : schéma officiel Sell Metadata 1.12.1, lecture mensuelle
+par jeton d'application, cache `vrm_reglages.ebay_transport_fr`. Lecture incomplète
+n'écrase pas la table. Sources documentées avant implémentation, sans requête
+vendeur réelle. v2 défini pour le futur consentement Agent (droit Notification),
+v1 reste demandé aujourd'hui.
+
+Délais : eBay 10 s, base eBay 5 s ; budget de synchro 45 s, réserve pour ranger.
+maxDuration 60 pour les portes eBay, compte et rappels, sans nouvelle fonction.
+Une page de commandes manquante ne remplace pas la capture. Les listes eBay
+incomplètes conservent les annonces/programmées précédentes ; rangement par
+version et heure de départ pour ne pas écraser une capture plus récente.
+
+Le bilan sous Compte eBay exploite les retours `lu` au lieu de les jeter : chaque
+compte et les sources non lues sont dits. Vue sans compte vérifié ⇒ rien n'est
+relu sur un autre compte. Les flags sont vrais seulement après rangement réussi.
+
+Le formulaire ne choisit plus Occasion silencieusement. État à choisir pour
+chaque nouvelle paire, remise à blanc si la catégorie l'interdit, état gardé
+seulement pour un brouillon où il était déjà saisi. Vérifier/publier bloqués avant
+le choix ; le serveur l'exige aussi. Les descriptions contenant `]]>` sont
+préservées dans un XML valide.
+
+Preuves : route 428 contrôles, dont GetOrders seul à 1455 et eBay qui ne répond
+jamais (requête interrompue, capture conservée) ; audit transport (trois états,
+identité, minimisation, cache mensuel, panne) ; banc formulaire (choix explicite),
+banc comptes (sync partielle, refus et panne) verts. Le build passe. La passe
+complète hors SQL est relancée après ces changements.
+
+Sources :
+- https://developer.ebay.com/DevZone/XML/Docs/Reference/eBay/types/ShippingDetailsType.html
+- https://developer.ebay.com/api-docs/master/sell/metadata/openapi/3/sell_metadata_v1_oas3.json
+- https://developer.ebay.com/api-docs/commerce/notification/static/release-notes.html
+
+K1 et la suite Agent restent à implémenter ; ne pas allumer `agent_ebay`.

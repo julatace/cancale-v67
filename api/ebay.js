@@ -22,7 +22,7 @@
 import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
+import { jetonApplication, keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -41,11 +41,13 @@ const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.princip
 // Vinted) : on ne publie rien. On mesure ce qu'eBay expose VRAIMENT pour son
 // compte, on range, et on renvoie un résumé (comptes + échantillon) — pas de
 // schéma inventé (§6).
+import { metadataTransport } from './_lib/ebay-metadata-transport.js';
+import { politiqueTransport } from './_lib/ebay-transport.js';
 import { lireCommandesEbay, fusionnerCommandes } from './_lib/ebay-commandes.js';
 const EBAY_API = 'https://api.ebay.com';
-async function ebayJson(url, token, extra) {
+async function ebayJson(url, token, extra, options = {}) {
   try {
-    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(Math.max(1, Math.min(10000, options.fin ? options.fin - Date.now() : 10000))), headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (_) {}
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
@@ -141,13 +143,13 @@ function classeEchec(r) {
 //   `avertissements` : les messages de sévérité Warning (eBay a accepté, mais
 //                      il a quelque chose à dire) ;
 //   `erreurs`        : la liste complète `{code, severite, message, params}`.
-async function tradingCall(token, callName, inner) {
+async function tradingCall(token, callName, inner, options = {}) {
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
   try {
     const r = await fetch(`${EBAY_API}/ws/api.dll`, {
-      method: 'POST',
-      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
+      method: 'POST', signal: AbortSignal.timeout(Math.max(1, Math.min(10000, options.fin ? options.fin - Date.now() : 10000))),
+      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': String(callName === 'GetOrders' && options.compatibilite === 1455 ? 1455 : 1149), 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body,
     });
     const xml = await r.text();
@@ -209,7 +211,7 @@ const pagesDe = (bloc) => { const n = Number((/<TotalNumberOfPages>(\d+)<\/Total
 // Pagination : 200 par page, 5 pages au plus par liste ; au-delà
 // `complet:false` (une identité absente d'une liste incomplète n'est PAS
 // prouvée absente).
-async function listeVendeur(token) {
+async function listeVendeur(token, options = {}) {
   const actives = [], programmees = [];
   let pagesA = 1, pagesS = 1, ack = '', status = 0;
   for (let p = 1; p <= 5; p++) {
@@ -218,7 +220,8 @@ async function listeVendeur(token) {
     const pagination = `<Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>${p}</PageNumber></Pagination>`;
     const inner = (vouluA ? `<ActiveList><Include>true</Include>${pagination}</ActiveList>` : '')
       + (vouluS ? `<ScheduledList><Include>true</Include>${pagination}</ScheduledList>` : '');
-    const r = await tradingCall(token, 'GetMyeBaySelling', inner);
+    if (options.fin && Date.now() >= options.fin) return { ok: false, status: 503, error: 'Délai de lecture des annonces atteint : dernière capture conservée.' };
+    const r = await tradingCall(token, 'GetMyeBaySelling', inner, options);
     status = r.status; ack = r.ack || ack;
     if (r.status === 0) return { ok: false, status: 503, error: 'eBay injoignable' };
     if (!r.ok) return { ok: false, status: r.status >= 400 ? r.status : 502, error: r.err || 'eBay n\'a pas rendu tes annonces.' };
@@ -230,12 +233,12 @@ async function listeVendeur(token) {
 
 // Détail COMPLET d'une annonce (description, catégorie, état, photos,
 // caractéristiques). Pour capter « tout ».
-async function tradingGetItem(token, itemId) {
+async function tradingGetItem(token, itemId, options = {}) {
   // (11 octobre, revue) L'heure de la lecture est celle où la question PART
   // chez eBay, jamais celle où la réponse arrive : une réponse lente ne doit pas
   // se croire plus fraîche qu'une pose faite pendant qu'elle voyageait.
   const t0 = Date.now();
-  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
+  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`, options);
   if (!res.ok) return { _err: res.err || res.ack || res.error || ('status ' + res.status) };
   const xml = res.xml;
   const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(xml); return x ? x[1].trim() : ''; };
@@ -1516,6 +1519,7 @@ async function handlePubInfo(b, ctx) {
 }
 
 async function handleSync(ctx) {
+  const fin = Date.now() + 45000;
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
   const token = at.token;
@@ -1525,14 +1529,15 @@ async function handleSync(ctx) {
   // comptée « en ligne ».
   const tListe = Date.now();   // la liste parle d'eBay À CETTE HEURE (`garder`)
   const anciennesCommandes = await lireDonnee(ligneDe('ebay_orders', ctx), ctx.owner);
-  const [orders, inv, liste] = await Promise.all([
+  const [orders, inv, liste, transport] = await Promise.all([
     anciennesCommandes === undefined
       ? Promise.resolve({ ok: false, status: 503, error: 'Dernière capture des commandes illisible : rien ne sera remplacé.' })
-      : lireCommandesEbay(ebayJson, token, anciennesCommandes && anciennesCommandes.capturedAt),
+      : lireCommandesEbay(ebayJson, token, anciennesCommandes && anciennesCommandes.capturedAt, Date.now(), fin),
     // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
     // header Accept-Language »). Ne concerne que les annonces créées par API.
     ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
-    listeVendeur(token),
+    listeVendeur(token, { fin }),
+    metadataTransport(ebayJson,jetonApplication),
   ]);
   // ── DÉTAIL COMPLET par annonce (photos, description, catégorie, état,
   //    caractéristiques) : « capter tout ». On borne à 20 GetItem par sync
@@ -1545,7 +1550,8 @@ async function handleSync(ctx) {
   const lecturesRegle = {};
   for (const it of lst.slice(0, 20)) {
     if (!it.itemId) continue;
-    const d = await tradingGetItem(token, it.itemId);
+    if (Date.now() >= fin - 5000) { detailDiag.push({ error: 'Lecture des détails incomplète : délai atteint.' }); break; }
+    const d = await tradingGetItem(token, it.itemId, { fin: fin - 5000 });
     if (d && !d._err) {
       const { _regle, ...detail } = d;
       it.detail = detail; if (!it.photo && detail.photos && detail.photos[0]) it.photo = detail.photos[0];
@@ -1553,6 +1559,20 @@ async function handleSync(ctx) {
     } else {
       lecturesRegle[it.itemId] = { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'sync' };
       if (d && d._err && detailDiag.length < 3) detailDiag.push({ itemId: it.itemId, err: d._err });
+    }
+  }
+  if (orders.ok && orders.data) {
+    orders.data.orders = fusionnerCommandes(anciennesCommandes && anciennesCommandes.orders, orders.data.orders);
+    const precedent = new Map((anciennesCommandes && Array.isArray(anciennesCommandes.orders) ? anciennesCommandes.orders : []).map(o => [o.orderId,o.transport]));
+    let lues = 0;
+    for (const o of orders.data.orders) {
+      if (String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID') continue;
+      const avant = precedent.get(o.orderId);
+      if (avant && ['EBAY_ONLY','aucune'].includes(avant.politiqueEtiquette)) {
+        o.transport = { ...o.transport, politiqueEtiquette: avant.politiqueEtiquette, politiqueLueLe: avant.politiqueLueLe, servicePaye: avant.servicePaye };
+      } else if (lues < 10 && Date.now() < fin - 5000) {
+        o.transport = { ...o.transport, ...(await politiqueTransport(o,token,(jeton,nom,xml,options)=>tradingCall(jeton,nom,xml,{...options,fin:fin-5000}))) }; lues++;
+      }
     }
   }
   // Range ce qu'on a (fusion par id).
@@ -1563,10 +1583,25 @@ async function handleSync(ctx) {
   //    en vente sur eBay. Une source qui n'a pas répondu garde sa dernière
   //    capture.
   const at2 = Date.now();
-  let rangeRegles = null;
+  let rangeRegles = null, rangeAnnonces = null, rangeProgrammees = null, rangeStock = null;
   if (liste.ok) {
-    await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner);
-    await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner);
+    rangeAnnonces = await modifierDonnee(ligneDe('ebay_listings', ctx), ctx.owner, d => {
+      if (Number(d && d.capturedAt) > tListe) return undefined;
+      const anciennes = new Map((d && Array.isArray(d.items) ? d.items : []).map(x => [String(x.itemId),x]));
+      const nouvelles = new Map(lst.map(x => [String(x.itemId), { ...(anciennes.get(String(x.itemId)) || {}), ...x }]));
+      if (!liste.complet) for (const [id,x] of anciennes) if (!nouvelles.has(id)) nouvelles.set(id,x);
+      return { items: [...nouvelles.values()], ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: tListe };
+    });
+    rangeProgrammees = await modifierDonnee(ligneDe('ebay_programmees', ctx), ctx.owner, d => {
+      if (Number(d && d.capturedAt) > tListe) return undefined;
+      const nouvelles = new Map(liste.programmees.map(x => [String(x.itemId), resumeProgrammee(x)]));
+      const enLigne = new Map(lst.map(x => [String(x.itemId), { itemId: x.itemId, sku: x.sku }]));
+      if (!liste.complet) {
+        for (const x of d && Array.isArray(d.items) ? d.items : []) if (!nouvelles.has(String(x.itemId))) nouvelles.set(String(x.itemId),x);
+        for (const x of d && Array.isArray(d.enLigne) ? d.enLigne : []) if (!enLigne.has(String(x.itemId))) enLigne.set(String(x.itemId),x);
+      }
+      return { items: [...nouvelles.values()], enLigne: [...enLigne.values()], complet: liste.complet, capturedAt: tListe };
+    });
     // Les règles : lire-fusionner-réécrire GARDÉ (une lecture ratée de la ligne
     // n'écrit rien). Une liste COMPLÈTE dit quelles annonces n'existent plus :
     // leurs règles sortent ; une liste incomplète ne prouve aucune absence.
@@ -1578,7 +1613,7 @@ async function handleSync(ctx) {
     orders: fusionnerCommandes(d && d.orders, orders.data.orders), status: orders.status,
     capturedAt: Math.max(Number(d && d.capturedAt) || 0, orders.capturedAt),
   }));
-  if (inv.ok && inv.data) await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
+  if (inv.ok && inv.data) rangeStock = await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
   // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
@@ -1587,10 +1622,11 @@ async function handleSync(ctx) {
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data && rangeCommandes === true), stock: !!(inv.ok && inv.data), regles: rangeRegles === true },
-    listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
+    lu: { annonces: !!(liste.ok && rangeAnnonces === true), programmees: !!(liste.ok && rangeProgrammees === true), commandes: !!(orders.ok && orders.data && rangeCommandes === true), stock: !!(inv.ok && inv.data && rangeStock === true), regles: rangeRegles === true },
+    listings: { status: liste.status, ack: liste.ack, complet: liste.ok ? liste.complet : null, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), error: orders.ok ? (rangeCommandes === true ? undefined : 'Commandes lues mais non enregistrées : dernière capture conservée.') : orders.error },
+    transport: { lu: transport.ok, error: transport.ok ? undefined : transport.error },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
   } };
 }

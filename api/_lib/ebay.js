@@ -25,9 +25,16 @@ const SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.finances',
 ].join(' ');
+// v2 sera demandé par l'onboarding Agent (K4), jamais par un renouvellement.
+const JEUX_PORTEES = {
+  v1: SCOPES,
+  v2: SCOPES + ' https://api.ebay.com/oauth/api_scope/commerce.notification.subscription',
+};
+
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const TOKENS_ID = 'ebay_tokens';
+const requete = (url, options = {}) => fetch(url, { signal: AbortSignal.timeout(String(url).startsWith(SUPABASE_URL) ? 5000 : 10000), ...options });
 
 // ⚠️ TOUT est lu à l'APPEL (jamais à l'import) : une fonction serverless
 // capturerait sinon un env absent au chargement (piège vu au banc).
@@ -57,14 +64,14 @@ const basicAuth  = () => 'Basic ' + Buffer.from(`${appId()}:${certId()}`).toStri
 function authUrl(state, opts) {
   return `${EBAY_AUTH_URL}?client_id=${encodeURIComponent(appId())}`
     + `&redirect_uri=${encodeURIComponent(ruName())}`
-    + `&response_type=code&scope=${encodeURIComponent(SCOPES)}`
+    + `&response_type=code&scope=${encodeURIComponent(JEUX_PORTEES[opts && opts.jeu] || JEUX_PORTEES.v1)}`
     + (opts && opts.ajout ? '&prompt=login' : '')
     + (state ? `&state=${encodeURIComponent(String(state).slice(0, 140))}` : '');
 }
 
 // Jeton applicatif (client_credentials) : sert à TESTER que les clés marchent.
 async function appToken() {
-  const r = await fetch(EBAY_TOKEN_URL, {
+  const r = await requete(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
     body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}`,
@@ -81,7 +88,7 @@ async function jetonApplication() {
   const contexte = appId() + ':' + certId();
   if (__jetonApplication && __jetonApplication.contexte === contexte && __jetonApplication.jusqua > Date.now()) return { ok: true, token: __jetonApplication.token };
   try {
-    const r = await fetch(EBAY_TOKEN_URL, { method: 'POST', signal: AbortSignal.timeout(10000),
+    const r = await requete(EBAY_TOKEN_URL, { method: 'POST', signal: AbortSignal.timeout(10000),
       headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
       body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}` });
     const j = await r.json().catch(() => null);
@@ -125,7 +132,7 @@ async function ecrireLignes(rows, owner) {
   const p = await portee(owner);
   if (!p) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${p.conflit}`, {
+    const r = await requete(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${p.conflit}`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(p.lignes(rows)),
@@ -170,7 +177,7 @@ const pseudoPropre = (s) => String(s == null ? '' : s).replace(/&lt;|&gt;|&quot;
 async function identiteEbay(token) {
   if (!token) return null;
   try {
-    const r = await fetch('https://api.ebay.com/ws/api.dll', {
+    const r = await requete('https://api.ebay.com/ws/api.dll', {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': 'GetUser', 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body: '<?xml version="1.0" encoding="utf-8"?><GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents"></GetUserRequest>',
@@ -240,7 +247,7 @@ async function storeRefresh(refresh, expiresInDays, owner, suffixe = '', portees
 async function echangerCode(code) {
   if (!code) return { ok: false, status: 400, error: 'code manquant' };
   if (!ruName()) return { ok: false, status: 503, reason: 'no-runame', error: 'RuName non configuré (EBAY_RUNAME).' };
-  const r = await fetch(EBAY_TOKEN_URL, {
+  const r = await requete(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
     body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(ruName())}`,
@@ -406,7 +413,7 @@ async function lireRefresh(owner, suffixe = '') {
   if (!p) return undefined;
   if (suffixe && !/^_[0-9a-f]{16}$/.test(suffixe)) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=refresh_token:data->>refresh_token`, {
+    const r = await requete(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${suffixe}${p.filtre}&select=refresh_token:data->>refresh_token`, {
       headers: { ...sbCle(sbKey()) },
     });
     if (!r.ok) return undefined;
@@ -435,7 +442,7 @@ async function accessToken(owner, suffixe = '') {
   // répond `invalid_scope` et plus RIEN ne se lit. Le nouveau droit s'obtient
   // en se reconnectant (nouveau consentement), pas en le réclamant au refresh.
   try {
-    const r = await fetch(EBAY_TOKEN_URL, {
+    const r = await requete(EBAY_TOKEN_URL, {
       method: 'POST', signal: AbortSignal.timeout(10000),
       headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
       body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
@@ -464,7 +471,7 @@ async function lireReglageVendeur(cle, owner) {
   const p = await portee(owner);
   if (!p) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
+    const r = await requete(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -477,7 +484,7 @@ async function lireDonnee(id, owner) {
   const p = await portee(owner);
   if (!p) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+    const r = await requete(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
@@ -514,7 +521,7 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
   for (let n = 0; n < essais; n++) {
     let rows;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+      const r = await requete(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
       if (!r.ok) return null;
       rows = await r.json();
     } catch (_) { return null; }
@@ -527,7 +534,7 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
     const data = { ...nouveau, rev: (Number.isSafeInteger(rev0) && rev0 >= 0 ? rev0 : 0) + 1 };
     try {
       if (!present) {
-        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        const w = await requete(`${SUPABASE_URL}/rest/v1/app_data`, {
           method: 'POST', headers: { ...json, Prefer: 'return=minimal' }, body: JSON.stringify(p.lignes([{ id, data }])),
         });
         if (w.ok) return true;
@@ -535,7 +542,7 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
         return false;
       }
       const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(typeof rev0 === 'object' ? JSON.stringify(rev0) : String(rev0))}`;
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {
+      const w = await requete(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {
         method: 'PATCH', headers: { ...json, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
       });
       if (!w.ok) return false;
@@ -591,6 +598,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { jetonApplication, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
+export { jetonApplication, JEUX_PORTEES, SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

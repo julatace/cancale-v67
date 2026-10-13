@@ -9520,3 +9520,27 @@ Preuves : audit route 425 ; banc comptes avec refus/panne mobile vert ; signatur
 (vecteur officiel, faux corps, 50 kid forgés), suppression deux vendeurs verts ;
 fermeture 27/0 ; abonnement 91/0 ; build/variables/fonctions API verts. Pas d'appel
 réel eBay/Vinted. K2 pas terminé : Metadata, politique 1455, bilan de sync, délais.
+
+## Reprise Codex — 13 octobre, transport et sync eBay (K2)
+
+GetOrders dédié 1455 pour les commandes payées sans politique connue. Identifiant
+exact exigé dans la réponse ; `EBAY_ONLY` / `aucune` (champ absent) / null (pas su).
+Tous les autres Trading restent 1149. Les faits rangés : pays et noms des champs,
+présence retrait/programme et service — aucun nom, rue, téléphone, email, ni
+référence de programme brute. Aucun achat d'étiquette. Source : ShippingDetailsType
+et schéma Sell Metadata 1.12.1 consultés avant de coder.
+
+Metadata FR mensuelle, par jeton d'application privé, cache dans vrm_reglages.
+Panne ne remplace rien. `JEUX_PORTEES.v2` contient le droit Notification pour K4,
+non demandé aujourd'hui. eBay sous 10 s, lectures base sous 5 s, budget sync 45 s,
+maxDuration 60 sur ebay.js/compte.js/ship-reminders.js (toujours 12 fonctions).
+
+Listes incomplètes conservent anciennes annonces/programmées ; CAS et heure de
+départ protègent une capture plus récente. Flags `lu` après écriture seulement.
+Compte eBay rend maintenant un bilan par compte, dit ce qui n'a pas été relu,
+et ne synchronise pas le principal par défaut sur une vue non vérifiée.
+
+Formulaire : état à choisir, aucun défaut Occasion, remise à blanc par paire ou
+catégorie incompatible ; vérifier/publier bloqués sans choix. Serveur et règle
+de brouillon exigent l'état. Route 428 contrôles, transport et bancs formulaire /
+comptes (sync partielle, refus, panne) verts, build vert. Agent toujours éteint.
