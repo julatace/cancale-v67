@@ -20236,7 +20236,14 @@ function ComptaPro({ liveStats, onNav }) {
 
 /* ── Comptabilité (onglet dédié, tous comptes agrégés) ──────────────────── */
 // Couleur stable par compte (pour l'étiquette "d'où vient" chaque ligne).
-const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
+// ⚠️ §7 : une pastille d'IDENTITÉ de compte ne doit JAMAIS emprunter une
+//   couleur SÉMANTIQUE (danger rouge = « deux paires sous un numéro », warn
+//   ambre, accent bleu) — sinon un compte sain porte un point rouge qui se lit
+//   comme une alarme, et « une fausse alerte fait cesser de lire les vraies ».
+//   L'ancienne palette violait 3 fois (bleu≈accent, rouge≈danger, ambre≈warn).
+//   Ces 8 teintes sont toutes loin des couleurs réservées (des deux thèmes) et
+//   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
+const ACCT_COLORS = ['#9b51e0','#27ae60','#00b8a9','#e056fd','#9acd32','#17a9c9','#6c5ce7','#e8529a'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
