@@ -1,0 +1,27 @@
+/* Direction claire Minéral. Chargée après la feuille historique.
+   La classe de bouton est opt-in : aucune modification du display des rails,
+   mini-actions, chiffres cliquables ou menus historiques. */
+:root[data-theme="light"] { --vrm-focus:#A63F23; }
+:root[data-theme="light"] body { background:#F4F3EF; }
+:root[data-theme="light"] body::before { content:none; }
+:root[data-theme="light"] ::selection { background:rgba(166,63,35,.16); }
+:root[data-theme="light"] :focus-visible { outline:2px solid #A63F23; outline-offset:3px; }
+.vrm-button {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:44px; max-width:100%; padding:11px 18px; border-radius:8px;
+  font:600 13px/1.35 'Inter',system-ui,sans-serif; letter-spacing:-.01em;
+  box-shadow:0 1px 1px rgba(32,33,31,.035);
+  transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease;
+  white-space:normal; text-align:center; touch-action:manipulation;
+}
+.vrm-button svg { flex-shrink:0; }
+.vrm-button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+.vrm-button:active:not(:disabled) { transform:translateY(1px); }
+.vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#A63F23); outline-offset:3px; }
+@media(hover:hover) and (pointer:fine) {
+  .vrm-button:hover:not(:disabled) { box-shadow:0 2px 5px rgba(32,33,31,.09); filter:none; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .vrm-button { transition:none; }
+  .vrm-button:active:not(:disabled) { transform:none; }
+}
