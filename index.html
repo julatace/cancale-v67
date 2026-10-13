@@ -49,11 +49,11 @@
       var d = JSON.parse(localStorage.getItem('vinted_dark') || 'false') === true;
       document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
       var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', d ? '#07090D' : '#F4F6FA');
+      if (m) m.setAttribute('content', d ? '#07090D' : '#F4F3EF');
     } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   </script>
   <style>
-    body{margin:0;padding:0;background:#F4F6FA;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#F4F3EF;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
        mais c'est ce qui fait la différence entre « feuille de papier » et
@@ -65,7 +65,7 @@
        ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#07090D) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
     html[data-theme="dark"]  body{ background:#07090D; background-image:none; }
-    html[data-theme="light"] body{ background:#F4F6FA; background-image:none; }
+    html[data-theme="light"] body{ background:#F4F3EF; background-image:none; }
     /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
        Il n'était posé nulle part : la date d'« Import des emails » dans
        Réglages s'affichait en boîte blanche au milieu de l'app sombre. */

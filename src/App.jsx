@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
+import { MINERAL } from "./themeMineral.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -311,6 +312,12 @@ const THEMES = {
     s1:"#3D7BFF", s2:"#8AB4FF",
   },
 };
+// ── DIRECTION « MINÉRAL » (choisie par Julien, 13 octobre) ───────────────────
+// Palette claire préparée par codex (src/themeMineral.js), appliquée VERBATIM
+// au thème clair : papier chaud, actions à l'encre. Les valeurs de codex
+// gagnent ; toute clé qu'elles ne couvrent pas garde sa valeur d'avant (aucun
+// jeton ne devient indéfini). Le thème SOMBRE n'est pas touché.
+Object.assign(THEMES.light, MINERAL);
 let C = THEMES.light;
 
 // Données d'amorçage vidées : chaque utilisateur part d'un catalogue/ventes
