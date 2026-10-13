@@ -47,13 +47,35 @@ const cmp = (a, b) => {
 // ── Les versions publiées sans le champ ─────────────────────────────────────
 const SANS_CODE = new Set(['5.168.0', '5.170.0']);
 const SANS_LIAISON = new Set(['5.168.0', '5.170.0']);
+// ⚠️ Retire les commentaires SANS avaler le code. Un strip naïf
+// `replace(/\/\*[\s\S]*?\*\//g, '')` prenait le `/*` d'une CHAÎNE
+// (`APP_URL_VRM + '/*'`, un motif d'URL) pour un début de commentaire et
+// mangeait 62 775 caractères — dont `demanderLiaison` : l'audit criait alors
+// au loup (« liaison : non » sur une 5.175 qui la porte). On scanne caractère
+// par caractère en respectant les chaînes `'` `"` et les gabarits `` ` ``.
+const sansCommentaires = (src) => {
+  let out = '', i = 0; const n = src.length;
+  while (i < n) {
+    const c = src[i], d = src[i + 1];
+    if (c === '/' && d === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+    if (c === '/' && d === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; out += ' '; continue; }
+    if (c === "'" || c === '"' || c === '`') {
+      const q = c; out += c; i++;
+      while (i < n) { const e = src[i]; out += e; i++; if (e === '\\') { if (i < n) { out += src[i]; i++; } continue; } if (e === q) break; }
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
+};
 const git = (args) => { try { return cp.execFileSync('git', ['-C', RACINE, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64e6 }); } catch (_) { return null; } };
 const refMain = git(['rev-parse', '--short', 'origin/main']);
 const manifMain = git(['show', 'origin/main:vinted-sync-extension/manifest.json']);
 const fondMain = git(['show', 'origin/main:vinted-sync-extension/background.js']);
 if (refMain && manifMain && fondMain) {
   const vMain = (JSON.parse(manifMain).version || '').trim();
-  const portePas = (re) => !re.test(fondMain.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''));
+  const fondNet = sansCommentaires(fondMain);
+  const portePas = (re) => !re.test(fondNet);
   if (portePas(/\bcode:\s*CODE_VERSION\b/)) SANS_CODE.add(vMain);
   if (portePas(/function\s+demanderLiaison\b/)) SANS_LIAISON.add(vMain);
   console.log(`· origin/main (${refMain.trim()}) : ${vMain} — état avec \`code\` : ${SANS_CODE.has(vMain) ? 'non' : 'oui'} · liaison : ${SANS_LIAISON.has(vMain) ? 'non' : 'oui'}`);
