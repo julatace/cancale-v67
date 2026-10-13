@@ -10647,10 +10647,10 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
 // la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
 // Sur téléphone, les chiffres laissent la première place aux articles.
-function ResumePlateforme({children}) {
+function ResumePlateforme({children,title='Chiffres de la plateforme',className=''}) {
   const [open,setOpen]=useState(()=>window.matchMedia('(min-width:768px)').matches);
   useEffect(()=>{const mq=window.matchMedia('(min-width:768px)');const change=()=>setOpen(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
-  return <details className="vrm-platform-summary" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary><span className="vrm-summary-short">Chiffres</span><span className="vrm-summary-accessible"> de la plateforme</span></summary>{children}</details>;
+  return <details className={`vrm-platform-summary ${className}`} open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>{title==='Chiffres de la plateforme'?<><span className="vrm-summary-short">Chiffres</span><span className="vrm-summary-accessible"> de la plateforme</span></>:title}</summary>{children}</details>;
 }
 function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
@@ -13243,7 +13243,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
-  const euro=p=>{const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?n.toFixed(2).replace('.',',')+(c?` ${c==='EUR'?'€':c}`:''):'';};
+  const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?n.toFixed(2).replace('.',',')+(c?` ${c==='EUR'?'€':c}`:''):'';};
   const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
   const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
   const d = it.detail || {};
@@ -16360,6 +16360,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         )}
       </Card></div>
 
+      {liveStats && <details className="vrm-finance-activity" style={{marginBottom:10,fontSize:12,color:C.muted}}>
+        <summary style={{cursor:'pointer',padding:'8px 0'}}>Ventes enregistrées · <span data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui {liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</span> · <span data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois {liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</span></summary>
+        <p>Ventes faites, toutes plateformes, avant encaissement. Le CA finalisé et l’argent reçu restent distincts.</p>
+        {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">Les ventes n’ont pas pu être lues. Les montants restent inconnus.</p>}
+        {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>Total partiel, sans {liveStats.venduManque.join(', ')} : ventes non lues.</p>}
+      </details>}
       <details className="vrm-finance-stock"><summary>Stock et volume de ventes</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
@@ -28544,7 +28550,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
                 plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
             {!baseKO && !premierJour && (
-              <div style={{marginBottom:14}}>
+              <div className="vrm-day-greeting" style={{marginBottom:14}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
                 <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
                 {!loading && jobs.length>0 && <div style={{fontSize:13,color:C.muted,marginTop:3}}><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</div>}
@@ -28561,7 +28567,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
                 claire : le gros chiffre en encre, l'accent réservé au lien. */}
             {!baseKO && !premierJour && !loading && sales.items && (
-              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+              <button type="button" className="vrm-day-money" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none',display:'block',padding:'18px 18px 16px'}}>
                 <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Vendu en {moisNom}</div>
                 <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display" style={{fontSize:'clamp(34px, 10vw, 48px)',fontWeight:800,letterSpacing:-1,marginTop:6,lineHeight:1,color:C.text,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={moisEur}/></div>
@@ -28592,6 +28598,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
             {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
+              <ResumePlateforme title="Évolution · 14 derniers jours" className="vrm-day-history">
               <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
                   <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
@@ -28607,6 +28614,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
                 </div>
               </div>
+              </ResumePlateforme>
             )}
 
             {/* ARGENT EN ATTENTE / DISPONIBLE À VIRER (§5.14 : deux notions,
