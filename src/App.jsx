@@ -29315,8 +29315,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 1er oct. — « trop chargé » : les places tiennent dans UNE carte,
                 une ligne chacune (nom · combien · Toutes / Aucune). La phrase
                 commune dessous, en petit. */}
-            <div data-places="" style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 12px 10px',boxShadow:C.shadow||'none'}}>
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,paddingTop:2}}>Publier aussi ailleurs</div>
+            {/* ── 13 oct. — « trop de texte, mal agencé » (Julien). CE RÉGLAGE
+                (où publier en plus de Vinted) SE LIT UNE FOIS : il descend
+                derrière un dépliant FERMÉ par défaut, au lieu d'un encart
+                permanent de 4-5 lignes posé entre les contrôles et la première
+                annonce. Le geste du quotidien reste la puce sous chaque carte ;
+                ici il n'y a que le réglage en masse (Toutes/Aucune) et
+                l'explication. Le résumé de la ligne (place N/total) est VISIBLE
+                sans ouvrir. `data-places` reste sur le contenu : le banc le
+                trouve par cet attribut (invariant : aucune case eBay). */}
+            <details data-places-wrap style={{marginBottom:12}}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+                <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>Publier aussi ailleurs</span>
+                <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
+                <span className="vrm-chevron" style={{fontSize:14,color:C.muted}}>›</span>
+              </summary>
+              <div data-places="" style={{marginTop:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 12px 10px',boxShadow:C.shadow||'none'}}>
               <div style={{display:'flex',flexWrap:'wrap',columnGap:22}}>
               {lignes.map((l, i) => (
                 <div key={l.pl.cle} style={{padding:'6px 0',flex:'1 1 260px',minWidth:0}}>
@@ -29337,7 +29352,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
               </div>
               {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,paddingTop:6}}>{phrase(lignes[0], false)}</div>}
-            </div>
+              </div>
+            </details>
           </>);
         })()}
         {/* ══ LA CARTE D'ANNONCE (3 octobre) ══════════════════════════════════
