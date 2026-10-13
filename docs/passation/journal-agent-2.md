@@ -544,3 +544,40 @@ frontière session/connexion, `scripts/*ebay*`) :
 - **10** rappel la veille : valider un 2ᵉ cron Vercel (un cron refusé bloque tous
   les déploiements).
 - **33** modèle de détourage local : licence commerciale.
+
+---
+
+## Vitesse 5 — 1ʳᵉ tranche : le Stock 3D chargé à la demande (13 octobre)
+
+**Mesuré d'abord :** les gros découpages existaient déjà (`App.jsx` en `React.lazy`
+derrière l'accueil ; `three` et `pdf-lib` en `import()`). Le plus gros bloc encore
+DANS le bundle initial était le Stock 3D (`Room3D` + `RoomPerspective`, ~1250
+lignes). Dépendances de niveau module mesurées (scan des identifiants libres, pas
+deviné) : `C`, `Icon`, `load`, `save`, `FURN_TYPES`, `GARAGE_AMBIANCES`, plus les
+hooks nommés `useState/useEffect/useRef` — tout le reste est local ou en props,
+`three` déjà dynamique.
+
+**Livré :** `src/Room3D.jsx` (nouveau), importé en `const Room3D =
+React.lazy(() => import('./Room3D.jsx'))`, rendu derrière `<React.Suspense>` à
+l'ouverture du Stock. Les 6 identifiants de module passent en **props** (pas
+d'import circulaire avec App.jsx) ; `RoomPerspective` (le repli 2.5D) part dans
+le même fichier et sert de repli interne de Room3D (plus de prop `fallback`
+construite côté App). Aucun changement de comportement.
+
+**Mesuré après :** chunk `Room3D-*.js` = **46 Ko** sorti du bundle ; App initiale
+**1 535 Ko → 1 485 Ko**.
+
+**Preuves :** `garage3d.cjs` (rend le Stock 3D : montage, sonde caméra, survol,
+clic droit, surlignage, molette, clavier, double-clic — tout vert via le chunk
+paresseux) + `verif_visuel.cjs` (conforme aux deux tailles) + `audit-tdz` vert.
+La chaîne de preuve est un vrai rouge→vert : à chaque dépendance oubliée le banc
+TOMBAIT au garde-fou d'écran (`useState is not defined`, puis `FURN_TYPES is not
+defined`) — c'est `garage3d.cjs` qui l'a attrapé, pas le build (un bundle ne lève
+pas sur un global manquant). `audit-variables/icones/coherence/chiffres/boutons/
+bancs` verts.
+
+⚠️ **Prochaines tranches** (écran par écran, un banc par écran, jamais en passe
+aveugle) : les autres gros écrans restent dans App.jsx — ils closurent beaucoup
+d'état/d'helpers, donc chaque extraction demande le même scan d'identifiants
+libres + un banc de rendu. Le Stock 3D était le plus isolé (tout en props),
+d'où le premier choix.
