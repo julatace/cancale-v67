@@ -9,6 +9,9 @@ Sur téléphone, les plateformes restent dans la barre du bas ; le menu du haut
 regroupe les autres pages par usage, avec des boutons en deux colonnes. Il peut
 être fermé avec Échap et garde le focus clavier dans son panneau.
 
+Les raccourcis de période visibles se limitent à la période choisie, « Ce mois »
+et « Mois dernier ». Les autres durées sont accessibles dans le sélecteur.
+
 Les pages partagent des titres plus lisibles, des résumés sans cadre supplémentaire
 et des onglets de plateforme au trait. L'en-tête eBay suit le thème choisi comme
 son contenu. Le statut de synchronisation ouvre les paramètres au toucher.
@@ -33,7 +36,7 @@ node scripts/audit-icones.cjs
 node scripts/audit-boutons.cjs
 ```
 
-Le banc mobile sert le build et des données synthétiques. Il interdit les
+Le banc mobile sert le build et des données synthétiques (222 contrôles réussis). Il interdit les
 requêtes distantes et couvre les écrans à 320, 360, 390 et 430 px, les menus,
 la recherche, les champs, les filtres, l'ancien zoom, l'agrandissement, la rotation
 et le rail d'ordinateur à 1512 px. `BANC_CAPTURES` peut désigner un dossier hors
