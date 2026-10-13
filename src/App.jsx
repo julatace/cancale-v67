@@ -5211,7 +5211,7 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const qui = React.useRef(null); if (!qui.current) qui.current = {};
   const el = React.useRef(null);
-  const etat = vinted ? photosVinted.etat(src) : 'natif';
+  const etat = vinted ? photosVinted.etatRendu(src) : 'natif';
   const mort = vinted && photosVinted.estMorte(src);
   const vuAuRendu = React.useRef('');
   vuAuRendu.current = etat + (mort ? '!' : '');
