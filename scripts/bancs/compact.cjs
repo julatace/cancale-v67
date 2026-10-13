@@ -108,7 +108,7 @@ async function brancher(p){
   await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Confirmer',exact:true}).click();
   await p.getByText('La facture n’a pas été mise en file. Relis son état dans Factures.',{exact:true}).waitFor();check(patch===1,'refus serveur annoncé sans faux succès');
   await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
-  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Compte eBay',exact:true}).click();await p.getByText('Compte eBay relié',{exact:true}).waitFor();
+  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Compte eBay relié',{exact:true}).waitFor();
   check(!(await p.getByRole('button',{name:'Autoriser les paiements'}).isVisible()),'paiements repliés, connexion claire');
   await p.getByText('Solde et paramètres du compte',{exact:true}).click();await p.getByRole('button',{name:'Autoriser les paiements'}).waitFor();check(await p.getByText('Compte eBay relié',{exact:true}).isVisible(),'scope paiements distinct de connexion');
   await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Actualisation indisponible. Les dernières données restent affichées.',{exact:true}).waitFor();check(true,'échec actualisation expliqué');

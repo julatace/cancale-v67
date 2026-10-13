@@ -20,6 +20,7 @@
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
+import {creerGestionEbay} from './_lib/ebay-gestion.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee } from './_lib/ebay.js';
@@ -153,6 +154,7 @@ function extraireItem(blk) {
     itemId: g('ItemID'),
     title: g('Title'),
     price: g('CurrentPrice') || g('BuyItNowPrice') || g('StartPrice'),
+    currency:(/<(?:CurrentPrice|BuyItNowPrice|StartPrice)[^>]*currencyID=["']([A-Z]{3})["']/.exec(blk) || [])[1] || null,
     qty: g('QuantityAvailable') || g('Quantity'),
     vendus: g('QuantitySold'),
     vues: wc,
@@ -1104,6 +1106,8 @@ async function handleCallback(req, res) {
 }
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
+const gestionEbay=creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin:EBAY_API});
+
 async function handleApp(req, res) {
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: keysReady(), canConsent: canConsent(), env: 'production' });
@@ -1162,6 +1166,16 @@ async function handleApp(req, res) {
     // qui engage (offre, retrait, programmation, annulation, déplacement) exige
     // en plus `confirme:true` — vérifié AVANT tout appel à eBay.
     const ACTIONS = {
+      commande:()=>gestionEbay.commande(b,owner),
+      transporteurs:()=>gestionEbay.transporteurs(b,owner),
+      expedier:()=>gestionEbay.expedier(b,owner),
+      messageacheteur:()=>gestionEbay.contacterAcheteur(b,owner),
+      messages:()=>gestionEbay.messages(b,owner),
+      repondre:()=>gestionEbay.repondre(b,owner),
+      offresrecues:()=>gestionEbay.offres(b,owner),
+      repondreoffre:()=>gestionEbay.repondreOffre(b,owner),
+      modifierannonce:()=>gestionEbay.modifierAnnonce(b,owner),
+      terminerannonce:()=>gestionEbay.terminerAnnonce(b,owner),
       sync: () => handleSync(owner),
       revise: () => handleRevise(b, owner),
       pubinfo: () => handlePubInfo(b, owner),

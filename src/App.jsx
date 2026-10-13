@@ -5,6 +5,7 @@ import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { photoArticle, photoCommande } from "./photosArticles.js";
+import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -4389,6 +4390,18 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
       return { ok: true, items: [], pagination: null, raw: null, source: 'harvest-vide' };
     }
   }
+  if(opts.force && extSait('messagerie')==='ok') {
+    const r=await vmrExec({uid:account.vinted_user_id,method:'GET',endpoint:`/api/v2/inbox?page=${page}&per_page=20`});
+    if(r?.ok && Array.isArray(r.data?.conversations)) {
+      const h=await fetchHarvest(account.vinted_user_id,'inbox');
+      const tous=new Map((h?.conversations || []).map(c=>[String(c.id),c]));
+      r.data.conversations.forEach(c=>tous.set(String(c.id),c));
+      return {ok:true,items:[...tous.values()],pagination:r.data.pagination || null,source:'extension'};
+    }
+    const h=await fetchHarvest(account.vinted_user_id,'inbox');
+    if(Array.isArray(h?.conversations))return {ok:true,items:h.conversations,source:'harvest',stale:true};
+    return {ok:false,error:r?.error || 'lecture-indisponible',items:[]};
+  }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, raw: null, source: 'harvest' };
   if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, raw: null, source: 'moisson-absente' };
@@ -4412,16 +4425,17 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
 // action_message) qu'on affiche comme evenements. Pour distinguer "moi" de
 // "l'acheteur" on compare entity.user_id a opposite_user.id (fiable meme si
 // l'id vendeur differe du vinted_user_id du compte).
-const fetchVintedConversationDetail = async (account, conversationId) => {
+const fetchVintedConversationDetail = async (account, conversationId, {force=false}={}) => {
   // 1) Données moissonnées (si tu as déjà ouvert ce fil sur vinted.fr).
   const h = await fetchHarvestConversation(account.vinted_user_id, conversationId);
-  if (h && h.conversation) return { ok: true, conversation: h.conversation, source: 'harvest' };
+  if (!force && h && h.conversation) return { ok:true,conversation:h.conversation,source:'harvest' };
   // 2) L'extension, depuis TON navigateur (5.135) : une lecture, au nom du
   //    compte connecté dans Chrome. Refusée (autre compte, absente) ⇒ repli.
   if (extSait('messagerie') === 'ok') {
     const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
     if (r && r.ok && r.data && r.data.conversation) return { ok: true, conversation: r.data.conversation, source: 'extension' };
   }
+  if(h?.conversation)return {ok:true,conversation:h.conversation,source:'harvest'};
   // 3) Repli : proxy.
   const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
   if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
@@ -4439,13 +4453,15 @@ const extractEventText = (e, entity_type) => {
   ['title','subtitle','body','text','header','description'].forEach(k => { if (typeof e[k] === 'string' && e[k].trim()) parts.push(e[k].trim()); });
   const seen = new Set(parts);
   const scan = (obj, depth = 0) => {
-    if (!obj || typeof obj !== 'object' || depth > 3) return;
+    if (!obj || typeof obj !== 'object' || depth > 6) return;
     for (const k in obj) {
       const v = obj[k];
-      if (typeof v === 'string' && v.trim()) {
+      if ((typeof v === 'string' && v.trim()) || (typeof v==='number' && Number.isFinite(v))) {
+        const texte=String(v).trim();
         // Champs qui portent typiquement un code / numéro de suivi / retrait.
-        if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(v.trim())) {
-          seen.add(v.trim()); parts.push(`${k}: ${v.trim()}`);
+        if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(texte)) {
+          const label=/pickup|retrait|pin/i.test(k)?'Code de retrait':/tracking|suivi/i.test(k)?'Suivi':/reference|référence/i.test(k)?'Référence':k;
+          seen.add(texte); parts.push(`${label}: ${texte}`);
         }
       } else if (v && typeof v === 'object') scan(v, depth + 1);
     }
@@ -4486,17 +4502,20 @@ const extractLinks = (e) => {
 const normalizeConversationMessages = (conversation) => {
   if (!conversation || !Array.isArray(conversation.messages)) return [];
   const oppId = conversation.opposite_user?.id;
-  return conversation.messages.map((m) => {
+  const messages=conversation.messages.map((m) => {
     const e = m.entity || {};
-    const ts = m.created_at_ts || e.created_at_ts || null;
+    const brut=m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at;
+    const nombre=Number(brut);const date=brut==null || brut===''?null:Number.isFinite(nombre)?(nombre<1e12?nombre*1000:nombre):(Date.parse(brut)||null);
+    const ts=date!=null && Number.isFinite(new Date(date).getTime())?date:null;
     const links = extractLinks(e);
     if (m.entity_type === 'message') {
-      return { kind: 'message', mine: oppId != null && e.user_id !== oppId, body: e.body || '', photos: e.photos || [], ts, links };
+      return { kind: 'message', mine:e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), body: e.body || '', photos:Array.isArray(e.photos)?e.photos:[], ts, links };
     }
     // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
     // codes de retrait compris.
     return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
   });
+  return messages.every(m=>m.ts!=null)?messages.sort((a,b)=>a.ts-b.ts):messages;
 };
 // L'offre d'un ACHETEUR encore en attente dans ce fil — la règle qu'utilisait le
 // moteur d'acceptation automatique, RETIRÉ le 5 octobre : c'est l'acheteur
@@ -4512,7 +4531,7 @@ const offreEnAttenteDe = (conversation) => {
     for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
       if (!m || m.entity_type !== 'offer_request_message') continue;
       const e = m.entity || {};
-      if (opp != null && e.user_id !== opp) continue;
+      if(opp!=null && (e.user_id==null || String(e.user_id)!==String(opp)))continue;
       if (e.current === false || e.status !== 10) continue;
       if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
       const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
@@ -7268,11 +7287,14 @@ function PlateformeLogo({ p, title }) {
       lineHeight:1, flexShrink:0, whiteSpace:'nowrap' }}>{m.t}</span>
   );
 }
-function NavigationIcon({ item, size=20, style }) {
-  const marque=item.id==='plat_vinted'?'V':item.id==='plat_leboncoin'?'lbc':item.id==='plat_ebay'?'eBay':null;
-  if(!marque)return <Icon name={item.icon} size={size} style={style}/>;
-  const couleur=marque==='V'?'#007F85':marque==='lbc'?LBC_ORANGE:'#3665F3';
-  return <span aria-hidden="true" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:size+5,height:size,fontSize:marque==='V'?size:marque==='lbc'?12:11,fontWeight:700,color:couleur,letterSpacing:-.5,flexShrink:0,...style}}>{marque==='eBay'?<><span style={{color:'#E53238'}}>e</span><span style={{color:'#3665F3'}}>B</span><span style={{color:'#B58D00'}}>a</span><span style={{color:'#639A2B'}}>y</span></>:marque}</span>;
+function BrandIcon({plateforme,size=24,style}) {
+  const source={vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg'}[plateforme];
+  if(!source)return null;
+  return <img className="vrm-brand-icon" src={source} alt="" aria-hidden="true" width={size} height={size} style={{objectFit:'contain',flexShrink:0,...style}}/>;
+}
+function NavigationIcon({item,size=20,style}) {
+  const marque={plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay'}[item.id];
+  return marque?<BrandIcon plateforme={marque} size={size+3} style={style}/>:<Icon name={item.icon} size={size} style={style}/>;
 }
 function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null,compact=false}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
@@ -10591,6 +10613,7 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
 function PlatSubNav({ sub, setSub, sections, dark }) {
+  const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   return (
     <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
@@ -10599,7 +10622,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
           style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
             color:on?(T.onAccent||'#fff'):T.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
             fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6}}>
-          {label}
+          <span className="vrm-section-icon"><Icon name={icones[id] || 'more'} size={17}/></span><span>{label}</span>
           {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
               comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
               ici pourrait contredire celui de l'écran juste en dessous (§11). */}
@@ -10735,14 +10758,12 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const aLabel = (o) => !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   // Un COLIS vendeur : vente prouvée (isSeller) OU un bordereau existe (un
   // bordereau n'existe que pour le vendeur). On exclut les achats / côté inconnu.
-  const estVendeur = (o) => o.isSeller === true || aLabel(o);
-  const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-  const estPoste = (o) => /done|livr|transit|remis|collect|termin|finalis|exp[ée]di[ée]/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-  const colis = ventes.filter(o => estVendeur(o) && !annulee(o));
-  const aExpedier = colis.filter(o => !estPoste(o) && !estFait(o));     // vendu, pas encore parti
+  const estVendeur = (o) => o.isSeller!==false && (o.isSeller===true || aLabel(o));
+  const colis=ventes.filter(o=>estVendeur(o) && !lbcAnnulee(o) && !lbcFinalisee(o));
+  const aExpedier=colis.filter(o=>!lbcExpediee(o) && !estFait(o));
   const prets = aExpedier.filter(o => o.label && o.label.voucherUrl);   // bordereau prêt
   const aGenerer = aExpedier.filter(o => !(o.label && o.label.voucherUrl)); // bordereau à générer
-  const postes = colis.filter(o => estPoste(o) || estFait(o));
+  const postes = colis.filter(o => lbcExpediee(o) || estFait(o));
   const lbcUrl = (o) => `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`;
   const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
   // ── LE N° (SKU) D'UN COLIS LEBONCOIN ──────────────────────────────────────
@@ -10776,9 +10797,9 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     const n = numDe(o);
     const posted = estFait(o);
     return (
-      <div key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+      <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <PhotoVente src={o.image} size={58} />
+          <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {badgeNum(n)}
@@ -10832,17 +10853,17 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
         {prets.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 12.5, color: C.muted }}>{aGenerer.length ? 'Génère les bordereaux ci-dessus, ils arriveront ici.' : 'Rien à poster — tout est parti. 👌'}</div></Card>
           : prets.map(o => carte(o, { principal: 'imprimer' }))}
         {postes.length > 0 && (<>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>Déjà postés ({postes.length})</div>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>En livraison ({postes.length})</div>
           <Card>
             {postes.map((o, i) => { const n = numDe(o); const lbl = o.label || {}; return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <PhotoVente src={o.image} size={40} />
+                <PhotoVente src={photoArticle(o)} size={40} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{estFait(o) ? 'Posté' : (o.stepLabel || 'Posté')}{lbl.reference ? ` · ${lbl.reference}` : ''}</div>
                 </div>
                 {badgeNum(n)}
-                {estFait(o) && <button type="button" onClick={() => toggleFait(o)} title="Remettre dans les colis à poster" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Pas encore</button>}
+                {estFait(o) && !lbcExpediee(o) && <button type="button" onClick={() => toggleFait(o)} title="Remettre dans les colis à poster" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Pas encore</button>}
                 {lbl.trackingUrl && <a href={lbl.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accent, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
               </div>
             ); })}
@@ -10893,6 +10914,11 @@ const lbcFinalisee = (o) => {
   // et pas `livr` : « en cours de livraison » = EN TRANSIT, pas livré. Et pas de
   // « reçu » seul (ambigu : « paiement reçu » peut être un palier amont).
   return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
+};
+const lbcExpediee = o => {
+  const t=[o.parcelStatus,o.stepStatus,o.stepLabel].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t))return false;
+  return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
 };
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
@@ -12150,7 +12176,7 @@ function EbayVentes({ baseKO }) {
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
   if (!orders.length) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
-  const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c === 'USD' ? '$' : '€');
+  const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c==='EUR'?'€':c || '');
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   return wrap(<>
     {head}
@@ -12164,9 +12190,9 @@ function EbayVentes({ baseKO }) {
         const expedie = ['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase());
         const statut = !o.orderPaymentStatus ? 'Statut à confirmer' : !paye ? 'Paiement en attente' : expedie ? 'Expédiée' : 'À expédier';
         const col = !paye ? E.muted : expedie ? E.muted : E.warn;
-        return <LigneVente key={o.orderId || i} photo={img} titre={li.title}
+        return <div className="vrm-ebay-order" key={o.orderId || i}><LigneVente photo={img} titre={li.title}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande order={o} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>
   </>);
@@ -12275,18 +12301,31 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   // VRAIE annonce eBay. Geste explicite (✏️ → Enregistrer), jamais automatique.
   const [edit, setEdit] = React.useState(false);
   const [price, setPrice] = React.useState(String(it.price || '').replace('.', ','));
-  const [qty, setQty] = React.useState(String(it.qty || ''));
+  const [qty,setQty]=React.useState(String(it.qty ?? ''));
+  const descSimple=String(it.detail?.description || '').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&');
+  const [titreEdite,setTitreEdite]=React.useState(it.title || '');
+  const [descEditee,setDescEditee]=React.useState(descSimple);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
-  const enregistrer = async () => {
-    setSaving(true); setMsg('');
-    try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
-      const j = await r.json();
-      if (j && j.ok) { setMsg('✓ Modifié sur eBay'); setEdit(false); if (onSaved) onSaved(); }
-      else setMsg(j && j.error ? j.error : 'eBay a refusé la modification.');
-    } catch (_) { setMsg('Modification impossible (réseau).'); }
-    setSaving(false);
+  const enregistrer=async()=>{
+    const changes={};
+    if(Number(String(price).replace(',','.'))!==Number(it.price) || !price.trim())changes.price=String(price).replace(',','.');
+    if(qty!==String(it.qty ?? ''))changes.quantity=qty;
+    if(titreEdite!==(it.title || ''))changes.title=titreEdite;
+    if(descEditee!==descSimple)changes.description=descEditee;
+    if(!Object.keys(changes).length){setMsg('Aucune modification.');return;}
+    if(('price' in changes && !/^\d+(?:[,.]\d{1,2})?$/.test(price)) || ('quantity' in changes && !/^\d{1,6}$/.test(qty)) || ('title' in changes && !titreEdite.trim()) || ('description' in changes && !descEditee.trim())){setMsg('Vérifie les champs modifiés.');return;}
+    if(!await askConfirm({title:'Modifier cette annonce eBay ?',desc:`${it.title || it.itemId}\n${'price' in changes?`Prix : ${it.price} → ${price} ${it.currency || ''}\n`:''}${'quantity' in changes?`Stock disponible : ${it.qty ?? '—'} → ${qty}\n`:''}${'title' in changes?`Titre : ${titreEdite}\n`:''}${'description' in changes?'La description sera remplacée par le texte saisi.':''}`,ok:'Modifier sur eBay',cancel:'Annuler'}))return;
+    setSaving(true);setMsg('');
+    try{
+      const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'modifierannonce',itemId:it.itemId,...changes,expectedPrice:it.price,expectedQuantity:it.qty,expectedTitle:it.title,confirme:true})});
+      const j=await r.json();if(r.ok && j?.ok){setMsg('Modifications acceptées par eBay.');setEdit(false);if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé la modification.');
+    }catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}
+    finally{setSaving(false);}
+  };
+  const terminer=async()=>{
+    if(!await askConfirm({title:'Terminer cette annonce ?',desc:`${it.title || it.itemId}\nElle ne sera plus proposée à la vente sur eBay.`,ok:'Terminer sur eBay',cancel:'Annuler'}))return;
+    setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
   const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
@@ -12380,16 +12419,19 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {/* ── Modifier prix / stock ── */}
           {!edit ? (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => { setEdit(true); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier le prix / le stock</button>
+              <button type="button" onClick={()=>{setPrice(String(it.price ?? '').replace('.',','));setQty(String(it.qty ?? ''));setTitreEdite(it.title || '');setDescEditee(descSimple);setEdit(true);setOpen(true);setMsg('');}} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Modifier l’annonce</button>
               {/* Le lien se change ici (la confirmation dit « tu pourras la
                   changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
               {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setInfo(''); }} style={btnE}>Changer la paire reliée</button>}
+              <button type="button" disabled={saving} onClick={terminer} style={btnE}>Terminer l’annonce</button>
               {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 11.5, color: E.muted }}>Prix €<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" style={inpE} /></label>
-              <label style={{ fontSize: 11.5, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={{ ...inpE, width: 72 }} /></label>
+              <label style={{ fontSize: 11.5, color: E.muted }}>Prix {it.currency || ''}<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" style={inpE} /></label>
+              <label style={{ fontSize: 11.5, color: E.muted }}>Stock disponible<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={{ ...inpE, width: 72 }} /></label>
+              <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
+              <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Description<textarea aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <button type="button" onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
               <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
@@ -14384,7 +14426,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // `icon` et `gradient` restent acceptés — les 10 appels ne changent pas — mais
   // ne sont plus dessinés.
   const StatCard=({label,value,color=C.text,sub,subColor=null,onClick=null,title=null})=>
-    <StatBox compact label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/>;
+    <div className={label==='CA finalisé'?'vrm-finance-metric is-primary':'vrm-finance-metric'}><StatBox compact label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/></div>;
   // Une seule phrase pour une seule cause, et elle ouvre la saisie en série sur
   // l'écran Annonces (le propriétaire de la modale, §11).
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onGo) onGo('cat_annonces'); };
@@ -14411,128 +14453,38 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   );
 
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+    <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <div>
-        <h2 style={{margin:0,color:C.text,fontSize:22,fontWeight:600,letterSpacing:-0.5}}>Tableau de bord</h2>
-        <div style={{fontSize:12,color:C.muted,marginTop:2}}>Vue d'ensemble de ton activité</div>
+        <h2 style={{margin:0,color:C.text,fontSize:22,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
+        <div style={{fontSize:12,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
       </div>
-
-      {/* À FAIRE : ce qui demande une action, tout de suite, en haut de l'accueil.
-          Réutilise le centre de notifications (mêmes items). Rien = tout est à jour. */}
-      {Array.isArray(actions) && (
-        actions.length>0 ? (
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {actions.map((a,i)=>(
-                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer'}}>
-                  {/* ⚠️ ICÔNE AU TRAIT, comme le rail et les titres d'écran (§5.55).
-                      Un emoji est dessiné par le système : à côté de nos propres
-                      icônes, ça ne va pas ensemble. L'emoji reste en repli. */}
-                  <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
-                    {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
-                  </span>
-                  <span style={{flex:1,fontSize:15,fontWeight:600,color:C.text}}>{a.text}</span>
-                  <span style={{fontSize:20,color:C.muted}}>›</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : baseKO ? (
-          /* ⚠️ SECONDE PHRASE DU MÊME GENRE, et mon premier correctif l'avait
-             ratée : le tableau de bord porte DEUX « tout est à jour » — celui
-             de l'onboarding et celui-ci, la liste « À faire » vide. C'est le
-             banc qui l'a vue, pas la relecture du code. Une liste d'actions
-             vide parce qu'on n'a rien pu lire n'est pas « rien qui presse ». */
-          <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien.</LignePanne>
-        ) : premierJour ? (
-          /* ⚠️⚠️ TROISIÈME « tout est à jour » DU MÊME ÉCRAN, vu au rendu le
-             16 septembre : le bandeau vert s'affichait JUSTE SOUS la carte qui
-             venait d'expliquer que rien n'était encore branché. Un écran qui se
-             contredit à deux centimètres d'écart. Rien n'est à jour : rien n'a
-             encore commencé — et la carte du dessus dit déjà quoi faire, donc
-             ici on se tait (§7 : une cause, une phrase). */
-          null
-        ) : (
-          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-            <span style={{fontSize:20}}>✅</span>
-            <span style={{fontSize:13,fontWeight:500,color:C.text}}>Tout est à jour — rien qui presse ✨</span>
-          </div>
-        )
-      )}
-
-      {/* AUJOURD'HUI : ce que tu as VENDU dans la journée (pas l'argent viré,
-          qui arrive plusieurs jours après — deux choses différentes). */}
-      {liveStats && liveStats.venduPasSu && (
-        <div data-dash-vendu-pas-su="1" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',marginBottom:12}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
-          <div style={{fontSize:15,fontWeight:600,color:C.text}}>—</div>
-          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Tes ventes n'ont pas pu être lues — rien n'est perdu, rouvre l'app dans un instant.</div>
-        </div>
-      )}
-      {liveStats && liveStats.ventesJour!=null && (
-        <button type="button" onClick={()=>onGo&&onGo('cat_ventes')}
-          data-dash-vendu-jour={Math.round((liveStats.caJour||0)*100)} data-dash-vendu-jour-n={liveStats.ventesJour}
-          style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:10,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
-          {liveStats.ventesJour>0 ? (
-            <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-              <span className="vrm-display" style={{fontSize:28,fontWeight:700,color:C.accent}}>{liveStats.ventesJour}</span>
-              <span style={{fontSize:15,fontWeight:600,color:C.text}}>vente{liveStats.ventesJour>1?'s':''}</span>
-              <span style={{fontSize:15,fontWeight:600,color:C.muted}}>· {liveStats.caJour.toFixed(0)} €</span>
-            </div>
-          ) : (
-            /* ⚠️ La HIÉRARCHIE était inversée : le message était en gris fin et
-               son explication juste en dessous en gras. On lit d'abord ce qui se
-               passe, l'explication reste une légende. */
-            <div style={{fontSize:15,fontWeight:600,color:C.text}}>Pas encore de vente aujourd'hui</div>
-          )}
-          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Ventes faites dans la journée, toutes plateformes — pas l'argent viré, qui arrive plus tard.</div>
-          {/* Un total partiel nomme ce qui manque, à côté — jamais à la place (§5). */}
-          {(liveStats.venduManque||[]).length>0 && (
-            <div data-dash-vendu-manque={liveStats.venduManque.join(',')} style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:3}}>Sans {liveStats.venduManque.join(', ')} : pas pu être lu, rouvre l'app dans un instant.</div>
-          )}
-        </button>
-      )}
-
-      {/* Résumé Vinted EN DIRECT (cliquable) */}
-      {liveStats && (
-        <div>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>En direct · ce mois</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))',gap:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            {[
-              /* ⚠️ CES CHIFFRES SONT DES REPÈRES, aucun n'appelle une action : ils
-                 restent à l'encre (§5.90). « Messages non lus » a été RETIRÉ d'ici
-                 (demande de Julien, 24 sept.) — les non-lus vivent dans le centre
-                 de notifications, pas en doublon sur cet écran. */
-              /* « CA du mois » nommait les ventes FAITES (en cours comprises) avec le
-                 mot du CA déclaré (l'argent reçu) — même correction que le héros
-                 de Ma journée (4 octobre). */
-              {k:'caMois', icon:'💸', label:'Vendu ce mois', val:liveStats.caMois!=null?`${liveStats.caMois.toFixed(0)} €`:'—', go:'cat_ventes', color:C.text},
-              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours!=null?liveStats.enCours:'—', go:'cat_ventes', color:C.text},
-              /* Revue de la 5.167 : des annonces « à confirmer » ne sont pas comptées —
-                 le nombre est alors un MINORANT (« ≥ N »), et un zéro qui veut dire
-                 « je ne sais pas » s'écrit « — » (§7). La ligne dessous dit combien. */
-              {k:'online', icon:'🟢', label:'Annonces en ligne', val:(liveStats.annAConfirmer||[]).length ? (liveStats.online>0 ? `≥ ${liveStats.online}` : '—') : liveStats.online, go:'cat_annonces', color:C.text},
-            ].map(s=>(
-              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
-                style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
-                <span data-dash-stat={s.k} data-dash-cents={s.k==='caMois'&&liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined} style={{display:'contents'}}><StatBox compact label={s.label} value={s.val} color={s.color}/></span>
-              </button>
-            ))}
-          </div>
-          {/* 5.165 : « Annonces en ligne » dit de quand date sa lecture — la même
-              phrase que l'écran Annonces (`FraicheurAnnonces`, §11). */}
-          <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} aConfirmer={liveStats.annAConfirmer} numeros={numerosDash} activite={liveStats.annActivite} style={{marginTop:8,marginBottom:0}}/>
-        </div>
-      )}
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',rowGap:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
+      <div className="vrm-finance-overview">
+        {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
+            VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
+            cette date). Le rapport comptable a été corrigé, ce titre-là était
+            resté — et c'est le chiffre qu'on regarde pour déclarer. */}
+        {/* ⚠️ SCOPE EXPLICITE : ce chiffre est le CA finalisé VINTED (caEncaisse) —
+            le même que la ligne « Vinted » de la carte « par plateforme » juste
+            dessous. Sans « Vinted » dans le sous-titre, il se lit comme un total
+            global alors que le « Total toutes plateformes » (Collectif) est plus
+            grand dès qu'une autre plateforme a des ventes : un total partiel qui
+            se présente comme complet (§5). On ne touche PAS la valeur (URSSAF). */}
+        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
+        {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
+            afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
+        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
+        {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
+            voisines, avec d'autres mots : trois formulations pour une seule
+            cause font croire à trois problèmes. */}
+        <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
+      </div>
+      <details className="vrm-finance-stock"><summary>Stock et volume de ventes</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
@@ -14553,25 +14505,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
-        {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
-            VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
-            cette date). Le rapport comptable a été corrigé, ce titre-là était
-            resté — et c'est le chiffre qu'on regarde pour déclarer. */}
-        {/* ⚠️ SCOPE EXPLICITE : ce chiffre est le CA finalisé VINTED (caEncaisse) —
-            le même que la ligne « Vinted » de la carte « par plateforme » juste
-            dessous. Sans « Vinted » dans le sous-titre, il se lit comme un total
-            global alors que le « Total toutes plateformes » (Collectif) est plus
-            grand dès qu'une autre plateforme a des ventes : un total partiel qui
-            se présente comme complet (§5). On ne touche PAS la valeur (URSSAF). */}
-        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
-        {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
-            afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
-        {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
-            voisines, avec d'autres mots : trois formulations pour une seule
-            cause font croire à trois problèmes. */}
-        <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
-      </div>
+      </div></details>
       {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
 
       {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
@@ -16226,7 +16160,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
               <Input type="date" value={data.saleDate} onChange={e=>setData(d=>({...d,saleDate:e.target.value}))}/>
             </Field>
           </div>
-          
+
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>Acheteur</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -16235,13 +16169,13 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
               <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="N° et rue, code postal, ville, pays"/></Field>
             </div>
           </div>
-          
+
           <Field label="N° transaction Vinted">
             <Input value={data.vintedNumber} onChange={e=>setData(d=>({...d,vintedNumber:e.target.value}))} placeholder="19921523337"/>
           </Field>
-          
+
           {err&&<div style={{color:C.danger,fontSize:12}}>⚠ {err}</div>}
-          
+
           <div style={{display:'flex',gap:8,marginTop:6}}>
             <Btn onClick={submit} color={C.accent} style={{flex:1}}>✓ Créer la facture</Btn>
             <Btn onClick={onClose} color={C.border}>Annuler</Btn>
@@ -18270,7 +18204,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
             </div>
             <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
           </div>
-          
+
           <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📥 Restaurer</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
@@ -20081,16 +20015,16 @@ function ComptaPro({ liveStats, onNav }) {
   const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ height: 3, background: C.accent }} />
         <div style={{ padding: '16px 18px' }}>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Résultat {annee} · après tes charges</div>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>CA déclaré − charges · {annee}</div>
           {recettesAnnee == null ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
@@ -20120,7 +20054,7 @@ function ComptaPro({ liveStats, onNav }) {
       </Card>
 
       {/* Trois repères de charges — même carte, hiérarchie claire. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <div className="vrm-finance-charges" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
           { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
           { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
@@ -21906,7 +21840,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const listingsRef = useRef(listings); listingsRef.current = listings;
   const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
-  const [openConv, setOpenConv] = useState(null);
+  const [openConv,setOpenConv]=useState(null);
+  const conversationRequest=React.useRef(0);
+  const conversationOrigin=React.useRef(null);
+  const chatScroll=React.useRef(null);
+  const [messageSearch,setMessageSearch]=useState('');
+  useEffect(()=>{if(chatScroll.current)chatScroll.current.scrollTop=chatScroll.current.scrollHeight;},[openConv?.messages?.length]);
+  useEffect(()=>{if(!openConv)return;const onKey=e=>{if(e.key==='Escape'){e.preventDefault();setOpenConv(null);}};document.addEventListener('keydown',onKey);return()=>{document.removeEventListener('keydown',onKey);conversationOrigin.current?.focus?.();};},[openConv?.request]);
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyErr, setReplyErr] = useState(null);
@@ -23961,20 +23901,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    serait le rapprochement par ressemblance interdit (§5). Le repère montré
   //    est celui du MODÈLE (prix moyen de revente), dit comme tel.
   // Trois états : `undefined` en cours · `null` pas su · tableau.
-  const [offresEmail, setOffresEmail] = useState(undefined);
-  const [offresFaites, setOffresFaites] = useState(() => new Set(load('vinted_offers_done', []) || []));
-  useEffect(() => onCloudReady(() => setOffresFaites((v) => v.size ? v : new Set(load('vinted_offers_done', []) || []))), []);
-  useEffect(() => {
-    if (curSub !== 'messages') return;
-    let stop = false;
-    const depuis = new Date(Date.now() - OFFRE_FENETRE_J * 86400000).toISOString().slice(0, 10);
-    lireTout(`id=like.email_offer_*&meta->>receivedAt=gte.${depuis}&select=id,article:meta->>article,montant:meta->>montant,qui:meta->>qui,uid:meta->>uid,account:meta->>account,receivedAt:meta->>receivedAt`)
-      .then((l) => { if (!stop) setOffresEmail(Array.isArray(l) ? l : null); })
-      .catch(() => { if (!stop) setOffresEmail(null); });
-    return () => { stop = true; };
-  }, [curSub]);
-  const cleOffre = (of) => `${of.receivedAt || ''}|${of.article || ''}`;
-  const offreTraitee = (of) => setOffresFaites((prev) => { const u = new Set(prev); u.add(cleOffre(of)); save('vinted_offers_done', [...u].slice(-500)); return u; });
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -24539,26 +24465,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates]);
 
   const openConversation = async (conv) => {
-    setReplyText(''); setReplyErr(null); setReplyBusy(false);
-    setPrixOffre(''); setOffreMsg(null); setOffreBusy(false);
-    setOpenConv({ loading:true, error:null, conversation:null, messages:[], acc:conv._acc, convId:conv.id, header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
-    const res = await fetchVintedConversationDetail(conv._acc, conv.id);
-    if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
-    setOpenConv(o => ({ ...o, loading:false, conversation:res.conversation, messages:normalizeConversationMessages(res.conversation) }));
+    if(!conv?._acc || conv.id==null)return;
+    conversationOrigin.current=document.activeElement;
+    const request=++conversationRequest.current;
+    setReplyText('');setReplyErr(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
+    setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.description,photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
+    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
+    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:res.conversation,messages:normalizeConversationMessages(res.conversation)}):o);
+  };
+  const actualiserConversation=async()=>{
+    const oc=openConv;if(!oc || oc.loading)return;
+    const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
+    setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?res.conversation:o.conversation,messages:res.ok?normalizeConversationMessages(res.conversation):o.messages}):o);
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
   // risque). Requête réelle captée : POST /api/v2/conversations/{id}/replies.
   const sendReply = async () => {
     const oc = openConv; const text = replyText.trim();
-    if (!oc || !oc.acc || !oc.convId || !text || replyBusy) return;
-    if (!vmrExtPresent()) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
+    if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
+    if (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
     setReplyBusy(true); setReplyErr(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
+    if(conversationRequest.current!==oc.request)return;
     setReplyBusy(false);
     if (r && r.ok) {
       setReplyText('');
-      setOpenConv(o => o ? ({ ...o, messages:[...o.messages, { kind:'message', mine:true, body:text }] }) : o);
+      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}] }):o);
     } else {
       setReplyErr((r && (r.error || (r.status ? 'HTTP '+r.status : ''))) || "Échec de l'envoi");
     }
@@ -24575,23 +24508,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let method = 'PUT', endpoint = '', body = null, p = 0;
     if (quoi === 'accept' || quoi === 'reject') {
       if (!off) return;
-      if (quoi === 'accept' && !(await askConfirm({ title: `Accepter ${fmtE(off.prix)} ?`, desc: 'La paire sera vendue à ce prix sur Vinted.', ok: 'Accepter', cancel: 'Annuler' }))) return;
+      if (quoi === 'accept' && !(await askConfirm({ title: `Accepter ${fmtE(off.prix)} ?`, desc:`Le prix sera accepté pour ${oc.header?.login || 'cet acheteur'}. La vente dépend ensuite de son paiement.`, ok: 'Accepter', cancel: 'Annuler' }))) return;
       endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
     } else {
       const tx = oc.conversation && oc.conversation.transaction && oc.conversation.transaction.id;
       p = Number(String(prixOffre).replace(',', '.'));
       if (!tx) { setOffreMsg({ err: "Pas d'article rattaché à cette conversation : rien à proposer." }); return; }
-      if (!(p > 0)) { setOffreMsg({ err: 'Indique un prix.' }); return; }
+      if(!(p>0) || !Number.isFinite(p) || !/^\d+(?:[,.]\d{1,2})?$/.test(prixOffre.trim())) { setOffreMsg({ err: 'Indique un prix.' }); return; }
       method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
     }
+    if(conversationRequest.current!==oc.request)return;
     setOffreBusy(true); setOffreMsg(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body });
+    if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
     if (r && r.ok) {
       setOffreMsg({ ok: quoi === 'accept' ? 'Offre acceptée sur Vinted.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
       setPrixOffre('');
-      const res = await fetchVintedConversationDetail(oc.acc, oc.convId);
-      if (res.ok) setOpenConv(o => o && o.convId === oc.convId ? ({ ...o, conversation: res.conversation, messages: normalizeConversationMessages(res.conversation) }) : o);
+      const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
+      if (res.ok) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: res.conversation, messages: normalizeConversationMessages(res.conversation) }) : o);
     } else {
       setOffreMsg({ err: (r && (r.error || (r.status ? 'HTTP ' + r.status : ''))) || "Vinted n'a pas répondu." });
     }
@@ -26306,6 +26241,108 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
         action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
+  const rendreConversation=()=>openConv && (
+<ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
+                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
+              </div>
+              <button type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
+              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
+              {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
+                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'10px 12px',marginBottom:4}}>
+                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
+                  {bl.map((u,i)=>(
+                    <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:8,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
+                  ))}
+                </div>
+              ) : null; })()}
+              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
+                m.kind==='event'
+                  ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
+                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'8px 12px',textAlign:'center'}}>
+                          <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
+                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
+                        </div>
+                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
+                  : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
+                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
+                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
+                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                      {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
+                    </div>
+              ))}
+              {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
+            </div>
+            {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
+            {!openConv.loading && !openConv.error && openConv.convId && (
+              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
+                    une. Par l'extension, sur le compte connecté dans Chrome. */}
+                {(()=>{
+                  const off = offreEnAttenteDe(openConv.conversation);
+                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
+                  if (!off && !tx) return null;
+                  const etat = extSait('messagerie');
+                  if (etat !== 'ok' || __vmrPlusieurs) return (
+                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
+                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
+                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
+                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
+                    </div>
+                  );
+                  return (
+                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
+                      {off && (
+                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
+                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
+                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                        </div>
+                      )}
+                      {tx && (
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
+                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
+                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                        </div>
+                      )}
+                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                    </div>
+                  );
+                })()}
+                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+                {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
+                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
+                  {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
+                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
+                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                  <textarea aria-label="Réponse à la conversation" value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                </div>
+                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
+              </div>
+            )}
+          </div>
+        </div></ResponsiveChatPortal>
+  );
+
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
@@ -28419,8 +28456,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
-        <ScreenHead icon="tag" title="Annonces en ligne" desc="Tes annonces actuellement en vente. Donne un numéro et un prix d'achat à chaque paire : c'est ce qui rend ton bénéfice et ton garage justes."/>
+        <ScreenHead icon="tag" title="Annonces en ligne" />
         <NoAcc/>
+        {listings.items?.length>0 && <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
+              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
+            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
+            <select aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
+              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
+              <option value="oldest">Date d'ajout (ancienne → récente)</option>
+              <option value="recent">Ordre Vinted</option>
+              <option value="price_desc">Prix ↓</option>
+              <option value="price_asc">Prix ↑</option>
+              {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
+              {annStats.hasView && <option value="views">Plus vues 👁</option>}
+              {annStats.hasView && <option value="boost">Vues sans favoris</option>}
+              {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
+              <option value="nonum">Sans numéro</option>
+            </select>
+            {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
+                toujours active (voir la déclaration de `autoNum`). */}
+            {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
+                ne servent pas tous les jours et encombraient la barre. */}
+            <div style={{position:'relative'}}>
+              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} title="Outils : répartir un lot, audit du stock"
+                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
+              {annToolsOpen && (<>
+                <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
+                    ses quatre outils sortaient de l'écran (1512 px : 1332→1562 pour une zone
+                    visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
+                    Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
+                    passé à la ligne, est trop près du bord gauche pour cela. */}
+                <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                  {[
+                    {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
+                    {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
+                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
+                       va pas servir »). */
+                    /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
+                       C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
+                       exactement ce que Julien interdit maintenant qu'il les écrit sur
+                       les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
+                       Ne pas le remettre sans son accord explicite. */
+                  ].map(t=>(
+                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                      <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+                      <span style={{minWidth:0}}>
+                        <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{t.lab}</span>
+                        <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>)}
+            </div>
+          </div>}
+
         {/* ⚠️ On DIT ce que le filtre « compte banni » a mis de côté (§ : une
             liste qui rétrécit sans explication se lit comme une perte). Les
             paires ne sont pas perdues — le compte Vinted est bloqué, elles ne
@@ -28551,7 +28645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
-        {listings.items && listings.items.length>0 && (<>
+        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary>Stock et ajustements</summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
               affichait un instantané périmé en le faisant passer pour du direct
@@ -28871,67 +28965,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           </>)}
           {/* Recherche + tri */}
-          <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-            <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
-              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
-            <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
-              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
-              <option value="oldest">Date d'ajout (ancienne → récente)</option>
-              <option value="recent">Ordre Vinted</option>
-              <option value="price_desc">Prix ↓</option>
-              <option value="price_asc">Prix ↑</option>
-              {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
-              {annStats.hasView && <option value="views">Plus vues 👁</option>}
-              {annStats.hasView && <option value="boost">Vues sans favoris</option>}
-              {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
-              <option value="nonum">Sans numéro</option>
-            </select>
-            {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
-                toujours active (voir la déclaration de `autoNum`). */}
-            {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
-                ne servent pas tous les jours et encombraient la barre. */}
-            <div style={{position:'relative'}}>
-              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} title="Outils : répartir un lot, audit du stock"
-                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
-              {annToolsOpen && (<>
-                <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
-                    ses quatre outils sortaient de l'écran (1512 px : 1332→1562 pour une zone
-                    visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
-                    Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
-                    passé à la ligne, est trop près du bord gauche pour cela. */}
-                <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
-                  {[
-                    {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
-                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
-                    {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
-                    /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
-                       va pas servir »). */
-                    /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
-                       C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
-                       exactement ce que Julien interdit maintenant qu'il les écrit sur
-                       les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
-                       Ne pas le remettre sans son accord explicite. */
-                  ].map(t=>(
-                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                      <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
-                      <span style={{minWidth:0}}>
-                        <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{t.lab}</span>
-                        <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>)}
-            </div>
-          </div>
+
           {/* ⚠️ Mode d'emploi permanent retiré : « les numéros se mettent
               automatiquement… » s'apprend une fois. Le prochain numéro libre
               reste visible là où on en a besoin — dans le champ N° d'une paire
               qui n'en a pas. */}
-        </>)}
+        </details>)}
         {listings.items && listings.items.length>0 && annShown.length===0 && (
           <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
         )}
@@ -29055,7 +29094,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 330px), 1fr))',gap:10}}>
+        <div className="vrm-ann-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))',gap:12}}>
           {annShown.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
             //    reconstruit avec 5 champs, la pastille « prête » valait
@@ -29076,7 +29115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
             return (
-              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
+              <div className="vrm-ann-card" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -29115,8 +29154,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {(() => {
                   const rempli = (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
-                    <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Boost · vendue · publier ailleurs</summary>
+                    <details className="vrm-ann-actions" style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>Actions · achat lié · publier ailleurs</summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
@@ -29212,63 +29251,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
-        <ScreenHead icon="chat" title="Messages" desc="Tes conversations, tous comptes. Réponds et tranche les offres ici : l'extension envoie depuis ton Chrome."/>
+        <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
-        {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
-            Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
-            On ne déroule plus toutes les conversations : une seule carte dit
-            combien de messages non lus, et un bouton emmène répondre sur Vinted
-            (répondre depuis l'app n'est pas possible, cf. section 5). */}
-        {/* ── OFFRES REÇUES, EN TÊTE (proposition 6) ── */}
-        {(()=>{
-          if (offresEmail === undefined || !sales.items) return null;   // on attend de savoir lesquelles sont déjà réglées
-          if (offresEmail === null) return <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
-          // ⚠️ Un compte qu'il a ÉCARTÉ (exclu par son choix) ou RETIRÉ de l'app
-          //    n'a plus rien à lui dire (revue du 8 octobre — mesuré : 5 offres
-          //    de julienf765, exclu puis retiré, « à trancher » et nommées sur
-          //    chaque ligne). La conversation juste en dessous les écartait
-          //    déjà : même règle ici (§11). « Retiré » ne se juge que sur une
-          //    liste de comptes LUE (rien lu ne vaut pas rien) ; une offre sans
-          //    compte connu reste affichée (pas su ≠ autre compte).
-          const comptesLus = accountsReady && !baseKO;
-          const offresDesComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
-            if (acctOff(u)) return false;
-            return !(comptesLus && !accountUids.has(u)); });
-          const { gardees, reglees } = offresAtraiter(offresDesComptes, sales.items, offresFaites, cleOffre);
-          if (!gardees.length) return null;
-          // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
-          const repere = {};
-          for (const o of sales.items) { if (!o || classifyOrderStatus(o.status)==='cancelled') continue; const k = extractModel(o.title); const p = montantCommande(o); if (!k || !(p>0)) continue; const r = repere[k] || (repere[k] = { n:0, s:0 }); r.n += 1; r.s += p; }
-          const nomModele = (k) => k.replace(/\b\w/g, (c) => c.toUpperCase());
-          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; };
-          const euros = (m) => { const n = parseFloat(String(m||'').replace(/\s/g,'').replace(',','.')); return n > 0 ? n : null; };
-          const tri = [...gardees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
-          const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
-          return (
-            <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
-              <div style={{padding:'10px 12px 6px'}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> offre{tri.length>1?'s':''} à trancher</div>
-                <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.{reglees.length>0?` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`:''}</div>
-              </div>
-              {tri.map((of,i)=>{
-                const m = euros(of.montant); const k = extractModel(of.article); const r = k && repere[k];
-                return (
-                  <div key={of.id||i} data-offre-email={of.id} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',borderTop:`1px solid ${C.border}`}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m!=null?<b>{fmtE(m)}</b>:'Une offre'}{of.qui?` · ${of.qui}`:''}</div>
-                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{of.article||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=3 ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
-                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center'}}>Répondre sur Vinted</a>
-                      <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>c'est fait</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+        <div className="vrm-message-workspace"><div className="vrm-inbox-column">
+        <input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher une conversation…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{width:'100%',padding:'10px 12px',marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text}}/>
         {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -29284,7 +29270,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
-          const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
+          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!selEff || uidC(c)===selEff) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -29302,10 +29288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           const coMsg = selEff;
-          const tri = [...liste].sort((a,b)=>
-            (coMsg ? ((uidC(b)===coMsg?1:0)-(uidC(a)===coMsg?1:0)) : 0)
-            || (b.unread?1:0)-(a.unread?1:0)
-            || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const tri=[...liste].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
@@ -29338,12 +29321,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
                 <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
-                  {/* « Tout est lu » ne s'écrit que si AUCUNE conversation
-                      affichée n'est non lue ET que chaque boîte a été lue. */}
-                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</>
-                    : boitesKO.length ? 'Aucun non lu dans les boîtes lues'
-                    : liste.length ? 'Tout est lu' : null /* vide : la ligne d'en dessous le dit, une fois (§7) */}
-                  {liste.length>0 && <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>}
+                  {liste.length} conversation{liste.length>1?'s':''}
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
@@ -29372,12 +29350,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
+              {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
                   return (
-                    <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
                       style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
                       {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
@@ -29397,6 +29376,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div></div>
+        <details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
@@ -29419,6 +29400,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Ils apparaissent aussi dans chaque conversation : un clic remplit la réponse.</div>
         </div>
+        </details>
       </>)}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
@@ -31035,104 +31017,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
 
-      {openConv && (
-        <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
-                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div>
-              </div>
-              <button type="button" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
-              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
-              {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
-              {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
-                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'10px 12px',marginBottom:4}}>
-                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
-                  {bl.map((u,i)=>(
-                    <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:8,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
-                  ))}
-                </div>
-              ) : null; })()}
-              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
-                m.kind==='event'
-                  ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
-                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'8px 12px',textAlign:'center'}}>
-                          <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
-                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
-                          {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
-                        </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
-                  : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
-                      {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
-                      {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
-                    </div>
-              ))}
-              {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
-            </div>
-            {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (
-              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
-                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
-                    une. Par l'extension, sur le compte connecté dans Chrome. */}
-                {(()=>{
-                  const off = offreEnAttenteDe(openConv.conversation);
-                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
-                  if (!off && !tx) return null;
-                  const etat = extSait('messagerie');
-                  if (etat !== 'ok' || __vmrPlusieurs) return (
-                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
-                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
-                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
-                    </div>
-                  );
-                  return (
-                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
-                      {off && (
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
-                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
-                        </div>
-                      )}
-                      {tx && (
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
-                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
-                        </div>
-                      )}
-                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
-                    </div>
-                  );
-                })()}
-                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
-                {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
-                  {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
-                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
-                      {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
-                    </button>
-                  ))}
-                </div>
-                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
-                </div>
-                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {curSub!=='messages' && rendreConversation()}
 
       {/* ── Relier un bordereau à une paire numérotée (à la main) ── */}
       {linkPickFor && (()=>{
@@ -37284,7 +37169,7 @@ function AppCoeur() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -37485,11 +37370,7 @@ function AppCoeur() {
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
-            <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
-              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:notifOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              <Icon name="bell2" size={17}/>
-              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${eD?'#000':C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
-            </button>
+            <button type="button" onClick={()=>{setPlatSub('messages');setTab('plat_vinted');}} title="Messages Vinted" aria-label="Ouvrir les messages Vinted" style={{background:'transparent',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 11px',color:ink,cursor:'pointer'}}><Icon name="chat" size={17}/></button>
             <button className="vrm-header-settings" type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="gear" size={17}/>
@@ -37899,7 +37780,7 @@ function AppCoeur() {
             return (
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
@@ -37917,8 +37798,10 @@ function AppCoeur() {
           {(() => { const pe = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === 'eBay') || {}; return (
             <PlatResume dark baseKO={baseKO} cases={[['Ventes payées', pe.ca != null ? fmt(pe.ca) : null]]}/>
           ); })()}
-          <div><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['compte','Compte eBay']]} dark/></div>
+          <div><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['compte','Compte']]} dark/></div>
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
+          {platSub==='messages'&&<div style={{padding:16}}><EbayMessages headers={enTeteSession} confirm={askConfirm} theme={C}/></div>}
+          {platSub==='offres'&&<div style={{padding:16}}><EbayOffres headers={enTeteSession} confirm={askConfirm} theme={C} onAnnonces={()=>setPlatSub('annonces')}/></div>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')}/>}</div>}

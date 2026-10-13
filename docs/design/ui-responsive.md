@@ -104,3 +104,41 @@ comptes Pro, l'annulation d'envoi, les refus serveur et le statut NOT_FULFILLED
 d'eBay. Les données et sessions sont synthétiques ; les appels distants sont
 interceptés. La livraison réelle des factures et les comptes de production ne
 sont pas exercés.
+
+### Messageries et gestion des revendeurs — 13 octobre 2026
+
+Les statistiques donnent la priorité au CA finalisé, au bénéfice et à la marge.
+Le stock devient secondaire ; les calculs existants et les coûts inconnus restent
+inchangés. Les logos sont des fichiers SVG locaux avec provenance dans brands.
+Les annonces placent la recherche et le tri avant les cartes et replient les
+outils de stock. Les échanges Vinted remplacent les cartes de notifications
+email, avec historique capté, photos, événements et actualisation par extension.
+Les réponses requièrent la capacité messagerie et le bon compte connecté.
+Les conversations sont portées hors du conteneur défilant sur téléphone pour
+que la navigation ne recouvre ni l'en-tête ni le bouton d'envoi.
+
+Leboncoin sépare les colis à expédier du suivi : un statut d'expédition attesté
+retire le bordereau de la préparation, et la finalisation retire le colis actif.
+Les captures et l'historique ne sont pas supprimés.
+
+eBay ajoute les échanges remontés sur 90 jours, les réponses, les offres reçues
+(accepter, refuser, contre-proposer), le contact de l'acheteur, l'adresse et le
+suivi de commande, l'enregistrement d'une expédition, la modification du titre,
+de la description, du prix et du stock, et la fermeture des annonces à prix fixe.
+Les variantes et enchères sont refusées par cette nouvelle édition. Les droits
+eBay restent nécessaires ; une reconnexion peut être imposée par eBay.
+Les échanges sans annonce identifiée ne sont pas répondus via RTQ : le contact
+acheteur reste disponible depuis la commande.
+
+Toutes les écritures exigent un clic confirmé. Le serveur relit les identités,
+prix et états engageants ; une erreur de transport n'entraîne pas de nouvelle
+écriture automatique. Le suivi utilise les lignes et quantités réellement
+restantes, et reconnaît le même suivi déjà enregistré. Les schémas ont été
+vérifiés dans les définitions Trading de Nogrod/ebay-sdk-php et le schéma public
+Sell Fulfillment de hendt/ebay-api. Aucun envoi client réel n'est exécuté par les
+bancs : toutes les écritures et données sont simulées.
+
+```bash
+node scripts/bancs/ebay-gestion.mjs
+node scripts/bancs/revendeurs.cjs
+```
