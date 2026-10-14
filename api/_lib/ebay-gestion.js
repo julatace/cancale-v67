@@ -108,6 +108,20 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const total=Number(texte(r.root.PaginationResult?.TotalNumberOfPages));
     return succes({messages:messagesEbay(r.root),page,totalPages:Number.isInteger(total)&&total>=0?total:null});
   }
+  async function message(b,owner){
+    if(!id(b.itemId) || !/^[A-Za-z0-9_-]{1,64}$/.test(String(b.messageId || '')))return echec('Message invalide.');
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await lire('GetMemberMessages',`<MailMessageType>All</MailMessageType><ItemID>${b.itemId}</ItemID><MemberMessageID>${b.messageId}</MemberMessageID>`,a.token);if(!r.root)return r;
+    const m=messagesEbay(r.root).find(m=>m.id===String(b.messageId) && m.itemId===String(b.itemId));
+    return m?succes({message:m}):echec('Ce message n’est plus disponible pour cette annonce.',404);
+  }
+  async function offre(b,owner){
+    if(!id(b.itemId) || !id(b.offerId))return echec('Offre invalide.');
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await lire('GetBestOffers',`<BestOfferID>${b.offerId}</BestOfferID>`,a.token);if(!r.root)return r;
+    const o=offresEbay(r.root).find(o=>o.id===String(b.offerId) && o.itemId===String(b.itemId));
+    return o?succes({offre:o}):echec('Cette offre n’est plus disponible pour cette annonce.',404);
+  }
   async function repondre(b,owner){
     if(b.confirme!==true)return echec('Confirme la réponse.',400,'confirmation');
     const body=String(b.body || '').trim();
@@ -164,5 +178,5 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     if(!id(b.itemId))return echec('Annonce invalide.');const a=await jeton(owner);if(!a.token)return a;
     return ecrire('EndFixedPriceItem',`<ItemID>${b.itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`,a.token);
   }
-  return {commande,transporteurs,expedier,contacterAcheteur,messages,repondre,offres,repondreOffre,modifierAnnonce,terminerAnnonce};
+  return {commande,transporteurs,expedier,contacterAcheteur,messages,message,repondre,offres,offre,repondreOffre,modifierAnnonce,terminerAnnonce};
 }
