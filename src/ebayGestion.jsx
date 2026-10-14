@@ -75,9 +75,8 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const selection=useRef(null);
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState(''),[historySearch,setHistorySearch]=useState(''),[draftOK,setDraftOK]=useState(true),[codeCopie,setCodeCopie]=useState('');
- const chatPanel=useRef(null);
  const fermerConversation=()=>{selection.current=null;setSelected(null);};
- useConversationFocus(chatPanel,selected?.id,fermerConversation);
+ const chatPanel=useConversationFocus(selected?.id,fermerConversation);
  const selectMessage=m=>{selection.current=m.id;setSelected(m);setBody(lireBrouillon(owner,compte,m.id));setDraftOK(true);setHistorySearch('');setCodeCopie('');setMessage('');};
  const modifierBody=v=>{setBody(v);if(selected)setDraftOK(sauverBrouillon(owner,compte,selected.id,v));};
  const cibleOuverte=useRef(null);

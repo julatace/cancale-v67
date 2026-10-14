@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
 
 // Une conversation mobile est modale ; sur ordinateur la liste reste accessible.
-export function useConversationFocus(panel,selectedId,onClose){
+export function useConversationFocus(selectedId,onClose){
  const close=useRef(onClose);close.current=onClose;
+ const [node,setNode]=useState(null);
  const [mobile,setMobile]=useState(()=>window.matchMedia('(max-width:767px)').matches);
  useEffect(()=>{const media=window.matchMedia('(max-width:767px)'),change=()=>setMobile(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[]);
  useEffect(()=>{
-  const node=panel.current;if(!selectedId || !node)return;
+  if(!selectedId || !node)return;
   const opener=document.activeElement;
   const locks=mobile?[document.body,document.querySelector('main')].filter(Boolean).map(el=>({el,value:el.style.getPropertyValue('overflow'),priority:el.style.getPropertyPriority('overflow')})):[];
   locks.forEach(({el})=>el.style.setProperty('overflow','hidden'));
@@ -31,5 +32,6 @@ export function useConversationFocus(panel,selectedId,onClose){
    if(opener?.isConnected && opener!==document.body)opener.focus({preventScroll:true});
    else document.querySelector('[aria-label="Rechercher un message eBay"]')?.focus({preventScroll:true});
   };
- },[selectedId,mobile,panel]);
+ },[selectedId,mobile,node]);
+ return setNode;
 }

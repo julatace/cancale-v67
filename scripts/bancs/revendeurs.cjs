@@ -218,6 +218,15 @@ async function brancher(p){
   check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).getAttribute('aria-modal')==='true','conversation mobile déclarée modale');
   check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow==='hidden'),'page arrière bloquée pendant la conversation');
   check(await p.getByLabel('Fermer la conversation eBay').evaluate(e=>e===document.activeElement),'focus initial sur fermer sans ouvrir le clavier mobile');
+  await p.setViewportSize({width:1512,height:900});
+  await p.waitForFunction(()=>document.querySelector('[aria-label="Conversation eBay"]')?.getAttribute('aria-modal')!== 'true');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow!=='hidden'),'passage ordinateur libère le défilement');
+  await p.getByLabel('Fermer la conversation eBay').focus();await p.keyboard.press('Shift+Tab');
+  check(await p.getByRole('dialog',{name:'Conversation eBay'}).evaluate(e=>!e.contains(document.activeElement)),'ordinateur conserve le clavier vers la liste');
+  await p.setViewportSize({width:390,height:844});
+  await p.waitForFunction(()=>document.querySelector('[aria-label="Conversation eBay"]')?.getAttribute('aria-modal')==='true');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow==='hidden'),'retour mobile rétablit le défilement bloqué');
+  await p.getByLabel('Fermer la conversation eBay').focus();
   await p.keyboard.press('Shift+Tab');check(await p.getByLabel('Réponse au message eBay').evaluate(e=>e===document.activeElement),'Tab inverse reste dans la conversation et ignore envoyer désactivé');
   await p.keyboard.press('Escape');check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).count()===0,'Échap ferme la conversation');
   check(await p.getByRole('button',{name:/Acheteur test Question/}).evaluate(e=>e===document.activeElement),'fermeture rend le focus à l’échange');
