@@ -7,7 +7,7 @@ export function cibleEbay(compte,t){
 export function bilanCommandeEbay(order,costs={}){
  if(order?.cancelStatus?.cancelState==='CANCELED' || order?.orderPaymentStatus==='FULLY_REFUNDED')return {benefice:null,raison:'Commande annulée ou intégralement remboursée : résultat à vérifier avec les remboursements.'};
  const lines=order?.lineItems;
- if(!Array.isArray(lines) || lines.length!==1 || lines[0].quantity!==1)return {benefice:null,raison:'Le bénéfice par paire nécessite une commande avec un seul article et une quantité de 1.'};
+ if(!Array.isArray(lines) || lines.length!==1 || lines[0].quantity!==1)return {benefice:null,raison:'Le bénéfice par article nécessite une commande avec un seul article et une quantité de 1.'};
  const line=lines[0];
  // `total` peut inclure le port payé par l’acheteur. Utiliser le prix
  // de l’article après remise, et refuser une remise dont le résultat manque.

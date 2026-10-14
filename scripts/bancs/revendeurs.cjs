@@ -17,8 +17,9 @@ const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 rows.push({id:'harvest_111_txn_9001',data:{payload:{transaction:{id:9001,item_id:777}}}},{id:'coffre_111_777',data:{id:'777',uid:'111',photos:['https://images1.vinted.net/test.png']}});
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
-{id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',buyer:{username:'AcheteurOrdi'},lineItems:[{title:'Paire eBay',legacyItemId:'12',sku:'VRM-12'},{title:'Chargeur ordinateur',sku:'CHARGEUR-USB'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
+{id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',buyer:{username:'AcheteurOrdi'},lineItems:[{title:'Paire eBay',legacyItemId:'12',sku:'VRM-12'},{title:'Chargeur ordinateur',sku:'CHARGEUR-USB'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
 {id:'ebay_listings',data:{capturedAt:Date.now(),complet:true,items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
+rows.find(x=>x.id==='ebay_orders').data.orders.push({orderId:'annule-1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',cancelStatus:{cancelState:'CANCELED'},lineItems:[{title:'Ordinateur annulé'}]});
 const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const server = http.createServer((q,r)=>{
   let fichier = new URL(q.url,'http://localhost').pathname;
@@ -73,6 +74,7 @@ async function brancher(p){
   await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
    if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
    if(a==='commande')j={ok:true,order:{orderId:body.orderId,orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',buyer:{username:'Acheteur test'},pricingSummary:{total:{value:'115',currency:'EUR'}},lineItems:[{lineItemId:'111',legacyItemId:'12',title:'Paire eBay',quantity:1,lineItemCost:{value:'100',currency:'EUR'},total:{value:'115',currency:'EUR'}}],totalMarketplaceFee:{value:'12.50',currency:'EUR'}},fulfillments:[]};
+   if(a==='commande' && body.orderId==='old-1'){j.order.lineItems.push({lineItemId:'222',title:'Chargeur USB-C',sku:'CH-USB-C',quantity:2,lineItemCost:{value:'30',currency:'EUR'}});j.order.fulfillmentStartInstructions=[{shippingStep:{shipTo:{fullName:'Acheteur de test',contactAddress:{addressLine1:'12 rue Exemple',postalCode:'35000',city:'Rennes',countryCode:'FR'}}}}];}
    if(a==='sync')j={ok:true,lu:{annonces:true,commandes:false},complet:{annonces:true,commandes:false}};
    if(a==='offredetail')j={ok:true,offre:{id:body.offerId,itemId:body.itemId,titre:'Offre hors de la première page',buyer:'Ancien acheteur',price:'83',currency:'EUR',quantity:1,status:'Pending'}};
    if(a==='message')j={ok:true,message:{id:body.messageId,itemId:body.itemId,sender:'Ancien acheteur',subject:'Ancien échange',body:'Message hors de la première page',responses:[]}};
@@ -117,6 +119,8 @@ async function brancher(p){
     await search.fill('ABSENT-123');check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'sélection eBay vide expliquée');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).isVisible(),'réinitialisation eBay restaure les commandes');
     await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'Expédiées',exact:true}).click();check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'commandes non expédiées exclues du filtre expédiées');
+    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
+    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText('Paire eBay',{exact:true}).isVisible(),'vente annulée exclue des commandes à expédier');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
    }
   }
@@ -287,6 +291,10 @@ async function brancher(p){
   await p.getByRole('button',{name:'Actualiser ce compte',exact:true}).click();await p.getByRole('button',{name:'Reprendre ce compte',exact:true}).waitFor();check((await p.locator('[data-ebay-sync-compte]').innerText()).includes('Non relu : commandes'),'synchronisation précise la source non relue');
   await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
   await p.getByLabel('Fermer la conversation eBay').click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();check(await p.getByText('Actualiser la commande',{exact:true}).isVisible(),'commande absente du cache lue directement sur eBay');
+  const contenu=p.getByRole('region',{name:'Articles de la commande eBay'});check(await contenu.getByText('Chargeur USB-C',{exact:true}).isVisible() && (await contenu.innerText()).includes('Quantité : 2'),'tous les articles et quantités de la commande visibles');
+  await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__adresseCopie=v;}}});});
+  await p.getByRole('button',{name:'Copier l’adresse',exact:true}).click();check(await p.evaluate(()=>window.__adresseCopie)==='Acheteur de test\n12 rue Exemple\n35000 Rennes\nFR','adresse copiée sans reconstituer les champs manquants');
+
   await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne offre à retrouver/}).click();await p.getByText('Offre hors de la première page',{exact:true}).waitFor();check(writes.length===1,'offre hors première page lue sans envoi aux observateurs');
   check(writes.length===1,'accès directs, brouillons, bénéfices et synchronisation sans action commerciale');
 

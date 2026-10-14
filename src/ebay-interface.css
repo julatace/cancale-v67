@@ -59,3 +59,11 @@
 .vrm-ebay-offer-heading b{overflow-wrap:anywhere}
 @media(min-width:1000px){.vrm-ebay-offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.vrm-ebay-offer-toolbar{grid-template-columns:minmax(0,1fr) 114px;gap:6px}.vrm-ebay-offer-toolbar>label{font-size:10px!important}.vrm-ebay-offer-toolbar input,.vrm-ebay-offer-toolbar select{padding:9px 7px!important}.vrm-ebay-offers h2{font-size:18px!important}}
+
+.vrm-ebay-order-state{font-size:11px;font-weight:600;color:var(--vrm-muted)}
+.vrm-ebay-order-items h3{margin:0 0 8px;font-size:12px}
+.vrm-ebay-order-items p{font-size:12px;color:var(--vrm-muted)}
+.vrm-ebay-order-item{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--vrm-line);font-size:12px}
+.vrm-ebay-order-item>div{min-width:0;overflow-wrap:anywhere}
+.vrm-ebay-order-item small{display:block;margin-top:4px;color:var(--vrm-muted);font-size:10px}
+.vrm-ebay-order-item>span{flex-shrink:0;font-variant-numeric:tabular-nums}
