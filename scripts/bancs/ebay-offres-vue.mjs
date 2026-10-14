@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {offresAffichees} from '../../src/ebayOffresVue.js';
+const rows=[{id:'2',itemId:'20',buyer:'Alice',titre:'Ordinateur',expiresAt:'invalide'},{id:'1',itemId:'10',buyer:'Bob',titre:'Écran',expiresAt:'2026-10-14T19:00:00Z'},{id:'3',itemId:'30',buyer:'Zoé',titre:'Table',expiresAt:'2026-10-14T18:00:00Z',message:'Livraison possible ?'}];
+const snapshot=JSON.stringify(rows);
+assert.deepEqual(offresAffichees(rows).map(x=>x.id),['3','1','2']);
+assert.equal(JSON.stringify(rows),snapshot);
+assert.deepEqual(offresAffichees(rows,{search:' alice '}).map(x=>x.id),['2']);
+assert.deepEqual(offresAffichees(rows,{search:'livraison'}).map(x=>x.id),['3']);
+assert.deepEqual(offresAffichees(rows,{search:'20'}).map(x=>x.id),['2']);
+assert.deepEqual(offresAffichees(rows,{sort:'buyer'}).map(x=>x.id),['2','1','3']);
+assert.deepEqual(offresAffichees(rows,{search:'absent',cible:{id:'1',itemId:'10'}}).map(x=>x.id),['1']);
+assert.deepEqual(offresAffichees(rows,{cible:{id:'1',itemId:'20'}}),[]);
+console.log('8 contrôles : échéances, recherche, cible exacte et données inchangées.');
