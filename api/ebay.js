@@ -1760,7 +1760,7 @@ async function handleApp(req, res) {
       messageacheteur:(ctx)=>gestionEbay.contacterAcheteur(b,ctx),
       messages:(ctx)=>gestionEbay.messages(b,ctx),
       message:(ctx)=>gestionEbay.message(b,ctx),
-      offre:(ctx)=>gestionEbay.offre(b,ctx),
+      offredetail:(ctx)=>gestionEbay.offre(b,ctx),
       repondre:(ctx)=>gestionEbay.repondre(b,ctx),
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
