@@ -4,6 +4,7 @@ import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
+import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { photoArticle, photoCommande } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -22705,6 +22706,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
+    // Recontrôler au clic : une synchro peut avoir changé les annonces affichées.
+    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) {
+      toast('Cette paire est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.');
+      return;
+    }
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
   };
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
@@ -33282,11 +33288,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Relier un bordereau à une paire numérotée (à la main) ── */}
       {linkPickFor && (()=>{
-        const byNum = new Map();
-        for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null) byNum.set(String(e.numero), e); }
         const q = linkSearch.trim().toLowerCase();
-        const list = [...byNum.entries()]
-          .map(([num, e]) => ({ num, ...e }))
+        const list = candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum)
           .filter(e => !q || String(e.num).includes(q) || (e.title||'').toLowerCase().includes(q) || (e.size!=null && String(e.size).toLowerCase().includes(q)))
           .sort((a,b)=>(parseInt(a.num,10)||0)-(parseInt(b.num,10)||0));
         const already = bordLinks[bordKey(linkPickFor)];
@@ -33305,7 +33308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:8,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire numérotée{q?' pour cette recherche':''}.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire hors ligne{q?' pour cette recherche':' disponible'}. Les paires encore en ligne ne sont pas proposées pour cette vente.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>

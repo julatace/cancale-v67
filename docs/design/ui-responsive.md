@@ -322,3 +322,37 @@ Les assertions de taille des anciennes photos ont été adaptées au nouveau
 portrait : 44 px sur téléphone, 62 px sur ordinateur. Les autres assertions
 fonctionnelles sont conservées. La taille des chiffres reste adaptée à la
 longueur des montants au lieu de forcer une taille unique.
+
+### Variantes et rapprochement des ventes — suite du 14 octobre
+
+Trois propositions autonomes dans docs/preview/vrm-variantes : Compact clair,
+Atelier contrasté et Liste business. Elles conservent les commandes côte à
+côte et utilisent des données fictives ; aucun sélecteur de thème supplémentaire
+n'est activé dans l'app. Rendus et interactions contrôlés à 390 et 1440 px.
+
+Dans « Relier à une paire numérotée » pour un bordereau sans annonce retrouvée,
+les annonces encore en ligne et leurs anciens enregistrements portant le même
+numéro sont exclus. La clé de numéro existante conserve les mêmes règles de
+préfixes et de zéros. Le choix est revérifié au clic ; les liens déjà enregistrés
+ne sont pas supprimés automatiquement. Les suggestions de publication croisée
+Leboncoin/eBay et les achats proposés pour saisir un coût ne changent pas.
+Six scénarios du module candidatsVente sont vérifiés, dont ancien numéro encore
+actif, préfixe, historique vide, données immuables et identifiants numériques.
+
+### Vingt mises en page à comparer
+
+Galerie autonome dans `public/apercus-vrm/index.html`, avec recherche, bascule
+Téléphone/Ordinateur et ouverture des vingt maquettes. Sources et planches de
+comparaison dans `docs/preview/vrm-20-dispositions`. Les variantes changent
+l'organisation : liste, grille, deux colonnes, tableau, détail latéral, chiffres
+sur le côté, comptes, pointures, files de travail, sélection en lots et navigation.
+Toutes leurs commandes restent simulées, sans API ni compte vendeur réel.
+
+Les vingt variantes sont vérifiées à 320/390/768/1440 px (80 parcours), puis les
+vues détail et comptes sont revérifiées après finition. Recherche, filtres,
+passage aux ventes et boutons côte à côte passent. La galerie vérifie ses vingt
+entrées et images, ses deux formats, sa recherche, ses liens, son rendu mobile
+et quatre planches de cinq propositions. Les bancs correspondants sont
+`dispositions-visuelles.cjs` et `galerie-visuelle.cjs`.
+La galerie sert à choisir la disposition avant une intégration supplémentaire ;
+elle n'active pas vingt thèmes différents dans l'application réelle.
