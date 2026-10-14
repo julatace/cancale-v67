@@ -7,6 +7,7 @@ export function etatCommandeEbay(order){
  if(cancel==='CANCELED')return state('Annulée','cancelled');
  if(payment==='FULLY_REFUNDED')return state('Remboursée','refunded');
  if(cancel && !['NONE_REQUESTED','CANCEL_REJECTED'].includes(cancel))return state('Annulation à vérifier','review');
+ if(payment==='PARTIALLY_REFUNDED')return state('Remboursement partiel à vérifier','refunded',false,['FULFILLED','SHIPPED'].includes(fulfillment));
  if(payment!=='PAID')return state(payment?'Paiement à vérifier':'Paiement à confirmer','payment',false,['FULFILLED','SHIPPED'].includes(fulfillment));
  if(['FULFILLED','SHIPPED'].includes(fulfillment))return state('Expédiée','shipped',false,true);
  if(fulfillment==='IN_PROGRESS')return state('Expédition partielle','partial',true);
