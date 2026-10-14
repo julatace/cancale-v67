@@ -21063,7 +21063,7 @@ const etatsVentesFrais = (commandes, cap = null, uid = null) => {
   for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!o || o.transaction_id == null) continue;
     const etat = String(o.status || '').trim();
-    if (etat) m.set(String(o.transaction_id), { etat, date: o.date || null, cap: Number.isFinite(cap) ? cap : null, uid: uid != null && String(uid) ? String(uid) : null });
+    if (etat) m.set(String(o.transaction_id), { etat, failed: o.transaction_user_status === 'failed', date: o.date || null, cap: Number.isFinite(cap) ? cap : null, uid: uid != null && String(uid) ? String(uid) : null });
   }
   return m;
 };
@@ -21111,17 +21111,34 @@ const lireVentesVintedProuvees = async (comptes) => {
   try {
     const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
     if (rows === null) return null;
+    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    if (bords === null) return null;
+    const fraisParCompte = new Map();
     let frais = null;
     if (Array.isArray(comptes) && comptes.length) {
       const lus = await Promise.all(comptes.map(async (a) => {
         const uid = a && a.vinted_user_id;
         const p = await fetchHarvestOrders(uid, 'sold').catch(() => undefined);
-        return etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid), uid);
+        const m = etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid), uid);
+        fraisParCompte.set(String(uid), m);
+        return m;
       }));
       frais = new Map();
       for (const m of lus) for (const [k, v] of m) frais.set(k, v);
     }
     const { vendus, preuves, revenues } = preuvesVentesVinted(rows, frais);
+    for (const b of bords) {
+      const m = /^harvest_(\d+)_label_(\d+)$/.exec(String(b && b.id || ''));
+      const it = String(b && b.it || '').trim();
+      if (!m || !/^\d+$/.test(it) || (b.tx != null && String(b.tx).trim() && String(b.tx).trim() !== m[2])) continue;
+      const f = fraisParCompte.get(m[1])?.get(m[2]);
+      if (!f) continue;
+      if (f.failed || etatRevient(f.etat)) revenues.add(it);
+      if (f.failed || !f.etat || PAS_UNE_VENTE.test(f.etat)) continue;
+      vendus.add(it);
+      if (!preuves.has(it)) preuves.set(it, []);
+      preuves.get(it).push({ tx: m[2], etat: f.etat, frais: true, date: f.date, cap: f.cap, compte: m[1] });
+    }
     vendus.preuves = preuves;
     vendus.revenues = revenues;
     return vendus;
