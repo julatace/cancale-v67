@@ -241,3 +241,38 @@ Les tests contrôlent la hauteur des outils avant les ventes (moins de 150 px
 à 320/390/1512), la position de l'analyse après la liste, l'alignement des
 annonces sur ordinateur et le fil dans la colonne de droite. Les calculs
 vendu/reçu, les états inconnus et les contrôles d'actions restent inchangés.
+
+### Boutons, navigation par plateforme et retraits — 14 octobre
+
+Inventaire de toutes les définitions natives de boutons dans src : 578 après
+ajout de la copie des codes. Le rapport `boutons-inventaire.md` précise les
+composants, noms et états disponibles. Les 139 définitions sans type explicite
+ont reçu `type="button"` ; les trois soumissions explicites sont conservées.
+43 noms accessibles ont été ajoutés aux icônes ou commandes symboliques ; les
+sélections et ouvertures concernées exposent leur état. Les petites commandes
+ont une cible de 44 px sur téléphone, un focus visible et un retour au clic.
+L'interrupteur de réponse automatique garde sa confirmation et expose son état
+comme switch, avec une zone tactile plus grande que son dessin.
+
+À la demande explicite du vendeur, les onglets sont organisés par plateforme :
+Accueil, Vinted, Leboncoin, eBay, Gestion sur téléphone. Les sections restent
+dans chaque plateforme et leur position est conservée. Gestion regroupe Stock,
+Colis et les outils ; Vestiaire reste disponible parmi les autres plateformes.
+Les fichiers de logos existants, notamment Vinted, sont conservés ; les nouveaux
+raccourcis de la barre utilisent des icônes simples et les noms des plateformes.
+
+L'écran Achats/À retirer met la paire, le relais et le code au premier plan.
+Les codes et identifiants de consignes restent séparés et copiables sans perdre
+leurs zéros initiaux. La copie n'est annoncée réussie qu'après résolution du
+presse-papier ; un refus est visible. Date complète, suivi et informations
+secondaires restent dans les détails ; échéances urgentes restent visibles.
+Les instructions du transporteur sont accessibles depuis « i », et les notices
+générales sont repliées. L'action « J'ai retiré » ne change pas sa logique :
+aucun retrait automatique ni suppression de captures.
+
+Validation sur données simulées : mobile/ordinateur, cartes d'annonces,
+réception/menus d'achat, copies réussies/refusées, codes de consigne séparés et
+codes longs aux largeurs 320/390/1512. Le banc historique `retrait.cjs`, qui lit
+scripts/bancs/fx/main.json, ne peut pas tourner ici : ces fixtures ne sont pas
+présentes. Les scénarios synthétiques du banc revendeurs couvrent le nouveau
+rendu et la copie ; ils ne remplacent pas un essai sur des comptes réels.

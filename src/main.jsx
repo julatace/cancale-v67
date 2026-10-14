@@ -52,9 +52,9 @@ class DernierFilet extends React.Component {
           <div style={{ fontSize: 11.5, fontFamily: 'ui-monospace, monospace', background: '#f6f7f9', border: '1px solid #e6e9ee',
             borderRadius: 10, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <button style={{ ...btn, border: 'none', background: '#14181d', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
-            <button style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>
-            <button style={btn} onClick={() => {
+            <button type="button" style={{ ...btn, border: 'none', background: '#14181d', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
+            <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>
+            <button type="button" style={btn} onClick={() => {
               // On ne touche QU'AUX clés de l'app, et on garde la session : le
               // nuage est la source de vérité, tout revient au rechargement.
               try { Object.keys(localStorage).forEach(k => { if (/^(vinted_|vrm_)/.test(k) && k !== 'vrm_session') localStorage.removeItem(k); }); } catch (_) {}
