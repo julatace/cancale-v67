@@ -11,7 +11,7 @@ import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
-import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues } from "./photosArticles.js";
+import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -5382,6 +5382,26 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
     </span>
   );
+}
+// Plusieurs sources certaines d’une vente : ne pas laisser un lien mort masquer son archive.
+function PhotoVenteSources({candidats,onBesoinAlternative,onSourceChargee,style,...props}){
+ const key=JSON.stringify(candidats),[favori,setFavori]=useState(null),[echecs,setEchecs]=useState({key,urls:[]});
+ const [,maj]=React.useReducer(n=>n+1,0);
+ const echecNatif=key===echecs.key?echecs.urls:[];
+ const echecsActuels=React.useRef(echecNatif);echecsActuels.current=echecNatif;
+ const etat=url=>echecNatif.includes(url)?'ko':photosVinted.estPhotoVinted(url)?(photosVinted.estMorte(url)?'ko':photosVinted.etatRendu(url)):'natif';
+ const snapshot=candidats.map(etat).join('|'),dernier=React.useRef(snapshot);dernier.current=snapshot;
+ const demander=React.useRef(onBesoinAlternative);demander.current=onBesoinAlternative;
+ const dejaDemande=React.useRef(null);
+ React.useEffect(()=>photosVinted.ecouter(()=>{
+  const nouveau=candidats.map(url=>echecsActuels.current.includes(url)?'ko':photosVinted.estPhotoVinted(url)?(photosVinted.estMorte(url)?'ko':photosVinted.etatRendu(url)):'natif').join('|');
+  if(nouveau!==dernier.current){dernier.current=nouveau;maj();}
+ }),[key]);
+ const source=choisirPhotoDisponible(candidats,etat,favori?.key===key?favori.url:null);
+ const tousEnEchec=!!source && candidats.every(url=>etat(url)==='ko');
+ React.useEffect(()=>{if(tousEnEchec && dejaDemande.current!==key){dejaDemande.current=key;demander.current?.();}},[key,tousEnEchec]);
+ if(!source || tousEnEchec && !photosVinted.estPhotoVinted(source))return <span style={cadrePhoto(style)} aria-hidden="true"><Icon name="image" size={taillePicto(style)}/></span>;
+ return <PhotoVinted {...props} src={source} style={style} onLoad={()=>{setFavori({key,url:source});onSourceChargee?.(source);}} onError={()=>setEchecs(prev=>{const urls=prev.key===key?prev.urls:[];return urls.includes(source)?prev:{key,urls:[...urls,source]};})}/>;
 }
 // ── QUI DIT DÉJÀ, SUR CET ÉCRAN, CE QUI BLOQUE L'EXTENSION ? (§7) ────────────
 // Les raisons « au niveau de l'extension » (`raisonExtGlobale`) se disent sous
@@ -22687,6 +22707,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [txnItem, setTxnItem] = useState({});
   const [photosVentesArchivees,setPhotosVentesArchivees]=useState({});
   const [photosVentesTransactions,setPhotosVentesTransactions]=useState({});
+  const [photosVentesForcees,setPhotosVentesForcees]=useState(()=>new Set());
+  const photosVentesValides=React.useRef(new Map());
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -26137,7 +26159,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(()=>{
     if(!['ventes','journee','bordereaux'].includes(curSub) || !sales.items?.length)return;
     let stop=false;
-    const besoins=demandesPhotosVentes(sales.items,listings.items || [],txnItem,photosVentesArchivees,photosVentesTransactions);
+    const forces=new Set([...photosVentesForcees].filter(key=>{const url=photosVentesValides.current.get(key);return !url || photosVinted.estPhotoVinted(url) && photosVinted.estMorte(url);}));
+    const besoins=demandesPhotosVentes(sales.items,listings.items || [],txnItem,photosVentesArchivees,photosVentesTransactions,forces);
     (async()=>{
       const transactions=[...besoins.transactions.keys()];
       for(let i=0;i<transactions.length && !stop;i+=100){
@@ -26160,7 +26183,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     })();
     return()=>{stop=true;};
-  },[sales.items,listings.items,txnItem,curSub]);
+  },[sales.items,listings.items,txnItem,curSub,photosVentesForcees]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
@@ -29172,6 +29195,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const ov = saleOv[String(o.transaction_id)] || {};
             const baseE = resolvedEntry(o);
             const photo = photoVenteVinted(o, listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees,photosVentesTransactions) || photoArticle(baseE);
+            const sourcesPhoto=photosVenteVintedCandidates(o,listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees,photosVentesTransactions);
+            const clePhoto=JSON.stringify([String(o._acc?.vinted_user_id),String(o.transaction_id)]);
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
@@ -29181,7 +29206,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources candidats={sourcesPhoto.length?sourcesPhoto:[photo]} alt="" loading="lazy" decoding="async" onSourceChargee={url=>photosVentesValides.current.set(clePhoto,url)} onBesoinAlternative={()=>{photosVentesValides.current.delete(clePhoto);setPhotosVentesForcees(prev=>{const next=new Set(prev);next.add(clePhoto);return next;});}} style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,

@@ -352,7 +352,7 @@ const pont = (pg) => pg.evaluate(() => window.__pont ? { ...window.__pont, parUr
 const ouvrir = async (pg, onglet, ms = 6000) => { await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(ms); };
 const section = async (pg, id, ms = 4000) => {
   try { await pg.click(`[data-section="${id}"]`, { timeout: 8000 }); }
-  catch (e) { await capture(pg, 'echec-section-' + id); throw e; }
+  catch (e) { await capture(pg, 'echec-section-' + id); console.error('Navigation photo :',e.message); throw e; }
   await pg.waitForTimeout(ms);
 };
 // Amène la première photo en haut de la zone qui défile (sur téléphone, le
