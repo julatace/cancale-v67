@@ -26,7 +26,7 @@ import crypto from 'crypto';
 import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
+import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -1656,7 +1656,7 @@ async function handleModifierAnnonceGestion(b,ctx){
 }
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
-const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireDonnee,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
+const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeCommandes,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
 
 async function handleApp(req, res) {

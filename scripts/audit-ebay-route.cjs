@@ -1238,6 +1238,34 @@ const RA = {};
     dit(ecrit(o.journal, 'ebay_listings') === null && ecrit(o.journal, 'ebay_programmees') === null,
       'eBay ne rend pas les annonces ⇒ annonces ET programmées gardent leur dernière capture');
   });
+  await essaie('curseur commandes projeté', async () => {
+    remettre();
+    lignes=lignes.filter(x=>x.id!=='ebay_orders' || (x.owner!==J && x.owner!==B));
+    const ancien = {orderId:'ancien',lineItems:[{sku:'historique'}]};
+    lignes.push({owner:J,id:'ebay_orders',data:{rev:4,capturedAt:1,orders:[ancien],pagination:{generation:'lecture-test',nextOffset:0,complete:false,lues:0,total:1,ids:[]}}});
+    lignes.push({owner:B,id:'ebay_orders',data:{rev:9,orders:[{orderId:'autre-vendeur'}]}});
+    const o = await app(JWT_J,{action:'commandessuite'});
+    const lectures = o.journal.filter(x=>x.ou==='lecture' && /id=eq.ebay_orders/.test(x.u));
+    dit(o.code===200 && o.corps.ok===true,'la page suivante fonctionne à partir du seul résumé sauvegardé');
+    dit(lectures.length===2 && /select=rev:data->rev/.test(lectures[0].u) && /select=data$/.test(lectures[1].u),'une projection de curseur puis une seule lecture complète pour fusionner');
+    dit(lectures.every(x=>x.u.includes('owner=eq.'+J)),'le résumé et la fusion restent limités au vendeur connecté');
+    const saved=lignes.find(x=>x.owner===J && x.id==='ebay_orders')?.data;
+    dit(saved?.orders?.some(x=>x.orderId==='ancien') && saved.orders.some(x=>x.orderId==='01-0001'),'la lecture projetée conserve les commandes historiques pendant la fusion');
+    dit(lignes.find(x=>x.owner===B && x.id==='ebay_orders')?.data.rev===9,'les commandes de l’autre vendeur restent intactes');
+  });
+  await essaie('résumé commandes trois états', async () => {
+    const {lireResumeCommandes} = await import('file://' + path.join(RACINE,'api','_lib','ebay.js'));
+    dit(await lireResumeCommandes('ebay_orders_absente',J)===null,'un résumé absent reste distinct d’une lecture échouée');
+    lignes.push({owner:J,id:'ebay_orders_legacy',data:{orders:[{orderId:'ancien'}]}});
+    const legacy=await lireResumeCommandes('ebay_orders_legacy',J);
+    dit(legacy && !legacy.pagination && !legacy.orders,'une ancienne capture sans curseur démarre sans charger ses commandes');
+    const originalFetch=global.fetch;let lectures=0;
+    try {
+      global.fetch=async(u,opts)=>{if(String(u).includes('id=eq.ebay_orders_erreur')){lectures++;return rep({message:'indisponible'},503);}return originalFetch(u,opts);};
+      dit(await lireResumeCommandes('ebay_orders_erreur',J)===undefined,'un échec de base ne devient pas un historique vide');
+      dit(await lireResumeCommandes('main',J)===undefined && lectures===1,'la projection de commandes refuse les autres lignes avant le réseau');
+    } finally {global.fetch=originalFetch;}
+  });
   await essaie('sync commandes illisibles', async () => {
     remettre(); mode.commandes = 'ko';
     const o = await app(JWT_J, { action: 'sync' });

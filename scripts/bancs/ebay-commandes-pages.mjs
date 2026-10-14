@@ -16,11 +16,11 @@ const serviceFirst=fusionCommandesEbay({orders:[row('ancien')]},{orders:Array.fr
 const serviceSecond={orders:[row(51)],offset:50,limit:50,total:51};
 function banc({read=serviceFirst,failPage=false,failWrite=false,changeDuringRead=false}={}){
  let state=structuredClone(read),gets=[],writes=[];
- const charger=creerLectureCommandesEbay({apiOrigin:'https://api.ebay.com',identifier:()=> 'gen2',lire:async(id,owner)=>{gets.push({id,owner});return state;},jeton:async ctx=>({ok:true,token:ctx.owner+ctx.compte.suffixe}),json:async(url,token)=>{gets.push({url,token});if(changeDuringRead)state={...state,rev:99};return {ok:!failPage,data:serviceSecond};},modifier:async(id,owner,fn)=>{if(failWrite)return false;const result=fn(state);if(result!==undefined){writes.push({id,owner});state=result;}return true;}});
+ const charger=creerLectureCommandesEbay({apiOrigin:'https://api.ebay.com',identifier:()=> 'gen2',lire:async(id,owner)=>{gets.push({id,owner});if(state==null)return state;const {rev,capturedAt,pagination}=state;const {generation,nextOffset,complete,lues,total}=pagination || {};return {rev,capturedAt,...(pagination?{pagination:{generation,nextOffset,complete,lues,total}}:{})};},jeton:async ctx=>({ok:true,token:ctx.owner+ctx.compte.suffixe}),json:async(url,token)=>{gets.push({url,token});if(changeDuringRead)state={...state,rev:99};return {ok:!failPage,data:serviceSecond};},modifier:async(id,owner,fn)=>{if(failWrite)return false;const result=fn(state);if(result!==undefined){writes.push({id,owner});state=result;}return true;}});
  return {charger,gets,writes,state:()=>state};
 }
 const ctx={owner:'vendeur-A',compte:{suffixe:'_secondaire'}};
-let b=banc(),r=await b.charger(ctx);assert.equal(r.body.complete,true);assert.equal(b.writes[0].id,'ebay_orders_secondaire');assert.equal(b.writes[0].owner,'vendeur-A');assert.ok(b.gets[1].url.endsWith('limit=50&offset=50'));assert.equal(b.gets[1].token,'vendeur-A_secondaire');
+let b=banc(),r=await b.charger(ctx);assert.equal(r.body.complete,true);assert.equal(b.writes[0].id,'ebay_orders_secondaire');assert.equal(b.writes[0].owner,'vendeur-A');assert.ok(b.gets[1].url.endsWith('limit=50&offset=50'));assert.equal(b.gets[1].token,'vendeur-A_secondaire');assert.equal(b.state().orders.length,52);assert.equal(b.state().pagination.ids.length,51);
 for(const options of [{read:undefined},{failPage:true},{failWrite:true},{changeDuringRead:true}]){
  // Destructure default values separately for the unreadable-store scenario.
  if(options.read===undefined && Object.hasOwn(options,'read')){

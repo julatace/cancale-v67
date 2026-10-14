@@ -462,6 +462,24 @@ async function lireDonnee(id, owner) {
   } catch (_) { return undefined; }
 }
 
+// Le curseur de commandes suffit pour préparer la page suivante. L'historique
+// entier n'est lu qu'au moment de la fusion protégée par comparaison de version.
+async function lireResumeCommandes(id, owner) {
+  if (!sbKey() || !/^ebay_orders(?:_[a-z0-9_]+)?$/i.test(String(id || ''))) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  const projection = 'rev:data->rev,capturedAt:data->capturedAt,generation:data->pagination->generation,nextOffset:data->pagination->nextOffset,complete:data->pagination->complete,lues:data->pagination->lues,total:data->pagination->total';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=${projection}`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    if (!rows[0]) return null;
+    const {rev,capturedAt,generation,nextOffset,complete,lues,total} = rows[0];
+    return {rev,capturedAt,...(generation != null ? {pagination:{generation,nextOffset,complete,lues,total}} : {})};
+  } catch (_) { return undefined; }
+}
+
 // ── LIRE-MODIFIER-ÉCRIRE UNE PETITE LIGNE SANS PERDRE CELLE D'À CÔTÉ ──────────
 // (11 octobre, revue de la règle d'offre.) `lireDonnee` puis `storeData`, c'est
 // une fusion qui réécrit la ligne ENTIÈRE : deux requêtes du même vendeur qui
@@ -568,6 +586,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };
