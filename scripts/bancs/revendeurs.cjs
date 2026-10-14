@@ -14,6 +14,7 @@ const ventes = [
 ];
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
+rows.push({id:'harvest_111_txn_9002',data:{payload:{transaction:{id:9002,item_photo:{url:'https://images1.vinted.net/test.png'}}}}});
 rows.push({id:'harvest_111_txn_9001',data:{payload:{transaction:{id:9001,item_id:777}}}},{id:'coffre_111_777',data:{id:'777',uid:'111',photos:['https://images1.vinted.net/test.png']}});
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
@@ -126,6 +127,7 @@ async function brancher(p){
   }
   await p.goto(base+'/?tab=plat_vinted');
   await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
+  await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente retrouvée depuis transaction sans annonce ni archive');
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
   await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
   const vente=p.locator('.vrm-sale-row').first();
