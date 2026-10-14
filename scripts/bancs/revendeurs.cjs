@@ -71,8 +71,8 @@ async function brancher(p){
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
   b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
-  const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[];
-  await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
+  const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[],commandeWrites=[],modeMessageCommande='refuse',messageCommandePret,libererMessageCommande;
+  await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
    if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
    if(a==='commande')j={ok:true,order:{orderId:body.orderId,orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',buyer:{username:'Acheteur test'},pricingSummary:{total:{value:'115',currency:'EUR'}},lineItems:[{lineItemId:'111',legacyItemId:'12',title:'Paire eBay',quantity:1,lineItemCost:{value:'100',currency:'EUR'},total:{value:'115',currency:'EUR'}}],totalMarketplaceFee:{value:'12.50',currency:'EUR'}},fulfillments:[]};
    if(a==='commande' && body.orderId==='old-1'){j.order.lineItems.push({lineItemId:'222',title:'Chargeur USB-C',sku:'CH-USB-C',quantity:2,lineItemCost:{value:'30',currency:'EUR'}});j.order.fulfillmentStartInstructions=[{shippingStep:{shipTo:{fullName:'Acheteur de test',contactAddress:{addressLine1:'12 rue Exemple',postalCode:'35000',city:'Rennes',countryCode:'FR'}}}}];}
@@ -82,6 +82,7 @@ async function brancher(p){
    if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.','Code de retrait : 001234']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
    if(a==='agent')j={ok:true,tasks:[{id:'offer:333',section:'offres',label:'Étudier l’offre',ref:'13',title:'Ancienne offre à retrouver'},{id:'message:m1',section:'messages',label:'Répondre au message',ref:'12',title:'Message de la paire'},{id:'message:999',section:'messages',label:'Répondre au message',ref:'12',title:'Ancien échange à retrouver'},{id:'order:old-1',section:'ventes',label:'Préparer l’expédition',ref:'old-1',title:'Ancienne commande à retrouver'},{id:'order:1',section:'ventes',label:'Préparer l’expédition',ref:'1',title:'Paire à expédier'},{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12',title:'Paire à négocier',price:'85.00',currency:'EUR',deadline:new Date(Date.now()+3600000).toISOString(),urgent:true}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'},...Array.from({length:6},(_,i)=>({id:'j'+(i+2),action:'expedier',ref:String(i+2),at:Date.now(),etat:'reussi'}))],journalLisible:true};
    if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'},{id:'o2',itemId:'13',titre:'Autre offre eBay',buyer:'Autre acheteur',price:90,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
+   if(a==='messageacheteur'){commandeWrites.push(body);if(modeMessageCommande==='attendre'){await new Promise(resolve=>{libererMessageCommande=resolve;messageCommandePret?.();});j={ok:true};}else j={ok:false,error:'Refus simulé du message commande'};}
    if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
    return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
   });
@@ -301,6 +302,22 @@ async function brancher(p){
   check(writes.length===1,'accès directs, brouillons, bénéfices et synchronisation sans action commerciale');
 
   check(writes.length===1,'une tâche ouvre la section sans accepter l’offre');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();
+  await p.getByText('Écrire à l’acheteur',{exact:true}).click();
+  await p.getByLabel('Objet du message eBay').fill('Livraison ordinateur');await p.getByLabel('Message à l’acheteur eBay').fill('Votre commande sera préparée demain.');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();
+  check(await p.getByLabel('Objet du message eBay').inputValue()==='Livraison ordinateur' && await p.getByLabel('Message à l’acheteur eBay').inputValue()==='Votre commande sera préparée demain.','objet et texte conservés en quittant la commande');
+  await p.getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(commandeWrites.length===0,'annuler le message commande ne transmet rien');
+  await p.getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByText('Refus simulé du message commande',{exact:true}).waitFor();
+  check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='Votre commande sera préparée demain.','refus conserve le brouillon de commande');
+  modeMessageCommande='attendre';const pret=new Promise(resolve=>messageCommandePret=resolve);
+  await p.getByRole('button',{name:'Envoyer le message',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer le message',exact:true}).click();await pret;
+  await p.getByLabel('Message à l’acheteur eBay').fill('Nouvelle réponse écrite pendant l’envoi.');await p.getByLabel('Objet du message eBay').fill('Nouvel objet');libererMessageCommande();
+  await p.getByText('Message accepté par eBay.',{exact:true}).waitFor();
+  check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='Nouvelle réponse écrite pendant l’envoi.' && await p.getByLabel('Objet du message eBay').inputValue()==='Nouvel objet','succès n’efface pas une rédaction plus récente');
+  check(commandeWrites[1].orderId==='old-1' && commandeWrites[1].body==='Votre commande sera préparée demain.' && commandeWrites[1].subject==='Livraison ordinateur','envoi utilise la commande et le texte confirmés');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Écrire à l’acheteur',{exact:true}).click();check(await p.getByLabel('Message à l’acheteur eBay').inputValue()==='','brouillons séparés par commande');
+
   await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}

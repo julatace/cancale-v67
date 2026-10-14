@@ -5,6 +5,7 @@ import CoutsVente from './CoutsVente.jsx';
 import './ebay-interface.css';
 import {offresAffichees} from './ebayOffresVue.js';
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
+import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
 import React,{useEffect,useState,useRef} from 'react';
@@ -27,9 +28,10 @@ const styleUI=C=>({input:{width:'100%',padding:'9px 10px',border:`1px solid ${C.
 const Erreur=({message})=>message?<p role="status" style={{fontSize:12,lineHeight:1.5}}>{message}</p>:null;
 const corpsLisible=body=>/<(?:div|p|span|br|a)\b/i.test(body || '')?String(body).replace(/<br\s*\/?\s*>|<\/p>/gi,'\n').replace(/<\/?[a-z][^>]*>/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&'):body;
 
-export function EbayCommande({order,ouvrir=false,costs={},onCosts,compte='principal',headers,confirm,theme:C}){
+export function EbayCommande({order,ouvrir=false,costs={},onCosts,owner,compte='principal',headers,confirm,theme:C}){
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
- const S=styleUI(C),[open,setOpen]=useState(ouvrir),[data,setData]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[carriers,setCarriers]=useState(null),[carrier,setCarrier]=useState(''),[tracking,setTracking]=useState(''),[body,setBody]=useState(''),[subject,setSubject]=useState('À propos de votre commande'),[copie,setCopie]=useState('');
+ const S=styleUI(C),[open,setOpen]=useState(ouvrir),[data,setData]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[carriers,setCarriers]=useState(null),[carrier,setCarrier]=useState(''),[tracking,setTracking]=useState(''),[copie,setCopie]=useState('');
+ const draft=useBrouillonCommande(owner,compte,order.orderId),body=draft.body,subject=draft.subject;
  async function relire(){setBusy(true);setMessage('');try{setData(await call('commande',{orderId:order.orderId},headers));}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{if(open && !data)relire();},[open]);
  async function transporteurs(){if(carriers)return;try{const j=await call('transporteurs',{},headers);setCarriers(j.carriers || []);}catch(e){setMessage(e.message);}}
@@ -61,11 +63,13 @@ export function EbayCommande({order,ouvrir=false,costs={},onCosts,compte='princi
      </div>
     </details>}
     <details><summary style={{fontSize:12,cursor:'pointer',fontWeight:600}}>Écrire à l’acheteur</summary><div style={{display:'grid',gap:8,marginTop:8}}>
-     <label style={S.label}>Objet<input aria-label="Objet du message eBay" maxLength={200} value={subject} onChange={e=>setSubject(e.target.value)} style={S.input}/></label>
-     <label style={S.label}>Message<textarea aria-label="Message à l’acheteur eBay" maxLength={2000} rows={4} value={body} onChange={e=>setBody(e.target.value)} style={S.input}/></label>
+     <label style={S.label}>Objet<input aria-label="Objet du message eBay" maxLength={200} value={subject} onChange={e=>draft.modifier({subject:e.target.value})} style={S.input}/></label>
+     <label style={S.label}>Message<textarea aria-label="Message à l’acheteur eBay" maxLength={2000} rows={4} value={body} onChange={e=>draft.modifier({body:e.target.value})} style={S.input}/></label>
+     {body && <small style={{color:C.muted}}>{draft.saved?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cette commande ouverte.'}</small>}
      <button type="button" style={S.button} disabled={busy || !body.trim() || !subject.trim()} onClick={async()=>{
+      const sent={body,subject};
       if(!await confirm({title:`Envoyer à ${data.order.buyer?.username || 'l’acheteur'} ?`,desc:`Commande ${order.orderId}\n${subject}\n\n${body}`,ok:'Envoyer le message',cancel:'Annuler'}))return;
-      setBusy(true);setMessage('');try{await call('messageacheteur',{orderId:order.orderId,subject,body,confirme:true},headers,{write:true});setBody('');setMessage('Message accepté par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
+      setBusy(true);setMessage('');try{await call('messageacheteur',{orderId:order.orderId,...sent,confirme:true},headers,{write:true});draft.effacerEnvoye(sent);setMessage('Message accepté par eBay.');}catch(e){setMessage(e.message);}finally{setBusy(false);}
      }}>Envoyer le message</button>
     </div></details>
    </>}
