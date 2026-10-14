@@ -514,7 +514,7 @@ const RA = {};
         'base non cloisonnée : le propriétaire voit son compte eBay, lu SANS filtre de vendeur (comme avant)', `HTTP ${o.code} · ${lec.map((x) => x.u).join(' ')}`);
     });
     await essaie('np autre vendeur', async () => {
-      for (const action of ['sync', 'status', 'authurl', 'programmer', 'regleoffre', 'regleoffrelire']) {
+      for (const action of ['commandessuite','sync', 'status', 'authurl', 'programmer', 'regleoffre', 'regleoffrelire']) {
         const o = await app(JWT_B, { action, confirme: true, itemId: '110000000001', accepte: 70, prixVu: 80, attendu: 'inconnu', itemIds: ['110000000001'] });
         dit(o.code === 403 && chezEbay(o.journal).length === 0,
           `base non cloisonnée : un autre vendeur ne pilote pas « ${action} » (un seul jeu de données, celui de l'installation)`, `HTTP ${o.code} · ${chezEbay(o.journal).length} appel(s) eBay`);
@@ -544,7 +544,7 @@ const RA = {};
   }
 
   // ── 1. Session obligatoire ─────────────────────────────────────────────────
-  const TOUTES = ['sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire','commande','transporteurs','expedier','messageacheteur','messages','repondre','offresrecues','repondreoffre','modifierannonce','terminerannonce'];
+  const TOUTES = ['commandessuite','message','offredetail','sync', 'finances', 'publish', 'revise', 'sku', 'offreinfo', 'offre', 'retirer', 'programmer', 'programmees', 'deprogrammer', 'reprogrammer', 'limites', 'regleoffre', 'regleoffrelire','commande','transporteurs','expedier','messageacheteur','messages','repondre','offresrecues','repondreoffre','modifierannonce','terminerannonce'];
   for (const action of TOUTES) {
     await essaie('sans session : ' + action, async () => {
       const o = await app('', { action, item: { title: 'x' }, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true, price: '10' });
@@ -558,7 +558,7 @@ const RA = {};
     dit(o.code === 401 && chezEbay(o.journal).length === 0, 'un jeton que le service d\'identité ne reconnaît pas est refusé', `HTTP ${o.code}`);
   });
   await essaie('abonnement coupé', async () => {
-    for (const action of ['status', 'sync', 'programmer', 'authurl']) {
+    for (const action of ['commandessuite','status', 'sync', 'programmer', 'authurl']) {
       const o = await app(JWT_C, { action, confirme: true });
       dit(o.code === 402 && chezEbay(o.journal).length === 0,
         `un vendeur dont l'abonnement est coupé ne pilote pas « ${action} » (402, zéro appel eBay)`, `HTTP ${o.code}`);
@@ -580,7 +580,7 @@ const RA = {};
     const s = await app(JWT_B, { action: 'status' });
     dit(s.code === 200 && s.corps && s.corps.connected === false,
       "un autre vendeur connecté voit SON état : pas de compte eBay relié (jamais celui de Julien)", `HTTP ${s.code} ${JSON.stringify(s.corps)}`);
-    for (const action of ['sync', 'sku', 'offreinfo', 'offre', 'retirer', 'programmees', 'limites']) {
+    for (const action of ['commandessuite','sync', 'sku', 'offreinfo', 'offre', 'retirer', 'programmees', 'limites']) {
       const o = await app(JWT_B, { action, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true });
       const jetonJ = chezEbay(o.journal).some((x) => /rt-de-J/.test(x.corps) || x.jeton === 'at-J');
       dit(o.code === 401 && o.corps && o.corps.reason === 'not-connected' && auCompte(o.journal).length === 0 && !jetonJ,

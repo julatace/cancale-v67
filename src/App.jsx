@@ -12742,6 +12742,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const [syncing, setSyncing] = React.useState(false);
   const syncLock=React.useRef(false);
   const [syncResult,setSyncResult]=React.useState({});
+  const [commandesSuite,setCommandesSuite]=React.useState({});
   const [soldes, setSoldes] = React.useState(null);  // [{compte, solde}] — solde : {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
   const autoFait = React.useRef(false);
   const comptesVue = React.useMemo(() => (Array.isArray(comptesEbay) ? comptesEbay : []).filter((c) => dansVueEbay({ _compte: c.ref }, vue)), [comptesEbay, vue]);
@@ -12760,7 +12761,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     if (!Array.isArray(comptesEbay)) return null;
     const [L, O] = await Promise.all([
       lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt,complet:data->complet', 'items', comptesVue),
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt,complet:data->complet,lues:data->lues,total:data->total', 'orders', comptesVue),
+      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt,complet:data->complet,lues:data->lues,total:data->total,lecture:data->pagination->lues,totalLecture:data->pagination->total', 'orders', comptesVue),
     ]);
     if (!L || !O) return null;
     const caps = [...L.lignes, ...O.lignes].map((x) => x.ligne && Number(x.ligne.capturedAt)).filter((n) => Number.isFinite(n) && n > 0);
@@ -12768,6 +12769,17 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     setData({ lectures:L.lignes.map(l=>({compte:l.compte,annonces:l.ligne,commandes:O.lignes.find(o=>o.compte.ref===l.compte.ref)?.ligne})),listings: L.items, orders: O.items, capturedAt: cap, illisibles: [...new Set([...L.illisibles, ...O.illisibles])] });
     return cap;
   }, [comptesEbay, comptesVue]);
+  const chargerPlusCommandes=async ref=>{
+    if(syncLock.current)return;
+    syncLock.current=true;setSyncing(true);setCommandesSuite(prev=>({...prev,[ref]:'Lecture en cours…'}));
+    try{
+      const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'commandessuite',...corpsCompteEbay(ref)})});
+      const j=await r.json();if(!r.ok || !j.ok)throw new Error(j.error || 'La page suivante n’a pas pu être lue.');
+      setCommandesSuite(prev=>({...prev,[ref]:`${j.lues} commande${j.lues>1?'s':''} lue${j.lues>1?'s':''}${j.total!=null?` sur ${j.total}`:''} pour cette lecture eBay.${j.complete?' Lecture terminée.':j.issue?' La liste a changé : actualise ce compte avant de reprendre.':' Tu peux charger la suite.'}`}));
+      signalerComptesEbay();await lireData();
+    }catch(e){setCommandesSuite(prev=>({...prev,[ref]:e.message}));}
+    finally{syncLock.current=false;setSyncing(false);}
+  };
   const synchroniser = React.useCallback(async (refCible) => {
     if(syncLock.current)return;
     if(!Array.isArray(comptesStatut)){setRetour('Les comptes eBay n’ont pas pu être lus. Actualise leur connexion avant de reprendre.');return;}
@@ -12861,7 +12873,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             </button>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>eBay te demandera de te connecter : choisis l'AUTRE compte (particulier ou pro). Chaque compte garde ses annonces et ses ventes à part.</div>
           </div>
-          <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button></div>;})}</div></details>
+          <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{l.commandes?.lecture!=null && <p style={{fontSize:11,color:C.muted}}>{l.commandes.lecture}{l.commandes.totalLecture!=null?` sur ${l.commandes.totalLecture}`:''} commandes pour cette lecture eBay</p>}{commandesSuite[l.compte.ref] && <p role="status" style={{fontSize:11}}>{commandesSuite[l.compte.ref]}</p>}{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button>{l.commandes?.complet!==true && <button type="button" disabled={syncing} onClick={()=>chargerPlusCommandes(l.compte.ref)} style={{marginTop:6,marginLeft:6,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>Lire davantage de commandes</button>}</div>;})}</div></details>
           <details className="vrm-ebay-settings"><summary>Solde et paramètres du compte</summary>
           {data == null ? (
             <div style={{ fontSize: 12.5, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
