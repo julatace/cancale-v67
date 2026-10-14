@@ -94,8 +94,9 @@ async function ouvrirMenu(pg, tx) {
   await pg.waitForTimeout(900);
   // onglet « Tous » (un achat finalisé = « Reçu », pas sous « À retirer »)
   const tous = pg.locator('button', { hasText: /^Tous$/ });
-  if (await tous.count()) { await tous.first().click(); await pg.waitForTimeout(400); }
+  await tous.first().waitFor({timeout:10000});await tous.first().click();
   const carte = pg.locator(`[data-achat-tx="${tx}"]`);
+  await carte.waitFor({timeout:10000});
   if (!(await carte.count())) return false;
   await carte.locator('button[title="Actions rapides"]').first().click();
   await pg.waitForTimeout(250);

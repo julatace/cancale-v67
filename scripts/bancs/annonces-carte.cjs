@@ -235,10 +235,10 @@ const projette = (row, sel) => {
         await pg.getByLabel('Trier les annonces',{exact:true}).selectOption('price_desc');
         await pg.getByLabel('Rechercher une annonce',{exact:true}).evaluate(e=>e.blur());
         const nav=pg.getByRole('navigation',{name:'Navigation principale'});
-        await nav.getByRole('button',{name:'Stock',exact:true}).click();
+        if(vp.width<1024){await nav.getByRole('button',{name:'Gestion',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
         if(vp.width<1024){
-          await nav.getByRole('button',{name:'Plus',exact:true}).click();
-          await pg.getByRole('menuitem',{name:'Annonces',exact:true}).click();
+          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
+          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
         } else {
           await nav.getByRole('button',{name:'Vinted',exact:true}).click();
           await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
