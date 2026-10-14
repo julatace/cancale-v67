@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.176.0';
+const CODE_VERSION = '5.177.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2667,11 +2667,12 @@ const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title',
   'promoted','can_push_up'];
 
 function photoUtile(it) {
-  const candidats = [it.photo, ...(Array.isArray(it.photos) ? it.photos : []), it.item?.photo,
+  const candidats = [it.photo,it.photo_url,it.photoUrl,it.image_url,it.imageUrl,it.item_photo,
+    ...(Array.isArray(it.item_photos) ? it.item_photos : []),it.transaction?.item_photo, ...(Array.isArray(it.photos) ? it.photos : []), it.item?.photo,
     ...(Array.isArray(it.item?.photos) ? it.item.photos : []), it.image, it.item?.image];
   for (const p of candidats) {
     if (!p) continue;
-    const url = typeof p === 'string' ? p : p.url || p.imageUrl || p.src
+    const url = typeof p === 'string' ? p : p.full_size_url || p.url || p.photo_url || p.imageUrl || p.src
       || (Array.isArray(p.thumbnails) && p.thumbnails.find(t => t && t.url)?.url);
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
     const out = { url };

@@ -9,7 +9,7 @@ import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
-import { photoArticle, photoCommande } from "./photosArticles.js";
+import { photoArticle, photoCommande, photoVenteVinted } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -50,7 +50,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.176.0';
+const EXT_ATTENDUE = '5.177.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -22672,6 +22672,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [venduesVinted, setVenduesVinted] = useState(new Set());
   // transaction → id d'annonce, tel que Vinted le dit (cf. fetchTxnItemIds).
   const [txnItem, setTxnItem] = useState({});
+  const [photosVentesArchivees,setPhotosVentesArchivees]=useState({});
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -26117,7 +26118,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // NEUF : sans ça elle grave d'abord et découvre l'identité ensuite, et comme
   // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
   const [txnPret, setTxnPret] = useState(false);
-  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, []);
+  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
+  // Les ventes n'ont plus forcément de vignette ni d'annonce dans le dressing.
+  // Lire uniquement la première photo des archives identifiées : aucun texte, PDF ou titre.
+  useEffect(()=>{
+    if(!['ventes','journee','bordereaux'].includes(curSub) || !sales.items?.length)return;
+    let stop=false;
+    const besoins=new Map();
+    for(const o of sales.items){
+      const uid=o._acc?.vinted_user_id, id=txnItem[String(o.transaction_id)] ?? o.item_id ?? o.item?.id;
+      if(uid==null || id==null || !/^\d+$/.test(String(uid)) || !/^\d+$/.test(String(id)))continue;
+      if(photoVenteVinted(o,listings.items || [],id,photosVentesArchivees))continue;
+      const key=JSON.stringify([String(uid),String(id)]);
+      besoins.set(`coffre_${uid}_${id}`,{key});
+    }
+    if(!besoins.size)return;
+    (async()=>{
+      const ids=[...besoins.keys()];
+      for(let i=0;i<ids.length && !stop;i+=100){
+        try{
+          const rows=await lireTout(`id=in.(${ids.slice(i,i+100).join(',')})&select=id,photo:data->photos->0`,{strict:true});
+          if(stop || !Array.isArray(rows))continue;
+          const patch={};
+          for(const row of rows){const target=besoins.get(row.id);if(target && photoArticle({photo:row.photo}))patch[target.key]={photo:row.photo};}
+          if(Object.keys(patch).length)setPhotosVentesArchivees(prev=>({...prev,...patch}));
+        }catch(_){ /* Une archive illisible ne supprime pas les photos déjà lues. */ }
+      }
+    })();
+    return()=>{stop=true;};
+  },[sales.items,listings.items,txnItem,curSub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
@@ -29128,7 +29157,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const benef = st==='cancelled'?null:bilan.benefice;
             const ov = saleOv[String(o.transaction_id)] || {};
             const baseE = resolvedEntry(o);
-            const photo = photoCommande(o, listings.items || _acctCache.listings?.items || []) || photoArticle(baseE);
+            const photo = photoVenteVinted(o, listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees) || photoArticle(baseE);
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
