@@ -30064,12 +30064,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             honnêtement (§17). Sans ça, un colis dont le seul moyen
                             de retrait était un QR mort ne laissait RIEN à présenter
                             au comptoir — vu en capture sur 09447431562792. */}
-                        {!qrVivant(t) && !code && !ident && t.suivi && (
-                          <div style={{flexShrink:0,textAlign:'center',background:`${C.warn}12`,border:`1.5px solid ${C.warn}`,borderRadius:8,padding:'4px 11px'}}>
-                            <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>N° de colis</div>
-                            <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{t.suivi}</div>
-                          </div>
-                        )}
                         {(code||ident) && (
                           <div style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (

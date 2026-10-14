@@ -178,13 +178,16 @@ async function brancher(p){
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
   rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},
    {id:'email_track_pickup2',data:{id:'pickup2',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire argent taille 43',code:'004567',code2:'009876',consigne:true,suivi:'TRACK-02',receivedAt:maintenant,limite:new Date(Date.now()-86400000).toISOString().slice(0,10)}},
-   {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}});
+   {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}},
+   {id:'email_track_pickup4',data:{id:'pickup4',carrier:'mondial',status:'available',lieu:'Relais Nord',artTitle:'Colis sans code',suivi:'TRACK-MISSING',receivedAt:maintenant}});
   await p.goto(base+'/?tab=cat_achats');await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
-  check(await p.locator('.vrm-pickup-card').count()===3, 'trois colis à retirer, sans mélange des codes');
+  check(await p.locator('.vrm-pickup-card').count()===4, 'quatre colis à retirer, sans mélange des codes');
   check(await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).isVisible(),'identifiant de consigne visible séparément');
   check(await p.getByRole('button',{name:'Copier code d’ouverture 004567',exact:true}).isVisible(),'code d’ouverture visible séparément');
   check((await p.locator('main').innerText()).includes('délai dépassé'),'échéance dépassée reste visible');
+  check(!(await p.locator('main').innerText()).includes('TRACK-MISSING'),'numéro de suivi absent des codes affichés');
+  check(await p.getByText('n° TRACK-MISSING',{exact:true}).count()===1,'numéro de suivi conservé dans les détails');
   check(await p.locator('.vrm-pickup-method').evaluateAll(es=>es.every(e=>!e.open)),'explications repliées par défaut');
   check(await p.locator('.vrm-pickup-details').evaluateAll(es=>es.every(e=>!e.open)),'suivi et dates secondaires dans les détails');
   await p.locator('.vrm-pickup-method summary').first().click();check(await p.locator('.vrm-pickup-method').first().evaluate(e=>e.open), 'informations de retrait accessibles au clic');await p.locator('.vrm-pickup-method summary').first().click();

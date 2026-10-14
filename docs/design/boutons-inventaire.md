@@ -6,10 +6,10 @@ Cet inventaire vérifie les types explicites et les noms dans le code. Les noms 
 
 | Fichier : ligne | Composant | Nom | Type | État disponible |
 |---|---|---|---|---|
-| Accueil.jsx:436 | Accueil | Créer mon compte | button | — |
-| Accueil.jsx:441 | Accueil | Déjà un compte ? Se connecter | button | — |
-| Accueil.jsx:462 | Accueil | Créer mon compte | button | — |
-| Accueil.jsx:466 | Accueil | Se connecter | button | — |
+| Accueil.jsx:455 | Accueil | Créer mon compte | button | — |
+| Accueil.jsx:460 | Accueil | Déjà un compte ? Se connecter | button | — |
+| Accueil.jsx:481 | Accueil | Créer mon compte | button | — |
+| Accueil.jsx:485 | Accueil | Se connecter | button | — |
 | App.jsx:1112 | RangerSheet | [calculé] N° [calculé] [calculé] [calculé] | button | — |
 | App.jsx:1127 | RangerSheet | Autre numéro… | button | — |
 | App.jsx:1128 | RangerSheet | Annuler | button | — |
@@ -343,215 +343,215 @@ Cet inventaire vérifie les types explicites et les noms dans le code. Les noms 
 | App.jsx:29612 | Comptabilite | 🎯 Viser [calculé] € | button | — |
 | App.jsx:29715 | Comptabilite | [calculé] [calculé] | button | sélection |
 | App.jsx:30057 | Comptabilite | Afficher le QR de retrait en grand | button | — |
-| App.jsx:30083 | Comptabilite | J’ai retiré ce colis | button | — |
-| App.jsx:30262 | Comptabilite | J’ai retiré ce colis | button | — |
-| App.jsx:30288 | Comptabilite | Afficher le QR de retrait en grand | button | — |
-| App.jsx:30299 | Comptabilite | Annuler | button | — |
-| App.jsx:30329 | Comptabilite | Afficher le QR de retrait en grand | button | — |
-| App.jsx:30340 | Comptabilite | Annuler | button | — |
-| App.jsx:30397 | Comptabilite | Afficher le QR de retrait en grand | button | — |
-| App.jsx:30403 | Comptabilite | Je l'avais récupéré | button | — |
-| App.jsx:30484 | Comptabilite | Achats hors Vinted [calculé] › | button | — |
-| App.jsx:30522 | Comptabilite | [calculé] | button | — |
-| App.jsx:30547 | Comptabilite | [calculé] | button | désactivé |
-| App.jsx:30562 | Comptabilite | Modifier | button | — |
-| App.jsx:30563 | Comptabilite | Supprimer | button | — |
-| App.jsx:30657 | Comptabilite | Note interne | button | — |
-| App.jsx:30662 | Comptabilite | Code de retrait | button | — |
-| App.jsx:30664 | Comptabilite | Actions rapides | button | — |
-| App.jsx:30668 | Comptabilite | Copier le prix payé (pour le numérotage) | button | — |
-| App.jsx:30669 | Comptabilite | [calculé] | button | — |
-| App.jsx:30670 | Comptabilite | [calculé] | button | — |
-| App.jsx:30671 | Comptabilite | Attestation de remboursement | button | — |
-| App.jsx:30672 | Comptabilite | Étiquette N° [calculé] | button | — |
-| App.jsx:30674 | Comptabilite | Masquer cet achat | button | — |
-| App.jsx:30687 | Comptabilite | Voir plus — [calculé] affichés sur [calculé] | button | — |
-| App.jsx:30703 | Comptabilite | Effacer la recherche d’annonces | button | — |
-| App.jsx:30722 | Comptabilite | Outils : répartir un lot, audit du stock | button | ouvert/fermé |
-| App.jsx:30745 | Comptabilite | [calculé] [calculé] [calculé] | button | — |
-| App.jsx:30759 | Comptabilite | Tout le stock | button | sélection |
-| App.jsx:30760 | Comptabilite | Sans numéro | button | sélection |
-| App.jsx:30761 | Comptabilite | À relancer | button | sélection |
-| App.jsx:30765 | Comptabilite | Réinitialiser les annonces | button | — |
-| App.jsx:30818 | Comptabilite | → N° [calculé] | button | — |
-| App.jsx:30872 | Comptabilite | Gérer les comptes → | button | — |
-| App.jsx:30931 | Comptabilite | Remettre N° [calculé] | button | — |
-| App.jsx:30957 | Comptabilite | [calculé] qui dorment [calculé] | button | — |
-| App.jsx:30958 | Comptabilite | Prix conseillé + titre & description prêts à coller | button | — |
-| App.jsx:30974 | Comptabilite | Conseils & signalements [calculé] › | button | — |
-| App.jsx:30989 | Comptabilite | [calculé] paire [calculé] qui te revien [calculé] [calculé] [calculé] | button | — |
-| App.jsx:31023 | Comptabilite | Copier le numéro | button | — |
-| App.jsx:31024 | Comptabilite | [nom calculé] | button | — |
-| App.jsx:31025 | Comptabilite | Masquer | button | — |
-| App.jsx:31052 | Comptabilite | [calculé] annonce [calculé] disparue [calculé] sans vente Plus en ligne, et aucune vente correspondante. Masquées par Vinted, ou retirées. [calculé] | button | — |
-| App.jsx:31071 | Comptabilite | La paire n'est plus à vendre : on libère son numéro pour une autre paire. | button | — |
-| App.jsx:31098 | Comptabilite | Déconnecter | button | — |
-| App.jsx:31107 | Comptabilite | [calculé] | button | — |
-| App.jsx:31114 | Comptabilite | ↺ annuler | button | — |
-| App.jsx:31119 | Comptabilite | Voir → | button | — |
-| App.jsx:31133 | Comptabilite | 🏷️ Repricing — [calculé] paire [calculé] à baisser Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat [calculé] | button | — |
-| App.jsx:31180 | Comptabilite | [calculé] | button | désactivé |
-| App.jsx:31330 | Comptabilite | Toutes | button | sélection |
-| App.jsx:31332 | Comptabilite | Aucune | button | sélection |
-| App.jsx:31440 | Comptabilite | Relier un achat | button | — |
-| App.jsx:31441 | Comptabilite | [calculé] | button | — |
-| App.jsx:31442 | Comptabilite | Passeport de la paire | button | — |
-| App.jsx:31443 | Comptabilite | Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted) | button | — |
-| App.jsx:31454 | Comptabilite | [nom calculé] | button | — |
-| App.jsx:31584 | Comptabilite | ↻ Actualiser | button | — |
-| App.jsx:31587 | Comptabilite | Toutes [calculé] | button | sélection |
-| App.jsx:31588 | Comptabilite | Non lues [calculé] | button | sélection |
-| App.jsx:31622 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
-| App.jsx:31638 | Comptabilite | Voir plus — [calculé] affichées sur [calculé] | button | — |
-| App.jsx:31648 | Comptabilite | [calculé] | button | — |
-| App.jsx:31653 | Comptabilite | Copier ce message | button | — |
-| App.jsx:31656 | Comptabilite | Modifier | button | — |
-| App.jsx:31657 | Comptabilite | Supprimer | button | — |
-| App.jsx:31662 | Comptabilite | ＋ Ajouter | button | — |
-| App.jsx:31733 | Comptabilite | Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF | button | désactivé |
-| App.jsx:31758 | Comptabilite | [calculé] | button | sélection |
-| App.jsx:31818 | Comptabilite | Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau | button | — |
-| App.jsx:31850 | Comptabilite | 📄 Tamponner [calculé] | button | — |
-| App.jsx:31924 | Comptabilite | [calculé] les [calculé] colis marqué [calculé] « posté [calculé] » — ils disparaissent seuls quand Vinted confirme l'envoi | button | — |
-| App.jsx:32044 | Comptabilite | [calculé] | button | — |
-| App.jsx:32079 | Comptabilite | choisir | button | — |
-| App.jsx:32083 | Comptabilite | Masquer | button | — |
-| App.jsx:32093 | Comptabilite | [nom calculé] | button | — |
-| App.jsx:32127 | Comptabilite | J'ai déjà téléchargé le PDF : le tamponner avec le numéro | button | — |
-| App.jsx:32130 | Comptabilite | Relier ce bordereau à une paire numérotée | button | — |
-| App.jsx:32136 | Comptabilite | Poser le numéro de boîte de cette paire | button | — |
-| App.jsx:32145 | Comptabilite | [nom calculé] | button | — |
-| App.jsx:32153 | Comptabilite | [nom calculé] | button | — |
-| App.jsx:32234 | Comptabilite | [calculé] | button | — |
-| App.jsx:32251 | Comptabilite | 🖨 Réimprimer | button | — |
-| App.jsx:32283 | Comptabilite | Fermer | button | — |
-| App.jsx:32305 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
-| App.jsx:32356 | Comptabilite | Fermer | button | — |
-| App.jsx:32364 | Comptabilite | Chercher | button | — |
-| App.jsx:32369 | Comptabilite | [calculé] [calculé] | button | — |
-| App.jsx:32382 | Comptabilite | 📍 [calculé] [calculé] Ajouter | button | — |
-| App.jsx:32410 | Comptabilite | ✋ Le N° n'est pas au bon endroit ? Le déplacer | button | — |
-| App.jsx:32427 | Comptabilite | Fermer | button | — |
-| App.jsx:32440 | Comptabilite | Fermer | button | — |
-| App.jsx:32536 | Comptabilite | Justificatif d'achat | button | — |
-| App.jsx:32549 | Comptabilite | ⬇️ Télécharger | button | — |
-| App.jsx:32564 | Comptabilite | ⬇️ CSV (registre détaillé) | button | — |
-| App.jsx:32565 | Comptabilite | 📄 PDF | button | — |
-| App.jsx:32580 | Comptabilite | Fermer | button | — |
-| App.jsx:32626 | Comptabilite | [calculé] | button | — |
-| App.jsx:32633 | Comptabilite | [calculé] | button | — |
-| App.jsx:32648 | Comptabilite | Fermer | button | — |
-| App.jsx:32689 | Comptabilite | Retour | button | — |
-| App.jsx:32691 | Comptabilite | Imprimer / PDF | button | — |
-| App.jsx:32733 | Comptabilite | Fermer | button | — |
-| App.jsx:32816 | Comptabilite | Fermer | button | — |
-| App.jsx:32878 | Comptabilite | Fermer | button | — |
-| App.jsx:32929 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
-| App.jsx:32959 | Comptabilite | Fermer | button | — |
-| App.jsx:32979 | Comptabilite | [calculé] | button | désactivé |
-| App.jsx:32996 | Comptabilite | [calculé] | button | — |
-| App.jsx:33001 | Comptabilite | [calculé] | button | — |
-| App.jsx:33021 | Comptabilite | Fermer | button | — |
-| App.jsx:33030 | Comptabilite | [calculé] ▾ | button | — |
-| App.jsx:33037 | Comptabilite | Année précédente | button | — |
-| App.jsx:33039 | Comptabilite | Année suivante | button | désactivé |
-| App.jsx:33049 | Comptabilite | [calculé] [calculé] | button | désactivé |
-| App.jsx:33146 | Comptabilite | retirer | button | — |
-| App.jsx:33172 | Comptabilite | Enregistrer | button | — |
-| App.jsx:33173 | Comptabilite | Annuler | button | — |
-| App.jsx:33180 | Comptabilite | J'ai déclaré ce mois | button | désactivé |
-| App.jsx:33270 | Comptabilite | Justificatif d'achat | button | — |
-| App.jsx:33276 | Comptabilite | ⬇️ CSV | button | — |
-| App.jsx:33277 | Comptabilite | 📄 PDF | button | — |
-| App.jsx:33304 | Comptabilite | × | button | — |
-| App.jsx:33309 | Comptabilite | ✕ Retirer le lien actuel (N° [calculé] ) | button | — |
-| App.jsx:33312 | Comptabilite | [calculé] N° [calculé] [calculé] [calculé] | button | — |
-| App.jsx:33344 | Comptabilite | × | button | — |
-| App.jsx:33478 | Comptabilite | [calculé] | button | — |
-| App.jsx:33492 | Comptabilite | Fermer | button | — |
-| App.jsx:33516 | Comptabilite | ✓ Tout retiré | button | — |
-| App.jsx:33517 | Comptabilite | × | button | — |
-| App.jsx:33537 | Comptabilite | J'ai retiré ce colis | button | — |
-| App.jsx:33555 | Comptabilite | × | button | — |
-| App.jsx:33641 | Comptabilite | Annuler | button | — |
-| App.jsx:33642 | Comptabilite | Renuméroter [calculé] paire [calculé] | button | — |
-| App.jsx:33686 | Comptabilite | Fermer | button | — |
-| App.jsx:33715 | Comptabilite | 📋 Copier la liste (pour l'imprimer) | button | — |
-| App.jsx:33758 | Comptabilite | × | button | — |
-| App.jsx:33790 | Comptabilite | × | button | — |
-| App.jsx:33799 | Comptabilite | [calculé] | button | — |
-| App.jsx:33809 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
-| App.jsx:33821 | Comptabilite | Appliquer | button | désactivé |
-| App.jsx:33842 | Comptabilite | Annuler | button | — |
-| App.jsx:33843 | Comptabilite | Enregistrer | button | — |
-| App.jsx:33866 | Comptabilite | × | button | — |
-| App.jsx:33949 | Comptabilite | Fermer | button | — |
-| App.jsx:33959 | Comptabilite | Annuler | button | — |
-| App.jsx:33960 | Comptabilite | Fermer | button | — |
-| App.jsx:34561 | LbcRelier | Relier | button | — |
-| App.jsx:34570 | LbcRelier | [nom calculé] | button | — |
-| App.jsx:34599 | QuotaLbc | [calculé] | button | — |
-| App.jsx:34608 | QuotaLbc | Enregistrer | button | — |
-| App.jsx:34980 | LeboncoinScreen | [calculé] | button | — |
-| App.jsx:35260 | LeboncoinScreen | Tu l'as déjà publiée toi-même : elle sort de la file | button | — |
-| App.jsx:35532 | PushPrefsSetting | [nom calculé] | button | désactivé |
-| App.jsx:35551 | SettingsScreen | [calculé] [calculé] [calculé] | button | — |
-| App.jsx:35609 | SettingsScreen | Annuler | button | — |
-| App.jsx:35610 | SettingsScreen | [calculé] | button | désactivé |
-| App.jsx:35648 | SettingsScreen | [calculé] | button | — |
-| App.jsx:35682 | SettingsScreen | Aller à l'écran de connexion | button | — |
-| App.jsx:35713 | SettingsScreen | Utiliser | button | — |
-| App.jsx:35777 | SettingsScreen | Choisir une image | button | — |
-| App.jsx:35782 | SettingsScreen | Remettre celle de VRM | button | — |
-| App.jsx:35807 | SettingsScreen | Copier l'adresse | button | — |
-| App.jsx:35866 | SettingsScreen | [calculé] | button | — |
-| App.jsx:36051 | FermerCompte | Fermer mon compte Efface tes données et ton compte VRM, définitivement. [calculé] | button | ouvert/fermé |
-| App.jsx:36089 | FermerCompte | [calculé] | button | désactivé |
-| App.jsx:36226 | MonAbonnement | [calculé] | button | désactivé |
-| App.jsx:36228 | MonAbonnement | [calculé] | button | désactivé |
-| App.jsx:36229 | MonAbonnement | [calculé] | button | désactivé |
-| App.jsx:36244 | MonAbonnement | [calculé] | button | désactivé |
-| App.jsx:36268 | MonAbonnement | [calculé] | button | désactivé |
-| App.jsx:36377 | AbonnementRequis | [calculé] | button | désactivé |
-| App.jsx:36384 | AbonnementRequis | Se déconnecter | button | — |
-| App.jsx:36467 | NumerosSetting | Chiffres · 1, 2, 3… | button | — |
-| App.jsx:36468 | NumerosSetting | Avec une lettre · [calculé] 1, [calculé] 2… | button | — |
-| App.jsx:36577 | RepondreSetting | Répondre automatiquement aux messages Vinted | button | sélection |
-| App.jsx:36680 | DetourageSetting | [calculé] | button | désactivé, sélection |
-| App.jsx:36740 | ZoomSetting | [calculé] | button | sélection |
-| App.jsx:36815 | ProFactureSetting | [calculé] | button | — |
-| App.jsx:36839 | ProFactureSetting | Retirer | button | — |
-| App.jsx:36873 | ProFactureSetting | [calculé] | button | — |
-| App.jsx:37128 | PushSetting | [calculé] | button | désactivé |
-| App.jsx:37132 | PushSetting | Tester | button | — |
-| App.jsx:37133 | PushSetting | Désactiver | button | — |
-| App.jsx:37175 | module | Réessayer | button | — |
-| App.jsx:37177 | module | 📋 Copier l'erreur | button | — |
-| App.jsx:37179 | module | Recharger l'app | button | — |
-| App.jsx:37314 | SecuriteSetting | [calculé] | button | — |
-| App.jsx:37665 | EmailsSetting | [nom calculé] | button | — |
-| App.jsx:37703 | EmailsSetting | [nom calculé] | button | — |
-| App.jsx:37708 | EmailsSetting | Les ajouter toutes ( [calculé] ) | button | — |
-| App.jsx:37715 | EmailsSetting | + Ajouter une adresse | button | désactivé |
-| App.jsx:37730 | EmailsSetting | [calculé] | button | désactivé |
-| App.jsx:37739 | EmailsSetting | [calculé] | button | désactivé |
-| App.jsx:37908 | ConnexionsSetting | Vide le cache et recharge la dernière version | button | — |
-| App.jsx:37959 | EcranMasques | [calculé] | button | sélection |
-| App.jsx:37982 | EcranMasques | Réafficher | button | — |
-| App.jsx:38023 | RegimeSetting | [calculé] [calculé] [calculé] | button | — |
-| App.jsx:39786 | AppCoeur | Voir la synchronisation | button | — |
-| App.jsx:39807 | AppCoeur | [nom calculé] | button | — |
-| App.jsx:39811 | AppCoeur | [nom calculé] | button | — |
-| App.jsx:39833 | AppCoeur | Rechercher une paire | button | — |
-| App.jsx:39837 | AppCoeur | Ouvrir les messages Vinted | button | — |
-| App.jsx:39838 | AppCoeur | Ouvrir les paramètres | button | — |
-| App.jsx:39879 | AppCoeur | Fermer la recherche | button | — |
-| App.jsx:39887 | AppCoeur | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] › | button | — |
-| App.jsx:39906 | AppCoeur | [calculé] [calculé] [calculé] [calculé] › | button | — |
-| App.jsx:39918 | AppCoeur | [calculé] [calculé] [calculé] [calculé] › | button | — |
-| App.jsx:39940 | AppCoeur | [calculé] [calculé] › | button | — |
-| App.jsx:39958 | AppCoeur | × | button | — |
-| App.jsx:39970 | AppCoeur | × | button | — |
+| App.jsx:30077 | Comptabilite | J’ai retiré ce colis | button | — |
+| App.jsx:30256 | Comptabilite | J’ai retiré ce colis | button | — |
+| App.jsx:30282 | Comptabilite | Afficher le QR de retrait en grand | button | — |
+| App.jsx:30293 | Comptabilite | Annuler | button | — |
+| App.jsx:30323 | Comptabilite | Afficher le QR de retrait en grand | button | — |
+| App.jsx:30334 | Comptabilite | Annuler | button | — |
+| App.jsx:30391 | Comptabilite | Afficher le QR de retrait en grand | button | — |
+| App.jsx:30397 | Comptabilite | Je l'avais récupéré | button | — |
+| App.jsx:30478 | Comptabilite | Achats hors Vinted [calculé] › | button | — |
+| App.jsx:30516 | Comptabilite | [calculé] | button | — |
+| App.jsx:30541 | Comptabilite | [calculé] | button | désactivé |
+| App.jsx:30556 | Comptabilite | Modifier | button | — |
+| App.jsx:30557 | Comptabilite | Supprimer | button | — |
+| App.jsx:30651 | Comptabilite | Note interne | button | — |
+| App.jsx:30656 | Comptabilite | Code de retrait | button | — |
+| App.jsx:30658 | Comptabilite | Actions rapides | button | — |
+| App.jsx:30662 | Comptabilite | Copier le prix payé (pour le numérotage) | button | — |
+| App.jsx:30663 | Comptabilite | [calculé] | button | — |
+| App.jsx:30664 | Comptabilite | [calculé] | button | — |
+| App.jsx:30665 | Comptabilite | Attestation de remboursement | button | — |
+| App.jsx:30666 | Comptabilite | Étiquette N° [calculé] | button | — |
+| App.jsx:30668 | Comptabilite | Masquer cet achat | button | — |
+| App.jsx:30681 | Comptabilite | Voir plus — [calculé] affichés sur [calculé] | button | — |
+| App.jsx:30697 | Comptabilite | Effacer la recherche d’annonces | button | — |
+| App.jsx:30716 | Comptabilite | Outils : répartir un lot, audit du stock | button | ouvert/fermé |
+| App.jsx:30739 | Comptabilite | [calculé] [calculé] [calculé] | button | — |
+| App.jsx:30753 | Comptabilite | Tout le stock | button | sélection |
+| App.jsx:30754 | Comptabilite | Sans numéro | button | sélection |
+| App.jsx:30755 | Comptabilite | À relancer | button | sélection |
+| App.jsx:30759 | Comptabilite | Réinitialiser les annonces | button | — |
+| App.jsx:30812 | Comptabilite | → N° [calculé] | button | — |
+| App.jsx:30866 | Comptabilite | Gérer les comptes → | button | — |
+| App.jsx:30925 | Comptabilite | Remettre N° [calculé] | button | — |
+| App.jsx:30951 | Comptabilite | [calculé] qui dorment [calculé] | button | — |
+| App.jsx:30952 | Comptabilite | Prix conseillé + titre & description prêts à coller | button | — |
+| App.jsx:30968 | Comptabilite | Conseils & signalements [calculé] › | button | — |
+| App.jsx:30983 | Comptabilite | [calculé] paire [calculé] qui te revien [calculé] [calculé] [calculé] | button | — |
+| App.jsx:31017 | Comptabilite | Copier le numéro | button | — |
+| App.jsx:31018 | Comptabilite | [nom calculé] | button | — |
+| App.jsx:31019 | Comptabilite | Masquer | button | — |
+| App.jsx:31046 | Comptabilite | [calculé] annonce [calculé] disparue [calculé] sans vente Plus en ligne, et aucune vente correspondante. Masquées par Vinted, ou retirées. [calculé] | button | — |
+| App.jsx:31065 | Comptabilite | La paire n'est plus à vendre : on libère son numéro pour une autre paire. | button | — |
+| App.jsx:31092 | Comptabilite | Déconnecter | button | — |
+| App.jsx:31101 | Comptabilite | [calculé] | button | — |
+| App.jsx:31108 | Comptabilite | ↺ annuler | button | — |
+| App.jsx:31113 | Comptabilite | Voir → | button | — |
+| App.jsx:31127 | Comptabilite | 🏷️ Repricing — [calculé] paire [calculé] à baisser Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat [calculé] | button | — |
+| App.jsx:31174 | Comptabilite | [calculé] | button | désactivé |
+| App.jsx:31324 | Comptabilite | Toutes | button | sélection |
+| App.jsx:31326 | Comptabilite | Aucune | button | sélection |
+| App.jsx:31434 | Comptabilite | Relier un achat | button | — |
+| App.jsx:31435 | Comptabilite | [calculé] | button | — |
+| App.jsx:31436 | Comptabilite | Passeport de la paire | button | — |
+| App.jsx:31437 | Comptabilite | Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted) | button | — |
+| App.jsx:31448 | Comptabilite | [nom calculé] | button | — |
+| App.jsx:31578 | Comptabilite | ↻ Actualiser | button | — |
+| App.jsx:31581 | Comptabilite | Toutes [calculé] | button | sélection |
+| App.jsx:31582 | Comptabilite | Non lues [calculé] | button | sélection |
+| App.jsx:31616 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
+| App.jsx:31632 | Comptabilite | Voir plus — [calculé] affichées sur [calculé] | button | — |
+| App.jsx:31642 | Comptabilite | [calculé] | button | — |
+| App.jsx:31647 | Comptabilite | Copier ce message | button | — |
+| App.jsx:31650 | Comptabilite | Modifier | button | — |
+| App.jsx:31651 | Comptabilite | Supprimer | button | — |
+| App.jsx:31656 | Comptabilite | ＋ Ajouter | button | — |
+| App.jsx:31727 | Comptabilite | Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF | button | désactivé |
+| App.jsx:31752 | Comptabilite | [calculé] | button | sélection |
+| App.jsx:31812 | Comptabilite | Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau | button | — |
+| App.jsx:31844 | Comptabilite | 📄 Tamponner [calculé] | button | — |
+| App.jsx:31918 | Comptabilite | [calculé] les [calculé] colis marqué [calculé] « posté [calculé] » — ils disparaissent seuls quand Vinted confirme l'envoi | button | — |
+| App.jsx:32038 | Comptabilite | [calculé] | button | — |
+| App.jsx:32073 | Comptabilite | choisir | button | — |
+| App.jsx:32077 | Comptabilite | Masquer | button | — |
+| App.jsx:32087 | Comptabilite | [nom calculé] | button | — |
+| App.jsx:32121 | Comptabilite | J'ai déjà téléchargé le PDF : le tamponner avec le numéro | button | — |
+| App.jsx:32124 | Comptabilite | Relier ce bordereau à une paire numérotée | button | — |
+| App.jsx:32130 | Comptabilite | Poser le numéro de boîte de cette paire | button | — |
+| App.jsx:32139 | Comptabilite | [nom calculé] | button | — |
+| App.jsx:32147 | Comptabilite | [nom calculé] | button | — |
+| App.jsx:32228 | Comptabilite | [calculé] | button | — |
+| App.jsx:32245 | Comptabilite | 🖨 Réimprimer | button | — |
+| App.jsx:32277 | Comptabilite | Fermer | button | — |
+| App.jsx:32299 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
+| App.jsx:32350 | Comptabilite | Fermer | button | — |
+| App.jsx:32358 | Comptabilite | Chercher | button | — |
+| App.jsx:32363 | Comptabilite | [calculé] [calculé] | button | — |
+| App.jsx:32376 | Comptabilite | 📍 [calculé] [calculé] Ajouter | button | — |
+| App.jsx:32404 | Comptabilite | ✋ Le N° n'est pas au bon endroit ? Le déplacer | button | — |
+| App.jsx:32421 | Comptabilite | Fermer | button | — |
+| App.jsx:32434 | Comptabilite | Fermer | button | — |
+| App.jsx:32530 | Comptabilite | Justificatif d'achat | button | — |
+| App.jsx:32543 | Comptabilite | ⬇️ Télécharger | button | — |
+| App.jsx:32558 | Comptabilite | ⬇️ CSV (registre détaillé) | button | — |
+| App.jsx:32559 | Comptabilite | 📄 PDF | button | — |
+| App.jsx:32574 | Comptabilite | Fermer | button | — |
+| App.jsx:32620 | Comptabilite | [calculé] | button | — |
+| App.jsx:32627 | Comptabilite | [calculé] | button | — |
+| App.jsx:32642 | Comptabilite | Fermer | button | — |
+| App.jsx:32683 | Comptabilite | Retour | button | — |
+| App.jsx:32685 | Comptabilite | Imprimer / PDF | button | — |
+| App.jsx:32727 | Comptabilite | Fermer | button | — |
+| App.jsx:32810 | Comptabilite | Fermer | button | — |
+| App.jsx:32872 | Comptabilite | Fermer | button | — |
+| App.jsx:32923 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
+| App.jsx:32953 | Comptabilite | Fermer | button | — |
+| App.jsx:32973 | Comptabilite | [calculé] | button | désactivé |
+| App.jsx:32990 | Comptabilite | [calculé] | button | — |
+| App.jsx:32995 | Comptabilite | [calculé] | button | — |
+| App.jsx:33015 | Comptabilite | Fermer | button | — |
+| App.jsx:33024 | Comptabilite | [calculé] ▾ | button | — |
+| App.jsx:33031 | Comptabilite | Année précédente | button | — |
+| App.jsx:33033 | Comptabilite | Année suivante | button | désactivé |
+| App.jsx:33043 | Comptabilite | [calculé] [calculé] | button | désactivé |
+| App.jsx:33140 | Comptabilite | retirer | button | — |
+| App.jsx:33166 | Comptabilite | Enregistrer | button | — |
+| App.jsx:33167 | Comptabilite | Annuler | button | — |
+| App.jsx:33174 | Comptabilite | J'ai déclaré ce mois | button | désactivé |
+| App.jsx:33264 | Comptabilite | Justificatif d'achat | button | — |
+| App.jsx:33270 | Comptabilite | ⬇️ CSV | button | — |
+| App.jsx:33271 | Comptabilite | 📄 PDF | button | — |
+| App.jsx:33298 | Comptabilite | × | button | — |
+| App.jsx:33303 | Comptabilite | ✕ Retirer le lien actuel (N° [calculé] ) | button | — |
+| App.jsx:33306 | Comptabilite | [calculé] N° [calculé] [calculé] [calculé] | button | — |
+| App.jsx:33338 | Comptabilite | × | button | — |
+| App.jsx:33472 | Comptabilite | [calculé] | button | — |
+| App.jsx:33486 | Comptabilite | Fermer | button | — |
+| App.jsx:33510 | Comptabilite | ✓ Tout retiré | button | — |
+| App.jsx:33511 | Comptabilite | × | button | — |
+| App.jsx:33531 | Comptabilite | J'ai retiré ce colis | button | — |
+| App.jsx:33549 | Comptabilite | × | button | — |
+| App.jsx:33635 | Comptabilite | Annuler | button | — |
+| App.jsx:33636 | Comptabilite | Renuméroter [calculé] paire [calculé] | button | — |
+| App.jsx:33680 | Comptabilite | Fermer | button | — |
+| App.jsx:33709 | Comptabilite | 📋 Copier la liste (pour l'imprimer) | button | — |
+| App.jsx:33752 | Comptabilite | × | button | — |
+| App.jsx:33784 | Comptabilite | × | button | — |
+| App.jsx:33793 | Comptabilite | [calculé] | button | — |
+| App.jsx:33803 | Comptabilite | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] | button | — |
+| App.jsx:33815 | Comptabilite | Appliquer | button | désactivé |
+| App.jsx:33836 | Comptabilite | Annuler | button | — |
+| App.jsx:33837 | Comptabilite | Enregistrer | button | — |
+| App.jsx:33860 | Comptabilite | × | button | — |
+| App.jsx:33943 | Comptabilite | Fermer | button | — |
+| App.jsx:33953 | Comptabilite | Annuler | button | — |
+| App.jsx:33954 | Comptabilite | Fermer | button | — |
+| App.jsx:34555 | LbcRelier | Relier | button | — |
+| App.jsx:34564 | LbcRelier | [nom calculé] | button | — |
+| App.jsx:34593 | QuotaLbc | [calculé] | button | — |
+| App.jsx:34602 | QuotaLbc | Enregistrer | button | — |
+| App.jsx:34974 | LeboncoinScreen | [calculé] | button | — |
+| App.jsx:35254 | LeboncoinScreen | Tu l'as déjà publiée toi-même : elle sort de la file | button | — |
+| App.jsx:35526 | PushPrefsSetting | [nom calculé] | button | désactivé |
+| App.jsx:35545 | SettingsScreen | [calculé] [calculé] [calculé] | button | — |
+| App.jsx:35603 | SettingsScreen | Annuler | button | — |
+| App.jsx:35604 | SettingsScreen | [calculé] | button | désactivé |
+| App.jsx:35642 | SettingsScreen | [calculé] | button | — |
+| App.jsx:35676 | SettingsScreen | Aller à l'écran de connexion | button | — |
+| App.jsx:35707 | SettingsScreen | Utiliser | button | — |
+| App.jsx:35771 | SettingsScreen | Choisir une image | button | — |
+| App.jsx:35776 | SettingsScreen | Remettre celle de VRM | button | — |
+| App.jsx:35801 | SettingsScreen | Copier l'adresse | button | — |
+| App.jsx:35860 | SettingsScreen | [calculé] | button | — |
+| App.jsx:36045 | FermerCompte | Fermer mon compte Efface tes données et ton compte VRM, définitivement. [calculé] | button | ouvert/fermé |
+| App.jsx:36083 | FermerCompte | [calculé] | button | désactivé |
+| App.jsx:36220 | MonAbonnement | [calculé] | button | désactivé |
+| App.jsx:36222 | MonAbonnement | [calculé] | button | désactivé |
+| App.jsx:36223 | MonAbonnement | [calculé] | button | désactivé |
+| App.jsx:36238 | MonAbonnement | [calculé] | button | désactivé |
+| App.jsx:36262 | MonAbonnement | [calculé] | button | désactivé |
+| App.jsx:36371 | AbonnementRequis | [calculé] | button | désactivé |
+| App.jsx:36378 | AbonnementRequis | Se déconnecter | button | — |
+| App.jsx:36461 | NumerosSetting | Chiffres · 1, 2, 3… | button | — |
+| App.jsx:36462 | NumerosSetting | Avec une lettre · [calculé] 1, [calculé] 2… | button | — |
+| App.jsx:36571 | RepondreSetting | Répondre automatiquement aux messages Vinted | button | sélection |
+| App.jsx:36674 | DetourageSetting | [calculé] | button | désactivé, sélection |
+| App.jsx:36734 | ZoomSetting | [calculé] | button | sélection |
+| App.jsx:36809 | ProFactureSetting | [calculé] | button | — |
+| App.jsx:36833 | ProFactureSetting | Retirer | button | — |
+| App.jsx:36867 | ProFactureSetting | [calculé] | button | — |
+| App.jsx:37122 | PushSetting | [calculé] | button | désactivé |
+| App.jsx:37126 | PushSetting | Tester | button | — |
+| App.jsx:37127 | PushSetting | Désactiver | button | — |
+| App.jsx:37169 | module | Réessayer | button | — |
+| App.jsx:37171 | module | 📋 Copier l'erreur | button | — |
+| App.jsx:37173 | module | Recharger l'app | button | — |
+| App.jsx:37308 | SecuriteSetting | [calculé] | button | — |
+| App.jsx:37659 | EmailsSetting | [nom calculé] | button | — |
+| App.jsx:37697 | EmailsSetting | [nom calculé] | button | — |
+| App.jsx:37702 | EmailsSetting | Les ajouter toutes ( [calculé] ) | button | — |
+| App.jsx:37709 | EmailsSetting | + Ajouter une adresse | button | désactivé |
+| App.jsx:37724 | EmailsSetting | [calculé] | button | désactivé |
+| App.jsx:37733 | EmailsSetting | [calculé] | button | désactivé |
+| App.jsx:37902 | ConnexionsSetting | Vide le cache et recharge la dernière version | button | — |
+| App.jsx:37953 | EcranMasques | [calculé] | button | sélection |
+| App.jsx:37976 | EcranMasques | Réafficher | button | — |
+| App.jsx:38017 | RegimeSetting | [calculé] [calculé] [calculé] | button | — |
+| App.jsx:39780 | AppCoeur | Voir la synchronisation | button | — |
+| App.jsx:39801 | AppCoeur | [nom calculé] | button | — |
+| App.jsx:39805 | AppCoeur | [nom calculé] | button | — |
+| App.jsx:39827 | AppCoeur | Rechercher une paire | button | — |
+| App.jsx:39831 | AppCoeur | Ouvrir les messages Vinted | button | — |
+| App.jsx:39832 | AppCoeur | Ouvrir les paramètres | button | — |
+| App.jsx:39873 | AppCoeur | Fermer la recherche | button | — |
+| App.jsx:39881 | AppCoeur | [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] [calculé] › | button | — |
+| App.jsx:39900 | AppCoeur | [calculé] [calculé] [calculé] [calculé] › | button | — |
+| App.jsx:39912 | AppCoeur | [calculé] [calculé] [calculé] [calculé] › | button | — |
+| App.jsx:39934 | AppCoeur | [calculé] [calculé] › | button | — |
+| App.jsx:39952 | AppCoeur | × | button | — |
+| App.jsx:39964 | AppCoeur | × | button | — |
 | Room3D.jsx:1157 | Room3D | Changer l'ambiance | button | — |
 | Room3D.jsx:1162 | Room3D | [calculé] [calculé] | button | — |
 | Room3D.jsx:1183 | Room3D | Voir toute la pièce | button | — |
