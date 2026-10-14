@@ -1,3 +1,4 @@
+import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
@@ -13028,7 +13029,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
   if (!orders.length && !cible) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
-  const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c==='EUR'?'€':c || '');
+  const euro = formaterMontantEbay;
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   const visibles=orders.filter(o=>{
     if(cible)return String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte;
