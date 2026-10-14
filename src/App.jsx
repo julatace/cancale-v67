@@ -369,6 +369,7 @@ const MULTI_USER = true;
 // prouve qui tu es (valable ~1 h) + un jeton de renouvellement pour en
 // obtenir un nouveau sans redemander le mot de passe.
 const SESSION_KEY = 'vrm_session';
+const vuesSession = new Map();
 let AUTH = { session: null, user: null, ready: !MULTI_USER };
 let _authListeners = [];
 const onAuthChange = (fn) => { _authListeners.push(fn); return () => { _authListeners = _authListeners.filter(f => f !== fn); }; };
@@ -376,6 +377,7 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
+  if (!s || (s.user?.id && s.user.id !== readSession()?.user?.id)) vuesSession.clear();
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
@@ -10711,6 +10713,42 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
 // Vignette d'une vente : l'image si l'extension l'a captée, sinon un cadre neutre
 // qui RÉSERVE la place (jamais un trou, jamais une fausse image). Si le lien a
 // expiré, on retombe sur le cadre — la carte le constate elle-même.
+// Préférences temporaires, isolées par vendeur et effacées à la déconnexion.
+function useVueSession(nom, initial) {
+  const cle=`${readSession()?.user?.id || 'local'}:${nom}`;
+  const [etat,setEtat]=useState(()=>({cle,valeur:vuesSession.has(cle)?vuesSession.get(cle):initial}));
+  const valeur=etat.cle===cle?etat.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
+  const changer=next=>setEtat(prev=>{
+    const ancien=prev.cle===cle?prev.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
+    const nouveau=typeof next==='function'?next(ancien):next;
+    vuesSession.set(cle,nouveau);
+    return {cle,valeur:nouveau};
+  });
+  return [valeur,changer];
+}
+
+function PhotoArticleAgrandissable({src,titre,children}) {
+  const url=photoArticle({photo:src});
+  const [ouverte,setOuverte]=useState(false);
+  const [affichee,setAffichee]=useState('');
+  const bouton=React.useRef(null),fermer=React.useRef(null);
+  React.useEffect(()=>{
+    if(!ouverte) return;
+    fermer.current?.focus();
+    return ()=>bouton.current?.focus();
+  },[ouverte]);
+  if(!url) return children;
+  return <>
+    <button ref={bouton} type="button" className="vrm-photo-open" aria-label={`Agrandir la photo de ${titre || 'cet article'}`} onClick={()=>{ const image=bouton.current?.querySelector('img'); setAffichee(image?.complete&&image.naturalWidth>0?image.currentSrc:url);setOuverte(true); }}>{children}<span aria-hidden="true"><Icon name="search" size={12}/></span></button>
+    {ouverte && createPortal(<div className="vrm-photo-viewer" onClick={()=>setOuverte(false)} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOuverte(false);}if(e.key==='Tab'){e.preventDefault();fermer.current?.focus();}}}>
+      <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" onClick={e=>e.stopPropagation()}>
+        <div><span>{titre || 'Photo de l’article'}</span><button ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
+        <PhotoVinted src={affichee || url} alt={titre || 'Article'} style={{width:'100%',height:'100%',objectFit:'contain',minHeight:0}}/>
+      </div>
+    </div>,document.body)}
+  </>;
+}
+
 function PhotoVente({ src, size = 64, portrait = false }) {
   const url = photoArticle({ photo:src });
   const [secours, setSecours] = React.useState(null);
@@ -10733,7 +10771,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false })
 function LigneVente({ photo, titre, meta, montant, actions }) {
   return <article className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-      <div className="vrm-sale-photo"><PhotoVente src={photo} size={64} portrait/></div>
+      <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
         <div className="vrm-sale-title" style={{fontSize:14,fontWeight:600,lineHeight:1.3,color:C.text}}>{titre || '(sans titre)'}</div>
         <div className="vrm-sale-meta" style={{fontSize:11.5,color:C.muted,marginTop:4}}>{meta}</div>
@@ -23096,8 +23134,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const toggleHidden = (tid) => {
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
-  const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
-  const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
+  const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
+  const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // Répartiteur de lot : ventile le prix d'un achat groupé sur plusieurs paires.
   const [lotOpen, setLotOpen] = useState(false);
   const [lotTotal, setLotTotal] = useState('');
@@ -23129,7 +23167,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
   const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
   const [showLikers, setShowLikers] = useState(false); // panneau relance des likers
-  const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
+  const [ordSearch, setOrdSearch] = useVueSession('commandes-recherche', ''); // recherche ventes/achats (titre/N°/pseudo)
   // ⚠️ MESURÉ LE 7 SEPTEMBRE, sur ses vraies données : l'écran Ventes rend
   // **287 cartes et 8 840 nœuds** d'un coup. Chaque frappe dans la recherche
   // les refiltrait toutes — **293 ms par lettre sur ordinateur, 179 ms sur
@@ -23140,7 +23178,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // frappe. Aucun changement de comportement : la même liste, au même moment,
   // à un souffle près.
   const ordSearchDiff = React.useDeferredValue(ordSearch);
-  const [periode, setPeriode] = useState(null); // filtre de période (ventes + achats)
+  const [periode, setPeriode] = useVueSession('commandes-periode', null); // filtre de période (ventes + achats)
   const [pickerFor, setPickerFor] = useState(null);
   // Recherche dans le sélecteur d'achat : avec ~700 achats, si la suggestion
   // n'est pas la bonne il n'y avait que le défilement.
@@ -23307,10 +23345,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </div>
     );
   };
-  const [vFilter, setVFilter] = useState('all'); // aexpedier | transit | finalisees | annulees | all (encours : ancien lien)
+  const [vFilter, setVFilter] = useVueSession('ventes-filtre', 'all'); // aexpedier | transit | finalisees | annulees | all (encours : ancien lien)
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
-  const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
+  const [aFilter, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | recus | all
   // ⚠️ UNE IMAGE MORTE (QR OU PHOTO) DOIT LAISSER SA PLACE — et le repli doit vivre dans
   // l'ÉTAT, pas dans le DOM : poser `style.display='none'` sur le bouton était
   // effacé au premier re-render de React, donc le cadre vide restait à l'écran
@@ -23845,8 +23883,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const conversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
   const chatScroll=React.useRef(null);
-  const [messageSearch,setMessageSearch]=useState('');
-  const [messageFilter,setMessageFilter]=useState('all');
+  const [messageSearch,setMessageSearch]=useVueSession('messages-recherche', '');
+  const [messageFilter,setMessageFilter]=useVueSession('messages-filtre', 'all');
   useEffect(()=>{if(chatScroll.current)chatScroll.current.scrollTop=chatScroll.current.scrollHeight;},[openConv?.messages?.length]);
   useEffect(()=>{if(!openConv)return;const onKey=e=>{if(e.key==='Escape'){e.preventDefault();setOpenConv(null);}};document.addEventListener('keydown',onKey);return()=>{document.removeEventListener('keydown',onKey);conversationOrigin.current?.focus?.();};},[openConv?.request]);
   const [replyText, setReplyText] = useState('');
@@ -28861,8 +28899,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         {sales.items && sales.items.length>0 && (
           <div style={{marginBottom:14}}>
-            <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, acheteur)…"
+            <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, acheteur…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
+            {ordSearch && <button type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
+            {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
+              <span>Filtres actifs</span><button type="button" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</button>
+            </div>}
           </div>
         )}
         <NoAcc/>
@@ -29476,7 +29518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
@@ -30657,10 +30699,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <option value="recent">Ordre Vinted</option>
               <option value="price_desc">Prix ↓</option>
               <option value="price_asc">Prix ↑</option>
-              {annStats.hasFav && <option value="favs">Plus de favoris</option>}
-              {annStats.hasView && <option value="views">Plus de vues</option>}
-              {annStats.hasView && <option value="boost">Vues sans favoris</option>}
-              {annStats.sleeping>0 && <option value="sleeping">En ligne depuis longtemps</option>}
+              {(annStats.hasFav || annSort==='favs') && <option value="favs">Plus de favoris</option>}
+              {(annStats.hasView || annSort==='views') && <option value="views">Plus de vues</option>}
+              {(annStats.hasView || annSort==='boost') && <option value="boost">Vues sans favoris</option>}
+              {(annStats.sleeping>0 || annSort==='sleeping') && <option value="sleeping">En ligne depuis longtemps</option>}
               <option value="nonum">Sans numéro</option>
             </select>
             {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
@@ -30703,6 +30745,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>)}
             </div>
           </div>}
+
+        {listings.items?.length>0 && <div className="vrm-stock-views" role="group" aria-label="Vues rapides des annonces">
+          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
+          <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
+          {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+        </div>}
+        {(annSearch.trim() || annSort!=='oldest') && <div className="vrm-filter-recap" role="status">
+          <span>{annShown.length} annonce{annShown.length>1?'s':''} dans cette sélection</span>
+          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
+        </div>}
 
         {/* ⚠️ On DIT ce que le filtre « compte banni » a mis de côté (§ : une
             liste qui rétrécit sans explication se lit comme une perte). Les

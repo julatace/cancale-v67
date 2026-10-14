@@ -84,6 +84,26 @@ async function brancher(p){
    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-desktop.png')});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-390.png')});}
    await p.setViewportSize({width:390,height:844});
   }
+  await p.goto(base+'/?tab=plat_vinted');
+  await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
+  await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
+  await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
+  const navigation=p.getByRole('navigation',{name:'Navigation principale'});
+  await navigation.getByRole('button',{name:'Stock',exact:true}).click();
+  await navigation.getByRole('button',{name:'Ventes',exact:true}).click();
+  check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='Nike', 'recherche de ventes conservée après passage dans le stock');
+  await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();
+  await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===2);
+  check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='', 'réinitialiser retrouve toutes les ventes');
+  await p.goto(base+'/?tab=plat_ebay');
+  const photo=p.getByRole('button',{name:'Agrandir la photo de Paire eBay',exact:true});
+  await photo.click();
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
+  await p.waitForFunction(()=>{const i=document.querySelector('.vrm-photo-panel img');return i&&i.complete&&i.naturalWidth>0;});
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).locator('img').getAttribute('alt')==='Paire eBay', 'image agrandie chargée avec le nom exact de la paire');
+  await p.keyboard.press('Escape');
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).count()===0, 'Échap ferme la photo');
+  check(await photo.evaluate(e=>e===document.activeElement), 'fermeture de photo rend le focus à la miniature');
   rows.push({id:'harvest_111_inbox',data:{capturedAt:maintenant,payload:{conversations:[{id:71,opposite_user:{id:22,login:'Client Vinted'},description:'Paire de test',last_message:'Merci',last_message_at:maintenant}]}}},{id:'harvest_111_conv_71',data:{payload:{conversation:{id:71,opposite_user:{id:22},allow_reply:false,messages:[{entity_type:'message',created_at_ts:1700000000,entity:{user_id:22,body:'Bonjour depuis Vinted'}},{entity_type:'status_message',created_at_ts:1700000001,entity:{title:'Colis disponible',pickup:{pickup_code:456789}}},{entity_type:'message',created_at_ts:1700000002,entity:{user_id:111,body:'Merci pour votre achat'}}]}}}});
   await p.goto(base+'/?tab=plat_vinted');
   const nav=p.getByRole('navigation',{name:'Navigation principale'});

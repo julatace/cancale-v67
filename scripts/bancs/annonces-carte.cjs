@@ -228,6 +228,28 @@ const projette = (row, sel) => {
         dit(s.remiseFavoris, 'G22 : le bloc explique la remise NATIVE (prévient tous les favoris)', s.aBloc ? '' : 'bloc absent');
         dit(!s.a9105, 'G22 : une paire peu suivie (9105, 2 ❤️) n’y est PAS (seuil 3)', s.a9105 ? 'présente à tort' : '');
       } catch (e) { dit(false, 'G22 : le bloc « suivies » se lit', String(e.message).slice(0, 120)); }
+      try {
+        await pg.getByLabel('Rechercher une annonce',{exact:true}).fill('aucun-modele-impossible-123456');
+        await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length===0);
+        dit(await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).isVisible(), 'recherche vide : réinitialisation disponible');
+        await pg.getByLabel('Trier les annonces',{exact:true}).selectOption('price_desc');
+        await pg.getByLabel('Rechercher une annonce',{exact:true}).evaluate(e=>e.blur());
+        const nav=pg.getByRole('navigation',{name:'Navigation principale'});
+        await nav.getByRole('button',{name:'Stock',exact:true}).click();
+        if(vp.width<1024){
+          await nav.getByRole('button',{name:'Plus',exact:true}).click();
+          await pg.getByRole('menuitem',{name:'Annonces',exact:true}).click();
+        } else {
+          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
+          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
+        }
+        dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='aucun-modele-impossible-123456', 'recherche d’annonces conservée après le stock');
+        dit(await pg.getByLabel('Trier les annonces',{exact:true}).inputValue()==='price_desc', 'tri d’annonces conservé après le stock');
+
+        await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).click();
+        await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length>0);
+        dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
+      } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }

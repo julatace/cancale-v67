@@ -397,3 +397,28 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 @media(prefers-reduced-motion:reduce) {
  .vrm-ann-overview > a img, .vrm-sale-row { transition:none; }
 }
+
+/* Les outils quotidiens restent courts et explicites. */
+.vrm-list-search { display:flex; align-items:center; gap:8px; border:1px solid var(--vrm-line); border-radius:10px; background:var(--vrm-surface); padding-left:12px; color:var(--vrm-muted); }
+.vrm-list-search input { flex:1; min-width:0; background:transparent !important; border:0 !important; padding-left:0 !important; }
+.vrm-list-search > button { border:0; background:transparent; color:var(--vrm-muted); width:42px; flex-shrink:0; }
+.vrm-stock-views { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
+.vrm-stock-views button { border:1px solid var(--vrm-line); border-radius:8px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:500 12px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-stock-views button[aria-pressed="true"] { background:var(--vrm-ink); border-color:var(--vrm-ink); color:var(--vrm-bg); }
+.vrm-filter-recap { display:flex; align-items:center; gap:8px; justify-content:space-between; color:var(--vrm-muted); font-size:11px; margin:6px 0 10px; }
+.vrm-filter-recap button { border:0; background:transparent; color:var(--vrm-ink); font:500 11px Inter,system-ui,sans-serif; padding:6px 0; cursor:pointer; }
+.vrm-photo-open { position:relative; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:zoom-in; overflow:hidden; }
+.vrm-photo-open > span:last-child { position:absolute; right:3px; bottom:3px; display:grid; place-items:center; width:19px; height:19px; border-radius:5px; background:#ffffffdd; color:#252521; }
+.vrm-photo-open > img { width:100% !important; height:100% !important; object-fit:cover; }
+.vrm-photo-viewer { position:fixed; inset:0; z-index:1400; background:#121512e8; display:flex; justify-content:center; align-items:center; padding:20px; }
+.vrm-photo-panel { width:min(720px,100%); height:min(820px,90dvh); display:flex; flex-direction:column; gap:14px; color:#fff; }
+.vrm-photo-panel > div:first-child { display:flex; align-items:center; gap:16px; justify-content:space-between; font-size:13px; line-height:1.4; }
+.vrm-photo-panel > div:first-child > span { min-width:0; }
+.vrm-photo-panel button { display:grid; place-items:center; min-width:44px; min-height:44px; border:1px solid #ffffff40; border-radius:10px; color:#fff; background:transparent; cursor:pointer; }
+.vrm-photo-panel > img { flex:1; }
+@media(max-width:767px) {
+ .vrm-photo-viewer { padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); }
+ .vrm-photo-panel { height:100%; }
+ .vrm-main .vrm-photo-open { min-height:0 !important; }
+ .vrm-filter-recap { gap:10px; }
+}
