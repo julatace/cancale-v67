@@ -144,6 +144,8 @@ async function brancher(p){
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'frais de vente sans débordement '+width);}
   await p.setViewportSize({width:390,height:844});
 
+  // Fermer le clavier simulé après saisie et changements de largeur avant de naviguer.
+  await p.evaluate(()=>document.activeElement?.blur());
   const navigation=p.getByRole('navigation',{name:'Navigation principale'});
   await navigation.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
   await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();
@@ -213,6 +215,24 @@ async function brancher(p){
   check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'messages revient à eBay après un passage dans le stock');
   check(writes.length===0,'ouvrir les messages ne transmet rien');
   await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByText('Oui, disponible.',{exact:true}).isVisible(),'historique de réponses visible');
+  check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).getAttribute('aria-modal')==='true','conversation mobile déclarée modale');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow==='hidden'),'page arrière bloquée pendant la conversation');
+  check(await p.getByLabel('Fermer la conversation eBay').evaluate(e=>e===document.activeElement),'focus initial sur fermer sans ouvrir le clavier mobile');
+  await p.setViewportSize({width:1512,height:900});
+  await p.waitForFunction(()=>document.querySelector('[aria-label="Conversation eBay"]')?.getAttribute('aria-modal')!== 'true');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow!=='hidden'),'passage ordinateur libère le défilement');
+  await p.getByLabel('Fermer la conversation eBay').focus();await p.keyboard.press('Shift+Tab');
+  check(await p.getByRole('dialog',{name:'Conversation eBay'}).evaluate(e=>!e.contains(document.activeElement)),'ordinateur conserve le clavier vers la liste');
+  await p.setViewportSize({width:390,height:844});
+  await p.waitForFunction(()=>document.querySelector('[aria-label="Conversation eBay"]')?.getAttribute('aria-modal')==='true');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow==='hidden'),'retour mobile rétablit le défilement bloqué');
+  await p.getByLabel('Fermer la conversation eBay').focus();
+  await p.keyboard.press('Shift+Tab');check(await p.getByLabel('Réponse au message eBay').evaluate(e=>e===document.activeElement),'Tab inverse reste dans la conversation et ignore envoyer désactivé');
+  await p.keyboard.press('Escape');check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).count()===0,'Échap ferme la conversation');
+  check(await p.getByRole('button',{name:/Acheteur test Question/}).evaluate(e=>e===document.activeElement),'fermeture rend le focus à l’échange');
+  check(await p.locator('main').evaluate(e=>getComputedStyle(e).overflow!=='hidden'),'défilement arrière restauré à la fermeture');
+  await p.getByRole('button',{name:/Acheteur test Question/}).click();
+
   await p.getByLabel('Réponse au message eBay').fill('Merci pour votre message');await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===0,'annuler la réponse ne transmet rien');
   await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).waitFor();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('Refus simulé eBay'));check(writes.length===1 && writes[0].messageId==='m1','réponse associée au message exact');check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','refus conserve le brouillon');
   await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('button',{name:'Offres',exact:true}).click();await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');

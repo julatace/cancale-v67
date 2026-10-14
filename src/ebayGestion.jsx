@@ -4,6 +4,7 @@ import {centimes} from './beneficePaire.js';
 import CoutsVente from './CoutsVente.jsx';
 import './ebay-interface.css';
 import {offresAffichees} from './ebayOffresVue.js';
+import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
 import React,{useEffect,useState,useRef} from 'react';
 
@@ -74,6 +75,8 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const selection=useRef(null);
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState(''),[historySearch,setHistorySearch]=useState(''),[draftOK,setDraftOK]=useState(true),[codeCopie,setCodeCopie]=useState('');
+ const fermerConversation=()=>{selection.current=null;setSelected(null);};
+ const chatPanel=useConversationFocus(selected?.id,fermerConversation);
  const selectMessage=m=>{selection.current=m.id;setSelected(m);setBody(lireBrouillon(owner,compte,m.id));setDraftOK(true);setHistorySearch('');setCodeCopie('');setMessage('');};
  const modifierBody=v=>{setBody(v);if(selected)setDraftOK(sauverBrouillon(owner,compte,selected.id,v));};
  const cibleOuverte=useRef(null);
@@ -97,8 +100,8 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
    {rows && ((pages!=null && page<pages) || (pages==null && rows.length>=50*page)) && <button type="button" disabled={busy} onClick={()=>charger(page+1)} style={{...S.button,marginTop:10}}>Charger la suite</button>}
    <p style={{fontSize:10,color:C.muted}}>Échanges remontés par eBay sur les 90 derniers jours.</p>
   </div><div className="vrm-chat-column">
-   {selected?<ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline"><div className="vrm-chat-panel" role="dialog" aria-label="Conversation eBay" style={{display:'flex',flexDirection:'column',background:C.card,overflow:'hidden'}}>
-    <div style={{display:'flex',gap:8,padding:12,borderBottom:`1px solid ${C.border}`}}><div style={{flex:1,minWidth:0}}><b style={{fontSize:14}}>{selected.sender || 'Acheteur'}</b><div style={{fontSize:11,color:C.muted}}>{selected.titre || selected.subject}</div></div><button type="button" aria-label="Fermer la conversation eBay" onClick={()=>{selection.current=null;setSelected(null);}} style={S.button}>×</button></div>
+   {selected?<ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline"><div ref={chatPanel} className="vrm-chat-panel" role="dialog" aria-label="Conversation eBay" style={{display:'flex',flexDirection:'column',background:C.card,overflow:'hidden'}}>
+    <div style={{display:'flex',gap:8,padding:12,borderBottom:`1px solid ${C.border}`}}><div style={{flex:1,minWidth:0}}><b style={{fontSize:14}}>{selected.sender || 'Acheteur'}</b><div style={{fontSize:11,color:C.muted}}>{selected.titre || selected.subject}</div></div><button type="button" aria-label="Fermer la conversation eBay" onClick={fermerConversation} style={S.button}>×</button></div>
     {codesRetraitEbay([selected.body,...(selected.responses || [])]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codesRetraitEbay([selected.body,...(selected.responses || [])]).map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
     <input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={{...S.input,flexShrink:0}}/>
     <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:14,display:'grid',alignContent:'start',gap:10}}>{corpsLisible(selected.body).toLowerCase().includes(historySearch.toLowerCase()) && <div style={{padding:12,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(selected.body)}</div>}{historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}{(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())).map((r,i)=><div key={i} style={{padding:12,borderRadius:10,background:C.bg,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(r)}</div>)}</div>
