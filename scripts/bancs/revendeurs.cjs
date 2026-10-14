@@ -80,7 +80,22 @@ async function brancher(p){
    check(await p.locator('.vrm-market-heading img').evaluate(e=>e.complete && e.naturalWidth>0),'logo local chargé '+nom);
    const summary=p.locator('.vrm-platform-summary');check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
-   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);}
+   for(const width of [320,390,1512]){
+    await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
+    if(width===1512){
+      const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
+      check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);
+    }
+    if(nom==='Vinted'){
+      await p.locator('.vrm-sale-row').first().waitFor();
+      const outil=await p.locator('.vrm-sales-workbar').boundingBox();
+      const liste=await p.locator('.vrm-sale-row').first().boundingBox();
+      const fin=await p.locator('.vrm-sale-row').last().boundingBox();
+      const analyse=await p.locator('.vrm-sales-analysis').boundingBox();
+      check(outil.y+outil.height<=liste.y && outil.height<150, 'outils regroupés et compacts avant les ventes '+width);
+      check(analyse.y>=fin.y+fin.height, 'analyse placée après la liste '+width);
+    }
+   }
    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-desktop.png')});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-390.png')});}
    await p.setViewportSize({width:390,height:844});
   }
@@ -125,6 +140,11 @@ async function brancher(p){
   check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'section messages retrouvée en revenant sur Vinted');
   await p.goto(base+'/?tab=plat_vinted');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
   check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
+  await p.setViewportSize({width:1512,height:900});await p.waitForTimeout(200);
+  const gauche=await p.locator('.vrm-inbox-column').boundingBox(), droite=await p.locator('.vrm-chat-column').boundingBox();
+  check(droite.x>=gauche.x+gauche.width-1, 'messagerie ordinateur : liste à gauche, fil à droite');
+  check(await p.locator('.vrm-chat-column .vrm-chat-panel').count()===1, 'fil intégré dans le panneau de droite');
+  await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
   const send=p.getByRole('button',{name:'Envoyer',exact:true});check(await send.isDisabled(),'conversation sans réponse autorisée bloquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
   await p.goto(base+'/?tab=dashboard');await p.locator('.vrm-finance-overview').waitFor();check(await p.locator('.vrm-finance-overview').isVisible(),'indicateurs financiers prioritaires');

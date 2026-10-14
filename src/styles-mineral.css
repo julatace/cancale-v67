@@ -422,3 +422,90 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
  .vrm-main .vrm-photo-open { min-height:0 !important; }
  .vrm-filter-recap { gap:10px; }
 }
+
+/* Disposition commune : outils, liste, puis analyse. */
+.vrm-workbar { background:var(--vrm-surface); border:1px solid var(--vrm-line); border-radius:10px; padding:12px; margin:0 0 16px; }
+.vrm-workbar:empty { display:none; }
+.vrm-workbar .vrm-ann-toolbar { margin-bottom:8px !important; }
+.vrm-workbar .vrm-stock-views { margin-bottom:0; }
+.vrm-workbar .vrm-filter-recap { margin-bottom:0; }
+.vrm-sales-workbar > .vrm-sales-search-group { margin-bottom:8px !important; }
+.vrm-sales-workbar .vrm-list-search { background:var(--vrm-bg); }
+.vrm-sales-analysis { margin-top:18px; border-top:1px solid var(--vrm-line); padding-top:12px; }
+.vrm-market-heading { padding-block:10px !important; }
+.vrm-market-space .vrm-platform-tabs { border:0; border-radius:0; background:transparent !important; border-bottom:1px solid var(--vrm-line); margin-bottom:10px; }
+.vrm-market-space .vrm-platform-tabs button { border-radius:6px !important; }
+.vrm-market-space .vrm-screen-head { margin-bottom:12px !important; }
+.vrm-market-space .vrm-screen-head h2 { font-size:21px !important; }
+.vrm-day-task-list { grid-template-columns:1fr !important; gap:0 !important; border:1px solid var(--vrm-line); border-radius:10px; overflow:hidden; }
+.vrm-day-task-list .vrm-day-task { border:0 !important; border-bottom:1px solid var(--vrm-line) !important; border-radius:0 !important; padding:12px 14px !important; }
+.vrm-day-task-list .vrm-day-task:last-child { border-bottom:0 !important; }
+.vrm-day-task-title { font-size:14px !important; }
+.vrm-finance-period-label { margin:0 !important; letter-spacing:.06em !important; }
+.vrm-finance-page { gap:12px !important; }
+@media(min-width:1024px) {
+ .vrm-ann-grid { grid-template-columns:minmax(0,1fr) !important; gap:0 !important; border:1px solid var(--vrm-line); border-radius:10px; overflow:hidden; }
+ .vrm-ann-card { border:0 !important; border-bottom:1px solid var(--vrm-line) !important; border-radius:0 !important; display:grid !important; grid-template-columns:minmax(0,1fr) 190px; }
+ .vrm-ann-card:last-child { border-bottom:0 !important; }
+ .vrm-ann-overview { position:relative; padding:12px 16px !important; }
+ .vrm-ann-overview > a { width:72px !important; height:96px !important; border-radius:6px !important; }
+ .vrm-ann-overview > div { padding-right:105px; }
+ .vrm-ann-card .vrm-ann-price-line { position:absolute; top:12px; right:16px; flex-direction:column; align-items:flex-end !important; gap:4px !important; }
+ .vrm-ann-card [data-prix] { font-size:21px !important; }
+ .vrm-ann-card [data-chiffres] { border:0; margin:0 !important; padding:2px 0 !important; }
+ .vrm-ann-actions { border:0; border-left:1px solid var(--vrm-line); display:flex; flex-direction:column; justify-content:center; padding:12px !important; }
+ .vrm-ann-actions > summary { display:flex; align-items:center; }
+ .vrm-ann-actions[open] { display:block; grid-column:1/-1; border-left:0; border-top:1px solid var(--vrm-line); }
+ .vrm-ann-card:has(.vrm-ann-actions[open]) .vrm-ann-overview { grid-column:1/-1; }
+ .vrm-sale-overview { display:grid !important; grid-template-columns:72px minmax(0,1fr) minmax(130px,180px); }
+ .vrm-sale-price { display:flex; align-items:flex-end; flex-direction:column; gap:6px; }
+ .vrm-day-money { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:4px 24px; }
+ .vrm-day-money > div:first-child { grid-column:1; }
+ .vrm-day-money > [data-vendu-mois] { grid-column:1; grid-row:2; }
+ .vrm-day-money > div:nth-child(3) { grid-column:1; grid-row:3; }
+ .vrm-day-money > [data-recu-mois] { grid-column:2; grid-row:1/4; flex-direction:column; justify-content:center !important; align-items:flex-start !important; border-top:0 !important; border-left:1px solid var(--vrm-line); padding:0 0 0 24px !important; margin:0 !important; }
+ .vrm-message-workspace { gap:0; border:1px solid var(--vrm-line); border-radius:10px; background:var(--vrm-surface); overflow:hidden; }
+ .vrm-inbox-column { padding:12px; max-height:calc(100dvh - 200px); overflow-y:auto; border-right:1px solid var(--vrm-line); }
+ .vrm-chat-column { padding:12px; }
+ .vrm-chat-inline .vrm-chat-panel { border:0; border-radius:0 !important; }
+ .vrm-chat-empty { border:0; }
+}
+@media(max-width:767px) {
+ .vrm-workbar { padding:9px; margin-bottom:10px; }
+ .vrm-market-heading h1 { font-size:18px; }
+ .vrm-main .vrm-market-space .vrm-platform-tabs { margin-inline:12px; padding:0 !important; }
+ .vrm-main .vrm-market-space .vrm-platform-tabs > button { min-height:44px !important; }
+ .vrm-ann-grid { gap:0 !important; border:1px solid var(--vrm-line); border-radius:10px; overflow:hidden; }
+ .vrm-ann-card { border:0 !important; border-bottom:1px solid var(--vrm-line) !important; border-radius:0 !important; }
+ .vrm-ann-card:last-child { border-bottom:0 !important; }
+ .vrm-ann-actions { border-top:0; }
+ .vrm-main .vrm-day-task { padding:10px 12px !important; }
+ .vrm-day-task-note { -webkit-line-clamp:1; }
+ .vrm-sale-row { border-radius:0; }
+}
+@media(max-width:767px) {
+ .vrm-sales-workbar { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:8px; }
+ .vrm-sales-workbar > .vrm-sales-search-group { grid-column:1; grid-row:1; margin-bottom:0 !important; min-width:0; }
+ .vrm-sales-workbar > .vrm-period { grid-column:2; grid-row:1; margin-bottom:0 !important; }
+ .vrm-sales-workbar > .vrm-period > .vrm-rangee { gap:0 !important; }
+ .vrm-sales-workbar > .vrm-period > .vrm-rangee > button:first-child { width:100%; padding-inline:7px !important; justify-content:center; font-size:11px !important; white-space:normal !important; line-height:1.25; }
+ .vrm-sales-workbar > .vrm-period > .vrm-rangee > button[aria-label="Effacer la période"] { display:none; }
+ .vrm-sales-workbar > .vrm-rangee { grid-column:1/-1; grid-row:2; margin:0 !important; }
+ .vrm-sales-workbar:has(.vrm-period-panel) { display:block; }
+ .vrm-sales-workbar:has(.vrm-period-panel) > .vrm-period { margin-top:8px; }
+ .vrm-sales-workbar:has(.vrm-period-panel) > .vrm-rangee { margin-top:8px !important; }
+ .vrm-sales-workbar .vrm-filter-recap { flex-wrap:wrap; }
+}
+@media(min-width:768px) {
+ .vrm-sales-workbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }
+ .vrm-sales-workbar > .vrm-sales-search-group { grid-column:1; grid-row:1; margin:0 !important; }
+ .vrm-sales-workbar > .vrm-period { grid-column:2; grid-row:1; margin:0 !important; }
+ .vrm-sales-workbar > .vrm-rangee { grid-column:1/-1; grid-row:2; margin:0 !important; }
+ .vrm-sales-workbar > .vrm-rangee > div:last-child { margin-left:auto; }
+ .vrm-sales-workbar:has(.vrm-period-panel) { display:block; }
+ .vrm-sales-workbar:has(.vrm-period-panel) > .vrm-rangee { margin-top:10px !important; }
+ .vrm-sales-workbar:has(.vrm-period-panel) > .vrm-period { margin-top:10px !important; }
+}
+@media(min-width:1024px) {
+ .vrm-app-header { position:relative !important; top:auto !important; right:auto !important; align-self:flex-end; flex-shrink:0; margin:8px 24px 0 272px; box-shadow:none !important; }
+}
