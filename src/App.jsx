@@ -10783,8 +10783,8 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   if (url && !ko) return <PhotoVinted src={url} alt="" loading="lazy" decoding="async" onError={()=>setKo(true)} style={{...box,objectFit:'cover'}}/>;
   return <span style={box} aria-hidden="true"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
-function FiltresVentes({ value, onChange, search, onSearch, cancelled = false }) {
-  const tabs=[['all','Toutes'],['pending','À expédier'],['done','Finalisées'],...(cancelled?[['cancelled','Annulées']]:[])];
+function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées' }) {
+  const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
     <div className="vrm-rangee vrm-sales-filters" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
@@ -13009,7 +13009,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   })();return()=>{stop=true;};},[comptesEbay]);
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
   const orders=lu===undefined?undefined:lu===null?null:lu.items.filter(o=>dansVueEbay(o,vue));
-  const wrap = (kids) => <div style={{ background: E.bg, padding: 16, paddingBottom: 48 }}>{kids}</div>;
+  const wrap = (kids) => <div className="vrm-ebay-sales" style={{ background: E.bg, padding: 16, paddingBottom: 48 }}>{kids}</div>;
   const head = <ScreenHead icon="cash" title="Ventes eBay"/>;
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
@@ -13017,23 +13017,31 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   if (!orders.length && !cible) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
   const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c==='EUR'?'€':c || '');
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
+  const visibles=orders.filter(o=>{
+    if(cible)return String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte;
+    const termes=[o.orderId,o.buyer?.username,o._pseudo,...(o.lineItems || []).flatMap(li=>[li.title,li.sku,li.legacyItemId])].filter(Boolean).join(' ').toLocaleLowerCase('fr-FR');
+    const expedie=['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase());
+    return (!recherche.trim() || termes.includes(recherche.trim().toLocaleLowerCase('fr-FR'))) && (filtre==='all' || (filtre==='done'?expedie:String(o.orderPaymentStatus || '').toUpperCase()==='PAID' && !expedie));
+  });
   return wrap(<>
     {head}
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{orders.length} commande{orders.length > 1 ? 's' : ''}{payees ? ` · ${payees} payée${payees > 1 ? 's' : ''}` : ''}</div>
     {illisibles.length>0 && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
-    <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche}/>
+    {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} doneLabel="Expédiées"/>}
+    {!cible && <div className="vrm-ebay-results" role="status">{visibles.length} commande{visibles.length>1?'s':''} affichée{visibles.length>1?'s':''}{(recherche || filtre!=='all') && <button type="button" onClick={()=>{setRecherche('');setFiltre('all');}}>Effacer les filtres</button>}</div>}
+    {!cible && !visibles.length && <div className="vrm-ebay-empty"><b>Aucune commande dans cette sélection</b><p>Essaie un titre, un acheteur, une référence ou un numéro de commande.</p></div>}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {orders.filter(o=>cible?String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte:(!recherche || String(o.lineItems?.[0]?.title || '').toLowerCase().includes(recherche.toLowerCase())) && (filtre==='all' || (filtre==='done'?['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase()):o.orderPaymentStatus==='PAID' && !['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase())))).map((o, i) => {
+      {visibles.map((o, i) => {
         const li = (o.lineItems && o.lineItems[0]) || {};
         const img = photoCommande(o, annonces.filter(a=>(a._compte || 'principal')===(o._compte || 'principal')));
         const paye = String(o.orderPaymentStatus || '').toUpperCase() === 'PAID';
         const expedie = ['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase());
         const statut = !o.orderPaymentStatus ? 'Statut à confirmer' : !paye ? 'Paiement en attente' : expedie ? 'Expédiée' : 'À expédier';
-        const col = !paye ? E.muted : expedie ? E.muted : E.warn;
+
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
-          meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
+          meta={<><span className="vrm-ebay-sale-status" data-state={paye && !expedie?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>
