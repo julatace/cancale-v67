@@ -34,12 +34,34 @@ export function photoCommande(commande, annonces = []) {
 }
 
 // L’identité transaction → article vient de Vinted. Les archives restent isolées par compte.
-export function photoVenteVinted(commande, annonces = [], itemId = null, archives = {}) {
+export function photoVenteVinted(commande, annonces = [], itemId = null, archives = {}, transactions = {}) {
   const enrichie = itemId != null ? {...commande,item_id:itemId} : commande;
   const directe = photoCommande(enrichie, annonces);
   if (directe) return directe;
   const id = itemId ?? commande?.item_id ?? commande?.item?.id;
   const uid = commande?._acc?.vinted_user_id;
+  const tid=commande?.transaction_id;
+  if(uid!=null && tid!=null){const photo=photoArticle(transactions[JSON.stringify([String(uid),String(tid)])]);if(photo)return photo;}
   if (id == null || uid == null) return null;
   return photoArticle(archives[JSON.stringify([String(uid),String(id)])]);
+}
+
+export function demandesPhotosVentes(commandes,annonces,identites,archives,transactions){
+ const out={archives:new Map(),transactions:new Map()};
+ for(const o of commandes || []){
+  const uid=o?._acc?.vinted_user_id,tid=o?.transaction_id,id=identites?.[String(tid)] ?? o?.item_id ?? o?.item?.id;
+  if(uid==null || !/^\d+$/.test(String(uid)))continue;
+  if(photoVenteVinted(o,annonces,id,archives,transactions))continue;
+  if(tid!=null && /^\d+$/.test(String(tid)))out.transactions.set(`harvest_${uid}_txn_${tid}`,JSON.stringify([String(uid),String(tid)]));
+  if(id!=null && /^\d+$/.test(String(id)))out.archives.set(`coffre_${uid}_${id}`,JSON.stringify([String(uid),String(id)]));
+ }
+ return out;
+}
+export function photosTransactionsLues(rows,demandes){
+ const out={};
+ for(const row of rows || []){
+  const key=demandes.get(row.id),photo=photoArticle({photo:row.photo}) || photoArticle({photo:row.photoItem});
+  if(key && photo)out[key]={photo};
+ }
+ return out;
 }

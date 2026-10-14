@@ -10,7 +10,7 @@ import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
-import { photoArticle, photoCommande, photoVenteVinted } from "./photosArticles.js";
+import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -22673,6 +22673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // transaction → id d'annonce, tel que Vinted le dit (cf. fetchTxnItemIds).
   const [txnItem, setTxnItem] = useState({});
   const [photosVentesArchivees,setPhotosVentesArchivees]=useState({});
+  const [photosVentesTransactions,setPhotosVentesTransactions]=useState({});
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -26119,28 +26120,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
   const [txnPret, setTxnPret] = useState(false);
   useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
-  // Les ventes n'ont plus forcément de vignette ni d'annonce dans le dressing.
-  // Lire uniquement la première photo des archives identifiées : aucun texte, PDF ou titre.
+  // Sources déjà capturées : lire les petites photos projetées, jamais les transactions entières.
   useEffect(()=>{
     if(!['ventes','journee','bordereaux'].includes(curSub) || !sales.items?.length)return;
     let stop=false;
-    const besoins=new Map();
-    for(const o of sales.items){
-      const uid=o._acc?.vinted_user_id, id=txnItem[String(o.transaction_id)] ?? o.item_id ?? o.item?.id;
-      if(uid==null || id==null || !/^\d+$/.test(String(uid)) || !/^\d+$/.test(String(id)))continue;
-      if(photoVenteVinted(o,listings.items || [],id,photosVentesArchivees))continue;
-      const key=JSON.stringify([String(uid),String(id)]);
-      besoins.set(`coffre_${uid}_${id}`,{key});
-    }
-    if(!besoins.size)return;
+    const besoins=demandesPhotosVentes(sales.items,listings.items || [],txnItem,photosVentesArchivees,photosVentesTransactions);
     (async()=>{
-      const ids=[...besoins.keys()];
+      const transactions=[...besoins.transactions.keys()];
+      for(let i=0;i<transactions.length && !stop;i+=100){
+        try{
+          const rows=await lireTout(`id=in.(${transactions.slice(i,i+100).join(',')})&select=id,photo:data->payload->transaction->item_photo,photoItem:data->payload->transaction->item->photo`,{strict:true});
+          if(stop || !Array.isArray(rows))continue;
+          const patch=photosTransactionsLues(rows,besoins.transactions);
+          if(Object.keys(patch).length)setPhotosVentesTransactions(prev=>({...prev,...patch}));
+        }catch(_){ /* Lecture ratée : conserver les sources précédentes. */ }
+      }
+      const ids=[...besoins.archives.keys()];
       for(let i=0;i<ids.length && !stop;i+=100){
         try{
           const rows=await lireTout(`id=in.(${ids.slice(i,i+100).join(',')})&select=id,photo:data->photos->0`,{strict:true});
           if(stop || !Array.isArray(rows))continue;
           const patch={};
-          for(const row of rows){const target=besoins.get(row.id);if(target && photoArticle({photo:row.photo}))patch[target.key]={photo:row.photo};}
+          for(const row of rows){const key=besoins.archives.get(row.id);if(key && photoArticle({photo:row.photo}))patch[key]={photo:row.photo};}
           if(Object.keys(patch).length)setPhotosVentesArchivees(prev=>({...prev,...patch}));
         }catch(_){ /* Une archive illisible ne supprime pas les photos déjà lues. */ }
       }
@@ -29157,7 +29158,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const benef = st==='cancelled'?null:bilan.benefice;
             const ov = saleOv[String(o.transaction_id)] || {};
             const baseE = resolvedEntry(o);
-            const photo = photoVenteVinted(o, listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees) || photoArticle(baseE);
+            const photo = photoVenteVinted(o, listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees,photosVentesTransactions) || photoArticle(baseE);
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
