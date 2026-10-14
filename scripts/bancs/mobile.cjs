@@ -76,7 +76,8 @@ async function brancher(p){
       check(geometrie.nav.bottom<=844.5&&geometrie.main.bottom<=geometrie.nav.top+.5,largeur+' '+tab+' navigation hors du contenu');
       if(tab==='cat_ventes'){
         await p.locator('.vrm-sale-row').first().waitFor();
-        check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===64,largeur+' photo de vente compacte');
+        const photo=await p.locator('.vrm-sale-photo').first().boundingBox();
+        check(photo.width>=40&&photo.width<=52&&photo.height>photo.width,largeur+' photo de vente compacte en portrait');
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
@@ -113,7 +114,7 @@ async function brancher(p){
     await ctx.close();
   }
   const ctx=await b.newContext({viewport:{width:1512,height:950}});const p=await ctx.newPage();await brancher(p);await p.addInitScript(()=>localStorage.setItem('vrm_zoom','1'));await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
-  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Ouvrir les paramètres'}).isVisible(),'ordinateur: paramètres dans l’île');check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===72,'ordinateur: disposition conservée');
+  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Ouvrir les paramètres'}).isVisible(),'ordinateur: paramètres dans l’île');const photoDesktop=await p.locator('.vrm-sale-photo').first().boundingBox();check(photoDesktop.width===62&&photoDesktop.height>photoDesktop.width,'ordinateur: photo portrait alignée à la liste');
   await p.getByText('Autres outils',{exact:true}).click();
   check(await p.getByRole('button',{name:'Factures',exact:true}).isVisible(),'ordinateur: outils repliés accessibles');
   await p.getByText('Détails Vinted',{exact:true}).click();

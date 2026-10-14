@@ -1,0 +1,245 @@
+/* Poste de travail VRM : style validé sur la maquette, limité à l'application.
+   Les actions, calculs, formulaires et confirmations gardent leur comportement. */
+:root[data-theme="light"]{--vrm-focus:#087d6e}
+:root[data-theme="light"] body{background:#f7f8fa}
+:root[data-theme="light"] ::selection{background:#cce9e1}
+:root[data-theme="light"] :focus-visible{outline-color:#087d6e}
+.vrm-app-shell{--vrm-action:#087d6e;--vrm-action-soft:#e9f5f1;--vrm-radius:12px;--vrm-focus:#087d6e}
+:root[data-theme="dark"] .vrm-app-shell{--vrm-action:#71cdb9;--vrm-action-soft:#183b34;--vrm-focus:#71cdb9}
+.vrm-app-shell,.vrm-app-shell input,.vrm-app-shell textarea,.vrm-app-shell select{font-family:Inter,system-ui,sans-serif}
+.vrm-app-shell .vrm-ui-icon{flex-shrink:0;vertical-align:middle}
+.vrm-app-shell .vrm-label{font-size:10px;letter-spacing:.02em;text-transform:none;line-height:1.5}
+.vrm-app-shell .vrm-display{font-variant-numeric:tabular-nums;letter-spacing:-.035em}
+.vrm-app-shell .vrm-button{min-height:36px;padding:8px 12px;border-radius:8px;font-size:12px;box-shadow:none;gap:6px;line-height:1.35}
+.vrm-app-shell .vrm-button[data-size="small"]{padding:6px 10px;font-size:11px;min-height:32px}
+.vrm-app-shell .vrm-button[data-variant="outline"]{background:var(--vrm-surface)!important;color:var(--vrm-ink)!important}
+.vrm-app-shell .vrm-button:disabled{opacity:.45}
+.vrm-app-shell .vrm-field>span{letter-spacing:0!important;text-transform:none!important;font-size:12px!important}
+.vrm-app-shell .vrm-field input{border-radius:8px!important;min-height:38px}
+.vrm-main{scroll-padding-block:12px}
+.vrm-main .vrm-surface{border-radius:12px!important;box-shadow:none!important;padding:18px!important}
+.vrm-screen-head{margin-bottom:16px!important}
+.vrm-screen-head h2{font-size:min(var(--vrm-value-size,27px),27px)!important;letter-spacing:-.035em!important}
+.vrm-sidebar{padding:24px 16px 18px!important;background:var(--vrm-surface)!important;border-right:1px solid var(--vrm-line)!important}
+.vrm-sidebar-brand{padding-bottom:24px}
+.vrm-sidebar-link{min-height:42px;font-size:12px;border-radius:8px;gap:11px}
+.vrm-sidebar-link[aria-current="page"]{background:var(--vrm-action-soft)!important;color:var(--vrm-action)!important}
+.vrm-sidebar-link:hover{background:var(--vrm-bg)}
+.vrm-sidebar-group{margin-bottom:16px}
+.vrm-sidebar-label{font-size:10px;color:var(--vrm-muted)}
+.vrm-app-header{box-shadow:none!important;border-bottom:1px solid var(--vrm-line)!important;background:var(--vrm-surface)!important}
+.vrm-app-header button{border-radius:8px!important}
+.vrm-header-actions{gap:8px!important}
+.vrm-mobile-nav{background:var(--vrm-surface)!important;box-shadow:none!important;padding-inline:4px}
+.vrm-mobile-nav>button{position:relative;color:var(--vrm-muted)!important}
+.vrm-mobile-nav>button[aria-current="page"]{color:var(--vrm-action)!important}
+.vrm-mobile-nav>button[aria-current="page"]:before{content:"";position:absolute;top:0;left:calc(50% - 11px);width:22px;height:3px;background:var(--vrm-action);border-radius:0 0 3px 3px}
+.vrm-mobile-nav>button[aria-current="page"]>span:first-child{background:transparent!important;color:inherit!important;transform:none!important}
+.vrm-mobile-nav>button>span:first-child{opacity:1!important}
+.vrm-market-heading{padding:18px 16px 12px;gap:10px}
+.vrm-market-heading h1{font-size:24px;letter-spacing:-.03em}
+.vrm-market-heading .vrm-brand-icon{width:25px;height:25px}
+.vrm-main .vrm-market-space .vrm-platform-tabs{display:flex!important;gap:20px!important;padding:0!important;margin:0 16px 12px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--vrm-line);border-radius:0}
+.vrm-main .vrm-market-space .vrm-platform-tabs>button{display:inline-flex!important;flex-direction:row!important;gap:5px!important;min-height:38px!important;border-radius:0!important;padding:8px 0!important;font-size:12px!important;font-weight:500!important;white-space:nowrap}
+.vrm-platform-tabs>button[aria-current="page"]{color:var(--vrm-action)!important;border-bottom-color:var(--vrm-action)!important;font-weight:650!important}
+.vrm-section-icon{display:flex!important}
+.vrm-section-icon .vrm-ui-icon{width:14px;height:14px}
+.vrm-summary-strip{padding:10px 0!important;gap:0!important}
+.vrm-stat{border-top:0!important;padding:10px 14px!important;min-width:0!important}
+.vrm-stat+.vrm-stat{border-left:1px solid var(--vrm-line)}
+.vrm-stat>.vrm-label{min-height:0!important}
+.vrm-stat .vrm-display{line-height:1.2!important}
+.vrm-workbar{background:var(--vrm-surface)!important;border:1px solid var(--vrm-line);border-radius:10px;padding:12px;box-shadow:none}
+.vrm-workbar input,.vrm-list-search{border-radius:8px!important}
+.vrm-stock-views button,.vrm-inbox-filters button,.vrm-sales-filters button{border-radius:7px!important;font-size:11px!important;min-height:32px;padding:6px 9px!important}
+.vrm-stock-views button[aria-pressed="true"],.vrm-inbox-filters button[aria-pressed="true"],.vrm-sales-filters button[aria-pressed="true"]{background:var(--vrm-action-soft)!important;color:var(--vrm-action)!important;border-color:var(--vrm-action)!important}
+/* Des listes alignées, avec la gestion à droite et les détails sur toute la largeur. */
+.vrm-ann-grid{grid-template-columns:minmax(0,1fr)!important;gap:0!important;border:1px solid var(--vrm-line);border-radius:12px;overflow:hidden}
+.vrm-ann-card{display:grid!important;grid-template-columns:minmax(0,1fr) 104px;border:0!important;border-bottom:1px solid var(--vrm-line)!important;border-radius:0!important;background:var(--vrm-surface)!important}
+.vrm-ann-card:last-child{border-bottom:0!important}
+.vrm-ann-overview{padding:14px!important;gap:12px!important}
+.vrm-ann-overview>a{width:62px!important;height:88px!important;border-radius:7px!important}
+.vrm-ann-overview>div{padding-right:104px;position:relative}
+.vrm-ann-card .vrm-ann-price-line{position:absolute;top:0;right:0;display:flex;flex-direction:column;align-items:flex-end!important;gap:4px!important}
+.vrm-ann-card [data-titre]{font-weight:600!important;font-size:13px!important}
+.vrm-ann-card [data-prix]{font-size:19px!important}
+.vrm-ann-card [data-chiffres]{padding:2px 0!important;border:0;margin:0!important;font-size:11px}
+.vrm-ann-actions{display:flex;flex-direction:column;justify-content:center;border:0!important;padding:10px!important}
+.vrm-ann-actions>summary{display:flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:6px 8px;border:1px solid var(--vrm-line);border-radius:7px;background:var(--vrm-bg);font-size:11px!important;font-weight:500}
+.vrm-ann-actions .vrm-action-chevron{display:none}
+.vrm-ann-actions[open]{display:block;grid-column:1/-1;border-top:1px solid var(--vrm-line)!important;padding:12px!important}
+.vrm-ann-actions[open]>summary{width:max-content;margin-left:auto}
+.vrm-ann-card:has(.vrm-ann-actions[open]) .vrm-ann-overview{grid-column:1/-1}
+.vrm-sale-row{padding:12px 14px!important;border-radius:0}
+.vrm-sale-overview{display:grid!important;grid-template-columns:62px minmax(0,1fr) 110px auto;gap:10px 12px!important;align-items:center!important}
+.vrm-sale-photo{width:62px!important;height:84px!important;border-radius:7px!important}
+.vrm-sale-photo>*{width:100%!important;height:100%!important}
+.vrm-sale-info{min-width:0}
+.vrm-sale-title{font-size:13px!important;font-weight:600!important}
+.vrm-sale-meta{font-size:11px!important;line-height:1.45}
+.vrm-sale-price{display:flex;flex-direction:column;align-items:flex-end!important;text-align:right!important;gap:3px!important}
+.vrm-sale-commands{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+.vrm-sale-commands:empty{display:none}
+.vrm-sale-commands .vrm-sale-action{margin:0!important}
+.vrm-sale-commands button{white-space:normal;font-size:11px!important}
+.vrm-shared-sale:has(.vrm-ebay-order-actions[open]) .vrm-sale-commands{grid-column:1/-1;display:block}
+.vrm-sale-commands .vrm-ebay-order-actions{margin:0}
+.vrm-sale-commands .vrm-ebay-order-actions>summary{padding:7px 9px;border:1px solid var(--vrm-line);border-radius:7px;background:var(--vrm-bg);font-size:11px}
+.vrm-sale-footer{gap:5px 10px;margin-top:6px}
+/* Messagerie : panneau partagé, conversation et saisie lisibles. */
+.vrm-message-workspace{gap:0;border:1px solid var(--vrm-line);border-radius:12px;background:var(--vrm-surface);overflow:hidden}
+.vrm-inbox-column{padding:12px}
+.vrm-inbox-row{padding:12px 10px!important;border-radius:0!important}
+.vrm-inbox-row.is-current{background:var(--vrm-action-soft)!important;box-shadow:inset 3px 0 var(--vrm-action)}
+.vrm-inbox-column input[type="search"]{background:var(--vrm-bg)!important;border-radius:8px!important}
+.vrm-chat-column{padding:12px}
+.vrm-chat-empty{border:0;background:var(--vrm-bg);border-radius:9px;min-height:300px}
+.vrm-chat-history{background:var(--vrm-bg);padding:14px!important;gap:9px!important}
+.vrm-chat-panel{border:1px solid var(--vrm-line);box-shadow:none}
+.vrm-chat-panel textarea{border-radius:9px!important}
+/* Les montants restent distincts, avec un bénéfice clairement identifié. */
+.vrm-finance-overview{border-radius:12px;grid-template-columns:1.4fr 1fr 1fr}
+.vrm-finance-metric{padding:18px;background:var(--vrm-surface)}
+.vrm-finance-metric.is-primary{background:#123e35}
+.vrm-finance-metric.is-primary .vrm-display{font-size:min(var(--vrm-value-size,34px),34px)!important}
+.vrm-finance-metric .vrm-display{font-size:min(var(--vrm-value-size,27px),27px)!important}
+.vrm-finance-stock-grid{gap:8px}
+.vrm-finance-charges{gap:8px!important}
+.vrm-finance-page table th{font-size:11px;font-weight:600}
+.vrm-finance-page table td{font-size:12px;line-height:1.45}
+.vrm-day-task-list{border-radius:12px;border:1px solid var(--vrm-line);overflow:hidden;background:var(--vrm-surface)}
+.vrm-main .vrm-day-task{border-radius:0!important;border:0!important;border-bottom:1px solid var(--vrm-line)!important;padding:12px 14px!important}
+.vrm-day-task:last-child{border-bottom:0!important}
+.vrm-day-task-title{font-size:13px!important}
+.vrm-day-task-note{font-size:11px!important}
+.vrm-day-task-action{font-size:11px!important;color:var(--vrm-action)!important}
+.vrm-day-money{border-radius:12px!important;padding:18px!important}
+/* Retraits, inventaire et réglages : même rythme, codes toujours complets. */
+.vrm-pickup-board{border-radius:12px}
+.vrm-pickup-group{border:1px solid var(--vrm-line)!important;border-radius:10px;overflow:visible;background:var(--vrm-surface)}
+.vrm-pickup-card{padding:12px!important}
+.vrm-pickup-card+.vrm-pickup-card{border-top:1px solid var(--vrm-line)}
+.vrm-pickup-code{border-radius:8px!important;background:var(--vrm-bg)!important}
+.vrm-main[data-screen="settings"] details{border-radius:10px}
+.vrm-main[data-screen="settings"] summary{cursor:pointer}
+.vrm-main[data-screen="settings"] .vrm-surface{margin-bottom:12px!important}
+.vrm-main:is([data-screen="stock"],[data-screen="garage"],[data-screen="settings"]) input:not([type="checkbox"]):not([type="range"]),.vrm-main:is([data-screen="stock"],[data-screen="garage"],[data-screen="settings"]) select{border-radius:8px!important}
+.vrm-main table{border-collapse:collapse}
+.vrm-main table th{text-align:left;color:var(--vrm-muted);font-weight:600}
+.vrm-main table td,.vrm-main table th{border-color:var(--vrm-line)!important}
+@media(min-width:1024px){
+ .vrm-main{padding-top:20px!important;padding-right:32px!important}
+ .vrm-app-header{padding-block:12px!important}
+ .vrm-message-workspace{grid-template-columns:minmax(250px,.85fr) minmax(0,1.5fr)}
+ .vrm-inbox-column{border-right:1px solid var(--vrm-line)}
+}
+@media(max-width:1023px){
+ .vrm-app-header{padding:5px 10px!important}
+ .vrm-header-actions{gap:4px!important}
+ .vrm-mobile-nav button{min-height:54px!important;padding-block:5px!important}
+ .vrm-mobile-nav .vrm-nav-label{font-size:11px!important}
+ /* Dessin compact, sans transformer les rangées ni les chiffres en boutons flex. */
+ .vrm-main button.vrm-button:not([role="switch"]){min-height:32px!important;padding:6px 9px!important;font-size:11px!important;border-radius:7px}
+ .vrm-main button.vrm-button[data-size="small"]{min-height:30px!important}
+ .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),.vrm-main select{min-height:38px}
+ .vrm-main .vrm-rangee{gap:6px!important}
+ .vrm-main .vrm-screen-head{margin-bottom:12px!important}
+ .vrm-main .vrm-tete-row h2{font-size:22px!important}
+ .vrm-main .vrm-surface{padding:12px!important}
+}
+@media(max-width:767px){
+ .vrm-market-heading{padding:12px 12px 8px;gap:8px}.vrm-market-heading h1{font-size:21px}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{margin-inline:12px;margin-bottom:10px;gap:16px!important;justify-content:flex-start!important}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{min-height:36px!important;font-size:11px!important;padding:7px 0!important;gap:4px!important}
+ .vrm-section-icon .vrm-ui-icon{width:13px;height:13px}
+ .vrm-main .vrm-summary-strip{padding:8px 0!important}
+ .vrm-stat{padding:6px 9px!important;min-width:0!important}
+ .vrm-stat .vrm-label{font-size:9px!important}
+ .vrm-stat .vrm-display{font-size:min(var(--vrm-value-size,20px),clamp(13px,4.4vw,20px))!important;white-space:nowrap}
+ .vrm-stat>div:last-child:not(.vrm-display){font-size:10px!important}
+ .vrm-workbar{padding:8px;margin-bottom:10px}
+ .vrm-main .vrm-stock-views button,.vrm-main .vrm-inbox-filters button{min-height:32px!important;font-size:10px!important;padding:5px 8px!important}
+ .vrm-ann-card{grid-template-columns:minmax(0,1fr) 72px}
+ .vrm-ann-card .vrm-ann-overview{padding:10px!important;gap:9px!important}
+ .vrm-ann-card .vrm-ann-overview>a{width:44px!important;height:82px!important;border-radius:6px!important}
+ .vrm-ann-overview>div{padding-right:0}
+ .vrm-ann-card .vrm-ann-price-line{position:static;flex-direction:row;align-items:center!important;gap:6px!important;order:1}
+ .vrm-ann-card [data-titre]{font-size:11px!important;line-height:1.35!important}
+ .vrm-ann-card [data-prix]{font-size:16px!important}
+ .vrm-ann-card [data-chiffres]{font-size:10px;line-height:1.4}
+ .vrm-ann-card [data-chiffres] span{font-size:10px!important}
+ .vrm-ann-actions{padding:7px!important}
+ .vrm-ann-actions>summary{font-size:10px!important;min-height:30px;padding:5px 6px;gap:4px}
+ .vrm-ann-actions>summary svg{width:12px;height:12px}
+ .vrm-ann-actions[open]{padding:10px!important}
+ .vrm-sale-row{padding:10px!important}
+ .vrm-sale-overview{grid-template-columns:44px minmax(0,1fr) auto;gap:4px 9px!important;align-items:center!important}
+ .vrm-sale-photo{grid-column:1;grid-row:1/3;width:44px!important;height:80px!important;border-radius:6px!important}
+ .vrm-sale-info{grid-column:2;grid-row:1}
+ .vrm-sale-title{font-size:11px!important;line-height:1.35!important}
+ .vrm-sale-meta{font-size:10px!important;line-height:1.4}
+ .vrm-sale-price{grid-column:2;grid-row:2;align-items:flex-start!important;text-align:left!important;margin:0!important;gap:2px!important}
+ .vrm-sale-price>.vrm-display{font-size:16px!important}
+ .vrm-sale-commands{grid-column:3;grid-row:1/3;max-width:105px;display:flex;flex-direction:row;gap:5px;align-items:center}
+ .vrm-sale-action{flex:0 1 auto!important;margin:0!important;display:flex;flex-direction:row;gap:5px}
+ .vrm-sale-action>*,.vrm-sale-action button{width:auto!important}
+ .vrm-main .vrm-sale-commands button{min-height:32px!important;min-width:28px;font-size:10px!important;padding:6px 8px!important}
+ .vrm-sale-commands .vrm-ebay-order-actions>summary{font-size:10px;padding:6px 8px}
+ .vrm-sale-footer{margin-left:53px}
+ .vrm-finance-overview{grid-template-columns:1fr 1fr 1fr;border-radius:10px}
+ .vrm-finance-metric{padding:11px 9px}.vrm-finance-metric.is-primary{grid-column:auto}
+ .vrm-finance-metric .vrm-display,.vrm-finance-metric.is-primary .vrm-display{font-size:min(var(--vrm-value-size,21px),clamp(14px,4.5vw,21px))!important;letter-spacing:-.04em}
+ .vrm-finance-metric .vrm-label{font-size:9px!important;min-height:2.8em!important}
+ .vrm-finance-overview .vrm-stat{padding:0!important;border-left:0!important}
+ .vrm-finance-page{gap:10px!important}.vrm-finance-page table td{font-size:11px}
+ .vrm-inbox-column{padding:10px}.vrm-chat-column{padding:0}
+ .vrm-inbox-row{padding:10px 8px!important;min-height:68px!important}.vrm-inbox-row>img{width:38px!important;height:48px!important}
+ .vrm-chat-panel{max-height:90dvh!important}.vrm-chat-history{padding:12px!important}
+ .vrm-main .vrm-day-task{padding:10px!important;gap:10px!important}
+ .vrm-day-task-title{font-size:12px!important}.vrm-day-task-note{font-size:10px!important}.vrm-day-task-action{font-size:10px!important}
+ .vrm-day-money{padding:12px!important;margin-bottom:10px!important}
+ .vrm-day-money>[data-vendu-mois]{font-size:25px!important}.vrm-day-money>[data-recu-mois]>.vrm-display{font-size:22px!important}
+ .vrm-pickup-card{padding:10px!important}.vrm-pickup-code{padding:7px!important}
+ .vrm-main .vrm-pickup-card button{min-height:32px!important;font-size:10px!important}
+}
+@media(prefers-reduced-motion:reduce){.vrm-app-shell *{scroll-behavior:auto!important}}
+/* Les anciens onglets en pastilles laissent place à une ligne soulignée. */
+.vrm-main .vrm-market-space .vrm-platform-tabs>button{background:transparent!important;border:0!important;border-bottom:2px solid transparent!important;box-shadow:none!important;color:var(--vrm-muted)!important}
+.vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current="page"]{color:var(--vrm-action)!important;border-bottom-color:var(--vrm-action)!important}
+.vrm-main .vrm-market-space .vrm-platform-tabs>button:hover{background:transparent!important;color:var(--vrm-action)!important}
+.vrm-settings-page,.vrm-lbc-listings-page{max-width:900px!important}
+.vrm-ebay-listing-overview{padding:14px!important;gap:12px!important}
+.vrm-ebay-listing-overview>img{width:62px!important;height:84px!important;object-fit:cover;border-radius:7px!important}
+.vrm-settings-page h2{font-size:25px!important;margin-bottom:16px!important}
+@media(max-width:767px){
+ .vrm-settings-page,.vrm-lbc-listings-page{padding:12px!important}
+ .vrm-settings-page h2{font-size:22px!important;margin-bottom:12px!important}
+ .vrm-ebay-listing-overview{padding:10px!important;gap:9px!important}
+ .vrm-ebay-listing-overview>img{width:44px!important;height:80px!important}
+ .vrm-ebay-listing-overview>div:first-of-type>div:first-child{font-size:11px!important}
+ .vrm-ebay-listing-overview>div:first-of-type>div{font-size:10px!important}
+ .vrm-main .vrm-finance-overview>.vrm-finance-metric{padding:11px 10px!important}
+ .vrm-main .vrm-finance-overview .vrm-stat{padding:0!important}
+ .vrm-finance-period-label{margin-top:4px!important;margin-bottom:0!important;font-size:10px!important}
+}
+@media(max-width:1023px){.vrm-main .vrm-carrousel{margin-inline:0;padding-inline:0;max-width:100%;scroll-padding-inline:0}}
+@media(max-width:767px){.vrm-main .vrm-ann-card .vrm-ann-overview>a{width:44px!important;height:82px!important}}
+.vrm-stock-page{padding:14px;max-width:960px;margin-inline:auto}
+.vrm-stock-add{align-items:center;min-width:0}
+.vrm-stock-add input{min-width:0;max-width:100%}
+.vrm-settings-row{box-shadow:none!important;margin-bottom:7px!important;padding:12px 14px!important;border-radius:9px!important}
+.vrm-settings-row>span:nth-of-type(2)>span:first-child{font-size:13px!important}
+@media(max-width:767px){.vrm-stock-page{padding:12px}.vrm-stock-add>button{font-size:11px!important;padding:7px 10px!important;min-height:34px!important;flex-shrink:0}.vrm-settings-row{padding:11px 12px!important;gap:10px!important}.vrm-settings-row>span:nth-of-type(2)>span:first-child{font-size:12px!important}}
+@media(max-width:767px){
+ /* Les montants éditables restent des textes cliquables, pas des pavés de 44 px. */
+ .vrm-main .vrm-ann-card button[data-edition]{min-height:24px!important;min-width:24px!important;padding:0 2px!important;font-size:11px!important}
+ .vrm-main .vrm-ann-card [data-chiffres]{gap:2px 9px!important}
+ .vrm-main .vrm-ann-price-line>span:last-child{padding:2px 5px!important;font-size:10px!important}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-ann-card{grid-template-columns:minmax(0,1fr) 64px}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:9px!important;gap:8px!important}
+ .vrm-main .vrm-ann-card [data-chiffres]{gap:2px 6px!important}
+ .vrm-main .vrm-ann-actions{padding:6px!important}
+ .vrm-main .vrm-ann-actions>summary{padding:5px!important;gap:3px}
+}

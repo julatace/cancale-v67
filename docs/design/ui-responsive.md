@@ -276,3 +276,49 @@ codes longs aux largeurs 320/390/1512. Le banc historique `retrait.cjs`, qui lit
 scripts/bancs/fx/main.json, ne peut pas tourner ici : ces fixtures ne sont pas
 présentes. Les scénarios synthétiques du banc revendeurs couvrent le nouveau
 rendu et la copie ; ils ne remplacent pas un essai sur des comptes réels.
+
+### Refonte complète du poste de travail — aperçu du 14 octobre
+
+La maquette compacte validée est intégrée à l'app, via `styles-workspace.css`
+chargée après les styles historiques. La palette claire partagée utilise un
+fond gris froid, des surfaces blanches, des contours fins et un accent vert.
+La feuille reste limitée à la coque de l'app ; les modifications concurrentes
+sur l'accueil public sont conservées. Les actifs de logos existants ne changent
+pas. Le mode sombre conserve sa palette et reçoit des accents adaptés.
+
+Navigation : barre latérale claire, onglet courant discret, barre mobile sans
+pastille pleine, sections de plateformes horizontales et soulignées. Les noms
+et accès restent les mêmes. Boutons partagés, champs, résumés et tuiles suivent
+un rythme commun ; les chiffres restent distincts des commandes. Les champs
+mobiles conservent 16 px pour éviter le zoom automatique lors d'une saisie.
+
+Annonces : liste commune, photo portrait, gestion à droite, détails de gestion
+sur toute la largeur à l'ouverture. Achat, boost et marge restent libellés et
+éditables ; valeur inconnue, prix et identité conservent leur logique. Les
+cartes eBay et la file Leboncoin reçoivent aussi les nouveaux espacements.
+Ventes : prix et action occupent des colonnes distinctes ; bordereau ou gestion
+de commande à droite sur téléphone. Les détails ouverts eBay reprennent toute
+la largeur ; les confirmations et états de génération restent conservés.
+
+Messagerie : panneaux unifiés, conversation sélectionnée discrète, historique
+sur fond calme. Finance : trois indicateurs alignés avec périmètre explicite,
+objectif et détails conservés ; aucun nouveau calcul métier. Retraits : codes
+complets, copie et échéances inchangés. Stock et paramètres reprennent les
+champs et listes ; les réglages utilisent la même famille d'icônes. Deux
+petits débordements à 320 px (carrousel accueil et saisie stock historique)
+sont corrigés sans masquer leur contenu.
+
+Les captures `refonte-app` proviennent de l'application compilée avec données
+simulées, contrairement aux captures de la maquette autonome dans
+`docs/preview/vrm-proposition`. Aucun envoi, vente ou modification de compte
+réel n'est effectué pendant ces validations. La refonte est préparée pour
+review et aperçu ; elle n'est pas fusionnée ni publiée sur vrm.center.
+
+Validation de cette version : build réussi, 138 contrôles visuels (13 écrans
+aux largeurs 320/390/1440, puis cinq écrans après activation réelle du mode
+sombre), 222 contrôles mobile/ordinateur, banc annonces vert et 82 contrôles
+revendeurs. Audits variables, icônes et 578 définitions de boutons verts.
+Les assertions de taille des anciennes photos ont été adaptées au nouveau
+portrait : 44 px sur téléphone, 62 px sur ordinateur. Les autres assertions
+fonctionnelles sont conservées. La taille des chiffres reste adaptée à la
+longueur des montants au lieu de forcer une taille unique.
