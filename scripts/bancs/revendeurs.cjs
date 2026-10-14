@@ -71,6 +71,7 @@ async function brancher(p){
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[];
   await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true};
    if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
+   if(a==='agent')j={ok:true,tasks:[{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12'}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'}],journalLisible:true};
    if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
    if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
    return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
@@ -105,6 +106,25 @@ async function brancher(p){
   await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
   await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
+  const vente=p.locator('.vrm-sale-row').first();
+  await vente.locator('.vrm-sale-details > summary').click();
+  await vente.getByPlaceholder("prix d'achat",{exact:true}).fill('40');await vente.getByPlaceholder("prix d'achat",{exact:true}).press('Tab');
+  await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
+  await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
+  await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('69,50'));
+  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'frais déduits et bénéfice indiqué estimé');
+  await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();
+  check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'confirmation des frais rend le bénéfice complet');
+  await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
+  await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('66,50'));
+  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'nouveau frais déduit et confirmation invalidée');
+  await vente.getByLabel('Port payé par moi',{exact:true}).fill('3abc');await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.blur());
+  check(!(await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.validity.valid)),'montant invalide refusé sans modifier le bénéfice');
+  check((await vente.locator('.vrm-sale-price').innerText()).includes('66,50'),'montant invalide conserve le dernier calcul enregistré');
+  await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'frais de vente sans débordement '+width);}
+  await p.setViewportSize({width:390,height:844});
+
   const navigation=p.getByRole('navigation',{name:'Navigation principale'});
   await navigation.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
   await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();
@@ -141,6 +161,11 @@ async function brancher(p){
   check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'section messages retrouvée en revenant sur Vinted');
   await p.goto(base+'/?tab=plat_vinted');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
   check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
+  rows.find(x=>x.id==='harvest_111_conv_71').data.payload.conversation.messages=[{id:901,entity_type:'message',created_at_ts:1700000003,entity:{user_id:22,body:'Nouveau message capturé'}}];
+  await p.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'messages',uid:'111',conv:'71'}})));
+  await p.getByText('Nouveau message capturé',{exact:true}).waitFor();
+  check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'capture partielle conserve l’historique déjà ouvert');
+  check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'capture partielle conserve le code de retrait');
   await p.setViewportSize({width:1512,height:900});await p.waitForTimeout(200);
   const gauche=await p.locator('.vrm-inbox-column').boundingBox(), droite=await p.locator('.vrm-chat-column').boundingBox();
   check(droite.x>=gauche.x+gauche.width-1, 'messagerie ordinateur : liste à gauche, fil à droite');
@@ -173,6 +198,13 @@ async function brancher(p){
   await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).waitFor();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('Refus simulé eBay'));check(writes.length===1 && writes[0].messageId==='m1','réponse associée au message exact');check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','refus conserve le brouillon');
   await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('button',{name:'Offres',exact:true}).click();await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');
   await p.getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
+  await p.getByRole('button',{name:'À traiter',exact:true}).click();
+  await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  check(await p.getByText('Messages : lecture indisponible',{exact:true}).isVisible(),'agent distingue la lecture indisponible des tâches vides');
+  check(await p.getByRole('button',{name:'Relire avant de reprendre',exact:true}).isVisible(),'action incertaine propose une relecture');
+  check(writes.length===1,'préparation et historique eBay sans action commerciale');
+  await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
+  check(writes.length===1,'une tâche ouvre la section sans accepter l’offre');
   await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}

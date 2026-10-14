@@ -16,7 +16,7 @@ export function lireXmlEbay(source,appel) {
 export function messagesEbay(root) {
   return liste(root?.MemberMessage?.MemberMessageExchange).map(e=>{
     const q=e.Question || {},it=e.Item || {};
-    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(texte),status:texte(e.MessageStatus),date:texte(e.CreationDate)};
+    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(r=>typeof r==='object'?texte(r.Body ?? r.Message ?? r):texte(r)).filter(Boolean),status:texte(e.MessageStatus),date:texte(e.CreationDate)};
   }).filter(m=>m.id);
 }
 export function offresEbay(root) {

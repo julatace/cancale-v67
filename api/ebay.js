@@ -1,3 +1,4 @@
+import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
 //
 // ⚠️ POURQUOI TOUT EN UN FICHIER : le plan Vercel Hobby limite à 12 fonctions
@@ -1743,6 +1744,12 @@ async function handleApp(req, res) {
     // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
     // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
+      agent:async(ctx)=>preparerAgentEbay({
+        orders:await lireDonnee(ligneDe('ebay_orders',ctx),ctx.owner),
+        messages:await gestionEbay.messages({page:1},ctx),
+        offres:await gestionEbay.offres({page:1},ctx),
+        journal:await lireDonnee(ligneDe('ebay_agent_journal',ctx),ctx.owner),
+      }),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),
@@ -1775,7 +1782,11 @@ async function handleApp(req, res) {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);
     if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
-    const r = await ACTIONS[action]({ owner, compte: rc.compte });
+    const ctx={owner,compte:rc.compte};
+    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce']);
+    const r = commerciales.has(action) && b.confirme===true
+      ? await executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
+      : await ACTIONS[action](ctx);
     res.status(r.status).json(r.body);
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

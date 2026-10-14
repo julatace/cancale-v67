@@ -1,11 +1,15 @@
+import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+import CoutsVente from "./CoutsVente.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
+import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
+import { fusionnerConversation } from "./conversations.js";
 import { photoArticle, photoCommande } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres} from "./ebayGestion.jsx";
+import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -45,7 +49,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.175.0';
+const EXT_ATTENDUE = '5.176.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -4440,13 +4444,14 @@ const fetchVintedConversationDetail = async (account, conversationId, {force=fal
   //    compte connecté dans Chrome. Refusée (autre compte, absente) ⇒ repli.
   if (extSait('messagerie') === 'ok') {
     const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
-    if (r && r.ok && r.data && r.data.conversation) return { ok: true, conversation: r.data.conversation, source: 'extension' };
+    if (r && r.ok && r.data && r.data.conversation) { const c = fusionnerConversation(h?.conversation, r.data.conversation); if (c) return { ok: true, conversation: c, source: 'extension' }; }
   }
   if(h?.conversation)return {ok:true,conversation:h.conversation,source:'harvest'};
   // 3) Repli : proxy.
   const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
   if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
-  return { ok: true, conversation: res.data?.conversation || null };
+  const c = fusionnerConversation(h?.conversation, res.data?.conversation);
+  return c ? { ok: true, conversation: c } : { ok:false,conversation:null,error:'Cette conversation n’a pas pu être lue.' };
 };
 
 // Aplati les entites d'une conversation en messages affichables et tries.
@@ -16408,7 +16413,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
         {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
             afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
+        <StatCard icon="📈" label="Bénéfice estimé" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
         {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
             voisines, avec d'autres mots : trois formulations pour une seule
             cause font croire à trois problèmes. */}
@@ -22704,6 +22709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
+    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) { toast('Cette paire est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.'); return; }
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
   };
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
@@ -24297,6 +24303,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
     if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
+    for(const [key] of champsCharges) if(ov[key]!=null && ov[key]!=='')merged[key]=ov[key];
+    if(ov.fraisComplets!=null)merged.fraisComplets=ov.fraisComplets;
     // ⚠️ ACHAT RELIÉ DEPUIS LA VENTE (pour une vente SANS identité d'annonce :
     // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
     // `buyFromId`/`buyFrom` — sans ce passage, le reçu relié par l'écran Ventes
@@ -24522,13 +24530,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
-  const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null; return (b!=null && !isNaN(b)) ? b : null; };
+  const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? b : null; };
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
   // comme 100 % de marge tant que le coût n'est pas saisi).
   const isSaleNoBuy = (o) => classifyOrderStatus(o.status)==='completed' && buyOf(o)==null;
   // Montant d'un champ € (prix d'achat, frais/boost) -> nombre ou 0.
   const eur = (v) => { if (v==null || String(v).trim()==='') return 0; const n = parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
   const feesOf = (e) => e ? eur(e.fees) : 0;
+  const chargesVente = (e) => coutsVente(e).total;
   // Fiabilité : deux annonces avec le MÊME titre rendent l'attribution d'une
   // vente ambiguë (le lien vente↔paire se fait par le titre). On les détecte
   // pour prévenir au lieu de risquer d'attribuer le mauvais numéro.
@@ -26600,6 +26609,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
   // risque). Requête réelle captée : POST /api/v2/conversations/{id}/replies.
+  useEffect(() => {
+    let arrete = false, timer;
+    const captures = new Map();
+    const ecoute = e => {
+      const d = e?.detail;
+      if (d?.type !== 'maj' || d.quoi !== 'messages' || !accounts.some(a=>String(a.vinted_user_id)===String(d.uid))) return;
+      const uid=String(d.uid);
+      const precedente=captures.get(uid);
+      captures.set(uid,{uid,conv:!d.conv || precedente?.conv===null?null:new Set([...(precedente?.conv || []),String(d.conv)])});
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const batch=[...captures.values()];captures.clear();
+        for(const capture of batch){
+          if(arrete)return;
+          if (curSub === 'messages') {
+            const h = await fetchHarvest(capture.uid,'inbox');
+            if (!arrete && Array.isArray(h?.conversations)) {
+              const acc = accounts.find(a=>String(a.vinted_user_id)===capture.uid);
+              setConvs(prev=>({...prev,loading:false,error:false,items:[...(prev.items||[]).filter(c=>String(c._acc?.vinted_user_id)!==capture.uid),...h.conversations.map(c=>({...c,_acc:acc}))].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0))}));
+              delete _acctCache.convs;
+            }
+          }
+          if (openConv && String(openConv.acc?.vinted_user_id)===capture.uid && (capture.conv===null || capture.conv.has(String(openConv.convId)))) {
+            const h = await fetchHarvestConversation(capture.uid,openConv.convId);
+            if (!arrete && h?.conversation) setOpenConv(prev=>{
+              if (prev?.request!==openConv.request) return prev;
+              const conversation=fusionnerConversation(prev.conversation,h.conversation);
+              return conversation?{...prev,conversation,messages:normalizeConversationMessages(conversation),source:'harvest'}:prev;
+            });
+          }
+        }
+      },350);
+    };
+    window.addEventListener('vrm:ext',ecoute);
+    return ()=>{arrete=true;clearTimeout(timer);captures.clear();window.removeEventListener('vrm:ext',ecoute);};
+  },[curSub,cleComptes,openConv?.request]);
+
   const sendReply = async () => {
     const oc = openConv; const text = replyText.trim();
     if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
@@ -26701,8 +26747,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (stt !== 'completed') continue;
       const sell = sellAmt; ca+=sell; nb+=1;
       const e = effEntry(o);
-      const fee = feesOf(e); frais += fee;
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      const fee = chargesVente(e); frais += fee;
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; benefConnu += sell-buy-fee; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
     return { ca, cout, frais, benef:ca-cout-frais, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
@@ -26825,11 +26871,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (j>=0 && j<3650) { daysSum+=j; daysNb+=1; }
       }
       // Meilleure marque : bénéfice moyen par paire (si prix d'achat connu).
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
       if (buy!=null && !isNaN(buy)) {
         const b = extractBrand(o.title) || '—';
         if (!brands[b]) brands[b] = { benef:0, nb:0 };
-        brands[b].benef += (sell-buy-feesOf(e)); brands[b].nb += 1;
+        brands[b].benef += (sell-buy-chargesVente(e)); brands[b].nb += 1;
       }
     }
     let bestBrand=null;
@@ -26914,9 +26960,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       if (idx[ym]==null) continue;
       const sell=o.price?.amount!=null?Number(o.price.amount):0;
-      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?(centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100):null;
       months[idx[ym]].ca+=sell;
-      if(buy!=null&&!isNaN(buy)) months[idx[ym]].benef += (sell-buy-feesOf(e));
+      if(buy!=null&&!isNaN(buy)) months[idx[ym]].benef += (sell-buy-chargesVente(e));
     }
     const max = Math.max(1, ...months.map(m=>Math.max(m.ca, m.benef)));
     const total = months.reduce((s,m)=>s+m.ca,0);
@@ -26970,10 +27016,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let fastest=null, slowest=null, bestPair=null;
     for (const o of items) {
       const sell=o.price?.amount!=null?Number(o.price.amount):0; ca+=sell;
-      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?(centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100):null;
       const d=new Date(o.date); monthsCA[d.getMonth()]+=sell; dates.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
       const b=extractBrand(o.title)||'Autres'; brands[b]=(brands[b]||0)+1;
-      if(buy!=null&&!isNaN(buy)){ const m=sell-buy-feesOf(e); benef+=m; benefNb++; if(!bestPair||m>bestPair.m) bestPair={m, title:o.title, num:e&&e.numero, photo:e&&e.photo}; }
+      if(buy!=null&&!isNaN(buy)){ const m=sell-buy-chargesVente(e); benef+=m; benefNb++; if(!bestPair||m>bestPair.m) bestPair={m, title:o.title, num:e&&e.numero, photo:e&&e.photo}; }
       if(e&&e.numberedAt){ const j=(d-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){ if(!fastest||j<fastest.j) fastest={j:Math.round(j),title:o.title,num:e&&e.numero}; if(!slowest||j>slowest.j) slowest={j:Math.round(j),title:o.title,num:e&&e.numero}; } }
     }
     const topBrand = Object.entries(brands).sort((a,b)=>b[1]-a[1])[0] || null;
@@ -27003,8 +27049,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       total+=1;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
       const e = effEntry(o);
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-      const fee = feesOf(e);
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
+      const fee = chargesVente(e);
       const days = (e && e.numberedAt && o.date) ? (new Date(o.date)-new Date(e.numberedAt))/86400000 : null;
       const b = extractBrand(o.title) || '—';
       const s = extractSize(o.title) || '?';
@@ -27052,7 +27098,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = effEntry(o);
       const buy = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? parseFloat(String(e.buyPrice).replace(',', '.')) : null;
       if (sell == null || buy == null || isNaN(buy)) continue;
-      const net = sell - buy - feesOf(e);
+      const net = sell - buy - chargesVente(e);
       if (net < -0.005) list.push({ o, sell, buy, net, num: e?.numero, title: o.title });
     }
     list.sort((a, b) => a.net - b.net);
@@ -27200,8 +27246,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (o.date) { const d=new Date(o.date); if(!isNaN(d) && (!lastDate || d>lastDate)) lastDate=d; }
       const e = effEntry(o);
       if (e && e.numberedAt && o.date) { const j=(new Date(o.date)-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){daysSum+=j;daysNb+=1;} }
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-      if (buy!=null && !isNaN(buy)) { benefSum += (sell-buy-feesOf(e)); benefNb+=1; }
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
+      if (buy!=null && !isNaN(buy)) { benefSum += (sell-buy-chargesVente(e)); benefNb+=1; }
     }
     const online = annBase.filter(it=>match(it.title)).length;
     const avgSell = nb ? caSum/nb : null;
@@ -27615,8 +27661,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const sell = l.eur;
       let fee = 0, buy = null, num = '';
       if (l.plateforme === 'Vinted' && l.o) {
-        const e = effEntry(l.o); fee = feesOf(e);
-        const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+        const e = effEntry(l.o); fee = chargesVente(e);
+        const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
         if (b!=null && !isNaN(b)) buy = b;
         num = (e && e.numero) || '';
       }
@@ -27870,8 +27916,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const sell = l.eur;
       let fee = 0, buy = null, num = '', account = '';
       if (l.plateforme === 'Vinted' && l.o) {
-        const e = effEntry(l.o); fee = feesOf(e);
-        const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+        const e = effEntry(l.o); fee = chargesVente(e);
+        const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
         if (b!=null && !isNaN(b)) buy = b;
         num = (e && e.numero) || ''; account = l.o._acc ? accName(l.o._acc) : '';
         const uV = String(l.o._acc?.vinted_user_id ?? ''); const qV = vintedParUid[uV] || (vintedParUid[uV] = { n: 0, cts: 0 });
@@ -28342,19 +28388,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
-    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Boost','Bénéfice net','Statut']];
+    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Frais confirmés']];
     (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
       const e = effEntry(o); const num = e?.numero || '';
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : '';
-      const fee = feesOf(e);
-      const benef = (buy!=='' && sell!=='' && !isNaN(buy)) ? (sell-buy-fee).toFixed(2) : '';
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : '';
+      const fee = chargesVente(e);
+      const bilan=beneficePaire(o.price?.amount,e);
+      const benef = st!=='cancelled' && bilan.benefice!=null ? bilan.benefice.toFixed(2) : '';
       rows.push([
         o.date?new Date(o.date).toLocaleDateString('fr-FR'):'', accName(o._acc), num, o.title||'',
-        sell===''?'':String(sell).replace('.',','), buy===''?'':String(buy).replace('.',','),
+        sell===''?'':String(sell).replace('.',','), buy==='' || buy==null?'':String(buy).replace('.',','),
         fee>0?String(fee.toFixed(2)).replace('.',','):'',
         benef===''?'':String(benef).replace('.',','), st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours',
+        ...['fees',...champsCharges.map(([k])=>k)].map(k=>centimes(e?.[k])==null?'':String(centimes(e[k])/100).replace('.',',')),bilan.complet?'oui':'non',
       ]);
     });
     const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -29041,15 +29089,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
             const st = classifyOrderStatus(o.status);
-            const photo = photoCommande(o, listings.items || _acctCache.listings?.items || []);
             const hidden = isHidden(o);
             const e = effEntry(o); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
-            const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-            const fees = feesOf(e);
-            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
+            const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
+            const fees = chargesVente(e);
+            const bilan = beneficePaire(o.price?.amount,e);
+            const benef = st==='cancelled'?null:bilan.benefice;
             const ov = saleOv[String(o.transaction_id)] || {};
             const baseE = resolvedEntry(o);
+            const photo = photoCommande(o, listings.items || _acctCache.listings?.items || []) || photoArticle(baseE);
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
@@ -29092,8 +29141,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
-                  {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
+                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
                       ou reçu par email en secours), sinon il COMMANDE l'extension.
@@ -29112,6 +29161,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
                <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
+               {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
                     (30 sept. : une ligne de moins par vente). */}
@@ -29249,9 +29299,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
-              ? <StatBox compact label="Bénéfice net" value="—" color={C.muted} sub={null}
+              ? <StatBox compact label="Bénéfice estimé" value="—" color={C.muted} sub={null}
                   onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
-              : <StatBox compact label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
+              : <StatBox compact label="Bénéfice estimé" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                   subColor={totals.nbCout<totals.nb?C.warn:undefined}
                   sub={totals.nbCout<totals.nb
                     ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
@@ -32465,9 +32515,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={inc ?? fmtE(annual.tvaMarge)} color={inc ? C.muted : C.warn}/>
                   <StatBox label="Marge HT" value={inc ?? fmtE(annual.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={inc ?? fmtE(annual.benefNet)} color={inc ? C.muted : annual.benefNet>=0?INV_STATUS.online.color:C.danger}
+                  <StatBox label="Bénéfice estimé" value={inc ?? fmtE(annual.benefNet)} color={inc ? C.muted : annual.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
-                    sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
+                    sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`frais renseignés ${fmtE(annual.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
@@ -33078,9 +33128,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       derrière est passé à l'encre. Ces deux chiffres n'appellent
                       aucune action : ce sont des faits. Le rouge reste pour un
                       bénéfice NÉGATIF, qui lui en appelle une. */}
-                  <StatBox label="Bénéfice net" value={report.enCours?'…':report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
+                  <StatBox label="Bénéfice estimé" value={report.enCours?'…':report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
-                    sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
+                    sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`frais renseignés ${fmtE(report.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>); })()}
@@ -33244,7 +33294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · boost ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · frais ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{fmtE(v.sell)}</div>
                   </div>
@@ -33278,11 +33328,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Relier un bordereau à une paire numérotée (à la main) ── */}
       {linkPickFor && (()=>{
-        const byNum = new Map();
-        for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null) byNum.set(String(e.numero), e); }
         const q = linkSearch.trim().toLowerCase();
-        const list = [...byNum.entries()]
-          .map(([num, e]) => ({ num, ...e }))
+        const list = candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum)
           .filter(e => !q || String(e.num).includes(q) || (e.title||'').toLowerCase().includes(q) || (e.size!=null && String(e.size).toLowerCase().includes(q)))
           .sort((a,b)=>(parseInt(a.num,10)||0)-(parseInt(b.num,10)||0));
         const already = bordLinks[bordKey(linkPickFor)];
@@ -33301,7 +33348,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:8,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire numérotée{q?' pour cette recherche':''}.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire hors ligne{q?' pour cette recherche':' disponible'}. Les paires encore en ligne ne sont pas proposées pour cette vente.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -40267,7 +40314,7 @@ function AppCoeur() {
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
-          <div><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['compte','Compte']]} dark/></div>
+          <div><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
@@ -40278,6 +40325,7 @@ function AppCoeur() {
           )}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={setPlatSub}/>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
