@@ -4,6 +4,7 @@ import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
+import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { photoArticle, photoCommande } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -7024,7 +7025,7 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
   const tonal = danger ? C.danger : (color || C.accent);
   return (
-    <button className="vrm-button" type="button" onClick={onClick} disabled={!!disabled} style={{
+    <button className="vrm-button" data-size={small?'small':undefined} data-variant={danger?'danger':outline?'outline':'primary'} type="button" onClick={onClick} disabled={!!disabled} style={{
       background:outline ? 'transparent' : tonal,
       color:outline ? tonal : (color || danger ? '#fff' : C.onAccent),
       border:`1px solid ${outline ? C.border : tonal}`,
@@ -7036,7 +7037,7 @@ function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
 }
 function Input({label,...p}) {
   return (
-    <label style={{display:'flex',flexDirection:'column',gap:4}}>
+    <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
       <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:5,
         color:C.text,padding:'8px 12px',fontSize:13,outline:'none',fontFamily:'inherit',...(p.style||{})}}
@@ -7330,11 +7331,11 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
     style:{border:'none',background:'transparent',padding:0,margin:0,font:'inherit',textAlign:'left',cursor:'pointer',width:'100%',
            display:'block',minHeight:0} } : {};
   return (
-    <Balise {...extra} style={compact
+    <Balise {...extra} className={compact?"vrm-stat vrm-stat-compact":"vrm-stat"} style={compact
         ? {flex:1,minWidth:0,...(extra.style||{}),padding:'2px 14px',boxShadow:`-1px 0 0 ${C.border}`}
         : {flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
       <div className={compact?undefined:'vrm-label'} style={compact?{fontSize:11.5,color:C.muted,fontWeight:500}:{color:C.muted,minHeight:'2.44em'}}>{label}</div>
-      <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
+      <div className="vrm-display" style={{'--vrm-value-size':fs,fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
   );
@@ -7888,7 +7889,7 @@ function IconTile({ name, color, size = 30 }) {
 const Icon = ({ name, size = 24, style }) => {
   const d = ICON_PATHS[name]; if (!d) return null;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg className="vrm-ui-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
       /* Une <svg> est un élément en ligne : sans ça elle se pose sur la ligne
          de base du texte et l'icône d'un bouton paraît décalée vers le haut. */
@@ -10791,7 +10792,8 @@ function LigneVente({ photo, titre, meta, montant, actions }) {
         <div className="vrm-sale-title" style={{fontSize:14,fontWeight:600,lineHeight:1.3,color:C.text}}>{titre || '(sans titre)'}</div>
         <div className="vrm-sale-meta" style={{fontSize:11.5,color:C.muted,marginTop:4}}>{meta}</div>
       </div>
-      <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}><span className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{montant}</span>{actions}</div>
+      <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}><span className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{montant}</span></div>
+      {actions && <div className="vrm-sale-commands">{actions}</div>}
     </div>
   </article>;
 }
@@ -13333,8 +13335,8 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
   const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
   return (
-    <div data-regle-envoi={envoiRegle || undefined} style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
-      <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0} data-ebay-carte-ouvrir={it.itemId}
+    <div className="vrm-ebay-listing" data-regle-envoi={envoiRegle || undefined} style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
+      <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0} className="vrm-ebay-listing-overview" data-ebay-carte-ouvrir={it.itemId}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
         style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', cursor: 'pointer' }}>
         <PhotoVente src={it.photo} size={56} />
@@ -18181,7 +18183,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
 
 // Helper pour les champs du formulaire
 function Field({label,children}) {
-  return <label style={{display:'flex',flexDirection:'column',gap:4}}>
+  return <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
     <span style={{fontSize:11,color:C.muted,fontWeight:600}}>{label}</span>
     {children}
   </label>;
@@ -20250,7 +20252,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   },[stockVinted,search]);
 
   return (
-    <div>
+    <div className="vrm-stock-page">
       <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
         desc="L'ancienne liste des numéros en ligne."
         right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
@@ -20264,7 +20266,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       </p>
 
       {/* Saisie à l'unité */}
-      <div style={{display:'flex',gap:8,marginBottom:12}}>
+      <div className="vrm-stock-add" style={{display:'flex',gap:8,marginBottom:12}}>
         <input
           value={input}
           onChange={e=>setInput(e.target.value)}
@@ -22704,6 +22706,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
+    // Recontrôler au clic : une synchro peut avoir changé les annonces affichées.
+    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) {
+      toast('Cette paire est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.');
+      return;
+    }
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
   };
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
@@ -29094,6 +29101,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
+
+                </div>
+                <div className="vrm-sale-commands">
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
                       ou reçu par email en secours), sinon il COMMANDE l'extension.
@@ -31407,7 +31417,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const rempli = (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details className="vrm-ann-actions" style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary aria-label={`Gérer ${it.title || 'cette annonce'}`} style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}><Icon name="gear" size={15}/> Gérer l’annonce <span className="vrm-action-chevron" aria-hidden="true">⌄</span></summary>
+                      <summary aria-label={`Gérer ${it.title || 'cette annonce'}`} style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}><Icon name="more" size={15}/><span className="vrm-ann-manage-label">Gérer</span> <span className="vrm-action-chevron" aria-hidden="true">⌄</span></summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
@@ -33278,11 +33288,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Relier un bordereau à une paire numérotée (à la main) ── */}
       {linkPickFor && (()=>{
-        const byNum = new Map();
-        for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null) byNum.set(String(e.numero), e); }
         const q = linkSearch.trim().toLowerCase();
-        const list = [...byNum.entries()]
-          .map(([num, e]) => ({ num, ...e }))
+        const list = candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum)
           .filter(e => !q || String(e.num).includes(q) || (e.title||'').toLowerCase().includes(q) || (e.size!=null && String(e.size).toLowerCase().includes(q)))
           .sort((a,b)=>(parseInt(a.num,10)||0)-(parseInt(b.num,10)||0));
         const already = bordLinks[bordKey(linkPickFor)];
@@ -33301,7 +33308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:8,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire numérotée{q?' pour cette recherche':''}.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire hors ligne{q?' pour cette recherche':' disponible'}. Les paires encore en ligne ne sont pas proposées pour cette vente.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -34966,9 +34973,9 @@ function LeboncoinScreen() {
   const lim = data ? (data.limit || null) : null;
   const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
   const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
-  const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '13px 15px', marginBottom: 12, ...style }}>{children}</div>;
+  const Card = ({ children, style }) => <div className="vrm-surface" style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '13px 15px', marginBottom: 12, ...style }}>{children}</div>;
   return (
-    <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
+    <div className="vrm-lbc-listings-page" style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
@@ -35226,7 +35233,7 @@ function LeboncoinScreen() {
                 // Combien MANQUENT à la capture (le vrai nombre d'après Vinted).
                 const manque = (q.nReelles != null && q.nReelles > q.photos) ? (q.nReelles - q.photos) : 0;
                 return (
-                <div key={q.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
+                <div className="vrm-lbc-listing" key={q.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
                   <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
@@ -35542,10 +35549,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // exactement ce qui fait « page web bricolée » au lieu d'« application ».
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
   const Row = ({icon,title,desc,onClick,color}) => (
-    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+    <button className="vrm-settings-row" type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
       {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
           retombe sur l'emoji (les écrans pas encore repris). */}
-      {ICON_PATHS[icon] ? <IconTile name={icon} color={color||C.accent}/> : <span style={{fontSize:22,flexShrink:0}}>{icon}</span>}
+      <IconTile name={ICON_PATHS[icon]?icon:icon==='☀️'||icon==='🌙'?'sun':'gear'} color={color||C.muted}/>
       <span style={{flex:1,minWidth:0}}>
         <span style={{display:'block',fontSize:15,fontWeight:600,color:color||C.text}}>{title}</span>
         {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>{desc}</span>}
@@ -35630,7 +35637,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const voirCompte = !ongletsCompte || vue === 'compte';
   const voirReglages = !ongletsCompte || vue === 'reglages';
   return (
-    <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
+    <div className="vrm-settings-page" style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <AcctSheet/>
       <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
       <ReglagesPasLus/>
@@ -39973,7 +39980,7 @@ function AppCoeur() {
           voyait comme un décalage. 1180 occupe l'espace disponible sans que la
           ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
-      <main className="vrm-main" data-defile="1" style={{
+      <main className="vrm-main" data-screen={tab} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).

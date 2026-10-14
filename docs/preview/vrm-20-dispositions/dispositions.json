@@ -1,0 +1,102 @@
+[
+  {
+    "id": "01",
+    "name": "Liste compacte",
+    "description": "Pour gérer rapidement les paires au quotidien"
+  },
+  {
+    "id": "02",
+    "name": "Atelier contrasté",
+    "description": "Navigation sombre et espace de travail lumineux"
+  },
+  {
+    "id": "03",
+    "name": "Liste business",
+    "description": "Lignes fines, prix et commandes bien alignés"
+  },
+  {
+    "id": "04",
+    "name": "Grille de paires",
+    "description": "Des petites fiches pour parcourir le catalogue"
+  },
+  {
+    "id": "05",
+    "name": "Deux colonnes",
+    "description": "Deux listes de travail sur grand écran"
+  },
+  {
+    "id": "06",
+    "name": "Tableau de travail",
+    "description": "Une ligne par paire, colonnes stables"
+  },
+  {
+    "id": "07",
+    "name": "Liste et détail",
+    "description": "La liste à gauche, un panneau de lecture à droite"
+  },
+  {
+    "id": "08",
+    "name": "Suivi financier",
+    "description": "Les résultats au premier plan, les paires juste après"
+  },
+  {
+    "id": "09",
+    "name": "Chiffres sur le côté",
+    "description": "Un rail de chiffres, une grande liste au centre"
+  },
+  {
+    "id": "10",
+    "name": "Par compte",
+    "description": "Séparer Bordeaux et Lyon dans la même vue"
+  },
+  {
+    "id": "11",
+    "name": "Deux files de travail",
+    "description": "À suivre et à ajuster, dans deux colonnes"
+  },
+  {
+    "id": "12",
+    "name": "Fil d’activité",
+    "description": "Les paires organisées comme un fil continu"
+  },
+  {
+    "id": "13",
+    "name": "Catalogue photo",
+    "description": "La photo prend davantage de place, sans empiler les actions"
+  },
+  {
+    "id": "14",
+    "name": "Numéros de rangement",
+    "description": "Le numéro devient le repère principal de la liste"
+  },
+  {
+    "id": "15",
+    "name": "Par pointure",
+    "description": "Retrouver les paires 42, 43 et 44 par groupes"
+  },
+  {
+    "id": "16",
+    "name": "Filtres visibles",
+    "description": "Un panneau de filtres prêt à l’emploi"
+  },
+  {
+    "id": "17",
+    "name": "Sélection en lots",
+    "description": "Sélectionner plusieurs paires dans une liste compacte"
+  },
+  {
+    "id": "18",
+    "name": "Expédition en priorité",
+    "description": "La vue commence par les colis à envoyer"
+  },
+  {
+    "id": "19",
+    "name": "Navigation en haut",
+    "description": "Plus de largeur disponible sur ordinateur"
+  },
+  {
+    "id": "20",
+    "name": "Sections sur le côté",
+    "description": "Sections verticales sur ordinateur, sélecteur compact sur téléphone"
+  }
+]
