@@ -35,3 +35,8 @@ const route=await ctx.handleSync({owner:'vendeur-A',compte:{suffixe:'_autre',pri
 assert.equal(route.body.lu.commandes,true);assert.equal(route.body.complet.commandes,false);assert.equal(writes.find(x=>x.id==='ebay_orders_autre').d.orders.length,3);assert.ok(writes.every(w=>w.owner==='vendeur-A'));
 failStore=true;const failed=await ctx.handleSync({owner:'vendeur-A',compte:{suffixe:'_autre',principal:false}});assert.equal(failed.body.lu.commandes,false);assert.equal(failed.body.lu.annonces,false);
 console.log('Parcours eBay : accès précis, brouillons cloisonnés, codes, bénéfices et capture partielle vérifiés ; synchronisation serveur exécutée avec services simulés.');
+
+const actions=source.slice(source.indexOf('    const ACTIONS = {'),source.indexOf('    if (!Object.prototype.hasOwnProperty.call(ACTIONS'));
+const names=[...actions.matchAll(/^      ([a-z]+):/gm)].map(m=>m[1]);
+assert.equal(new Set(names).size,names.length,'aucune action serveur masquée par une clé dupliquée');
+assert.ok(names.includes('offre') && names.includes('offredetail'),'envoi aux observateurs et lecture ciblée distincts');

@@ -1,0 +1,16 @@
+/* eBay : compact sur téléphone, lisible sans changer les actions métier. */
+.vrm-ebay-task-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vrm-ebay-task-filters button{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:40px;transition:background .15s}
+.vrm-ebay-filter-count{font-size:10px;font-variant-numeric:tabular-nums;opacity:.7}
+.vrm-ebay-tasks button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.vrm-ebay-task-row{min-height:54px}
+.vrm-ebay-task-row:hover{filter:brightness(.97)}
+@media(min-width:1000px){.vrm-ebay-task-groups{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}}
+@media(max-width:480px){
+.vrm-ebay-task-filters{gap:4px}
+.vrm-ebay-task-filters button{padding:7px 3px!important;font-size:11px!important;gap:3px}
+.vrm-ebay-heading h2{font-size:18px!important}
+.vrm-ebay-task-row{padding:9px 10px!important}
+.vrm-ebay-task-row small{font-size:10px;overflow-wrap:anywhere}
+.vrm-ebay-tasks input[type=search]{font-size:16px!important}
+}
