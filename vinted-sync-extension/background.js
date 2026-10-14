@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.175.0';
+const CODE_VERSION = '5.176.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1184,6 +1184,33 @@ async function inboxFusionnee(rowId, neuf) {
   return fusionnerInbox(avant, neuf);
 }
 
+// Les pages d'un même fil se réunissent par identité de message.
+// BEGIN CONVERSATION PARTAGEE
+function fusionnerConversation(avant, neuf) {
+  const a = avant && (avant.conversation || avant), n = neuf && (neuf.conversation || neuf);
+  if (!n || !Array.isArray(n.messages)) return null;
+  if (a?.id != null && n.id != null && String(a.id) !== String(n.id)) return null;
+  const messages = [], index = new Map();
+  for (const m of [...(Array.isArray(a?.messages) ? a.messages : []), ...n.messages]) {
+    if (!m || typeof m !== 'object') continue;
+    const id = m.id ?? m.entity?.id;
+    const cle = id == null || String(id).trim() === '' ? null : String(m.entity_type || '') + ':' + String(id);
+    if (cle != null && index.has(cle)) { const i = index.get(cle); messages[i] = { ...messages[i], ...m, ...(m.entity ? { entity: { ...(messages[i].entity || {}), ...m.entity } } : {}) }; }
+    else { if (cle != null) index.set(cle, messages.length); messages.push(m); }
+  }
+  const ts = m => { const v = m.created_at_ts ?? m.entity?.created_at_ts ?? m.created_at ?? m.entity?.created_at; const num = Number(v); return v == null ? 0 : Number.isFinite(num) ? (num < 1e12 ? num * 1000 : num) : (Date.parse(v) || 0); };
+  messages.sort((x,y) => ts(x) - ts(y));
+  const conversation = { ...(a || {}), ...n, messages };
+  return neuf.conversation ? { ...neuf, conversation } : conversation;
+}
+// END CONVERSATION PARTAGEE
+
+async function conversationFusionnee(rowId, neuf) {
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=p:data->payload`);
+  if (rows === null) return null;
+  return fusionnerConversation(rows[0]?.p || null, neuf);
+}
+
 async function dressingPlusRiche(rowId, parsed) {
   const n = ((parsed && parsed.items) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
@@ -1393,6 +1420,10 @@ async function storeHarvest(domain, type, id, body) {
     const f = await inboxFusionnee(rowId, parsed);
     if (f === null) { noterDiag('inbox_lecture_ratee'); return; }   // pas su : on n'écrase rien
     parsed = f;
+  } else if (type === 'conversation') {
+    const f = await conversationFusionnee(rowId, parsed);
+    if (f === null) { noterDiag('conversation_lecture_ou_forme_ratee'); return; }
+    parsed = f;
   } else if (CLE_LISTE[type]) {
     const riche = await listePlusRiche(rowId, parsed, CLE_LISTE[type]);
     if (riche === null) return;                   // compteur illisible : pas su, on n'écrase rien (déjà noté)
@@ -1438,6 +1469,7 @@ async function storeHarvest(domain, type, id, body) {
   // 5.165 : un dressing RANGÉ fait foi sur les suppressions d'avant (règle
   // `supprimeeApres`) et rajeunit « annonces lues il y a… » : l'app relit.
   if (ecrit !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+  if (ecrit !== false && (type === 'inbox' || type === 'conversation')) notifierApp({ type: 'maj', quoi: 'messages', uid: String(uid), ...(type === 'conversation' ? {conv:String(id)} : {}) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -2635,14 +2667,19 @@ const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title',
   'promoted','can_push_up'];
 
 function photoUtile(it) {
-  const p = it.photo || (Array.isArray(it.photos) ? it.photos[0] : null) || null;
-  if (!p) return null;
-  const url = p.url || (Array.isArray(p.thumbnails) && p.thumbnails[0] && p.thumbnails[0].url) || null;
-  if (!url) return null;
-  const out = { url };
-  const ts = p.high_resolution && p.high_resolution.timestamp;
-  if (ts) out.high_resolution = { timestamp: ts };   // sert a dater la mise en ligne
-  return out;
+  const candidats = [it.photo, ...(Array.isArray(it.photos) ? it.photos : []), it.item?.photo,
+    ...(Array.isArray(it.item?.photos) ? it.item.photos : []), it.image, it.item?.image];
+  for (const p of candidats) {
+    if (!p) continue;
+    const url = typeof p === 'string' ? p : p.url || p.imageUrl || p.src
+      || (Array.isArray(p.thumbnails) && p.thumbnails.find(t => t && t.url)?.url);
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
+    const out = { url };
+    const ts = p.high_resolution && p.high_resolution.timestamp;
+    if (ts) out.high_resolution = { timestamp: ts };
+    return out;
+  }
+  return null;
 }
 
 function articleMaigre(it) {
@@ -2673,6 +2710,8 @@ function commandeMaigre(o) {
   for (const c of ['date','price','title','status','transaction_id','conversation_id','transaction_user_status']) {
     if (o[c] !== undefined) out[c] = o[c];
   }
+  const itemId = o.item_id ?? o.item?.id ?? o.item?.item_id;
+  if (itemId != null) out.item_id = itemId;
   const ph = photoUtile(o); if (ph) out.photo = ph;
   return out;
 }

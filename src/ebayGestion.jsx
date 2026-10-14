@@ -109,3 +109,14 @@ export function EbayOffres({compte='principal',headers,confirm,theme:C,onAnnonce
   <button type="button" onClick={onAnnonces} style={{...S.button,marginTop:14}}>Proposer aux observateurs d’une annonce</button>
  </section>;
 }
+
+export function EbayAgent({compte='principal',headers,theme:C,onSection}){
+ const S=styleUI(C),[data,setData]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function charger(){setBusy(true);setError('');try{setData(await appelerEbay('agent',{compte},headers));}catch(e){setError(e.message);}finally{setBusy(false);}}
+ useEffect(()=>{charger();},[]);
+ const labels={expedier:'Expédition',messageacheteur:'Message acheteur',repondre:'Réponse',repondreoffre:'Offre',modifierannonce:'Annonce modifiée',terminerannonce:'Fin d’annonce'};
+ return <section><div style={{display:'flex',gap:8,alignItems:'center'}}><h2 style={{fontSize:22,margin:0}}>À traiter sur eBay</h2><button disabled={busy} onClick={charger} style={{...S.button,marginLeft:'auto'}}>{busy?'Lecture…':'Actualiser'}</button></div><Erreur message={error}/><p style={{fontSize:12,color:C.muted}}>Prépare tes actions ici, puis vérifie et confirme dans la section correspondante.</p>
+ {data && <><div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11,color:C.muted}}>{data.sources.map(s=><span key={s.nom}>{s.nom} : {s.ok?(s.partiel?'lecture partielle':'à jour'):'lecture indisponible'}{s.at?` · ${new Date(s.at).toLocaleString('fr-FR')}`:''}</span>)}</div><div style={{display:'grid',gap:8,marginTop:12}}>{data.tasks.map(t=><button key={t.id} onClick={()=>onSection(t.section)} style={{...S.button,display:'flex',gap:8,justifyContent:'space-between',textAlign:'left'}}><span>{t.label}</span><small>{t.ref} →</small></button>)}</div>{!data.tasks.length && <p style={{fontSize:12,color:C.muted}}>Aucune action détectée dans les données lues.</p>}
+ <h3 style={{fontSize:15,marginTop:24}}>Historique des actions</h3>{!data.journalLisible?<Erreur message="Historique indisponible."/>:!data.journal.length?<p style={{fontSize:12,color:C.muted}}>Les prochaines actions effectuées dans VRM apparaîtront ici.</p>:<div style={{display:'grid',gap:8}}>{data.journal.map(j=><div key={j.id} style={{padding:10,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12}}><b>{labels[j.action] || j.action}</b> · {j.ref}<div style={{fontSize:11,color:C.muted,marginTop:4}}>{new Date(j.at).toLocaleString('fr-FR')} · {j.etat==='reussi'?'Confirmé par eBay':j.etat==='refuse'?'Refusé': 'À vérifier sur eBay'}</div>{['incertain','en_cours'].includes(j.etat) && <button style={{...S.button,marginTop:8}} onClick={()=>onSection(j.action.includes('offre')?'offres':['repondre','messageacheteur'].includes(j.action)?'messages':j.action.includes('annonce')?'annonces':'ventes')}>Relire avant de reprendre</button>}</div>)}</div>}</>}
+ </section>;
+}
