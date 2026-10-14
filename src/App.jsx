@@ -1,3 +1,4 @@
+import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
@@ -979,6 +980,7 @@ const SYNC_KEYS = [
   // Son rythme de programmation eBay (par jour, plage, jours, écart, ordre,
   // préréglages de départ) : le sien, sur tous ses appareils (5 octobre).
   'vrm_ebay_rythme',
+  'vrm_ebay_couts',
   'vrm_ebay_vue',             // l'onglet eBay : « Tous les comptes » ou UN compte (9 octobre)
   'vrm_ebay_compte_pub',      // le dernier compte eBay choisi pour publier / programmer
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
@@ -12737,6 +12739,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   //    CHAQUE compte a ses lignes ; on lit ceux de la vue (un, ou tous). ──
   const [data, setData] = React.useState(null);   // {listings, orders, capturedAt, illisibles} | null
   const [syncing, setSyncing] = React.useState(false);
+  const syncLock=React.useRef(false);
+  const [syncResult,setSyncResult]=React.useState({});
   const [soldes, setSoldes] = React.useState(null);  // [{compte, solde}] — solde : {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
   const autoFait = React.useRef(false);
   const comptesVue = React.useMemo(() => (Array.isArray(comptesEbay) ? comptesEbay : []).filter((c) => dansVueEbay({ _compte: c.ref }, vue)), [comptesEbay, vue]);
@@ -12754,29 +12758,39 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const lireData = React.useCallback(async () => {
     if (!Array.isArray(comptesEbay)) return null;
     const [L, O] = await Promise.all([
-      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesVue),
-      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders', comptesVue),
+      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt,complet:data->complet', 'items', comptesVue),
+      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt,complet:data->complet,lues:data->lues,total:data->total', 'orders', comptesVue),
     ]);
     if (!L || !O) return null;
     const caps = [...L.lignes, ...O.lignes].map((x) => x.ligne && Number(x.ligne.capturedAt)).filter((n) => Number.isFinite(n) && n > 0);
     const cap = caps.length ? Math.min(...caps) : null;
-    setData({ listings: L.items, orders: O.items, capturedAt: cap, illisibles: [...new Set([...L.illisibles, ...O.illisibles])] });
+    setData({ lectures:L.lignes.map(l=>({compte:l.compte,annonces:l.ligne,commandes:O.lignes.find(o=>o.compte.ref===l.compte.ref)?.ligne})),listings: L.items, orders: O.items, capturedAt: cap, illisibles: [...new Set([...L.illisibles, ...O.illisibles])] });
     return cap;
   }, [comptesEbay, comptesVue]);
-  const synchroniser = React.useCallback(async () => {
-    setSyncing(true);
-    // Chaque compte relié de la vue, l'un après l'autre (une synchro = des
-    // lectures chez eBay ; jamais en rafale).
-    const liste = (Array.isArray(comptesStatut) ? comptesStatut : []).filter((c) => c.relie === true && dansVueEbay({ _compte: c.principal ? 'principal' : c.cle }, vue));
-    let erreurs=0,partielles=0;
-    for (const c of (liste.length ? liste : [{ principal: true }])) {
-      try { const r=await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync', ...(c.principal ? {} : corpsCompteEbay(c.cle)) }) }); const j=await r.json(); if(!r.ok || !j.ok)erreurs++;else if(j.lu && (!j.lu.annonces || !j.lu.commandes))partielles++; } catch (_) {erreurs++;}
-    }
-    signalerComptesEbay();   // la synchro du principal a pu apprendre son pseudo
-    await lireData();
-    setRetour(erreurs?(liste.length>1?'Actualisation indisponible pour certains comptes. Les dernières données restent affichées.':'Actualisation indisponible. Les dernières données restent affichées.'):partielles?'Actualisation partielle. Certaines données conservent leur dernière lecture.':'Compte eBay actualisé.');
-    setSyncing(false);
-  }, [lireData, comptesStatut, vue]);
+  const synchroniser = React.useCallback(async (refCible) => {
+    if(syncLock.current)return;
+    if(!Array.isArray(comptesStatut)){setRetour('Les comptes eBay n’ont pas pu être lus. Actualise leur connexion avant de reprendre.');return;}
+    const ref=typeof refCible==='string'?refCible:null;
+    const liste=comptesStatut.filter(c=>c.relie===true && (ref?(c.principal?'principal':c.cle)===ref:dansVueEbay({_compte:c.principal?'principal':c.cle},vue)));
+    if(!liste.length){setRetour('Aucun compte connecté dans cette sélection.');return;}
+    syncLock.current=true;setSyncing(true);let erreurs=0,partielles=0;
+    try{
+      for(const c of liste){
+        const id=c.principal?'principal':c.cle;
+        setSyncResult(prev=>({...prev,[id]:{etat:'lecture'}}));
+        try{
+          const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'sync',...(c.principal?{}:corpsCompteEbay(c.cle))})});
+          const j=await r.json();const ok=r.ok && j.ok===true;
+          const manque=ok?['annonces','commandes'].filter(k=>j.lu?.[k]!==true):[];
+          const incompletes=ok?['annonces','commandes'].filter(k=>j.lu?.[k]===true && j.complet?.[k]!==true):[];
+          if(!ok)erreurs++;else if(manque.length || incompletes.length)partielles++;
+          setSyncResult(prev=>({...prev,[id]:{etat:!ok?'erreur':manque.length || incompletes.length?'partiel':'ok',manque,incompletes,reason:j.reason || null,at:Date.now()}}));
+        }catch(_){erreurs++;setSyncResult(prev=>({...prev,[id]:{etat:'erreur',at:Date.now()}}));}
+      }
+      signalerComptesEbay();await lireData();
+      setRetour(erreurs?'Certaines lectures ont échoué. Tu peux reprendre uniquement le compte concerné.':partielles?'Lecture partielle : les données non relues conservent leur dernière capture.':'Comptes eBay actualisés.');
+    }finally{syncLock.current=false;setSyncing(false);}
+  }, [lireData,comptesStatut,vue]);
   React.useEffect(() => {
     if (connected !== true || !Array.isArray(comptesEbay)) return;
     let stop = false;
@@ -12846,6 +12860,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             </button>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>eBay te demandera de te connecter : choisis l'AUTRE compte (particulier ou pro). Chaque compte garde ses annonces et ses ventes à part.</div>
           </div>
+          <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button></div>;})}</div></details>
           <details className="vrm-ebay-settings"><summary>Solde et paramètres du compte</summary>
           {data == null ? (
             <div style={{ fontSize: 12.5, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
@@ -12976,10 +12991,14 @@ function EbayActionCompte({vue,comptes,onCompte,children}){
  if(vue==='*' && comptes.length>1)return <div style={{display:'grid',gap:12}}><p style={{fontSize:13,color:C.muted}}>Choisis le compte eBay pour consulter ses échanges et répondre à ses acheteurs.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{comptes.map(c=><button type="button" key={c.ref} onClick={()=>onCompte(c.ref)} style={{padding:'10px 14px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text}}>{nomCompteEbay(c)}</button>)}</div></div>;
  return children(vue==='*'?(comptes[0]?.ref || 'principal'):vue);
 }
-function EbayVentes({ baseKO,vue='*',comptesEbay }) {
+function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const E = EBAY_SKIN;
   const [filtre,setFiltre]=React.useState('all');
   const [recherche,setRecherche]=React.useState('');
+  const [couts,setCouts]=React.useState(()=>load('vrm_ebay_couts',{}));
+  const touched=React.useRef(false);
+  React.useEffect(()=>onCloudReady(()=>{if(!touched.current)setCouts(load('vrm_ebay_couts',{}));}),[]);
+  const sauverCouts=(compte,id,patch)=>{touched.current=true;setCouts(prev=>{const k=JSON.stringify([compte,String(id)]),next={...prev,[k]:{...(prev[k]||{}),...patch}};save('vrm_ebay_couts',next);return next;});};
   const [annonces, setAnnonces] = React.useState([]);
   const [lu,setLu]=React.useState(undefined);
   React.useEffect(()=>{if(comptesEbay===undefined)return;let stop=false;(async()=>{
@@ -12995,16 +13014,18 @@ function EbayVentes({ baseKO,vue='*',comptesEbay }) {
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
-  if (!orders.length) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
+  if (!orders.length && !cible) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
   const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c==='EUR'?'€':c || '');
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   return wrap(<>
     {head}
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{orders.length} commande{orders.length > 1 ? 's' : ''}{payees ? ` · ${payees} payée${payees > 1 ? 's' : ''}` : ''}</div>
     {illisibles.length>0 && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
+    {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
+    {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
     <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche}/>
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {orders.filter(o=>(!recherche || String(o.lineItems?.[0]?.title || '').toLowerCase().includes(recherche.toLowerCase())) && (filtre==='all' || (filtre==='done'?['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase()):o.orderPaymentStatus==='PAID' && !['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase())))).map((o, i) => {
+      {orders.filter(o=>cible?String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte:(!recherche || String(o.lineItems?.[0]?.title || '').toLowerCase().includes(recherche.toLowerCase())) && (filtre==='all' || (filtre==='done'?['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase()):o.orderPaymentStatus==='PAID' && !['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase())))).map((o, i) => {
         const li = (o.lineItems && o.lineItems[0]) || {};
         const img = photoCommande(o, annonces.filter(a=>(a._compte || 'principal')===(o._compte || 'principal')));
         const paye = String(o.orderPaymentStatus || '').toUpperCase() === 'PAID';
@@ -13013,7 +13034,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay }) {
         const col = !paye ? E.muted : expedie ? E.muted : E.warn;
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande order={o} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>
   </>);
@@ -38678,9 +38699,10 @@ function AppCoeur() {
   // référence). Réglage synchronisé (`vrm_ebay_vue`), rattrapé à l'arrivée du
   // nuage seulement s'il est resté au défaut (§5.49). Un compte déconnecté
   // depuis — ou un seul compte relié — ⇒ « Tous » (rien à choisir).
+  const [ebayCible,setEbayCible]=useState(null);
   const [ebayVue,setEbayVueBrut]=useState(()=>{ const v=load('vrm_ebay_vue','*'); return (typeof v==='string'&&v)?v:'*'; });
   useEffect(()=>onCloudReady(()=>setEbayVueBrut((v)=>v==='*'?((()=>{ const n=load('vrm_ebay_vue','*'); return (typeof n==='string'&&n)?n:'*'; })()):v)),[]);
-  const setEbayVue=(v)=>{ const n=(typeof v==='string'&&v)?v:'*'; setEbayVueBrut(n); save('vrm_ebay_vue',n); };
+  const setEbayVue=(v)=>{ const n=(typeof v==='string'&&v)?v:'*'; setEbayCible(null); setEbayVueBrut(n); save('vrm_ebay_vue',n); };
   const ebayVueEff=(Array.isArray(comptesEbay)&&comptesEbay.length>=2&&comptesEbay.some((c)=>c.ref===ebayVue))?ebayVue:'*';
   useEffect(()=>{
     let stop=false;
@@ -40315,7 +40337,7 @@ function AppCoeur() {
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
-          <div><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
+          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
@@ -40324,10 +40346,10 @@ function AppCoeur() {
               attrs={{ 'data-ebay-vue': ebayVueEff }}
               options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) }))} />
           )}
-          {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
-          {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={setPlatSub}/>}</EbayActionCompte></div>}
-          {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
+          {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
+          {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/>}</EbayActionCompte></div>}
+          {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}

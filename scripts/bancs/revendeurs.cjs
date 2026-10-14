@@ -17,8 +17,8 @@ const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
-{id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
-{id:'ebay_listings',data:{items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
+{id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
+{id:'ebay_listings',data:{capturedAt:Date.now(),complet:true,items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
 const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const server = http.createServer((q,r)=>{
   let fichier = new URL(q.url,'http://localhost').pathname;
@@ -69,10 +69,14 @@ async function brancher(p){
   b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[];
-  await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true};
-   if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
-   if(a==='agent')j={ok:true,tasks:[{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12',title:'Paire à négocier',price:'85.00',currency:'EUR',deadline:new Date(Date.now()+3600000).toISOString(),urgent:true}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'},...Array.from({length:6},(_,i)=>({id:'j'+(i+2),action:'expedier',ref:String(i+2),at:Date.now(),etat:'reussi'}))],journalLisible:true};
-   if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
+  await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
+   if(a==='status')j={ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]};
+   if(a==='commande')j={ok:true,order:{orderId:body.orderId,orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',buyer:{username:'Acheteur test'},pricingSummary:{total:{value:'115',currency:'EUR'}},lineItems:[{lineItemId:'111',legacyItemId:'12',title:'Paire eBay',quantity:1,lineItemCost:{value:'100',currency:'EUR'},total:{value:'115',currency:'EUR'}}],totalMarketplaceFee:{value:'12.50',currency:'EUR'}},fulfillments:[]};
+   if(a==='sync')j={ok:true,lu:{annonces:true,commandes:false},complet:{annonces:true,commandes:false}};
+   if(a==='message')j={ok:true,message:{id:body.messageId,itemId:body.itemId,sender:'Ancien acheteur',subject:'Ancien échange',body:'Message hors de la première page',responses:[]}};
+   if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.','Code de retrait : 001234']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
+   if(a==='agent')j={ok:true,tasks:[{id:'message:m1',section:'messages',label:'Répondre au message',ref:'12',title:'Message de la paire'},{id:'message:999',section:'messages',label:'Répondre au message',ref:'12',title:'Ancien échange à retrouver'},{id:'order:old-1',section:'ventes',label:'Préparer l’expédition',ref:'old-1',title:'Ancienne commande à retrouver'},{id:'order:1',section:'ventes',label:'Préparer l’expédition',ref:'1',title:'Paire à expédier'},{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12',title:'Paire à négocier',price:'85.00',currency:'EUR',deadline:new Date(Date.now()+3600000).toISOString(),urgent:true}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'},...Array.from({length:6},(_,i)=>({id:'j'+(i+2),action:'expedier',ref:String(i+2),at:Date.now(),etat:'reussi'}))],journalLisible:true};
+   if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'},{id:'o2',itemId:'13',titre:'Autre offre eBay',buyer:'Autre acheteur',price:90,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
    if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
    return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
   });
@@ -198,7 +202,7 @@ async function brancher(p){
   await p.getByLabel('Réponse au message eBay').fill('Merci pour votre message');await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===0,'annuler la réponse ne transmet rien');
   await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).waitFor();await p.getByRole('button',{name:'Annuler',exact:true}).locator('..').getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.waitForFunction(()=>document.body.textContent.includes('Refus simulé eBay'));check(writes.length===1 && writes[0].messageId==='m1','réponse associée au message exact');check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','refus conserve le brouillon');
   await p.getByLabel('Fermer la conversation eBay').click();await p.getByRole('button',{name:'Offres',exact:true}).click();await p.getByText('Paire de test',{exact:true}).waitFor();check(writes.length===1,'lire les offres ne les accepte pas');
-  await p.getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
+  await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
   check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'agent montre le titre de la paire');
@@ -213,6 +217,35 @@ async function brancher(p){
   check(await p.getByText(/· Confirmé par eBay$/).count()===5,'historique compact avec cinq résultats confirmés');await p.getByRole('button',{name:'Voir les 7 actions',exact:true}).click();check(await p.getByText(/· Confirmé par eBay$/).count()===6,'historique complet accessible au clic');check(await p.getByRole('button',{name:'Relire avant de reprendre',exact:true}).isVisible(),'résultat incertain conservé dans l’historique complet');
 
   await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
+  check(await p.getByText('Autre offre eBay',{exact:true}).count()===0,'raccourci ouvre uniquement l’offre visée');
+  await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).isVisible(),'retour à toutes les offres');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
+  await p.getByRole('button',{name:/Message de la paire/}).click();await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).waitFor();
+  check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','raccourci ouvre le bon message et retrouve le brouillon refusé');
+  await p.getByLabel('Réponse au message eBay').fill('Brouillon de la première paire');
+  await p.getByLabel('Rechercher dans la conversation eBay').fill('001234');
+  check(await p.getByText('Code de retrait : 001234',{exact:true}).isVisible(),'recherche dans le contenu de la conversation');
+  check(await p.getByText('Bonjour, disponible ?',{exact:true}).count()===0,'recherche masque les messages sans correspondance');
+  await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__codeEbay=v;}}});});
+  await p.getByRole('button',{name:'Copier le code eBay 001234',exact:true}).click();check(await p.evaluate(()=>window.__codeEbay)==='001234','code eBay copié avec ses zéros initiaux');
+  await p.getByLabel('Fermer la conversation eBay').click();
+  await p.getByRole('button',{name:/Autre acheteur Autre échange/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='','brouillons séparés par échange');
+  await p.getByLabel('Réponse au message eBay').fill('Brouillon de la seconde paire');await p.getByLabel('Fermer la conversation eBay').click();
+  await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','changer d’échange conserve le brouillon');
+  await p.getByLabel('Fermer la conversation eBay').click();await p.reload();await p.getByRole('navigation',{name:'Navigation principale'}).getByRole('button',{name:'eBay',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByLabel('Réponse au message eBay').inputValue()==='Brouillon de la première paire','rechargement conserve le brouillon dans cet onglet');
+  await p.getByLabel('Fermer la conversation eBay').click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
+  await p.getByRole('button',{name:/Paire à expédier/}).click();await p.getByText('Commande 1',{exact:true}).first().waitFor();await p.getByText('Prix d’achat à renseigner.',{exact:true}).count();
+  await p.getByText('Bénéfice de la paire : à compléter',{exact:true}).click();await p.getByLabel('Prix d’achat eBay').fill('40');await p.getByLabel('Prix d’achat eBay').press('Tab');
+  check((await p.getByText(/Bénéfice de la paire :/).innerText()).includes('47,50'),'bénéfice eBay exclut le port acheteur et déduit la commission lue');
+  await p.getByText('Détail des frais et du bénéfice',{exact:true}).click();check(await p.getByLabel('Commission plateforme',{exact:true}).getAttribute('readonly')!==null,'commission eBay lue protégée contre la saisie');
+  await p.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();check(!(await p.getByText(/Bénéfice de la paire :/).innerText()).includes('estimé'),'frais confirmés sur la commande eBay');
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'commande ciblée sans débordement '+width);}await p.setViewportSize({width:390,height:844});
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Synchronisation par compte',{exact:true}).click();
+  await p.getByRole('button',{name:'Actualiser ce compte',exact:true}).click();await p.getByRole('button',{name:'Reprendre ce compte',exact:true}).waitFor();check((await p.locator('[data-ebay-sync-compte]').innerText()).includes('Non relu : commandes'),'synchronisation précise la source non relue');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancien échange à retrouver/}).click();await p.getByText('Message hors de la première page',{exact:true}).waitFor();check(await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).isVisible(),'message absent de la première page lu directement');
+  await p.getByLabel('Fermer la conversation eBay').click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();await p.getByRole('button',{name:/Ancienne commande à retrouver/}).click();await p.getByText('Commande old-1',{exact:true}).first().waitFor();check(await p.getByText('Actualiser la commande',{exact:true}).isVisible(),'commande absente du cache lue directement sur eBay');
+  check(writes.length===1,'accès directs, brouillons, bénéfices et synchronisation sans action commerciale');
+
   check(writes.length===1,'une tâche ouvre la section sans accepter l’offre');
   await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
@@ -241,5 +274,5 @@ async function brancher(p){
   check((await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).innerText()).includes('Copie indisponible'),'copie refusée annoncée honnêtement');
   if(process.env.BANC_CAPTURES){await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'retraits-390.png')});await p.setViewportSize({width:1512,height:900});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'retraits-desktop.png')});}
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'colis-desktop.png')});}check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles revendeurs réussis.');
- }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}
+ }catch(e){if(b){const page=b.contexts()[0]?.pages()[0];if(page){await page.screenshot({path:'/tmp/vrm-revendeurs-echec.png'}).catch(()=>{});console.error('État du navigateur :',await page.evaluate(()=>({url:location.href,width:innerWidth,nav:[...document.querySelectorAll('nav')].map(n=>n.innerText),texte:document.body.innerText.slice(0,1800)})).catch(()=>null));}}throw e;}finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

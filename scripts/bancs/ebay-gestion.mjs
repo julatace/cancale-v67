@@ -36,4 +36,8 @@ b=banc();r=await b.gestion.modifierAnnonce({itemId:'123',price:'99',expectedPric
 b=banc({readItem:item.replace('FixedPriceItem','Chinese')});r=await b.gestion.modifierAnnonce({itemId:'123',price:'99',expectedPrice:'95',confirme:true},'vendeur-A');check(r.status===409 && !b.mutations.length,'enchère : pas de modification de stock inventée');
 b=banc({ack:'Failure'});r=await b.gestion.terminerAnnonce({itemId:'123',confirme:true},'vendeur-A');check(!r.body.ok,'refus eBay jamais annoncé réussi');
 b=banc({offer:offre.replace('<Status>Pending</Status>','<Status>Pending</Status><ExpirationTime>illisible</ExpirationTime>')});r=await b.gestion.repondreOffre({itemId:'123',offerId:'789',decision:'Accept',expectedPrice:'80',currency:'EUR',confirme:true},'vendeur-A');check(r.status===409 && !b.mutations.length,'échéance illisible : aucun accord envoyé');
+b=banc();r=await b.gestion.message({messageId:'456',itemId:'123'},'vendeur-A');check(r.body.message?.id==='456' && !b.mutations.length,'message ciblé relu sans écriture');
+b=banc();r=await b.gestion.message({messageId:'456',itemId:'999'},'vendeur-A');check(r.status===404 && !b.mutations.length,'identité annonce différente : pas de message voisin');
+b=banc();r=await b.gestion.offre({offerId:'789',itemId:'123'},'vendeur-A');check(r.body.offre?.id==='789' && !b.mutations.length,'offre ciblée relue sans accord');
+b=banc();r=await b.gestion.offre({offerId:'789',itemId:'999'},'vendeur-A');check(r.status===404 && !b.mutations.length,'offre d’une annonce différente refusée');
 console.log(n+' contrôles gestion eBay réussis, appels intégralement simulés.');

@@ -1,3 +1,4 @@
+import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
 import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
 //
@@ -1493,17 +1494,19 @@ async function handleSync(ctx) {
   //    capture.
   const at2 = Date.now();
   let rangeRegles = null;
+  let annoncesRange=false,commandesRange=false,programmeesRange=false,stockRange=false;
   if (liste.ok) {
-    await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner);
-    await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner);
+    annoncesRange=await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner)===true;
+    programmeesRange=await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner)===true;
     // Les règles : lire-fusionner-réécrire GARDÉ (une lecture ratée de la ligne
     // n'écrit rien). Une liste COMPLÈTE dit quelles annonces n'existent plus :
     // leurs règles sortent ; une liste incomplète ne prouve aucune absence.
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  if (orders.ok && orders.data) await storeData(ligneDe('ebay_orders', ctx), { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, ctx.owner);
-  if (inv.ok && inv.data) await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
+  const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2):null;
+  if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2),status:orders.status}))===true;
+  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2 }, ctx.owner)===true;
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
   // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
@@ -1512,7 +1515,8 @@ async function handleSync(ctx) {
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data), stock: !!(inv.ok && inv.data), regles: rangeRegles === true },
+    lu: { annonces: annoncesRange, programmees: programmeesRange, commandes: commandesRange, stock: stockRange, regles: rangeRegles === true },
+    complet: {annonces:annoncesRange && liste.complet===true,commandes:commandesRange && captureCommandes?.complet===true},
     listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
@@ -1755,6 +1759,8 @@ async function handleApp(req, res) {
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),
       messageacheteur:(ctx)=>gestionEbay.contacterAcheteur(b,ctx),
       messages:(ctx)=>gestionEbay.messages(b,ctx),
+      message:(ctx)=>gestionEbay.message(b,ctx),
+      offre:(ctx)=>gestionEbay.offre(b,ctx),
       repondre:(ctx)=>gestionEbay.repondre(b,ctx),
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
