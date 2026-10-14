@@ -1,3 +1,5 @@
+import {appelerEbay} from './ebayRequetes.js';
+import {useReponseIncertaine} from './ebayEtatIncertain.js';
 import {lireBrouillon,sauverBrouillon,effacerBrouillonSiIdentique} from './brouillonsMessages.js';
 import {bilanCommandeEbay,codesRetraitEbay} from './ebayParcours.js';
 import {centimes} from './beneficePaire.js';
@@ -16,14 +18,7 @@ export function ResponsiveChatPortal({children}){
  return mobile?createPortal(children,document.body):children;
 }
 const montant=(v,c)=>v==null?'—':Number.isFinite(Number(v))?new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2,minimumFractionDigits:2}).format(Number(v))+(c?` ${c==='EUR'?'€':c}`:''): '—';
-export async function appelerEbay(action,payload,headers,{write=false}={}){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
- try{
-  const r=await fetch('/api/ebay',{method:'POST',headers:{'Content-Type':'application/json',...headers()},body:JSON.stringify({action,...payload}),signal:controller.signal});
-  const j=await r.json();if(!r.ok || !j?.ok)throw Object.assign(new Error(j?.error || 'eBay est indisponible.'),{reason:j?.reason});return j;
- }catch(e){if(e.name==='AbortError' || e instanceof TypeError)throw Object.assign(new Error(write?'État incertain : actualise avant de recommencer.':'Lecture indisponible. Réessaie.'),{reason:write?'incertain':'lecture'});throw e;
- }finally{clearTimeout(timer);}
-}
+export {appelerEbay} from './ebayRequetes.js';
 const styleUI=C=>({input:{width:'100%',padding:'9px 10px',border:`1px solid ${C.border}`,borderRadius:8,color:C.text,background:C.card,fontFamily:'inherit',fontSize:13,boxSizing:'border-box'},button:{padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:8,color:C.text,background:C.card,fontFamily:'inherit',fontSize:12,fontWeight:600,cursor:'pointer'},label:{display:'grid',gap:5,fontSize:12,color:C.muted}});
 const Erreur=({message})=>message?<p role="status" style={{fontSize:12,lineHeight:1.5}}>{message}</p>:null;
 const corpsLisible=body=>/<(?:div|p|span|br|a)\b/i.test(body || '')?String(body).replace(/<br\s*\/?\s*>|<\/p>/gi,'\n').replace(/<\/?[a-z][^>]*>/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&'):body;
@@ -84,6 +79,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  const S=styleUI(C),[rows,setRows]=useState(null),[selected,setSelected]=useState(null),[body,setBody]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1),[pages,setPages]=useState(null),[search,setSearch]=useState(''),[historySearch,setHistorySearch]=useState(''),[draftOK,setDraftOK]=useState(true),[codeCopie,setCodeCopie]=useState('');
  const fermerConversation=()=>{selection.current=null;setSelected(null);};
  const chatPanel=useConversationFocus(selected?.id,fermerConversation);
+ const resultatIncertain=useReponseIncertaine(owner,compte,selected?.id);
  const selectMessage=m=>{selection.current=m.id;setSelected(m);setBody(lireBrouillon(owner,compte,m.id));setDraftOK(true);setHistorySearch('');setCodeCopie('');setMessage('');};
  const modifierBody=v=>{setBody(v);if(selected)setDraftOK(sauverBrouillon(owner,compte,selected.id,v));};
  const cibleOuverte=useRef(null);
@@ -97,6 +93,18 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  },[cible?.id,rows]);
  async function charger(next=1){setBusy(true);setMessage('');try{const j=await call('messages',{page:next},headers);if(!Array.isArray(j.messages))throw new Error('Les messages ne sont pas lisibles.');setRows(p=>next===1?j.messages:[...new Map([...(p || []),...j.messages].map(m=>[m.id,m])).values()]);setPage(next);setPages(j.totalPages);setSelected(p=>p?(j.messages.find(m=>m.id===p.id && m.itemId===p.itemId) || p):p);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
+ async function relireEchange(){
+  const m=selected;if(!m?.itemId)return;
+  setBusy(true);setMessage('');
+  try{
+   const j=await call('message',{messageId:m.id,itemId:m.itemId},headers);
+   if(String(j.message?.id)!==String(m.id) || String(j.message?.itemId)!==String(m.itemId))throw new Error('L’échange exact n’a pas pu être relu.');
+   setRows(p=>p?.map(x=>x.id===m.id?j.message:x));
+   if(selection.current===m.id){setSelected(j.message);setMessage('Échange relu : vérifie les réponses avant de renvoyer.');}
+   resultatIncertain.marquer(false);
+  }catch(e){if(selection.current===m.id)setMessage(e.message);}
+  finally{setBusy(false);}
+ }
  const affiches=(rows || []).filter(m=>`${m.sender} ${m.subject} ${m.titre} ${m.body} ${(m.responses || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
  return <section><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><button type="button" disabled={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
   {cible && <p style={{fontSize:12}}>Message sélectionné <button type="button" onClick={onClearCible}>Voir tous les échanges</button>{rows && !rows.some(m=>String(m.id)===cible.id) && <span role="status"> · Cet échange n’est pas dans la page lue. Charge la suite ou actualise.</span>}</p>}
@@ -112,10 +120,10 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
     {codesRetraitEbay([selected.body,...(selected.responses || [])]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codesRetraitEbay([selected.body,...(selected.responses || [])]).map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
     <input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={{...S.input,flexShrink:0}}/>
     <div className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:14,display:'grid',alignContent:'start',gap:10}}>{corpsLisible(selected.body).toLowerCase().includes(historySearch.toLowerCase()) && <div style={{padding:12,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(selected.body)}</div>}{historySearch && ![selected.body,...(selected.responses || [])].some(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())) && <p style={{fontSize:12,color:C.muted}}>Aucun message ne correspond à cette recherche.</p>}{(selected.responses || []).filter(r=>corpsLisible(r).toLowerCase().includes(historySearch.toLowerCase())).map((r,i)=><div key={i} style={{padding:12,borderRadius:10,background:C.bg,fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{corpsLisible(r)}</div>)}</div>
-    <div style={{padding:12,borderTop:`1px solid ${C.border}`,display:'grid',gap:8}}><Erreur message={message}/>{body && <small style={{color:C.muted}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}<textarea aria-label="Réponse au message eBay" maxLength={2000} value={body} onChange={e=>modifierBody(e.target.value)} rows={3} placeholder="Écrire une réponse…" style={S.input}/><button type="button" style={S.button} disabled={busy || !body.trim() || !selected.itemId} onClick={async()=>{
+    <div style={{padding:12,borderTop:`1px solid ${C.border}`,display:'grid',gap:8}}><Erreur message={message}/>{body && <small style={{color:C.muted}}>{draftOK?'Brouillon conservé dans cet onglet.':'Brouillon non sauvegardé : garde cet échange ouvert.'}</small>}<textarea aria-label="Réponse au message eBay" maxLength={2000} value={body} onChange={e=>modifierBody(e.target.value)} rows={3} placeholder="Écrire une réponse…" style={S.input}/><button type="button" style={S.button} disabled={busy || resultatIncertain.value || !body.trim() || !selected.itemId} onClick={async()=>{
      const m=selected,texte=body;if(!await confirm({title:`Répondre à ${m.sender || 'cet acheteur'} ?`,desc:`${m.titre || m.subject}\n\n${texte}`,ok:'Envoyer la réponse',cancel:'Annuler'}))return;
-     setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);if(selection.current===m.id){setBody(current=>current===texte?'':current);setMessage('Réponse acceptée par eBay.');}}catch(e){if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
-    }}>Envoyer la réponse</button>{!selected.itemId && <small style={{color:C.muted}}>Cet échange n’a pas d’annonce identifiée. Le contact des acheteurs d’une commande reste disponible dans Ventes.</small>}</div>
+     setBusy(true);setMessage('');try{await call('repondre',{itemId:m.itemId,messageId:m.id,body:texte,confirme:true},headers,{write:true});effacerBrouillonSiIdentique(owner,compte,m.id,texte);setRows(p=>p?.map(x=>x.id===m.id?{...x,responses:[...(x.responses || []),texte]}:x));setSelected(p=>p?.id===m.id?{...p,responses:[...(p.responses || []),texte]}:p);if(selection.current===m.id){setBody(current=>current===texte?'':current);setMessage('Réponse acceptée par eBay.');}}catch(e){if(e.reason==='incertain')resultatIncertain.marquer(true);if(selection.current===m.id)setMessage(e.message);}finally{setBusy(false);}
+    }}>Envoyer la réponse</button>{resultatIncertain.value && <div style={{fontSize:12,color:C.muted}}><p>Le résultat du dernier envoi n’est pas confirmé. Relis cet échange avant une nouvelle réponse.</p><button type="button" style={S.button} disabled={busy || !selected.itemId} onClick={relireEchange}>Relire l’échange</button></div>}{!selected.itemId && <small style={{color:C.muted}}>Cet échange n’a pas d’annonce identifiée. Le contact des acheteurs d’une commande reste disponible dans Ventes.</small>}</div>
    </div></div></ResponsiveChatPortal>:<div className="vrm-chat-empty"><span>Choisis un échange</span><small>Lis les réponses et réponds depuis VRM.</small></div>}
   </div></div>
  </section>;
