@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {formaterMontantEbay} from '../../src/montantsEbay.js';
+for(const value of [null,undefined,'','   ','NaN',NaN,Infinity,'0x10','1e2','12 euros',{},'1.234'])assert.equal(formaterMontantEbay(value,'EUR'),'—');
+assert.equal(formaterMontantEbay('0','EUR'),'0,00 €');
+assert.equal(formaterMontantEbay('-0.00','EUR'),'0,00 €');
+assert.equal(formaterMontantEbay('95,50','EUR'),'95,50 €');
+assert.equal(formaterMontantEbay('95.5000','EUR'),'95,50 €');
+assert.equal(formaterMontantEbay('-12.50','EUR'),'-12,50 €');
+assert.equal(formaterMontantEbay('10.00','USD'),'10,00 USD');
+assert.equal(formaterMontantEbay('90071992547409.91','EUR').replace(/[\s\u202f]/g,''),'90071992547409,91€');
+console.log('19 contrôles : montant inconnu, zéro explicite, crédits, devises et précision.');
