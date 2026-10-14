@@ -35,4 +35,5 @@ b=banc();r=await b.gestion.modifierAnnonce({itemId:'123',quantity:'2',expectedQu
 b=banc();r=await b.gestion.modifierAnnonce({itemId:'123',price:'99',expectedPrice:'90',confirme:true},'vendeur-A');check(r.status===409 && !b.mutations.length,'ancien prix périmé : pas d’écrasement');
 b=banc({readItem:item.replace('FixedPriceItem','Chinese')});r=await b.gestion.modifierAnnonce({itemId:'123',price:'99',expectedPrice:'95',confirme:true},'vendeur-A');check(r.status===409 && !b.mutations.length,'enchère : pas de modification de stock inventée');
 b=banc({ack:'Failure'});r=await b.gestion.terminerAnnonce({itemId:'123',confirme:true},'vendeur-A');check(!r.body.ok,'refus eBay jamais annoncé réussi');
+b=banc({offer:offre.replace('<Status>Pending</Status>','<Status>Pending</Status><ExpirationTime>illisible</ExpirationTime>')});r=await b.gestion.repondreOffre({itemId:'123',offerId:'789',decision:'Accept',expectedPrice:'80',currency:'EUR',confirme:true},'vendeur-A');check(r.status===409 && !b.mutations.length,'échéance illisible : aucun accord envoyé');
 console.log(n+' contrôles gestion eBay réussis, appels intégralement simulés.');
