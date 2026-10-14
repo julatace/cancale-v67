@@ -343,3 +343,57 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
  .vrm-day-money > [data-recu-mois] > span:last-child { font-size:10.5px !important; line-height:1.35; }
  .vrm-day-history > summary { padding:9px 0; font-size:11px; }
 }
+
+/* Poste de travail, 14 octobre : repères stables et surfaces plus légères. */
+.vrm-mobile-nav { gap:2px; background:var(--vrm-surface) !important; border-top:1px solid var(--vrm-line) !important; }
+.vrm-mobile-nav > button[aria-current="page"] { color:var(--vrm-ink) !important; }
+.vrm-mobile-nav > button[aria-current="page"] > span:first-child { background:var(--vrm-focus,#A63F23); color:#fff; border-radius:9px; width:44px !important; }
+.vrm-mobile-nav .vrm-nav-more { flex:1 1 0; width:auto !important; height:auto !important; min-width:0; flex-direction:column; gap:5px; border:0 !important; border-radius:0 !important; background:transparent !important; color:var(--vrm-muted) !important; font-weight:500; }
+.vrm-menu-bottom { top:auto !important; bottom:0; border-radius:20px 20px 0 0; border-bottom:0 !important; padding:14px 14px calc(18px + env(safe-area-inset-bottom)) !important; }
+.vrm-menu-bottom .vrm-menu-group:first-of-type { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.vrm-menu-bottom .vrm-menu-group:first-of-type > .vrm-label { grid-column:1/-1; }
+.vrm-market-heading h1, .vrm-finance-page h2 { letter-spacing:-.045em; }
+.vrm-ann-card { border-color:var(--vrm-line) !important; overflow:hidden; }
+.vrm-ann-overview > a { background:var(--vrm-surface); }
+.vrm-ann-overview > a img { transition:transform .2s ease; }
+.vrm-ann-card [data-chiffres] { font-variant-numeric:tabular-nums; }
+.vrm-ann-actions { background:transparent; border-top:1px solid var(--vrm-line); }
+.vrm-ann-actions > summary { font-weight:500; }
+.vrm-sale-row { border-radius:10px; transition:background .15s; }
+.vrm-sale-price .vrm-display, .vrm-ann-price-line { font-variant-numeric:tabular-nums; }
+.vrm-sale-photo { background:var(--vrm-surface); overflow:hidden; }
+.vrm-sale-title { letter-spacing:-.015em; }
+.vrm-finance-overview { gap:1px; border:1px solid var(--vrm-line); border-radius:16px; overflow:hidden; background:var(--vrm-line); }
+.vrm-finance-metric { border:0; border-radius:0; padding:22px; }
+.vrm-finance-metric.is-primary { background:#173c35; }
+.vrm-finance-metric.is-primary .vrm-display { font-size:40px !important; letter-spacing:-1.4px; }
+.vrm-finance-goal > div { border-radius:12px; }
+.vrm-inbox-filters { display:flex; gap:6px; padding:0 0 12px; }
+.vrm-inbox-filters button { display:flex; align-items:center; gap:7px; border:1px solid var(--vrm-line); border-radius:8px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:500 12px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-inbox-filters button[aria-pressed="true"] { background:var(--vrm-ink); color:var(--vrm-bg); border-color:var(--vrm-ink); }
+.vrm-inbox-filters button span { font-size:10px; font-variant-numeric:tabular-nums; opacity:.75; }
+.vrm-inbox-feedback { color:var(--vrm-muted); font-size:12px; padding:12px 0; }
+.vrm-inbox-row { border-radius:0 !important; padding:14px 12px !important; }
+.vrm-inbox-row > img { width:46px !important; height:58px !important; border-radius:7px !important; }
+.vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#A63F23); }
+.vrm-inbox-column input[type="search"] { border-radius:10px !important; background:var(--vrm-surface) !important; }
+.vrm-chat-empty { border-style:dashed; background:transparent; min-height:320px; }
+@media(hover:hover) and (pointer:fine) {
+ .vrm-ann-overview > a:hover img { transform:scale(1.04); }
+ .vrm-inbox-row:hover { background:var(--vrm-surface) !important; }
+}
+@media(max-width:767px) {
+ .vrm-mobile-nav button { min-height:60px; }
+ .vrm-ann-grid { gap:10px !important; }
+ .vrm-ann-card .vrm-ann-overview { padding:10px !important; gap:10px !important; }
+ .vrm-ann-card .vrm-ann-overview > a { width:76px !important; height:104px !important; }
+ .vrm-ann-card [data-prix] { font-size:20px !important; }
+ .vrm-ann-actions > summary { min-height:40px; padding:8px 0; }
+ .vrm-finance-metric { padding:16px; }
+ .vrm-finance-metric.is-primary .vrm-display { font-size:34px !important; }
+ .vrm-finance-overview { border-radius:12px; }
+ .vrm-inbox-row { padding:11px 10px !important; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .vrm-ann-overview > a img, .vrm-sale-row { transition:none; }
+}
