@@ -85,7 +85,25 @@ async function brancher(p){
    await p.setViewportSize({width:390,height:844});
   }
   rows.push({id:'harvest_111_inbox',data:{capturedAt:maintenant,payload:{conversations:[{id:71,opposite_user:{id:22,login:'Client Vinted'},description:'Paire de test',last_message:'Merci',last_message_at:maintenant}]}}},{id:'harvest_111_conv_71',data:{payload:{conversation:{id:71,opposite_user:{id:22},allow_reply:false,messages:[{entity_type:'message',created_at_ts:1700000000,entity:{user_id:22,body:'Bonjour depuis Vinted'}},{entity_type:'status_message',created_at_ts:1700000001,entity:{title:'Colis disponible',pickup:{pickup_code:456789}}},{entity_type:'message',created_at_ts:1700000002,entity:{user_id:111,body:'Merci pour votre achat'}}]}}}});
-  await p.goto(base+'/?tab=plat_vinted');await p.getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
+  await p.goto(base+'/?tab=plat_vinted');
+  const nav=p.getByRole('navigation',{name:'Navigation principale'});
+  await nav.getByRole('button',{name:'Accueil',exact:true}).waitFor();
+  check(JSON.stringify(await nav.getByRole('button').allTextContents()).includes('Accueil'), 'accueil présent dans la navigation mobile');
+  check(await nav.getByRole('button').count()===5, 'cinq accès mobiles stables');
+  await nav.getByRole('button',{name:'Messages',exact:true}).click();
+  await p.locator('[data-conv="71"]').waitFor();
+  await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Non lues/}).click();
+  check(await p.locator('[data-conv]').count()===0, 'filtre non lu masque la conversation déjà lue');
+  check(await p.getByText('Aucune conversation non lue dans cette sélection.',{exact:true}).isVisible(), 'filtre vide expliqué');
+  await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Toutes/}).click();
+  check(await p.locator('[data-conv="71"]').count()===1, 'toutes les conversations retrouvées');
+  await nav.getByRole('button',{name:'Plus',exact:true}).click();
+  await p.getByRole('menuitem',{name:'Leboncoin',exact:true}).click();
+  await p.getByRole('heading',{name:'Leboncoin',exact:true}).waitFor();
+  await nav.getByRole('button',{name:'Plus',exact:true}).click();
+  await p.getByRole('menuitem',{name:'Vinted',exact:true}).click();
+  check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'section messages retrouvée en revenant sur Vinted');
+  await p.goto(base+'/?tab=plat_vinted');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
   check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
   const send=p.getByRole('button',{name:'Envoyer',exact:true});check(await send.isDisabled(),'conversation sans réponse autorisée bloquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
@@ -95,7 +113,19 @@ async function brancher(p){
   check(await p.locator('.vrm-finance-goal').evaluate(e=>e.getBoundingClientRect().top<document.querySelector('.vrm-finance-stock').getBoundingClientRect().top),'objectif placé avant les détails du stock');
 
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'statistiques-390.png')});
-  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
+  await p.locator('main').evaluate(e=>{e.scrollTop=250;});await p.waitForTimeout(150);
+  const avant=await p.locator('main').evaluate(e=>e.scrollTop);
+  await nav.getByRole('button',{name:'Stock',exact:true}).click();
+  await nav.getByRole('button',{name:'Plus',exact:true}).click();await p.getByRole('menuitem',{name:'Statistiques',exact:true}).click();
+  await p.waitForTimeout(800);
+  check(avant>100 && Math.abs(await p.locator('main').evaluate(e=>e.scrollTop)-avant)<3, 'position retrouvée après passage dans le stock');
+
+  await p.goto(base+'/?tab=plat_ebay');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
+  await nav.getByRole('button',{name:'Stock',exact:true}).click();
+  await nav.getByRole('button',{name:'Messages',exact:true}).click();
+  await p.getByRole('heading',{name:'eBay',exact:true}).waitFor();
+  await p.getByText('Acheteur test',{exact:true}).waitFor();
+  check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'messages revient à eBay après un passage dans le stock');
   check(writes.length===0,'ouvrir les messages ne transmet rien');
   await p.getByRole('button',{name:/Acheteur test Question/}).click();check(await p.getByText('Oui, disponible.',{exact:true}).isVisible(),'historique de réponses visible');
   await p.getByLabel('Réponse au message eBay').fill('Merci pour votre message');await p.getByRole('button',{name:'Envoyer la réponse',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===0,'annuler la réponse ne transmet rien');

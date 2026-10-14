@@ -8679,7 +8679,7 @@ function SideBar({ tab, setTab }) {
 //    ponctuels (`PLUS_TABS`) et Réglages. Zéro doublon, et tout reste joignable
 //    (les cinq du quotidien par la barre, le reste par ici). §7 : on ne dit pas
 //    deux fois la même chose sur le même écran.
-function MenuEcrans({ tab, setTab, dark = false }) {
+function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   const [open, setOpen] = React.useState(false);
   const declencheur = React.useRef(null);
   const panneau = React.useRef(null);
@@ -8703,17 +8703,18 @@ function MenuEcrans({ tab, setTab, dark = false }) {
     };
   }, [open]);
   const groupes = [
+    { titre: 'Plateformes', items: BOTTOM_TABS.filter(t => t.id !== 'journee') },
     { titre: 'Gestion', items: NAV_GESTION },
     { titre: 'Dans Vinted', items: VINTED_TABS },
     { titre: 'Autres outils', items: NAV_OUTILS },
   ];
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} aria-label="Tous les écrans" aria-expanded={open}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-nav-more":undefined} aria-label={bottom?"Plus":"Tous les écrans"} aria-expanded={open}
         style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
           borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
           color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
-        <Icon name={open?'close':'menu'} size={19}/>
+        <Icon name={open?'close':'menu'} size={19}/>{bottom && <span className="vrm-nav-label">Plus</span>}
       </button>
       {open && (
         <div data-noswipe onClick={()=>setOpen(false)}
@@ -8722,7 +8723,7 @@ function MenuEcrans({ tab, setTab, dark = false }) {
           {/* Le panneau descend DU HAUT, sous le bouton qui l'a ouvert : une
               feuille qui monte du bas pour un bouton du haut, le geste et le
               mouvement se contredisent. */}
-          <div ref={panneau} className="vrm-mobile-menu" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
+          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-menu-bottom":"vrm-mobile-menu"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
             style={{position:'absolute',left:0,right:0,top:0,background:C.chrome,color:C.onChrome,
               borderBottom:`1px solid ${C.chromeLine}`,boxShadow:'0 14px 40px rgba(21,17,16,.28)',
               padding:'calc(8px + env(safe-area-inset-top)) 10px 12px',
@@ -8761,15 +8762,38 @@ function MenuEcrans({ tab, setTab, dark = false }) {
   );
 }
 
-function BottomBar({tab,setTab}) {
+// Retrouver sa position après un passage dans un autre écran.
+function MemoireDefilement({ ecran }) {
+  const positions=React.useRef(new Map());
+  React.useLayoutEffect(()=>{
+    const main=document.querySelector('.vrm-main');
+    if(!main) return;
+    const cible=positions.current.get(ecran)||0;
+    let position=cible, restauration=true, arrete=false;
+    const restaurer=()=>{ if(!arrete&&restauration){ main.scrollTop=cible; if(Math.abs(main.scrollTop-cible)<2) restauration=false; } };
+    const lire=()=>{ if(!restauration) position=main.scrollTop; };
+    const intervenir=()=>{ restauration=false; position=main.scrollTop; };
+    main.addEventListener('scroll',lire,{passive:true});
+    main.addEventListener('wheel',intervenir,{passive:true});
+    main.addEventListener('touchstart',intervenir,{passive:true});
+    const observer=new ResizeObserver(restaurer);
+    if(main.firstElementChild) observer.observe(main.firstElementChild);
+    restaurer();
+    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;observer.disconnect();},2500);
+    return ()=>{
+      arrete=true;clearTimeout(delai);observer.disconnect();
+      positions.current.set(ecran,position);
+      main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);
+    };
+  },[ecran]);
+  return null;
+}
+
+function BottomBar({tab,setTab,platSub,onSection}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
-  // ⚠️ LE BOUTON « PLUS » A DÉMÉNAGÉ EN HAUT À GAUCHE (`MenuEcrans`). Il était
-  // un sixième bouton d'un genre différent des cinq autres — il n'ouvrait pas
-  // un écran mais une liste — et son libellé changeait selon l'écran affiché,
-  // donc la barre n'avait jamais tout à fait la même tête. Elle porte
-  // maintenant les CINQ écrans du quotidien, et rien d'autre.
+  // Les accès quotidiens restent fixes ; Plus ouvre les plateformes et les outils.
   React.useEffect(()=>{
     const isField=el=>el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT');
     const onIn=e=>{ if(isField(e.target)) setKbOpen(true); };
@@ -8795,8 +8819,11 @@ function BottomBar({tab,setTab}) {
       // être décalée par le `zoom` de densité. On la masque au clavier avec
       // `display:none` (elle est dans le flux, un translate laisserait un vide).
       }}>
-      {(()=>{ const actif=BAR_GROUPE[tab]||tab; return BOTTOM_TABS.map(t=>{ const on=actif===t.id; return (
-        <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
+      {(()=>{ const plateforme=tab.startsWith('plat_') && tab!=='plat_vestiaire';
+        const actif=tab==='journee'?'journee':tab==='garage'?'garage':plateforme&&platSub==='messages'?'messages':plateforme&&platSub==='ventes'?'ventes':null;
+        const items=[{id:'journee',icon:'home',label:'Accueil'},{id:'garage',icon:'box',label:'Stock'},{id:'ventes',icon:'cash',label:'Ventes'},{id:'messages',icon:'chat',label:'Messages'}];
+        return items.map(t=>{ const on=actif===t.id; return (
+        <button key={t.id} type="button" onClick={()=>['ventes','messages'].includes(t.id)?onSection(t.id):setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
           color:on?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
@@ -8809,6 +8836,7 @@ function BottomBar({tab,setTab}) {
             overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
         </button>
       );}); })()}
+      <MenuEcrans tab={tab} setTab={setTab} bottom/>
     </nav>
     </>
   );
@@ -23818,6 +23846,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const conversationOrigin=React.useRef(null);
   const chatScroll=React.useRef(null);
   const [messageSearch,setMessageSearch]=useState('');
+  const [messageFilter,setMessageFilter]=useState('all');
   useEffect(()=>{if(chatScroll.current)chatScroll.current.scrollTop=chatScroll.current.scrollHeight;},[openConv?.messages?.length]);
   useEffect(()=>{if(!openConv)return;const onKey=e=>{if(e.key==='Escape'){e.preventDefault();setOpenConv(null);}};document.addEventListener('keydown',onKey);return()=>{document.removeEventListener('keydown',onKey);conversationOrigin.current?.focus?.();};},[openConv?.request]);
   const [replyText, setReplyText] = useState('');
@@ -31455,7 +31484,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           const coMsg = selEff;
-          const tri=[...liste].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
@@ -31492,6 +31521,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
+              <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
+                <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
+                <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+              </div>
+              {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
                   Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
@@ -31521,7 +31555,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
-                  const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
+                  const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   return (
                     <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
                       style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
@@ -38078,7 +38112,19 @@ function AppCoeur() {
   // Un lien peut demander une SECTION précise (ex. les messages) : `subVoulue`
   // la porte le temps du changement d'onglet.
   const subVoulue=React.useRef(null);
-  React.useEffect(()=>{ setPlatSub(subVoulue.current||'ventes'); subVoulue.current=null; },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  const sectionsPlateformes=React.useRef({});
+  const plateformeRecente=React.useRef('plat_vinted');
+  const dernierePlateforme=React.useRef(tab);
+  React.useLayoutEffect(()=>{
+    const precedent=dernierePlateforme.current;
+    if(precedent!==tab){
+      sectionsPlateformes.current[precedent]=platSub;
+      setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||'ventes');
+      dernierePlateforme.current=tab;
+    }
+    if(tab.startsWith('plat_')&&tab!=='plat_vestiaire') plateformeRecente.current=tab;
+    subVoulue.current=null;
+  },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
   // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
   // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
@@ -40204,9 +40250,10 @@ function AppCoeur() {
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
       </main>
+      <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab} platSub={platSub} onSection={section=>{ const cible=tab.startsWith('plat_')&&tab!=='plat_vestiaire'?tab:plateformeRecente.current; if(cible===tab) setPlatSub(section); else {subVoulue.current=section;setTab(cible);} }}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

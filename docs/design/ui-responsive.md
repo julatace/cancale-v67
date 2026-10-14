@@ -167,3 +167,29 @@ incertains restent visibles. Les totaux eBay en euros refusent les montants ou
 devises inconnus, et les cartes gardent la devise captée. L'édition prix/stock
 omet les champs inchangés et garde les contrôles de concurrence et de quantité.
 Voir `../passation/notes/agent-ebay/suite-2026-10-13.md` pour le périmètre de l'agent.
+
+### Poste de travail — 14 octobre 2026
+
+La navigation mobile expose Accueil, Stock, Ventes, Messages et Plus. Ventes et
+Messages ouvrent la plateforme courante ou la dernière plateforme utilisée ;
+le nom de cette plateforme et son sélecteur de comptes restent visibles. Plus
+réutilise le menu accessible des écrans, avec les quatre plateformes et les
+outils ; le rail ordinateur reste disponible. La section de chaque plateforme
+est retenue pendant la session. La position de défilement est également retenue
+par écran et section, sans bloquer un geste de défilement de l'utilisateur.
+
+La messagerie Vinted propose Toutes/Non lues avec les nombres de la sélection
+réellement captée. Un filtre vide est expliqué et ne signifie pas qu'une boîte
+illisible est lue. La photo de l'article, lorsqu'elle est captée dans cette
+conversation, passe avant l'avatar de l'interlocuteur. Les permissions de
+réponse et les confirmations d'envoi restent celles du fil existant.
+
+Les cartes d'annonces se resserrent sur téléphone, leurs actions secondaires
+restent dans un dépliant. Les finances regroupent les trois indicateurs dans
+une surface commune avec le CA finalisé en premier ; calculs, devises,
+périmètres, bénéfices inconnus et objectif mensuel restent inchangés.
+
+Validation : build, audits de variables/icônes/boutons, banc mobile (222), banc
+compact (29), banc revendeurs enrichi pour la nouvelle navigation, le filtre non
+lu, la mémoire des sections et le retour à la position. Données et écritures
+simulées ; aucun envoi réel à un acheteur pendant la validation.
