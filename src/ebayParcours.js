@@ -5,6 +5,9 @@ export function cibleEbay(compte,t){
  return id?{compte:compte || 'principal',section:t.section,id:String(id),itemId:t.ref?String(t.ref):null}:null;
 }
 export function bilanCommandeEbay(order,costs={}){
+ const cancel=String(order?.cancelStatus?.cancelState || '').toUpperCase(),payment=String(order?.orderPaymentStatus || '').toUpperCase();
+ if(payment==='PARTIALLY_REFUNDED' || (Array.isArray(order?.paymentSummary?.refunds) && order.paymentSummary.refunds.length))return {benefice:null,raison:'Un remboursement figure sur cette commande : résultat à vérifier avec les remboursements et les frais réellement conservés.'};
+ if(cancel && !['NONE_REQUESTED','CANCEL_REJECTED','CANCELED'].includes(cancel))return {benefice:null,raison:'Annulation en cours ou non confirmée : le bénéfice reste à vérifier.'};
  if(order?.cancelStatus?.cancelState==='CANCELED' || order?.orderPaymentStatus==='FULLY_REFUNDED')return {benefice:null,raison:'Commande annulée ou intégralement remboursée : résultat à vérifier avec les remboursements.'};
  const lines=order?.lineItems;
  if(!Array.isArray(lines) || lines.length!==1 || lines[0].quantity!==1)return {benefice:null,raison:'Le bénéfice par article nécessite une commande avec un seul article et une quantité de 1.'};

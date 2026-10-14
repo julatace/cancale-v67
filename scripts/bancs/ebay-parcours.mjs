@@ -22,6 +22,8 @@ assert.equal(bilanCommandeEbay({...order,cancelStatus:{cancelState:'CANCELED'}},
 assert.equal(bilanCommandeEbay({...order,lineItems:[{quantity:1,total:order.lineItems[0].total}]}).benefice,null);
 assert.equal(bilanCommandeEbay({...order,lineItems:[{...order.lineItems[0],discounts:[{}]}]}).benefice,null);
 assert.equal(bilanCommandeEbay({...order,lineItems:[{...order.lineItems[0],discountedLineItemCost:{value:'90',currency:'EUR'}}]},{buyPrice:'40'}).benefice,37.5);
+for(const change of [{orderPaymentStatus:'PARTIALLY_REFUNDED'},{paymentSummary:{refunds:[{refundAmount:{value:'10',currency:'EUR'}}]}},{cancelStatus:{cancelState:'CANCEL_REQUESTED'}},{cancelStatus:{cancelState:'INCONNU'}}])assert.equal(bilanCommandeEbay({...order,...change},{buyPrice:'40',fraisComplets:true,commissionLueConfirmee:'12.50'}).benefice,null,'remboursement ou annulation ne conserve pas un bénéfice fictivement complet');
+assert.equal(bilanCommandeEbay({...order,paymentSummary:{refunds:[]}},{buyPrice:'40',fraisComplets:true,commissionLueConfirmee:'12.50'}).benefice,47.5);
 const prev={orders:[{orderId:'old',orderFulfillmentStatus:'NOT_STARTED'},{orderId:'same',orderFulfillmentStatus:'NOT_STARTED'}]},copy=JSON.stringify(prev);
 const merged=fusionCommandesEbay(prev,{orders:[{orderId:'same',orderFulfillmentStatus:'FULFILLED'}],total:100,next:'page2'},42);
 assert.equal(merged.orders.length,2);assert.equal(merged.orders[1].orderFulfillmentStatus,'FULFILLED');assert.equal(merged.complet,false);assert.equal(JSON.stringify(prev),copy);
