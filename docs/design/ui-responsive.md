@@ -193,3 +193,24 @@ Validation : build, audits de variables/icônes/boutons, banc mobile (222), banc
 compact (29), banc revendeurs enrichi pour la nouvelle navigation, le filtre non
 lu, la mémoire des sections et le retour à la position. Données et écritures
 simulées ; aucun envoi réel à un acheteur pendant la validation.
+
+### Recherches et photos — suite du 14 octobre
+
+Les recherches, tris, filtres de ventes/achats, périodes et filtres de messagerie
+Vinted restent en mémoire pendant la session de la page, même après passage
+par le stock ou une autre plateforme. Cette mémoire est isolée par vendeur,
+effacée à la déconnexion et ne contient que des préférences d'affichage ; elle
+n'est pas conservée après rechargement de la page. Le filtre de compte garde
+ses règles de sélection précédentes.
+
+Les annonces proposent des vues rapides du stock, sans numéro et à relancer
+(selon l'ancienneté déjà calculée), avec réinitialisation explicite et nombre
+d'annonces dans la sélection. Les ventes proposent l'effacement de recherche
+et la remise à zéro de la période et du statut. Les opérations eBay et les
+calculs de marge ne changent pas.
+
+Une photo de vente disponible s'agrandit dans une fenêtre dédiée, pour Vinted
+comme pour les lignes partagées Leboncoin/eBay. La fenêtre réutilise l'image
+réellement chargée dans la miniature, y compris son image de secours. Fermeture
+au bouton, au fond ou à Échap, focus rendu à la miniature ; la touche Tab reste
+sur le bouton de fermeture. Aucune recherche de photo par titre.
