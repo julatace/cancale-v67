@@ -214,3 +214,30 @@ comme pour les lignes partagées Leboncoin/eBay. La fenêtre réutilise l'image
 réellement chargée dans la miniature, y compris son image de secours. Fermeture
 au bouton, au fond ou à Échap, focus rendu à la miniature ; la touche Tab reste
 sur le bouton de fermeture. Aucune recherche de photo par titre.
+
+### Disposition commune — 14 octobre, PR suivante
+
+Suite au retour sur l'ensemble de la disposition, les ventes réunissent la
+recherche, les statuts et la période dans une seule barre de travail. Sur
+mobile, recherche et période sont côte à côte, les statuts dessous. Les
+raccourcis mensuels restent dans le sélecteur compact ; les dates natives et
+les contrôles de validité ne changent pas. L'analyse des ventes est déplacée
+après la liste, dans l'ordre réel du document.
+
+Les annonces deviennent une liste à filets fins : sur ordinateur, photo et
+informations à gauche, prix et numéro alignés à droite, accès à la gestion dans
+une colonne dédiée. La gestion dépliée occupe la largeur de la ligne. Sur
+mobile, les cartes deviennent des lignes dans une même surface. La recherche,
+le tri et les vues rapides sont regroupés. Les filtres des ventes Leboncoin et
+eBay réutilisent également une barre commune.
+
+Ma journée regroupe ses actions dans une liste et met les montants vendu/reçu
+côte à côte sur ordinateur également. Les statistiques réduisent les espaces
+entre leur titre et leurs indicateurs. La messagerie ordinateur groupe liste
+et fil dans un seul panneau, avec défilement propre à la liste. L'en-tête
+ordinateur est remis dans le flux pour ne plus recouvrir les chiffres.
+
+Les tests contrôlent la hauteur des outils avant les ventes (moins de 150 px
+à 320/390/1512), la position de l'analyse après la liste, l'alignement des
+annonces sur ordinateur et le fil dans la colonne de droite. Les calculs
+vendu/reçu, les états inconnus et les contrôles d'actions restent inchangés.

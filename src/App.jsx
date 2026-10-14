@@ -8371,7 +8371,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     </details>
   );
 }
-function PeriodePicker({ value, onChange }) {
+function PeriodePicker({ value, onChange, compact = false }) {
   const [open,setOpen] = useState(false);
   const [mode,setMode] = useState('mois');
   const localDate = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
@@ -8404,12 +8404,12 @@ function PeriodePicker({ value, onChange }) {
   return <div className="vrm-period" style={{marginBottom:10}}>
     <div className="vrm-rangee" style={{display:'flex',gap:6,alignItems:'center'}}>
       <button type="button" onClick={()=>{setOpen(v=>!v);setErreur('');}} aria-expanded={open} aria-controls={panneauId} style={{...chip,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="calendar" size={14}/>{libellePeriode(value)}</button>
-      <button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button>
-      <button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button>
+      {!compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button>
+      <button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}
       {value && <button type="button" aria-label="Effacer la période" onClick={()=>{onChange(null);setOpen(false);}} style={chip}><Icon name="close" size={14}/></button>}
     </div>
     {open && <div id={panneauId} className="vrm-period-panel" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginTop:8}}>
-      <div style={{display:'flex',gap:6,marginBottom:12}}><button type="button" onClick={()=>preset('j7')} style={chip}>7 jours</button><button type="button" onClick={()=>preset('j30')} style={chip}>30 jours</button></div>
+      <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>{compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button><button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}<button type="button" onClick={()=>preset('j7')} style={chip}>7 jours</button><button type="button" onClick={()=>preset('j30')} style={chip}>30 jours</button></div>
       <div role="group" aria-label="Choix de période" style={{display:'flex',gap:8,marginBottom:10}}>
         <button type="button" aria-pressed={mode==='mois'} onClick={()=>setMode('mois')} style={{...chip,fontWeight:mode==='mois'?700:400}}>Un mois</button>
         <button type="button" aria-pressed={mode==='dates'} onClick={()=>setMode('dates')} style={{...chip,fontWeight:mode==='dates'?700:400}}>Deux dates</button>
@@ -10762,10 +10762,10 @@ function PhotoVente({ src, size = 64, portrait = false }) {
 }
 function FiltresVentes({ value, onChange, search, onSearch, cancelled = false }) {
   const tabs=[['all','Toutes'],['pending','À expédier'],['done','Finalisées'],...(cancelled?[['cancelled','Annulées']]:[])];
-  return <>
+  return <div className="vrm-workbar vrm-shared-workbar">
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
     <div className="vrm-rangee vrm-sales-filters" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
-  </>;
+  </div>;
 }
 
 function LigneVente({ photo, titre, meta, montant, actions }) {
@@ -16378,7 +16378,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
+      <div className="vrm-finance-period-label" style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
       <div className="vrm-finance-overview">
         {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
@@ -28622,7 +28622,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
         return (
-          <div>
+          <div className="vrm-day-layout">
             <ScreenHead icon="sun" title="Ma journée"/>
 
             {/* ═══ RÉTABLI LE 13 OCTOBRE (retiré par #500) ════════════════════
@@ -28763,7 +28763,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 grand écran et UNE sur téléphone — la même règle, sans test de
                 largeur dans le JavaScript. */}
             {!loading && jobs.length>0 && (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
+              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
                   /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
                      différentes, empilées : c'est exactement ce qui faisait
@@ -28897,8 +28897,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
+        <div className="vrm-workbar vrm-sales-workbar">
         {sales.items && sales.items.length>0 && (
-          <div style={{marginBottom:14}}>
+          <div className="vrm-sales-search-group" style={{marginBottom:14}}>
             <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, acheteur…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
             {ordSearch && <button type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
@@ -28907,6 +28908,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>}
           </div>
         )}
+        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+          {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
+            <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+          ))}
+          {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
+              sur une ligne). Les filtres restent visibles — c'est le réglage du
+              quotidien — et Compta / Registre / Litiges / CSV passent derrière un
+              seul « ⋯ Outils ». Les litiges gardent une pastille d'alerte car
+              c'est de l'argent en jeu. */}
+          {accounts.length>0 && (()=>{
+            const alert = disputes.salesLost.length>0 || disputes.buysBack.length>0;
+            return (
+              <div style={{position:'relative'}}>
+                <button onClick={()=>setToolsOpen(v=>!v)} title="Outils : compta, registre annuel, litiges, export"
+                  style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
+                </button>
+                {toolsOpen && (
+                  <>
+                    <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                      {[
+                        {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
+                        {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
+                        /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
+                           pas un problème, je reçois les articles après ; ils sont déjà
+                           dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
+                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+                      ].map(t=>(
+                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                          <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+                          <span style={{minWidth:0}}>
+                            <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
+                            <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        {/* LA PÉRIODE, SOUS LE FILTRE QU'ELLE AFFINE. Elle était tout en haut,
+            au-dessus de tout : six pastilles + la recherche formaient deux blocs
+            pleins avant la première vente. Ici, elle est là où on l'utilise —
+            on choisit « Finalisées », puis le mois. */}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} compact/>}
+        </div>
         <NoAcc/>
         {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
             LEBONCOIN (onglet Leboncoin → aperçu), pas dans les ventes VINTED
@@ -28945,6 +28996,198 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             à expédier. Elle devient une ligne discrète, au même gabarit que
             « Analyse de tes ventes » juste en dessous : deux entrées de même
             nature ont désormais la même apparence. */}
+        {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
+            nommés au rendu — y compris quand la liste vient du cache. */}
+        {nomsVentesKO.length>0 && (
+          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+          </div>
+        )}
+        {sales.loading && <Skeleton variant="row" count={5}/>}
+        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
+        {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
+        {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
+            Une ligne de vente de 980 px pour une photo, un titre et un
+            prix, c'est le meme defaut que les cartes d'action de Ma
+            journee : on defile deux fois plus pour voir la meme chose.
+            `auto-fit, minmax(min(430px, 100%), 1fr)` donne DEUX colonnes sur grand
+            ecran et UNE sur telephone — la meme regle, sans test de
+            largeur dans le JavaScript, donc rien a maintenir en double.
+            Les lignes portent deja `flexWrap` et une largeur plancher
+            (§26), elles supportent la colonne plus etroite. */}
+        {/* Liste blanche groupée façon démo (comme Achats) : une seule surface,
+            filets fins entre les lignes, lignes aérées — plus de cartes
+            encadrées séparées. */}
+        {/* ⚠️ UNE RAISON COMMUNE SE DIT UNE FOIS (§7). Si l'extension est
+            absente, muette ou en retard, TOUS les boutons « Générer le
+            bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
+            de la liste, au lieu de la répéter sous chaque vente. */}
+        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
+        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
+            const st = classifyOrderStatus(o.status);
+            const photo = photoCommande(o, listings.items || _acctCache.listings?.items || []);
+            const hidden = isHidden(o);
+            const e = effEntry(o); const num = e?.numero;
+            const sell = o.price?.amount!=null?Number(o.price.amount):null;
+            const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+            const fees = feesOf(e);
+            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
+            const ov = saleOv[String(o.transaction_id)] || {};
+            const baseE = resolvedEntry(o);
+            const baseNum = baseE?.numero || '';
+            const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
+            return (
+              // Ligne de vente dans la liste groupée (filet fin entre les lignes,
+              // pas de carte encadrée séparée — style démo, comme Achats).
+              <div className="vrm-sale-row" key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+               {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
+               <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                </div>
+                <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
+                  <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
+                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
+                  <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                    {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
+                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
+                    {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
+                    {st==='cancelled' && num && (()=>{
+                      const out = saleOutcome(o);
+                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
+                      //    se redonne jamais : l'app le refuse dans le champ N°. Dire
+                      //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
+                      const arch = !numeroReprenable(num);
+                      if (out === 'retour') return arch
+                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
+                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
+                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
+                      return arch
+                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
+                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                    })()}
+                    {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
+                        chaque vente sans N°, c'était la même alerte ×N (§7). Le
+                        champ « N° ? » juste dessous porte la même information. */}
+                  </div>
+                </div>
+                <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
+                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
+                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
+                  {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
+                  {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
+                      bouton : il imprime si le PDF est là (capté par l'extension,
+                      ou reçu par email en secours), sinon il COMMANDE l'extension.
+                      ⚠️ Seulement tant que le colis doit partir : une fois expédiée
+                      ou finalisée, une vente n'a plus de bordereau à afficher
+                      (« il ne devrait même pas y en avoir », Julien). */}
+                  {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
+                    <div className="vrm-sale-action" style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
+                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
+                        aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
+                        onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
+                    </div>
+                  )}
+                </div>
+               </div>
+               {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
+               <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
+               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
+               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
+                    (30 sept. : une ligne de moins par vente). */}
+                {!hidden && (
+                  <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
+                    <div title={num?undefined:"Paire pas encore identifiée automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
+                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
+                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
+                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                      <span style={{fontSize:11,color:C.muted}}>€</span>
+                    </div>
+                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                  </div>
+                )}
+                <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
+                {num && aExpedier(o) && !hidden && inGarage(num) && (
+                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                )}
+                {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
+                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
+                )}
+                {num && isPairLost(num) && (
+                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
+                )}
+                {isLotTitle(o.title) && (
+                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                )}
+                {hidden ? (
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
+                ) : st==='cancelled' ? (
+                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
+                ) : (
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
+                )}
+                </div>
+               </div>
+               {/* La barre de progression a été retirée : la pastille de statut
+                   ci-dessus dit déjà où en est la vente (style maquette iOS,
+                   28 sept.). Un segment de plus, c'est la même info deux fois. */}
+               {/* « je veux que ça fasse également ça dans les ventes, donc avec le
+                   numéro et l'achat qui correspond » — le N° est dans le titre de la
+                   ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
+                   identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
+               {/* ⚠️ RELIER L'ACHAT DEPUIS LA VENTE (demande de Julien : « relier
+                   les achats avec les ventes »). Sur une vente AVEC identité
+                   d'annonce on relie la PAIRE (le même geste que l'écran
+                   Annonces, §11) ; sans identité, on relie la vente elle-même
+                   (`_saleTx` → override). Le picker trie déjà les achats de même
+                   marque/taille en tête (`scoreAchat`) : « même si l'app ne
+                   trouve pas, elle fait une sélection » (sa demande) — et c'est
+                   TOUJOURS son clic qui tranche, jamais un rapprochement
+                   automatique par titre (§5). On ne le propose pas sur une vente
+                   annulée. */}
+               {!hidden && st!=='cancelled' && (()=>{
+                 const idf = identiteAnnonce(o);
+                 const saleItem = idf
+                   ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc }
+                   : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc };
+                 if (e && e.buyFromId) return (
+                   <div style={{display:'flex',alignItems:'center',gap:8}}>
+                     <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
+                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
+                   </div>
+                 );
+                 if (buy==null) return (
+                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
+                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
+                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
+                   </button>
+                 );
+                 return null;
+               })()}
+               </details></div>
+              </div>
+            );
+          })}
+        </div>
+        {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
+            un clic ouvre la suite. On dessine 60 cartes au lieu de 287 — sur
+            iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
+            une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
+            TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
+        {ventesAffichees.length > ventesMax && (
+          <button type="button" onClick={()=>setVentesMax(n=>n+120)}
+            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+            Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
+          </button>
+        )}
+        <div className="vrm-sales-analysis">
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
@@ -29421,246 +29664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ); })()}
         </>)}
-        {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
-            nommés au rendu — y compris quand la liste vient du cache. */}
-        {nomsVentesKO.length>0 && (
-          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
-          </div>
-        )}
-        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-          {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
-            <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
-          ))}
-          {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
-              sur une ligne). Les filtres restent visibles — c'est le réglage du
-              quotidien — et Compta / Registre / Litiges / CSV passent derrière un
-              seul « ⋯ Outils ». Les litiges gardent une pastille d'alerte car
-              c'est de l'argent en jeu. */}
-          {accounts.length>0 && (()=>{
-            const alert = disputes.salesLost.length>0 || disputes.buysBack.length>0;
-            return (
-              <div style={{position:'relative'}}>
-                <button onClick={()=>setToolsOpen(v=>!v)} title="Outils : compta, registre annuel, litiges, export"
-                  style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
-                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
-                </button>
-                {toolsOpen && (
-                  <>
-                    <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
-                      {[
-                        {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
-                        {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
-                        /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
-                           pas un problème, je reçois les articles après ; ils sont déjà
-                           dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
-                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
-                      ].map(t=>(
-                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                          <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
-                          <span style={{minWidth:0}}>
-                            <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
-                            <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })()}
         </div>
-        {/* LA PÉRIODE, SOUS LE FILTRE QU'ELLE AFFINE. Elle était tout en haut,
-            au-dessus de tout : six pastilles + la recherche formaient deux blocs
-            pleins avant la première vente. Ici, elle est là où on l'utilise —
-            on choisit « Finalisées », puis le mois. */}
-        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
-        {sales.loading && <Skeleton variant="row" count={5}/>}
-        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
-        {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
-        {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
-            Une ligne de vente de 980 px pour une photo, un titre et un
-            prix, c'est le meme defaut que les cartes d'action de Ma
-            journee : on defile deux fois plus pour voir la meme chose.
-            `auto-fit, minmax(min(430px, 100%), 1fr)` donne DEUX colonnes sur grand
-            ecran et UNE sur telephone — la meme regle, sans test de
-            largeur dans le JavaScript, donc rien a maintenir en double.
-            Les lignes portent deja `flexWrap` et une largeur plancher
-            (§26), elles supportent la colonne plus etroite. */}
-        {/* Liste blanche groupée façon démo (comme Achats) : une seule surface,
-            filets fins entre les lignes, lignes aérées — plus de cartes
-            encadrées séparées. */}
-        {/* ⚠️ UNE RAISON COMMUNE SE DIT UNE FOIS (§7). Si l'extension est
-            absente, muette ou en retard, TOUS les boutons « Générer le
-            bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
-            de la liste, au lieu de la répéter sous chaque vente. */}
-        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
-            const st = classifyOrderStatus(o.status);
-            const photo = photoCommande(o, listings.items || _acctCache.listings?.items || []);
-            const hidden = isHidden(o);
-            const e = effEntry(o); const num = e?.numero;
-            const sell = o.price?.amount!=null?Number(o.price.amount):null;
-            const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-            const fees = feesOf(e);
-            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
-            const ov = saleOv[String(o.transaction_id)] || {};
-            const baseE = resolvedEntry(o);
-            const baseNum = baseE?.numero || '';
-            const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
-            return (
-              // Ligne de vente dans la liste groupée (filet fin entre les lignes,
-              // pas de carte encadrée séparée — style démo, comme Achats).
-              <div className="vrm-sale-row" key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
-               {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
-               <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                </div>
-                <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
-                  <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
-                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                  <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
-                    {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
-                    {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
-                    {st==='cancelled' && num && (()=>{
-                      const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
-                      // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
-                      //    se redonne jamais : l'app le refuse dans le champ N°. Dire
-                      //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
-                      const arch = !numeroReprenable(num);
-                      if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
-                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
-                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
-                      return arch
-                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
-                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
-                    })()}
-                    {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
-                        chaque vente sans N°, c'était la même alerte ×N (§7). Le
-                        champ « N° ? » juste dessous porte la même information. */}
-                  </div>
-                </div>
-                <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
-                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
-                  {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
-                  {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
-                      bouton : il imprime si le PDF est là (capté par l'extension,
-                      ou reçu par email en secours), sinon il COMMANDE l'extension.
-                      ⚠️ Seulement tant que le colis doit partir : une fois expédiée
-                      ou finalisée, une vente n'a plus de bordereau à afficher
-                      (« il ne devrait même pas y en avoir », Julien). */}
-                  {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
-                    <div className="vrm-sale-action" style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
-                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
-                        aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
-                        onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
-                    </div>
-                  )}
-                </div>
-               </div>
-               {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
-               <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
-               <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
-               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
-                    (30 sept. : une ligne de moins par vente). */}
-                {!hidden && (
-                  <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
-                    <div title={num?undefined:"Paire pas encore identifiée automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
-                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                    </div>
-                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
-                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                      <span style={{fontSize:11,color:C.muted}}>€</span>
-                    </div>
-                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
-                  </div>
-                )}
-                <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
-                {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
-                )}
-                {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
-                )}
-                {num && isPairLost(num) && (
-                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
-                )}
-                {isLotTitle(o.title) && (
-                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
-                )}
-                {hidden ? (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
-                ) : st==='cancelled' ? (
-                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
-                ) : (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
-                )}
-                </div>
-               </div>
-               {/* La barre de progression a été retirée : la pastille de statut
-                   ci-dessus dit déjà où en est la vente (style maquette iOS,
-                   28 sept.). Un segment de plus, c'est la même info deux fois. */}
-               {/* « je veux que ça fasse également ça dans les ventes, donc avec le
-                   numéro et l'achat qui correspond » — le N° est dans le titre de la
-                   ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
-                   identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
-               {/* ⚠️ RELIER L'ACHAT DEPUIS LA VENTE (demande de Julien : « relier
-                   les achats avec les ventes »). Sur une vente AVEC identité
-                   d'annonce on relie la PAIRE (le même geste que l'écran
-                   Annonces, §11) ; sans identité, on relie la vente elle-même
-                   (`_saleTx` → override). Le picker trie déjà les achats de même
-                   marque/taille en tête (`scoreAchat`) : « même si l'app ne
-                   trouve pas, elle fait une sélection » (sa demande) — et c'est
-                   TOUJOURS son clic qui tranche, jamais un rapprochement
-                   automatique par titre (§5). On ne le propose pas sur une vente
-                   annulée. */}
-               {!hidden && st!=='cancelled' && (()=>{
-                 const idf = identiteAnnonce(o);
-                 const saleItem = idf
-                   ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc }
-                   : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc };
-                 if (e && e.buyFromId) return (
-                   <div style={{display:'flex',alignItems:'center',gap:8}}>
-                     <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
-                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
-                   </div>
-                 );
-                 if (buy==null) return (
-                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
-                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
-                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
-                   </button>
-                 );
-                 return null;
-               })()}
-               </details></div>
-              </div>
-            );
-          })}
-        </div>
-        {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
-            un clic ouvre la suite. On dessine 60 cartes au lieu de 287 — sur
-            iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
-            une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
-            TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
-        {ventesAffichees.length > ventesMax && (
-          <button type="button" onClick={()=>setVentesMax(n=>n+120)}
-            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-            Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
-          </button>
-        )}
       </>)}
 
 
@@ -30687,6 +30691,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" />
         <NoAcc/>
+        <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
             <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
@@ -30756,6 +30761,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
         </div>}
 
+        </div>
         {/* ⚠️ On DIT ce que le filtre « compte banni » a mis de côté (§ : une
             liste qui rétrécit sans explication se lit comme une perte). Les
             paires ne sont pas perdues — le compte Vinted est bloqué, elles ne

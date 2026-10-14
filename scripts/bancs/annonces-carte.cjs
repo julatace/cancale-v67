@@ -249,6 +249,11 @@ const projette = (row, sel) => {
         await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).click();
         await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length>0);
         dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
+        if(vp.width>=1024){
+          const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
+          dit(Math.abs(premier.x-suivant.x)<2 && suivant.y>=premier.y+premier.height-1, 'ordinateur : annonces alignées dans une seule liste');
+        }
+
       } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
