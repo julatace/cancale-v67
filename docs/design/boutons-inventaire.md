@@ -6,10 +6,10 @@ Cet inventaire vérifie les types explicites et les noms dans le code. Les noms 
 
 | Fichier : ligne | Composant | Nom | Type | État disponible |
 |---|---|---|---|---|
-| Accueil.jsx:455 | Accueil | Créer mon compte | button | — |
-| Accueil.jsx:460 | Accueil | Déjà un compte ? Se connecter | button | — |
-| Accueil.jsx:481 | Accueil | Créer mon compte | button | — |
-| Accueil.jsx:485 | Accueil | Se connecter | button | — |
+| Accueil.jsx:483 | Accueil | Créer mon compte | button | — |
+| Accueil.jsx:488 | Accueil | Déjà un compte ? Se connecter | button | — |
+| Accueil.jsx:509 | Accueil | Créer mon compte | button | — |
+| Accueil.jsx:513 | Accueil | Se connecter | button | — |
 | App.jsx:1112 | RangerSheet | [calculé] N° [calculé] [calculé] [calculé] | button | — |
 | App.jsx:1127 | RangerSheet | Autre numéro… | button | — |
 | App.jsx:1128 | RangerSheet | Annuler | button | — |
