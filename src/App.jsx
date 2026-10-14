@@ -9648,16 +9648,17 @@ const jobEnCours = (job) => !!(job && CMD_ACTIVE.includes(job.etape) && (job.viv
 // générer, ou rien qui bloque → rien du tout (pas de bandeau permanent).
 function RaisonBordereauxGrises({ ventes }) {
   useExtVivante();
+  const [aideOuverte,setAideOuverte]=React.useState(false);
   const sansSouris = useSansSouris();
   const n = (ventes || []).length;
   const r = n ? raisonExtGlobale(sansSouris) : null;
   const montre = !!(r && r.code !== 'verif');
   // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
   // ne la répète pas (§7, `useVoixExt`).
-  useVoixExt(montre ? r.code : null);
+  useVoixExt(montre && aideOuverte ? r.code : null);
   if (!montre) return null;
   return (
-    <details className="vrm-label-help"><summary>Bordereaux et impression</summary><div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+    <details className="vrm-label-help" onToggle={ev=>setAideOuverte(ev.currentTarget.open)}><summary>Bordereaux et impression</summary><div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>

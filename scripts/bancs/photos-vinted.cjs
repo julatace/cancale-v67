@@ -82,7 +82,7 @@
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), https = require('https'), path = require('path'), os = require('os'), cp = require('child_process');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 // PORT_BANC / PORT_CDN : pour tourner à côté d'un autre banc (5741/5742 par défaut).
 const PORT = +process.env.PORT_BANC || 5741, PORT_CDN = +process.env.PORT_CDN || 5742;
 
@@ -372,6 +372,8 @@ const sain = (m, nom) => {
   dit(m.sw <= m.cw + 1, `${nom} : aucun débordement horizontal`, `${m.sw} > ${m.cw}`);
 };
 const capture = (pg, nom) => pg.screenshot({ path: path.join(os.tmpdir(), `photos-vinted-${nom}.png`), fullPage: false }).catch(() => {});
+// L’en-tête de main peut être entièrement AU-DESSUS de la phrase. On exige
+// sa visibilité dans le viewport, pas un chevauchement vertical artificiel.
 // K. Les mots de la phrase qui passent SOUS l'île d'actions (`header` flottant,
 // ordinateur) — mesurés mot par mot (un rectangle de bloc ne dit pas quels mots
 // sont cachés : c'était le GESTE).
@@ -392,7 +394,7 @@ const motsSousIle = async (pg) => { await defiler(pg, 0); await pg.waitForTimeou
   }
   const pb = ph.getBoundingClientRect();
   return { phrase: true, ile: true, mots: caches.join(' '), boite: [Math.round(hb.left), Math.round(hb.top), Math.round(hb.right), Math.round(hb.bottom)],
-    phraseBoite: [Math.round(pb.left), Math.round(pb.top), Math.round(pb.right), Math.round(pb.bottom)] };
+    viewportHeight:innerHeight, phraseBoite: [Math.round(pb.left), Math.round(pb.top), Math.round(pb.right), Math.round(pb.bottom)] };
 }); };
 // Ma journée · « Dernières ventes » : les vignettes, et l'icône que l'écran met
 // À LA PLACE d'une photo qu'il a retirée de sa liste (`imgMortes`).
@@ -519,7 +521,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         dit(m.sonde === 'injoignable', `B ${L} : la cause affichée est celle mesurée (deux échecs réseau, sans extension pour départager)`, String(m.sonde));
         if (L > 1000) {
           const k = await motsSousIle(pg);
-          dit(k.phrase && k.ile && k.phraseBoite[1] < k.boite[3] && !k.mots, `K ${L} (sans extension) : la phrase est à hauteur de l'île, et aucun de ses mots ne passe dessous`, k.mots || JSON.stringify(k));
+          dit(k.phrase && k.ile && k.phraseBoite[1]>=0 && k.phraseBoite[3]<=k.viewportHeight && !k.mots, `K ${L} (sans extension) : la phrase est visible en haut de page, et aucun mot ne passe sous l’en-tête`, k.mots || JSON.stringify(k));
         }
         dit(m.geste === (L < 600 ? 'telephone' : 'chrome'), `B ${L} : le geste suit l'appareil (${L < 600 ? 'sur le téléphone : l’ordinateur' : 'le Chrome où l’extension est installée'})`, String(m.geste) + ' · ' + m.texte.slice(0, 140));
         sain(m, `B ${L} Annonces`);
@@ -671,6 +673,9 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { refusePremieres: { cles: JETONS_ANNONCES, n: 3 } } });
       await ouvrir(pg, 'plat_vinted', 3000);
       await section(pg, 'annonces', 9000);
+      // Défile vers les photos : l’en-tête compact ne garantit pas que deux
+      // photos récupérables soient dans le viewport initial (main aussi).
+      await versPhotos(pg,2500);
       const m = await mesurer(pg); const p = await pont(pg);
       await capture(pg, 'G-annonces');
       dit(!!p && p.refusees >= 3 && m.secours >= 2, 'G : le scénario est réel (l’extension en refuse trois, en rend d’autres)', JSON.stringify({ refusees: p && p.refusees, secours: m.secours }));
@@ -694,7 +699,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       dit(m.geste === 'refus' && !/recharge/i.test(m.texte), 'R : l’extension a répondu sans image ⇒ aucun « recharge cette page » (le geste ne pourrait pas marcher)', `${m.geste} · ${m.texte.slice(0, 200)}`);
       const k = await motsSousIle(pg);
       await capture(pg, 'R-haut');
-      dit(k.phrase && k.ile && k.phraseBoite[1] < k.boite[3] && !k.mots, 'K 1512 (avec extension) : la phrase est à hauteur de l’île, et aucun de ses mots ne passe dessous', k.mots || JSON.stringify(k));
+      dit(k.phrase && k.ile && k.phraseBoite[1]>=0 && k.phraseBoite[3]<=k.viewportHeight && !k.mots, 'K 1512 (avec extension) : la phrase est visible en haut de page, et aucun mot ne passe sous l’en-tête', k.mots || JSON.stringify(k));
       await ouvrir(pg, 'plat_vinted', 3000);
       await section(pg, 'annonces', 9000);
       m = await mesurer(pg);
@@ -746,6 +751,10 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { muet: true } });
       await ouvrir(pg, 'plat_vinted', 42000);
       await versPhotos(pg, 1500);
+      const repli=await mesurer(pg);
+      dit(repli.phrases===1 && repli.geste==='muette' && /recharge/i.test(repli.texte),'U replié : une aide cachée ne prive pas les photos du geste utile',repli.texte);
+      await pg.locator('.vrm-label-help > summary').click();
+      await pg.waitForTimeout(500);
       let m = await mesurer(pg);
       await capture(pg, 'U-ventes');
       const bandeau = await pg.evaluate(() => !!document.querySelector('[data-raison-bord="muette"]'));
