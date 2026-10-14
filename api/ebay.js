@@ -1,3 +1,4 @@
+import {creerLectureCommandesEbay} from './_lib/ebay-commandes-pages.js';
 import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
 import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
@@ -1504,8 +1505,9 @@ async function handleSync(ctx) {
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2):null;
-  if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2),status:orders.status}))===true;
+  const lectureCommandesId=crypto.randomUUID();
+  const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
+  if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
   if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2 }, ctx.owner)===true;
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
@@ -1654,6 +1656,7 @@ async function handleModifierAnnonceGestion(b,ctx){
 }
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
+const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireDonnee,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
 
 async function handleApp(req, res) {
@@ -1767,6 +1770,7 @@ async function handleApp(req, res) {
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
       sync: (ctx) => handleSync(ctx),
+      commandessuite:(ctx)=>chargerCommandesSuivantes(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),
       pubverify: (ctx) => handleVerify(b, ctx),
