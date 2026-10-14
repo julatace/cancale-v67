@@ -190,6 +190,13 @@ const CSS = `
 @media (prefers-reduced-motion:reduce){
   .acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour,.acc-hero:before{animation:none!important}
 }
+/* Apparition au defilement des sections du corps. La classe .acc-reveil n'est
+   posee QUE par le script (jamais au rendu) : sans JS, ou si l'observateur ne
+   se declenche pas, la section reste visible (un filet la revele apres 1,6 s).
+   Reduire les animations : jamais posee. */
+.acc-reveil{opacity:0;transform:translateY(22px);transition:opacity 640ms ${COURBE_SORTIE},transform 640ms ${COURBE_SORTIE}}
+.acc-reveil.vu{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.acc-reveil{opacity:1!important;transform:none!important;transition:none!important}}
 
 /* Les sections. */
 .acc-sec{position:relative;padding:64px 0;scroll-margin-top:80px}
@@ -442,6 +449,27 @@ export default function Accueil({ onEntrer }) {
     } catch (_) {}
     return () => { fini = true; try { window.cancelIdleCallback && window.cancelIdleCallback(id); } catch (_) {} clearTimeout(id); try { io && io.disconnect(); } catch (_) {} };
   }, []);
+
+  // Apparition au défilement des sections du corps (le héros a sa propre
+  // cascade au chargement). On ne cache une section QUE si le mouvement est
+  // permis ET qu'un observateur existe. L'observateur livre toujours une
+  // notification initiale : les sections déjà à l'écran se révèlent tout de
+  // suite, celles plus bas attendent le défilement. S'il ne se construit pas,
+  // tout est révélé. « Réduire les animations » : on ne touche à rien.
+  React.useEffect(() => {
+    if (moins || typeof IntersectionObserver !== 'function') return;
+    const secs = Array.from(document.querySelectorAll('.acc-sec, .acc-fin'));
+    if (!secs.length) return;
+    const reveler = (s) => { try { s.classList.add('vu'); } catch (_) {} };
+    let io = null;
+    try {
+      io = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) { reveler(e.target); io.unobserve(e.target); } });
+      }, { rootMargin: '0px 0px -12% 0px' });
+      secs.forEach((s) => { s.classList.add('acc-reveil'); io.observe(s); });
+    } catch (_) { secs.forEach((s) => s.classList.remove('acc-reveil')); }
+    return () => { try { io && io.disconnect(); } catch (_) {} };
+  }, [moins]);
 
   const vers = (id) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: moins ? 'auto' : 'smooth', block: 'start' }); };
   const ancre = (id) => (e) => { e.preventDefault(); vers(id); };
