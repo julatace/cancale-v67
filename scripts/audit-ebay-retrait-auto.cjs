@@ -127,6 +127,21 @@ async function controles(APP, journal) {
     if (F2) dit((await F2.lireVentesVintedProuvees([{ vinted_user_id: 'A' }])) === null, 'transactions illisibles ⇒ `null` (« pas su »), jamais un ensemble vide');
   });
 
+  await essaie('bordereaux confirmés par le même compte', async () => {
+    const bords = [{id:'harvest_111_label_10',tx:'10',it:'100'}, {id:'harvest_222_label_10',tx:'10',it:'200'}, {id:'harvest_111_label_11',tx:'12',it:'300'}, {id:'harvest_111_label_12',tx:'12',it:'400'}, {id:'harvest_111_label_13',tx:'13',it:'500'}];
+    const F = charger(APP, {
+      lireTout: async q => q.includes('_label_') ? bords : [],
+      fetchHarvestOrders: async uid => uid === '111' ? {my_orders:[{transaction_id:10,status:'Le paiement a été validé',date:new Date().toISOString()},{transaction_id:12,status:'Commande annulée',date:new Date().toISOString()},{transaction_id:13,status:'Le paiement a été validé',transaction_user_status:'failed',date:new Date().toISOString()}]} : undefined,
+      _harvestSeen:{'111_orders_sold':Date.now()},
+    }, dit);
+    const v = await F.lireVentesVintedProuvees([{vinted_user_id:'111'},{vinted_user_id:'222'}]);
+    dit(v.has('100') && v.preuves.get('100')[0].frais && v.preuves.get('100')[0].compte === '111', 'bordereau seul et vente récente du même compte : preuve stricte');
+    dit(!v.has('200'), 'même transaction sur un autre compte illisible : aucune preuve');
+    dit(!v.has('300'), 'transaction du bordereau contradictoire : aucune preuve');
+    dit(!v.has('500') && v.revenues.has('500'), 'vente classée en échec malgré son titre : aucun retrait');
+    dit(!v.has('400') && v.revenues.has('400'), 'vente annulée : la paire est revenue, aucun retrait');
+  });
+
   // ── 2. LES ANNONCES EN VENTE : TOUS SES COMPTES, ÉCARTÉS COMPRIS ──────────
   await essaie('annonces en vente', async () => {
     const LIST = {

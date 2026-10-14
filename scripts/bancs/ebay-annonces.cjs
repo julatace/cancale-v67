@@ -126,7 +126,7 @@ const VENTES = { capturedAt: auj.toISOString(), payload: { my_orders: [
 const bordereau = (tx, item) => ({ id: `harvest_111_label_${tx}`, data: { uid: '111', url: 'https://s3.test/l.pdf', tx: String(tx), item: String(item), items: [String(item)], capturedAt: auj.toISOString(), pdfB64: 'JVBERi0x' } });
 const BORDEREAUX = [bordereau(9001, 7002), bordereau(9003, 7003), bordereau(9006, 7006)];
 const EBAY_ANNONCES = () => [
-  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001' },
+  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', depuis: recent(100), observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001' },
   // Pas de SKU, et SA photo est exactement celle de la paire N°21 (une identité).
   { itemId: '110000000002', title: 'Nike Dunk Low panda taille 42', price: '100.0', sku: '', observateurs: 3, photo: 'https://img.test/v7001.jpg', url: 'https://www.ebay.fr/itm/110000000002' },
   { itemId: '110000000003', title: 'Salomon XT-6 noir taille 41', price: '120.0', sku: 'VRM-23', observateurs: null, photo: 'https://img.test/e3.jpg' },
@@ -329,14 +329,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       // ── Le tableau de bord d'abord : la MÊME règle, la même conclusion (§11).
       await essaie('tableau de bord', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForFunction(() => /vendues? sur eBay, encore en vente sur Vinted/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-        const t = await pg.evaluate(() => document.body.innerText);
-        const a = /(\d+) paires? vendues? sur Vinted, encore en vente sur eBay/.exec(t);
-        const v = /(\d+) paires? vendues? sur eBay, encore en vente sur Vinted/.exec(t);
-        dit(a && a[1] === '1', 'le tableau de bord annonce 1 paire vendue sur Vinted à retirer d\'eBay', a ? a[0] : 'absent');
-        dit(v && v[1] === '1', 'et 1 paire vendue sur eBay à retirer de Vinted', v ? v[0] : 'absent');
-        const p = /(\d+) paires? vendues? (sur Vinted|ailleurs), programmées? sur eBay — à annuler/.exec(t);
-        dit(p && p[1] === '3' && p[2] === 'ailleurs', 'et 3 paires vendues AILLEURS (Vinted, eBay, Leboncoin), PROGRAMMÉES sur eBay — à annuler (même règle que l\'écran, §11)', p ? p[0] : 'absent');
+        dit(await pg.locator('[data-ebay-a-retirer]').count() === 0, 'les alertes détaillées restent dans eBay pour garder un accueil compact');
       });
       await essaie('écran Annonces eBay', async () => {
         await versAnnoncesEbay(pg);
