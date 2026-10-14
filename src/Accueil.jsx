@@ -172,6 +172,25 @@ const CSS = `
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
 @keyframes accApparait{from{opacity:0}to{opacity:1}}
 
+/* APPARITION DU HÉROS AU CHARGEMENT (14 oct.) — première impression. Une
+   cascade douce : chaque élément monte de 14 px en fondu, décalé, ease-out
+   court, et se fige à l'état final (fill both) — aucun décalage de mise en
+   page après. La carte démo arrive un cheveu plus tard. Grammaire du mouvement
+   de la page : ca joue UNE fois, au premier regard. Reduire les animations
+   coupe tout (etat final direct). */
+@keyframes accMonte{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour{animation:accMonte 560ms ${COURBE_SORTIE} both}
+.acc-def{animation-delay:40ms}
+.acc-h1{animation-delay:110ms}
+.acc-sous{animation-delay:190ms}
+.acc-actions{animation-delay:270ms}
+.acc-lignes{animation-delay:350ms}
+.acc-carte-jour{animation-duration:680ms;animation-delay:180ms}
+.acc-hero:before{animation:accApparait 1000ms ${COURBE_SORTIE} both}
+@media (prefers-reduced-motion:reduce){
+  .acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour,.acc-hero:before{animation:none!important}
+}
+
 /* Les sections. */
 .acc-sec{position:relative;padding:64px 0;scroll-margin-top:80px}
 .acc-quand{font-size:13px;font-weight:500;color:${K.muted};margin-bottom:12px}
