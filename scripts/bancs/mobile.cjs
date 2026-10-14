@@ -87,7 +87,7 @@ async function brancher(p){
     }
     await p.getByRole('button',{name:'Tous les écrans',exact:true}).tap();
     await p.getByRole('menuitem',{name:'Colis',exact:true}).waitFor();
-    check(await p.getByText('Gestion',{exact:true}).isVisible(),largeur+' menu: gestion regroupée');
+    check(await p.getByRole('menu').getByText('Gestion',{exact:true}).isVisible(),largeur+' menu: gestion regroupée');
     await p.keyboard.press('Escape');
     check(await p.getByRole('button',{name:'Tous les écrans',exact:true}).evaluate(e=>e===document.activeElement),largeur+' menu: retour du focus');
     await p.getByRole('button',{name:'Tous les écrans',exact:true}).tap();await p.getByRole('menuitem',{name:'Réglages',exact:true}).tap();check(await p.getByText("Taille de l'affichage",{exact:true}).isVisible(),largeur+' réglages accessibles depuis le menu');

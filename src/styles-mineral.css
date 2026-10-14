@@ -509,3 +509,60 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 @media(min-width:1024px) {
  .vrm-app-header { position:relative !important; top:auto !important; right:auto !important; align-self:flex-end; flex-shrink:0; margin:8px 24px 0 272px; box-shadow:none !important; }
 }
+
+/* Commandes : cible claire, focus visible et états explicites. */
+.vrm-app-shell button { touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+.vrm-app-shell button:focus-visible, .vrm-app-shell summary:focus-visible, .vrm-app-shell a:focus-visible { outline:2px solid var(--vrm-focus,#A63F23); outline-offset:3px; }
+.vrm-app-shell button:disabled { cursor:not-allowed; }
+.vrm-icon-control { min-width:36px; min-height:36px; }
+@media(hover:hover) and (pointer:fine) {
+ .vrm-app-shell button:not(:disabled):hover { filter:brightness(.97); }
+}
+.vrm-app-shell button:not(:disabled):active { filter:brightness(.92); }
+@media(max-width:767px) { .vrm-main .vrm-icon-control { min-width:44px; min-height:44px !important; } }
+
+/* Retraits : la paire et son code, sans les notices en permanence. */
+.vrm-pickup-board { border:0 !important; background:transparent !important; padding:0 !important; }
+.vrm-pickup-point { background:var(--vrm-surface) !important; }
+.vrm-pickup-point:has(>.vrm-pickup-method) { display:flex; flex-direction:column; }
+.vrm-pickup-point > .vrm-pickup-method { order:3; border-top:1px solid var(--vrm-line); }
+.vrm-pickup-help, .vrm-pickup-method, .vrm-pickup-details { color:var(--vrm-muted); font-size:11px; }
+.vrm-pickup-help > summary { cursor:pointer; padding:8px 0; }
+.vrm-pickup-method > summary { cursor:pointer; padding:9px 12px; }
+.vrm-pickup-details > summary { cursor:pointer; padding:5px 0; }
+.vrm-pickup-card { gap:8px 10px !important; padding:10px !important; box-shadow:none; }
+.vrm-pickup-card > img { width:40px !important; height:56px !important; object-fit:cover; border-radius:6px !important; }
+.vrm-pickup-card > div:first-of-type { flex:1 1 180px !important; }
+.vrm-pickup-code { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:66px; padding:8px 12px; border:1px solid var(--vrm-line); border-radius:8px; color:var(--vrm-ink); background:var(--vrm-bg); cursor:pointer; }
+.vrm-pickup-code > span { font-size:10px; line-height:1.3; }
+.vrm-pickup-code > strong { font-family:ui-monospace,SFMono-Regular,monospace; letter-spacing:1px; font-variant-numeric:tabular-nums; line-height:1.2; }
+.vrm-pickup-code > small { font-size:9px; color:var(--vrm-muted); }
+@media(max-width:767px) {
+ .vrm-pickup-card > div:first-of-type { flex-basis:calc(100% - 52px) !important; }
+ .vrm-pickup-card > .vrm-pickup-code { flex:1 1 110px; }
+ .vrm-pickup-card > div:has(>.vrm-pickup-code) { width:100%; display:flex; flex-wrap:wrap; }
+ .vrm-pickup-card > div:has(>.vrm-pickup-code) > .vrm-pickup-code { flex:1; min-width:0; }
+ .vrm-pickup-card > button[aria-label="Retiré"] { margin-left:auto; min-height:40px !important; padding:7px 11px !important; }
+ .vrm-pickup-help { margin-top:2px; }
+}
+.vrm-setting-switch { min-width:46px; min-height:44px; height:44px !important; background:transparent !important; border:0 !important; }
+.vrm-setting-switch::before { content:''; position:absolute; left:0; top:calc(50% - 13.5px); width:46px; height:27px; border:1px solid var(--vrm-line); border-radius:999px; background:var(--vrm-bg); }
+.vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#A63F23); border-color:var(--vrm-focus,#A63F23); }
+.vrm-setting-switch > span { top:calc(50% - 10.5px) !important; }
+.vrm-mobile-nav .vrm-nav-more > span:first-child { display:grid; place-items:center; width:44px; height:26px; }
+.vrm-pickup-point { position:relative; overflow:visible !important; }
+.vrm-pickup-point > div:first-child { padding-right:54px !important; border-radius:10px 10px 0 0; }
+.vrm-pickup-point > div:last-child { padding:0 !important; }
+.vrm-pickup-method { position:absolute; right:8px; top:5px; z-index:4; border:0 !important; }
+.vrm-pickup-method > summary { display:grid; place-items:center; width:40px; min-height:40px; padding:0; border-radius:8px; font-size:16px; cursor:pointer; list-style:none; }
+.vrm-pickup-method > summary::-webkit-details-marker { display:none; }
+.vrm-pickup-method > div { position:absolute; right:0; top:44px; width:min(280px,calc(100vw - 64px)); padding:12px !important; border:1px solid var(--vrm-line) !important; border-radius:10px; background:var(--vrm-surface); box-shadow:0 4px 16px #0002; }
+.vrm-pickup-location-label { display:none; }
+.vrm-pickup-card { position:relative; border:0 !important; border-radius:0 !important; margin-bottom:0 !important; padding:12px !important; }
+.vrm-pickup-card + .vrm-pickup-card { border-top:1px solid var(--vrm-line) !important; }
+.vrm-pickup-card > div:first-of-type { padding-right:104px; }
+.vrm-pickup-card > div:first-of-type > div:first-child { white-space:normal !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3; }
+.vrm-pickup-collect { position:absolute; right:10px; top:10px; min-height:36px !important; padding:6px 9px !important; font-size:11px !important; }
+.vrm-pickup-code { padding:8px; }
+@media(max-width:767px) { .vrm-main .vrm-pickup-collect { min-height:40px !important; } }
+.vrm-main button[aria-label^="Couleur de"] { min-width:44px; min-height:44px; }

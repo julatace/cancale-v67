@@ -1109,7 +1109,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
       )}
       <div style={{display:'flex',flexDirection:'column',gap:7,maxHeight:'46vh',overflowY:'auto'}}>
         {liste.slice(0, 200).map(p => (
-          <button key={p.numero} onClick={()=>onPick(p)}
+          <button type="button" key={p.numero} onClick={()=>onPick(p)}
             style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
             {p.photo
               ? <PhotoVinted src={p.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:'cover',flexShrink:0,background:C.card2}}/>
@@ -1124,8 +1124,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
         ))}
       </div>
       <div style={{display:'flex',gap:8,marginTop:12}}>
-        <button onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
-        <button onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:10,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+        <button type="button" onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
+        <button type="button" onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:10,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
       </div>
     </SheetShell>
   );
@@ -7919,7 +7919,7 @@ function MicDictee({ onText, titre = 'Dicter' }) {
     } catch (_) { setEcoute(false); recRef.current = null; }
   };
   return (
-    <button type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+    <button className="vrm-icon-control" type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
       title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
       style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
         border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
@@ -8406,7 +8406,7 @@ function PeriodePicker({ value, onChange, compact = false }) {
       <button type="button" onClick={()=>{setOpen(v=>!v);setErreur('');}} aria-expanded={open} aria-controls={panneauId} style={{...chip,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="calendar" size={14}/>{libellePeriode(value)}</button>
       {!compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button>
       <button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}
-      {value && <button type="button" aria-label="Effacer la période" onClick={()=>{onChange(null);setOpen(false);}} style={chip}><Icon name="close" size={14}/></button>}
+      {value && <button className="vrm-icon-control" type="button" aria-label="Effacer la période" onClick={()=>{onChange(null);setOpen(false);}} style={chip}><Icon name="close" size={14}/></button>}
     </div>
     {open && <div id={panneauId} className="vrm-period-panel" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginTop:8}}>
       <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>{compact && <><button type="button" onClick={()=>preset('mois')} style={chip}>Ce mois</button><button type="button" onClick={()=>preset('dernier')} style={chip}>Mois dernier</button></>}<button type="button" onClick={()=>preset('j7')} style={chip}>7 jours</button><button type="button" onClick={()=>preset('j30')} style={chip}>30 jours</button></div>
@@ -8644,8 +8644,12 @@ function SideBar({ tab, setTab }) {
       <div className="vrm-sidebar-brand"><VrmWord height={26} color={C.onChrome} accent={C.onChrome}/></div>
       <div className="vrm-sidebar-group">
         <div className="vrm-sidebar-label">Plateformes</div>
-        {BOTTOM_TABS.map(bouton)}
+        {BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(bouton)}
       </div>
+      <details className="vrm-sidebar-group" open={tab==='plat_vestiaire'||undefined}>
+        <summary className="vrm-sidebar-label">Autres plateformes</summary>
+        {BOTTOM_TABS.filter(t=>t.id==='plat_vestiaire').map(bouton)}
+      </details>
       <div className="vrm-sidebar-group">
         <div className="vrm-sidebar-label">Gestion</div>
         {NAV_GESTION.map(bouton)}
@@ -8705,18 +8709,18 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
     };
   }, [open]);
   const groupes = [
-    { titre: 'Plateformes', items: BOTTOM_TABS.filter(t => t.id !== 'journee') },
+    { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
     { titre: 'Gestion', items: NAV_GESTION },
-    { titre: 'Dans Vinted', items: VINTED_TABS },
+    ...(!bottom?[{ titre: 'Dans Vinted', items: VINTED_TABS }]:[]),
     { titre: 'Autres outils', items: NAV_OUTILS },
   ];
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-nav-more":undefined} aria-label={bottom?"Plus":"Tous les écrans"} aria-expanded={open}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-nav-more":undefined} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}
         style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
           borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
           color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
-        <Icon name={open?'close':'menu'} size={19}/>{bottom && <span className="vrm-nav-label">Plus</span>}
+        {bottom?<span aria-hidden="true"><Icon name={open?'close':'menu'} size={19}/></span>:<Icon name={open?'close':'menu'} size={19}/>} {bottom && <span className="vrm-nav-label">Gestion</span>}
       </button>
       {open && (
         <div data-noswipe onClick={()=>setOpen(false)}
@@ -8732,7 +8736,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
               animation:'cancaleSheet .2s cubic-bezier(.32,.72,0,1)',maxHeight:'86vh',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 8px'}}>
               <span style={{fontSize:19,fontWeight:600}}>Ton espace</span>
-              <button type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)} style={{border:0,background:'transparent',color:C.onChrome,cursor:'pointer',padding:8}}><Icon name="close" size={20}/></button>
+              <button className="vrm-icon-control" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)} style={{border:0,background:'transparent',color:C.onChrome,cursor:'pointer',padding:8}}><Icon name="close" size={20}/></button>
             </div>
             {groupes.map(g => (
               <div className="vrm-menu-group" key={g.titre} style={{marginBottom:4}}>
@@ -8791,7 +8795,7 @@ function MemoireDefilement({ ecran }) {
   return null;
 }
 
-function BottomBar({tab,setTab,platSub,onSection}) {
+function BottomBar({tab,setTab}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
@@ -8821,18 +8825,17 @@ function BottomBar({tab,setTab,platSub,onSection}) {
       // être décalée par le `zoom` de densité. On la masque au clavier avec
       // `display:none` (elle est dans le flux, un translate laisserait un vide).
       }}>
-      {(()=>{ const plateforme=tab.startsWith('plat_') && tab!=='plat_vestiaire';
-        const actif=tab==='journee'?'journee':tab==='garage'?'garage':plateforme&&platSub==='messages'?'messages':plateforme&&platSub==='ventes'?'ventes':null;
-        const items=[{id:'journee',icon:'home',label:'Accueil'},{id:'garage',icon:'box',label:'Stock'},{id:'ventes',icon:'cash',label:'Ventes'},{id:'messages',icon:'chat',label:'Messages'}];
+      {(()=>{ const actif=BAR_GROUPE[tab]||tab;
+        const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
-        <button key={t.id} type="button" onClick={()=>['ventes','messages'].includes(t.id)?onSection(t.id):setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
+        <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
           color:on?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
           <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
             width:38,height:26,transition:'transform .2s cubic-bezier(.32,.72,0,1), opacity .2s ease',
             transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
-            <NavigationIcon item={t} size={23} style={{strokeWidth:on?2:1.7}}/>
+            <Icon name={t.icon} size={23} style={{strokeWidth:on?2:1.7}}/>
           </span>
           <span className="vrm-nav-label" style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
             overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
@@ -10742,11 +10745,23 @@ function PhotoArticleAgrandissable({src,titre,children}) {
     <button ref={bouton} type="button" className="vrm-photo-open" aria-label={`Agrandir la photo de ${titre || 'cet article'}`} onClick={()=>{ const image=bouton.current?.querySelector('img'); setAffichee(image?.complete&&image.naturalWidth>0?image.currentSrc:url);setOuverte(true); }}>{children}<span aria-hidden="true"><Icon name="search" size={12}/></span></button>
     {ouverte && createPortal(<div className="vrm-photo-viewer" onClick={()=>setOuverte(false)} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOuverte(false);}if(e.key==='Tab'){e.preventDefault();fermer.current?.focus();}}}>
       <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" onClick={e=>e.stopPropagation()}>
-        <div><span>{titre || 'Photo de l’article'}</span><button ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
+        <div><span>{titre || 'Photo de l’article'}</span><button className="vrm-icon-control" ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
         <PhotoVinted src={affichee || url} alt={titre || 'Article'} style={{width:'100%',height:'100%',objectFit:'contain',minHeight:0}}/>
       </div>
     </div>,document.body)}
   </>;
+}
+
+function CodeRetraitCopiable({label,code}) {
+  const [etat,setEtat]=useState('');
+  React.useEffect(()=>setEtat(''),[code]);
+  return <button type="button" className="vrm-pickup-code" aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
+    try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
+    catch { setEtat('Copie indisponible'); }
+  }}>
+    <span>{label}</span><strong style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
+    <small aria-live="polite">{etat || 'Copier'}</small>
+  </button>;
 }
 
 function PhotoVente({ src, size = 64, portrait = false }) {
@@ -10954,8 +10969,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
-            {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
-            <button onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
+            {bordResult.pdfBuf && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
       )}
@@ -15539,7 +15554,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {lotInterrompu && (
       <div data-regles-lot-interrompu={lotInterrompu.n} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <span style={{ flex: 1, minWidth: 0 }}>Le dernier lot a été interrompu : {lotInterrompu.n} annonce{lotInterrompu.n > 1 ? 's' : ''} non envoyée{lotInterrompu.n > 1 ? 's' : ''}. Rouvre « Une règle pour toutes » pour {lotInterrompu.n > 1 ? 'les' : 'la'} reprendre.</span>
-        <button type="button" data-regles-lot-interrompu-fermer aria-label="Effacer ce message" onClick={() => { try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} setLotInterrompu(null); }} style={{ ...lienE, padding: '4px 9px' }}>✕</button>
+        <button className="vrm-icon-control" type="button" data-regles-lot-interrompu-fermer aria-label="Effacer ce message" onClick={() => { try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} setLotInterrompu(null); }} style={{ ...lienE, padding: '4px 9px' }}>✕</button>
       </div>
     )}
     {toutesOuvert && connected === true && regles !== undefined && (
@@ -15768,7 +15783,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {actions.map((a,i)=>(
-                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
+                <button type="button" key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
                   <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
                     {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
                   </span>
@@ -16649,7 +16664,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
             <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
+                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
               ))}
             </div>
           </div>
@@ -16777,7 +16792,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
               <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
                 {[['ca','CA €'],['ventes','Ventes']].map(([v,l])=>(
-                  <button key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
+                  <button type="button" key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
                 ))}
               </div>
             </div>
@@ -17034,7 +17049,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
-            <button type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:17,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -17052,7 +17067,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
             </div>
-            <button type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+            <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:17,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
@@ -18058,7 +18073,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
-          <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
         <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accent}}>{nextNumber}</b></div>
         
@@ -18129,7 +18144,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
-          <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
         {/* Sélecteur de micro-entreprise */}
         <div style={{marginBottom:12}}>
@@ -18565,14 +18580,14 @@ function LocalPhoto({ locate, onLocateConsumed }) {
             2. Pose des <b>numéros</b> aux endroits où sont rangées tes paires.<br />
             3. Cherche un N° → l'app te montre <b>l'endroit exact sur ta photo</b>.
           </div>
-          <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 800, padding: '12px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>{busy ? 'Chargement…' : '📷 Ajouter une photo'}</button>
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 800, padding: '12px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>{busy ? 'Chargement…' : '📷 Ajouter une photo'}</button>
         </div>
       ) : (<>
         {/* Recherche */}
         <div style={{ display: 'flex', gap: 8 }}>
           <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → l'app te montre où"
             inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button onClick={() => { setSearch(''); setHighlight(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px', fontFamily: 'inherit' }}><Icon name="close" size={15}/></button>}
+          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHighlight(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px', fontFamily: 'inherit' }}><Icon name="close" size={15}/></button>}
         </div>
         {highlight && highlight.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucun repère « {search} » sur tes photos. Pose-le avec « 📍 Placer un numéro ».</div>}
         {highlight && highlight.pinId && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===highlight.pinId); return p ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{p.numero} → <b>{cur.name}</b> (surligné sur la photo)</div> : null; })()}
@@ -18581,17 +18596,17 @@ function LocalPhoto({ locate, onLocateConsumed }) {
         {photos.length > 1 && (
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
             {photos.map((p, i) => (
-              <button key={p.id} onClick={() => { setActive(i); setHighlight(null); setSelPin(null); }} style={{ flexShrink: 0, border: `1px solid ${i === active ? C.accent : C.border}`, background: i === active ? C.accent : C.card, color: i === active ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{p.name} · {(p.pins || []).length}</button>
+              <button type="button" key={p.id} onClick={() => { setActive(i); setHighlight(null); setSelPin(null); }} style={{ flexShrink: 0, border: `1px solid ${i === active ? C.accent : C.border}`, background: i === active ? C.accent : C.card, color: i === active ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{p.name} · {(p.pins || []).length}</button>
             ))}
           </div>
         )}
 
         {/* Barre d'actions */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => setPlacing(v => !v)} style={{ border: 'none', borderRadius: 10, background: placing ? C.warn : C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>{placing ? '✋ Touche la photo…' : '📍 Placer un numéro'}</button>
-          <button onClick={() => renamePhoto(active)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>✎ Renommer</button>
-          <button onClick={() => fileRef.current?.click()} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>➕ Photo</button>
-          <button onClick={() => removePhoto(active)} title="Supprimer cette photo" style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 12.5, fontWeight: 700, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit' }}><Icon name="trash" size={16}/></button>
+          <button type="button" onClick={() => setPlacing(v => !v)} style={{ border: 'none', borderRadius: 10, background: placing ? C.warn : C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>{placing ? '✋ Touche la photo…' : '📍 Placer un numéro'}</button>
+          <button type="button" onClick={() => renamePhoto(active)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>✎ Renommer</button>
+          <button type="button" onClick={() => fileRef.current?.click()} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>➕ Photo</button>
+          <button className="vrm-icon-control" type="button" aria-label="Supprimer cette photo" onClick={() => removePhoto(active)} title="Supprimer cette photo" style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 12.5, fontWeight: 700, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit' }}><Icon name="trash" size={16}/></button>
         </div>
         {placing && <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 700 }}>Touche l'endroit de la photo où est rangée la paire, puis tape son N°.</div>}
 
@@ -18616,7 +18631,7 @@ function LocalPhoto({ locate, onLocateConsumed }) {
         {selPin && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===selPin); return p ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 13px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: C.text, flex: 1 }}>📍 Repère N°{p.numero}</span>
-            <button onClick={() => removePin(p.id)} style={{ border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Retirer</button>
+            <button type="button" onClick={() => removePin(p.id)} style={{ border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Retirer</button>
           </div>
         ) : null; })()}
         <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Touche un repère pour le retirer. Ajoute plusieurs photos (une par meuble/mur) via « ➕ Photo ». Tes photos sont sauvegardées et te suivent sur tes appareils.</div>
@@ -19338,7 +19353,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {/* Recherche */}
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+        {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
       </div>
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
       {hi && hi.itemId && (()=>{
@@ -19354,14 +19369,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
         {plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
           return (
-            <button key={r.id} onClick={() => switchRoom(r.id)} style={{ border: `1.5px solid ${on ? C.accent : C.border}`, borderRadius: 999, background: on ? C.accent : C.card, color: on ? '#fff' : C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button type="button" key={r.id} onClick={() => switchRoom(r.id)} style={{ border: `1.5px solid ${on ? C.accent : C.border}`, borderRadius: 999, background: on ? C.accent : C.card, color: on ? '#fff' : C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
               {r.name}{r.items && r.items.length ? ` · ${r.items.length}` : ''}
             </button>
           );
         })}
-        <button onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ Pièce</button>
-        <button onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-        {plan.rooms.length > 1 && <button onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
+        <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ Pièce</button>
+        <button className="vrm-icon-control" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
+        {plan.rooms.length > 1 && <button className="vrm-icon-control" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
       </div>
       {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
           revendeur pour son rangement, ça doit être plus facile à prendre en
@@ -19396,7 +19411,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
               {liste.map(([k, t]) => (
-                <button key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+                <button type="button" key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
               ))}
             </div>
           ) : null);
@@ -19404,16 +19419,16 @@ function RoomPlan({ locate, onLocateConsumed }) {
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
-          <button onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
-          <button onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-          <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
-          <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button type="button" onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
+          <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button type="button" onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
+          <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
-          <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
-          <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
+          <button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
           <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
           {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
-            <button key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
+            <button type="button" aria-label={`Couleur de mur ${['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#e4e8ee')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
           ))}
           <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
             <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
@@ -19422,7 +19437,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
         {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button type="button" onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
             {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
           </button>
           <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
@@ -19434,14 +19449,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
-          <button onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <button type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
-          <button onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+          <button type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
         </div>
       ); })()}
 
@@ -19484,7 +19499,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                           {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
                         </span>
                       </span>
-                      <button onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du stock"
+                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du stock"
                         style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
                     </div>
                   ))}
@@ -19495,22 +19510,22 @@ function RoomPlan({ locate, onLocateConsumed }) {
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
-              {(selItem.lvl || 0) > 0 && <button onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
+              {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
+              <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
           {/* Personnalisation : couleur + hauteur */}
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
-            {FURN_COLORS.map(c => (<button key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
+            {FURN_COLORS.map(c => (<button type="button" aria-label={`Couleur de meuble ${FURN_COLORS.indexOf(c)+1}`} aria-pressed={colorOf(selItem)===c} key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
-              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
             </>}
           </div>
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
@@ -19520,13 +19535,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
-                <button onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
-                <button onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
+                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
+                <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
+                <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
               </div>
             );
           })()}
@@ -19537,27 +19552,27 @@ function RoomPlan({ locate, onLocateConsumed }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
-                <button onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <button onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
-                {(selItem.lift || 0) > 0 && <button onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
+                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
+                {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
-            <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
+            <button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           </>}
-          <button onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-          <button onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
-          <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+          <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
+          <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
+          <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
         </div>
       )}
       {/* ⚠️ MODE D'EMPLOI PERMANENT → DÉPLIANT. Ce paragraphe de cinq lignes
@@ -19574,12 +19589,12 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 16, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 15, fontWeight: 900, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
-              <button onClick={() => setOpenItem(null)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}><Icon name="close" size={15}/></button>
+              <button className="vrm-icon-control" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}><Icon name="close" size={15}/></button>
             </div>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
               <span style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
-                <button onClick={() => setGrid(opened, opened.rows + 1, opened.cols)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ rangée</button>
-                <button onClick={() => setGrid(opened, opened.rows, opened.cols + 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ colonne</button>
+                <button type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ rangée</button>
+                <button type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ colonne</button>
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 8, padding: 8 }}>
@@ -19823,7 +19838,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
       <div style={{display:'flex',gap:6,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
         {[['plan','home','Ma pièce'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
-          <button key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
+          <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
             style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -19837,7 +19852,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {placing && (
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
           <span>📦 Range la paire <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
-          <button onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
+          <button type="button" onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
         </div>
       )}
 
@@ -19928,11 +19943,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </Btn>
         {colorMode&&<div style={{display:'flex',gap:4,alignItems:'center'}}>
           {COLORS.map(col=>(
-            <button key={col} onClick={()=>setActiveColor(col)}
+            <button type="button" aria-label={col} key={col} onClick={()=>setActiveColor(col)}
               style={{width:22,height:22,borderRadius:'50%',background:col,border:activeColor===col?'2px solid #fff':'2px solid transparent',cursor:'pointer'}}
               title={col}/>
           ))}
-          <button onClick={()=>setActiveColor(null)}
+          <button className="vrm-icon-control" type="button" aria-label="Effacer" onClick={()=>setActiveColor(null)}
             style={{width:22,height:22,borderRadius:'50%',background:'transparent',border:'2px dashed #555',cursor:'pointer',fontSize:11,color:'#666'}}
             title="Effacer"><Icon name="close" size={15}/></button>
         </div>}
@@ -19952,9 +19967,9 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           {LAYOUT.map(z=>(
             <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:5}}>
               <span style={{color:C.muted}}>Colonnes :</span>
-              <button onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
+              <button className="vrm-icon-control" type="button" aria-label="Retirer une colonne de rangement" onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
               <span style={{color:C.accent,fontWeight:500,minWidth:24,textAlign:'center'}}>{z.cols.length+(extraCols[z.id]||0)}</span>
-              <button onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
+              <button className="vrm-icon-control" type="button" aria-label="Ajouter une colonne de rangement" onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:5,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
             </div>
           ))}
         </div>
@@ -20110,7 +20125,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
       }}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
           <h3 style={{margin:0,color:C.accent,fontSize:20,fontWeight:600}}>💾 Sauvegarde</h3>
-          <button onClick={onClose} style={{background:'transparent',border:'none',color:C.muted,fontSize:20,cursor:'pointer'}}><Icon name="close" size={15}/></button>
+          <button className="vrm-icon-control" type="button" aria-label="Fermer la fenêtre" onClick={onClose} style={{background:'transparent',border:'none',color:C.muted,fontSize:20,cursor:'pointer'}}><Icon name="close" size={15}/></button>
         </div>
         
         <div style={{fontSize:12,color:C.muted,marginBottom:18,lineHeight:1.5}}>
@@ -20238,7 +20253,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
     <div>
       <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
         desc="L'ancienne liste des numéros en ligne."
-        right={<button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
+        right={<button type="button" onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
           {showBulk?'Fermer':'Coller en masse'}
         </button>}/>
 
@@ -20258,7 +20273,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           inputMode="numeric"
           style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:15}}
         />
-        <button onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
+        <button type="button" onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
           Ajouter
         </button>
       </div>
@@ -20274,7 +20289,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
             placeholder="1908 1925 898 ..."
             style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
           />
-          <button onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
+          <button type="button" onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
             Ajouter tout
           </button>
         </div>
@@ -20355,7 +20370,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
                 borderRadius:8,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:500
               }}>
                 {n}
-                <button onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
+                <button type="button" onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
               </span>
             );
           })}
@@ -20719,7 +20734,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       )}
       <ScreenHead icon="link" title="Comptes Vinted liés"
         desc="Ceux que l'extension Chrome capte quand tu navigues sur Vinted. Annonces, ventes, achats et messages se consultent dans leurs onglets."
-        right={<button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
+        right={<button type="button" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
           {loading ? '…' : '↻ Actualiser'}
         </button>}/>
 
@@ -20778,7 +20793,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                           onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
                           placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
                           style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:170}}/>
-                        <button onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
+                        <button type="button" onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
                       </div>
                     ) : (
                       <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
@@ -20831,16 +20846,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:500,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
                   {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
-                    <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
+                    <button type="button" onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
                       style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
                       {off ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eyeOff" size={12}/>Masqué (annonces + compta)</span>
                            : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
                     </button>
                   ); })()}
-                  <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                  <button type="button" onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
-                  <button onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
+                  <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
                   </button>
@@ -21835,9 +21850,9 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
-                <button type="button" title="Générer le bordereau annoté (numéro + titre)" onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}><Icon name="doc" size={16}/></button>
-                <button type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
-                <button type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
+                <button className="vrm-icon-control" aria-label="Générer le bordereau annoté (numéro + titre)" type="button" title="Générer le bordereau annoté (numéro + titre)" onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}><Icon name="doc" size={16}/></button>
+                <button className="vrm-icon-control" aria-label="Modifier la paire" type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
+                <button className="vrm-icon-control" aria-label="Supprimer la paire" type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
               </div>
             </div>
           );
@@ -22228,7 +22243,7 @@ function LoadError({ onRetry }) {
     <div style={{fontSize:32,marginBottom:8}}>😕</div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
     <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Vérifie ta connexion, ou que ton compte Vinted est toujours actif.</div>
-    <button onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:500}}>Réessayer</button>
+    <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:500}}>Réessayer</button>
   </div>;
 }
 
@@ -22262,7 +22277,7 @@ function BordPlacer({ place, onConfirm, onCancel }) {
         <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>📄 Nouveau format de bordereau</div>
         <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginBottom:12}}>
           Fais glisser l'étiquette <b>N° + titre</b> là où il y a de la place sur ton bordereau. L'app <b>retiendra</b> cet emplacement pour ce format.
-          <button onClick={()=>window.open(blobUrl,'_blank')} style={{marginLeft:6,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:500,cursor:'pointer',padding:0,fontSize:12}}>👁 Voir mon bordereau</button>
+          <button type="button" onClick={()=>window.open(blobUrl,'_blank')} style={{marginLeft:6,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:500,cursor:'pointer',padding:0,fontSize:12}}>👁 Voir mon bordereau</button>
         </div>
         <div ref={padRef}
           onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
@@ -22278,8 +22293,8 @@ function BordPlacer({ place, onConfirm, onCancel }) {
           </div>
         </div>
         <div style={{display:'flex',gap:8,marginTop:14}}>
-          <button onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
-          <button onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
+          <button type="button" onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
+          <button type="button" onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
         </div>
       </div>
     </div>
@@ -28371,7 +28386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
                 <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
               </div>
-              <button type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button className="vrm-icon-control" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
@@ -28886,7 +28901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* Mêmes symboles que la barre du bas : un écran et son raccourci
               portent le même signe, au trait, pas un emoji du système. */}
           {[['ventes','cash','Ventes'],['achats','bag','Achats'],['annonces','shop','Annonces'],['bordereaux','printer','Bordereaux']].map(([id,ic,label])=>(
-            <button key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
+            <button type="button" key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
           ))}
         </div>
       )}
@@ -28902,7 +28917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
             <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, acheteur…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
-            {ordSearch && <button type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
+            {ordSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
               <span>Filtres actifs</span><button type="button" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</button>
             </div>}
@@ -28910,7 +28925,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
-            <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -28921,7 +28936,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const alert = disputes.salesLost.length>0 || disputes.buysBack.length>0;
             return (
               <div style={{position:'relative'}}>
-                <button onClick={()=>setToolsOpen(v=>!v)} title="Outils : compta, registre annuel, litiges, export"
+                <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Outils : compta, registre annuel, litiges, export"
                   style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
                   ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
                 </button>
@@ -28937,7 +28952,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                            dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
                         ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
                       ].map(t=>(
-                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                        <button type="button" key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                           <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
                           <span style={{minWidth:0}}>
                             <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
@@ -29115,7 +29130,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
                   <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
@@ -29124,14 +29139,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 {isLotTitle(o.title) && (
-                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
                 )}
                 {hidden ? (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
                 ) : st==='cancelled' ? (
-                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
                 ) : (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
                 )}
                 </div>
                </div>
@@ -29190,7 +29205,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-sales-analysis">
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
-            <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
+            <button type="button" onClick={()=>setAnalyseOpen(v=>!v)} aria-expanded={analyseOpen}
               style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
               <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
               <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
@@ -29567,7 +29582,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{fontSize:12,color:C.muted}}>€</span>
                 </div>
               ) : (
-                <button onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                <button type="button" onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                   {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
                 </button>
               )}
@@ -29697,7 +29712,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
             return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
+            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -29841,7 +29856,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const groups = {};
           avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
-            <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
+            <div className="vrm-pickup-board" style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
                 <div style={{flex:1,minWidth:0}}>
                   {/* ⚠️ UN TOTAL QUI NE DIT PAS LE HORS-DÉLAI EST TROMPEUR : sur
@@ -29865,23 +29880,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
                       la paire — jamais un total gonflé : quand il en manque, ça
                       se voit, c'est justement l'information utile. */}
-                  {(()=>{ const nom = avail.filter(t=>String(t.artTitle||'').trim()).length + extra.filter(o=>String(o.title||'').trim()).length;
-                    return <div style={{fontSize:11.5,color:C.muted,fontWeight:600,marginTop:1}}>
-                      {nom} paire{nom>1?'s':''} connue{nom>1?'s':''}{nom<pickupUnion.total?` · ${pickupUnion.total-nom} colis dont l'article n'est pas encore identifié`:''}
-                    </div>; })()}
+
                   {/* ⚠️ POUR QUELQU'UN QUI NE CONNAÎT PAS VINTED (Julien, 25 sept. :
                       « une personne qui ne connaît pas du tout Vinted pourrait
                       savoir ce qu'elle doit faire »). Le geste, en 3 temps, écrit
                       une seule fois en haut — pas répété sur chaque fiche (§7).
                       Chaque fiche répond ensuite à OÙ · QUEL CODE · QUEL JOUR. */}
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+                  <details className="vrm-pickup-help"><summary>Comment retirer un colis ?</summary><div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
                     {[['1','Va au point relais indiqué'],['2','Donne le code ou montre le QR'],['3','Coche ✓ « récupéré »']].map(([n,txt])=>(
                       <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
                         <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
                         {txt}
                       </span>
                     ))}
-                  </div>
+                  </div></details>
                 </div>
               </div>
               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
@@ -29911,7 +29923,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return b[1].colis.length - a[1].colis.length;
                 });
                 return ordrePoints.map(([nom,g])=>(
-                <div key={nom} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
+                <div className="vrm-pickup-point" key={nom} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   {/* ── LA DESTINATION ────────────────────────────────────────
                       Le nom du lieu en premier (c'est là qu'on va), l'adresse
                       dessous, et LE GESTE à faire une fois sur place — chaque
@@ -29930,7 +29942,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           novice lise l'ADRESSE comme une destination, pas comme un
                           titre. Lieu inconnu → on ne ment pas, on renvoie à la
                           source (e-mail du transporteur). */}
-                      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{g.lieuInconnu?'Point relais':'Va à'}</div>
+                      <div className="vrm-pickup-location-label" style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{g.lieuInconnu?'Point relais':'Va à'}</div>
                       <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:g.lieuInconnu?'normal':'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{nom}</div>
                       {g.lieuInconnu && <div style={{fontSize:11,color:C.muted,marginTop:1}}>L'adresse exacte est dans l'e-mail du transporteur.</div>}
                     </div>
@@ -29938,7 +29950,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(()=>{ const M=methodeDuPoint(g.colis);
                     const urg=(()=>{ let m=null; for(const t of g.colis){ const j=joursAvant(t.limite); if(j!=null&&(m==null||j<m)) m=j; } return m; })();
                     return (
-                      <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
+                      <details className="vrm-pickup-method"><summary aria-label="Informations sur ce retrait" title="Informations sur ce retrait">i</summary><div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                         <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{g.colis.length} colis · {M.titre}</span>
                         <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>{M.geste}</span>
                         {/* ⚠️ LE RÉSUMÉ N'A SA PLACE QUE S'IL AJOUTE QUELQUE CHOSE
@@ -29960,7 +29972,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </span>
                           );
                         })()}
-                      </div>
+                      </div></details>
                     ); })()}
                   <div style={{padding:'10px 12px 4px'}}>
                   {g.colis.map((t,i)=>{
@@ -29973,7 +29985,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const casier = !!t.consigne || !!ident;
                     const jours = joursAvant(t.limite);
                     return (
-                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
+                      <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
@@ -29997,7 +30009,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               depuis quand le colis attend, c'est ce qui dit s'il faut y
                               aller aujourd'hui. La date vient de l'email lui-même — et
                               un email rejoué garde SA date d'origine (api/email-rattacher). */}
-                          {(t.suivi || t.receivedAt) && (()=>{
+                          <details className="vrm-pickup-details"><summary>Détails du colis</summary>{(t.suivi || t.receivedAt) && (()=>{
                             const d = t.receivedAt ? new Date(t.receivedAt) : null;
                             const ok = d && !isNaN(d);
                             const j = ok ? Math.round((Date.now() - d.getTime()) / 86400000) : null;
@@ -30006,7 +30018,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               {t.suivi && ok && ' · '}
                               {ok && <span>arrivé le {d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}{j>0?` · il y a ${j} j`:j===0?" · aujourd'hui":''}</span>}
                             </div>;
-                          })()}
+                          })()}{jours!=null && <div style={{fontSize:11,color:C.muted}}>Date limite : {new Date(t.limite).toLocaleDateString('fr-FR')}</div>}</details>
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -30022,7 +30034,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                   « arrivé il y a 6 j ». On donne LA date et de
                                   COMBIEN c'est dépassé : c'est ce qui décide si
                                   on court au relais ou si on réclame. */}
-                              {jours<0?`délai dépassé depuis ${-jours} j (${new Date(t.limite).toLocaleDateString('fr-FR')}) — va vite le chercher`:jours===0?"dernier jour pour le retirer":jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
+                              {jours<0?`délai dépassé depuis ${-jours} j`:jours===0?"Dernier jour pour le retrait":jours===1?'À retirer demain':`À retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}`}
                             </div>
                           )}
                         </div>
@@ -30042,7 +30054,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             au comptoir qu'on ne peut pas se le permettre.
                             `onError` efface la vignette : le code prend sa place. */}
                         {qrVivant(t) && (
-                          <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
+                          <button className="vrm-icon-control" type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
                             style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:8,padding:3,cursor:'pointer',width:64,height:64,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                             <img src={qrVivant(t)} alt="QR de retrait" onError={()=>noterImgMorte(qrImage(t))}
                               style={{width:'100%',height:'100%',objectFit:'contain'}}/>
@@ -30061,20 +30073,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(code||ident) && (
                           <div style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (
-                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:8,padding:'4px 11px'}}>
-                                <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div>
-                                <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{ident}</div>
-                              </div>
+                              <CodeRetraitCopiable label="Identifiant" code={ident}/>
                             )}
                             {code && (
-                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:8,padding:'4px 11px'}}>
-                                <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{ident?"Code d'ouverture":'Code'}</div>
-                                <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
-                              </div>
+                              <CodeRetraitCopiable label={ident?"Code d’ouverture":"Code de retrait"} code={code}/>
                             )}
                           </div>
                         )}
-                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ Retiré</button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                       </div>
                     );
                   })}
@@ -30121,7 +30127,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const comptesGr = [...new Set(pt.colis.map(o => (o && o._acc) ? accName(o._acc) : '').filter(Boolean))];
                   const memeCompte = comptesGr.length === 1 ? comptesGr[0] : null;
                   return (
-                <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
+                <div className="vrm-pickup-point" key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     <CarrierBadge carrier="vinted" size={24}/>
                     <div style={{flex:'1 1 140px',minWidth:0}}>
@@ -30132,12 +30138,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           « Va à : … » ; lieu inconnu → on le DIT en clair (le lieu
                           ET le code sont dans la conversation Vinted), jamais un
                           libellé vague qu'un novice ne comprend pas. */}
-                      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{pt.nom?'Va à':'Point relais'}</div>
+                      <div className="vrm-pickup-location-label" style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{pt.nom?'Va à':'Point relais'}</div>
                       <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:pt.nom?'nowrap':'normal',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{pt.nom || 'À voir dans ta conversation Vinted'}</div>
+                      {memeCompte && <div style={{fontSize:11,color:C.muted,marginTop:2}}>{memeCompte}</div>}
                       {!pt.nom && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Le lieu exact et le code sont écrits dans la conversation du colis.</div>}
                     </div>
                   </div>
-                  <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
+                  <details className="vrm-pickup-method"><summary aria-label="Informations sur ce retrait" title="Informations sur ce retrait">i</summary><div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                     {/* ⚠️ LE MÊME NOMBRE NE S'ÉCRIT PAS DEUX FOIS SUR UN ÉCRAN.
                         « 12 colis à retirer » en tête, puis « 12 colis · Au
                         comptoir » trois lignes dessous : le second ne distingue
@@ -30163,7 +30170,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             return `Le code (et le QR) est dans la conversation Vinted de chaque colis — ouvre-la avec le bouton sous le colis, il y est tout de suite. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
                       {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
                     </span>
-                  </div>
+                  </div></details>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
                       Une ligne de colis tient sur UNE ligne de texte et s'étirait
                       sur 1 080 px : le bouton « ✓ retiré » se retrouvait à un
@@ -30177,7 +30184,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     // source — aucun email ne les porte (voir `colisRelais`).
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
-                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
+                    <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
@@ -30188,11 +30195,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             leurs vendeurs » plus bas (§11 : montantCommande + o.date).
                             Chacun ne s'affiche que s'il est connu — jamais un 0
                             inventé (§5/§7). */}
-                        {(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
+                        <details className="vrm-pickup-details"><summary>Détails de l’achat</summary>{(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
                           const jour = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('fr-FR') : '';
                           const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+' €'); if(jour) bits.push('commandé le '+jour);
                           return bits.length ? <div style={{fontSize:11,color:C.muted,marginTop:1}}>{bits.join(' · ')}</div> : null;
-                        })()}
+                        })()}</details>
                         {/* L'adresse est déjà en tête du bloc : ici on ne met que
                             ce qui est propre à CE colis. */}
                         {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne
@@ -30250,12 +30257,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         })()}
                       </div>
                       {cd&&(
-                        <div style={{flexShrink:0,textAlign:'center',padding:'4px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card2||C.card}}>
-                          <div className="vrm-label" style={{fontSize:9,color:C.muted}}>CODE</div>
-                          <div style={{fontSize:20,fontWeight:800,color:C.text,fontFamily:'monospace',letterSpacing:1.5,whiteSpace:'nowrap'}}>{cd}</div>
-                        </div>
+                        <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ Retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                     </div>
                     );
                   })}
@@ -30281,7 +30285,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
                       </div>
                       {qi && (
-                        <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
+                        <button className="vrm-icon-control" type="button" onClick={()=>openQrView(t)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
                           style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:8,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                           <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
@@ -30322,7 +30326,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
                       </div>
                       {qi && (
-                        <button type="button" onClick={()=>openQrView(tk)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
+                        <button className="vrm-icon-control" type="button" onClick={()=>openQrView(tk)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
                           style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:8,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                           <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
@@ -30390,7 +30394,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         s'affichait NULLE PART. « Il n'y a pas tous les codes de
                         retrait » (Julien) — c'était vrai, et voilà où. */}
                     {(()=>{ const qi=qrVivant(t); return qi ? (
-                      <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — présente-le au comptoir" aria-label="Afficher le QR de retrait en grand"
+                      <button className="vrm-icon-control" type="button" onClick={()=>openQrView(t)} title="QR de retrait — présente-le au comptoir" aria-label="Afficher le QR de retrait en grand"
                         style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:8,padding:3,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                         <img src={qi} alt="QR de retrait" onError={()=>noterImgMorte(qi)} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                       </button>
@@ -30555,8 +30559,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'2px 7px'}}>N°{b.numero}</span>}
                   <span style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
-                  <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="pencil" size={15}/></button>
-                  <button type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="trash" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="pencil" size={15}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="trash" size={16}/></button>
                 </div>
               );})}
             </div>
@@ -30650,14 +30654,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const close = () => setAchatMenu(null);
                 return (
               <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,position:'relative'}}>
-                {note && <button type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={14}/></button>}
+                {note && <button className="vrm-icon-control" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={14}/></button>}
                 {suivi && (st.step===2||st.step===3) && (
                   <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,color:C.blue||C.accent,textDecoration:'none'}}><Icon name="truck" size={15}/></a>
                 )}
                 {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
-                  <button type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
                 )}
-                <button type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${achatMenu===tid?C.accent:C.border}`,background:achatMenu===tid?`${C.accent}12`:'transparent',color:achatMenu===tid?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:17,lineHeight:1}}>⋯</button>
+                <button className="vrm-icon-control" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${achatMenu===tid?C.accent:C.border}`,background:achatMenu===tid?`${C.accent}12`:'transparent',color:achatMenu===tid?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:17,lineHeight:1}}>⋯</button>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   <div role="menu" style={{position:'absolute',top:34,right:0,zIndex:41,minWidth:226,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow||'0 8px 24px rgba(0,0,0,.18)',overflow:'hidden',padding:'4px 0'}}>
@@ -30696,7 +30700,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
             <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {annSearch && <button type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
+            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
             <select aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
@@ -30715,7 +30719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
                 ne servent pas tous les jours et encombraient la barre. */}
             <div style={{position:'relative'}}>
-              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} title="Outils : répartir un lot, audit du stock"
+              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
               {annToolsOpen && (<>
                 <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
@@ -30950,8 +30954,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
-            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
+            {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -31016,9 +31020,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>
-                      {r.num && numeroReprenable(r.num) && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      {r.num && numeroReprenable(r.num) && <button className="vrm-icon-control" type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
                       <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
-                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+                      <button className="vrm-icon-control" type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
                   );
                 })}
@@ -31100,19 +31104,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:8,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
               <span style={{flex:1,minWidth:0}}>email de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
-              <button onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
+              <button type="button" onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
             </div>
           )}
           {soldManual.size>0 && (()=>{ const hidden=(listings.items||[]).filter(it=>soldManual.has(String(it.id))); if(!hidden.length) return null; return (
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:8,padding:'7px 11px'}}>
               <span style={{color:C.warn,fontWeight:600}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
-              <button onClick={async ()=>{ if(await askConfirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
+              <button type="button" onClick={async ()=>{ if(await askConfirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
-              😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+              😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
           )}
@@ -31126,7 +31130,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* ── Assistant de repricing : liste consolidée à baisser ── */}
           {repriceList.length>0 && (
             <div style={{marginBottom:12,border:`1px solid ${C.warn}66`,background:`${C.warn}0e`,borderRadius:10,overflow:'hidden'}}>
-              <button onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              <button type="button" onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
                   <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} paire{repriceList.length>1?'s':''} à baisser</span>
@@ -31641,7 +31645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
             <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
-            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="pencil" size={12}/>Modifier</span>}</button>
+            <button type="button" onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="pencil" size={12}/>Modifier</span>}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
@@ -31649,7 +31653,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
                 {showQR ? (
                   <>
-                    <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
+                    <button className="vrm-icon-control" aria-label="Modifier" type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
                     <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
                   </>
                 ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
@@ -32076,7 +32080,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         ) : null; })()}
                       </div>
-                      <button type="button" onClick={async ()=>{
+                      <button className="vrm-icon-control" type="button" onClick={async ()=>{
                         if (b) { if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }
                         else if (o && o.transaction_id!=null && await askConfirm('Masquer ce colis ? (il disparaît de la liste)')) toggleHidden(o.transaction_id);
                       }} title="Masquer" aria-label="Masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
@@ -32227,7 +32231,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:8,padding:'9px 12px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {faits.length} colis parti{faits.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
-              <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
+              <button type="button" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
             </div>
           );
         })()}
@@ -32357,12 +32361,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
                   placeholder="ex : Super U Cancale, Tabac de la Place Saint-Malo…"
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
+                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
               <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
                 <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
                 {Object.entries(CARRIERS).map(([k,c])=>{ const on=relayPicker.carrier===c.name; return (
-                  <button key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
+                  <button type="button" key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
                     <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:5,background:c.bg,color:c.fg,fontSize:9,fontWeight:700}}>{c.short}</span>
                     {c.name}
                   </button>
@@ -32375,7 +32379,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <OsmMap points={relayPicker.results.map(f=>({key:f.id,lat:f.lat,lon:f.lon}))} selected={null} onSelect={id=>{ const f=relayPicker.results.find(x=>x.id===id); if(f) addFoundPlace(f); }}/>
               <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
                 {relayPicker.results.map(f=>(
-                  <button key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                  <button type="button" key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     <span style={{fontSize:20,flexShrink:0}}>📍</span>
                     <span style={{flex:1,minWidth:0}}>
                       <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
@@ -32403,7 +32407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {bordResult.pdfBuf && !bordResult.batch && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && !bordResult.thermique && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
@@ -32420,7 +32424,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
                 </div>
               ); })()}
-            <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
+            <button type="button" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
           </div>
         </div>
       )}
@@ -32529,7 +32533,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
@@ -32557,8 +32561,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
-                <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
+                <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
+                <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
             </div>
@@ -32619,14 +32623,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>TITRE OPTIMISÉ</div>
                   <div style={{display:'flex',gap:8,alignItems:'stretch'}}>
                     <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:500,color:C.text}}>{lister.title}</div>
-                    <button onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:8,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
+                    <button type="button" onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:8,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
                   </div>
                 </div>
                 {/* Description prête */}
                 <div style={{marginBottom:6}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>DESCRIPTION PRÊTE À COLLER</div>
                   <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
-                  <button onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:8,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
+                  <button type="button" onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:8,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
                 </div>
                 <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Le prix vient de tes ventes finalisées du même modèle (recherche par mots). Colle le titre et la description sur Vinted, ajoute tes photos, et fixe le prix conseillé.</div>
               </>)}
@@ -32641,7 +32645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
-              <button type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+              <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
             </div>
             <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)} ${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
             {lotView.loading ? (
@@ -32682,7 +32686,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <button type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
+              <button className="vrm-icon-control" type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
               <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
               <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>PDF</button>
             </div>
@@ -32871,7 +32875,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} paire{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
                   </div>
                 </div>
-                <button type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
+                <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
               {fillBuyRows.length>0 && (
                 <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.4}}>
@@ -33030,9 +33034,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {moisOuvert && (
                   <div style={{marginTop:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:10}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                      <button type="button" aria-label="Année précédente" onClick={()=>setReportAnnee(a=>a-1)} style={{border:'none',background:'transparent',color:C.text,fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 8px'}}>‹</button>
+                      <button className="vrm-icon-control" type="button" aria-label="Année précédente" onClick={()=>setReportAnnee(a=>a-1)} style={{border:'none',background:'transparent',color:C.text,fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 8px'}}>‹</button>
                       <div style={{fontSize:13,fontWeight:700,color:C.text}}>{reportAnnee}</div>
-                      <button type="button" aria-label="Année suivante" onClick={()=>setReportAnnee(a=>a+1)} disabled={reportAnnee>=new Date().getFullYear()} style={{border:'none',background:'transparent',color:reportAnnee>=new Date().getFullYear()?C.muted:C.text,fontSize:18,cursor:reportAnnee>=new Date().getFullYear()?'default':'pointer',lineHeight:1,padding:'0 8px',opacity:reportAnnee>=new Date().getFullYear()?0.4:1}}>›</button>
+                      <button className="vrm-icon-control" type="button" aria-label="Année suivante" onClick={()=>setReportAnnee(a=>a+1)} disabled={reportAnnee>=new Date().getFullYear()} style={{border:'none',background:'transparent',color:reportAnnee>=new Date().getFullYear()?C.muted:C.text,fontSize:18,cursor:reportAnnee>=new Date().getFullYear()?'default':'pointer',lineHeight:1,padding:'0 8px',opacity:reportAnnee>=new Date().getFullYear()?0.4:1}}>›</button>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
                       {MOIS_FR.map((nom,m)=>{
@@ -33263,14 +33267,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-              <button onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
-              <button onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
+              <button type="button" onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
+              <button type="button" onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
             </div>
           </div>
         </div>
@@ -33530,7 +33534,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
                         <div style={{width:32,height:32,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<PhotoVinted src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
-                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                        <button className="vrm-icon-control" aria-label="J'ai retiré ce colis" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
                     ); })}
                   </div>
@@ -33679,7 +33683,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                 <span style={{flex:1,fontSize:17,fontWeight:700,color:C.text}}>Inventaire physique</span>
-                <button type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
+                <button className="vrm-icon-control" type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
               </div>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
                 <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
@@ -34973,7 +34977,7 @@ function LeboncoinScreen() {
     <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
-        <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
+        <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
@@ -35859,7 +35863,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🛎 Alertes dans l'app</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications téléphone ci-dessus couvrent le reste, app fermée.</div>
         </div>
-        <button onClick={onToggleNotif} style={{
+        <button type="button" onClick={onToggleNotif} style={{
           flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
           background:notifEnabled?C.accent:'transparent',color:notifEnabled?'#fff':C.muted,
           border:`1.5px solid ${notifEnabled?C.accent:C.border}`,
@@ -36570,7 +36574,7 @@ function RepondreSetting() {
             À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>plusieurs par visite</b> (le reste à la visite suivante, sans jamais dépasser une limite sûre par heure), jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
           </div>
         </div>
-        <button type="button" onClick={basculer} aria-pressed={on}
+        <button className="vrm-setting-switch" aria-label="Répondre automatiquement aux messages Vinted" type="button" role="switch" onClick={basculer} aria-checked={on}
           style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
           <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
         </button>
@@ -36808,7 +36812,7 @@ function ProFactureSetting() {
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>🧾 Facturation Pro</div>
-        <button onClick={()=>upd('actif', !cfg.actif)} style={{
+        <button type="button" onClick={()=>upd('actif', !cfg.actif)} style={{
           padding:'4px 14px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
           background:cfg.actif?C.accent:'transparent',color:cfg.actif?'#fff':C.muted,
           border:`1.5px solid ${cfg.actif?C.accent:C.border}`,
@@ -36832,7 +36836,7 @@ function ProFactureSetting() {
               {cfg.logo?'Changer le logo':'Ajouter un logo'}
             </span>
           </label>
-          {cfg.logo && <button onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
+          {cfg.logo && <button type="button" onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
         </div>
         {/* Identité */}
         <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:8}}>
@@ -36866,7 +36870,7 @@ function ProFactureSetting() {
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>Envoi automatique à l'acheteur</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>Rien ne part sans ton accord. Tu peux couper à tout moment — l'arrêt est immédiat. OFF = les factures attendent dans l'onglet Factures.</div>
           </div>
-          <button onClick={()=>upd('autoSend', !cfg.autoSend)} style={{
+          <button type="button" onClick={()=>upd('autoSend', !cfg.autoSend)} style={{
             flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
             background:cfg.autoSend?C.accent:'transparent',color:cfg.autoSend?'#fff':C.muted,
             border:`1.5px solid ${cfg.autoSend?C.accent:C.border}`,
@@ -37121,12 +37125,12 @@ function PushSetting() {
       {state!=='unsupported' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {state!=='on' ? (
-            <button onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
+            <button type="button" onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
               {state==='busy'?'…':'Activer sur cet appareil'}
             </button>
           ) : (<>
-            <button onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
-            <button onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
+            <button type="button" onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
+            <button type="button" onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
           </>)}
         </div>
       )}
@@ -37901,7 +37905,7 @@ function ConnexionsSetting() {
             🔄 Forcer la mise à jour »), juste au-dessus de la pièce en 3D :
             de l'outillage de développeur posé dans un écran de travail. Il ne
             disparaît pas — il rejoint la version, là où on le cherche. */}
-        <button onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }}
+        <button type="button" onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }}
           title="Vide le cache et recharge la dernière version"
           style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card2, color: C.text, fontSize: 11, fontWeight: 600, padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Forcer la mise à jour</button>
       </div>
@@ -38016,7 +38020,7 @@ function RegimeSetting() {
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
           ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
-          <button key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:8,cursor:'pointer',
+          <button type="button" key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:8,cursor:'pointer',
             border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
             <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:8,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
               {regime===id && <span style={{width:9,height:9,borderRadius:8,background:C.accent}}/>}
@@ -38171,7 +38175,6 @@ function AppCoeur() {
   // la porte le temps du changement d'onglet.
   const subVoulue=React.useRef(null);
   const sectionsPlateformes=React.useRef({});
-  const plateformeRecente=React.useRef('plat_vinted');
   const dernierePlateforme=React.useRef(tab);
   React.useLayoutEffect(()=>{
     const precedent=dernierePlateforme.current;
@@ -38180,7 +38183,6 @@ function AppCoeur() {
       setPlatSub(subVoulue.current||sectionsPlateformes.current[tab]||'ventes');
       dernierePlateforme.current=tab;
     }
-    if(tab.startsWith('plat_')&&tab!=='plat_vestiaire') plateformeRecente.current=tab;
     subVoulue.current=null;
   },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
@@ -39828,11 +39830,11 @@ function AppCoeur() {
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
-            <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
+            <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
-            <button type="button" onClick={()=>{setPlatSub('messages');setTab('plat_vinted');}} title="Messages Vinted" aria-label="Ouvrir les messages Vinted" style={{background:'transparent',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 11px',color:ink,cursor:'pointer'}}><Icon name="chat" size={17}/></button>
+            <button className="vrm-icon-control" type="button" onClick={()=>{setPlatSub('messages');setTab('plat_vinted');}} title="Messages Vinted" aria-label="Ouvrir les messages Vinted" style={{background:'transparent',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 11px',color:ink,cursor:'pointer'}}><Icon name="chat" size={17}/></button>
             <button className="vrm-header-settings" type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="gear" size={17}/>
@@ -39874,7 +39876,7 @@ function AppCoeur() {
             <span style={{fontSize:20}}>🔍</span>
             <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
               style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
+            <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
@@ -39935,7 +39937,7 @@ function AppCoeur() {
             {notifItems.length===0 ? (
               <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
             ) : notifItems.map((it,i)=>(
-              <button key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
+              <button type="button" key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>{it.icon}</span>
                 <span style={{flex:1,fontSize:13,fontWeight:600,color:C.text}}>{it.text}</span>
@@ -39953,7 +39955,7 @@ function AppCoeur() {
             {notifBanner.ventes>0&&notifBanner.factures>0&&' · '}
             {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
           </span>
-          <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:5,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+          <button type="button" onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:5,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
       {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
@@ -39965,7 +39967,7 @@ function AppCoeur() {
             {vintedNotif.messages>0&&`${vintedNotif.messages} nouveau${vintedNotif.messages>1?'x':''} message${vintedNotif.messages>1?'s':''}`}
             {' '}sur Vinted
           </span>
-          <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:5,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+          <button type="button" onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:5,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
       {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
@@ -40311,7 +40313,7 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab} platSub={platSub} onSection={section=>{ const cible=tab.startsWith('plat_')&&tab!=='plat_vestiaire'?tab:plateformeRecente.current; if(cible===tab) setPlatSub(section); else {subVoulue.current=section;setTab(cible);} }}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

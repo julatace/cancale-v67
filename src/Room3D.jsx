@@ -1180,15 +1180,15 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
                 gauche, navigation à droite : chacun garde sa place quelle que
                 soit la largeur. */}
             <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
-              <button onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
-              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
-              {sel && <button onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
+              {sel && <button type="button" onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
             <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
-              <button onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
-              <button onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
-              <button onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
-              <button onPointerDown={stop} onClick={() => call('rotateView', 22)} title="Tourner à droite" style={btn} aria-label="Tourner la vue à droite">▶</button>
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
+              <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('rotateView', 22)} title="Tourner à droite" style={btn} aria-label="Tourner la vue à droite">▶</button>
             </div>
           </>
         );

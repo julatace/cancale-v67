@@ -77,6 +77,8 @@ async function brancher(p){
   });
   for(const [tab,nom] of [['plat_vinted','Vinted'],['plat_leboncoin','Leboncoin'],['plat_ebay','eBay']]){
    await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
+   const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
+   check(sansNom===0,'boutons visibles nommés '+nom);
    check(await p.locator('.vrm-market-heading img').evaluate(e=>e.complete && e.naturalWidth>0),'logo local chargé '+nom);
    const summary=p.locator('.vrm-platform-summary');check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
@@ -104,8 +106,8 @@ async function brancher(p){
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
   await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
   const navigation=p.getByRole('navigation',{name:'Navigation principale'});
-  await navigation.getByRole('button',{name:'Stock',exact:true}).click();
-  await navigation.getByRole('button',{name:'Ventes',exact:true}).click();
+  await navigation.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
+  await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='Nike', 'recherche de ventes conservée après passage dans le stock');
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===2);
@@ -125,18 +127,17 @@ async function brancher(p){
   await nav.getByRole('button',{name:'Accueil',exact:true}).waitFor();
   check(JSON.stringify(await nav.getByRole('button').allTextContents()).includes('Accueil'), 'accueil présent dans la navigation mobile');
   check(await nav.getByRole('button').count()===5, 'cinq accès mobiles stables');
-  await nav.getByRole('button',{name:'Messages',exact:true}).click();
+  check(JSON.stringify((await nav.getByRole('button').allTextContents()).map(t=>t.trim()))===JSON.stringify(['Accueil','Vinted','Leboncoin','eBay','Gestion']), 'navigation organisée par plateforme');
+  await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();
   await p.locator('[data-conv="71"]').waitFor();
   await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Non lues/}).click();
   check(await p.locator('[data-conv]').count()===0, 'filtre non lu masque la conversation déjà lue');
   check(await p.getByText('Aucune conversation non lue dans cette sélection.',{exact:true}).isVisible(), 'filtre vide expliqué');
   await p.locator('.vrm-inbox-filters').getByRole('button',{name:/Toutes/}).click();
   check(await p.locator('[data-conv="71"]').count()===1, 'toutes les conversations retrouvées');
-  await nav.getByRole('button',{name:'Plus',exact:true}).click();
-  await p.getByRole('menuitem',{name:'Leboncoin',exact:true}).click();
+  await nav.getByRole('button',{name:'Leboncoin',exact:true}).click();
   await p.getByRole('heading',{name:'Leboncoin',exact:true}).waitFor();
-  await nav.getByRole('button',{name:'Plus',exact:true}).click();
-  await p.getByRole('menuitem',{name:'Vinted',exact:true}).click();
+  await nav.getByRole('button',{name:'Vinted',exact:true}).click();
   check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'section messages retrouvée en revenant sur Vinted');
   await p.goto(base+'/?tab=plat_vinted');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
   check(await p.getByText('Merci pour votre achat',{exact:true}).isVisible(),'historique Vinted complet capté');check((await p.locator('.vrm-chat-panel').innerText()).includes('456789'),'code de retrait numérique conservé');
@@ -155,14 +156,14 @@ async function brancher(p){
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'statistiques-390.png')});
   await p.locator('main').evaluate(e=>{e.scrollTop=250;});await p.waitForTimeout(150);
   const avant=await p.locator('main').evaluate(e=>e.scrollTop);
-  await nav.getByRole('button',{name:'Stock',exact:true}).click();
-  await nav.getByRole('button',{name:'Plus',exact:true}).click();await p.getByRole('menuitem',{name:'Statistiques',exact:true}).click();
+  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
+  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Statistiques',exact:true}).click();
   await p.waitForTimeout(800);
   check(avant>100 && Math.abs(await p.locator('main').evaluate(e=>e.scrollTop)-avant)<3, 'position retrouvée après passage dans le stock');
 
   await p.goto(base+'/?tab=plat_ebay');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
-  await nav.getByRole('button',{name:'Stock',exact:true}).click();
-  await nav.getByRole('button',{name:'Messages',exact:true}).click();
+  await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
+  await nav.getByRole('button',{name:'eBay',exact:true}).click();
   await p.getByRole('heading',{name:'eBay',exact:true}).waitFor();
   await p.getByText('Acheteur test',{exact:true}).waitFor();
   check(await p.locator('.vrm-platform-tabs button[aria-current="page"]').innerText()==='Messages', 'messages revient à eBay après un passage dans le stock');
@@ -175,6 +176,26 @@ async function brancher(p){
   await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
+  rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},
+   {id:'email_track_pickup2',data:{id:'pickup2',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire argent taille 43',code:'004567',code2:'009876',consigne:true,suivi:'TRACK-02',receivedAt:maintenant,limite:new Date(Date.now()-86400000).toISOString().slice(0,10)}},
+   {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}});
+  await p.goto(base+'/?tab=cat_achats');await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
+  check(await p.locator('.vrm-pickup-card').count()===3, 'trois colis à retirer, sans mélange des codes');
+  check(await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).isVisible(),'identifiant de consigne visible séparément');
+  check(await p.getByRole('button',{name:'Copier code d’ouverture 004567',exact:true}).isVisible(),'code d’ouverture visible séparément');
+  check((await p.locator('main').innerText()).includes('délai dépassé'),'échéance dépassée reste visible');
+  check(await p.locator('.vrm-pickup-method').evaluateAll(es=>es.every(e=>!e.open)),'explications repliées par défaut');
+  check(await p.locator('.vrm-pickup-details').evaluateAll(es=>es.every(e=>!e.open)),'suivi et dates secondaires dans les détails');
+  await p.locator('.vrm-pickup-method summary').first().click();check(await p.locator('.vrm-pickup-method').first().evaluate(e=>e.open), 'informations de retrait accessibles au clic');await p.locator('.vrm-pickup-method summary').first().click();
+  await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async v=>{window.__codeCopie=v;}}});});
+  await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).click();
+  check(await p.evaluate(()=>window.__codeCopie)==='001234','copie conserve les zéros initiaux');
+  check((await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).innerText()).includes('Copié'),'confirmation après copie réussie');
+  await p.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('Refus simulé');}}});});
+  await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).click();
+  check((await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).innerText()).includes('Copie indisponible'),'copie refusée annoncée honnêtement');
+  if(process.env.BANC_CAPTURES){await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'retraits-390.png')});await p.setViewportSize({width:1512,height:900});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'retraits-desktop.png')});}
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'colis-desktop.png')});}check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles revendeurs réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
