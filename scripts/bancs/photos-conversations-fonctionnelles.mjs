@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {fusionnerConversation} from '../../src/conversations.js';
-import {photoArticle,photoCommande} from '../../src/photosArticles.js';
+import {photoArticle,photoCommande,photoVenteVinted} from '../../src/photosArticles.js';
 const image='https://images1.vinted.net/t/paire/f800/image.jpeg';
 assert.equal(photoArticle({photos:[null,{url:image}]}),image);
 assert.equal(photoArticle({photo:{thumbnails:[{}, {url:image}]}}),image);
@@ -30,3 +30,18 @@ assert.equal(ctx.fusionnerConversation(old,{conversation:{id:8,messages:[]}}),nu
 assert.equal(ctx.fusionnerConversation(old,{conversation:{id:7}}),null);
 assert.equal(ctx.fusionnerConversation(old,{conversation:{id:7,messages:[]}}).conversation.messages.length,2);
 console.log('19 contrôles photos, identité et historique de conversation réussis.');
+
+// Régression : une vente sans photo, liée à une annonce sortie du dressing.
+const vente={transaction_id:7,_acc:{vinted_user_id:'111'}};
+const archives={[JSON.stringify(['111','42'])]:{photo:image}};
+assert.equal(photoVenteVinted(vente,[],42,archives),image);
+assert.equal(photoVenteVinted({...vente,_acc:{vinted_user_id:'222'}},[],42,archives),null);
+assert.equal(photoVenteVinted(vente,[],null,archives),null);
+assert.equal(photoVenteVinted(vente,[{id:42,_acc:{vinted_user_id:'111'},photo:image}],42),image);
+assert.equal(photoVenteVinted(vente,[{id:42,_acc:{vinted_user_id:'222'},photo:image}],42),null);
+assert.equal(photoArticle({item_photo:{url:image}}),image);
+assert.equal(photoArticle({item_photos:[{full_size_url:image}]}),image);
+for(const raw of [{item_photo:{url:image}},{photo_url:image},{item_photos:[{full_size_url:image}]}]){
+ assert.equal(ctx.commandeMaigre({transaction_id:7,...raw}).photo.url,image,'photo conservée par la capture de commandes');
+}
+console.log('10 régressions supplémentaires : archives par compte, lien transaction et champs photos conservés.');

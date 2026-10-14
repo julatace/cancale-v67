@@ -13,6 +13,7 @@ export function photoArticle(article) {
   if (!article) return null;
   for (const value of [article.photo_url,article.photoUrl,article.image_url,article.imageUrl,
     article.photo,article.image,article.photos,article.images,article.imageUrls,
+    article.item_photo,article.item_photos,article.transaction?.item_photo,
     article.item?.photo,article.item?.photos,article.item?.image,article.item?.photo_url]) {
     const u = adresse(value); if (u) return u;
   }
@@ -30,4 +31,15 @@ export function photoCommande(commande, annonces = []) {
     && !(compte && a._acc?.vinted_user_id && String(a._acc.vinted_user_id) !== String(compte))
     && !(compteEbay && a._compte && String(a._compte) !== String(compteEbay)));
   return memes.length === 1 ? photoArticle(memes[0]) : null;
+}
+
+// L’identité transaction → article vient de Vinted. Les archives restent isolées par compte.
+export function photoVenteVinted(commande, annonces = [], itemId = null, archives = {}) {
+  const enrichie = itemId != null ? {...commande,item_id:itemId} : commande;
+  const directe = photoCommande(enrichie, annonces);
+  if (directe) return directe;
+  const id = itemId ?? commande?.item_id ?? commande?.item?.id;
+  const uid = commande?._acc?.vinted_user_id;
+  if (id == null || uid == null) return null;
+  return photoArticle(archives[JSON.stringify([String(uid),String(id)])]);
 }

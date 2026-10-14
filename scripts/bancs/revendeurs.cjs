@@ -14,7 +14,7 @@ const ventes = [
 ];
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
-ventes[0].photo={url:'https://images1.vinted.net/test.png'};
+rows.push({id:'harvest_111_txn_9001',data:{payload:{transaction:{id:9001,item_id:777}}}},{id:'coffre_111_777',data:{id:'777',uid:'111',photos:['https://images1.vinted.net/test.png']}});
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
 {id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',buyer:{username:'AcheteurOrdi'},lineItems:[{title:'Paire eBay',legacyItemId:'12',sku:'VRM-12'},{title:'Chargeur ordinateur',sku:'CHARGEUR-USB'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
@@ -52,6 +52,7 @@ async function brancher(p){
         }return out;
       });return json(selection);
     }
+    if(url.hostname==='images1.vinted.net' && url.pathname==='/test.png')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
     if(url.pathname==='/api/compte' && url.searchParams.get('mode')==='photo')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
     if(url.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{}'});
     if(url.hostname==='127.0.0.1')return r.continue();
@@ -96,6 +97,9 @@ async function brancher(p){
     }
     if(nom==='Vinted'){
       await p.locator('.vrm-sale-row').first().waitFor();
+      await p.locator('.vrm-sale-row').first().getByRole('button',{name:/Agrandir la photo/}).waitFor();
+      await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});
+      check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente récupérée depuis son archive exacte '+width);
       const outil=await p.locator('.vrm-sales-workbar').boundingBox();
       const liste=await p.locator('.vrm-sale-row').first().boundingBox();
       const fin=await p.locator('.vrm-sale-row').last().boundingBox();
