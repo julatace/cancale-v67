@@ -164,9 +164,16 @@ const CSS = `
 .acc-lignes b{color:${K.text};font-weight:600}
 .acc-lignes .sep{padding-left:6px;color:${K.faint}}
 .acc-lignes .nw{white-space:nowrap}
-.acc-carte-jour{position:relative}
+.acc-carte-jour{position:relative;perspective:1200px}
 .acc-carte-jour:before{content:"";position:absolute;inset:-80px -60px;background:radial-gradient(closest-side,rgba(61,123,255,.12),transparent);pointer-events:none;z-index:0}
 .acc-carte-jour > *{position:relative;z-index:1}
+/* Profondeur 3D de la carte démo : elle s'incline légèrement vers le pointeur
+   (vitrine marketing — jamais sur les écrans de données de l'app). transform
+   seul, retargeté par une transition (interruptible). Souris fine seulement ;
+   coupé en mouvement réduit. Le film ne rend que CarteJourEcran : il n'est pas
+   touché (fonction pure du temps). */
+.acc-tilt{transition:transform 260ms ${COURBE_SORTIE};transform-style:preserve-3d;will-change:transform}
+@media (prefers-reduced-motion:reduce){.acc-tilt{transition:none!important;transform:none!important}}
 .acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
 .acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
@@ -189,6 +196,15 @@ const CSS = `
 .acc-hero:before{animation:accApparait 1000ms ${COURBE_SORTIE} both}
 @media (prefers-reduced-motion:reduce){
   .acc-def,.acc-h1,.acc-sous,.acc-actions,.acc-lignes,.acc-carte-jour,.acc-hero:before{animation:none!important}
+}
+/* Un reflet balaie le bouton principal du héros UNE fois, juste après qu'il
+   apparaît : l'œil va à l'action. Invisible avant et après (hors écran), coupé
+   en mouvement réduit (le pseudo reste hors champ, aucune animation posée). */
+.acc-actions .acc-p{overflow:hidden}
+.acc-actions .acc-p:after{content:"";position:absolute;top:0;bottom:0;left:0;width:55%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);transform:translateX(-185%) skewX(-12deg);pointer-events:none}
+@keyframes accLustre{from{transform:translateX(-185%) skewX(-12deg)}to{transform:translateX(230%) skewX(-12deg)}}
+@media (prefers-reduced-motion:no-preference){
+  .acc-actions .acc-p:after{animation:accLustre 1050ms ${COURBE_SORTIE} 820ms 1 both}
 }
 /* Apparition au defilement des sections du corps. La classe .acc-reveil n'est
    posee QUE par le script (jamais au rendu) : sans JS, ou si l'observateur ne

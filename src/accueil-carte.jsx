@@ -260,10 +260,36 @@ export function CarteJourEcran({ s, etatScene = 'joue', onVers, cible = true }) 
 // propose « Revoir ». Moins de mouvement : l'état final, sans « Revoir ».
 export default function CarteJour({ onVers }) {
   const boite = React.useRef(null);
+  const tilt = React.useRef(null);
   const { s, etat, rejouer, reduit } = useScene(boite, DUREE_CARTE, { seuil: 0.35, attente: 300 });
+  // Inclinaison 3D vers le pointeur (souris fine seulement, coupée en mouvement
+  // réduit). On écrit le transform SUR l'élément incliné (jamais une variable
+  // sur le parent), retargeté par la transition CSS : le suivi est amorti.
+  React.useEffect(() => {
+    const b = boite.current, c = tilt.current;
+    if (!b || !c || reduit) return;
+    let fine = false;
+    try { fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (_) {}
+    if (!fine) return;
+    let raf = 0, rx = 0, ry = 0;
+    const poser = () => { raf = 0; c.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`; };
+    const bouge = (e) => {
+      const r = b.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      ry = ((e.clientX - r.left) / r.width - 0.5) * 9;   // ±4,5°
+      rx = -((e.clientY - r.top) / r.height - 0.5) * 7;  // ±3,5°
+      if (!raf) raf = requestAnimationFrame(poser);
+    };
+    const sort = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } c.style.transform = ''; };
+    b.addEventListener('pointermove', bouge);
+    b.addEventListener('pointerleave', sort);
+    return () => { b.removeEventListener('pointermove', bouge); b.removeEventListener('pointerleave', sort); if (raf) cancelAnimationFrame(raf); };
+  }, [reduit]);
   return (
     <div className="acc-carte-jour" ref={boite}>
-      <CarteJourEcran s={s} etatScene={etat} onVers={onVers} />
+      <div className="acc-tilt" ref={tilt}>
+        <CarteJourEcran s={s} etatScene={etat} onVers={onVers} />
+      </div>
       <div className="acc-revoir-l">
         {etat === 'fin' && !reduit && <RevoirBouton onClick={rejouer} libelle="Revoir l’exemple" />}
       </div>
