@@ -71,7 +71,7 @@ async function brancher(p){
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[];
   await p.route('**/api/ebay',r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true};
    if(a==='messages')j={ok:true,messages:[{id:'m1',itemId:'12',sender:'Acheteur test',subject:'Question sur la paire',body:'Bonjour, disponible ?',responses:['Oui, disponible.']},{id:'m2',itemId:'13',sender:'Autre acheteur',subject:'Autre échange',body:'Quelle taille ?',responses:[]}],totalPages:1};
-   if(a==='agent')j={ok:true,tasks:[{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12'}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'}],journalLisible:true};
+   if(a==='agent')j={ok:true,tasks:[{id:'offer:o1',section:'offres',label:'Étudier l’offre',ref:'12',title:'Paire à négocier',price:'85.00',currency:'EUR',deadline:new Date(Date.now()+3600000).toISOString(),urgent:true}],sources:[{nom:'Messages',ok:false},{nom:'Offres',ok:true,partiel:true}],journal:[{id:'j1',action:'expedier',ref:'1',at:Date.now(),etat:'incertain'},...Array.from({length:6},(_,i)=>({id:'j'+(i+2),action:'expedier',ref:String(i+2),at:Date.now(),etat:'reussi'}))],journalLisible:true};
    if(a==='offresrecues')j={ok:true,offres:[{id:'o1',itemId:'12',titre:'Paire de test',buyer:'Acheteur test',price:85,currency:'EUR',quantity:1,status:'Pending'}],totalPages:1};
    if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
    return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
@@ -201,9 +201,17 @@ async function brancher(p){
   await p.getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'agent montre le titre de la paire');
+  await p.getByLabel('Rechercher une tâche eBay').fill('absent');check(await p.getByText('Aucune tâche ne correspond à cette recherche.',{exact:true}).isVisible(),'recherche des tâches sans résultat expliquée');
+  await p.getByLabel('Rechercher une tâche eBay').fill('négocier');check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'recherche des tâches retrouve la paire');
+  await p.getByText('Sources et dernière lecture',{exact:true}).click();
   check(await p.getByText('Messages : lecture indisponible',{exact:true}).isVisible(),'agent distingue la lecture indisponible des tâches vides');
   check(await p.getByRole('button',{name:'Relire avant de reprendre',exact:true}).isVisible(),'action incertaine propose une relecture');
   check(writes.length===1,'préparation et historique eBay sans action commerciale');
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'tâches eBay sans débordement '+width);}
+  await p.setViewportSize({width:390,height:844});
+  check(await p.getByText(/· Confirmé par eBay$/).count()===5,'historique compact avec cinq résultats confirmés');await p.getByRole('button',{name:'Voir les 7 actions',exact:true}).click();check(await p.getByText(/· Confirmé par eBay$/).count()===6,'historique complet accessible au clic');check(await p.getByRole('button',{name:'Relire avant de reprendre',exact:true}).isVisible(),'résultat incertain conservé dans l’historique complet');
+
   await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
   check(writes.length===1,'une tâche ouvre la section sans accepter l’offre');
   await p.goto(base+'/?tab=plat_leboncoin');await p.getByRole('button',{name:'Colis',exact:true}).click();await p.getByText('Colis à préparer',{exact:true}).waitFor();

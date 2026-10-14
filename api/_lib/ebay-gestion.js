@@ -130,7 +130,7 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const a=await jeton(owner);if(!a.token)return a;
     const r=await lire('GetBestOffers',`<BestOfferID>${b.offerId}</BestOfferID>`,a.token);if(!r.root)return r;
     const offer=offresEbay(r.root).find(o=>o.id===String(b.offerId) && o.itemId===String(b.itemId));
-    if(!offer || !['Pending','Active'].includes(offer.status) || (offer.expiresAt && Date.parse(offer.expiresAt)<=Date.now()))return echec('Cette offre n’est plus en attente.',409);
+    if(!offer || !['Pending','Active'].includes(offer.status) || (offer.expiresAt && (!Number.isFinite(Date.parse(offer.expiresAt)) || Date.parse(offer.expiresAt)<=Date.now())))return echec('Cette offre n’est plus en attente.',409);
     if((!argent(b.expectedPrice) || !argent(offer.price) || Math.round(Number(String(b.expectedPrice).replace(',','.'))*100)!==Math.round(Number(offer.price)*100)) || b.currency!==offer.currency || !/^[A-Z]{3}$/.test(offer.currency || '') || !Number.isInteger(offer.quantity) || offer.quantity<1)return echec('L’offre a changé ou ses montants ne sont pas lisibles. Actualise-la.',409);
     let inner=`<ItemID>${offer.itemId}</ItemID><BestOfferID>${offer.id}</BestOfferID><Action>${b.decision}</Action>`;
     if(b.decision==='Counter')inner+=`<CounterOfferPrice currencyID="${offer.currency}">${Number(String(b.price).replace(',','.')).toFixed(2)}</CounterOfferPrice><CounterOfferQuantity>${offer.quantity}</CounterOfferQuantity>`;
