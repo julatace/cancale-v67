@@ -1,3 +1,4 @@
+import {etatCommandeEbay} from './ebay-etat-commande.js';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_',textNodeName:'#text',parseTagValue:false,trimValues:false,removeNSPrefix:true});
@@ -81,7 +82,7 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const f=await ebayJson(`${apiOrigin}/sell/fulfillment/v1/order/${encodeURIComponent(b.orderId)}/shipping_fulfillment`,a.token);
     if(!f.ok || !Array.isArray(f.data?.fulfillments))return echec('Le suivi existant n’a pas pu être vérifié. Rien n’a été envoyé.',502);
     if(f.data.fulfillments.some(x=>x.shipmentTrackingNumber===tracking && String(x.shippingCarrierCode).toLowerCase()===carrier.toLowerCase()))return succes({deja:true});
-    if(o.order.orderFulfillmentStatus==='FULFILLED')return echec('Cette commande est déjà expédiée. Actualise son suivi.',409);
+    if(!etatCommandeEbay(o.order).peutExpedier)return echec('L’état d’expédition de cette commande doit être vérifié. Actualise son suivi.',409);
     const lineItems=lignesRestantAExpedier(o.order,f.data.fulfillments);
     if(!lineItems)return echec('Les quantités à expédier ne sont pas lisibles.',502);
     if(!lineItems.length)return echec('Toutes les pièces ont déjà une expédition.',409);

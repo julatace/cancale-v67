@@ -4,6 +4,7 @@ import {centimes} from './beneficePaire.js';
 import CoutsVente from './CoutsVente.jsx';
 import './ebay-interface.css';
 import {offresAffichees} from './ebayOffresVue.js';
+import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
 import React,{useEffect,useState,useRef} from 'react';
@@ -28,23 +29,25 @@ const corpsLisible=body=>/<(?:div|p|span|br|a)\b/i.test(body || '')?String(body)
 
 export function EbayCommande({order,ouvrir=false,costs={},onCosts,compte='principal',headers,confirm,theme:C}){
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
- const S=styleUI(C),[open,setOpen]=useState(ouvrir),[data,setData]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[carriers,setCarriers]=useState(null),[carrier,setCarrier]=useState(''),[tracking,setTracking]=useState(''),[body,setBody]=useState(''),[subject,setSubject]=useState('À propos de votre commande');
+ const S=styleUI(C),[open,setOpen]=useState(ouvrir),[data,setData]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[carriers,setCarriers]=useState(null),[carrier,setCarrier]=useState(''),[tracking,setTracking]=useState(''),[body,setBody]=useState(''),[subject,setSubject]=useState('À propos de votre commande'),[copie,setCopie]=useState('');
  async function relire(){setBusy(true);setMessage('');try{setData(await call('commande',{orderId:order.orderId},headers));}catch(e){setMessage(e.message);}finally{setBusy(false);}}
  useEffect(()=>{if(open && !data)relire();},[open]);
  async function transporteurs(){if(carriers)return;try{const j=await call('transporteurs',{},headers);setCarriers(j.carriers || []);}catch(e){setMessage(e.message);}}
  const frais=data?.order?.pricingSummary,ship=data?.order?.fulfillmentStartInstructions?.[0]?.shippingStep?.shipTo;
  const adresse=ship?.contactAddress;
- const paiement=data?.order?.orderPaymentStatus,annulation=data?.order?.cancelStatus?.cancelState;
- const peutExpedier=paiement==='PAID' && data?.order?.orderFulfillmentStatus!=='FULFILLED' && (!annulation || ['NONE_REQUESTED','CANCEL_REJECTED'].includes(annulation));
+ const etat=etatCommandeEbay(data?.order),peutExpedier=etat.peutExpedier;
+ const adresseTexte=ship?[ship.fullName,adresse?.addressLine1,adresse?.addressLine2,[adresse?.postalCode,adresse?.city].filter(Boolean).join(' '),adresse?.countryCode].filter(Boolean).join('\n'):'';
  return <details className="vrm-ebay-order-actions" open={open} onToggle={e=>setOpen(e.currentTarget.open)}>
   <summary>Gérer la commande</summary>
   <div style={{padding:'8px 0',display:'grid',gap:12}}>
    <Erreur message={message}/>{busy && <span style={{fontSize:12,color:C.muted}}>Lecture eBay…</span>}
    {data && <>
+    <div className="vrm-ebay-order-state">{etat.label}</div>
+    <section aria-label="Articles de la commande eBay" className="vrm-ebay-order-items"><h3>Contenu de la commande</h3>{data.order.lineItems?.length?data.order.lineItems.map((li,i)=><div className="vrm-ebay-order-item" key={li.lineItemId || i}><div><b>{li.title || 'Article sans titre'}</b><small>{li.sku?`Référence : ${li.sku} · `:''}Quantité : {Number.isInteger(li.quantity) && li.quantity>0?li.quantity:'non fournie'}</small></div><span>{montant((li.discountedLineItemCost || (li.discounts?.length?null:li.lineItemCost))?.value,(li.discountedLineItemCost || li.lineItemCost)?.currency)}</span></div>):<p>Le détail des articles n’a pas été fourni par eBay.</p>}</section>
     {onCosts && <EbayBenefice order={data.order} costs={costs} onCosts={onCosts} theme={C}/>}
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,fontSize:12}}>
      <div><b>Commande {order.orderId}</b><div style={{color:C.muted,marginTop:4}}>Acheteur : {data.order.buyer?.username || '—'}</div><div style={{marginTop:4}}>Total : {montant(frais?.total?.value,frais?.total?.currency)}</div></div>
-     <div><b>Livraison</b>{ship?<div style={{color:C.muted,lineHeight:1.5,marginTop:4}}>{ship.fullName}<br/>{[adresse?.addressLine1,adresse?.addressLine2].filter(Boolean).join(' ')}<br/>{[adresse?.postalCode,adresse?.city,adresse?.countryCode].filter(Boolean).join(' ')}</div>:<div style={{color:C.muted}}>Adresse non fournie par eBay.</div>}</div>
+     <div><b>Livraison</b>{ship?<div style={{color:C.muted,lineHeight:1.5,marginTop:4}}>{ship.fullName}<br/>{[adresse?.addressLine1,adresse?.addressLine2].filter(Boolean).join(' ')}<br/>{[adresse?.postalCode,adresse?.city,adresse?.countryCode].filter(Boolean).join(' ')}{adresseTexte && <div><button type="button" style={{...S.button,marginTop:6}} onClick={async()=>{try{await navigator.clipboard.writeText(adresseTexte);setCopie('Adresse copiée');}catch(_){setCopie('Copie indisponible');}}}>Copier l’adresse</button><span role="status" style={{display:'block',marginTop:4}}>{copie}</span></div>}</div>:<div style={{color:C.muted}}>Adresse non fournie par eBay.</div>}</div>
     </div>
     <div style={{fontSize:12}}><b>Suivi</b>{data.fulfillments===null?<p>Le suivi n’a pas pu être lu.</p>:data.fulfillments.length?data.fulfillments.map((f,i)=><div key={f.fulfillmentId || i} style={{marginTop:5,color:C.muted}}>{f.shippingCarrierCode || 'Transporteur'} · {f.shipmentTrackingNumber || 'Numéro non fourni'}{f.shippedDate?` · ${new Date(f.shippedDate).toLocaleDateString('fr-FR')}`:''}</div>):<p style={{color:C.muted}}>Aucune expédition enregistrée sur eBay.</p>}</div>
     {peutExpedier && <details onToggle={e=>{if(e.currentTarget.open)transporteurs();}}><summary style={{fontSize:12,cursor:'pointer',fontWeight:600}}>Enregistrer l’expédition</summary>

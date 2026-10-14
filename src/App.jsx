@@ -9,6 +9,7 @@ import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
+import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -13020,8 +13021,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const visibles=orders.filter(o=>{
     if(cible)return String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte;
     const termes=[o.orderId,o.buyer?.username,o._pseudo,...(o.lineItems || []).flatMap(li=>[li.title,li.sku,li.legacyItemId])].filter(Boolean).join(' ').toLocaleLowerCase('fr-FR');
-    const expedie=['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase());
-    return (!recherche.trim() || termes.includes(recherche.trim().toLocaleLowerCase('fr-FR'))) && (filtre==='all' || (filtre==='done'?expedie:String(o.orderPaymentStatus || '').toUpperCase()==='PAID' && !expedie));
+    const etat=etatCommandeEbay(o);
+    return (!recherche.trim() || termes.includes(recherche.trim().toLocaleLowerCase('fr-FR'))) && (filtre==='all' || (filtre==='done'?etat.expedie:etat.peutExpedier));
   });
   return wrap(<>
     {head}
@@ -13036,12 +13037,11 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
       {visibles.map((o, i) => {
         const li = (o.lineItems && o.lineItems[0]) || {};
         const img = photoCommande(o, annonces.filter(a=>(a._compte || 'principal')===(o._compte || 'principal')));
-        const paye = String(o.orderPaymentStatus || '').toUpperCase() === 'PAID';
-        const expedie = ['FULFILLED','SHIPPED'].includes(String(o.orderFulfillmentStatus || '').toUpperCase());
-        const statut = !o.orderPaymentStatus ? 'Statut à confirmer' : !paye ? 'Paiement en attente' : expedie ? 'Expédiée' : 'À expédier';
+        const etat=etatCommandeEbay(o);
+        const statut=etat.label;
 
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
-          meta={<><span className="vrm-ebay-sale-status" data-state={paye && !expedie?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
+          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>

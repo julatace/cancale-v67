@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {etatCommandeEbay} from '../../api/_lib/ebay-etat-commande.js';
+import {preparerAgentEbay} from '../../api/_lib/ebay-agent.js';
+const paid={orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED'};
+assert.equal(etatCommandeEbay(paid).peutExpedier,true);
+assert.equal(etatCommandeEbay({...paid,orderFulfillmentStatus:'IN_PROGRESS'}).label,'Expédition partielle');
+for(const change of [{orderFulfillmentStatus:'INCONNU'},{orderFulfillmentStatus:undefined},{orderFulfillmentStatus:'FULFILLED'},{cancelStatus:{cancelState:'CANCELED'}},{cancelStatus:{cancelState:'CANCEL_REQUESTED'}},{orderPaymentStatus:'FULLY_REFUNDED'},{orderPaymentStatus:'PENDING'}])assert.equal(etatCommandeEbay({...paid,...change}).peutExpedier,false);
+const cancelled={...paid,cancelStatus:{cancelState:'CANCELED'}};
+assert.equal(etatCommandeEbay(cancelled).label,'Annulée');
+assert.equal(etatCommandeEbay({...paid,orderPaymentStatus:'FULLY_REFUNDED'}).label,'Remboursée');
+assert.equal(etatCommandeEbay({...paid,orderFulfillmentStatus:'FULFILLED'}).expedie,true);
+const tasks=preparerAgentEbay({orders:{capturedAt:Date.now(),orders:[paid,{...cancelled,orderId:'2'},{...paid,orderId:'3',orderFulfillmentStatus:'INCONNU'}]}}).body.tasks;
+assert.deepEqual(tasks.map(t=>t.id),['order:1']);
+console.log('13 contrôles : états inconnus, annulations, remboursements et préparation cohérente.');
