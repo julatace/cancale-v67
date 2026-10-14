@@ -17,7 +17,7 @@ const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
-{id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
+{id:'ebay_orders',data:{capturedAt:Date.now(),complet:true,orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',buyer:{username:'AcheteurOrdi'},lineItems:[{title:'Paire eBay',legacyItemId:'12',sku:'VRM-12'},{title:'Chargeur ordinateur',sku:'CHARGEUR-USB'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
 {id:'ebay_listings',data:{capturedAt:Date.now(),complet:true,items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
 const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const server = http.createServer((q,r)=>{
@@ -106,6 +106,15 @@ async function brancher(p){
    }
    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-desktop.png')});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-390.png')});}
    await p.setViewportSize({width:390,height:844});
+   if(nom==='eBay'){
+    const search=p.getByLabel('Rechercher une vente');
+    await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'recherche eBay par acheteur');
+    await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'recherche eBay sur un article secondaire et son SKU');
+    await search.fill('ABSENT-123');check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'sélection eBay vide expliquée');
+    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).isVisible(),'réinitialisation eBay restaure les commandes');
+    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'Expédiées',exact:true}).click();check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'commandes non expédiées exclues du filtre expédiées');
+    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
+   }
   }
   await p.goto(base+'/?tab=plat_vinted');
   await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
