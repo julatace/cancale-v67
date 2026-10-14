@@ -13,6 +13,7 @@ const ventes = [
   { transaction_id:9002, title:'Nike P-6000 argent avec un titre volontairement long taille 43', price:{amount:'120',currency_code:'EUR'}, status:'Commande finalisée', date:maintenant },
 ];
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
+ventes[0].photo={url:'https://images1.vinted.net/expired.png'};
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
 rows.push({id:'harvest_111_txn_9002',data:{payload:{transaction:{id:9002,item_photo:{url:'https://images1.vinted.net/test.png'}}}}});
 rows.push({id:'harvest_111_txn_9001',data:{payload:{transaction:{id:9001,item_id:777}}}},{id:'coffre_111_777',data:{id:'777',uid:'111',photos:['https://images1.vinted.net/test.png']}});
@@ -55,6 +56,7 @@ async function brancher(p){
         }return out;
       });return json(selection);
     }
+    if(url.hostname==='images1.vinted.net' && url.pathname==='/expired.png')return r.fulfill({status:404,contentType:'text/plain',body:'Photo indisponible'});
     if(url.hostname==='images1.vinted.net' && url.pathname==='/test.png')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
     if(url.pathname==='/api/compte' && url.searchParams.get('mode')==='photo')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
     if(url.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{}'});
@@ -108,7 +110,7 @@ async function brancher(p){
       await p.locator('.vrm-sale-row').first().waitFor();
       await p.locator('.vrm-sale-row').first().getByRole('button',{name:/Agrandir la photo/}).waitFor();
       await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});
-      check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente récupérée depuis son archive exacte '+width);
+      check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
       const outil=await p.locator('.vrm-sales-workbar').boundingBox();
       const liste=await p.locator('.vrm-sale-row').first().boundingBox();
       const fin=await p.locator('.vrm-sale-row').last().boundingBox();

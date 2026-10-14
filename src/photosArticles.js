@@ -46,12 +46,12 @@ export function photoVenteVinted(commande, annonces = [], itemId = null, archive
   return photoArticle(archives[JSON.stringify([String(uid),String(id)])]);
 }
 
-export function demandesPhotosVentes(commandes,annonces,identites,archives,transactions){
+export function demandesPhotosVentes(commandes,annonces,identites,archives,transactions,forces=new Set()){
  const out={archives:new Map(),transactions:new Map()};
  for(const o of commandes || []){
   const uid=o?._acc?.vinted_user_id,tid=o?.transaction_id,id=identites?.[String(tid)] ?? o?.item_id ?? o?.item?.id;
   if(uid==null || !/^\d+$/.test(String(uid)))continue;
-  if(photoVenteVinted(o,annonces,id,archives,transactions))continue;
+  if(photoVenteVinted(o,annonces,id,archives,transactions) && !forces.has(JSON.stringify([String(uid),String(tid)])))continue;
   if(tid!=null && /^\d+$/.test(String(tid)))out.transactions.set(`harvest_${uid}_txn_${tid}`,JSON.stringify([String(uid),String(tid)]));
   if(id!=null && /^\d+$/.test(String(id)))out.archives.set(`coffre_${uid}_${id}`,JSON.stringify([String(uid),String(id)]));
  }
@@ -64,4 +64,16 @@ export function photosTransactionsLues(rows,demandes){
   if(key && photo)out[key]={photo};
  }
  return out;
+}
+
+export function photosVenteVintedCandidates(commande,annonces=[],itemId=null,archives={},transactions={}){
+ const uid=commande?._acc?.vinted_user_id,tid=commande?.transaction_id,id=itemId ?? commande?.item_id ?? commande?.item?.id;
+ const sources=[photoArticle(commande),id!=null?photoCommande({item_id:id,_acc:commande?._acc},annonces):null,
+  uid!=null && tid!=null?photoArticle(transactions[JSON.stringify([String(uid),String(tid)])]):null,
+  uid!=null && id!=null?photoArticle(archives[JSON.stringify([String(uid),String(id)])]):null];
+ return [...new Set(sources.filter(Boolean))];
+}
+export function choisirPhotoDisponible(candidates,etat,favorite=null){
+ if(favorite && candidates.includes(favorite) && etat(favorite)!=='ko')return favorite;
+ return candidates.find(url=>etat(url)!=='ko') || candidates[0] || null;
 }
