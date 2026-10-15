@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { appelerEbay } from './ebayRequetes.js';
 import {
-  rentabilite, ventesComparables, fourchetteRevente, budgetDuMois, taillesDuTitre, centimesDe, eurosTexte,
+  rentabilite, ventesComparables, fourchetteRevente, budgetDuMois, taillesDuTitre, titrePorte, centimesDe, eurosTexte,
   ETATS_VEILLE, MOTIFS_REFUS, COMPARABLES_MIN, VEILLE_MAX_RECHERCHES,
 } from '../api/_lib/veille-regle.js';
 
@@ -37,6 +37,7 @@ function styles(C) {
     muet: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
     titre: { fontSize: 14, fontWeight: 700, color: C.text, margin: 0 },
     pastille: { display: 'inline-block', fontSize: 11, padding: '2px 7px', borderRadius: 999, border: `1px solid ${C.border}`, color: C.muted, marginRight: 5, marginTop: 4 },
+    petit: { ...bouton, minHeight: 30, padding: '5px 10px', fontSize: 12 },
   };
 }
 
@@ -60,7 +61,9 @@ export function Rentabilite({ C, cle: cleFixe, titreInitial = '', achatInit = nu
   const f = useMemo(() => fourchetteRevente(comparables, maintenant), [comparables, maintenant]);
   const c = (k) => centimesDe(v[k]);
   const res = rentabilite({ achat: c('achat'), livraison: c('livraison'), remise: c('remise'), frais: c('frais'), revente: c('revente'), marge: c('marge') });
-  const scen = f.assez && c('achat') != null ? ['prudente', 'moyenne', 'ambitieuse'].map((k) => [k, rentabilite({ achat: c('achat'), livraison: c('livraison'), remise: c('remise'), frais: c('frais'), revente: f[k] }).benefice]) : null;
+  // Les trois scénarios en UNE grille : la revente de chacun, et le bénéfice
+  // qu'elle donnerait (quand le prix d'achat est saisi). Un clic la reprend.
+  const scen = f.assez ? ['prudente', 'moyenne', 'ambitieuse'].map((k) => [k, f[k], c('achat') == null ? null : rentabilite({ achat: c('achat'), livraison: c('livraison'), remise: c('remise'), frais: c('frais'), revente: f[k] }).benefice]) : null;
   const champ = (k, lib, ph) => (
     <label style={S.etiquette}>{lib}
       <input inputMode="decimal" value={v[k]} placeholder={ph} onChange={(e) => setV({ ...v, [k]: e.target.value })} style={S.champ} data-renta-champ={k}/>
@@ -87,13 +90,6 @@ export function Rentabilite({ C, cle: cleFixe, titreInitial = '', achatInit = nu
             : !cle ? 'Modèle ou pointure non reconnus : pas de ventes comparables.'
               : !f.assez ? `Pas assez de ventes comparables (${f.n} sur ${COMPARABLES_MIN}) — ${cle.modele} en ${cle.taille}.`
                 : (<>
-                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                    {['prudente', 'moyenne', 'ambitieuse'].map((k) => (
-                      <button key={k} type="button" style={S.bouton} onClick={() => setV({ ...v, revente: enEuros(f[k]) })} data-scenario={k}>
-                        {k[0].toUpperCase() + k.slice(1)} · {eur(f[k])}
-                      </button>
-                    ))}
-                  </span>
                   {f.n} vente{f.n > 1 ? 's' : ''} de {cle.modele} en {cle.taille}, la plus récente {f.plusRecenteJ === 0 ? 'aujourd\'hui' : `il y a ${f.plusRecenteJ} j`}{f.anciennes ? ' — anciennes, prudence' : ''}.{' '}
                   <button type="button" onClick={() => setVoirVentes(!voirVentes)} style={{ ...S.bouton, minHeight: 0, padding: '2px 8px', fontSize: 11.5 }}>{voirVentes ? 'Masquer' : 'Voir'} les ventes</button>
                   {voirVentes && (
@@ -105,12 +101,16 @@ export function Rentabilite({ C, cle: cleFixe, titreInitial = '', achatInit = nu
       </div>
       {scen && (
         <div data-scenarios="" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
-          {scen.map(([k, b]) => (
-            <div key={k} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 8px', minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: C.muted }}>{k[0].toUpperCase() + k.slice(1)}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }} data-scenario-benefice={k}>{b == null ? '—' : eur(b)}</div>
-            </div>
-          ))}
+          {scen.map(([k, rv, b]) => {
+            const choisi = c('revente') === rv;
+            return (
+              <button key={k} type="button" onClick={() => setV({ ...v, revente: enEuros(rv) })} data-scenario={k} aria-pressed={choisi}
+                style={{ textAlign: 'left', border: `1px solid ${choisi ? C.accent : C.border}`, background: C.card, borderRadius: 8, padding: '6px 8px', minWidth: 0, cursor: 'pointer', fontFamily: 'inherit', color: C.text }}>
+                <span style={{ display: 'block', fontSize: 11, color: C.muted }}>{k[0].toUpperCase() + k.slice(1)} · {eur(rv)}</span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }} data-scenario-benefice={k}>{b == null ? '—' : eur(b)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
       <div style={{ display: 'grid', gap: 3, fontSize: 13, color: C.text }}>
@@ -195,16 +195,25 @@ function Formulaire({ C, initial, onAnnuler, onEnregistrer, onTester, occupe, er
 }
 
 // ── UNE ANNONCE TROUVÉE ──────────────────────────────────────────────────────
-function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, modeleDe, occupe }) {
+// Le modèle d'une annonce, pour chercher SES ventes comparables : celui de la
+// recherche quand le titre le porte (« Spezial Handball » cherchée comme
+// « Spezial » ⇒ ses ventes de Spezial), sinon celui que l'app lit dans le titre
+// (`extractModel`, la liste des modèles connus — une seule règle, §11). La
+// pointure, elle, doit être LUE dans le titre (une seule) : jamais supposée.
+export function cleComparables(titre, recherche, modeleDe) {
+  if (typeof modeleDe !== 'function') return null;
+  const nom = recherche && (recherche.noms || [])[0];
+  const parRecherche = nom && titrePorte(titre, nom) ? modeleDe(nom) : null;
+  const modele = parRecherche || modeleDe(titre);
+  const { eu } = taillesDuTitre(titre);
+  return modele && eu.length === 1 ? { modele, taille: eu[0] } : null;
+}
+function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, modeleDe, occupe, recherche }) {
   const S = styles(C);
   const [refus, setRefus] = useState(false);
   const [note, setNote] = useState(null);
   const [renta, setRenta] = useState(false);
-  const cle = useMemo(() => {
-    const modele = typeof modeleDe === 'function' ? modeleDe(a.titre) : null;
-    const { eu } = taillesDuTitre(a.titre);
-    return modele && eu.length === 1 ? { modele, taille: eu[0] } : null;
-  }, [a.titre, modeleDe]);
+  const cle = useMemo(() => cleComparables(a.titre, recherche, modeleDe), [a.titre, recherche, modeleDe]);
   const pasRevue = !lectureSeule && Number.isFinite(verifAt) && Number.isFinite(a.revuLe) && a.revuLe < verifAt;
   const prix = a.livraison != null
     ? <>{eur(a.prix)} + {eur(a.livraison)} livraison = <b>{eur(a.total)}</b></>
@@ -223,28 +232,29 @@ function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, 
           {[a.etat || 'état non indiqué', a.pays ? `vendeur en ${a.pays}` : '', a.vendeur && a.vendeur.pct != null ? `${String(a.vendeur.pct).replace('.', ',')} % d'avis positifs (eBay)` : '', a.offre ? 'offre possible sur eBay' : ''].filter(Boolean).join(' · ')}
         </div>
         {(a.raisons || []).length > 0 && <div style={S.muet} data-pourquoi="">Pourquoi : {a.raisons.join(' · ')}</div>}
-        {(a.inverifiables || []).length > 0 && <div style={S.muet} data-inverifiable="">Non vérifié : {a.inverifiables.join(' · ')}</div>}
+        {/* La livraison inconnue est déjà dite sur la ligne du prix : une cause, une phrase (§7). */}
+        {(() => { const nv = (a.inverifiables || []).filter((x) => !/^livraison inconnue/.test(x)); return nv.length > 0 && <div style={S.muet} data-inverifiable="">Non vérifié : {nv.join(' · ')}</div>; })()}
         <div>
           {statutTxt && <span style={{ ...S.pastille, color: C.text }} data-statut-txt="">{statutTxt}</span>}
-          {(a.drapeaux || []).map((d) => <span key={d} style={S.pastille} data-drapeau={d}>{DRAPEAUX[d] || d}</span>)}
+          {(a.drapeaux || []).filter((d) => d !== 'sans-photo').map((d) => <span key={d} style={S.pastille} data-drapeau={d}>{DRAPEAUX[d] || d}</span>)}
           {pasRevue && <span style={S.pastille} data-drapeau="pas-revue">pas revue à la dernière vérification</span>}
           {Number.isFinite(a.revuLe) && maintenant - a.revuLe > 6 * 3600000 && <span style={S.pastille} data-drapeau="ancien">prix lu {ilYa(a.revuLe, maintenant)}</span>}
         </div>
         {a.note && note == null && <div style={{ ...S.muet, fontStyle: 'italic' }} data-note="">« {a.note} »</div>}
         {!lectureSeule && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-            {a.statut === 'nouvelle' && <button type="button" style={S.bouton} disabled={occupe} onClick={() => dec('a-examiner')} data-decision="a-examiner">À examiner</button>}
-            {a.statut !== 'achetee' && a.statut !== 'refusee' && <button type="button" style={S.bouton} disabled={occupe} onClick={() => dec('achetee')} data-decision="achetee">Je l'ai achetée</button>}
-            {a.statut !== 'refusee' && !refus && <button type="button" style={S.bouton} disabled={occupe} onClick={() => setRefus(true)} data-decision="refuser">Refuser</button>}
-            {a.statut !== 'nouvelle' && <button type="button" style={S.bouton} disabled={occupe} onClick={() => dec('nouvelle')} data-decision="remettre">Remettre</button>}
-            <button type="button" style={S.bouton} onClick={() => setNote(note == null ? (a.note || '') : null)} data-decision="note">Note</button>
-            <button type="button" style={S.bouton} onClick={() => setRenta(!renta)} aria-expanded={renta} data-ouvrir-renta="">Rentabilité</button>
+            {a.statut === 'nouvelle' && <button type="button" style={S.petit} disabled={occupe} onClick={() => dec('a-examiner')} data-decision="a-examiner">À examiner</button>}
+            {a.statut !== 'achetee' && a.statut !== 'refusee' && <button type="button" style={S.petit} disabled={occupe} onClick={() => dec('achetee')} data-decision="achetee">Je l'ai achetée</button>}
+            {a.statut !== 'refusee' && !refus && <button type="button" style={S.petit} disabled={occupe} onClick={() => setRefus(true)} data-decision="refuser">Refuser</button>}
+            {a.statut !== 'nouvelle' && <button type="button" style={S.petit} disabled={occupe} onClick={() => dec('nouvelle')} data-decision="remettre">Remettre</button>}
+            <button type="button" style={S.petit} onClick={() => setNote(note == null ? (a.note || '') : null)} data-decision="note">Note</button>
+            <button type="button" style={S.petit} onClick={() => setRenta(!renta)} aria-expanded={renta} data-ouvrir-renta="">Rentabilité</button>
           </div>
         )}
         {refus && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }} data-motifs="">
-            {Object.entries(MOTIFS_REFUS).map(([k, lib]) => <button key={k} type="button" style={S.bouton} disabled={occupe} onClick={() => { setRefus(false); dec('refusee', { motif: k }); }} data-motif={k}>{lib}</button>)}
-            <button type="button" style={S.bouton} onClick={() => setRefus(false)}>Annuler</button>
+            {Object.entries(MOTIFS_REFUS).map(([k, lib]) => <button key={k} type="button" style={S.petit} disabled={occupe} onClick={() => { setRefus(false); dec('refusee', { motif: k }); }} data-motif={k}>{lib}</button>)}
+            <button type="button" style={S.petit} onClick={() => setRefus(false)}>Annuler</button>
           </div>
         )}
         {note != null && (
@@ -260,7 +270,7 @@ function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, 
 }
 
 // ── LA LISTE DES ANNONCES D'UNE RECHERCHE ────────────────────────────────────
-function Annonces({ C, res, maintenant, onDecision, ventes, modeleDe, occupe, lectureSeule }) {
+function Annonces({ C, res, maintenant, onDecision, ventes, modeleDe, occupe, lectureSeule, recherche }) {
   const S = styles(C);
   const toutes = (res && res.annonces) || [];
   const groupes = [['nouvelle', 'Nouvelles'], ['a-examiner', 'À examiner'], ['achetee', 'Achetées'], ['refusee', 'Refusées']].map(([k, l]) => [k, l, toutes.filter((a) => a.statut === k).length]).filter((g) => g[2] > 0);
@@ -281,13 +291,13 @@ function Annonces({ C, res, maintenant, onDecision, ventes, modeleDe, occupe, le
           <button key={k} type="button" onClick={() => setVue(k)} aria-pressed={k === vueEff} data-groupe={k}
             style={k === vueEff ? { ...S.bouton, borderColor: C.accent, color: C.accent } : S.bouton}>{l} · {n}</button>
         ))}
-        <label style={{ ...S.muet, marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>Tri
+        {toutes.length > 1 && <label style={{ ...S.muet, marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>Tri
           <select value={ordre} onChange={(e) => setOrdre(e.target.value)} style={{ ...S.champ, width: 'auto', minHeight: 32, fontSize: 13, padding: '4px 8px' }} data-tri="">
             {Object.entries(ORDRES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-        </label>
+        </label>}
       </div>
-      {liste.map((a) => <Annonce key={a.id} C={C} a={a} verifAt={res.verif && res.verif.at} maintenant={maintenant} onDecision={onDecision} ventes={ventes} modeleDe={modeleDe} occupe={occupe} lectureSeule={lectureSeule}/>)}
+      {liste.map((a) => <Annonce key={a.id} C={C} a={a} verifAt={res.verif && res.verif.at} maintenant={maintenant} onDecision={onDecision} ventes={ventes} modeleDe={modeleDe} occupe={occupe} lectureSeule={lectureSeule} recherche={recherche}/>)}
     </div>
   );
 }
@@ -298,7 +308,7 @@ function LigneVerif({ C, verif, maintenant, libelles }) {
   const S = styles(C);
   if (!verif) return <div style={S.muet} data-fraicheur="jamais">Jamais vérifiée.</div>;
   if (!verif.ok) return <div style={{ ...S.muet, color: C.warn }} data-fraicheur="echec">Dernière vérification ratée {ilYa(verif.at, maintenant)} : {verif.erreur || 'eBay n\'a pas répondu'}.{verif.derniereReussie ? ` Dernière réussie ${ilYa(verif.derniereReussie, maintenant)}.` : ''}</div>;
-  const ec = Object.entries(verif.ecartees || {}).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n} ${(libelles && libelles[k]) || k}`);
+  const ec = Object.entries(verif.ecartees || {}).sort((x, y) => y[1] - x[1]).map(([k, n]) => { const l = (libelles && libelles[k]) || [k, k]; return `${n} ${Array.isArray(l) ? l[n > 1 ? 1 : 0] : l}`; });
   return (
     <div style={S.muet} data-fraicheur="ok" data-verif-at={verif.at}>
       Vérifiée {ilYa(verif.at, maintenant)}{verif.source === 'matin' ? ' (passage du matin)' : ''} · {verif.lus} lue{verif.lus > 1 ? 's' : ''} · {verif.retenues} retenue{verif.retenues > 1 ? 's' : ''}
@@ -462,8 +472,6 @@ export default function VeilleAchat({ C, headers, confirm, chargerVentes, modele
 
       {recherches.map((r) => {
         const res = resultats[r.id] || { annonces: [], bilan: {} };
-        const b = res.bilan || {};
-        const bilanTxt = [b['a-examiner'] ? `${b['a-examiner']} à examiner` : '', b.achetee ? `${b.achetee} achetée${b.achetee > 1 ? 's' : ''}` : '', b.refusee ? `${b.refusee} refusée${b.refusee > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
         return (
           <article key={r.id} data-recherche={r.id} data-verif={res.verif ? (res.verif.ok ? 'ok' : 'echec') : 'jamais'} data-pause={r.pause ? '1' : '0'} style={S.carte}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -471,7 +479,6 @@ export default function VeilleAchat({ C, headers, confirm, chargerVentes, modele
                 <h3 style={S.titre}>{r.nom}{r.pause && <span style={{ ...S.pastille, marginLeft: 6 }} data-en-pause="">en pause</span>}</h3>
                 <div style={S.muet}>{resume(r)}</div>
                 <LigneVerif C={C} verif={res.verif} maintenant={maintenant} libelles={donnees && donnees.libellesExclusion}/>
-                {bilanTxt && <div style={S.muet} data-bilan-recherche="">{bilanTxt}</div>}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                 <button type="button" style={S.principal} disabled={!!occupe || !ebayDispo} onClick={() => verifier(r)} data-verifier="">{occupe === r.id ? 'Vérification…' : 'Vérifier'}</button>
@@ -488,7 +495,7 @@ export default function VeilleAchat({ C, headers, confirm, chargerVentes, modele
                 </details>
               </div>
             </div>
-            <Annonces C={C} res={res} maintenant={maintenant} onDecision={decider(r.id)} ventes={ventes} modeleDe={modeleDe} occupe={!!occupe}/>
+            <Annonces C={C} res={res} maintenant={maintenant} onDecision={decider(r.id)} ventes={ventes} modeleDe={modeleDe} occupe={!!occupe} recherche={r}/>
           </article>
         );
       })}

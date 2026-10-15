@@ -113,8 +113,9 @@ export function taillesDuTitre(titre) {
   const sansUs = t.replace(reUs, '$1 ');
   // Avant le nombre : ni chiffre ni lettre (« art42 » n'est pas du 42) — une
   // virgule ou un point seulement s'ils ne suivent pas un chiffre (« 1,42 »).
-  // Après : ni chiffre, ni décimale, ni « / », ni une unité (€, cm, ans…).
-  const reEu = /(^|[^0-9a-z.,]|[^0-9][.,])(?:(?:taille|pointure|size|t|eu|eur|fr)\s*[:.]?\s*)?(3[4-9]|4[0-9]|5[0-2])(?:(\.5)|\s(1\/2|1\/3|2\/3)(?![0-9]))?(?![0-9]|[.,][0-9]|\/[0-9]|\s*(?:€|eur\b|euros?\b|cm\b|mm\b|%|ans\b))/g;
+  // Après : ni chiffre, ni décimale, ni une unité (€, cm, ans…). « 42/43 » rend
+  // les DEUX pointures (le titre en porte deux : c'est signalé).
+  const reEu = /(^|[^0-9a-z.,]|[^0-9][.,])(?:(?:taille|pointure|size|t|eu|eur|fr)\s*[:.]?\s*)?(3[4-9]|4[0-9]|5[0-2])(?:(\.5)|\s(1\/2|1\/3|2\/3)(?![0-9]))?(?![0-9]|[.,][0-9]|\s*(?:€|eur\b|euros?\b|cm\b|mm\b|%|ans\b))/g;
   while ((m = reEu.exec(sansUs))) eu.add(m[2] + (m[3] ? '.5' : (m[4] ? FRACTION[m[4]] : '')));
   return { eu: [...eu], autres: [...autres] };
 }
@@ -255,8 +256,10 @@ export function analyserAnnonce(a, r) {
   const titre = a.titre || '';
   // Le modèle (ou un de ses autres noms) DOIT être dans le titre.
   const nom = (r.noms || []).find((n) => titrePorte(titre, n));
-  if (nom) raisons.push(`« ${nom} » dans le titre`); else exclure('nom', 'modèle absent du titre');
-  if (r.marque) { if (titrePorte(titre, r.marque)) raisons.push(`marque ${r.marque}`); else inverifiables.push('marque absente du titre'); }
+  // Les raisons sont des faits COURTS, lus dans l'annonce : « Spezial » ·
+  // Adidas · pointure 42 · Occasion · ≤ 60 € livraison comprise.
+  if (nom) raisons.push(`« ${nom} »`); else exclure('nom', 'modèle absent du titre');
+  if (r.marque) { if (titrePorte(titre, r.marque)) raisons.push(r.marque); else inverifiables.push('marque absente du titre'); }
   const mot = (r.motsExclus || []).find((m) => titrePorte(titre, m));
   if (mot) exclure('mot', `mot exclu « ${mot} »`);
   const lot = estUnLot(titre);
@@ -274,7 +277,7 @@ export function analyserAnnonce(a, r) {
   if ((r.etats || []).length) {
     const permis = r.etats.flatMap((e) => (ETATS_VEILLE[e] ? ETATS_VEILLE[e].ids : []));
     if (!a.etatId) inverifiables.push('état non indiqué');
-    else if (permis.includes(a.etatId)) raisons.push(`état : ${a.etat || a.etatId}`);
+    else if (permis.includes(a.etatId)) raisons.push(a.etat || `état ${a.etatId}`);
     else exclure('etat', `état « ${a.etat || a.etatId} »`);
   }
   if (a.achat === 'encheres') { if (r.encheres === 'aussi') drapeaux.push('encheres'); else exclure('encheres', 'une enchère'); }
@@ -290,7 +293,7 @@ export function analyserAnnonce(a, r) {
   } else {
     total = a.prix + a.livraison; totalConfirme = true;
     if (total > r.prixMax) exclure('prix', `${eurosTexte(total)} livraison comprise`);
-    else raisons.push(`${eurosTexte(total)} livraison comprise ≤ ${eurosTexte(r.prixMax)}`);
+    else raisons.push(`≤ ${eurosTexte(r.prixMax)} livraison comprise`);
   }
   if (!a.image) drapeaux.push('sans-photo');
   return { garde: !exclusion, exclusion, raisons, inverifiables, drapeaux, total, totalConfirme };
@@ -298,7 +301,7 @@ export function analyserAnnonce(a, r) {
 
 // Les écartées, comptées par cause : « 62 autre pointure, 20 lots » dit comment
 // resserrer ou élargir une recherche (COMPLEMENT-02) sans montrer 80 annonces.
-export const LIBELLES_EXCLUSION = { nom: 'modèle absent', mot: 'mot exclu', lot: 'lots', 'pas-lot': 'pas des lots', taille: 'autre pointure', etat: 'autre état', encheres: 'enchères', pays: 'autre pays', prix: 'trop cher', devise: 'autre devise' };
+export const LIBELLES_EXCLUSION = { nom: ['modèle absent', 'modèle absent'], mot: ['mot exclu', 'mots exclus'], lot: ['lot', 'lots'], 'pas-lot': ['pas un lot', 'pas des lots'], taille: ['autre pointure', 'autres pointures'], etat: ['autre état', 'autres états'], encheres: ['enchère', 'enchères'], pays: ['autre pays', 'autres pays'], prix: ['trop cher', 'trop chères'], devise: ['autre devise', 'autres devises'] };
 
 // ── UNE VÉRIFICATION ─────────────────────────────────────────────────────────
 // `lectures` : ce qu'eBay a rendu pour chaque requête : { ok, items[], total,
@@ -394,13 +397,20 @@ export function fusionnerVerification(d, rid, jugement, maintenant, source, r) {
   }
   const ids = Object.keys(annonces);
   if (ids.length > VEILLE_ANNONCES_MAX) {
+    // Dans l'ordre : les nouvelles que cette lecture n'a pas revues, le détail
+    // des refus les plus anciens, puis les nouvelles mises en ligne le plus tôt
+    // (on garde les annonces les plus RÉCENTES : c'est ce qu'une veille guette).
     const vieux = (k) => annonces[k].revuLe || annonces[k].vuLe || 0;
+    const creee = (k) => Date.parse(annonces[k].cree || '') || 0;
+    const fraiches = new Set(nouvelles);
     const jetables = [
-      ...ids.filter((k) => annonces[k].statut === 'nouvelle' && !nouvelles.includes(k)).sort((x, y) => vieux(x) - vieux(y)),
+      ...ids.filter((k) => annonces[k].statut === 'nouvelle' && annonces[k].revuLe !== maintenant).sort((x, y) => vieux(x) - vieux(y)),
       ...ids.filter((k) => annonces[k].statut === 'refusee').sort((x, y) => (annonces[x].decideLe || 0) - (annonces[y].decideLe || 0)),
+      ...ids.filter((k) => annonces[k].statut === 'nouvelle' && annonces[k].revuLe === maintenant).sort((x, y) => (creee(x) - creee(y)) || (fraiches.has(x) - fraiches.has(y))),
     ];
     for (const k of jetables.slice(0, ids.length - VEILLE_ANNONCES_MAX)) delete annonces[k];
   }
+  for (let i = nouvelles.length - 1; i >= 0; i--) if (!annonces[nouvelles[i]]) nouvelles.splice(i, 1);
   pr[rid] = {
     annonces, refusees,
     verif: { at: maintenant, ok: true, partiel: !!jugement.partiel, lus: jugement.lus, totalEbay: jugement.totalEbay, complet: !!jugement.complet, retenues: (jugement.retenues || []).length, ecartees: jugement.ecartees || {}, source: source || 'clic' },
