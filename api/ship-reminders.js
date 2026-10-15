@@ -25,6 +25,10 @@ import { aExpedier } from './widget.js';
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+// Le régime fiscal du vendeur (profil « Mon entreprise ») : le rappel URSSAF du
+// 1er parle d'autoentrepreneur.urssaf.fr — il n'a de sens qu'en micro (§11, la
+// même règle que l'app : `regimeEffectif`).
+import { regimeEffectif } from './_lib/facturation.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -299,6 +303,16 @@ async function traiterVendeur() {
     try {
       const mois = today.slice(0, 7);
       if (today.endsWith('-01')) {
+        // ⚠️ « Déclare ton CA sur autoentrepreneur.urssaf.fr » n'a de sens que
+        // pour une MICRO-entreprise : une société ou une EI au réel recevait ce
+        // rappel quand même (16 octobre). Le régime se lit dans `main` (déjà
+        // lu ci-dessus) ; `main` illisible = pas su ⇒ on se tait — envoyer le
+        // MAUVAIS geste à une société coûte plus qu'un rappel manqué un mois.
+        // Pas de profil déclaré ⇒ micro (le comportement d'avant, inchangé).
+        const regime = mLu === undefined ? null : regimeEffectif(m.vrm_profil_entreprise, m.vinted_regime);
+        if (regime === null) urssaf = 'profil pas lu — rien envoyé';
+        else if (regime !== 'micro') urssaf = 'pas une micro-entreprise — rien envoyé';
+        else {
         const deja = (await getRow('urssaf_reminder_dedup')) || {};
         if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
           await sendPushToAll({
@@ -309,6 +323,7 @@ async function traiterVendeur() {
           });
           await ecrireDedup('urssaf_reminder_dedup', { mois });
           urssaf = 'envoyé';
+        }
         }
       }
     } catch (_) { urssaf = 'échec'; }

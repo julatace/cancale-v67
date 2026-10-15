@@ -2791,6 +2791,31 @@ const fetchProInvoices = async ({metadata=false}={}) => {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   } catch (_) { return []; }
 };
+// (16 octobre) Une vente Pro arrivée pendant que le profil était incomplet est
+// GARDÉE par le serveur (ligne `email_invoice_*`, status 'profil', aucune
+// facture). C'est l'app qui l'émet, sur SON clic, une fois le profil complété —
+// puis la ligne devient une vraie ligne d'envoi (number + html, status 'draft').
+// On ne remplace la ligne QUE si elle est encore 'profil' (filtre serveur) : un
+// rejeu de l'email qui l'aurait déjà émise entre-temps n'est pas écrasé.
+const majLigneEnvoiApresEmission = async (inv, doc, html) => {
+  if (!inv || !inv._id) return false;
+  try {
+    const base = `${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(inv._id)}`;
+    const read = await fetch(base + '&select=id,data', { headers: sbAuth() });
+    if (!read.ok) return false;
+    const rows = await read.json();
+    const fresh = Array.isArray(rows) && rows.length === 1 ? rows[0].data : null;
+    if (!fresh || fresh.type !== 'facture_pro') return false;
+    if (fresh.status !== 'profil') return true;            // déjà émise par un rejeu : rien à écrire
+    const res = await fetch(base + `&data->>status=eq.profil&select=id`, {
+      method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data: { ...fresh, status: 'draft', number: doc.numero, document: FACT.idDocument(doc.annee, doc.rang), html, manque: null } }),
+    });
+    if (!res.ok) return false;
+    const changed = await res.json().catch(() => null);
+    return Array.isArray(changed) && changed.length === 1;
+  } catch (_) { return false; }
+};
 // Relire avant l'envoi et modifier seulement un brouillon encore identique.
 const setProInvoiceStatus = async (inv, status) => {
   if(status!=='queued' || !inv?._id || !inv.buyerEmail || inv.type!=='facture_pro')return false;
@@ -16284,6 +16309,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     return v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null } : null;
   }, [liveStats]);
   const TAUX_URSSAF = tauxUrssaf()/100;
+  // ── LE RÉGIME FISCAL DE CET ÉCRAN (16 octobre) ────────────────────────────
+  // « À payer (13,5 %) », « Déclarer sur l'URSSAF », « (versement libératoire) »
+  // s'affichaient pour TOUT LE MONDE — société et EI au réel comprises — alors
+  // que le profil « Mon entreprise » du même lot dit « tes cotisations ne sont
+  // pas un % du CA : VRM ne les estime pas » : deux verdicts sur une notion
+  // (§11). La règle est `FACT.regimeEffectif` (la même que le serveur) ; pas de
+  // profil déclaré ⇒ micro, comme avant. §5.49 : réglage synchronisé lu au
+  // montage ⇒ rattrapé par `onCloudReady`, et relu à chaque `vrm:save`.
+  const [fiscalBrut, setFiscalBrut] = useState(() => ({ p: load(FACT.PROFIL_CLE, null), r: load('vinted_regime', null) }));
+  useEffect(() => onCloudReady(() => setFiscalBrut(v => (v.p == null && v.r == null) ? { p: load(FACT.PROFIL_CLE, null), r: load('vinted_regime', null) } : v)), []);
+  useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === FACT.PROFIL_CLE || k === 'vinted_regime') setFiscalBrut({ p: load(FACT.PROFIL_CLE, null), r: load('vinted_regime', null) }); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const fiscalDash = useMemo(() => {
+    const p = FACT.normProfil(fiscalBrut.p, { regime: fiscalBrut.r });
+    const regime = FACT.regimeEffectif(fiscalBrut.p, fiscalBrut.r);
+    // `vl` ne vaut que pour une micro : true (déclaré), false (déclaré non),
+    // null (jamais dit) — « pas su » ne s'écrit pas « versement libératoire ».
+    return { regime, micro: regime === 'micro', vl: p.forme === 'micro' ? p.vl : null };
+  }, [fiscalBrut]);
   // ⚠️ SANS LIGNE PUBLIÉE, ON NE RETOMBE PLUS SUR L'ARCHIVE (vide depuis
   //    juillet 2026 → « 0,00 € à payer » sur un appareil neuf). `null` = on ne
   //    sait pas encore : la carte écrit un tiret et dit où ça se calcule.
@@ -16498,8 +16544,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Téléchargement du récap comptable MENSUEL en CSV
   const exportCompta=()=>{
     try{
-      const rows=[['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'Net estime']];
-      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit==null?'':m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
+      // (16 octobre) Hors micro, « Cotisations 13,5 % » serait un chiffre
+      // inventé — l'export dit la raison, il ne chiffre pas (même règle que
+      // l'écran et que les rapports : au réel, pas un % du CA).
+      const micro = fiscalDash.micro;
+      const rows=[['Mois','Ventes','CA finalise','Benefice', micro?`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`:'Cotisations (pas un % du CA - non estimees)', micro?'Net estime':'']];
+      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit==null?'':m.profit.toFixed(2), micro?m.urssaf.toFixed(2):'', micro?m.net.toFixed(2):'']));
       const csv=rows.map(r=>r.join(';')).join('\n');
       const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -16751,14 +16801,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)}</div>
             {liveStats&&liveStats.caMois!=null&&<div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>saisis tes prix d'achat</div>}
           </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
-          </div>
+          {/* (16 octobre) L'estimation « % du CA » n'existe QUE pour une micro.
+              Société ou EI au réel : la carte écrivait quand même « À payer
+              (13,5 %) 135,00 € » — un montant inventé sur l'écran où il décide
+              ce qu'il verse. Même mot que le rapport comptable (§11) :
+              « Cotisations — · au réel : pas un % du CA ». */}
+          {fiscalDash.micro ? <>
+            <div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
+            </div>
+          </> : (
+            <div data-cotisations-regime={fiscalDash.regime}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Cotisations</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>—</div>
+              <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>{fiscalDash.regime==='marge'?'pas un % du CA — le détail est dans le rapport comptable':'au réel : pas un % du CA'}</div>
+            </div>
+          )}
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
           {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
@@ -16785,7 +16848,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               const decl = (urssafInfo && urssafInfo.declare) || '';
               return <span data-urssaf-declare={decl}>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, <b>hors {nA} vente{nA>1?'s':''} ({fmt(caA)})</b> versée{nA>1?'s':''} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} — {nA>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici</span>}
-                . C'est la somme à verser à la fin du mois (versement libératoire).
+                {/* (16 octobre) « (versement libératoire) » n'est vrai que s'il
+                    l'a DÉCLARÉ (p.vl === true) : un micro sans VL lisait que son
+                    taux le comprenait, une société lisait une somme à verser
+                    qui n'existe pas. La phrase suit la donnée. */}
+                . {fiscalDash.micro
+                  ? (fiscalDash.vl === true
+                    ? <>C'est la somme à verser à la fin du mois (versement libératoire).</>
+                    : <>C'est la somme de cotisations à verser à la fin du mois.</>)
+                  : <>Tes cotisations ne se calculent pas sur ce chiffre : VRM ne les estime pas.</>}
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
               </span>;
             })()}
@@ -16820,10 +16891,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             silence. L'écart est de quelques jours à quelques semaines : on le
             DIT au lieu de laisser croire à un chiffre officiel. */}
         <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. {fiscalDash.micro ? <>Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</> : <>Je ne suis pas comptable : fais valider tes chiffres par le tien.</>}
         </div>
-        {/* Prochaine échéance de DÉCLARATION (rappel) */}
-        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+        {/* Prochaine échéance de DÉCLARATION (rappel) — MICRO seulement : la
+            déclaration mensuelle/trimestrielle sur autoentrepreneur.urssaf.fr
+            n'existe pas au réel ni pour une société (16 octobre : le bouton
+            « Déclarer sur l'URSSAF → » s'affichait pour tout le monde). */}
+        {fiscalDash.micro && <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
             <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
             <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
@@ -16849,7 +16923,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               </div>
             );
           })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
-        </div>
+        </div>}
       </Card>
 
       {/* Barre de progression du garage */}
@@ -17173,7 +17247,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
+                  {['Mois','Ventes','CA finalisé','Bénéfice',fiscalDash.micro?`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`:'Cotisations',fiscalDash.micro?'Net estimé':'Net'].map(h=>(
                     <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -17185,15 +17259,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500}}>{fmt(m.ca)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.accent}}>{m.profit==null?'—':fmt(m.profit)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(m.net)}</td>
+                    {/* (16 octobre) Hors micro, « 135,00 € » de cotisations serait
+                        un chiffre inventé : un tiret, la raison est sous le tableau. */}
+                    <td style={{padding:'8px 10px',textAlign:'right',color:fiscalDash.micro?C.warn:C.muted}}>{fiscalDash.micro?fmt(m.urssaf):'—'}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:fiscalDash.micro?C.accent:C.muted,fontWeight:500}}>{fiscalDash.micro?fmt(m.net):'—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. {fiscalDash.micro ? <>Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.</> : <>{fiscalDash.regime==='marge'?'Régime de la marge':'Au réel'}, tes cotisations ne sont pas un % du CA : VRM ne les estime pas.</>}
           </div>
         </Card>
       )}
@@ -17931,11 +18007,47 @@ const jetonFacture = () => {
   try { if (crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, ''); } catch (_) {}
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 };
-const emettreDocumentFacture = async (entree) => {
+// La facture VIVANTE d'une source (`vinted:{tx}`, `email_sale_{key}`) : celle
+// qui n'est pas entièrement annulée par ses avoirs. Trois états — `null` pas
+// su · `false` aucune · le document. (16 octobre : l'app n'avait AUCUN contrôle
+// par sourceId — la même vente pouvait recevoir deux factures.)
+const factureVivanteParSource = async (sourceId) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.facture_*&meta->>sourceId=eq.${encodeURIComponent(sourceId)}&select=id,data`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const factures = j.filter(x => x && x.data && x.data.type === 'facture' && x.data.numero);
+    for (const f of factures) {
+      const ra = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.facture_*&meta->>origineNumero=eq.${encodeURIComponent(f.data.numero)}&select=id,t:data->>type,ttcC:data->ttcC`, { headers: sbAuth() });
+      if (!ra.ok) return null;                              // pas su ⇒ on n'émet pas
+      const av = await ra.json();
+      if (!Array.isArray(av)) return null;
+      const credite = av.filter(x => x && x.t === 'avoir').reduce((s, x) => s + (Number(x.ttcC) || 0), 0);
+      if (credite < (Number(f.data.ttcC) || 0)) return { ...f.data, _id: f.id };   // encore vivante
+    }
+    return false;
+  } catch (_) { return null; }
+};
+// `entree.jeton` : STABLE, posé par le formulaire — après « la base n'a pas
+// confirmé l'écriture », le second clic retrouve le document déjà écrit au lieu
+// d'en émettre un deuxième (16 octobre). `anciennes` : les factures d'avant le
+// 15 octobre (`vinted_invoices`) — leurs numéros « AAAA-NNNNNN » de la même
+// année ne sont jamais redonnés.
+const emettreDocumentFacture = async (entree, { anciennes } = {}) => {
   const annee = FACT.anneeParis();
-  const jeton = jetonFacture();
+  const jeton = entree.jeton || jetonFacture();
+  // Une vente n'a qu'UNE facture vivante : une source déjà facturée (et pas
+  // entièrement annulée par un avoir) ne se refacture pas — « cette vente a
+  // déjà sa facture n° X ». Un avoir, lui, peut citer sa facture plusieurs fois.
+  if (entree.type !== 'avoir' && entree.sourceId) {
+    const v = await factureVivanteParSource(entree.sourceId);
+    if (v === null) return { ok: false, raison: 'lecture' };
+    if (v) return { ok: false, raison: 'source', doc: v };
+  }
   return FACT.emettre({
-    annee,
+    annee, jeton,
+    reserves: FACT.rangsReserves(anciennes, annee),
     lireIds: async (a) => { const r = await lireTout(`id=like.facture_${a}_*&select=id`, { strict: true }); return r === null ? null : r.map(x => x.id); },
     preparer: async (rang) => {
       const { doc } = FACT.construireDocument({ ...entree, annee, rang, emiseLe: new Date().toISOString(), jeton, creeVia: 'app' });
@@ -18022,10 +18134,45 @@ function Invoices({ invoices }) {
     if (busy) return;
     setBusy(true);
     try {
-      const r = await emettreDocumentFacture(entree);
-      if (r.ok) { toast(`${libelle} n° ${r.doc.numero} émis${libelle === 'Facture' ? 'e' : ''}`); setForm(null); }
+      const r = await emettreDocumentFacture(entree, { anciennes });
+      // `deja` : le document de CE formulaire existait déjà (écriture
+      // « incertaine » du clic précédent, retrouvée par son jeton) — on le dit,
+      // on ferme, on n'émet jamais deux fois (16 octobre).
+      if (r.ok && r.deja) { toast(`${libelle} n° ${r.doc.numero} déjà émis${libelle === 'Facture' ? 'e' : ''} — rien de nouveau n'a été écrit.`); setForm(null); }
+      else if (r.ok) { toast(`${libelle} n° ${r.doc.numero} émis${libelle === 'Facture' ? 'e' : ''}`); setForm(null); }
+      else if (r.raison === 'source' && r.doc) { toast(`Cette vente a déjà sa facture n° ${r.doc.numero} — rien n'a été émis. Une erreur se corrige par un avoir.`); setForm(null); }
       else toast(RAISON_EMISSION[r.raison] || 'Rien n\'a été émis.');
       setDocs(await lireDocumentsFactures());
+    } finally { setBusy(false); }
+  };
+  // Émettre la facture d'une vente GARDÉE « en attente du profil » (serveur,
+  // 16 octobre) : même boucle d'émission, sourceId de la vente (une seule
+  // facture, même si on reclique), puis la ligne d'envoi devient réelle.
+  const emettreAttente = async (inv) => {
+    if (busy || !peutEmettre) return;
+    const ttcC = FACT.centimesDe(inv.prix);
+    if (!isFinite(ttcC) || ttcC <= 0) { toast('Le prix de cette vente est illisible — émets sa facture à la main (+ Nouvelle facture).'); return; }
+    if (!await askConfirm({ title: `Émettre la facture de « ${inv.designation || 'cette vente'} » (${FACT.eurosDe(ttcC)}) ?`, desc: 'Elle prend le numéro suivant de ta suite et ne se modifie plus.', ok: 'Émettre' })) return;
+    setBusy(true);
+    try {
+      const entree = { type: 'facture', jeton: jetonFacture(), profil, tauxTva: tva, ttcC,
+        designation: inv.designation || 'Article Vinted', dateVente: String(inv.createdAt || '').slice(0, 10) || FACT.jourParis(),
+        refPaire: inv.numero || '', transaction: '',
+        client: { nom: inv.buyerName || '', email: inv.buyerEmail || '', adresse: inv.buyerAddress || '' },
+        sourceId: inv.sourceId || '' };
+      const r = await emettreDocumentFacture(entree, { anciennes });
+      const doc = r.ok ? r.doc : (r.raison === 'source' ? r.doc : null);
+      if (!doc) { toast(RAISON_EMISSION[r.raison] || 'Rien n\'a été émis.'); return; }
+      // La ligne d'envoi : le HTML de la facture (le même que le serveur, §11),
+      // avec le logo de la Facturation Pro s'il existe.
+      const cfg = (await lireProFacturePourReprise()) || {};
+      const html = FACT.corpsHtmlDocument(doc, { logoSrc: cfg.logo ? 'cid:logoFacture' : '' });
+      const maj = await majLigneEnvoiApresEmission(inv, doc, html);
+      toast(r.raison === 'source'
+        ? `Cette vente avait déjà sa facture n° ${doc.numero} — la ligne d'envoi est ${maj ? 'reliée' : 'à relier (réessaie)'}.`
+        : `Facture n° ${doc.numero} émise${maj ? '' : ' — la ligne d\'envoi n\'a pas pu être mise à jour, réessaie'}.`);
+      setDocs(await lireDocumentsFactures());
+      setProInvs(await fetchProInvoices());
     } finally { setBusy(false); }
   };
   const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
@@ -18122,15 +18269,22 @@ function Invoices({ invoices }) {
           <div style={{ fontSize: 12, fontWeight: 600, color: C.text, margin: '0 0 8px' }}>Envois par email ({proInvs.length})</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {proInvs.slice(0, 20).map(inv => {
-              const lbl = inv.status === 'sent' ? 'envoyée' : inv.status === 'queued' ? 'envoi en cours' : 'à envoyer';
+              // 'profil' (16 octobre) : la vente est arrivée profil incomplet —
+              // AUCUNE facture n'existe encore, c'est son clic qui l'émet.
+              const attente = inv.status === 'profil';
+              const lbl = attente ? 'en attente de ton profil' : inv.status === 'sent' ? 'envoyée' : inv.status === 'queued' ? 'envoi en cours' : 'à envoyer';
               return (
-                <div key={inv._id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, flexWrap: 'wrap' }}>
+                <div key={inv._id} data-envoi-statut={inv.status || 'draft'} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{inv.number} <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginLeft: 4 }}>{lbl}</span></div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{attente ? 'Sans numéro' : inv.number} <span style={{ fontSize: 11, fontWeight: 600, color: attente ? C.warn : C.muted, marginLeft: 4 }}>{lbl}</span></div>
                     <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>{inv.designation || 'Article'} · {inv.prix} € · {inv.buyerName || inv.buyerEmail}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button type="button" onClick={() => { ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html || '').replace('cid:logoFacture', '')}</body></html>`); }} style={{ ...btn(false), padding: '5px 10px', fontSize: 12 }}>Voir</button>
+                    {attente && (
+                      <button type="button" data-emettre-attente={inv._id} disabled={!peutEmettre} title={raisonGrise || 'Émettre la facture de cette vente'} onClick={() => emettreAttente(inv)}
+                        style={{ ...btn(true), padding: '5px 10px', fontSize: 12, opacity: peutEmettre ? 1 : 0.45, cursor: peutEmettre ? 'pointer' : 'default' }}>Émettre sa facture</button>
+                    )}
+                    {!attente && <button type="button" onClick={() => { ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html || '').replace('cid:logoFacture', '')}</body></html>`); }} style={{ ...btn(false), padding: '5px 10px', fontSize: 12 }}>Voir</button>}
                     {inv.status === 'draft' && inv.buyerEmail && (
                       <button type="button" onClick={async () => {
                         if (!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
@@ -18180,10 +18334,17 @@ function Invoices({ invoices }) {
 function FactureForm({ type, origine, profil, tauxTva, busy, etatAvoir, onClose, onEmettre }) {
   const av = type === 'avoir';
   const lo = (origine && origine.lignes && origine.lignes[0]) || {};
+  // La désignation d'un avoir est L'ARTICLE, pas « Avoir sur la facture X — … » :
+  // le document cite déjà sa facture d'origine (« Sur la facture N° X »), et la
+  // liste portait la même phrase deux fois (badge + désignation, §7, 16 octobre).
   const [d, setD] = useState(() => av
-    ? { designation: `Avoir sur la facture ${origine.numero} — ${lo.designation || ''}`.trim(), prix: etatAvoir ? (etatAvoir.resteC / 100).toFixed(2).replace('.', ',') : '', motif: '' }
+    ? { designation: lo.designation || '', prix: etatAvoir ? (etatAvoir.resteC / 100).toFixed(2).replace('.', ',') : '', motif: '' }
     : { designation: '', prix: '', dateVente: FACT.jourParis(), refPaire: '', transaction: '', nom: '', email: '', adresse: '' });
   const [err, setErr] = useState('');
+  // UN jeton par formulaire, PAS par clic : après « la base n'a pas confirmé
+  // l'écriture », le second clic du même formulaire retrouve le document déjà
+  // écrit (par son jeton) au lieu d'en émettre un deuxième (16 octobre).
+  const [jeton] = useState(() => jetonFacture());
   // Un avoir suit le régime de SA facture (le profil a pu changer depuis).
   const profilDoc = av ? { ...profil, tva: origine.mode === 'franchise' ? 'franchise' : 'assujetti', marge: origine.mode === 'marge' } : profil;
   const tauxDoc = av ? origine.tauxTva : tauxTva;
@@ -18195,16 +18356,19 @@ function FactureForm({ type, origine, profil, tauxTva, busy, etatAvoir, onClose,
     setErr('');
     if (!d.designation.trim()) { setErr('La désignation est obligatoire.'); return; }
     if (!mt) { setErr('Montant invalide.'); return; }
+    // Le NOM du client fait partie des mentions de la facture : sans lui, le
+    // document imprimait « Client » à la place du nom (16 octobre).
+    if (!av && !d.nom.trim()) { setErr('Le nom du client est obligatoire : il apparaît sur la facture.'); return; }
     if (av && etatAvoir && ttcC > etatAvoir.resteC) { setErr(`L'avoir ne peut pas dépasser ${FACT.eurosDe(etatAvoir.resteC)} (ce qui reste de la facture).`); return; }
     const ok = await askConfirm(av
       ? { title: `Émettre un avoir de ${FACT.eurosDe(ttcC)} ?`, desc: `Sur la facture ${origine.numero}. Il prend le numéro suivant de ta suite et ne se modifie plus.`, ok: 'Émettre' }
       : { title: 'Émettre cette facture ?', desc: 'Une fois émise, elle ne se modifie ni ne se supprime : une erreur se corrigera par un avoir.', ok: 'Émettre' });
     if (!ok) return;
     if (av) {
-      await onEmettre({ type: 'avoir', profil: profilDoc, tauxTva: tauxDoc, ttcC, designation: d.designation, motif: d.motif, origineNumero: origine.numero, origineJour: origine.jour,
+      await onEmettre({ type: 'avoir', jeton, profil: profilDoc, tauxTva: tauxDoc, ttcC, designation: d.designation, motif: d.motif, origineNumero: origine.numero, origineJour: origine.jour,
         client: origine.client, refPaire: lo.refPaire, transaction: lo.transaction, dateVente: origine.dateVente, sourceId: `avoir:${origine.numero}` }, 'Avoir');
     } else {
-      await onEmettre({ type: 'facture', profil, tauxTva, ttcC, designation: d.designation, dateVente: d.dateVente, refPaire: d.refPaire, transaction: d.transaction,
+      await onEmettre({ type: 'facture', jeton, profil, tauxTva, ttcC, designation: d.designation, dateVente: d.dateVente, refPaire: d.refPaire, transaction: d.transaction,
         client: { nom: d.nom, email: d.email, adresse: d.adresse }, sourceId: d.transaction ? `vinted:${d.transaction}` : '' }, 'Facture');
     }
   };
@@ -18226,9 +18390,9 @@ function FactureForm({ type, origine, profil, tauxTva, busy, etatAvoir, onClose,
             <Field label="Réf. paire (facultatif)"><input value={d.refPaire} onChange={set('refPaire')} style={champ}/></Field>
             <Field label="N° de transaction (facultatif)"><input value={d.transaction} onChange={set('transaction')} inputMode="numeric" style={champ}/></Field>
           </div>
-          <Field label="Client"><input value={d.nom} onChange={set('nom')} placeholder="Prénom Nom" style={champ}/></Field>
+          <Field label="Nom du client"><input value={d.nom} onChange={set('nom')} placeholder="Prénom Nom" style={champ}/></Field>
           <Field label="Email du client (facultatif)"><input type="email" value={d.email} onChange={set('email')} style={champ}/></Field>
-          <Field label="Adresse du client (facultatif)"><input value={d.adresse} onChange={set('adresse')} style={champ}/></Field>
+          <Field label="Adresse du client (mention de la facture — mets-la si tu l'as)"><input value={d.adresse} onChange={set('adresse')} style={champ}/></Field>
         </>}
         {/* Ce qui sera écrit, tiré du régime — jamais une mention tapée à la main. */}
         <div data-apercu-montants style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
@@ -27901,7 +28065,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    // (16 octobre) Au réel, l'écran dit « Cotisations — » mais le CSV écrivait
+    // « Estimation cotisations (13,5%) » : le document qui part chez le
+    // comptable portait un chiffre que l'écran refuse d'afficher.
+    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); if (R.regime==='reel') L.push(['Cotisations','au reel : pas un % du CA - non estimees']); else L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     // ⚠️ Le document part chez un comptable : ce qui n'y est PAS encore doit
     // partir avec lui, sinon un mois se présente comme terminé (§5.84).
@@ -27932,7 +28099,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    // (16 octobre) Même règle que l'écran : au réel, aucune cotisation estimée.
+    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); if (R.regime==='reel') kv('Cotisations', 'au reel : pas un % du CA - non estimees'); else kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
@@ -28110,6 +28278,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
+    // (16 octobre) Même règle que l'écran du bilan : au réel, « — », jamais estimées.
+    else if (R.regime==='reel') { L.push(['Cotisations','au reel : pas un % du CA - non estimees']); }
     else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
     L.push([`Resultat apres charges (benefice net - charges)`,R.resultatCharges.toFixed(2)]);
     if (R.nbCout<R.nb) L.push([`  benefice net sur ${R.nbCout}/${R.nb} ventes au cout d'achat connu`]);
@@ -28139,7 +28309,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    // (16 octobre) Même règle que l'écran du bilan : au réel, « — », jamais estimées.
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); if (R.regime==='reel') kv('Cotisations', 'au reel : pas un % du CA - non estimees'); else kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
@@ -38151,7 +38322,11 @@ function ProfilEntreprise({ ouvertParDefaut }) {
   const [coordOuvert, setCoordOuvert] = useState(!!ouvertParDefaut);
   const [reglesOuvert, setReglesOuvert] = useState(false);
   const eSiren = FACT.etatSiren(siren);
-  const manque = FACT.manquePourFacturer(p, { tauxTva: tva });
+  const manqueDetail = FACT.manquePourFacturerDetaille(p, { tauxTva: tva });
+  const manque = manqueDetail.map(x => x.texte);
+  // L'en-tête « Coordonnées · N à compléter » ne compte que les COORDONNÉES :
+  // il comptait « ton régime de TVA », qui n'en est pas une (16 octobre).
+  const manqueCoord = manqueDetail.filter(x => x.coord);
   const regles = FACT.reglesDuProfil(p, { tauxUrssaf: parseFloat(String(txUrs).replace(',', '.')) });
   const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: C.bg, color: C.text, outline: 'none', minWidth: 0 };
   const lab = { fontSize: 12, fontWeight: 600, color: C.text };
@@ -38172,9 +38347,16 @@ function ProfilEntreprise({ ouvertParDefaut }) {
       <span style={lab}>{titre}</span>{contenu}
     </div>
   );
-  const texteChamp = (cle, placeholder, opts = {}) => (
-    <input value={p[cle] || ''} disabled={!pret} placeholder={placeholder} inputMode={opts.inputMode} aria-label={placeholder} data-champ={cle}
-      onChange={e => maj({ [cle]: opts.norm ? opts.norm(e.target.value) : e.target.value })} style={champ}/>
+  // Un LIBELLÉ visible au-dessus de chaque champ : le placeholder disparaît dès
+  // que le champ est rempli — « Saint-Malo » ne disait plus si c'était la ville
+  // de l'adresse ou celle du RCS, et « Code postal » sortait coupé (« Code
+  // posta ») à 390 px (16 octobre). Le placeholder redevient un EXEMPLE.
+  const texteChamp = (cle, libelle, opts = {}) => (
+    <label data-libelle-champ={cle} style={{ display: 'grid', gap: 3, minWidth: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>{libelle}</span>
+      <input value={p[cle] || ''} disabled={!pret} placeholder={opts.exemple || ''} inputMode={opts.inputMode} aria-label={libelle} data-champ={cle}
+        onChange={e => maj({ [cle]: opts.norm ? opts.norm(e.target.value) : e.target.value })} style={champ}/>
+    </label>
   );
   const sirenPhrase = { vide: '', format: '9 chiffres attendus.', cle: 'La clé de contrôle ne correspond pas : vérifie les chiffres.', ok: 'Numéro valide (clé vérifiée).' }[eSiren];
   const tvaCalc = FACT.tvaIntraDuSiren(p.siren);
@@ -38225,27 +38407,27 @@ function ProfilEntreprise({ ouvertParDefaut }) {
         <button type="button" aria-expanded={coordOuvert} onClick={() => setCoordOuvert(v => !v)} data-coordonnees
           style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: C.text, display: 'flex', gap: 6, alignItems: 'center' }}>
           <span aria-hidden="true">{coordOuvert ? '▾' : '▸'}</span> Coordonnées sur tes factures
-          <span data-manque-n={manque.length} style={{ fontWeight: 400, color: manque.length ? C.warn : C.muted }}>{manque.length ? `· ${manque.length} à compléter` : '· complètes'}</span>
+          <span data-manque-n={manqueCoord.length} style={{ fontWeight: 400, color: manqueCoord.length ? C.warn : C.muted }}>{manqueCoord.length ? `· ${manqueCoord.length} à compléter` : '· complètes'}</span>
         </button>
         {coordOuvert && (
           <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
             {texteChamp('nom', p.forme === 'societe' ? 'Raison sociale' : 'Prénom et nom (ou nom commercial)')}
             {FACT.estEI(p) && p.nom && <span style={{ fontSize: 11.5, color: C.muted, marginTop: -4 }}>Sur tes factures : « {FACT.nomVendeur(p)} ».</span>}
-            {texteChamp('adresse', 'Adresse')}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,110px) minmax(0,1fr)', gap: 8 }}>
-              {texteChamp('cp', 'Code postal', { inputMode: 'numeric' })}{texteChamp('ville', 'Ville')}
+            {texteChamp('adresse', 'Adresse', { exemple: 'ex : 4 rue du Port' })}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,130px) minmax(0,1fr)', gap: 8 }}>
+              {texteChamp('cp', 'Code postal', { inputMode: 'numeric', exemple: 'ex : 35260' })}{texteChamp('ville', 'Ville')}
             </div>
-            {texteChamp('siret', 'SIRET (14 chiffres, facultatif)', { inputMode: 'numeric', norm: (v) => FACT.chiffresSeuls(v).slice(0, 14) })}
+            {texteChamp('siret', 'SIRET (facultatif)', { inputMode: 'numeric', exemple: '14 chiffres', norm: (v) => FACT.chiffresSeuls(v).slice(0, 14) })}
             {p.siret && eSiret !== 'ok' && <span data-siret-etat={eSiret} style={{ fontSize: 12, color: C.warn }}>{eSiret === 'autre_siren' ? 'Ce SIRET ne commence pas par ton SIREN.' : eSiret === 'format' ? '14 chiffres attendus.' : 'La clé de contrôle ne correspond pas.'}</span>}
             {p.tva === 'assujetti' && <>
-              {texteChamp('tvaIntra', 'N° de TVA intracommunautaire (FR…)', { norm: (v) => v.replace(/\s/g, '').toUpperCase() })}
+              {texteChamp('tvaIntra', 'N° de TVA intracommunautaire', { exemple: 'ex : FR…', norm: (v) => v.replace(/\s/g, '').toUpperCase() })}
               {p.tvaIntra && !['ok', 'ok_non_verifie'].includes(eTvaIntra) && <span data-tva-etat={eTvaIntra} style={{ fontSize: 12, color: C.warn }}>{eTvaIntra === 'autre_siren' ? 'Ce numéro ne porte pas ton SIREN.' : eTvaIntra === 'cle' ? 'La clé ne correspond pas à ton SIREN.' : 'Forme attendue : FR + 2 caractères + 9 chiffres.'}</span>}
               {!p.tvaIntra && tvaCalc && <button type="button" data-tva-calcul onClick={() => maj({ tvaIntra: tvaCalc })}
                 style={{ justifySelf: 'start', border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Utiliser {tvaCalc} <span style={{ color: C.muted }}>(calculé depuis ton SIREN)</span></button>}
             </>}
             {p.forme === 'societe' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8 }}>
-              {texteChamp('formeJuridique', 'Forme (SAS, SARL…)')}{texteChamp('capital', 'Capital (€)')}{texteChamp('rcs', 'Ville du RCS')}
+              {texteChamp('formeJuridique', 'Forme juridique', { exemple: 'ex : SAS' })}{texteChamp('capital', 'Capital social (€)', { exemple: 'ex : 1000' })}{texteChamp('rcs', 'Ville du RCS', { exemple: 'ex : Saint-Malo' })}
             </div>}
             {manque.length > 0 && <div data-manque style={{ fontSize: 12, color: C.muted }}>Pour émettre une facture, il manque : {manque.join(', ')}.</div>}
           </div>

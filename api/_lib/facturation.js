@@ -181,6 +181,18 @@ export function regimeDe(p) {
   if (p.forme === 'micro') return 'micro';
   return margeAppliquee(p) ? 'marge' : 'reel';
 }
+// Le régime EFFECTIF d'un vendeur, pour les écrans et le serveur qui n'ont que
+// le profil brut + le réglage publié : le profil déclaré d'abord, sinon le
+// `vinted_regime` publié ('reel'/'marge' : posés uniquement par le profil, mais
+// gardés si le profil ne se lit pas), sinon **'micro'** — le comportement
+// d'avant le profil, rien ne change en silence pour qui n'a rien déclaré.
+// (16 octobre : le tableau de bord disait « À payer (13,5 %) · Déclarer sur
+// l'URSSAF » à une société au réel, et le rappel du 1er partait chez elle.)
+export function regimeEffectif(profilBrut, regimePub) {
+  const r = regimeDe(normProfil(profilBrut, { regime: regimePub }));
+  if (r) return r;
+  return regimePub === 'reel' || regimePub === 'marge' ? regimePub : 'micro';
+}
 export function libelleProfil(p) {
   if (!p || !p.forme) return 'Profil à préciser';
   const parts = [FORMES[p.forme]];
@@ -259,27 +271,35 @@ export function reglesDuProfil(p, { tauxUrssaf } = {}) {
 // Une facture se fait PARFAITEMENT ou pas du tout : sans régime de TVA, l'app ne
 // saurait pas quelle mention écrire, et une mention fausse sur un document légal
 // est pire qu'un bouton grisé avec sa raison.
-export function manquePourFacturer(p, { tauxTva } = {}) {
+// Chaque manque dit AUSSI s'il est une COORDONNÉE (nom, adresse, numéros…) ou
+// un choix de régime : l'en-tête « Coordonnées sur tes factures · N à
+// compléter » ne compte que les coordonnées (16 octobre : il comptait « ton
+// régime de TVA », qui n'en est pas une).
+export function manquePourFacturerDetaille(p, { tauxTva } = {}) {
   const m = [];
-  if (!p) return ['ton profil d\'entreprise'];
-  if (!p.forme) m.push('ta forme d\'entreprise');
-  if (!p.tva) m.push('ton régime de TVA');
-  if (!p.nom) m.push(p.forme === 'societe' ? 'ta raison sociale' : 'ton nom');
-  if (!p.adresse || !p.cp || !p.ville) m.push('ton adresse complète');
-  if (etatSiren(p.siren) !== 'ok') m.push('ton SIREN');
-  if (p.siret && etatSiret(p.siret, p.siren) !== 'ok') m.push('un SIRET valide (ou laisse-le vide)');
+  const M = (texte, coord) => m.push({ texte, coord: !!coord });
+  if (!p) { M('ton profil d\'entreprise', false); return m; }
+  if (!p.forme) M('ta forme d\'entreprise', false);
+  if (!p.tva) M('ton régime de TVA', false);
+  if (!p.nom) M(p.forme === 'societe' ? 'ta raison sociale' : 'ton nom', true);
+  if (!p.adresse || !p.cp || !p.ville) M('ton adresse complète', true);
+  if (etatSiren(p.siren) !== 'ok') M('ton SIREN', true);
+  if (p.siret && etatSiret(p.siret, p.siren) !== 'ok') M('un SIRET valide (ou laisse-le vide)', true);
   if (p.tva === 'assujetti') {
     const e = etatTvaIntra(p.tvaIntra, p.siren);
-    if (e !== 'ok' && e !== 'ok_non_verifie') m.push('ton n° de TVA intracommunautaire');
-    if (p.marge === null) m.push('si tu appliques le régime de la marge');
-    if (p.marge === false) { const t = Number(tauxTva); if (!(isFinite(t) && t > 0 && t <= 30)) m.push('ton taux de TVA'); }
+    if (e !== 'ok' && e !== 'ok_non_verifie') M('ton n° de TVA intracommunautaire', true);
+    if (p.marge === null) M('si tu appliques le régime de la marge', false);
+    if (p.marge === false) { const t = Number(tauxTva); if (!(isFinite(t) && t > 0 && t <= 30)) M('ton taux de TVA', false); }
   }
   if (p.forme === 'societe') {
-    if (!p.formeJuridique) m.push('ta forme juridique (SAS, SARL…)');
-    if (!p.capital) m.push('ton capital social');
-    if (!p.rcs) m.push('la ville de ton RCS');
+    if (!p.formeJuridique) M('ta forme juridique (SAS, SARL…)', true);
+    if (!p.capital) M('ton capital social', true);
+    if (!p.rcs) M('la ville de ton RCS', true);
   }
   return m;
+}
+export function manquePourFacturer(p, opts) {
+  return manquePourFacturerDetaille(p, opts).map((x) => x.texte);
 }
 
 // ── MENTIONS ET MONTANTS ───────────────────────────────────────────────────
@@ -301,7 +321,10 @@ export function mentionsLegales(p) {
 export function nomVendeur(p) {
   const n = String((p && p.nom) || '').trim();
   if (!n) return '';
-  if (estEI(p) && !/(^|\s)EI(\s|$)|entrepreneur individuel/i.test(n)) return `${n} EI`;
+  // « EI » déjà écrit, sous n'importe quelle ponctuation — « (EI) », « EI. »,
+  // « EI, » : la regex d'avant n'acceptait que l'espace, et doublait le
+  // suffixe (« Julie Exemple (EI) EI », vu sur l'aperçu ET figé sur la facture).
+  if (estEI(p) && !/(^|[\s(,;:])EI([\s),;:.!]|$)|entrepreneur individuel/i.test(n)) return `${n} EI`;
   return n;
 }
 // Montants en CENTIMES ENTIERS, à partir du prix payé (TTC). Un seul arrondi.
@@ -339,10 +362,27 @@ export function lireIdDocument(id) {
   const m = /^facture_(\d{4})_(\d{6})$/.exec(String(id || ''));
   return m ? { annee: Number(m[1]), rang: Number(m[2]) } : null;
 }
-export function prochainRang(ids, annee) {
+// `reserves` : des rangs que la suite ne doit JAMAIS redonner — ceux des
+// anciennes factures (`vinted_invoices`, numéros « AAAA-NNNNNN » d'avant la
+// suite). Sans eux, la nouvelle suite repartait à 2026-000001 alors qu'une
+// ancienne facture portait déjà ce numéro : deux factures, un numéro, la même
+// année (16 octobre).
+export function prochainRang(ids, annee, reserves) {
   let max = 0;
   for (const id of ids || []) { const l = lireIdDocument(id); if (l && l.annee === annee && l.rang > max) max = l.rang; }
+  for (const r of reserves || []) { const n = Number(r); if (isFinite(n) && n > max) max = n; }
   return max + 1;
+}
+// Les rangs portés par les anciennes factures d'une année. On ne lit que la
+// FORME « AAAA-NNN… » : un ancien numéro libre (« FA-2026-0007 », vide…) ne
+// réserve rien — mieux vaut un rang de trop que deviner.
+export function rangsReserves(anciennes, annee) {
+  const out = [];
+  for (const i of anciennes || []) {
+    const m = /^(\d{4})\s*-\s*(\d{1,6})$/.exec(String((i && i.number) || '').trim());
+    if (m && Number(m[1]) === annee) out.push(Number(m[2]));
+  }
+  return out;
 }
 // La continuité, année par année : { annee, n, max, manquants:[rangs] }.
 export function continuite(ids) {
@@ -379,6 +419,13 @@ export function construireDocument(o) {
   const designation = String((o.designation || '')).trim().slice(0, 200);
   if (!designation) erreurs.push('designation');
   if (type === 'avoir' && !o.origineNumero) erreurs.push('origine');
+  // L'identité du CLIENT fait partie des mentions d'une facture (art. 242
+  // nonies A : nom du client — texte non ouvert d'ici, recoupé en secondaire).
+  // Sans nom ni email, le document imprimait « Client » à la place du nom
+  // (16 octobre) : une facture se fait parfaitement ou pas du tout.
+  const cNom = String((o.client && o.client.nom) || '').trim();
+  const cEmail = String((o.client && o.client.email) || '').trim();
+  if (type === 'facture' && !cNom && !cEmail) erreurs.push('client');
   const manque = manquePourFacturer(p, { tauxTva: o.tauxTva });
   if (manque.length) erreurs.push('profil');
   if (erreurs.length) return { doc: null, erreurs, manque };
@@ -463,11 +510,26 @@ export function etatAvoirs(docs) {
 // `lireIds` rend la liste des identifiants de l'année, ou `null` = pas su (on
 // n'émet RIEN sur une lecture ratée : un rang calculé sur une liste incomplète
 // donnerait un numéro déjà émis).
-export async function emettre({ annee, preparer, lireIds, inserer, trouverParJeton, essais = 5 }) {
+// `jeton` (16 octobre) : un jeton STABLE posé par l'appelant — le même d'un
+// clic à l'autre du même formulaire, le même entre deux traitements du même
+// email. Un document déjà écrit sous ce jeton EST cette émission : on le rend
+// (`deja: true`), on ne réémet jamais. Avant, chaque clic tirait un jeton
+// neuf : après « la base n'a pas confirmé l'écriture », un second clic créait
+// une 2e facture pour la même vente. `null` au jeton = pas su ⇒ rien n'est
+// émis (raison `lecture`). Le contrôle tourne à CHAQUE tour de boucle : deux
+// porteurs du même jeton (deux traitements simultanés du même email) ne
+// peuvent pas écrire deux documents.
+// `reserves` : rangs interdits (anciennes factures) — voir `prochainRang`.
+export async function emettre({ annee, jeton, reserves, preparer, lireIds, inserer, trouverParJeton, essais = 5 }) {
   for (let i = 0; i < essais; i++) {
+    if (jeton && trouverParJeton) {
+      const t = await trouverParJeton(jeton);
+      if (t === null || t === undefined) return { ok: false, raison: 'lecture' };
+      if (t) return { ok: true, doc: t, deja: true };
+    }
     const ids = await lireIds(annee);
     if (ids === null || ids === undefined) return { ok: false, raison: 'lecture' };
-    const rang = prochainRang(ids, annee);
+    const rang = prochainRang(ids, annee, reserves);
     const doc = await preparer(rang);
     if (!doc) return { ok: false, raison: 'document' };
     const r = await inserer(idDocument(annee, rang), doc);
@@ -526,7 +588,10 @@ export function corpsHtmlDocument(doc, { logoSrc } = {}) {
     + (avoir ? `<div style="font-size:13px;color:#555">Sur la facture N° ${h(doc.origineNumero)}${doc.origineJour ? ` du ${h(jourFr(doc.origineJour))}` : ''}</div>` : '')
     + `</div></div>`
     + `<div style="margin-bottom:22px;font-size:13px;line-height:1.5"><div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.06em">Client</div>`
-    + `<b>${h(c.nom || c.email || 'Client')}</b>${c.adresse ? '<br>' + h(c.adresse) : ''}${c.email && c.nom ? '<br>' + h(c.email) : ''}</div>`
+    // Un document d'AVANT l'exigence du client peut n'avoir ni nom ni email :
+    // « (non renseigné) », jamais le mot « Client » répété sous son titre de
+    // rubrique (« Client Client », vu sur un avoir le 16 octobre).
+    + `<b>${h(c.nom || c.email || '(non renseigné)')}</b>${c.adresse ? '<br>' + h(c.adresse) : ''}${c.email && c.nom ? '<br>' + h(c.email) : ''}</div>`
     + `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px"><thead><tr style="background:#f3f4f6">`
     + `<th style="text-align:left;padding:9px">Désignation</th><th style="text-align:right;padding:9px">Qté</th><th style="text-align:right;padding:9px">${puLibelle}</th></tr></thead>`
     + `<tbody><tr><td style="padding:9px;border-bottom:1px solid #e5e7eb">${h(ligne.designation)}${ligne.refPaire ? `<div style="font-size:11px;color:#777">Réf. ${h(ligne.refPaire)}</div>` : ''}${ligne.transaction ? `<div style="font-size:11px;color:#777">Transaction ${h(ligne.transaction)}</div>` : ''}</td>`

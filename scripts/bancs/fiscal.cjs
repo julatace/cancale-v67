@@ -19,7 +19,20 @@
 //   E. Les factures ne se lisent pas : « pas pu lire », jamais « aucune », et
 //      rien ne s'émet.
 //   F. Régime de la marge : la mention « Biens d'occasion », aucune TVA.
+//   G. (relecture du 16 octobre) Le TABLEAU DE BORD suit le régime : au réel,
+//      aucun « À payer (13,5 %) », aucun « Déclarer sur l'URSSAF », aucun
+//      « (versement libératoire) » ; micro sans VL : la phrase ne parle plus de
+//      versement libératoire ; micro avec VL : elle le dit encore (l'autre sens).
+//   I. Écriture « incertaine » (elle passe, la base répond 503) puis second
+//      clic : UN seul document (le jeton est celui du formulaire).
+//   J. Une facture sans nom de client ne s'émet pas ; l'avoir ne répète pas
+//      « Avoir sur la facture X » deux fois dans la liste (§7).
+//   K. Les numéros des ANCIENNES factures (`vinted_invoices`) ne se redonnent
+//      jamais la même année.
+//   L. Une vente Pro gardée « en attente du profil » s'émet d'un clic depuis
+//      Factures, et sa ligne d'envoi devient réelle.
 //   + rendu à 390 et 1512 px, clair et sombre (captures dans scripts/bancs/).
+//   (Les exports du rapport et du bilan au réel : scripts/bancs/fiscal-rapports.cjs.)
 // ⚠️ Les nombres et identités sont INVENTÉS (SIREN 123 456 782 a une clé juste,
 //    il n'appartient à personne de connu ici) — §6 : aucune donnée réelle.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -70,11 +83,16 @@ const projette = (r, sel) => {
   return vu ? o : { ...r };
 };
 
-const ouvrir = async (b, { vp, sombre, main, tab, facturesKO, voleur }) => {
+// `etat` (mutable, partagé avec le scénario) : `etat.jetonKO` fait échouer la
+// recherche par jeton (522), `etat.ecritSans5xx` fait PASSER l'écriture d'une
+// facture mais répondre 503 (le cas « incertain » du 16 octobre), `seed` pose
+// des clés localStorage, `lignes` ajoute des lignes à la base.
+const ouvrir = async (b, { vp, sombre, main, tab, facturesKO, voleur, seed, lignes, etat = {} }) => {
   // Le mode sombre est un réglage SYNCHRONISÉ : le nuage le rattrape au
   // chargement, il doit donc être dans la ligne `main` (pas seulement dans le
   // navigateur) — sinon la capture « sombre » sort en clair.
   const store = new Map([['main', { id: 'main', data: sombre ? { ...main, vinted_dark: true } : main }]]);
+  for (const l of lignes || []) store.set(l.id, { id: l.id, data: l.data });
   const journal = { factures: [], interdits: [], mainEcrits: [] };
   const ctx = await b.newContext({ viewport: vp, acceptDownloads: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -95,6 +113,7 @@ const ouvrir = async (b, { vp, sombre, main, tab, facturesKO, voleur }) => {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: h, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([]);
     if (meth === 'GET') {
+      if (etat.jetonKO && /facture_/.test(u) && /jeton/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: h, body: '<html>522</html>' });
       if (facturesKO && /facture_/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: h, body: '<html>522</html>' });
       const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
       let rows = [...store.values()].sort((a, c) => a.id.localeCompare(c.id));
@@ -120,11 +139,28 @@ const ouvrir = async (b, { vp, sombre, main, tab, facturesKO, voleur }) => {
         store.set(r.id, { id: r.id, data: r.data });
         rendus.push(r);
       }
+      // Le cas « incertain » (16 octobre) : l'écriture PASSE (la ligne est en
+      // base) mais la base répond 503 — l'app ne doit jamais réémettre.
+      if (etat.ecritSans5xx && lot.some((r) => /^facture_/.test(r.id))) return route.fulfill({ status: 503, contentType: 'text/html', headers: h, body: '<html>503</html>' });
       return route.fulfill({ status: 201, contentType: 'application/json', headers: h, body: /return=representation/.test(prefer) ? JSON.stringify(rendus) : '' });
+    }
+    if (meth === 'PATCH') {
+      // La ligne d'envoi « en attente du profil » devient une vraie ligne
+      // d'envoi (status profil → draft) : PostgREST n'applique le PATCH que si
+      // les filtres passent — la fausse base fait pareil.
+      if (/facture_/.test(u)) { journal.interdits.push(meth + ' ' + u.split('?')[1]); return j([]); }
+      const eq = /[?&]id=eq\.([^&]*)/.exec(u);
+      const row = eq && store.get(eq[1]);
+      let corps = null; try { corps = JSON.parse(req.postData() || '{}'); } catch (_) {}
+      let passe = !!row;
+      if (row) for (const m of u.matchAll(/[?&]data->>(\w+)=eq\.([^&]*)/g)) if (!(row.data && String(row.data[m[1]]) === m[2])) passe = false;
+      if (passe && corps && corps.data) { store.set(row.id, { id: row.id, data: corps.data }); return j([{ id: row.id }]); }
+      return j([]);
     }
     if (/facture_/.test(u)) journal.interdits.push(meth + ' ' + u.split('?')[1]);
     return j([]);
   });
+  if (seed) await pg.addInitScript((sd) => { try { for (const [k, v] of Object.entries(sd)) localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }, seed);
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
@@ -274,6 +310,7 @@ const confirmer = async (pg) => {
     await pg.locator('[data-nouvelle-facture]').click();
     await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Paire inventée C');
     await pg.locator('[data-facture-form="facture"] input').nth(1).fill('20');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client C');
     await pg.locator('[data-emettre]').click();
     await confirmer(pg);
     await pg.waitForTimeout(1500);
@@ -298,6 +335,7 @@ const confirmer = async (pg) => {
     await pg.locator('[data-nouvelle-facture]').click();
     await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Paire inventée D');
     await pg.locator('[data-facture-form="facture"] input').nth(1).fill('30');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client D');
     await pg.locator('[data-emettre]').click();
     await confirmer(pg);
     await pg.waitForTimeout(1800);
@@ -328,6 +366,7 @@ const confirmer = async (pg) => {
     await pg.locator('[data-nouvelle-facture]').click();
     await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Salomon XT-6 inventée');
     await pg.locator('[data-facture-form="facture"] input').nth(1).fill('99');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client F');
     const ap = await pg.locator('[data-apercu-montants]').innerText();
     dit(/Régime particulier – Biens d'occasion/.test(ap) && !/TVA 20/.test(ap) && !/293 B/.test(ap), 'l\'aperçu : la mention de la marge, aucune TVA, pas de mention de franchise', ap.replace(/\n/g, ' · '));
     await pg.locator('[data-emettre]').click();
@@ -359,6 +398,142 @@ const confirmer = async (pg) => {
     dit(/Régime particulier – Biens d'occasion/.test(t) || /Biens d'occasion/.test(t), 'les règles de la marge sont listées pour ce profil');
     await pg.screenshot({ path: SC + '/z-fiscal-profil-390-sombre.png', fullPage: true });
     dit(o.errs.length === 0 && !mort(await texte(pg)), 'aucune erreur d\'app', o.errs.slice(0, 2).join(' | '));
+    await o.ctx.close();
+  });
+
+  // ══ G. Le tableau de bord suit le RÉGIME (relecture du 16 octobre) ═══════
+  // Société / EI au réel : « À payer (13,5 %) », « Déclarer sur l'URSSAF »,
+  // « (versement libératoire) » et « Prochaine déclaration URSSAF » sont des
+  // notions de MICRO — elles s'affichaient pour tout le monde, à côté d'un
+  // profil qui dit « tes cotisations ne sont pas un % du CA » (§11).
+  console.log('\n── G. Tableau de bord : le régime décide (réel · micro sans VL · micro avec VL)');
+  const ym = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; })();
+  const URSSAF_MOIS = { mois: [{ ym, n: 3, ca: 1000, nMasq: 0, caMasq: 0, par: { Vinted: { n: 3, ca: 1000 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, ailleurs: {}, declare: null }],
+    aDater: { n: 0, ca: 0, par: {} }, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' }, declare: 'lu', at: Date.now() };
+  const SOC_REEL = { v: 1, forme: 'societe', tva: 'assujetti', marge: false, vl: null, tvaIntra: 'FR11123456782', formeJuridique: 'SAS', capital: '1000', rcs: 'Saint-Malo', siren: '123456782', nom: 'Exemple SAS', adresse: '1 rue de la Mer', cp: '35260', ville: 'Cancale' };
+  const MICRO_SANS_VL = { ...PROFIL_FRANCHISE, vl: false };
+  const MICRO_AVEC_VL = { ...PROFIL_FRANCHISE, vl: true };
+  await essaie('G-reel', async () => {
+    const m = { vinted_regime: 'reel', vinted_tva: 20, vinted_urssaf_freq: 'mensuel', vrm_profil_entreprise: SOC_REEL, vinted_urssaf_mois: URSSAF_MOIS };
+    const o = await ouvrir(b, { vp: { width: 1512, height: 950 }, main: m, seed: m, tab: 'dashboard' });
+    const { pg } = o;
+    const t = await texte(pg);
+    dit(!/À payer \(13,5 %\)/i.test(t) && !/135,00/.test(t), 'société au réel : AUCUN « À payer (13,5 %) », aucun 135,00 € inventé');
+    dit(!/Déclarer sur l'URSSAF/.test(t) && !/Prochaine déclaration URSSAF/i.test(t), 'ni bouton « Déclarer sur l\'URSSAF », ni échéance de déclaration micro');
+    dit(!/\(versement libératoire\)/.test(t), 'et jamais « (versement libératoire) » (une notion de micro)');
+    dit(await pg.locator('[data-cotisations-regime="reel"]').count() === 1 && /au réel : pas un % du CA/.test(t), 'à la place : « Cotisations — · au réel : pas un % du CA » (les mots du rapport, §11)');
+    dit(/Calculé sur le CA des ventes/.test(t), 'le CA du mois, lui, reste affiché (il sert à sa TVA et à son comptable)');
+    // Le CSV du récap comptable mensuel ne chiffre pas non plus.
+    const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 8000 }), pg.getByText('Exporter (CSV', { exact: false }).first().click()]);
+    const csv = fs.readFileSync(await dl.path(), 'utf8');
+    dit(!/Cotisations\+impot/.test(csv) && /pas un % du CA/.test(csv) && !/;135\.00;/.test(csv), 'le CSV du récap mensuel ne chiffre aucune cotisation au réel', csv.split('\n')[0]);
+    dit(o.errs.length === 0 && !mort(t), 'aucune erreur d\'app', o.errs.slice(0, 2).join(' | '));
+    await o.ctx.close();
+  });
+  await essaie('G-micro-sans-vl', async () => {
+    const m = { vinted_regime: 'micro', vinted_urssaf_freq: 'mensuel', vrm_profil_entreprise: MICRO_SANS_VL, vinted_urssaf_mois: URSSAF_MOIS };
+    const o = await ouvrir(b, { vp: { width: 390, height: 844 }, main: m, seed: m, tab: 'dashboard' });
+    const t = await texte(o.pg);
+    dit(/À payer \(13,5 %\)/i.test(t) && /Prochaine déclaration URSSAF/i.test(t), 'micro : la carte URSSAF reste entière (l\'autre sens — tout retirer partout passerait sinon)');
+    dit(!/\(versement libératoire\)/.test(t) && /somme de cotisations à verser/.test(t), 'mais sans VL déclaré, la phrase ne dit plus « (versement libératoire) »');
+    await o.ctx.close();
+  });
+  await essaie('G-micro-avec-vl', async () => {
+    const m = { vinted_regime: 'micro', vinted_urssaf_freq: 'mensuel', vrm_profil_entreprise: MICRO_AVEC_VL, vinted_urssaf_mois: URSSAF_MOIS };
+    const o = await ouvrir(b, { vp: { width: 1512, height: 950 }, main: m, seed: m, tab: 'dashboard' });
+    const t = await texte(o.pg);
+    dit(/\(versement libératoire\)/.test(t), 'VL déclaré : la phrase le dit — la mention suit la DONNÉE, pas une formule figée');
+    await o.ctx.close();
+  });
+
+  // ══ I. « Émettre » après une écriture incertaine : JAMAIS deux factures ══
+  // Reproduit le 16 octobre : l'écriture PASSE mais la base répond 503 ; le
+  // formulaire restait ouvert, et un second clic créait une 2e facture pour la
+  // même vente (chaque clic tirait un jeton neuf). Le jeton est maintenant
+  // celui du FORMULAIRE : le second clic retrouve le document déjà écrit.
+  console.log('\n── I. Écriture incertaine puis second clic : un seul document');
+  await essaie('I', async () => {
+    const etat = {};
+    const o = await ouvrir(b, { vp: { width: 1512, height: 950 }, main: { vinted_regime: 'micro', vrm_profil_entreprise: PROFIL_FRANCHISE }, tab: 'invoices', etat });
+    const { pg, store } = o;
+    await pg.locator('[data-nouvelle-facture]').click();
+    await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Paire inventée Q');
+    await pg.locator('[data-facture-form="facture"] input').nth(1).fill('45');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client Q');
+    etat.ecritSans5xx = true; etat.jetonKO = true;      // l'écriture passe, la base répond 503, le jeton ne se lit plus
+    await pg.locator('[data-emettre]').click(); await confirmer(pg); await pg.waitForTimeout(1500);
+    const n1 = [...store.keys()].filter((k) => /^facture_\d{4}_\d{6}$/.test(k)).length;
+    dit(await pg.locator('[data-facture-form="facture"]').count() === 1, 'le formulaire reste ouvert après l\'échec (rien n\'est perdu de sa saisie)');
+    etat.ecritSans5xx = false; etat.jetonKO = false;    // la base répond de nouveau
+    await pg.locator('[data-emettre]').click(); await pg.waitForTimeout(600);
+    await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === 'Émettre'); if (bs.length) bs[bs.length - 1].click(); });
+    await pg.waitForTimeout(1800);
+    const docs2 = [...store.keys()].filter((k) => /^facture_\d{4}_\d{6}$/.test(k));
+    dit(docs2.length === 1, `UN seul document en base après les deux clics (il y en avait ${n1} après le premier)`, docs2.join(','));
+    dit(await pg.locator('[data-facture-form="facture"]').count() === 0, 'et le formulaire est fermé (le document existe, il le dit)');
+    await o.ctx.close();
+  });
+
+  // ══ J. Une facture sans client ne s'émet pas ; l'avoir ne se répète pas ══
+  console.log('\n── J. Le client est une mention : exigé ; l\'avoir ne répète pas sa facture (§7)');
+  await essaie('J', async () => {
+    const o = await ouvrir(b, { vp: { width: 390, height: 844 }, main: { vinted_regime: 'micro', vrm_profil_entreprise: PROFIL_FRANCHISE }, tab: 'invoices' });
+    const { pg, store } = o;
+    await pg.locator('[data-nouvelle-facture]').click();
+    await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Paire inventée J');
+    await pg.locator('[data-facture-form="facture"] input').nth(1).fill('120');
+    await pg.locator('[data-emettre]').click(); await pg.waitForTimeout(700);
+    dit([...store.keys()].filter((k) => /^facture_\d{4}_\d{6}$/.test(k)).length === 0 && /nom du client est obligatoire/i.test(await texte(pg)),
+      'sans nom de client : rien ne s\'émet, et la raison est dite (le document imprimait « Client » à la place du nom)');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client J');
+    await pg.locator('[data-emettre]').click(); await confirmer(pg); await pg.waitForTimeout(1500);
+    const d1 = (store.get(`facture_${AN}_000001`) || {}).data;
+    dit(!!d1 && d1.client && d1.client.nom === 'Client J', 'avec le nom : la facture s\'émet, le client est figé dedans');
+    // L'avoir : sa désignation est L'ARTICLE — le badge « Avoir · facture X »
+    // et le document (« Sur la facture N° X ») citent déjà l'origine (§7).
+    await pg.locator(`[data-faire-avoir="${AN}-000001"]`).click();
+    await pg.locator('[data-emettre]').click(); await confirmer(pg); await pg.waitForTimeout(1500);
+    const d2 = (store.get(`facture_${AN}_000002`) || {}).data;
+    dit(!!d2 && d2.type === 'avoir' && !/Avoir sur la facture/.test((d2.lignes[0] || {}).designation || ''), 'la désignation de l\'avoir est l\'article, pas « Avoir sur la facture X — … »', d2 ? (d2.lignes[0] || {}).designation : 'absent');
+    const ligne = await pg.locator(`[data-document="${AN}-000002"]`).innerText().catch(() => '');
+    dit((ligne.match(new RegExp(`${AN}-000001`, 'g')) || []).length === 1, 'la liste ne cite la facture d\'origine qu\'UNE fois (badge), plus deux (§7)', ligne.replace(/\n/g, ' · '));
+    await o.ctx.close();
+  });
+
+  // ══ K. Les anciens numéros (`vinted_invoices`) ne se redonnent jamais ════
+  console.log('\n── K. Anciennes factures 2026-000001/2 : la nouvelle suite continue à 3');
+  await essaie('K', async () => {
+    const o = await ouvrir(b, { vp: { width: 1512, height: 950 }, main: { vinted_regime: 'micro', vinted_invoices: ANCIENNES, vrm_profil_entreprise: PROFIL_FRANCHISE }, tab: 'invoices' });
+    const { pg, store } = o;
+    await pg.locator('[data-nouvelle-facture]').click();
+    await pg.locator('[data-facture-form="facture"] input').nth(0).fill('Paire inventée K');
+    await pg.locator('[data-facture-form="facture"] input').nth(1).fill('40');
+    await pg.locator('[data-facture-form="facture"] input[placeholder="Prénom Nom"]').fill('Client K');
+    await pg.locator('[data-emettre]').click(); await confirmer(pg); await pg.waitForTimeout(1500);
+    const ids = [...store.keys()].filter((k) => /^facture_\d{4}_\d{6}$/.test(k));
+    dit(ids.length === 1 && ids[0] === `facture_${AN}_000003`, 'la nouvelle facture prend le n° 3 — jamais un numéro qu\'une ancienne facture de la même année porte déjà', ids.join(','));
+    await o.ctx.close();
+  });
+
+  // ══ L. Une vente « en attente du profil » s'émet d'un clic ═══════════════
+  // Le serveur garde la vente (ligne d'envoi, status 'profil') quand elle
+  // arrive profil incomplet ; une fois « Mon entreprise » complété, c'est ICI
+  // qu'elle s'émet — avant le 16 octobre elle n'était JAMAIS facturée.
+  console.log('\n── L. La vente gardée « en attente du profil » s\'émet depuis Factures');
+  await essaie('L', async () => {
+    const attente = { id: 'email_invoice_testcle1', data: { type: 'facture_pro', status: 'profil', sourceId: 'email_sale_testcle1', designation: 'Paire inventée L', prix: '70,00', buyerName: 'Cliente L', buyerEmail: 'cliente@exemple.test', buyerAddress: '2 rue du Port, 35260 Cancale', numero: '12', account: 'compte_test', createdAt: new Date().toISOString(), manque: ['ton SIREN'] } };
+    const o = await ouvrir(b, { vp: { width: 1512, height: 950 }, main: { vinted_regime: 'micro', vrm_profil_entreprise: PROFIL_FRANCHISE }, tab: 'invoices', lignes: [attente] });
+    const { pg, store } = o;
+    dit(await pg.locator('[data-envoi-statut="profil"]').count() === 1 && /en attente de ton profil/.test(await texte(pg)), 'la vente gardée est listée « en attente de ton profil »');
+    await pg.locator('[data-emettre-attente]').click(); await confirmer(pg); await pg.waitForTimeout(1800);
+    const ids = [...store.keys()].filter((k) => /^facture_\d{4}_\d{6}$/.test(k));
+    const d = ids.length === 1 ? store.get(ids[0]).data : null;
+    dit(!!d && d.sourceId === 'email_sale_testcle1' && d.client && d.client.nom === 'Cliente L' && d.ttcC === 7000, 'un clic émet SA facture (sourceId de la vente, client, 70,00 €)', ids.join(','));
+    const ligne = (store.get('email_invoice_testcle1') || {}).data || {};
+    dit(ligne.status === 'draft' && ligne.number === (d && d.numero) && /vrm-doc/.test(ligne.html || ''), 'et la ligne d\'envoi devient réelle (numéro + document imprimable, prête pour « Envoyer »)', JSON.stringify({ status: ligne.status, number: ligne.number }));
+    // Recliquer ne réémet jamais (le sourceId retrouve la facture vivante).
+    await pg.waitForTimeout(400);
+    dit(await pg.locator('[data-emettre-attente]').count() === 0, 'le bouton a disparu (la ligne n\'est plus en attente)');
     await o.ctx.close();
   });
 

@@ -135,6 +135,59 @@ const HTML522 = '<!DOCTYPE html><html><head><title>522: Connection timed out</ti
     const r6 = await F.emettre({ annee: 2026, preparer: prep, lireIds: lire, inserer: async () => 'incertain', trouverParJeton: async () => null });
     dit(!r6.ok && r6.raison === 'incertain', 'écriture sans réponse et jeton illisible : on s\'arrête (jamais un second essai à l\'aveugle)');
   });
+  // (relecture du 16 octobre) Les règles ajoutées après la revue du lot.
+  await essaie('un jeton STABLE n\'émet jamais deux fois', async () => {
+    // Le jeton est posé PAR L'APPELANT (le formulaire, la réclamation du
+    // serveur) : un document déjà écrit sous ce jeton EST l'émission — le
+    // second clic (ou le second traitement du même email) le retrouve.
+    const docs = new Map();      // jeton → doc écrit
+    const store = new Set();
+    const lire = async (a) => [...store].filter((id) => id.startsWith(`facture_${a}_`));
+    const prep = (jeton) => async (rang) => { const d = { numero: F.numeroDocument(2026, rang), jeton }; return d; };
+    const insererEtRetenir = async (id, doc) => { if (store.has(id)) return 'pris'; store.add(id); docs.set(doc.jeton, doc); return 'ok'; };
+    const parJeton = async (j) => (docs.has(j) ? docs.get(j) : false);
+    const a1 = await F.emettre({ annee: 2026, jeton: 'stable1', preparer: prep('stable1'), lireIds: lire, inserer: insererEtRetenir, trouverParJeton: parJeton });
+    const a2 = await F.emettre({ annee: 2026, jeton: 'stable1', preparer: prep('stable1'), lireIds: lire, inserer: insererEtRetenir, trouverParJeton: parJeton });
+    dit(a1.ok && a2.ok && a2.deja === true && a2.doc.numero === a1.doc.numero && store.size === 1,
+      'le même jeton rejoué rend le document DÉJÀ écrit (`deja`), jamais un deuxième', JSON.stringify({ n1: a1.doc && a1.doc.numero, n2: a2.doc && a2.doc.numero, ecrits: store.size }));
+    const a3 = await F.emettre({ annee: 2026, jeton: 'stable2', preparer: prep('stable2'), lireIds: lire, inserer: insererEtRetenir, trouverParJeton: async () => null });
+    dit(!a3.ok && a3.raison === 'lecture' && store.size === 1, 'jeton illisible AVANT d\'émettre : rien n\'est écrit (pas su ≠ absent)', JSON.stringify(a3));
+  });
+  await essaie('les anciens numéros ne se redonnent jamais', async () => {
+    dit(F.prochainRang([], 2026, F.rangsReserves([{ number: '2026-000001' }, { number: '2026-000002' }], 2026)) === 3,
+      'une suite neuve continue APRÈS les anciennes factures de l\'année (2026-000001/2 ⇒ n° 3)');
+    dit(F.rangsReserves([{ number: '2025-000009' }, { number: 'FA-2026-0007' }, { number: '' }], 2026).length === 0,
+      'une ancienne facture d\'une autre année, ou à numéro libre, ne réserve rien');
+  });
+  await essaie('le client est une mention de la facture', async () => {
+    const { doc, erreurs } = F.construireDocument({ type: 'facture', profil: franchise(), annee: 2026, rang: 1, emiseLe: '2026-10-16T10:00:00.000Z', ttcC: 4200, designation: 'Paire', client: { nom: '', email: '', adresse: '' } });
+    dit(doc === null && erreurs.includes('client'), 'une facture SANS nom ni email de client ne se construit pas (elle imprimait « Client » à la place du nom)', erreurs.join(','));
+    const ok1 = F.construireDocument({ type: 'facture', profil: franchise(), annee: 2026, rang: 1, emiseLe: '2026-10-16T10:00:00.000Z', ttcC: 4200, designation: 'Paire', client: { email: 'c@exemple.test' } });
+    dit(!!ok1.doc, 'un email de client suffit (les ventes Pro par email n\'ont pas toujours le nom)');
+    const av = F.construireDocument({ type: 'avoir', profil: franchise(), annee: 2026, rang: 2, emiseLe: '2026-10-16T10:00:00.000Z', ttcC: 4200, designation: 'Paire', origineNumero: '2026-000001', client: {} });
+    dit(!!av.doc, 'un avoir copie le client de SA facture : il n\'est pas bloqué par un client vide d\'avant la règle');
+    const html = F.corpsHtmlDocument({ type: 'facture', numero: '2026-000001', jour: '2026-10-16', mode: 'franchise', ttcC: 4200, vendeur: { nom: 'X', siren: '123456782' }, client: {}, lignes: [{ designation: 'Paire', ttcC: 4200 }], mentions: [] });
+    dit(!/Client<\/div><b>Client</.test(html.replace(/\s|style="[^"]*"/g, '')) && /non renseigné/.test(html),
+      'un document d\'AVANT la règle n\'imprime plus « Client Client » : « (non renseigné) »');
+  });
+  await essaie('le suffixe « EI » ne se double jamais', async () => {
+    const p = (nom) => F.normProfil({ ...base, nom, forme: 'micro' });
+    dit(F.nomVendeur(p('Julie Exemple (EI)')) === 'Julie Exemple (EI)', '« (EI) » déjà écrit : aucun « EI » ajouté', F.nomVendeur(p('Julie Exemple (EI)')));
+    dit(F.nomVendeur(p('Julie Exemple EI.')) === 'Julie Exemple EI.', '« EI. » déjà écrit : aucun « EI » ajouté', F.nomVendeur(p('Julie Exemple EI.')));
+    dit(F.nomVendeur(p('Julie Exemple')) === 'Julie Exemple EI', 'et sans « EI », le suffixe reste ajouté (l\'autre sens)');
+  });
+  await essaie('le régime effectif et les coordonnées', async () => {
+    dit(F.regimeEffectif(null, null) === 'micro' && F.regimeEffectif(null, 'micro') === 'micro', 'pas de profil déclaré ⇒ micro (le comportement d\'avant, rien ne change en silence)');
+    dit(F.regimeEffectif({ forme: 'societe', tva: 'assujetti', marge: false }, null) === 'reel' && F.regimeEffectif(null, 'reel') === 'reel' && F.regimeEffectif(null, 'marge') === 'marge',
+      'société/EI au réel ⇒ « reel », même si seul le réglage publié est lisible');
+    const det = F.manquePourFacturerDetaille(F.normProfil({ siren: '123456782' }));
+    const coords = det.filter((x) => x.coord).map((x) => x.texte);
+    const choix = det.filter((x) => !x.coord).map((x) => x.texte);
+    dit(choix.some((t) => /régime de TVA/.test(t)) && choix.some((t) => /forme d'entreprise/.test(t)) && !coords.some((t) => /régime de TVA/.test(t)),
+      'le régime de TVA et la forme ne comptent pas comme des COORDONNÉES (l\'en-tête « N à compléter » ne les compte plus)', JSON.stringify({ coords, choix }));
+    dit(JSON.stringify(det.map((x) => x.texte)) === JSON.stringify(F.manquePourFacturer(F.normProfil({ siren: '123456782' }))),
+      'et la liste détaillée dit EXACTEMENT les mêmes manques que la liste plate (§11)');
+  });
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log('\n── B. LA ROUTE api/email-inbound (facture Pro, boîte noire)');
@@ -279,7 +332,9 @@ const HTML522 = '<!DOCTYPE html><html><head><title>522: Connection timed out</ti
   await essaie('B6 — profil incomplet (pas de SIREN) : le geste, pas une facture fausse', async () => {
     poserBase({ forme: 'micro', tva: 'franchise', nom: 'Julie Test', adresse: '1 rue', cp: '35260', ville: 'Cancale' });
     const r = await envoyer(EMAIL('acheteuse5', 'New Balance', '70,00'));
-    dit(factures().length === 0 && envois().length === 0, 'aucune facture émise sans SIREN', tout().map((x) => x.number || x.numero).join(','));
+    // (16 octobre) La vente n'est plus perdue : sa ligne d'envoi est GARDÉE en
+    // « profil » — mais toujours AUCUNE facture, aucun numéro (voir B9).
+    dit(factures().length === 0 && envois().every((e) => e.status === 'profil' && !e.number), 'aucune facture émise sans SIREN (la vente est gardée, sans numéro)', tout().map((x) => x.number || x.numero || x.status).join(','));
     dit(r.code === 200, 'et la route ne fait pas rejouer l\'email pour rien (200)', `HTTP ${r.code}`);
   });
   await essaie('B7 — société au régime de la marge', async () => {
@@ -288,6 +343,103 @@ const HTML522 = '<!DOCTYPE html><html><head><title>522: Connection timed out</ti
     const h = (envois()[0] || {}).html || '';
     dit(/Régime particulier – Biens d(?:'|&#39;|&apos;)occasion/.test(h), 'la facture porte « Régime particulier – Biens d\'occasion »', h ? '' : 'aucune facture');
     dit(h && !/TVA\s*20\s*%/.test(h) && !/293 B/.test(h), 'et n\'affiche ni TVA ni la mention de franchise (art. 297 E)', /TVA\s*20\s*%/.test(h) ? 'TVA 20 % affichée' : /293 B/.test(h) ? 'mention 293 B' : '');
+  });
+
+  await essaie('B8 — le même email traité deux fois EN MÊME TEMPS (16 octobre)', async () => {
+    // Reproduit par la relecture : `Promise.all` sur le même email émettait
+    // DEUX factures pour une vente (le contrôle par sourceId ne protège que des
+    // rejeux successifs). La réclamation `source_facture_{key}` est atomique
+    // (`ignore-duplicates`) : UN traitement émet, l'autre répond 503 (rejoué,
+    // il retrouvera la facture par sa source) — jamais un second document.
+    poserBase(PF);
+    const E = EMAIL('acheteuse7', 'Salomon XT-6', '99,00');
+    const [a, bq] = await Promise.all([envoyer(E), envoyer(E)]);
+    const f = factures();
+    dit(f.length === 1, 'UN seul document émis pour les deux traitements simultanés', JSON.stringify(f));
+    dit([a.code, bq.code].filter((c) => c === 200).length >= 1 && [a.code, bq.code].every((c) => c === 200 || c >= 500),
+      'une réponse 200 (la facture), l\'autre 200 ou 5xx (rejouée) — jamais deux 200 avec deux documents', `${a.code} / ${bq.code}`);
+    const e = envois();
+    dit(e.length === 1 && e[0].number === store.get(f[0]).data.numero, 'une seule ligne d\'envoi, qui pointe la facture émise');
+    // Et un REJEU après coup retrouve la même facture (rien de neuf).
+    await envoyer(E);
+    dit(factures().length === 1, 'un rejeu tardif ne crée toujours rien', factures().join(','));
+  });
+  await essaie('B9 — vente arrivée profil incomplet : GARDÉE, puis facturée (16 octobre)', async () => {
+    // Reproduit par la relecture : la vente « New Balance » reçue sans SIREN
+    // n'était JAMAIS facturée, même une fois le profil complété — et la
+    // notification laissait croire le contraire. Elle est maintenant GARDÉE
+    // dans sa ligne d'envoi (status 'profil') : l'app l'émet d'un clic (banc
+    // fiscal.cjs, section L), et un rejeu de l'email l'émet aussi.
+    poserBase({ forme: 'micro', tva: 'franchise', nom: 'Julie Test', adresse: '1 rue', cp: '35260', ville: 'Cancale' });
+    const E = EMAIL('acheteuse8', 'New Balance 990', '70,00');
+    const r1 = await envoyer(E);
+    dit(r1.code === 200 && factures().length === 0, 'sans SIREN : aucune facture (rien d\'inventé), et pas de rejeu forcé', `HTTP ${r1.code}`);
+    const attente = envois()[0];
+    dit(!!attente && attente.status === 'profil' && !attente.number && attente.sourceId && attente.buyerEmail === 'client@exemple.test',
+      'la vente est GARDÉE : ligne d\'envoi « profil », avec la vente (acheteur, source) et SANS numéro', JSON.stringify(attente && { status: attente.status, src: !!attente.sourceId }));
+    // Le profil est complété, l'email revient (fil renvoyé par le script Gmail).
+    const m = store.get('main'); m.data = { ...m.data, vrm_profil_entreprise: { ...m.data.vrm_profil_entreprise, siren: '123456782' } };
+    await envoyer(E);
+    const f = factures();
+    const ligne = envois()[0];
+    dit(f.length === 1 && ligne && ligne.status !== 'profil' && ligne.number === store.get(f[0]).data.numero,
+      'au rejeu, SA facture est émise et la ligne d\'envoi devient réelle (numéro + état d\'envoi)', JSON.stringify({ f, status: ligne && ligne.status, n: ligne && ligne.number }));
+    await envoyer(E);
+    dit(factures().length === 1, 'et un troisième passage ne crée rien de plus');
+  });
+  await essaie('B10 — les anciens numéros (`vinted_invoices`) jamais redonnés par le serveur', async () => {
+    poserBase(PF);
+    const an = anneeP();
+    const m = store.get('main');
+    m.data = { ...m.data, vinted_invoices: [{ id: 'inv_1', number: `${an}-000001`, itemName: 'Ancienne A', sellPrice: 40 }, { id: 'inv_2', number: `${an}-000002`, itemName: 'Ancienne B', sellPrice: 55 }] };
+    await envoyer(EMAIL('acheteuse9', 'Puma Palermo', '45,00'));
+    const f = factures();
+    dit(f.length === 1 && f[0] === `facture_${an}_000003`, 'la facture Pro prend le n° 3 — jamais un numéro qu\'une ancienne facture de l\'année porte (même règle que l\'app, §11)', f.join(','));
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log('\n── C. LE RAPPEL URSSAF DU 1ᵉʳ (api/ship-reminders) SUIT LE RÉGIME');
+  // Reproduit par la relecture du 16 octobre : « pense à déclarer ton chiffre
+  // d'affaires sur autoentrepreneur.urssaf.fr » partait chez une SOCIÉTÉ au
+  // réel. La route est EXÉCUTÉE (pas relue), la date forcée au 1ᵉʳ du mois.
+  await essaie('C — le rappel URSSAF suit le régime', async () => {
+    const VraieDate = Date;
+    const FIXE = VraieDate.parse('2026-11-01T08:00:00Z');
+    // eslint-disable-next-line no-global-assign
+    global.Date = class extends VraieDate { constructor(...a) { if (a.length === 0) super(FIXE); else super(...a); } static now() { return FIXE; } };
+    try {
+      const faireRappel = async ({ main, mainKO }) => {
+        const ecrits = []; let pushes = 0;
+        global.fetch = async (url, opts = {}) => {
+          const u = String(url);
+          const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+          if (/^https:\/\/push\//.test(u)) { pushes++; return new Response('', { status: 201 }); }
+          if ((opts.method || 'GET') === 'POST') { try { JSON.parse(opts.body || '[]').forEach((r) => ecrits.push(r.id)); } catch (_) {} return new Response('', { status: 201 }); }
+          if (/select=owner&limit=1/.test(u)) return J([{ owner: 'A' }]);
+          if (/id=eq\.main/.test(u) && /select=owner/.test(u) && !/owner=eq\./.test(u)) return J([{ owner: 'A' }]);
+          if (/id=eq\.main/.test(u) && mainKO) return new Response(HTML522, { status: 522, headers: { 'content-type': 'text/html' } });
+          if (/id=eq\.main/.test(u)) return J([{ data: main }]);
+          if (/id=eq\.push_prefs/.test(u)) return J([{ data: { urssaf: true } }]);
+          if (/id=eq\.push_subs/.test(u)) return J([{ data: { subs: [{ endpoint: 'https://push/A1' }] } }]);
+          if (/urssaf_reminder_dedup|ship_reminder_dedup|panel_bords_done/.test(u)) return J([{ data: {} }]);
+          return J([]);
+        };
+        const mod = await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'));
+        const res = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } };
+        await mod.default({ method: 'GET', headers: {}, query: {} }, res);
+        const bilan = (res.corps && res.corps.bilans && res.corps.bilans[0]) || res.corps || {};
+        return { urssaf: bilan.urssaf, dedup: ecrits.includes('urssaf_reminder_dedup'), pushes };
+      };
+      // (les octets de la notification passent par web-push, absent de ce
+      // harnais sans clés VAPID : le verdict est `urssaf` + le mémo, pas
+      // l'aller réseau.)
+      const micro = await faireRappel({ main: { vinted_regime: 'micro' } });
+      dit(micro.urssaf === 'envoyé' && micro.dedup, 'micro (ou rien de déclaré) : le rappel part, le mémo est écrit — rien ne s\'éteint en silence', JSON.stringify(micro));
+      const soc = await faireRappel({ main: { vinted_regime: 'reel', vrm_profil_entreprise: { v: 1, forme: 'societe', tva: 'assujetti', marge: false, siren: '123456782', nom: 'Exemple SAS' } } });
+      dit(/pas une micro/.test(String(soc.urssaf)) && !soc.dedup && soc.pushes === 0, 'société au réel : AUCUN rappel « déclare sur autoentrepreneur.urssaf.fr », aucun mémo', JSON.stringify(soc));
+      const ko2 = await faireRappel({ main: null, mainKO: true });
+      dit(/pas lu/.test(String(ko2.urssaf)) && !ko2.dedup && ko2.pushes === 0, 'profil illisible : on se tait (envoyer le MAUVAIS geste à une société coûte plus qu\'un rappel manqué)', JSON.stringify(ko2));
+    } finally { global.Date = VraieDate; }
   });
 
   console.log(ko ? `\n❌ audit-facturation : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-facturation : ${ok} contrôles — profil et factures tenus`);

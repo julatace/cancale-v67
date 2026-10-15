@@ -356,12 +356,14 @@ async function supabaseLireRow(id) {
 const SB_LIRE = () => ({ ...sbCle(SUPABASE_KEY) });
 async function lireProfilServeur() {
   try {
-    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=p:data->vrm_profil_entreprise,r:data->>vinted_regime,t:data->>vinted_tva`), { headers: SB_LIRE() });
+    // `vinted_invoices` : les ANCIENNES factures (numéros « AAAA-NNNNNN »
+    // d'avant la suite) — leurs rangs ne se redonnent jamais (§ prochainRang).
+    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=p:data->vrm_profil_entreprise,r:data->>vinted_regime,t:data->>vinted_tva,i:data->vinted_invoices`), { headers: SB_LIRE() });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
     const row = j[0] || {};
-    return { brut: row.p || null, regime: row.r || null, tva: row.t };
+    return { brut: row.p || null, regime: row.r || null, tva: row.t, anciennes: Array.isArray(row.i) ? row.i : [] };
   } catch (_) { return null; }
 }
 async function idsFacturesAnnee(annee) {
@@ -410,11 +412,14 @@ async function insererFactureServeur(id, doc) {
 }
 // La ligne d'ENVOI (lue par le script Gmail) : écrite seulement si elle n'existe
 // pas encore — un rejeu ne remet jamais en « à envoyer » une facture envoyée.
+// ⚠️ Une ligne « en attente du profil » (status 'profil', posée quand la vente
+//    est arrivée profil incomplet) n'est PAS une facture : elle est REMPLACÉE
+//    par la vraie dès que l'émission aboutit (rejeu après profil complété).
 async function assurerLigneEnvoi(key, doc, sale, acc, cfg, now) {
   const id = `email_invoice_${key}`;
   const lu = await supabaseLireRow(id);
   if (!lu.lu) { marquerEcritureRatee(); return null; }
-  if (lu.data) return { number: lu.data.number || doc.numero, status: lu.data.status || 'draft', deja: true };
+  if (lu.data && lu.data.status !== 'profil') return { number: lu.data.number || doc.numero, status: lu.data.status || 'draft', deja: true };
   const status = cfg.autoSend ? 'queued' : 'draft';
   const html = FACT.corpsHtmlDocument(doc, { logoSrc: cfg.logo ? 'cid:logoFacture' : '' });
   const ok = await supabaseUpsert([{ id, data: {
@@ -425,6 +430,67 @@ async function assurerLigneEnvoi(key, doc, sale, acc, cfg, now) {
     account: acc.login || '', html, createdAt: now,
   } }]);
   return ok ? { number: doc.numero, status } : null;
+}
+// ── LA RÉCLAMATION DE LA SOURCE (16 octobre) ────────────────────────────────
+// Deux traitements SIMULTANÉS du même email passaient tous deux le contrôle
+// « déjà émise ? » (aucune ne l'était encore) et émettaient DEUX factures pour
+// une seule vente — reproduit par `Promise.all([envoyer(E), envoyer(E)])`.
+// Le contrôle par sourceId ne protège que des rejeux SUCCESSIFS : l'atomicité
+// vient d'une ligne de RÉCLAMATION (`source_facture_{key}`, hors du motif
+// `facture_*` pour ne jamais entrer dans la suite ni dans les recherches par
+// jeton), insérée en `ignore-duplicates` : le premier la prend, le second lit
+// le jeton du premier et retrouve SA facture — jamais une seconde.
+// Rend { jeton } (à utiliser pour émettre), { doc } (déjà émise), ou null = pas su.
+async function reclamerSourceFacture(key, sourceId, now) {
+  const id = `source_facture_${key}`;
+  const jeton = crypto.randomBytes(16).toString('hex');
+  const owner = proprietaireCourant();
+  const rows = owner ? [{ owner, id, data: { sourceId, jeton, at: now } }] : withOwnerAll([{ id, data: { sourceId, jeton, at: now } }]);
+  let pris = null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+      method: 'POST',
+      headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify(rows),
+    });
+    if (!r.ok) return null;                                   // refus ou 5xx : pas su, 503, rejeu
+    const j = await r.json().catch(() => null);
+    if (!Array.isArray(j)) return null;
+    if (j.length) return { jeton };                           // la réclamation est à nous
+    pris = await supabaseLireRow(id);                         // un autre l'a prise : son jeton fait foi
+  } catch (_) { return null; }
+  if (!pris || !pris.lu || !pris.data || !pris.data.jeton) return null;
+  const doc = await factureParMeta('jeton', pris.data.jeton);
+  if (doc === null) return null;
+  if (doc) return { doc };
+  // Réclamée mais rien d'écrit : l'autre traitement est EN VOL (ou est mort
+  // entre la réclamation et l'écriture). Récente ⇒ pas su (503, l'email est
+  // rejoué et retrouvera la facture) ; vieille de plus de 10 min ⇒ on reprend
+  // SON jeton — `emettre` revérifie le jeton à chaque tour, deux repreneurs ne
+  // peuvent pas écrire deux documents.
+  const age = Date.parse(now) - Date.parse(pris.data.at || 0);
+  if (!(isFinite(age) && age > 10 * 60 * 1000)) return null;
+  return { jeton: pris.data.jeton };
+}
+// La ligne « en attente du profil » : une vente Pro arrivée profil incomplet
+// n'était JAMAIS facturée, même une fois le profil complété (16 octobre) — et
+// la notification laissait croire le contraire. La vente est gardée dans sa
+// ligne d'envoi (status 'profil', les données de la vente, AUCUN numéro) :
+// l'app la liste et « Émettre sa facture » l'émet une fois le profil complété ;
+// un rejeu de l'email l'émet aussi (assurerLigneEnvoi remplace la ligne).
+async function garderVenteEnAttenteProfil(key, sourceId, sale, acc, now, manque) {
+  const id = `email_invoice_${key}`;
+  const lu = await supabaseLireRow(id);
+  if (!lu.lu) { marquerEcritureRatee(); return; }             // pas su ⇒ 503, l'email reviendra
+  if (lu.data) return;                                        // déjà gardée (ou déjà facturée)
+  const ok = await supabaseUpsert([{ id, data: {
+    type: 'facture_pro', status: 'profil', sourceId,
+    designation: sale.designation || '', prix: sale.prix || '',
+    buyerName: sale.nomComplet || '', buyerEmail: sale.email || '', buyerAddress: sale.adresse || '',
+    numero: sale.numero || '', pseudo: sale.pseudo || '', account: acc.login || '',
+    createdAt: now, manque: manque || [],
+  } }]);
+  if (!ok) marquerEcritureRatee();                            // perdre cette ligne = perdre la facture
 }
 async function createProInvoice(sale, acc, cfg, now, key) {
   const sourceId = `email_sale_${key}`;
@@ -439,12 +505,18 @@ async function createProInvoice(sale, acc, cfg, now, key) {
   const t = parseFloat(String(lu.tva == null ? '' : lu.tva).replace(',', '.'));
   const tauxTva = isFinite(t) && t > 0 && t <= 30 ? t : null;
   const manque = FACT.manquePourFacturer(profil, { tauxTva });
-  if (manque.length) return { erreur: 'profil', manque };
+  if (manque.length) { await garderVenteEnAttenteProfil(key, sourceId, sale, acc, now, manque); return { erreur: 'profil', manque }; }
   const ttcC = FACT.centimesDe(sale.prix);
   const annee = FACT.anneeParis(new Date(now));
-  const jeton = crypto.randomBytes(16).toString('hex');
+  // 3) La réclamation atomique : UN seul traitement émet pour cette vente.
+  const claim = await reclamerSourceFacture(key, sourceId, now);
+  if (!claim) { marquerEcritureRatee(); return { erreur: 'pas-su' }; }
+  if (claim.doc) return (await assurerLigneEnvoi(key, claim.doc, sale, acc, cfg, now)) || { erreur: 'pas-su' };
+  const jeton = claim.jeton;
   const r = await FACT.emettre({
-    annee, lireIds: idsFacturesAnnee,
+    annee, jeton, lireIds: idsFacturesAnnee,
+    // Un ancien numéro `vinted_invoices` de la même année ne se redonne jamais.
+    reserves: FACT.rangsReserves(Array.isArray(lu.anciennes) ? lu.anciennes : [], annee),
     preparer: async (rang) => {
       const { doc } = FACT.construireDocument({ type: 'facture', annee, rang, emiseLe: new Date().toISOString(), profil, tauxTva, ttcC,
         designation: sale.designation || 'Article Vinted', dateVente: FACT.jourParis(new Date(now)),
@@ -1686,10 +1758,13 @@ export async function traiterEmail(req, res) {
               }); } catch (_) {}
             } else if (facture && facture.erreur === 'profil') {
               // Le geste, pas une facture fausse : sans régime de TVA ni SIREN,
-              // aucune mention n'est sûre.
+              // aucune mention n'est sûre. ⚠️ Et la phrase dit LA SUITE RÉELLE :
+              // la vente est gardée dans Factures, c'est SON clic qui émettra —
+              // l'ancienne phrase laissait croire que la facture suivrait toute
+              // seule une fois le profil complété, ce qui n'arrivait jamais.
               try { await pushOnce({
-                title: '🧾 Facture non préparée',
-                body: `${data.designation || 'Vente'} : complète « Mon entreprise » dans Factures (${(facture.manque || []).slice(0, 2).join(', ')}).`,
+                title: '🧾 Facture en attente',
+                body: `${data.designation || 'Vente'} : complète « Mon entreprise » (${(facture.manque || []).slice(0, 2).join(', ')}), puis émets sa facture depuis Factures — la vente t'y attend.`,
                 tag: `inv-profil-${key}`, url: '/?tab=invoices', _cat: 'facture',
               }); } catch (_) {}
             }
