@@ -16544,11 +16544,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   },[encaissees,urssafMois,TAUX_URSSAF]);
 
   // ── ÉVOLUTION MENSUELLE, DÉRIVÉE DU RÉCAP COMPTABLE (§11) ─────────────────
-  // On CONSOMME `moisRecap` — le même tableau que le Récap comptable mensuel
-  // (source : la ligne publiée `vinted_urssaf_mois`, sinon l'archive) : le
-  // graphique et le tableau ne peuvent donc PAS diverger, et la courbe apparaît
-  // partout où le tableau a des lignes. Les deux anciens graphiques lisaient le
-  // vieux catalogue local par `receiveDate`/`saleDate` (vide depuis la moisson) :
+  // On CONSOMME `moisRecap` (source : la ligne publiée `vinted_urssaf_mois`,
+  // sinon l'archive). Le tableau des cotisations par mois qui le rendait aussi
+  // est retiré (15 octobre) : le déclaratif vit dans Déclarations.
+  // Les deux anciens graphiques lisaient le vieux catalogue local par `receiveDate`/`saleDate` (vide depuis la moisson) :
   // Julien ne voyait plus aucune courbe alors qu'il a ~190 ventes en août.
   // `moisRecap` est du plus récent au plus ancien → on remet dans l'ordre du
   // temps et on garde 12 mois ; le dernier est le mois EN COURS (encore en
@@ -16563,20 +16562,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       return {key:m.ym||m.label,label:mc[mi]||String(mo||''),nomComplet:m.label,ca:Number(m.ca)||0,ventes:Number(m.count)||0,enCours:m.ym===curKey};
     });
   },[moisRecap]);
-
-  // Téléchargement du récap comptable MENSUEL en CSV
-  const exportCompta=()=>{
-    try{
-      const rows=[['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'Net estime']];
-      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit==null?'':m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
-      const csv=rows.map(r=>r.join(';')).join('\n');
-      const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url; a.download=`cancale-comptabilite-${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    }catch(err){ toast('Erreur export : '+err.message); }
-  };
 
   // Carte avec icône et taille
   // ⚠️ LE TABLEAU DE BORD AVAIT GARDÉ L'ANCIENNE IDENTITÉ : cartes encadrées à
@@ -17113,42 +17098,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         );
       })()}
 
-      {/* Récap comptable mensuel */}
-      {moisRecap.length>0&&(
-        <Card>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta}>📥 Exporter (CSV · Excel · Numbers)</Btn>
-          </div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-              <thead>
-                <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
-                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {moisRecap.map(m=>(
-                  <tr key={m.label} style={{borderBottom:`1px solid ${C.border}`}}>
-                    <td style={{padding:'8px 10px',fontWeight:600,color:C.accent,whiteSpace:'nowrap'}}>{m.label}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.accent}}>{m.profit==null?'—':fmt(m.profit)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(m.net)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
-          </div>
-        </Card>
-      )}
-
+      {/* (revue du 15 octobre) Le « Récap comptable mensuel » — cotisations
+          URSSAF par mois, son export, « la déclaration se fait sur
+          autoentrepreneur.urssaf.fr » et « taux réglable dans Réglages » (le
+          taux a quitté Réglages) — était le déclaratif resté ici. Il vit dans
+          Déclarations : la carte du mois, le rapport de n'importe quel mois
+          (avec ses exports) et le registre annuel. La courbe des mois, plus
+          haut, garde le CA ; ici il ne reste que la porte (en tête d'écran). */}
       {/* Récap hebdomadaire */}
       {showWeekly&&weeklyRecapData.count>0&&(
         <Card style={{borderLeft:`4px solid ${C.blue}`,background:`${C.blue}11`}}>
@@ -22038,7 +21994,11 @@ const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
 // (15 octobre) « Pack photos » et « Boost » sont des CATÉGORIES de dépense, plus
 // un formulaire à part : Julien ne veut plus saisir ses packs d'office (« c'est
 // l'extension qui doit regarder »). Il PEUT en noter un, rien ne le force.
-const COMPTA_CATS = ['Emballage', 'Fournitures', 'Logiciel & abonnement', 'Frais plateforme', 'Pack photos', 'Boost', 'Transport', 'Matériel', 'Remise en état', 'Autre'];
+// (revue du 15 octobre) « Boost » n'est PLUS une catégorie proposée : un boost
+// se note sur sa paire (« Boost payé »), qui le retire déjà du résultat — noté
+// aussi en dépense, il comptait deux fois. Une dépense « Boost » notée avant
+// reste affichée et comptée (sa catégorie est gardée telle quelle).
+const COMPTA_CATS = ['Emballage', 'Fournitures', 'Logiciel & abonnement', 'Frais plateforme', 'Pack photos', 'Transport', 'Matériel', 'Remise en état', 'Autre'];
 // Les abonnements (logiciels, plateformes…) : catégorie, périodicité, TVA.
 const ABO_CATS = ['Logiciel', 'Plateforme de vente', 'Photos & stockage', 'Téléphone & internet', 'Banque', 'Assurance', 'Local', 'Autre'];
 const PERIODES_ABO = { mois: { pas: 1, court: '/mois', long: 'par mois' }, trimestre: { pas: 3, court: '/trim.', long: 'par trimestre' }, an: { pas: 12, court: '/an', long: 'par an' } };
@@ -22103,6 +22063,37 @@ const echeancesDuMois = (data, ym) => {
     tva: tvaDe(f.montant, f.tva), paye: !!(f.payes && f.payes[ym] === true),
   }));
 };
+// LE RAPPEL DU MOIS (revue du 15 octobre) : ce qui reste à PAYER ce mois-ci.
+// UNE règle, trois lecteurs : l'écran Comptabilité (« À payer en octobre »),
+// Ma journée (la ligne « N abonnements à payer ») et « À faire » de Collectif.
+// Avant, la coque recomptait dans un effet qui ne se relançait pas sur
+// « Marquer payé » : Comptabilité disait « tout est payé », Collectif réclamait
+// encore 42 € jusqu'au rechargement (§11 : deux nombres pour une notion).
+const abonnementsAPayer = (data, ym) => {
+  const dus = echeancesDuMois(data, ym).filter(e => !e.paye);
+  return { n: dus.length, total: Math.round(dus.reduce((t, e) => t + e.montant, 0) * 100) / 100, dus };
+};
+// Le même rappel, lu là où l'écran n'a pas la ligne en main (Ma journée, la
+// coque) — et SUIVI : « payé », un ajout, un arrêt (`vrm:save` de
+// `vrm_compta`), l'arrivée du nuage, le changement de mois. `null` tant que le
+// nuage n'est pas arrivé : on ne sait pas ce qu'il a noté (jamais un « rien à
+// payer » inventé, jamais un rappel d'une vieille copie de l'appareil).
+function useAbonnementsAPayer() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_compta') setTick(t => t + 1); };
+    window.addEventListener('vrm:save', f);
+    const off = onCloudReady(() => setTick(t => t + 1));
+    return () => { window.removeEventListener('vrm:save', f); off(); };
+  }, []);
+  const ym = aujourdhuiParis().ym;
+  return useMemo(() => {
+    if (!isCloudReady()) return null;
+    let d = null; try { d = load('vrm_compta', null); } catch (_) {}
+    return abonnementsAPayer(d && typeof d === 'object' ? d : COMPTA_DEFAUT, ym);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, ym]);
+}
 // La PRÉVISION : ce qui tombera chaque mois à partir de `ymDepart` (inclus).
 const previsionAbonnements = (data, ymDepart, n = 3) => {
   const out = [], r0 = ymRang(ymDepart);
@@ -22112,6 +22103,11 @@ const previsionAbonnements = (data, ymDepart, n = 3) => {
   }
   return out;
 };
+// Les PROCHAINES échéances après le mois `ym` : les `n` premiers mois où quelque
+// chose tombe, cherchés sur l'année qui vient (revue du 15 octobre — un
+// trimestriel ou un annuel qui ne tombe pas ce mois-ci doit quand même être
+// annoncé : « novembre 45 € »).
+const prochainesEcheances = (data, ym, n = 3) => previsionAbonnements(data, ymDeRang(ymRang(ym) + 1), 12).filter(p => p.n > 0).slice(0, n);
 // Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
 // ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Un coût fixe
 // compte les mois de l'année où il a couru (jamais au-delà du mois en cours, à
@@ -22268,8 +22264,16 @@ function ComptaPro({ liveStats, onNav }) {
   const echeances = echeancesDuMois(data, moisCle);
   const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
   const chargesMois = Math.round((somme(echeances, x => x.montant) + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant)) * 100) / 100;
-  const aPayer = echeances.filter(e => !e.paye);
-  const prevision = previsionAbonnements(data, ymDeRang(ymRang(moisCle) + 1), 3).filter(p => p.n > 0);
+  // Ce qui reste à payer ce mois-ci : LA règle partagée avec Ma journée et la
+  // coque (`abonnementsAPayer`, §11).
+  const rappel = abonnementsAPayer(data, moisCle);
+  const aPayer = rappel.dus;
+  // La PRÉVISION : les trois prochains mois où quelque chose tombe, cherchés sur
+  // l'année qui vient (revue du 15 octobre). Elle vivait DANS la carte du mois,
+  // qui ne s'affiche que s'il tombe quelque chose ce mois-ci : un trimestriel ou
+  // un annuel qui ne tombe pas en octobre faisait disparaître la prévision —
+  // « 45 € en novembre » n'était dit nulle part.
+  const prevision = prochainesEcheances(data, moisCle);
 
   // ── LE RÉSULTAT : celui du bilan annuel, par la MÊME règle (§11) ──────────
   // L'écran Ventes publie le registre de l'année (`vrm_resultat_annee` : CA des
@@ -22331,25 +22335,40 @@ function ComptaPro({ liveStats, onNav }) {
   const moisLong = (ym) => MOIS_LONGS[(Number(String(ym || '').slice(5, 7)) || 1) - 1];
   const deMois = (ym) => { const m = moisLong(ym); return /^[aeiou]/i.test(m) ? `d'${m}` : `de ${m}`; };
   const dateCourte = (d) => String(d || '').split('-').reverse().join('/');
-  // Export CSV pour le comptable : dépenses, packs notés, échéances des
-  // abonnements (avec leur TVA quand elle est connue). Le TOTAL est celui de
-  // l'écran (`comptaChargesAnnee`, §11).
+  // Export CSV pour le comptable : dépenses, packs notés, et UNE LIGNE PAR
+  // ÉCHÉANCE d'abonnement (revue du 15 octobre). Avant, un abonnement sortait en
+  // une ligne non datée (« x10 echeances ») et la colonne TVA mélangeait le taux
+  // et le montant dans du texte (« 5,5 % · 5.50 ») : un comptable ne pouvait ni
+  // la sommer ni la trier. Chaque colonne porte maintenant UNE valeur, les
+  // nombres avec le même point décimal que les autres exports (registre,
+  // rapport). L'échéance est datée par son MOIS (le jour n'est pas connu : il
+  // n'est pas inventé). Les lignes suivent la règle de l'écran (`echeanceFixeEn`,
+  // jamais au-delà du mois en cours) et leur somme est le TOTAL de l'écran
+  // (`comptaChargesAnnee`, §11).
   const exporterCharges = () => {
     const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-    const L = [[`Depenses ${annee}`], [], ['Date', 'Type', 'Categorie', 'Libelle', 'Montant TTC', 'TVA', 'Montant HT']];
-    depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([dateCourte(d.date), 'Depense', d.cat || '', d.libelle || '', (Number(d.montant) || 0).toFixed(2), '', '']));
-    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([dateCourte(p.date), 'Depense', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2), '', '']));
-    // Chaque abonnement avec ses échéances de l'année (même règle que l'écran).
-    charges.fixesLignes.forEach(f => {
-      const per = PERIODES_ABO[f.periode] || PERIODES_ABO.mois;
-      const tv = f.tva ? `${String(f.tva.taux).replace('.', ',')} % · ${(f.tva.tva * f.mois).toFixed(2)}` : '';
-      L.push(['', `Abonnement ${per.long} x${f.mois} echeance${f.mois > 1 ? 's' : ''} (depuis ${f.debut}${f.fin ? ' jusqu\'a ' + f.fin : ''})`, f.cat || '', f.libelle || '', f.total.toFixed(2), tv, f.tva ? (f.tva.ht * f.mois).toFixed(2) : '']);
+    const n2 = (v) => (Number(v) || 0).toFixed(2);
+    const L = [[`Depenses ${annee}`], [], ['Mois', 'Date', 'Type', 'Categorie', 'Libelle', 'Montant TTC', 'Taux TVA (%)', 'TVA', 'Montant HT', 'Coche payee']];
+    const lignes = [];
+    depenses.filter(d => cetteAnnee(d.date)).forEach(d => lignes.push([String(d.date).slice(0, 7), dateCourte(d.date), 'Depense', d.cat || '', d.libelle || '', n2(d.montant), '', '', '', '']));
+    packs.filter(p => cetteAnnee(p.date)).forEach(p => lignes.push([String(p.date).slice(0, 7), dateCourte(p.date), 'Depense', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, n2(p.montant), '', '', '', '']));
+    fixes.forEach(f => {
+      if (!YM_COMPTA.test(String(f.debut || ''))) return;
+      const tv = tvaDe(f.montant, f.tva), per = PERIODES_ABO[periodeAbo(f)];
+      for (let m = 1; m <= 12; m++) {
+        const ym = `${annee}-${String(m).padStart(2, '0')}`;
+        if (ym > moisCle || !echeanceFixeEn(f, ym)) continue;
+        lignes.push([ym, '', `Abonnement ${per.long}`, f.cat || '', f.libelle || '', n2(f.montant),
+          tv ? String(tv.taux) : '', tv ? n2(tv.tva) : '', tv ? n2(tv.ht) : '', (f.payes && f.payes[ym] === true) ? 'oui' : 'non']);
+      }
     });
-    if (charges.fixesSansDebut) L.push(['', `${charges.fixesSansDebut} abonnement(s) sans date de debut : non compte(s)`, '', '', '', '', '']);
-    L.push(['', '', '', 'TOTAL', chargesAnnee.toFixed(2), '', '']);
+    lignes.sort((a, b) => a[0].localeCompare(b[0]) || String(a[1]).split('/').reverse().join('').localeCompare(String(b[1]).split('/').reverse().join('')));
+    L.push(...lignes);
+    if (charges.fixesSansDebut) L.push(['', '', `${charges.fixesSansDebut} abonnement(s) sans date de debut : non compte(s)`, '', '', '', '', '', '', '']);
+    L.push(['', '', '', '', 'TOTAL', chargesAnnee.toFixed(2), '', '', '', '']);
     const csv = L.map(r => r.map(e).join(';')).join('\n');
     try {
-      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob); const a = document.createElement('a');
       a.href = url; a.download = `depenses-${annee}.csv`; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 3000);
@@ -22405,6 +22424,21 @@ function ComptaPro({ liveStats, onNav }) {
   const depAnnee = lignesDep.filter(l => cetteAnnee(l.date)), depAvant = lignesDep.filter(l => !cetteAnnee(l.date));
   const parMois = (arr) => { const g = []; for (const l of arr) { const ym = String(l.date).slice(0, 7); const last = g[g.length - 1]; if (last && last.ym === ym) last.l.push(l); else g.push({ ym, l: [l] }); } return g; };
   const groupesDep = parMois(dTout ? lignesDep : depAnnee);
+  // ── PACKS PHOTOS ET BOOSTS : CE QUE L'ÉCRAN SAIT, À SA PLACE (revue du 15
+  // octobre). La carte disait « ils ne sont comptés nulle part, note-les dans
+  // Dépenses (catégorie Boost) » — or un boost se note sur SA PAIRE (« Boost
+  // payé ») et il est DÉJÀ retiré du résultat par le registre : noté une
+  // seconde fois en dépense, il comptait deux fois (180 − 90 − 5 − 5 = 80 au
+  // lieu de 85). Elle ne pouvait d'ailleurs rien afficher (§7). Elle dit
+  // maintenant ce qui est noté, et où chaque chose se note :
+  //   · les boosts : la somme des « Boost payé » des ventes de l'année, PUBLIÉE
+  //     par le registre (`vrm_resultat_annee.boosts`, §11) — jamais recomptée
+  //     ici ; publication absente ou d'avant ⇒ « — » (pas su) ;
+  //   · les packs photos : les dépenses « Pack photos » de l'année (et les
+  //     packs notés avant le 15 octobre), déjà dans la liste et les totaux.
+  const packsAnnee = depAnnee.filter(l => l.cat === 'Pack photos');
+  const boostsVentes = (pubAnnee && pubAnnee.boosts && isFinite(Number(pubAnnee.boosts.eur)))
+    ? { n: Number(pubAnnee.boosts.n) || 0, eur: Number(pubAnnee.boosts.eur) } : null;
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -22414,14 +22448,19 @@ function ComptaPro({ liveStats, onNav }) {
       <ScreenHead icon="euro" title="Comptabilité" desc="Tes dépenses, tes abonnements et ce qu'ils te coûtent."
         right={<button type="button" data-vers-declarations onClick={() => onNav && onNav('fiscal')} style={btn2}><Icon name="doc" size={14} />Déclarations URSSAF</button>} />
 
-      {/* ── LE MOIS EN TROIS CHIFFRES ──────────────────────────────────────── */}
+      {/* ── LE MOIS EN TROIS CHIFFRES ──────────────────────────────────────────
+          (revue du 15 octobre) « Dépenses » désignait trois totaux : le mois
+          avec les abonnements, la section sans eux, et l'année. Le mot
+          « Dépenses » ne nomme plus que la section (ce qu'il paie une fois) ;
+          les totaux s'appellent « Total » et disent ce qu'ils additionnent.
+          Chacun ne s'écrit qu'UNE fois sur l'écran (§7). */}
       <div className="vrm-finance-charges" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
-          { l: `Dépenses ${deMois(moisCle)}`, v: fmt(chargesMois), s: 'dépenses + abonnements' },
-          { l: 'Abonnements', v: fmt(fixesParMois), s: (() => { const n = fixes.filter(f => fixeActifEn(f, moisCle)).length; return n ? `par mois · ${n} en cours` : fixes.length ? 'aucun en cours' : 'aucun noté'; })() },
-          { l: `Total dépenses ${annee}`, v: fmt(chargesAnnee), s: 'depuis janvier' },
+          { id: 'mois', l: `Total ${deMois(moisCle)}`, v: fmt(chargesMois), s: 'dépenses + abonnements' },
+          { id: 'abonnements', l: 'Abonnements', v: fmt(fixesParMois), s: (() => { const n = fixes.filter(f => fixeActifEn(f, moisCle)).length; return n ? `par mois · ${n} en cours` : fixes.length ? 'aucun en cours' : 'aucun noté'; })() },
+          { id: 'annee', l: `Total ${annee}`, v: fmt(chargesAnnee), s: 'dépenses + abonnements' },
         ].map((x, i) => (
-          <Card key={i} style={{ padding: '13px 15px' }}>
+          <Card key={i} data-compta-total={x.id} style={{ padding: '13px 15px' }}>
             {/* Lettres resserrées : à 390 px trois colonnes, et « ABONNEMENTS » se
                 coupait au milieu du mot (« ABONNEMENT / S »). */}
             <div style={{ ...sousTitre, letterSpacing: 0.2 }}>{x.l}</div>
@@ -22434,13 +22473,15 @@ function ComptaPro({ liveStats, onNav }) {
       {/* ── LE RAPPEL DU MOIS : CE QUI TOMBE, PRÉVU OU PAYÉ ───────────────────
           Le rappel mensuel demandé, DANS l'app (aucun envoi de plus) : la cloche
           porte la même ligne (`echeancesDuMois`, §11). « Payé » se coche ici. */}
-      {echeances.length > 0 && (
+      {(echeances.length > 0 || prevision.length > 0) && (
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div data-rappel-abos={aPayer.length} data-rappel-total={somme(aPayer, x => x.montant).toFixed(2)} style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text, flex: 1, minWidth: 0 }}>
-              {aPayer.length ? `À payer en ${moisLong(moisCle)}` : `${moisLong(moisCle).replace(/^./, c => c.toUpperCase())} : tout est payé`}
+          <div data-rappel-abos={rappel.n} data-rappel-total={rappel.total.toFixed(2)} style={{ padding: '13px 16px', borderBottom: echeances.length ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: echeances.length ? C.text : C.muted, flex: 1, minWidth: 0 }}>
+              {aPayer.length ? `À payer en ${moisLong(moisCle)}`
+                : echeances.length ? `${moisLong(moisCle).replace(/^./, c => c.toUpperCase())} : tout est payé`
+                : `Aucun abonnement à payer en ${moisLong(moisCle)}`}
             </h3>
-            {aPayer.length > 0 && <span className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fmt(somme(aPayer, x => x.montant))}</span>}
+            {aPayer.length > 0 && <span className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fmt(rappel.total)}</span>}
           </div>
           {echeances.map((e, i) => (
             <div key={e.id} data-echeance={e.id} data-echeance-statut={e.paye ? 'paye' : 'prevu'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -22461,7 +22502,10 @@ function ComptaPro({ liveStats, onNav }) {
       )}
 
       {/* ── DÉPENSES ─────────────────────────────────────────────────────── */}
-      {section({ id: 'depenses', titre: 'Dépenses', note: 'Emballage, fournitures, frais… tout ce que tu paies pour ton activité.', total: depAnnee.length ? fmt(somme(depAnnee, x => x.montant)) : null }, <>
+      {/* Pas de total dans l'en-tête (revue du 15 octobre) : c'était un
+          quatrième « dépenses » (l'année sans les abonnements). Les totaux
+          vivent en haut, les sous-totaux par mois dans la liste. */}
+      {section({ id: 'depenses', titre: 'Dépenses', note: 'Emballage, fournitures, frais… ce que tu paies une fois. Les abonnements sont plus bas.' }, <>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="date" aria-label="Date de la dépense" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
           <input type="text" aria-label="Libellé de la dépense" placeholder="Ex. scotch, cartons" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
@@ -22477,7 +22521,9 @@ function ComptaPro({ liveStats, onNav }) {
               <div key={g.ym || 'sans'} data-dep-mois={g.ym}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, margin: '14px 2px 0', ...sousTitre }}>
                   <span>{g.ym ? moisTexte(g.ym) : 'Sans date'}</span>
-                  <span className="vrm-display" style={{ letterSpacing: 0 }}>{fmt(somme(g.l, x => x.montant))}</span>
+                  {/* Un seul achat dans le mois : son sous-total est son montant,
+                      écrit juste dessous — pas deux fois (§7). */}
+                  {g.l.length > 1 && <span className="vrm-display" style={{ letterSpacing: 0 }}>{fmt(somme(g.l, x => x.montant))}</span>}
                 </div>
                 {listeBox(g.l.map((l, i) => (
                   <div key={l.cle + l.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -22497,7 +22543,9 @@ function ComptaPro({ liveStats, onNav }) {
       {/* ── ABONNEMENTS ───────────────────────────────────────────────────────
           Chacun court de son mois de début à son mois d'arrêt (revue du 9
           octobre), et tombe selon sa périodicité (15 octobre). */}
-      {section({ id: 'abonnements', titre: 'Abonnements', note: 'Logiciels, plateformes, téléphone… ajoutés une fois, comptés à chaque échéance.', total: fixesParMois ? `≈ ${fmt(fixesParMois)} /mois` : null }, <>
+      {/* Le tarif par mois est déjà dans la carte « Abonnements » du haut : il
+          ne s'écrit pas une seconde fois ici (§7, revue du 15 octobre). */}
+      {section({ id: 'abonnements', titre: 'Abonnements', note: 'Logiciels, plateformes, téléphone… ajoutés une fois, comptés à chaque échéance.' }, <>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="text" aria-label="Nom de l'abonnement" placeholder="Ex. Canva, forfait mobile" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 170px' }} />
           <input type="text" inputMode="decimal" aria-label="Montant TTC de l'abonnement" placeholder="€ TTC" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 90 }} />
@@ -22547,13 +22595,24 @@ function ComptaPro({ liveStats, onNav }) {
           son montant (Leboncoin : seule la GRILLE de prix est relevée, jamais un
           achat ; Vinted : 1 ligne de porte-monnaie captée, un virement). Rien
           n'est donc compté, et c'est dit — jamais un montant inventé. */}
-      <Card style={{ padding: '14px 16px' }}>
-        <div data-frais-captes="aucun" style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text, flex: 1, minWidth: 0 }}>Packs photos et boosts</h3>
-          <span className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.muted }}>—</span>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <h3 style={{ margin: 0, padding: '13px 16px', fontSize: 15, fontWeight: 700, color: C.text, borderBottom: `1px solid ${C.border}` }}>Packs photos et boosts</h3>
+        <div data-boosts-ventes={boostsVentes ? boostsVentes.eur.toFixed(2) : ''} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '10px 16px' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text }}>Boosts payés, sur tes ventes {annee}
+            <span style={{ fontSize: 11.5, color: C.muted }}> · {!boostsVentes ? 'ventes pas encore lues ici' : boostsVentes.n ? `${boostsVentes.n} vente${boostsVentes.n > 1 ? 's' : ''} · retirés de ton résultat, pas des dépenses` : 'aucun noté'}</span>
+          </span>
+          <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: boostsVentes ? C.text : C.muted, whiteSpace: 'nowrap' }}>{boostsVentes ? fmt(boostsVentes.eur) : '—'}</span>
         </div>
-        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.55, marginTop: 6 }}>
-          Aucun achat capté : Leboncoin et Vinted ne montrent pas encore ces paiements à l'extension, ils ne sont donc comptés nulle part. Si tu en as payé un, note-le dans Dépenses (catégorie « Pack photos » ou « Boost »).
+        <div data-packs-notes={somme(packsAnnee, x => x.montant).toFixed(2)} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '10px 16px', borderTop: `1px solid ${C.border}` }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text }}>Packs photos, dans tes dépenses {annee}
+            <span style={{ fontSize: 11.5, color: C.muted }}> · {packsAnnee.length ? `${packsAnnee.length} noté${packsAnnee.length > 1 ? 's' : ''}` : 'aucun noté'}</span>
+          </span>
+          <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(somme(packsAnnee, x => x.montant))}</span>
+        </div>
+        {/* Rien n'est CAPTÉ automatiquement (mesuré le 15 octobre) : dit une
+            fois, avec où chaque chose se note — jamais un montant inventé. */}
+        <div data-frais-captes="aucun" style={{ padding: '10px 16px', borderTop: `1px solid ${C.border}`, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          Un boost se note sur sa paire (Annonces → Gérer l'annonce → « Boost payé »), un pack photos dans Dépenses. Rien n'est capté tout seul pour l'instant : Leboncoin et Vinted ne montrent pas ces paiements à l'extension.
         </div>
       </Card>
 
@@ -22566,13 +22625,12 @@ function ComptaPro({ liveStats, onNav }) {
         <div style={{ height: 3, background: C.accent }} />
         <div data-resultat-compta={!pubAnnee ? 'absent' : resultat.etat} data-resultat-valeur={resultat && resultat.valeur != null ? resultat.valeur.toFixed(2) : ''}
           data-resultat-causes={resultat ? resultat.causes.map(c => c.code).join(',') : ''} style={{ padding: '16px 18px' }}>
-          <div style={{ ...sousTitre, letterSpacing: 1, marginBottom: 10 }}>Résultat {annee} · après tes dépenses</div>
+          <div style={{ ...sousTitre, letterSpacing: 1, marginBottom: 10 }}>Résultat {annee} · après dépenses et abonnements</div>
+          {/* (revue du 15 octobre) Le total de l'année est déjà en haut (« Total
+              {annee} ») : il ne s'écrit pas une seconde fois ici (§7). */}
           {!pubAnnee ? (
             <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-                <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
-                <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes dépenses {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
-              </div>
+              <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
                 Ton résultat s'affiche dès que tes ventes de l'année arrivent sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={btnLien}>Ventes</button> une fois.
               </div>
@@ -22589,12 +22647,9 @@ function ComptaPro({ liveStats, onNav }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 12.5, color: C.muted }}>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(pubAnnee.ca)}</span>
                 <span>de ventes finalisées ({pubAnnee.nb})</span>
-                <span style={{ color: C.border }}>—</span>
-                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
-                <span>de dépenses</span>
               </div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                Résultat = tes ventes − le coût d'achat de tes paires − tes boosts − tes dépenses, comme dans le registre annuel. Ventes datées au versement de l'argent{pubAnnee.at ? ` · calculé à ta dernière ouverture de Ventes, ${ilYaCourt(pubAnnee.at)}` : ''}.
+                Résultat = tes ventes − le coût d'achat de tes paires − leurs boosts − ton total {annee} (dépenses + abonnements), comme dans le registre annuel. Ventes datées au versement de l'argent{pubAnnee.at ? ` · calculé à ta dernière ouverture de Ventes, ${ilYaCourt(pubAnnee.at)}` : ''}.
               </div>
             </div>
           )}
@@ -22843,6 +22898,10 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
   const [facturesVentes,setFacturesVentes]=useState([]);
+  // Les abonnements du mois pas encore cochés « payé » — la ligne de Ma journée
+  // (revue du 15 octobre : le rappel n'apparaissait que sous Autres outils →
+  // Collectif ; la cloche qui devait le porter ne s'ouvre nulle part).
+  const abosAPayer = useAbonnementsAPayer();
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
@@ -28367,6 +28426,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0, benef:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     let nMasq=0, caMasq=0;
+    // Les « Boost payé » des ventes de l'année (revue du 15 octobre), comptés
+    // dans les MÊMES lignes que `frais` : la carte « Packs photos et boosts » de
+    // la Comptabilité les consomme (publiés plus bas) — jamais recomptés ailleurs.
+    let boostsN=0, boostsCts=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
     // ⚠️ MÊME SOURCE QUE LE RAPPORT MENSUEL ET LE TABLEAU DE BORD (6 octobre,
     //    §11) : `declarables`. Les comptes EXCLUS n'y sont pas, les ventes
@@ -28392,6 +28455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const e = effEntry(l.o); fee = chargesVente(e);
         const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
         if (b!=null && !isNaN(b)) buy = b;
+        { const bc = centimes(e && e.fees); if (bc > 0) { boostsN += 1; boostsCts += bc; } }
         num = (e && e.numero) || ''; account = l.o._acc ? accName(l.o._acc) : '';
         const uV = String(l.o._acc?.vinted_user_id ?? ''); const qV = vintedParUid[uV] || (vintedParUid[uV] = { n: 0, cts: 0 });
         qV.n += 1; qV.cts += Math.round(sell * 100);
@@ -28446,7 +28510,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultat, resultatCharges, aDaterAnnee, manque,
+    return { boosts: { n: boostsN, eur: boostsCts / 100 }, regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultat, resultatCharges, aDaterAnnee, manque,
       enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted,
       // La partie Vinted du registre, par compte, en TROIS états : `undefined`
       // tant qu'elle se lit, `null` quand les dates de versement sont
@@ -28471,9 +28535,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (annual.year !== aujourdhuiParis().y || declRapport.vinted !== 'lu' || nomsVentesKO.length) return;
       const r2 = (x) => Math.round(x * 100) / 100;
       const charge = { annee: annual.year, ca: r2(annual.ca), nb: annual.nb, nbCout: annual.nbCout, benefNet: r2(annual.benefNet),
-        aDater: { n: annual.aDaterAnnee.n, eur: annual.aDaterAnnee.eur }, manque: annual.manque };
+        aDater: { n: annual.aDaterAnnee.n, eur: annual.aDaterAnnee.eur }, manque: annual.manque,
+        boosts: { n: annual.boosts.n, eur: r2(annual.boosts.eur) } };
       const avant = load('vrm_resultat_annee', null);
-      const memeChose = avant && JSON.stringify({ annee: avant.annee, ca: avant.ca, nb: avant.nb, nbCout: avant.nbCout, benefNet: avant.benefNet, aDater: avant.aDater, manque: avant.manque }) === JSON.stringify(charge);
+      const memeChose = avant && JSON.stringify({ annee: avant.annee, ca: avant.ca, nb: avant.nb, nbCout: avant.nbCout, benefNet: avant.benefNet, aDater: avant.aDater, manque: avant.manque, boosts: avant.boosts }) === JSON.stringify(charge);
       // `at` dit QUAND ce registre a été vu pour la dernière fois (l'onglet
       // l'écrit : « calculé il y a 3 h ») — remis à l'heure au plus toutes les
       // 10 minutes, même inchangé.
@@ -29187,6 +29252,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        // ⚠️ LE RAPPEL MENSUEL DES ABONNEMENTS (revue du 15 octobre). Julien :
+        //    « ça nous rappelle tous les mois combien on dépense ». Il était
+        //    promis « dans la cloche » — un panneau que rien n'ouvre — et ne
+        //    vivait que sous Autres outils → Collectif. Il est ici, sur l'écran
+        //    qu'il ouvre le matin, par LA règle de l'écran Comptabilité
+        //    (`abonnementsAPayer`, §11) : il part dès que tout est coché « payé ».
+        //    Neutre (pas d'urgence : c'est souvent prélevé tout seul), et pas le
+        //    premier jour (la carte des premiers pas passe avant tout).
+        if(!premierJour && abosAPayer && abosAPayer.n>0) jobs.push({id:'abonnements',n:abosAPayer.n,icon:'calendar',color:C.muted,
+          title:`${abosAPayer.n} abonnement${abosAPayer.n>1?'s':''} à payer`,
+          sub:`${fmt(abosAPayer.total)} ce mois-ci — coche « payé » dans Comptabilité`,tab:'compta',prio:5.5});
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -40233,17 +40309,8 @@ function AppCoeur() {
         // (15 octobre) Le déclaratif vit dans Déclarations, plus dans Statistiques.
         if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'fiscal'});
       }
-      // Les abonnements du mois (15 octobre) — « ça nous rappelle tous les mois
-      // combien on dépense ». La MÊME règle que l'écran Comptabilité
-      // (`echeancesDuMois`, §11) ; tant que le nuage n'est pas arrivé on ne sait
-      // pas ce qu'il a noté : on se tait (jamais un « rien à payer » inventé).
-      {
-        let ab=null; try{ ab=isCloudReady()?load('vrm_compta',null):null; }catch(_){}
-        if(ab && typeof ab==='object'){
-          const dus=echeancesDuMois(ab,aujourdhuiParis().ym).filter(e=>!e.paye);
-          if(dus.length) items.push({icon:'🧾', ic:'calendar', text:`${dus.length} abonnement${dus.length>1?'s':''} à payer ce mois-ci — ${fmt(dus.reduce((t,e)=>t+e.montant,0))}`, n:dus.length, tab:'compta'});
-        }
-      }
+      // (Les abonnements du mois ne sont PLUS calculés ici : cet effet ne se
+      // relance pas quand il coche « payé » — voir `actionsDuJour` plus bas.)
       setNotifItems(items);
       // Le mémo des conversations reste borné (les plus récentes gardées).
       { const ks=Object.keys(nextSeen); if(ks.length>4000){ const garde={}; ks.slice(-4000).forEach(k=>{ garde[k]=nextSeen[k]; }); save('vinted_notif_seen_convs',garde); } else save('vinted_notif_seen_convs',nextSeen); }
@@ -40286,6 +40353,18 @@ function AppCoeur() {
   // l'arrivée du nuage.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vintedAccounts, colisTick, nuagePret, preuveTick]);
+  // ⚠️ LES ABONNEMENTS DU MOIS, HORS DE L'EFFET CI-DESSUS (revue du 15
+  //    octobre). Calculés dedans, ils n'étaient relus qu'au changement de
+  //    comptes, de colis, de nuage ou de preuve : « Marquer payé » dans
+  //    Comptabilité laissait « 2 abonnements à payer — 42,00 € » dans « À
+  //    faire » de Collectif jusqu'au rechargement, pendant que Comptabilité
+  //    disait « tout est payé ». LA règle de l'écran (`abonnementsAPayer`),
+  //    suivie par `useAbonnementsAPayer` (chaque enregistrement de
+  //    `vrm_compta`, l'arrivée du nuage, le changement de mois).
+  const abosAPayer = useAbonnementsAPayer();
+  const actionsDuJour = useMemo(() => (abosAPayer && abosAPayer.n > 0)
+    ? [...notifItems, { icon:'🧾', ic:'calendar', text:`${abosAPayer.n} abonnement${abosAPayer.n>1?'s':''} à payer ce mois-ci — ${fmt(abosAPayer.total)}`, n:abosAPayer.n, tab:'compta' }]
+    : notifItems, [notifItems, abosAPayer]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
@@ -40603,9 +40682,9 @@ function AppCoeur() {
         <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
           <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
             <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>🔔 Notifications</div>
-            {notifItems.length===0 ? (
+            {actionsDuJour.length===0 ? (
               <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
-            ) : notifItems.map((it,i)=>(
+            ) : actionsDuJour.map((it,i)=>(
               <button type="button" key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>{it.icon}</span>
@@ -40876,8 +40955,8 @@ function AppCoeur() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={actionsDuJour} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={actionsDuJour} premierJour={premierJour}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les

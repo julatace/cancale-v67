@@ -307,7 +307,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     const cartes = await pg.evaluate(() => {
       const l = document.body.innerText.split('\n').map((x) => x.trim()).filter(Boolean);
       const v = (re) => { const i = l.findIndex((x) => re.test(x)); return i < 0 ? null : l[i + 1]; };
-      return { total: v(/^total (charges|dépenses) 2026$/i), mois: v(/^(abonnements|coûts fixes \/ mois)$/i) };
+      return { total: v(/^total (charges |dépenses )?2026$/i), mois: v(/^(abonnements|coûts fixes \/ mois)$/i) };
     });
     dit(nombre(cartes.total) === 70, '[fixes] « Total charges 2026 » le 15 octobre : 30 € (octobre) + 2 × 20 € (août, septembre) = 70 € (avant : 50 € × 10 mois)', `« ${cartes.total} »`);
     dit(nombre(cartes.mois) === 30, '[fixes] « Coûts fixes / mois » ne compte que ce qui court ce mois-ci', `« ${cartes.mois} »`);
@@ -351,7 +351,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     dit(!!h && h.valeur === '—' && /pas encore datée/.test(h.suite) && /1 vente sur 3/.test(h.suite), '[390 px] le héro dit « — » et les DEUX causes, d’une phrase', h ? h.suite : '');
     // Les gestes : « Arrêter » garde le poste (et son mois en cours), « depuis
     // quand ? » le fait compter. Jugé sur la ligne rangée ET sur le total rendu.
-    const total = () => pg.evaluate(() => { const l = document.body.innerText.split('\n').map((x) => x.trim()).filter(Boolean); const i = l.findIndex((x) => /^total (charges|dépenses) 2026$/i.test(x)); return i < 0 ? null : l[i + 1]; });
+    const total = () => pg.evaluate(() => { const l = document.body.innerText.split('\n').map((x) => x.trim()).filter(Boolean); const i = l.findIndex((x) => /^total (charges |dépenses )?2026$/i.test(x)); return i < 0 ? null : l[i + 1]; });
     dit(nombre(await total()) === 82, '[390 px] avant les gestes : 30 + 2 × 20 + 12 = 82 € (le poste sans début n’est pas compté)', await total());
     await pg.click('[data-fixe-arreter]');
     await pg.waitForTimeout(900);

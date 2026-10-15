@@ -9066,9 +9066,10 @@ d'office : c'est l'extension qui doit regarder ».
   (`previsionAbonnements`). « Payé » ne change aucun total : une échéance est due.
   La fenêtre froide rejoue un « payé » mois par mois (`op: 'paye'`), sans
   effacer les mois payés ailleurs.
-- **Rappel mensuel dans l'app, sans cron** : la cloche porte « N abonnements à
-  payer ce mois-ci — X € » (`tab: 'compta'`), par la MÊME règle ; rien tant que
-  le nuage n'est pas arrivé.
+- **Rappel mensuel dans l'app, sans cron** : ~~la cloche porte~~ (⚠️ FAUX, voir
+  la revue ci-dessous : aucun bouton n'ouvre ce panneau) — **Ma journée** porte
+  « N abonnements à payer — X € », et « À faire » de Collectif aussi, par la
+  MÊME règle (`abonnementsAPayer`) ; rien tant que le nuage n'est pas arrivé.
 - **Packs photos et boosts** : le formulaire « Packs de photos » est retiré. Les
   packs notés avant restent dans la liste des dépenses et dans les totaux.
   **Mesuré le 15 octobre (lecture seule)** : aucune source ne porte un ACHAT de
@@ -9079,8 +9080,9 @@ d'office : c'est l'extension qui doit regarder ».
   sera à la prochaine visite de la page qui les charge, sans changer
   l'extension) ; Vinted : 10 lignes `harvest_*_billing`, UNE ligne
   `invoice_lines` (un virement), 0 relevé. Donc rien n'est compté
-  automatiquement, et la carte « Packs photos et boosts » dit « — » et pourquoi.
-  **Ne pas écrire l'analyseur avant d'avoir la forme d'un achat** (§4.10).
+  automatiquement — **et la carte ne dit plus « — » seulement** (revue
+  ci-dessous : elle dit ce qui est noté, et où). **Ne pas écrire l'analyseur
+  avant d'avoir la forme d'un achat** (§4.10).
 - **Déclarations** (onglet `fiscal`, Gestion) : la carte URSSAF du mois
   (`CarteUrssafMois`, déplacée de Statistiques, mêmes champs de la ligne publiée,
   plus le repli sur l'archive vide « 0,00 € »), le rapport du mois (« J'ai
@@ -9114,6 +9116,75 @@ d'office : c'est l'extension qui doit regarder ».
 - **Non fait** : pièces jointes (justificatifs) — il faut un compartiment privé
   par vendeur, une migration ; frais par vente agrégés (ils vivent dans Ventes,
   `beneficePaire`) ; SIREN, profils fiscaux, avoirs (lots à part).
+
+#### Revue du même lot (15 octobre, soir) : sept défauts, tous reproduits au rendu
+Chacun reproduit d'abord (sonde du relecteur sur le build de 63782f2, données
+inventées), corrigé, puis rouge sur 63782f2 et sous mutation.
+- ⚠️⚠️ **« Marquer payé » ne quittait pas « À faire »** : Comptabilité disait
+  « Octobre : tout est payé », Collectif « 2 abonnements à payer — 42,00 € »
+  jusqu'au rechargement. Le rappel était calculé dans l'effet de la coque
+  (`notifItems`), qui ne se relance que sur comptes / colis / nuage / preuve.
+  ⇒ **UNE règle** `abonnementsAPayer(data, ym)` (ce qui tombe, moins le coché
+  « payé ») pour l'écran, Ma journée et « À faire » ; hors de l'écran elle est
+  lue par **`useAbonnementsAPayer()`**, qui suit le `vrm:save` de `vrm_compta`,
+  l'arrivée du nuage et le mois (`null` avant le nuage : rien d'inventé). La
+  coque ajoute la ligne à `notifItems` dans `actionsDuJour` (un `useMemo`), plus
+  dans l'effet. `audit-compta-abonnements` exige que SEULS la règle, la
+  prévision et l'écran lisent `echeancesDuMois`.
+- ⚠️ **Le rappel mensuel n'était nulle part où il regarde** : la « cloche »
+  (`notifOpen`) n'a **aucun bouton qui l'ouvre** (0 `setNotifOpen(true)`, vérifié
+  — ne pas la « réparer » sans qu'il la demande, §4.11), et Dashboard reçoit
+  `actions` sans les afficher. ⇒ Une ligne sur **Ma journée**
+  (`data-job="abonnements"`, neutre, `prio` 5.5, pas le premier jour), qui mène
+  à Comptabilité. **Tranché : pas de notification push** — il faudrait recopier
+  la règle d'échéance côté serveur (§11), et le lot dit « sans cron ».
+- ⚠️ **La carte « Packs photos et boosts » faisait compter un boost deux fois** :
+  « ils ne sont comptés nulle part, note-les dans Dépenses (Boost) » — alors que
+  le « Boost payé » d'une paire est DÉJÀ retiré du résultat par le registre
+  (`frais`). Suivi, le conseil donnait 180 − 90 − 5 − 5 = 80 au lieu de 85. Et la
+  carte ne pouvait rien afficher (§7). ⇒ Le registre **publie ses boosts**
+  (`vrm_resultat_annee.boosts` = la somme des `fees` des ventes Vinted de
+  l'année, dans les MÊMES lignes que `frais`) ; la carte les dit (« retirés de
+  ton résultat, pas des dépenses », « — » si la publication manque), avec les
+  packs photos notés dans Dépenses, et UNE phrase : où chaque chose se note,
+  rien n'est capté tout seul. **« Boost » n'est plus une catégorie de dépense**
+  (`COMPTA_CATS`) ; une dépense « Boost » notée avant reste affichée et comptée.
+  Mesuré en production (lecture seule) : `vrm_compta` n'existe chez aucun des
+  3 propriétaires, 0 « Boost payé » saisi — rien à migrer.
+- **La prévision disparaissait** quand rien ne tombait ce mois-ci (un
+  trimestriel, un annuel) : elle vivait dans la carte du mois. ⇒ La carte
+  s'affiche aussi pour la seule prévision (« Aucun abonnement à payer en
+  octobre » · « Ensuite : novembre 45,00 € »), et `prochainesEcheances` cherche
+  les trois prochains mois qui portent une échéance sur l'année qui vient.
+- **Statistiques gardait le déclaratif** (« Récap comptable mensuel » :
+  cotisations par mois, export, « taux réglable dans Réglages » — d'où il est
+  parti) : **retiré** ; la courbe des mois reste, la porte vers Déclarations
+  aussi. Le déclaratif par mois vit dans Déclarations (carte du mois, rapport
+  de n'importe quel mois et ses exports, registre).
+- **Le même nombre deux fois, et « Dépenses » pour trois totaux** : « Abonnements
+  32,00 € » et « ≈ 32,00 € /mois » ; le total de l'année répété dans la carte du
+  résultat ; un total « Dépenses » (sans les abonnements) dans l'en-tête de la
+  section. ⇒ Les totaux s'appellent « Total d'octobre » / « Total 2026 »
+  (« dépenses + abonnements »), « Dépenses » ne nomme plus que la section (ce
+  qu'il paie une fois, sans total d'en-tête), le résultat ne répète plus le
+  total ; un mois de la liste à un seul achat n'écrit plus son sous-total.
+- **Le CSV des dépenses** : la colonne TVA mélangeait taux et montant (« 5,5 % ·
+  5.50 ») et un abonnement sortait en une ligne non datée. ⇒ Colonnes Mois ·
+  Date · Type · Catégorie · Libellé · Montant TTC · Taux TVA (%) · TVA · Montant
+  HT · Coche payée ; **une ligne par échéance**, datée par son mois (le jour
+  n'est pas inventé) ; nombres au point décimal, comme le registre et le
+  rapport ; la somme des lignes = le TOTAL de l'écran.
+- Preuves : `audit-compta-abonnements.cjs` **7 rouges sur 63782f2**, et rouge
+  sous ses 3 nouvelles mutations (`suivi` 1, `prevision` 2, `boostcat` 1 ;
+  `cloche` réécrite sur la règle partagée, 2). Banc `compta-abonnements.cjs`
+  (60 contrôles, port 5972) **14 rouges sur le build de 63782f2**, et rouge sur
+  trois builds réaffaiblis : rappel qui ne suit plus `vrm_compta` (1 :
+  Collectif), boosts non publiés (1), prévision remise dans la carte du mois (2).
+  ⚠️ Son scénario du rappel ne meurt plus sur le code d'avant : sans la ligne de
+  Ma journée, il va à Comptabilité par le menu et juge quand même Collectif.
+  `compta-resultat` lit « Total 2026 » (libellé, pas la règle).
+- ⚠️ **Constaté, pas de ce lot** : `premierjour.cjs` sort **2 rouges** (« bonjour
+  = « » ») sur 63782f2 comme après — la ligne du salut a changé ailleurs.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

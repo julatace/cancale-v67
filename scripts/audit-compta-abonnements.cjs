@@ -18,11 +18,18 @@
  *   · la TVA n'est jamais inventée ;
  *   · « payé » se rejoue mois par mois après la fenêtre froide, sans effacer
  *     les mois payés sur un autre appareil ;
- *   · la cloche et l'écran lisent la même règle (`echeancesDuMois`, §11).
+ *   · l'écran, Ma journée et « À faire » lisent la même règle
+ *     (`abonnementsAPayer`, §11), et le rappel hors de l'écran SUIT « payé »
+ *     (revue du 15 octobre : Collectif réclamait 42 € déjà payés) ;
+ *   · la prévision annonce la prochaine échéance même quand rien ne tombe ce
+ *     mois-ci (revue du 15 octobre : un trimestriel la faisait disparaître) ;
+ *   · « Boost » n'est plus une catégorie de dépense : un boost se note sur sa
+ *     paire et il est déjà retiré du résultat (revue du 15 octobre).
  *
  *   node scripts/audit-compta-abonnements.cjs                → les règles d'App.jsx
  *   node scripts/audit-compta-abonnements.cjs --mutation X   → une règle RÉAFFAIBLIE
- *        (periode · lisse · paye · tva · cloche) — chacune doit faire passer au
+ *        (periode · lisse · paye · tva · cloche · suivi · prevision · boostcat)
+ *        — chacune doit faire passer au
  *        moins un contrôle au ROUGE (§6.1).
  *   node scripts/audit-compta-abonnements.cjs --src chemin   → un autre App.jsx
  */
@@ -53,8 +60,15 @@ const MUTATIONS = {
   paye: [['const payes = { ...((x.payes && typeof x.payes === \'object\') ? x.payes : {}) };', 'const payes = {};']],
   // une TVA inventée quand aucun taux n'est connu
   tva: [["const t = Number(taux), m = Number(ttc);", "const t = Number(taux) || 20, m = Number(ttc);"]],
-  // la cloche recompte de son côté (une seconde règle)
-  cloche: [['const dus=echeancesDuMois(ab,aujourdhuiParis().ym).filter(e=>!e.paye);', "const dus=(ab.fixes||[]).filter(f=>fixeActifEn(f,aujourdhuiParis().ym)).map(f=>({montant:Number(f.montant)||0,paye:false}));"]],
+  // le rappel recompte de son côté (une seconde règle : ce qui court, pas ce
+  // qui tombe, et « payé » ignoré)
+  cloche: [['const dus = echeancesDuMois(data, ym).filter(e => !e.paye);', "const dus = ((data && data.fixes) || []).filter(f => fixeActifEn(f, ym)).map(f => ({ montant: Number(f.montant) || 0, paye: false }));"]],
+  // le rappel lu hors de l'écran ne suit plus « payé » (le défaut du 15 octobre)
+  suivi: [["if (e && e.detail && e.detail.k === 'vrm_compta') setTick(t => t + 1);", ';']],
+  // la prévision ne regarde plus que les trois mois suivants
+  prevision: [['previsionAbonnements(data, ymDeRang(ymRang(ym) + 1), 12)', 'previsionAbonnements(data, ymDeRang(ymRang(ym) + 1), 3)']],
+  // « Boost » redevient une catégorie de dépense (le double compte)
+  boostcat: [["'Pack photos', 'Transport'", "'Pack photos', 'Boost', 'Transport'"]],
 };
 if (MUTATION) {
   const m = MUTATIONS[MUTATION];
@@ -69,10 +83,10 @@ let ast;
 try { ast = parser.parse(SRC, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true }); }
 catch (e) { dit(false, 'App.jsx se lit', e.message); fin(); }
 
-const decl = {};
+const decl = {}, plages = [];
 for (const n of ast.program.body) {
-  if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && d.id.name) decl[d.id.name] = SRC.slice(n.start, n.end);
-  if (n.type === 'FunctionDeclaration' && n.id) decl[n.id.name] = SRC.slice(n.start, n.end);
+  if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && d.id.name) { decl[d.id.name] = SRC.slice(n.start, n.end); plages.push([d.id.name, n.start, n.end]); }
+  if (n.type === 'FunctionDeclaration' && n.id) { decl[n.id.name] = SRC.slice(n.start, n.end); plages.push([n.id.name, n.start, n.end]); }
 }
 const NOMS = Object.keys(decl).filter(n => /^[a-z_$][\w$]*$/i.test(n));
 const ordre = [];
@@ -83,7 +97,7 @@ const tire = (nom, pile) => {
   for (const autre of NOMS) if (autre !== nom && txt.includes(autre) && new RegExp('(^|[^\\w$.]|\\.\\.\\.)' + autre.replace(/\$/g, '\\$') + '(?![\\w$])').test(txt)) tire(autre, pile);
   ordre.push(nom);
 };
-const REGLES = ['echeanceFixeEn', 'comptaChargesAnnee', 'echeancesDuMois', 'previsionAbonnements', 'tvaDe', 'rejouerCompta'];
+const REGLES = ['echeanceFixeEn', 'comptaChargesAnnee', 'echeancesDuMois', 'previsionAbonnements', 'tvaDe', 'rejouerCompta', 'abonnementsAPayer', 'prochainesEcheances'];
 for (const r of REGLES) tire(r, new Set());
 const code = ordre.filter(n => !['C', 'THEMES'].includes(n)).map(n => decl[n]).join('\n');
 const ctx = { console, Date, Number, String, Math, isFinite, isNaN, Set, Map, Array, Object, parseFloat, JSON, Intl, RegExp };
@@ -141,6 +155,25 @@ if (PR) {
   const p = essaie('prévision', () => PR(D, '2026-11', 3));
   dit(!!p && p.map(x => `${x.ym}=${x.total}`).join(',') === '2026-11=17,2026-12=17,2027-01=47', 'la prévision : novembre 17 €, décembre 17 €, janvier 47 € (le trimestriel retombe)', p ? p.map(x => `${x.ym}=${x.total}`).join(',') : '');
 }
+// Le RAPPEL : ce qui reste à payer ce mois-ci (revue du 15 octobre) — UNE règle
+// pour l'écran, Ma journée et « À faire ».
+const AP = ctx.abonnementsAPayer;
+if (AP) {
+  const r = essaie('à payer en octobre', () => AP(D, '2026-10'));
+  dit(!!r && r.n === 3 && Math.abs(r.total - 47) < 0.005, 'à payer en octobre : ce qui TOMBE (12 + 30 + 5 = 47 €), pas l’annuel de juin', r ? `${r.n} · ${r.total} €` : '');
+  const r2 = essaie('après « payé »', () => AP({ fixes: D.fixes.map(f => f.id === 't' ? { ...f, payes: { '2026-10': true } } : f) }, '2026-10'));
+  dit(!!r2 && r2.n === 2 && Math.abs(r2.total - 17) < 0.005, '« payé » sur le trimestriel : il reste 2 abonnements, 17 € — le rappel suit la coche', r2 ? `${r2.n} · ${r2.total} €` : '');
+}
+// La prévision quand RIEN ne tombe ce mois-ci (revue du 15 octobre) : un seul
+// trimestriel pris en août — rien en octobre, 45 € en novembre.
+const PE = ctx.prochainesEcheances;
+if (PE) {
+  const q = { fixes: [{ id: 'q', libelle: 'Trimestriel', montant: 45, debut: '2026-08', periode: 'trimestre' }] };
+  const p = essaie('prochaines échéances', () => PE(q, '2026-10'));
+  dit(!!p && p.map(x => `${x.ym}=${x.total}`).join(',') === '2026-11=45,2027-02=45,2027-05=45', 'rien ne tombe en octobre : la prévision annonce quand même novembre, février, mai (45 €)', p ? p.map(x => `${x.ym}=${x.total}`).join(',') : '');
+  const a = essaie('annuel', () => PE({ fixes: [{ id: 'a', montant: 120, debut: '2026-06', periode: 'an' }] }, '2026-10'));
+  dit(!!a && a.map(x => `${x.ym}=${x.total}`).join(',') === '2027-06=120', 'un annuel pris en juin : sa prochaine échéance (juin 2027) est annoncée, à huit mois', a ? a.map(x => `${x.ym}=${x.total}`).join(',') : '');
+}
 
 // ── 3. LA TVA N'EST JAMAIS INVENTÉE ─────────────────────────────────────────
 const T = ctx.tvaDe;
@@ -162,13 +195,36 @@ if (RJ) {
   dit(!!r2 && r2.fixes[0].payes && r2.fixes[0].payes['2026-09'] === undefined, 'décocher retire ce mois-là, et lui seul', r2 ? JSON.stringify(r2.fixes[0].payes) : '');
 }
 
-// ── 5. UNE RÈGLE, DEUX LECTEURS : L'ÉCRAN ET LA CLOCHE (§11) ────────────────
+// ── 5. UNE RÈGLE, TROIS LECTEURS : L'ÉCRAN, MA JOURNÉE, « À FAIRE » (§11) ──
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 const corps = (debut, finMarque) => { const i = SRC.indexOf(debut); if (i < 0) return ''; const j = SRC.indexOf(finMarque, i + debut.length); return sansCommentaires(SRC.slice(i, j < 0 ? i + 20000 : j)); };
 const onglet = corps('function ComptaPro(', '\nfunction ');
-const cloche = (() => { const i = SRC.indexOf("load('vrm_compta',null)"); return i < 0 ? '' : sansCommentaires(SRC.slice(i - 200, i + 600)); })();
-dit(/echeancesDuMois\(/.test(onglet), 'l’écran Comptabilité lit le mois par `echeancesDuMois`');
-dit(/echeancesDuMois\(/.test(cloche) && !/fixeActifEn\(/.test(cloche), 'la cloche lit le même mois par la même règle — elle ne recompte pas de son côté', cloche ? '' : 'rappel introuvable dans la cloche');
+dit(/abonnementsAPayer\(/.test(onglet), 'l’écran Comptabilité lit ce qui reste à payer par `abonnementsAPayer`');
+// Qui appelle `echeancesDuMois` ? Seulement la règle du rappel, la prévision et
+// l'écran (sa liste du mois) — aucun autre lecteur ne recompte (la coque le
+// faisait dans un effet qui ne suivait pas « payé »).
+// Commentaires neutralisés EN GARDANT LES LONGUEURS (les positions doivent
+// rester celles de l'analyseur, pour savoir dans quelle déclaration on est).
+const code0 = SRC.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])(\/\/[^\n]*)/g, (m, a, c) => a + c.replace(/./g, ' '));
+const appelants = new Set();
+for (let i = code0.indexOf('echeancesDuMois('); i >= 0; i = code0.indexOf('echeancesDuMois(', i + 1)) {
+  const pl = plages.filter(([, a, b]) => a <= i && i < b).map(([n]) => n);
+  appelants.add(pl.length ? pl.join('/') : '?');
+}
+appelants.delete('echeancesDuMois');
+const permis = ['abonnementsAPayer', 'previsionAbonnements', 'ComptaPro'];
+dit(appelants.size > 0 && [...appelants].every(n => permis.includes(n)), 'seuls la règle du rappel, la prévision et l’écran lisent `echeancesDuMois` — la coque ne recompte plus', [...appelants].join(', '));
+// Le rappel lu hors de l'écran (Ma journée, la coque) passe par le crochet qui
+// SUIT `vrm_compta` — c'est ce qui manquait.
+const crochet = corps('function useAbonnementsAPayer(', '\n}\n');
+dit(/abonnementsAPayer\(/.test(crochet) && /vrm:save/.test(crochet) && /['"]vrm_compta['"]/.test((/addEventListener\(\s*['"]vrm:save['"][\s\S]*?\n/.exec(crochet) || [''])[0] + (/const f = [^\n]*/.exec(crochet) || [''])[0]) && /onCloudReady\(/.test(crochet),
+  'le rappel hors de l’écran SUIT chaque enregistrement de `vrm_compta` (« payé ») et l’arrivée du nuage', crochet ? '' : 'crochet introuvable');
+const nAppels = (code0.match(/(?<!function )useAbonnementsAPayer\(\)/g) || []).length;
+dit(nAppels >= 2, 'Ma journée ET la coque (« À faire ») lisent le rappel par ce crochet', `${nAppels} appel(s)`);
 dit(!/ajouterPack\b/.test(onglet), 'plus de formulaire de packs à remplir d’office (Julien, 15 octobre)');
+// « Boost » n'est plus proposé en dépense : un boost se note sur sa paire et le
+// registre le retire déjà du résultat — noté deux fois, il comptait deux fois.
+const cats = (() => { try { return vm.runInNewContext('(' + (/const COMPTA_CATS = (\[[^\]]*\])/.exec(SRC) || [, 'null'])[1] + ')'); } catch (_) { return null; } })();
+dit(Array.isArray(cats) && cats.includes('Pack photos') && !cats.some(c => /boost/i.test(c)), '« Boost » n’est plus une catégorie de dépense (le boost se note sur sa paire, déjà retiré du résultat) ; « Pack photos » reste', JSON.stringify(cats));
 
 fin();
