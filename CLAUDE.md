@@ -9057,8 +9057,13 @@ passe interrompue (rien n'en était vérifié) : tout ce qui suit a été relanc
   (`toujours-lire` 3 · `lbc-seulement` 1 · `sans-garde` 1 · `sans-tri` 1 ·
   `efface-codes` 1 · `sans-vivant` 2).
 - `scripts/bancs/ebay-photos-clic.cjs` (port 5831, données inventées, vrai dialogue
-  du pont simulé, 1512 et 390 px) : **31 contrôles, 15 rouges sur le build de w15**,
-  0 après ; mutations du build — voir la section « bancs » du rapport de fusion.
+  du pont simulé, 1512 et 390 px) : **34 contrôles, 18 rouges sur le build de w15**
+  (dont « Annuler » : **1 publication** partie avec 1 photo sur 14), 0 après ; six
+  builds réaffaiblis, chacun rouge : demande retirée 14 · relecture sur tout signal 1 ·
+  dressings relus 1 · pause non gardée 2 · confirmation retirée 3 · formulaire écrasé 1.
+  ⚠️ **Le cache des lignes de l'app (`ROW_TTL_MS`, 60 s) cachait le défaut des
+  dressings relus** : la mutation passait au vert tant que la lecture finissait dans
+  la minute. Le banc a donc une section H où la lecture finit 65 s plus tard.
   ⚠️ Sous la charge de la machine (40 sur 4 cœurs, d'autres bancs en parallèle)
   Playwright jugeait le bouton de la feuille « pas stable » : le banc attend la fin
   des animations de la feuille puis clique sans ce contrôle-là.
@@ -9077,6 +9082,15 @@ passe interrompue (rien n'en était vérifié) : tout ce qui suit a été relanc
   2 min rend vraiment (mesuré seulement sur des pages synthétiques à la forme
   `__NEXT_DATA__` déjà lue par le fond) ; pourquoi 6/12 et 5/13 restent partielles
   après une lecture (la page en donnait-elle moins ?) ;
+- au commit de cette branche, trois audits sont rouges PAR CONSTRUCTION, levés à
+  la montée de version (session principale) : `audit-coherence` (photosclic =
+  `A_POSER`, exprès), `audit-extension-zip` et `audit-preuve-vente` (le
+  `background.js` change sous un numéro, 5.177.0, déjà publié avec un autre
+  contenu). Les **94 autres audits sont verts** ; les bancs de l'écran aussi
+  (`ebay-annonces`, `ebay-programmer`, `ebay-comptes`, `verif_visuel`) ;
+  `ebay-form` garde **2 rouges PRÉEXISTANTS sur w15** (« Vendre une paire sur
+  eBay » rendu AUSSI sous « Compte eBay » — vérifié sur le build de w15, même
+  rouge) : domaine eBay, pas de ce chantier ;
 - **hors de ce chantier, signalé** : `main.updated_at` vaut toujours le 11 octobre
   14:58:07 (l'heure de la migration 013) et les journaux de la base comptent
   **33 « canceling statement due to statement timeout »** sur 24 h — à rapprocher de
