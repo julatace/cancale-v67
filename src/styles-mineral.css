@@ -87,7 +87,6 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display:none; }
   .vrm-app-header [data-etat-actions] > span[aria-hidden] { display:none; }
   .vrm-app-header [data-etat-actions]::after { content:'i'; display:grid; place-items:center; width:18px; height:18px; border:1.5px solid currentColor; border-radius:50%; font-size:12px; font-weight:600; }
-  .vrm-header-settings { display:none; }
   .vrm-mobile-nav { padding-inline:4px; }
   .vrm-mobile-nav button { min-height:64px; }
   .vrm-mobile-nav .vrm-nav-label { font-size:11px !important; letter-spacing:0 !important; }
@@ -572,4 +571,13 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 @media(max-width:767px){
  .vrm-chat-panel input:not([type="checkbox"]):not([type="radio"]),
  .vrm-chat-panel select{font-size:16px!important;min-height:40px;max-width:100%;box-sizing:border-box}
+}
+
+/* Ma journée — la barre des quatre actions (15 octobre). Sur téléphone, quatre
+   colonnes étroites : l'icône au-dessus du nombre, le libellé centré et libre
+   de passer sur deux lignes (« Prix à baisser » ne tient pas sur 74 px). */
+@media(max-width:767px) {
+ .vrm-day-bar > button { padding:10px 6px !important; align-items:center !important; text-align:center !important; }
+ .vrm-day-bar > button > span:first-child { flex-direction:column; gap:5px !important; }
+ .vrm-day-bar-label { white-space:normal !important; line-height:1.2; text-align:center; overflow:visible !important; }
 }

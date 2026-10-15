@@ -166,13 +166,16 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // qu'il devait attraper. C'est la base qui decide : s'il existe un colis sans
   // code, la ligne DOIT nommer un compte, quelle que soit la formulation.
   const logins=[...new Set(accounts.map(a=>String(a.login||'')).filter(Boolean))];
-  const ligne=(/Retirer \d+ colis[\s\S]{0,220}/.exec(j2)||[''])[0];
+  // (15 octobre) La case « À retirer » de la barre porte son nombre (`data-n`)
+  // et son détail — dont le COMPTE — dans son nom (`aria-label`).
+  const caseR=await pg.evaluate(()=>{const e=document.querySelector('[data-journee="retrait"]');return e?{n:Number(e.getAttribute('data-n')||0),nom:e.getAttribute('aria-label')||''}:null;});
+  const ligne=caseR?caseR.nom:'';
   const sansCode=aRetirer.filter(o=>!codes[String(o.transaction_id||'')]);
   console.log('base servie : '+sansCode.length+' colis sans code, sur '
     +[...new Set(sansCode.map(o=>o.__uid).filter(Boolean))].length+' compte(s)');
   if(sansCode.length===0){ console.log('--  (aucun colis sans code dans ces fixtures)'); }
   else {
-    dit(/Retirer \d+ colis/.test(j2), 'Ma journee annonce les colis a retirer');
+    dit(!!caseR && caseR.n>0, 'Ma journee annonce les colis a retirer');
     dit(!/Ouvre la conversation UNE fois/.test(j2),
       "et ne reclame plus d'ouvrir chaque conversation",
       "l'extension va les chercher toute seule depuis le 27 aout");
@@ -280,7 +283,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   for (const t of ['cat_achats','journee','dashboard']) {
     await pg.goto('http://localhost:4383/?tab='+t,{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(5000);
-    const txt = await pg.evaluate(()=>document.body.innerText||'');
+    const txt = await pg.evaluate(()=>{ const e=document.querySelector('[data-journee="retrait"]'); return (e&&e.getAttribute('aria-label'))||document.body.innerText||''; });
     const m = /(\d+)\s+colis à retirer/.exec(txt) || /Retirer\s+(\d+)\s+colis/.exec(txt);
     if (m) nombres[t] = Number(m[1]);
   }

@@ -180,8 +180,12 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   };
   // Ma journée ne publie rien : on attend que sa carte « Expédier » soit là
   // (borné), puis un temps de repos — jamais moins que la règle n'exige.
+  // (15 octobre) Ma journée est une barre de quatre cases : « prêts à imprimer »
+  // n'y est plus écrit en clair, il est dans le NOM de la case « À envoyer »
+  // (`aria-label`, ce que lit un lecteur d'écran et l'infobulle). On lit là.
+  const texteJournee = (p) => p.evaluate(() => { const e = document.querySelector('[data-journee="colis"]'); return (e && e.getAttribute('aria-label')) || ''; });
   const attendCarte = async (p, ms) => {
-    try { await p.waitForFunction(() => /pr[êe]ts?\s+[àa]\s+imprimer/i.test(document.body.innerText || ''),
+    try { await p.waitForFunction(() => { const e = document.querySelector('[data-journee="colis"]'); return /pr[êe]ts?\s+[àa]\s+imprimer/i.test((e && e.getAttribute('aria-label')) || ''); },
       null, { timeout: ms, polling: 200 }); } catch (_) {}
     await p.waitForTimeout(1500);
   };
@@ -277,7 +281,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     await brancher(p2);
     await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
     await attendCarte(p2, 20000);
-    const av = lit(await p2.evaluate(()=>document.body.innerText||''));
+    const av = lit(await texteJournee(p2));
     // Une publication restée d'avant (nuage, passage précédent) ne doit pas
     // tenir lieu de celle de CETTE ouverture : on l'efface, Colis doit republier.
     await p2.evaluate(()=>{ try { localStorage.removeItem('vrm_colis_prets'); } catch (_) {} });
@@ -287,7 +291,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const colis = lit(await p2.evaluate(()=>document.body.innerText||''));
     await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
     await attendCarte(p2, 20000);
-    const ap = lit(await p2.evaluate(()=>document.body.innerText||''));
+    const ap = lit(await texteJournee(p2));
     console.log(`    accueil seul : ${av?(av.approx?'au moins ':'')+av.n:'—'} · Colis : ${colis?colis.n:'—'} · accueil ensuite : ${ap?(ap.approx?'au moins ':'')+ap.n:'—'}`);
     dit(!!(av && colis && ap), 'les deux écrans annoncent un nombre de bordereaux prêts');
     if (av && colis) {

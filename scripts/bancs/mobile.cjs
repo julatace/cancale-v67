@@ -113,7 +113,7 @@ async function brancher(p){
     await ctx.close();
   }
   const ctx=await b.newContext({viewport:{width:1512,height:950}});const p=await ctx.newPage();await brancher(p);await p.addInitScript(()=>localStorage.setItem('vrm_zoom','1'));await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
-  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Ouvrir les paramètres'}).isVisible(),'ordinateur: paramètres dans l’île');check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===72,'ordinateur: disposition conservée');
+  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check((await p.locator('.vrm-app-header [aria-label="Ouvrir les paramètres"], .vrm-app-header [aria-label="Ouvrir les messages Vinted"]').count())===0&&await p.locator('.vrm-sidebar-settings').isVisible(),'ordinateur: Réglages dans la barre latérale, plus dans l’île (15 octobre)');check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===72,'ordinateur: disposition conservée');
   await p.getByText('Autres outils',{exact:true}).click();
   check(await p.getByRole('button',{name:'Factures',exact:true}).isVisible(),'ordinateur: outils repliés accessibles');
   await p.getByText('Détails Vinted',{exact:true}).click();

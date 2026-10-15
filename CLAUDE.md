@@ -8984,6 +8984,63 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Ma journée : une barre de quatre actions, plus de bannière (15 octobre)
+Julien : « enlève la bannière bleue… », « Colis à envoyer, Colis à retirer,
+Répondre aux messages, Baisser les prix — les seules choses, sans les textes à
+côté, une barre en largeur », « enlève répondre à 112 messages, c'est
+incohérent », « enlève Messages et Réglages en haut ; laisse le nuage, lecture
+seule et la loupe ».
+- **Mesuré (lecture seule)** : sur ses 7 comptes, boîtes captées le jour même,
+  **149 conversations « non lues »**, dont **115 de plus de 14 jours** (un compte
+  en a 25, la plus récente du 9 septembre) et **30 de moins de 7 jours**. La
+  liste de la boîte ne dit ni qui a écrit en dernier ni s'il est l'acheteur :
+  « Un acheteur attend » n'était jamais prouvé.
+- **« Messages » = `estNonLueRecente`** : marquée non lue PAR VINTED et dernier
+  mouvement de moins de `MESSAGES_RECENTS_J` (7) jours. Une règle pour la barre,
+  le point de l'onglet Messages et le widget (`liveStats.unread`, §11). Rien de
+  plus n'est affirmé (ni « acheteur », ni « à répondre »). ⚠️ L'écran Messages
+  (« Non lues N ») compte encore toutes les non lues : à brancher sur la même
+  règle par le chantier Messages.
+- **`BarreJournee`** : quatre cases FIXES (une case à zéro reste), icône +
+  nombre + deux mots ; le détail (en retard, prêts à imprimer, hors délai, le
+  compte où manquent des codes) vit dans le nom accessible et l'infobulle.
+  **Trois états par nombre** (`etatCompteur`, `etatLecture`) : « … » pendant la
+  lecture, « — » sur échec (jamais 0), « ≥ n » si un compte n'a pas répondu ; un
+  zéro partiel vaut « — ». « À retirer » attend aussi les emails de suivi
+  (Ma journée ne les lisait pas : le nombre était un minorant). L'urgence colore
+  le chiffre en ambre (pas de rouge, §7).
+- Les **exceptions** (coché « posté » jamais parti, litige à renvoyer, emails mis
+  de côté) restent, une ligne chacune avec son geste ; « Prix à baisser » ouvre
+  Annonces SUR le repricing (`DEMANDE_REPRICING`) et **est publié**
+  (`vrm_prix_a_baisser`) : le Tableau de bord/Collectif le consomme au lieu de
+  compter les annonces de plus de 30 j (deux règles avant).
+- **Bandeaux d'ouverture retirés** : le bleu (« N nouvelles ventes · N messages
+  sur Vinted ») et l'accent (« ventes comptabilisées · factures reçues », compté
+  par DIFFÉRENCE DE TOTAL sur l'archive vide — le motif des ~300 notifications),
+  et le panneau de la cloche, jamais ouvert (code mort, §4.11). Une vente
+  arrivée depuis la dernière ouverture (par identité, `vinted_notif_seen_ventes`)
+  porte « Nouvelle » dans les dernières ventes ; la notification du navigateur
+  dit une cause par notification.
+- **Ordre** : bonjour (aussi le premier jour : `premierjour.cjs` était rouge
+  depuis le 13 octobre), barre, vendu/reçu, vendu aujourd'hui, **dernières
+  ventes** (visibles sans défiler à 1512 px), en attente, 14 jours. Ventes
+  illisibles ⇒ « Vendu en octobre » ne dit plus « 0 € » : une ligne et
+  « Réessayer ».
+- **En-tête** : nuage, lecture seule, loupe. Réglages reste dans la barre
+  latérale, le menu ☰ et sous le nuage ; Messages dans Vinted → Messages et la
+  case « Messages ».
+- Preuves : banc `journee-barre.cjs` (port 5901, données inventées, 390/1512,
+  clair/sombre) **98 contrôles, 52 rouges sur w15** ; trois mutations rouges
+  (règle des messages sans la date : 5 · échec lu comme 0 : 2 · « ≥ » retiré :
+  3). Adaptés à la nouvelle forme (attributs, pas phrases) : `demarrage`,
+  `statuts-colis` (la « cloche » se lit sur Collectif), `premierjour`, `colis`,
+  `retrait`, `mobile`.
+- ⚠️ **Rouges trouvés DÉJÀ sur w15, hors de ce lot** (mêmes lignes avant/après) :
+  `pont` 6, `messagerie` 16 (le bloc des offres retiré le 13 oct.),
+  `filtre-compte` 8, `capacites` 20 (grille Annonces jamais rendue),
+  `tout-generer` 3, `retrait` 2. Pas « corrigés » ici : ce ne sont pas des
+  écrans de ce lot.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

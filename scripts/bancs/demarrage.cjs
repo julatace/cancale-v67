@@ -73,7 +73,11 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
   await pg.waitForTimeout(sondeKO ? 9000 : 6000);
   const txt = await pg.evaluate(() => document.body.innerText);
   const etape = await pg.evaluate(() => { const e = document.querySelector('[data-etape]'); return e ? e.getAttribute('data-etape') : null; });
-  const nouv = (/(\d+) nouvelles? ventes?/.exec(txt) || [])[1];
+  // (15 octobre) Le bandeau d'ouverture est retiré (demande de Julien) : une
+  // vente arrivée depuis la dernière ouverture se lit sur Ma journée, dans
+  // l'en-tête des dernières ventes (`data-nouvelles-ventes`). Le contrôle juge
+  // le NOMBRE porté par l'attribut, pas une phrase (§6.5).
+  const nouv = await pg.evaluate(() => { const e = document.querySelector('[data-nouvelles-ventes]'); return e ? e.getAttribute('data-nouvelles-ventes') : null; });
   const seen = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vinted_notif_seen_ventes')||'null')||[]).length; } catch(_) { return -1; } }).catch(()=>-2);
   if (process.env.DEBUG) console.log('   [debug]', JSON.stringify(lus.urls||[]), 'seen', seen, (txt.match(/.*nouvelle.*/g)||[]).slice(0,3));
   await pg.close();
