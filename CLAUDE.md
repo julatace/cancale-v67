@@ -9044,6 +9044,77 @@ la racine** ; ce que l'autre session a apporté (charges, packs, exports) reste.
   `type="month"`) ; l'estimation de 45 jours entre vente et versement reste
   celle de la carte des seuils, jamais mesurée chez lui.
 
+### La Comptabilité recentrée, les abonnements, et l'espace « Déclarations » (15 octobre)
+Julien : « la comptabilité c'est simplement renseigner les dépenses » ; « il y a
+Déclarer dans comptabilité, je ne comprends pas ce que ça vient faire là » ;
+« pour les abonnements logiciels on doit pouvoir marquer le coût fixe par mois,
+et ensuite ça nous rappelle tous les mois » ; « le pack photos ne doit pas être
+d'office : c'est l'extension qui doit regarder ».
+- **Le travail local non poussé de la comptabilité est fusionné d'abord**
+  (`worktree-wf_c713efbe-040-2` : e974d21 + 9131eaa — résultat après charges en
+  UNE règle, coûts fixes datés, fenêtre froide rejouée, jour de Paris). Conflits
+  résolus sur w15 (le libellé « Bénéfice estimé » de #515 gardé).
+- **Abonnements** (les « coûts fixes », même ligne `vrm_compta.fixes`) : nom,
+  montant TTC, **périodicité** (`periode` : mois · trimestre · an — absente =
+  mois, rien ne change pour un poste saisi avant), début, catégorie (`ABO_CATS`),
+  **TVA** (`tva` : un taux ; `tvaDe` ne l'invente jamais), et **payé par mois**
+  (`payes['YYYY-MM']`, sur SON clic). UNE règle, `echeanceFixeEn` : une échéance
+  le mois de début puis tous les `pas` mois, tant qu'il court. Elle fait le total
+  de l'année (`comptaChargesAnnee`, donc aussi le registre annuel), le tarif
+  « par mois » (l'annuel ramené au mois), le **rappel du mois**
+  (`echeancesDuMois` : « À payer en octobre », prévu/payé) et la **prévision**
+  (`previsionAbonnements`). « Payé » ne change aucun total : une échéance est due.
+  La fenêtre froide rejoue un « payé » mois par mois (`op: 'paye'`), sans
+  effacer les mois payés ailleurs.
+- **Rappel mensuel dans l'app, sans cron** : la cloche porte « N abonnements à
+  payer ce mois-ci — X € » (`tab: 'compta'`), par la MÊME règle ; rien tant que
+  le nuage n'est pas arrivé.
+- **Packs photos et boosts** : le formulaire « Packs de photos » est retiré. Les
+  packs notés avant restent dans la liste des dépenses et dans les totaux.
+  **Mesuré le 15 octobre (lecture seule)** : aucune source ne porte un ACHAT de
+  pack ou de boost avec identité et montant — Leboncoin : seul le schéma de la
+  GRILLE de prix (`options/v7/pricing/classifieds`) est relevé ; les chemins
+  `usage-consumption-bff/v2/users/me/packages` et `public/credits/me/credits`
+  ont été vus mais leur forme jamais relevée (45 schémas sur 60 places : elle le
+  sera à la prochaine visite de la page qui les charge, sans changer
+  l'extension) ; Vinted : 10 lignes `harvest_*_billing`, UNE ligne
+  `invoice_lines` (un virement), 0 relevé. Donc rien n'est compté
+  automatiquement, et la carte « Packs photos et boosts » dit « — » et pourquoi.
+  **Ne pas écrire l'analyseur avant d'avoir la forme d'un achat** (§4.10).
+- **Déclarations** (onglet `fiscal`, Gestion) : la carte URSSAF du mois
+  (`CarteUrssafMois`, déplacée de Statistiques, mêmes champs de la ligne publiée,
+  plus le repli sur l'archive vide « 0,00 € »), le rapport du mois (« J'ai
+  déclaré ce mois »), le registre annuel (seuils Vinted), le régime et le taux.
+  Monté par `<Comptabilite only="fiscal">` — le PROPRIÉTAIRE des ventes : mêmes
+  fenêtres, mêmes règles, il publie lui-même `vinted_urssaf_mois` (la carte la
+  relit sur `vrm:save`). Statistiques, Réglages et Ventes → Outils n'en gardent
+  qu'une **porte** ; le rappel push du 1er et la cloche ouvrent `?tab=fiscal`.
+  Échéance en retard : ambre, plus rouge (§7). « (versement libératoire) » retiré
+  de la phrase (il s'affichait à tout micro).
+- **Étude** banque / facturation électronique / Indy :
+  `docs/roadmap/etude-banque-facturation-indy-2026-10-15.md` (sources
+  secondaires : impots.gouv.fr ne répond pas d'ici). L'écran ne promet rien :
+  « rien n'est connecté ».
+- Preuves : `audit-compta-abonnements.cjs` (les vraies règles dans un `vm`)
+  **12 rouges sur w15**, et rouge sous chacune de ses 5 mutations (`periode` 7,
+  `lisse` 1, `paye` 2, `tva` 3, `cloche` 2) ; banc `compta-abonnements.cjs`
+  (données inventées, 390/1512, clair/sombre, port 5972) **11 rouges sur le
+  build de w15**, **8 rouges** sous la mutation « périodicité ignorée ». Bancs mis à
+  jour sans les affaiblir (le rapport et le registre s'ouvrent par Ventes →
+  Outils → Déclarations) : `rapport`, `seuils-vinted`, `compta-resultat`,
+  `urssaf`, `vendu-recu`, et `fiscal` ajouté à `verif_visuel`, `verif_dark`,
+  `panne`.
+- ⚠️ **Le banc `seuils-vinted` a attrapé un défaut de MON déplacement** : les
+  relectures des ventes (signal de l'extension, retour sur l'onglet, sonde de
+  60 s) ne visaient que Ventes, Ma journée et Colis — sur Déclarations, une
+  vente rangée par l'extension ne changeait ni la carte ni le registre.
+  `fiscal` est dans ces écrans (9 rouges avant, vert après). Le banc lisait
+  aussi « CA des ventes finalisées » dans TOUTE la page (le choix du régime le
+  dit aussi) : il lit maintenant dans la fenêtre du registre.
+- **Non fait** : pièces jointes (justificatifs) — il faut un compartiment privé
+  par vendeur, une migration ; frais par vente agrégés (ils vivent dans Ventes,
+  `beneficePaire`) ; SIREN, profils fiscaux, avoirs (lots à part).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
