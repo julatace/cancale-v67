@@ -28,11 +28,58 @@ const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); 
   ? ok('Ventes : le bénéfice ne somme que les ventes au coût connu')
   : nok('Ventes : `benefConnu` sommé sur les ventes au coût connu');
 
-// 2) …et c'est bien CE chiffre qui est affiché
-// (un audit suit la RÈGLE, pas son orthographe : d'autres attributs peuvent précéder `label`)
-/StatBox\b[^>]*?label="Bénéfice net" value=\{fmtE0\(totals\.benefConnu\)\}/.test(app)
-  ? ok('Ventes : la carte affiche `benefConnu`, pas `ca - cout`')
-  : nok('Ventes : la carte affiche `totals.benefConnu`');
+// 2) …et c'est bien CE chiffre qui est affiché.
+// ⚠️ (15 octobre) UN AUDIT SUIT LA RÈGLE, PAS SON ORTHOGRAPHE. Ce contrôle
+// exigeait le libellé « Bénéfice net » : renommée « Bénéfice estimé » (13 oct.),
+// la carte affichait toujours `totals.benefConnu` avec sa couverture — et
+// l'audit tombait au rouge sur une app intacte. On juge maintenant la VALEUR
+// rendue, sur l'arbre syntaxique (les `=>` des attributs ne coupent rien) :
+//   a. la carte qui porte la COUVERTURE (`subColor` qui compare `nbCout` à `nb`)
+//      affiche `totals.benefConnu` ;
+//   b. aucune carte n'affiche `totals.benef` (= CA − coût − frais : le coût nul
+//      sur les ventes non renseignées) ni une soustraction `totals.ca − totals.cout`.
+// Le libellé reste libre.
+{
+  let parser = null;
+  try { parser = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); } catch (_) {}
+  if (!parser) nok('Ventes : la carte du bénéfice se juge sur l\'arbre syntaxique', '@babel/parser absent (node_modules)');
+  else {
+    const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
+    const cartes = [];
+    const visite = (n) => {
+      if (!n || typeof n.type !== 'string') return;
+      if (n.type === 'JSXOpeningElement' && n.name && /^Stat(Box|Card)$/.test(n.name.name || '')) {
+        const attr = {};
+        for (const a of n.attributes || []) if (a.type === 'JSXAttribute' && a.name && a.value) attr[a.name.name] = a.value.type === 'JSXExpressionContainer' ? a.value.expression : a.value;
+        cartes.push({ attr, ligne: n.loc && n.loc.start.line });
+      }
+      for (const k of Object.keys(n)) { if (k === 'loc' || k === 'start' || k === 'end') continue; const v = n[k]; if (Array.isArray(v)) v.forEach(visite); else if (v && typeof v.type === 'string') visite(v); }
+    };
+    visite(ast.program);
+    // Ce que lit une expression : les `totals.X` qu'elle touche, et si elle
+    // soustrait le coût du CA.
+    const lit = (e) => {
+      const out = { membres: new Set(), caMoinsCout: false };
+      const v = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'MemberExpression' && n.object && n.object.type === 'Identifier' && n.object.name === 'totals' && n.property) out.membres.add(n.property.name);
+        if (n.type === 'BinaryExpression' && n.operator === '-') { const g = lit(n.left), d = lit(n.right); if (g.membres.has('ca') && d.membres.has('cout')) out.caMoinsCout = true; }
+        for (const k of Object.keys(n)) { if (k === 'loc' || k === 'start' || k === 'end') continue; const x = n[k]; if (Array.isArray(x)) x.forEach(v); else if (x && typeof x.type === 'string') v(x); }
+      };
+      v(e);
+      return out;
+    };
+    const couverture = cartes.filter((c) => { const s = c.attr.subColor && lit(c.attr.subColor); return s && s.membres.has('nbCout') && s.membres.has('nb'); });
+    const benefAvecCouverture = couverture.filter((c) => c.attr.value && lit(c.attr.value).membres.has('benefConnu'));
+    benefAvecCouverture.length
+      ? ok('Ventes : la carte qui porte la couverture affiche `totals.benefConnu`, pas `ca - cout`')
+      : nok('Ventes : la carte qui porte la couverture (`nbCout`/`nb`) doit afficher `totals.benefConnu`', couverture.map((c) => 'ligne ' + c.ligne).join(' · ') || 'aucune carte ne porte la couverture');
+    const fautives = cartes.filter((c) => { const v = c.attr.value && lit(c.attr.value); return v && (v.membres.has('benef') || v.caMoinsCout); });
+    fautives.length
+      ? nok('une carte affiche `totals.benef` ou `ca − coût` (le coût nul sur les ventes non renseignées)', fautives.map((c) => 'ligne ' + c.ligne).join(' · '))
+      : ok('aucune carte n\'affiche `totals.benef` ni `ca − coût`');
+  }
+}
 
 // 3) la couverture est écrite À CÔTÉ du chiffre, et elle se voit (subColor)
 /subColor=\{totals\.nbCout<totals\.nb\?C\.warn/.test(app)

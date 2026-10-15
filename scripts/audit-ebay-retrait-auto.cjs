@@ -24,8 +24,17 @@
 //
 // `--prouve` réaffaiblit chaque garde tour à tour : chaque fois, au moins un
 // contrôle doit passer au ROUGE. « La fonction n'existait pas avant » n'est pas
-// une preuve (§6.1) — la partie « preuve de vente » s'exécute aussi sur le code
-// d'avant, où la fonction existait déjà.
+// une preuve (§6.1).
+//
+// ⚠️ (15 octobre) LA PREUVE DE VENTE A UN SEUL LECTEUR (§11) :
+// `lirePreuvesVenteVinted`, dont `lireVentesVintedProuvees` n'est qu'une
+// enveloppe. Le 13 octobre, le retrait automatique avait reçu un SECOND lecteur
+// des transactions (sa propre règle, la liste des ventes lue par
+// `fetchHarvestOrders`) : la coque retirait des paires que l'écran eBay jugeait
+// « pas su ». La base simulée sert donc la forme que lit CE lecteur (lignes de
+// transaction par leur identifiant, ventes par `id=in.(…orders_sold)` avec leur
+// date de capture), et le contrôle « l'écran et la coque : le même verdict »
+// juge les deux appelants sur la même base.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const R = path.join(__dirname, '..');
 const APP0 = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
@@ -45,7 +54,10 @@ function decls(APP, noms) {
   return { src: out.join('\n'), manquants: noms.filter((x) => !trouve.has(x)) };
 }
 const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay','skuEbayDe','traductionAnnonce','numeroExterne','numEbayLu','numLigneEbay', 'CLE_COMPTE_EBAY', 'corpsCompteEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
-  'etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'capListeVentes', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
+  // (15 octobre) LE lecteur de la preuve (§11) : le bloc partagé avec
+  // l'extension, le détail du retrait automatique, et l'enveloppe.
+  'PREUVE_RECENTE_MS', 'venteVivante', 'venteEnCoursPreuve', 'ETAT_TXN_TERMINAL', 'preuvesParTransaction', 'preuvesParBordereau', 'comptesAJuger', 'ventesParCompteDe',
+  'PAS_UN_RETOUR', 'etatRevient', 'capturesParCompte', 'detailPreuvesVinted', 'uidsDeComptes', 'lirePreuvesVenteVinted', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
   'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe', 'LISTE_VENTES_FRAICHE_MS', 'noterRetraitAutoIncertain'];
 
@@ -63,20 +75,30 @@ function charger(APP, env, dit) {
 }
 
 // ── LES DONNÉES (inventées, la FORME mesurée : §6.3) ───────────────────────
-// Les lignes de transaction telles que la projection les rend
-// (`tx:meta->>id, it:meta->>item_id, ti:meta->>status_title, at:…`).
+// (15 octobre) LA forme que lit LE lecteur (`lirePreuvesVenteVinted`) : la
+// transaction par l'identifiant de sa ligne (`harvest_{uid}_txn_{tx}`) et ses
+// scalaires de `meta` (`it`, `ti`, `at`, `cap`) ; la liste des ventes par
+// `id=in.(harvest_{uid}_orders_sold)` (`v` = `my_orders`, `cap` = sa capture).
+// Les comptes sont des uids NUMÉRIQUES, comme chez lui (la règle les lit dans
+// l'identifiant de ligne). Le compte 222 n'a AUCUNE liste de ventes captée.
+const UA = '111', UB = '222';
+const txnL = (uid, tx, it, ti, at, cap) => ({ id: `harvest_${uid}_txn_${tx}`, it, ti, at, ...(cap ? { cap } : {}) });
 const TXN = [
-  { tx: '501', it: 'I1', ti: 'Le paiement a été validé', at: '2026-09-20T10:00:00+02:00' },            // REMBOURSÉE selon orders_sold
-  { tx: '502', it: 'I2', ti: 'Commande annulée - article indisponible ', at: '2026-09-21T10:00:00+02:00' }, // l'acheteur qui a perdu la course…
-  { tx: '503', it: 'I2', ti: 'Commande finalisée - l\'acheteur a validé la commande', at: '2026-09-22T10:00:00+02:00' }, // …et la vraie vente
-  { tx: '504', it: 'I3', ti: '', at: null },                                                            // une conversation
-  { tx: '505', it: 'I4', ti: 'Le paiement a été validé', at: '2026-09-23T10:00:00+02:00' },            // compte illisible : pas confirmée
-  { tx: '506', it: 'I5', ti: '', at: null },                                                            // captée en conversation, VENDUE depuis
+  txnL(UA, '501', 'I1', 'Le paiement a été validé', '2026-09-20T10:00:00+02:00'),            // REMBOURSÉE selon orders_sold
+  txnL(UA, '502', 'I2', 'Commande annulée - article indisponible ', '2026-09-21T10:00:00+02:00'), // l'acheteur qui a perdu la course…
+  txnL(UA, '503', 'I2', 'Commande finalisée - l\'acheteur a validé la commande', '2026-09-22T10:00:00+02:00'), // …et la vraie vente
+  txnL(UA, '504', 'I3', '', null),                                                            // une conversation
+  txnL(UB, '505', 'I4', 'Le paiement a été validé', '2026-09-23T10:00:00+02:00'),            // compte sans liste captée : pas confirmée
+  txnL(UA, '506', 'I5', '', null),                                                            // captée en conversation, VENDUE depuis
   // La transaction relue APRÈS la liste des ventes (une conversation rouverte) :
   // c'est elle qui fait foi — elle dit « Remboursement effectué ».
-  { tx: '507', it: 'I6', ti: 'Remboursement effectué', at: '2026-09-25T10:00:00+02:00', cap: '2026-10-05T10:00:00.000Z' },
-  // L'inverse : la liste relue après la transaction dit la vente finalisée.
-  { tx: '508', it: 'I7', ti: 'Retour initié', at: '2026-09-26T10:00:00+02:00', cap: '2026-09-27T10:00:00.000Z' },
+  txnL(UA, '507', 'I6', 'Remboursement effectué', '2026-09-25T10:00:00+02:00', '2026-10-05T10:00:00.000Z'),
+  // La liste relue après la transaction dit la vente finalisée — mais la
+  // transaction « retour initié » ne prouve pas la vente (la règle partagée).
+  txnL(UA, '508', 'I7', 'Retour initié', '2026-09-26T10:00:00+02:00', '2026-09-27T10:00:00.000Z'),
+  // Une transaction relue APRÈS la liste, finalisée : la liste (plus ancienne)
+  // ne la CONFIRME pas — c'est la transaction qui fait foi.
+  txnL(UA, '509', 'I8', 'Commande finalisée', '2026-09-28T10:00:00+02:00', '2026-10-05T10:00:00.000Z'),
 ];
 const VENTES_A = [
   { transaction_id: 501, status: 'Remboursement effectué', date: '2026-09-20T09:00:00+02:00' },
@@ -84,9 +106,21 @@ const VENTES_A = [
   { transaction_id: 506, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-24T12:00:00+02:00' },
   { transaction_id: 507, status: 'Le paiement a été validé', date: '2026-09-25T10:00:00+02:00' },
   { transaction_id: 508, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-26T10:00:00+02:00' },
+  { transaction_id: 509, status: 'Commande finalisée', date: '2026-09-28T10:00:00+02:00' },
 ];
-// La liste des ventes du compte A a été captée le 1er octobre (`_harvestSeen`).
+// La liste des ventes du compte 111 a été captée le 1er octobre.
 const CAP_A = Date.parse('2026-10-01T10:00:00.000Z');
+// La fausse base, telle que `lireTout` la rend : chaque famille selon SA
+// requête (§6.3). `ventes` : { uid: { v: [my_orders], cap: ISO } } — un compte
+// absent n'a pas de liste captée.
+const base = ({ txn = [], bords = [], ventes = {} } = {}, lus = null) => async (q) => {
+  if (lus) lus.push(q);
+  if (/_txn_/.test(q)) return txn.map((r) => ({ ...r }));
+  if (/_label_/.test(q)) return bords.map((r) => ({ ...r }));
+  const dans = /id=in\.\(([^)]*)\)/.exec(q);
+  if (/orders_sold/.test(q) && dans) return dans[1].split(',').map((id) => { const u = (/^harvest_(\d+)_orders_sold$/.exec(id) || [])[1]; return u && ventes[u] ? { id, v: ventes[u].v, cap: ventes[u].cap } : null; }).filter(Boolean);
+  return [];
+};
 
 async function controles(APP, journal) {
   let ko = 0;
@@ -98,48 +132,59 @@ async function controles(APP, journal) {
   // Sur le code d'avant aussi : `lireVentesVintedProuvees` existait.
   await essaie('preuve de vente', async () => {
     const lus = [];
-    const env = {
-      lireTout: async (q) => { lus.push(q); return TXN.map((r) => ({ ...r })); },
-      fetchHarvestOrders: async (uid) => (uid === 'A' ? { my_orders: VENTES_A } : undefined),   // B : la base n'a pas répondu
-      _harvestSeen: { A_orders_sold: CAP_A },
-    };
+    const env = { lireTout: base({ txn: TXN, ventes: { [UA]: { v: VENTES_A, cap: new Date(CAP_A).toISOString() } } }, lus) };   // 222 : aucune liste captée
     const F = charger(APP, env, dit); if (!F) return;
-    const v = await F.lireVentesVintedProuvees([{ vinted_user_id: 'A' }, { vinted_user_id: 'B' }]);
+    const v = await F.lireVentesVintedProuvees([{ vinted_user_id: UA }, { vinted_user_id: UB }]);
     const has = (x) => !!(v && typeof v.has === 'function' && v.has(x));
     dit(v && !has('I1'), 'une vente REMBOURSÉE selon la liste de ses ventes n\'est PAS « prouvée vendue » (la ligne de transaction était périmée)', JSON.stringify(v && [...v]));
     dit(has('I2'), '« annulée — article indisponible » à côté d\'une vente finalisée : la paire EST vendue (l\'acheteur qui a perdu la course)');
     dit(!has('I3'), 'une conversation (état vide) n\'est pas une vente');
-    dit(has('I4'), 'un compte dont la liste des ventes n\'a pas pu être lue : sa transaction garde son état (rien n\'est retiré de la preuve sur un « pas su »)');
-    dit(has('I5'), 'une transaction captée en conversation puis VENDUE (la liste des ventes le dit) compte');
+    dit(has('I4'), 'un compte sans liste des ventes captée : sa transaction garde son état (rien n\'est retiré de la preuve)');
+    // ⚠️ (15 octobre) La preuve est UNE règle, celle de l'extension et de l'écran
+    // eBay (§11) : la liste des ventes CONFIRME ou DÉFAIT une preuve, elle n'en
+    // crée pas à partir d'une conversation ou d'un « retour initié ». Le second
+    // lecteur du 13 octobre les comptait vendues — la coque disait « à retirer »
+    // une paire que l'écran eBay et l'extension ne disaient pas vendue.
+    dit(v && !has('I5') && !has('I7'), 'une transaction captée en conversation, ou « retour initié », ne prouve pas la vente même quand la liste la dit faite — la MÊME règle que l\'extension et l\'écran eBay (§11)', JSON.stringify(v && [...v]));
     dit(v && !has('I6'), 'la transaction relue APRÈS la liste des ventes fait foi : elle dit « remboursée », la paire n\'est pas vendue (l\'état le plus frais, pas toujours celui de la liste)', JSON.stringify(v && [...v]));
-    dit(has('I7'), 'et l\'inverse : la liste relue après une transaction « retour initié » dit la vente finalisée — vendue');
     const rv = v && v.revenues;
     dit(!!(rv && typeof rv.has === 'function') && rv.has('I1') && rv.has('I7') && !rv.has('I2') && !rv.has('I5'),
       'la preuve dit quelles annonces sont revenues AU MOINS UNE FOIS, d\'après l\'une ou l\'autre source (remboursée, retour) — pas l\'acheteur qui a perdu la course', JSON.stringify(rv && [...rv]));
     const p = v && v.preuves;
     dit(!!(p && typeof p.get === 'function'), 'la preuve porte son détail (`.preuves`) — le retrait automatique en a besoin');
     if (p && typeof p.get === 'function') {
-      dit((p.get('I4') || []).every((x) => !x.frais) && (p.get('I2') || []).some((x) => x.frais),
-        'et dit d\'où vient chaque état : confirmé par la liste des ventes, ou de la seule transaction', JSON.stringify({ I2: p.get('I2'), I4: p.get('I4') }).slice(0, 200));
+      const i2 = (p.get('I2') || []).find((x) => x.frais);
+      dit((p.get('I4') || []).length > 0 && (p.get('I4') || []).every((x) => !x.frais) && !!i2 && i2.compte === UA && i2.cap === CAP_A,
+        'et dit d\'où vient chaque état : confirmé par la liste des ventes (son compte, sa date de capture), ou de la seule transaction', JSON.stringify({ I2: p.get('I2'), I4: p.get('I4') }).slice(0, 240));
+      dit(has('I8') && (p.get('I8') || []).length > 0 && (p.get('I8') || []).every((x) => !x.frais),
+        'une transaction relue APRÈS la liste : la liste, plus ancienne, ne la CONFIRME pas (c\'est la transaction qui fait foi)', JSON.stringify(p.get('I8')));
     }
-    dit(lus.some((q) => /tx:meta->>id/.test(q) && /cap:meta->>capturedAt/.test(q) && !/select=[^&]*\bdata\b(?!->)/.test(q)), 'la lecture projette le n° de transaction et sa date de capture (§4.4 : des scalaires, jamais `data`)', lus[0]);
-    const F2 = charger(APP, { lireTout: async () => null, fetchHarvestOrders: async () => ({ my_orders: VENTES_A }) }, dit);
-    if (F2) dit((await F2.lireVentesVintedProuvees([{ vinted_user_id: 'A' }])) === null, 'transactions illisibles ⇒ `null` (« pas su »), jamais un ensemble vide');
+    const qTxn = lus.find((q) => /_txn_/.test(q)) || '', qVentes = lus.find((q) => /orders_sold/.test(q)) || '';
+    dit(/select=id,/.test(qTxn) && /cap:meta->>capturedAt/.test(qTxn) && !/select=[^&]*\bdata\b(?!->)/.test(qTxn), 'la lecture des transactions projette leur identifiant (le n° de transaction) et leur date de capture (§4.4 : des scalaires, jamais `data`)', qTxn);
+    dit(/cap:meta->>capturedAt/.test(qVentes) && /v:data->payload->my_orders/.test(qVentes), 'et celle des ventes, la liste ET sa date de capture (le retrait automatique exige une liste récente)', qVentes);
+    const F2 = charger(APP, { lireTout: async () => null }, dit);
+    if (F2) dit((await F2.lireVentesVintedProuvees([{ vinted_user_id: UA }])) === null, 'transactions illisibles ⇒ `null` (« pas su »), jamais un ensemble vide');
+    // La liste des ventes dont une preuve DÉPEND (une transaction à un état non
+    // terminal) ne répond pas : « pas su », jamais une demi-preuve.
+    const F3 = charger(APP, { lireTout: async (q) => (/orders_sold/.test(q) ? null : base({ txn: TXN })(q)) }, dit);
+    if (F3) dit((await F3.lireVentesVintedProuvees([{ vinted_user_id: UA }])) === null, 'liste des ventes à juger illisible ⇒ `null` (« pas su »)');
   });
 
   await essaie('bordereaux confirmés par le même compte', async () => {
-    const bords = [{id:'harvest_111_label_10',tx:'10',it:'100'}, {id:'harvest_222_label_10',tx:'10',it:'200'}, {id:'harvest_111_label_11',tx:'12',it:'300'}, {id:'harvest_111_label_12',tx:'12',it:'400'}, {id:'harvest_111_label_13',tx:'13',it:'500'}];
+    const bords = [{id:'harvest_111_label_10',tx:'10',it:'100'}, {id:'harvest_222_label_10',tx:'10',it:'200'}, {id:'harvest_111_label_11',tx:'12',it:'300'}, {id:'harvest_111_label_12',tx:'12',it:'400'}, {id:'harvest_111_label_13',tx:'13',it:'500'},
+      // La N°600 : un acheteur a perdu la course (« article indisponible »,
+      // classée `failed`), l'autre l'a achetée — elle n'est PAS revenue.
+      {id:'harvest_111_label_14',tx:'14',it:'600'}, {id:'harvest_111_label_15',tx:'15',it:'600'}];
     const F = charger(APP, {
-      lireTout: async q => q.includes('_label_') ? bords : [],
-      fetchHarvestOrders: async uid => uid === '111' ? {my_orders:[{transaction_id:10,status:'Le paiement a été validé',date:new Date().toISOString()},{transaction_id:12,status:'Commande annulée',date:new Date().toISOString()},{transaction_id:13,status:'Le paiement a été validé',transaction_user_status:'failed',date:new Date().toISOString()}]} : undefined,
-      _harvestSeen:{'111_orders_sold':Date.now()},
+      lireTout: base({ bords, ventes: { 111: { cap: new Date().toISOString(), v: [{transaction_id:10,status:'Le paiement a été validé',date:new Date().toISOString()},{transaction_id:12,status:'Commande annulée',date:new Date().toISOString()},{transaction_id:13,status:'Le paiement a été validé',transaction_user_status:'failed',date:new Date().toISOString()},{transaction_id:14,status:'Commande annulée - article indisponible',transaction_user_status:'failed',date:new Date().toISOString()},{transaction_id:15,status:'Le paiement a été validé',date:new Date().toISOString()}] } } }),   // 222 : aucune liste captée
     }, dit);
     const v = await F.lireVentesVintedProuvees([{vinted_user_id:'111'},{vinted_user_id:'222'}]);
     dit(v.has('100') && v.preuves.get('100')[0].frais && v.preuves.get('100')[0].compte === '111', 'bordereau seul et vente récente du même compte : preuve stricte');
-    dit(!v.has('200'), 'même transaction sur un autre compte illisible : aucune preuve');
+    dit(!v.has('200'), 'même transaction sur un autre compte (sans liste captée) : aucune preuve');
     dit(!v.has('300'), 'transaction du bordereau contradictoire : aucune preuve');
     dit(!v.has('500') && v.revenues.has('500'), 'vente classée en échec malgré son titre : aucun retrait');
     dit(!v.has('400') && v.revenues.has('400'), 'vente annulée : la paire est revenue, aucun retrait');
+    dit(v.has('600') && !v.revenues.has('600'), 'l\'acheteur qui a perdu la course (« article indisponible », même classé `failed`) ne fait pas revenir une paire vendue à un autre', JSON.stringify({ vendue: v.has('600'), revenue: v.revenues.has('600') }));
   });
 
   // ── 2. LES ANNONCES EN VENTE : TOUS SES COMPTES, ÉCARTÉS COMPRIS ──────────
@@ -167,21 +212,23 @@ async function controles(APP, journal) {
     '7030': { numero: '30' },                          // date de mise en ligne eBay inconnue
     '7031': { numero: '31' },                          // eBay la dit déjà terminée
     '7032': { numero: '32' },                          // une seconde vente sûre (passage annulé en cours)
-    '7033': { numero: '33' },                          // revenue une fois (retour), revendue : les sources se contredisent
+    '7033': { numero: '33' },                          // revenue une fois (retour), revendue ensuite
   };
   const txn = [
-    { tx: '622', it: '7022', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '626', it: '7026', ti: 'Le paiement a été validé', at: D_VENTE },
-    { tx: '627', it: '7027', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '628', it: '7028', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '629', it: '7029', ti: 'Le paiement a été validé', at: D_VENTE },
-    { tx: '630', it: '7030', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '631', it: '7031', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '632', it: '7032', ti: 'Commande finalisée', at: D_VENTE },
-    { tx: '633', it: '7033', ti: 'Retour initié', at: D_VENTE },
+    txnL(UA, '622', '7022', 'Commande finalisée', D_VENTE),
+    txnL(UA, '626', '7026', 'Le paiement a été validé', D_VENTE),
+    txnL(UA, '627', '7027', 'Commande finalisée', D_VENTE),
+    txnL(UA, '628', '7028', 'Commande finalisée', D_VENTE),
+    txnL(UA, '629', '7029', 'Le paiement a été validé', D_VENTE),
+    txnL(UA, '630', '7030', 'Commande finalisée', D_VENTE),
+    txnL(UA, '631', '7031', 'Commande finalisée', D_VENTE),
+    txnL(UA, '632', '7032', 'Commande finalisée', D_VENTE),
+    // La N°33 : vendue, RETOURNÉE (« retour initié »), puis revendue.
+    txnL(UA, '633', '7033', 'Retour initié', D_VENTE),
+    txnL(UA, '634', '7033', 'Commande finalisée', D_VENTE),
   ];
   const fini = { status: 'Commande finalisée', date: D_VENTE };
-  const ventes = [622, 627, 628, 630, 631, 632, 633].map((t) => ({ transaction_id: t, ...fini })).concat([{ transaction_id: 626, status: 'Remboursement effectué', date: D_VENTE }]);
+  const ventes = [622, 627, 628, 630, 631, 632, 634].map((t) => ({ transaction_id: t, ...fini })).concat([{ transaction_id: 626, status: 'Remboursement effectué', date: D_VENTE }, { transaction_id: 633, status: 'Retour initié', date: D_VENTE }]);
   const avant = '2026-09-15T10:00:00.000Z', apres = '2026-10-02T10:00:00.000Z';
   const annonce = (n, depuis, fin) => ({ itemId: '1100000000' + n, sku: 'VRM-' + n, title: 'Paire ' + n, depuis, ...(fin ? { fin } : {}) });
   const ANNONCES = [annonce(22, avant), annonce(26, avant), annonce(27, apres), annonce(28, avant), annonce(29, avant), annonce(30, ''), annonce(31, avant, '2026-10-03T00:00:00.000Z'), annonce(32, avant), annonce(33, avant)];
@@ -189,17 +236,15 @@ async function controles(APP, journal) {
   const scenario = async (quoi, opts) => {
     const appels = [], toasts = [];
     const env = {
-      lireTout: async () => txn.map((r) => ({ ...r })),
-      fetchHarvestOrders: async () => ({ my_orders: ventes }),
-      // (revue du 8 octobre) La liste des ventes du compte A a été captée il y
+      // (revue du 8 octobre) La liste des ventes du compte 111 a été captée il y
       // a 2 h — sauf scénario « liste ancienne ».
-      _harvestSeen: { A_orders_sold: opts.capListe != null ? opts.capListe : MAINTENANT - 2 * 3600000 },
+      lireTout: base({ txn, ventes: { [UA]: { v: ventes, cap: new Date(opts.capListe != null ? opts.capListe : MAINTENANT - 2 * 3600000).toISOString() } } }),
       enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
       fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b); if (opts.apresAppel) opts.apresAppel(appels); return {ok:true,status:200,json: async () => (opts.reponse ? opts.reponse(b) : { ok: true }) }; },
     };
     const F = charger(APP, env, dit); if (!F) return null;
     if (!F.passageRetraitEbayAuto) { dit(false, `${quoi} : \`passageRetraitEbayAuto\` existe (le passage de la coque, exécutable)`); return null; }
-    const vendus = await F.lireVentesVintedProuvees([{ vinted_user_id: 'A' }]);
+    const vendus = await F.lireVentesVintedProuvees([{ vinted_user_id: UA }]);
     const res = await F.passageRetraitEbayAuto({
       nuageAuDepart: opts.nuage !== false, continuer: opts.continuer || (() => true),
       annonces: opts.annonces || ANNONCES, commandes: [], enLigne: new Set(), toutesLues: opts.toutesLues !== false,
@@ -208,6 +253,25 @@ async function controles(APP, journal) {
     });
     return { res, appels, toasts };
   };
+  // ── 3 avant. (15 octobre) L'ÉCRAN eBAY ET LA COQUE : LE MÊME VERDICT (§11).
+  //    La coque lisait la preuve par SON lecteur (avec le détail), l'écran par
+  //    `lirePreuvesVenteVinted` (sans) : l'écran disait « je n'ai pas pu tout
+  //    vérifier » sur chaque paire pendant que la coque retirait. Les deux
+  //    lectures, telles que chacun les fait, doivent rendre le même verdict.
+  await essaie('écran et coque : le même verdict', async () => {
+    const F = charger(APP, { lireTout: base({ txn, ventes: { [UA]: { v: ventes, cap: new Date(MAINTENANT - 2 * 3600000).toISOString() } } }) }, dit);
+    if (!F || !F.lirePreuvesVenteVinted) return;
+    const verdict = (vendus) => {
+      const dv = F.doublesVenteEbay({ annonces: ANNONCES, commandes: [], numeros, enLigne: new Set(), vendusVinted: vendus, programmees: [], ventes: null });
+      const r = F.retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted: vendus, toutesLues: true, comptesBloques: new Set(), maintenant: MAINTENANT });
+      return JSON.stringify({ permis: r.permis.map((d) => d.numero).sort(), ecartes: r.ecartes.map((e) => `${e.numero}:${e.raison}`).sort() });
+    };
+    const coque = verdict(await F.lireVentesVintedProuvees([{ vinted_user_id: UA }]));
+    // L'écran : les comptes non écartés pour « pas reliées », TOUS pour confirmer.
+    const p = await F.lirePreuvesVenteVinted({ comptes: [UA], confirmer: [{ vinted_user_id: UA }] });
+    const ecran = verdict(p ? p.vendus : null);
+    dit(coque === ecran && /"22"/.test(ecran), 'l\'écran eBay et la coque rendent le MÊME verdict de retrait automatique (une lecture, une règle)', `coque ${coque} · écran ${ecran}`);
+  });
   await essaie('passage normal', async () => {
     const s = await scenario('passage normal', {});
     if (!s) return;
@@ -220,7 +284,7 @@ async function controles(APP, journal) {
     dit(!ids.includes('110000000029'), 'une vente que la liste des ventes ne confirme pas ne retire rien');
     dit(!ids.includes('110000000030'), 'une date de mise en ligne eBay inconnue ne retire rien');
     dit(!ids.includes('110000000031'), 'une annonce qu\'eBay dit déjà terminée ne prend pas de place');
-    dit(!ids.includes('110000000033'), 'une paire revenue au moins une fois (la transaction dit « retour initié », la liste « finalisée ») ne se retire pas toute seule');
+    dit(!ids.includes('110000000033'), 'une paire revenue au moins une fois (une transaction « retour initié »), puis revendue, ne se retire pas toute seule');
     dit(s.appels.every((b) => b.action === 'retirer' && b.auto === true && b.confirme === true && /^VRM-\d+$/.test(b.sku)), 'chaque envoi : {action:retirer, auto:true, confirme:true, sku VRM-n°}', JSON.stringify(s.appels[0]));
     const raisons = (s.res && s.res.ecartes || []).map((e) => `${e.numero}:${e.raison}`).sort().join(',');
     dit(/27:ebay-apres-vente/.test(raisons) && /28:numero-partage/.test(raisons) && /29:vente-non-confirmee/.test(raisons) && /30:date-pas-sue/.test(raisons) && /31:deja-terminee/.test(raisons) && /33:revenue-une-fois/.test(raisons),
@@ -239,7 +303,7 @@ async function controles(APP, journal) {
     dit(s2.appels.length === 2, 'l\'autre sens : une liste relue il y a 47 h confirme (la borne est 48 h)', `${s2.appels.length} envoi(s)`);
   });
   await essaie('compte bloqué par Vinted', async () => {
-    const s = await scenario('compte bloqué', { bloques: new Set(['A']) }); if (!s) return;
+    const s = await scenario('compte bloqué', { bloques: new Set([UA]) }); if (!s) return;
     dit(s.appels.length === 0, 'une vente sur un compte que Vinted a BLOQUÉ (capture figée pour toujours) ne retire rien', JSON.stringify(s.appels.map((b) => b.itemId)));
     const r = (s.res && s.res.ecartes || []).filter((e) => e.numero === '22').map((e) => e.raison);
     dit(r[0] === 'compte-bloque', 'et la raison est dite : « compte-bloque »', JSON.stringify(r));
@@ -352,6 +416,17 @@ async function controles(APP, journal) {
     'la coque lit les annonces en vente et la preuve sur TOUS ses comptes (écartés compris), comme l\'écran eBay');
   dit(/lirePreuvesVenteVinted\(/.test(sansCommentaires) && /await lireAnnoncesVintedEnLigne\(comptes\)/.test(sansCommentaires),
     'l\'écran eBay lit avec les MÊMES fonctions (une règle, deux lecteurs)');
+  // (15 octobre) Et il CONFIRME la preuve avec tous ses comptes liés, comme la
+  // coque : sans le détail, il jugeait le retrait automatique « pas su » sur
+  // chaque paire pendant que la coque, elle, retirait.
+  {
+    // L'appel de l'écran est celui qui demande aussi la ligne « pas reliées »
+    // (`comptes:`) : celui-là doit demander le détail (`confirmer:`).
+    const appels = [...sansCommentaires.matchAll(/lirePreuvesVenteVinted\(\{([^}]*)\}\)/g)].map((m) => m[1]);
+    const ecran = appels.filter((c) => /\bcomptes\s*:/.test(c));
+    dit(ecran.length > 0 && ecran.every((c) => /\bconfirmer\s*:/.test(c)) && /uidsDeComptes\(comptes\)/.test(sansCommentaires),
+      'l\'écran eBay demande le détail de la preuve (`confirmer`) sur tous ses comptes liés, comme la coque (§11)', JSON.stringify(ecran));
+  }
   dit(!/retirerEbayAuto\(dvE\./.test(sansCommentaires), 'plus aucun retrait automatique lancé directement sur la liste de l\'alerte (sans la règle stricte)');
   dit(/comptesBloques:comptesBloquesVinted\(\)/.test(sansCommentaires), 'la coque passe les comptes que Vinted a bloqués (`vinted_accounts_blocked`) au passage');
   return ko;
@@ -366,7 +441,10 @@ const PROUVE = process.argv.includes('--prouve');
     process.exit(ko ? 1 : 0);
   }
   const MUTATIONS = [
-    ['la preuve sans la liste des ventes (état périmé)', 'const f = (lit && tx) ? frais.get(tx) : null;', 'const f = null;'],
+    ['la preuve sans la liste des ventes (état périmé)', 'const parTx = preuvesParTransaction(rows, parCompte);', 'const parTx = preuvesParTransaction(rows);'],
+    ['la confirmation sans la liste des ventes', 'const lu = tx ? lues.get(tx) : null;', 'const lu = null;'],
+    ['une vente « failed » pas comptée revenue', "(etatRevient(s) || String(o.transaction_user_status || '') === 'failed')", 'etatRevient(s)'],
+    ['l\'écran sans le détail de la preuve', ", confirmer: avecSku ? comptesConfirmer : null }).then(", " }).then("],
     ['N° porté par plusieurs fiches accepté', "if (ids.length !== 1) { ecarte('numero-partage'); continue; }", ''],
     ['vente non confirmée acceptée', '.filter((v) => v && v.frais);', '.filter((v) => v);'],
     ['annonce eBay postérieure à la vente acceptée', "if (!(tEbay < tVente)) { ecarte('ebay-apres-vente'); continue; }", ''],
@@ -375,9 +453,9 @@ const PROUVE = process.argv.includes('--prouve');
     ['annulation relue seulement au départ', "if (typeof continuer === 'function' && !continuer()) break;", ''],
     ['un compte illisible compté « lu »', 'toutesLues: okAny && toutes', 'toutesLues: okAny'],
     ['« déjà terminée » prend une place', '/* déjà close : ne prend pas une des 5 places */', 'n += 1;'],
-    ['la transaction plus fraîche ignorée (la liste gagne toujours)', '!(Number.isFinite(capTx) && Number.isFinite(f.cap) && capTx > f.cap)', 'true'],
+    ['la transaction plus fraîche ignorée (la liste gagne toujours)', 'if (Number.isFinite(capTx) && Number.isFinite(cap) && capTx > cap) return null;', ''],
     ['une paire revenue une fois acceptée', "if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }", ''],
-    ['« article indisponible » compté comme un retour', "!/indisponible|[ée]chou/i.test(s)", 'true'],
+    ['« article indisponible » compté comme un retour', 'const PAS_UN_RETOUR = /indisponible|[ée]chou/i;', 'const PAS_UN_RETOUR = /(?!)/;'],
     ['« incertain » lu comme un refus', "if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) {", 'if (false) {'],
     // (revue du 8 octobre)
     ['une liste de ventes ancienne confirme', 'const fraiches = confirmees.filter((v) => Number.isFinite(v.cap) && maintenant - v.cap <= LISTE_VENTES_FRAICHE_MS);', 'const fraiches = confirmees;'],
@@ -385,7 +463,7 @@ const PROUVE = process.argv.includes('--prouve');
     ['comptes bloqués inconnus lus « aucun »', "const bloques = comptesBloques && typeof comptesBloques.has === 'function' ? comptesBloques : null;", 'const bloques = comptesBloques && typeof comptesBloques.has === \'function\' ? comptesBloques : new Set();'],
     ['un retrait incertain tu', 'const incertain = () => {', 'const incertain = () => { return;'],
     ['un refus de VRM attribué à eBay', "toast(`N°${d.numero} n'a pas été retirée automatiquement${", "toast(`N°${d.numero} : eBay a refusé le retrait automatique, pas été retirée${"],
-    ['la preuve sans la date de sa liste', 'cap: parListe ? f.cap : null, compte:', 'cap: null, compte:'],
+    ['la preuve sans la date de sa liste', 'return { etat, cap: Number.isFinite(cap) ? cap : null, compte: lu.uid,', 'return { etat, cap: null, compte: lu.uid,'],
   ];
   let nonPris = 0;
   for (const [nom, de, vers] of MUTATIONS) {
