@@ -21,7 +21,9 @@
 //   6. l'autre sens : un 404/500 ne met pas en pause, et la pause finie, tout
 //      repart ;
 //   7. la moisson faite DANS LA PAGE (`inject.js`) s'arrête au premier 429,
-//      prévient le fond, et ne démarre pas pendant une pause.
+//      prévient le fond, et ne démarre pas pendant une pause ;
+//   2b. un 429 reçu PENDANT la génération des bordereaux arrête la visite :
+//      ni la garde de la moisson ni un échec ne sont comptés (revue 15 oct.).
 //  Données inventées. Usage : node scripts/audit-frein-vinted.cjs [--src f]
 //  (`--inject f` : une autre copie d'`inject.js`, pour la preuve sur l'avant.)
 // ════════════════════════════════════════════════════════════════════════════
@@ -143,6 +145,25 @@ function pageInject({ repondre, avantChargement } = {}) {
     const ventes = await F.envoyer({ from: 'vmr-bridge', action: 'cmd', cmd: 'ventes' }, APP);
     dit(!!ventes && ventes.accepte === false && ventes.code === 'vinted-pause', 'et « relis mes ventes »', JSON.stringify(ventes));
     dit(F.j.vinted.length === avant, 'aucun de ces clics n’a envoyé de requête', `${F.j.vinted.length - avant}`);
+  });
+
+  console.log('── 2b. un 429 pendant la génération des bordereaux de la visite');
+  await essaie('bordereaux freinés', async () => {
+    // (revue du 15 octobre) La ligne `if (await pauseVinted()) return` qui
+    // suivait la génération était partie avec l'appel des réponses
+    // automatiques : la suite de la visite consommait la garde de 5 min de la
+    // moisson et comptait un faux échec — au retour de la pause, un échec
+    // passager ne rendait plus la garde.
+    const l = lignes();
+    l[`harvest_${UID}_orders_sold`] = { capturedAt: new Date().toISOString(), payload: { my_orders: [{ transaction_id: 5101, title: 'Vente à expédier', status: 'Le paiement a été validé' }] } };
+    const f = faireFond({ src: SRC, lignes: l, vinted: vintedAvec(/\/user_addresses/, 429) });
+    await f.ctx.visiteVinted();
+    const i = f.j.vinted.findIndex((x) => /\/user_addresses/.test(x.chemin));
+    dit(i >= 0 && !!pauseDe(f.store), 'la génération a demandé l’adresse d’envoi et reçu le 429 (pause posée)', JSON.stringify(f.j.vinted.map((x) => x.chemin)));
+    dit(i >= 0 && f.j.vinted.slice(i + 1).length === 0, 'après le 429 : plus aucune requête dans la visite', JSON.stringify(f.j.vinted.slice(i + 1).map((x) => x.chemin)));
+    dit(!((f.store.vrmDerniereVisite || {})[UID]), 'la visite s’arrête là : la garde de 5 min de la moisson n’est PAS consommée', JSON.stringify(f.store.vrmDerniereVisite || null));
+    dit(!((f.store.vrmVisiteEchecs || {})[UID]), 'aucun faux échec de visite n’est compté', JSON.stringify(f.store.vrmVisiteEchecs || null));
+    dit(!(f.j.journal || []).some((t) => /Rien n'a pu être rangé/.test(t)), 'et le journal ne dit pas « rien n’a pu être rangé »', JSON.stringify(f.j.journal));
   });
 
   console.log('── 5. la pause monte si Vinted recommence');

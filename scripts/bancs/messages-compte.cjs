@@ -35,6 +35,15 @@
 //      fil s'ouvre en lecture seule avec le geste.
 //   G. Réglages : plus d'interrupteur « Répondre à mes messages Vinted », et
 //      une ancienne valeur allumée sur l'appareil est rééteinte.
+// Revue du 15 octobre (chaque défaut reproduit d'abord, rouge sur 9701837) :
+//   D2/D3. un envoi incertain survit à un départ de Messages ET à un
+//      rechargement : revenu sur le fil, Entrée ne renvoie pas — le fil relu en
+//      direct à l'ouverture le dit envoyé ;
+//   D4. un ANCIEN message au même texte (« Merci ! ») ne fait pas dire
+//      « Envoyé » à un envoi qui n'est jamais parti ;
+//   H. compte choisi à la main ≠ compte de Chrome : estompé = lecture seule
+//      (le compte de Chrome reste net, c'est lui qui répond) ;
+//   A/C. le nombre de non-lus s'écrit une fois ; chaque offre dit qui l'a faite.
 // Rendu à 1512 et 390 px, clair et sombre (captures dans BANC_CAPTURES ou le
 // dossier temporaire). `BANC_PORT` (5932 par défaut).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -43,6 +52,10 @@ const fs = require('fs'), http = require('http'), path = require('path'), os = r
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 5932;
 const CAPT = process.env.BANC_CAPTURES || os.tmpdir();
+// `SECTIONS=d2,d3` : ne rendre que ces scénarios (abc, d, d2, d3, d4, h, abis, f, g) —
+// pour les preuves par réaffaiblissement, un build par mutation.
+const SEC = (process.env.SECTIONS || '').split(',').map((x) => x.trim()).filter(Boolean);
+const veut = (x) => !SEC.length || SEC.includes(x);
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -54,7 +67,10 @@ const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: iso(h), 
 const message = (id, user, body, h) => ({ entity_type: 'message', created_at_ts: Math.floor((auj - h * 3600e3) / 1000), entity: { id, user_id: user, body } });
 const filsDe = () => ({
   301: { id: 301, allow_reply: true, description: 'Nike Air Max 1', opposite_user: { id: 5301, login: 'acheteuse_a' }, transaction: { id: 9001, item_id: 444 },
-    messages: [message(1, 5301, 'Bonjour, toujours dispo ?', 3),
+    // (revue du 15 octobre) un ANCIEN « Merci ! » du vendeur : une réponse courte
+    // revient souvent dans un fil — elle ne prouve pas qu'un envoi incertain du
+    // même texte est parti.
+    messages: [message(1, 5301, 'Bonjour, toujours dispo ?', 3), message(2, 999, 'Merci !', 2.9),
       { id: 60, entity_type: 'offer_message', created_at_ts: Math.floor((auj - 2.8 * 3600e3) / 1000), entity: { user_id: 999, current: false, price: { amount: '50.0', currency_code: 'EUR' }, price_label: '50,00 €', currency: 'EUR' } },
       { id: 61, entity_type: 'offer_request_message', created_at_ts: Math.floor((auj - 2.5 * 3600e3) / 1000), entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9001, offer_request_id: 77 } }] },
   401: { id: 401, allow_reply: true, description: 'Adidas Samba 42', opposite_user: { id: 5401, login: 'acheteur_b1' }, transaction: { id: 9101, item_id: 555 },
@@ -64,9 +80,16 @@ const filsDe = () => ({
   402: { id: 402, allow_reply: false, description: 'Puma Suede 41', opposite_user: { id: 5402, login: 'acheteur_b2' },
     messages: [message(21, 5402, 'Encore là ?', 3)] },
 });
-const lignesDe = () => {
+// Un TROISIÈME compte (H) : pour juger qu'un fil estompé est toujours en lecture
+// seule quand un compte est choisi à la main.
+const COMPTE_C = { id: 3, vinted_user_id: '333', login: 'compte_c', domain: 'www.vinted.fr', updated_at: iso(0) };
+const FIL_C = { id: 501, allow_reply: true, description: 'New Balance 550', opposite_user: { id: 5501, login: 'acheteur_c' }, transaction: { id: 9201, item_id: 666 },
+  messages: [message(31, 5501, 'Dispo en 43 ?', 4)] };
+const lignesDe = (trois) => {
   const fils = filsDe();
   return [
+    ...(trois ? [{ id: 'harvest_333_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(501, 'acheteur_c', 'Dispo en 43 ?', true, 4)] } } },
+      { id: 'harvest_333_conv_501', data: { capturedAt: iso(0), payload: { conversation: FIL_C } } }] : []),
     { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_a', 'Toujours dispo ?', true, 2), conv(303, 'curieux_a', 'Merci !', false, 30)] } } },
     { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(401, 'acheteur_b1', 'Vous faites 40 € ?', true, 1), conv(402, 'acheteur_b2', 'Encore là ?', true, 3)] } } },
     { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: fils[301] } } },
@@ -105,11 +128,15 @@ const projette = (row, sel) => {
 // Le pont, dans la forme de ses réponses. `chrome` : uid du compte ouvert dans
 // Chrome. Une GARDE STRICTE comme la vraie extension : un fil d'un autre compte
 // est refusé (`vinted-autre`), rien ne part. `window.__modeReponse` : 'ok' · 'refus'
-// (Vinted répond 403) · 'muet' (le message PART, mais aucune réponse ne revient).
+// (Vinted répond 403) · 'muet' (le message PART, mais aucune réponse ne revient)
+// · 'perdu' (rien ne part, et aucune réponse ne revient).
+// Ce qui est PARTI chez Vinted y reste après un rechargement de VRM (le vrai
+// Vinted le garde) : les envois sont gardés dans le stockage de la page.
 const PONT = ({ version, chrome, fils }) => {
   window.__execs = []; window.__modeReponse = 'ok';
   const post = (m) => window.postMessage(m, '*');
-  const lo = { 111: 'compte_a', 222: 'compte_b' };
+  const lo = { 111: 'compte_a', 222: 'compte_b', 333: 'compte_c' };
+  try { for (const x of JSON.parse(localStorage.getItem('__banc_envoyes') || '[]')) if (fils[x.conv]) fils[x.conv].messages.push(x.m); } catch (_) {}
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
@@ -123,8 +150,13 @@ const PONT = ({ version, chrome, fils }) => {
     if (d.method === 'POST' && m && m[2]) {
       const mode = window.__modeReponse;
       if (mode === 'refus') { setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: false, status: 403, error: 'erreur 403' }), 30); return; }
+      if (mode === 'perdu') return;                      // rien n'est parti, rien ne revient
       const f = fils[m[1]];
-      if (f) f.messages.push({ entity_type: 'message', created_at_ts: Math.floor(Date.now() / 1000), entity: { id: 900 + f.messages.length, user_id: 999, body: d.body && d.body.reply && d.body.reply.body } });
+      if (f) {
+        const nouveau = { entity_type: 'message', created_at_ts: Math.floor(Date.now() / 1000), entity: { id: 900 + f.messages.length, user_id: 999, body: d.body && d.body.reply && d.body.reply.body } };
+        f.messages.push(nouveau);
+        try { const l = JSON.parse(localStorage.getItem('__banc_envoyes') || '[]'); l.push({ conv: m[1], m: nouveau }); localStorage.setItem('__banc_envoyes', JSON.stringify(l)); } catch (_) {}
+      }
       if (mode === 'muet') return;                       // parti, mais rien ne revient
       setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data: {} }), 30);
       return;
@@ -137,7 +169,7 @@ const PONT = ({ version, chrome, fils }) => {
 // `tel` : 390 px de large. `tactile` : un vrai téléphone (aucune souris) — là,
 // l'extension ne peut pas tourner : c'est le cas F. Une fenêtre étroite sur
 // l'ordinateur (390 px, souris), elle, garde l'extension.
-async function rendre(b, { chrome = '111', tel = false, tactile = false, sombre = false, onglet = 'cat_msg', sansExtension = false, repondAuto = false } = {}) {
+async function rendre(b, { chrome = '111', tel = false, tactile = false, sombre = false, onglet = 'cat_msg', sansExtension = false, repondAuto = false, trois = false } = {}) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tactile ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -150,13 +182,14 @@ async function rendre(b, { chrome = '111', tel = false, tactile = false, sombre 
   } catch (_) {} }, { sombre, repondAuto });
   if (!sansExtension) await pg.addInitScript(PONT, { version: '5.163.0', chrome, fils: filsDe() });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  const lignes = lignesDe();
+  const lignes = lignesDe(trois);
+  const accs = trois ? [...ACCS, COMPTE_C] : ACCS;
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(accs);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -197,7 +230,7 @@ const zone = (pg) => pg.evaluate(() => {
     note: (document.querySelector('[data-envoi-note]') || {}).innerText || '', envoye: document.querySelectorAll('[data-envoye]').length } : null;
 });
 const execs = (pg) => pg.evaluate(() => window.__execs || []);
-const ouvrir = async (pg, id) => { await pg.click(`[data-conv="${id}"]`, { timeout: 4000 }); await pg.waitForTimeout(900); };
+const ouvrir = async (pg, id) => { await pg.click(`[data-conv="${id}"]`, { timeout: 10000 }); await pg.waitForTimeout(900); };
 const fermer = async (pg) => { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); };
 const sansDebordement = async (pg) => pg.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 // Le bouton Envoyer, trouvé par son RÔLE et son nom (il existe aussi sur le code
@@ -210,7 +243,7 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
-    for (const { tel, sombre } of [{ tel: false, sombre: false }, { tel: true, sombre: false }, { tel: false, sombre: true }, { tel: true, sombre: true }]) {
+    for (const { tel, sombre } of (veut('abc') ? [{ tel: false, sombre: false }, { tel: true, sombre: false }, { tel: false, sombre: true }, { tel: true, sombre: true }] : [])) {
       const taille = (tel ? '390' : '1512') + (sombre ? '-sombre' : '');
       console.log(`── A-B-C. Chrome sur compte_a · ${taille}`);
       const r = await rendre(b, { chrome: '111', tel, sombre });
@@ -226,6 +259,10 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
         dit(l.sep.length === 1 && l.sep[0].etat === 'lecture' && l.sep[0].n === '2' && /lecture seule/.test(l.sep[0].txt) && /2 non lus/.test(l.sep[0].txt),
           'UNE ligne « Autres comptes · lecture seule · 2 non lus » — le pourquoi dit une fois, pas sur chaque ligne', JSON.stringify(l.sep));
         dit(l.tete && l.tete.etat === 'nonlus' && l.tete.n === '3' && /^3 non lus$/.test(l.tete.txt), 'la tête dit « 3 non lus » (toute la liste, autres comptes compris)', JSON.stringify(l.tete));
+        // (revue du 15 octobre) « 3 non lus | Toutes 4 | Non lues 3 » : le même
+        // nombre deux fois à 40 px (§7). On juge le RENDU de la tête et des filtres.
+        const haut = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie-tete], .vrm-inbox-filters')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()).join(' | '));
+        dit((haut.match(/\b3\b/g) || []).length === 1, 'le nombre de non-lus s’écrit UNE fois (la tête), pas une seconde fois sur le filtre', haut);
         await capture(r.pg, 'liste-' + taille);
       });
       await essaie('B ' + taille, async () => {
@@ -260,7 +297,10 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
         const zA = await zone(r.pg);
         dit(zA && zA.etat === 'libre' && zA.texte === '', 'le fil de compte_a se répond (zone libre) et ne reprend PAS le brouillon d’un autre fil', JSON.stringify(zA && { etat: zA.etat, texte: zA.texte }));
         const filA = await r.pg.evaluate(() => (document.querySelector('.vrm-chat-history') || {}).innerText || '');
-        dit(/Offre : 50,00 €/.test(filA) && !/offer_(request_)?message|currency_code|INFO COLIS/i.test(filA), 'une offre sans titre se lit « Offre : 50,00 € » — jamais le type brut « offer_message », ni un faux « Info colis · currency_code »', filA.replace(/\s+/g, ' ').slice(0, 160));
+        dit(/Ton offre : 50,00 €/.test(filA) && /Offre reçue : 45,00 €/.test(filA) && !/offer_(request_)?message|currency_code|INFO COLIS/i.test(filA),
+          'chaque offre dit QUI l’a faite — « Ton offre : 50,00 € », « Offre reçue : 45,00 € » — jamais le type brut, ni un faux « Info colis · currency_code »', filA.replace(/\s+/g, ' ').slice(0, 200));
+        const cotes = await r.pg.evaluate(() => [...document.querySelectorAll('[data-offre-fil]')].map((x) => x.getAttribute('data-offre-fil') + ':' + getComputedStyle(x).alignSelf));
+        dit(cotes.includes('moi:flex-end') && cotes.includes('acheteur:flex-start'), 'et chacune se range du côté de son auteur (la sienne à droite, celle de l’acheteuse à gauche)', JSON.stringify(cotes));
         await r.pg.fill('textarea[aria-label="Réponse à la conversation"]', 'Brouillon A');
         await fermer(r.pg);
         await ouvrir(r.pg, '303');
@@ -278,8 +318,8 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
       await r.ctx.close();
     }
 
+    if (veut('d')) {
     console.log('── D. envoyer, refus, envoi sans réponse (1512)');
-    {
       const r = await rendre(b, { chrome: '111' });
       await essaie('D envoyé', async () => {
         await ouvrir(r.pg, '301');
@@ -337,6 +377,109 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
       await r.ctx.close();
     }
 
+    // ── D2-D4 (revue du 15 octobre) ─────────────────────────────────────────
+    // L'envoi incertain vivait dans un `useState` : quitter Messages ou
+    // recharger le perdait, et le BROUILLON (même texte) revenait dans le champ —
+    // Entrée renvoyait le message. Et la relecture disait « Envoyé » dès qu'un
+    // ANCIEN message au même texte était dans le fil.
+    const TA = 'textarea[aria-label="Réponse à la conversation"]';
+    const envoiIncertain = async (pg, texte, mode) => {
+      await ouvrir(pg, '301');
+      await pg.evaluate((m) => { window.__modeReponse = m; }, mode);
+      await pg.fill(TA, texte);
+      await envoyer(pg);
+      await pg.waitForTimeout(16500);
+      const z = await zone(pg);
+      dit(z && z.etat === 'incertain', `« ${texte} » (${mode}) : envoi non confirmé`, JSON.stringify(z && z.etat));
+      await pg.evaluate(() => { window.__modeReponse = 'ok'; });
+    };
+    const repliesDe = async (pg) => (await execs(pg)).filter((x) => x.method === 'POST' && /\/replies$/.test(x.endpoint)).map((x) => x.body && x.body.reply && x.body.reply.body);
+    if (veut('d2')) {
+    console.log('── D2. envoi incertain, puis Ma journée et retour sur Messages (sans recharger)');
+    await essaie('D2', async () => {
+      const r = await rendre(b, { chrome: '111' });
+      await envoiIncertain(r.pg, 'Je vous la garde', 'muet');
+      await fermer(r.pg);
+      await r.pg.getByText('Ma journée', { exact: true }).first().click({ timeout: 8000 }); await r.pg.waitForTimeout(1500);
+      await r.pg.getByText('Vinted', { exact: true }).first().click({ timeout: 8000 }); await r.pg.waitForTimeout(1200);
+      await r.pg.getByRole('button', { name: 'Messages', exact: true }).first().click({ timeout: 8000 }).catch(() => {}); await r.pg.waitForTimeout(2500);
+      await ouvrir(r.pg, '301');
+      const zR = await zone(r.pg);
+      await r.pg.focus(TA); await r.pg.keyboard.press('Enter'); await r.pg.waitForTimeout(900);
+      const env = await repliesDe(r.pg);
+      dit(env.length === 1, 'revenu sur le fil, Entrée ne renvoie PAS le message — un seul envoi en tout', JSON.stringify(env));
+      dit(zR && zR.etat === 'libre' && zR.texte === '' && /Envoyé/.test(zR.note), 'relu en direct à l’ouverture, le fil le retrouve : « Envoyé — il est dans le fil », le brouillon s’efface', JSON.stringify(zR && { etat: zR.etat, texte: zR.texte, note: zR.note }));
+      await capture(r.pg, 'incertain-retour-1512');
+      await r.ctx.close();
+    });
+    }
+    if (veut('d3')) {
+    console.log('── D3. envoi incertain, puis RECHARGEMENT de la page');
+    await essaie('D3', async () => {
+      const r = await rendre(b, { chrome: '111' });
+      await envoiIncertain(r.pg, 'Je vous la garde', 'muet');
+      await r.pg.goto(`http://localhost:${PORT}/?tab=cat_msg`, { waitUntil: 'domcontentloaded' }); await r.pg.waitForTimeout(5000);
+      await ouvrir(r.pg, '301');
+      const zR = await zone(r.pg);
+      await r.pg.focus(TA); await r.pg.keyboard.press('Enter'); await r.pg.waitForTimeout(900);
+      const env = await repliesDe(r.pg);
+      dit(env.length === 0, 'après le rechargement, Entrée ne renvoie PAS le message', JSON.stringify(env));
+      dit(zR && zR.texte === '' && /Envoyé/.test(zR.note), 'et le fil relu le dit envoyé (« il est dans le fil »)', JSON.stringify(zR && { etat: zR.etat, texte: zR.texte, note: zR.note }));
+      await r.ctx.close();
+    });
+    }
+    if (veut('d4')) {
+    console.log('── D4. envoi incertain d’un « Merci ! » qui n’est PAS parti, un ancien « Merci ! » déjà dans le fil');
+    await essaie('D4', async () => {
+      const r = await rendre(b, { chrome: '111' });
+      await envoiIncertain(r.pg, 'Merci !', 'perdu');
+      await r.pg.click('button[aria-label="Actualiser la conversation"]', { timeout: 4000 }); await r.pg.waitForTimeout(1500);
+      const zJ = await zone(r.pg);
+      const fil = await r.pg.evaluate(() => (document.querySelector('.vrm-chat-history') || {}).innerText || '');
+      dit((fil.match(/Merci !/g) || []).length === 1, 'le fil relu ne porte que l’ANCIEN « Merci ! » (rien n’est parti)', String((fil.match(/Merci !/g) || []).length));
+      dit(zJ && zJ.etat === 'libre' && /Pas dans le fil/.test(zJ.note) && !/Envoyé/.test(zJ.note) && zJ.texte === 'Merci !' && zJ.envoyerGrise === false,
+        'la relecture ne le dit PAS envoyé : « pas dans le fil », le texte reste et peut repartir', JSON.stringify(zJ && { etat: zJ.etat, note: zJ.note, texte: zJ.texte, grise: zJ.envoyerGrise }));
+      await r.ctx.close();
+    });
+    }
+
+    // ── H (revue du 15 octobre) : estompé = LECTURE SEULE, même quand un autre
+    //    compte est choisi à la main. Le flou suivait le choix : Chrome sur
+    //    compte_a, compte_b choisi ⇒ les fils de compte_a (les seuls auxquels on
+    //    répond d'ici) étaient estompés.
+    if (veut('h')) {
+    console.log('── H. Chrome sur compte_a, compte_b choisi à la main, trois comptes');
+    await essaie('H', async () => {
+      const r = await rendre(b, { chrome: '111', trois: true });
+      await r.pg.selectOption('#vrm-sel-compte', '222', { timeout: 8000 }); await r.pg.waitForTimeout(700);
+      const l = await liste(r.pg);
+      dit(l.ordre === '401 402 301 303 | 501', 'le compte choisi (compte_b) d’abord, puis celui de Chrome (compte_a), puis « Autres comptes »', l.ordre);
+      const flou = (id) => { const x = l.lignes.find((y) => y.id === id); return x ? x.flou : null; };
+      dit(['401', '402', '301', '303'].every((id) => flou(id) === false) && flou('501') === true, 'compte_a (il répond d’ici) et compte_b (choisi) restent nets ; seul compte_c est estompé', JSON.stringify(l.lignes));
+      dit(l.sep.length === 1 && l.sep[0].etat === 'lecture' && /lecture seule/.test(l.sep[0].txt), 'la séparation dit « lecture seule »', JSON.stringify(l.sep));
+      const note = await r.pg.evaluate(() => { const n = document.querySelector('[data-sel-compte-note]'); return n ? n.innerText.replace(/\s+/g, ' ') : ''; });
+      dit(/sauf/.test(note) && /compte_a/.test(note), 'la note du choix ne dit pas compte_a estompé (« sauf compte_a qui répond d’ici »)', note);
+      // Chaque fil estompé s'ouvre en lecture seule ; celui de Chrome se répond.
+      const etats = {};
+      for (const id of l.lignes.filter((x) => x.flou).map((x) => x.id).concat(['301', '401'])) { await ouvrir(r.pg, id); const z = await zone(r.pg); etats[id] = z && z.etat; await fermer(r.pg); }
+      dit(l.lignes.filter((x) => x.flou).every((x) => etats[x.id] === 'lecture' || etats[x.id] === 'refusee'), 'tout fil ESTOMPÉ s’ouvre en lecture seule', JSON.stringify(etats));
+      dit(etats['301'] === 'libre' && etats['401'] === 'lecture', 'le fil de compte_a (net) se répond ; celui de compte_b (net, choisi) dit pourquoi il se lit seulement', JSON.stringify(etats));
+      await capture(r.pg, 'choix-b-trois-comptes-1512');
+      dit(r.errs.length === 0, 'aucune erreur d’app (H)', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    });
+    await essaie('H2', async () => {
+      // Deux comptes seulement : rien d'estompé (les deux sont nets), pas de note.
+      const r = await rendre(b, { chrome: '111' });
+      await r.pg.selectOption('#vrm-sel-compte', '222', { timeout: 8000 }); await r.pg.waitForTimeout(700);
+      const l = await liste(r.pg);
+      const note = await r.pg.evaluate(() => !!document.querySelector('[data-sel-compte-note]'));
+      dit(l.lignes.length === 4 && l.lignes.every((x) => !x.flou) && l.ordre === '401 402 301 303' && !note, 'deux comptes, compte_b choisi : rien d’estompé — compte_a répond d’ici — et aucune note de flou', JSON.stringify({ ordre: l.ordre, note }));
+      await r.ctx.close();
+    });
+    }
+
+    if (veut('abis')) {
     console.log('── A bis. « Tous les comptes » choisi : rien d’estompé, mais un fil de compte_b reste en lecture seule');
     await essaie('tous', async () => {
       const r = await rendre(b, { chrome: '111' });
@@ -349,6 +492,8 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
       await r.ctx.close();
     });
 
+    }
+    if (veut('f')) {
     console.log('── F. SANS extension (téléphone) : tout affiché, rien d’estompé, lecture seule dite');
     await essaie('F', async () => {
       const r = await rendre(b, { tel: true, tactile: true, sansExtension: true });
@@ -361,6 +506,8 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
       await r.ctx.close();
     });
 
+    }
+    if (veut('g')) {
     console.log('── G. Réglages : plus de réponse automatique');
     await essaie('G', async () => {
       const r = await rendre(b, { onglet: 'settings', repondAuto: true });
@@ -372,6 +519,7 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
       dit(v === 'false', 'une ancienne valeur ALLUMÉE sur l’appareil est rééteinte (une extension d’avant le retrait la lit encore)', String(v));
       await r.ctx.close();
     });
+    }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ messages-compte : ${ko} rouge(s), ${okN} vert(s)` : `\n✅ messages-compte : ${okN} contrôles verts`);

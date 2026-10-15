@@ -10,7 +10,7 @@ import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
-import { brouillonsVinted } from "./brouillonsMessages.js";
+import { brouillonsVinted, incertainsVinted } from "./brouillonsMessages.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
@@ -4561,18 +4561,27 @@ const normalizeConversationMessages = (conversation) => {
     //    (« Offre : 45,00 € », son état s'il est dit), sans balayage ; un
     //    évènement qui n'a vraiment rien à dire (et aucun lien) n'est pas
     //    affiché — jamais son type brut.
-    let body;
+    let body, offre = false, mine = null;
     if (/^offer(_request)?_message$/.test(String(m.entity_type || ''))) {
+      // ⚠️ (revue du 15 octobre) QUI a fait l'offre se dit. Mesuré en base le
+      //    15 octobre : 537 `offer_message` (534 de lui) et 854
+      //    `offer_request_message` (845 de l'autre), `user_id` sur TOUS — on
+      //    SAIT qui l'a faite, et le fil affichait « Offre : 50,00 € » pour la
+      //    sienne comme pour celle de l'acheteur. Pas de login
+      //    dans la phrase (un login qui contient « pin » ferait passer la
+      //    pastille pour une info de retrait) ; `user_id` absent ⇒ « Offre ».
+      offre = true;
+      mine = e.user_id != null && oppId != null ? String(e.user_id) !== String(oppId) : null;
       const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
       const prix = e.price_label || (px != null && isFinite(Number(px)) ? Number(px).toFixed(2).replace('.', ',') + ' €' : '');
       const dit = [e.title, e.body].filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim()).join(' · ');
-      body = dit || (prix ? `Offre : ${prix}` : '');
+      body = dit || (prix ? `${mine === true ? 'Ton offre' : mine === false ? 'Offre reçue' : 'Offre'} : ${prix}` : '');
       if (typeof e.status_title === 'string' && e.status_title.trim() && !body.includes(e.status_title.trim())) body += (body ? ' · ' : '') + e.status_title.trim();
     } else {
       body = extractEventText(e, m.entity_type);
       if (body === m.entity_type) body = '';
     }
-    return { kind: 'event', body, ts, links };
+    return { kind: 'event', body, ts, links, offre, mine };
   }).filter((m) => m.kind !== 'event' || m.body || (m.links && m.links.length));
   return messages.every(m=>m.ts!=null)?messages.sort((a,b)=>a.ts-b.ts):messages;
 };
@@ -5592,12 +5601,15 @@ const compteEffectif = (sel, connecte, estChoisissable) => {
 // ⚠️ PAS « les non lues d'abord » : mesuré le 15 octobre, 115 des 150
 //    conversations non lues ont plus de 14 jours — elles enterreraient les
 //    échanges frais. Le filtre « Non lues » est là pour elles.
+// `compte` : un compte, ou une LISTE de comptes dans l'ordre où ils passent
+// devant (le compte choisi, puis celui qui répond d'ici — revue du 15 octobre).
 function ordreConversations(liste, compte) {
   const uid = (c) => String((c && c._acc && c._acc.vinted_user_id) || '');
   const t = (c) => Date.parse((c && c.updated_at) || '') || 0;
-  const k = String(compte || '');
+  const devant = (Array.isArray(compte) ? compte : [compte]).map((k) => String(k || '')).filter(Boolean);
+  const rang = (c) => { const i = devant.indexOf(uid(c)); return i < 0 ? devant.length : i; };
   return [...(Array.isArray(liste) ? liste : [])].sort((a, b) => {
-    if (k) { const pa = uid(a) === k ? 0 : 1, pb = uid(b) === k ? 0 : 1; if (pa !== pb) return pa - pb; }
+    const pa = rang(a), pb = rang(b); if (pa !== pb) return pa - pb;
     return t(b) - t(a);
   });
 }
@@ -5649,6 +5661,20 @@ function issueEnvoiVinted(r) {
 // Le même message, relu dans le fil (espaces normalisés) — c'est ce qui dit
 // qu'un envoi « incertain » est en réalité parti.
 const memeMessage = (a, b) => String(a || '').replace(/\s+/g, ' ').trim() === String(b || '').replace(/\s+/g, ' ').trim();
+// ⚠️⚠️ UN ENVOI INCERTAIN EST-IL DANS LE FIL RELU ? (revue du 15 octobre)
+//    « Un message à moi au même texte » ne suffit pas : les réponses courtes
+//    (« Merci ! », « Oui ») reviennent souvent dans un même fil. Mesuré au banc :
+//    un ancien « Merci ! » de 3 h faisait dire « Envoyé — il est dans le fil »
+//    à un message qui n'était JAMAIS parti — l'acheteur ne recevait rien, et
+//    l'app disait le contraire. On compte donc les messages à moi, au même
+//    texte, envoyés DEPUIS le clic (ou sans date lisible), et on exige qu'il y
+//    en ait PLUS qu'au moment du clic (`avant`, compté sur le fil affiché).
+//    La marge absorbe l'écart d'horloge entre l'appareil et Vinted : un message
+//    parti a une date Vinted, le clic une date de l'appareil.
+const ENVOI_MARGE_MS = 30 * 60 * 1000;
+const envoisRecents = (messages, texte, at) => (Array.isArray(messages) ? messages : [])
+  .filter((m) => m && m.kind === 'message' && m.mine && memeMessage(m.body, texte) && (m.ts == null || !(Number(at) > 0) || m.ts >= Number(at) - ENVOI_MARGE_MS)).length;
+const envoiRetrouve = (messages, inc) => !!inc && envoisRecents(messages, inc.texte, inc.at) > (Number(inc.avant) || 0);
 // L'identité d'un fil pour ses brouillons et ses envois incertains : le compte
 // et la conversation (jamais le titre ni l'acheteur).
 const cleConvMsg = (acc, convId) => String((acc && acc.vinted_user_id) || '') + ':' + String(convId);
@@ -22561,7 +22587,7 @@ const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JS
 // avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
 // compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
 // pas la rangée (§7, pas de bruit).
-function SelecteurCompte({ accounts, sel, setSel, connecte }) {
+function SelecteurCompte({ accounts, sel, setSel, connecte, ecran }) {
   const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
   const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
   const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
@@ -22587,8 +22613,17 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   // Un compte choisi (par lui ou d'office) estompe les autres : on le dit UNE
   // fois, ici, avec le geste — sinon des lignes floues et inertes apparaissent
   // sans raison dès que l'extension est allumée (§7).
-  const note = val !== '*' ? <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
-    {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
+  // ⚠️ Messages (revue du 15 octobre) : le compte de Chrome n'y est JAMAIS
+  //    estompé — c'est lui qui répond d'ici. Choisir un autre compte le laisse
+  //    net : « les autres comptes sont estompés » serait faux pour lui.
+  //    Et s'il n'y a pas d'AUTRE compte que ces deux-là, rien n'est estompé :
+  //    pas de note (elle expliquerait un flou absent).
+  const coNom = coVu ? nom(list.find(a => String(a.vinted_user_id) === coVu)) : '';
+  const messagesDeuxNets = ecran === 'messages' && coVu && val !== '*' && val !== coVu;
+  const sauf = messagesDeuxNets ? `, sauf 📍\u00a0${coNom} qui répond d'ici` : '';
+  const rienEstompe = messagesDeuxNets && !list.some(a => String(a.vinted_user_id) !== val && String(a.vinted_user_id) !== coVu);
+  const note = val !== '*' && !rienEstompe ? <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
+    {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés{sauf} — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
   </span> : null;
   return <ListeComptes id="vrm-sel-compte" valeur={val} onChange={setSel}
     options={tri.map(a => { const uid = String(a.vinted_user_id); return { val: uid, nom: (uid === co ? '📍 ' : '') + nom(a) }; })}
@@ -24128,7 +24163,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avant de renvoyer). Un envoi incertain se retient PAR FIL (`compte:fil`) :
   // changer de conversation ne lève pas la garde — c'est là que partait le
   // second message. `replyNote` : ce que la relecture a établi.
+  // ⚠️⚠️ (revue du 15 octobre) La marque vit AUSSI dans l'onglet
+  //    (`incertainsVinted`, à côté du brouillon) : en mémoire seule, elle
+  //    disparaissait en quittant Messages ou en rechargeant, pendant que le
+  //    brouillon — le même texte — revenait dans le champ, et Entrée renvoyait
+  //    le message. L'état React ne sert qu'à redessiner.
   const [incertains, setIncertains] = useState({});
+  const incertainDe = (acc, convId) => {
+    if (!acc || convId == null) return null;
+    return incertains[cleConvMsg(acc, convId)] || incertainsVinted.lire(proprietaireBrouillon(), String(acc.vinted_user_id || ''), convId);
+  };
+  const poserIncertain = (acc, convId, v) => {
+    setIncertains(m => ({ ...m, [cleConvMsg(acc, convId)]: v }));
+    incertainsVinted.poser(proprietaireBrouillon(), String(acc.vinted_user_id || ''), convId, v);
+  };
+  const leverIncertain = (acc, convId) => {
+    const k = cleConvMsg(acc, convId);
+    setIncertains(m => { const n = { ...m }; delete n[k]; return n; });
+    incertainsVinted.lever(proprietaireBrouillon(), String(acc.vinted_user_id || ''), convId);
+  };
   const [replyNote, setReplyNote] = useState(null);
   // Peut-on répondre d'ici ? (`etatReponseVinted`) — l'état de l'extension change
   // pendant que le fil est ouvert (battement de 20 s, compte de Chrome) : on
@@ -26864,27 +26917,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lisible = extSait('messagerie')==='ok' && etatReponseVinted(conv._acc.vinted_user_id, '', sansSourisMsg).ok !== false;
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:lisible,parExtension:lisible});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:res.conversation,messages:normalizeConversationMessages(res.conversation)}):o);
+    // Un envoi resté incertain dans ce fil (avant de quitter l'écran, avant un
+    // rechargement) : relu EN DIRECT à l'ouverture, il se tranche tout de suite.
+    // Lu sur une copie, on ne conclut rien — la garde reste, et elle se dit.
+    trancherIncertain(conv._acc, conv.id, request, res, false);
+  };
+  // ── UN ENVOI INCERTAIN SE TRANCHE PAR LA RELECTURE DU FIL CHEZ VINTED ──
+  // Relu EN DIRECT (par l'extension) : le message y est (`envoiRetrouve` : plus
+  // de messages à moi, au même texte, depuis le clic, qu'au moment du clic) ⇒
+  // il est parti (le brouillon s'efface) ; il n'y est pas ⇒ il n'est pas parti
+  // (on peut renvoyer). Relu sur une copie enregistrée : on ne peut rien
+  // conclure — la garde reste ; sur une relecture DEMANDÉE (↻), c'est dit.
+  const trancherIncertain = (acc, convId, request, res, demande) => {
+    const inc = incertainDe(acc, convId);
+    if (!inc) return;
+    const ici = conversationRequest.current === request;
+    if (!(res && res.ok && res.source === 'extension')) { if (demande) poserIncertain(acc, convId, { ...inc, relu: 'ko' }); return; }
+    const parti = envoiRetrouve(normalizeConversationMessages(res.conversation), inc);
+    leverIncertain(acc, convId);
+    if (parti) {
+      brouillonsVinted.effacerSiIdentique(proprietaireBrouillon(), String(acc.vinted_user_id), convId, inc.brut);
+      if (ici) { setReplyText(t => (t === inc.brut ? '' : t)); setReplyNote('Envoyé — il est dans le fil.'); }
+    } else if (ici) setReplyNote("Pas dans le fil : il n'est pas parti, tu peux le renvoyer.");
   };
   const actualiserConversation=async()=>{
     const oc=openConv;if(!oc || oc.loading)return;
     const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true,parExtension:etatReponseVinted(oc.acc?.vinted_user_id,'',sansSourisMsg).ok!==false});
     if(conversationRequest.current!==oc.request)return;
     setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?res.conversation:o.conversation,messages:res.ok?normalizeConversationMessages(res.conversation):o.messages}):o);
-    // ── UN ENVOI INCERTAIN SE TRANCHE PAR LA RELECTURE DU FIL CHEZ VINTED ──
-    // Relu EN DIRECT (par l'extension) : le message y est ⇒ il est parti (le
-    // brouillon s'efface) ; il n'y est pas ⇒ il n'est pas parti (on peut
-    // renvoyer). Relu sur une copie enregistrée : on ne peut rien conclure — la
-    // garde reste, et c'est dit.
-    const k = cleConvMsg(oc.acc, oc.convId), inc = incertains[k];
-    if (!inc) return;
-    if (!(res.ok && res.source === 'extension')) { setIncertains(m => ({ ...m, [k]: { ...inc, relu: 'ko' } })); return; }
-    const parti = normalizeConversationMessages(res.conversation).some(m => m.kind==='message' && m.mine && memeMessage(m.body, inc.texte));
-    setIncertains(m => { const n = { ...m }; delete n[k]; return n; });
-    if (parti) {
-      brouillonsVinted.effacerSiIdentique(proprietaireBrouillon(), String(oc.acc.vinted_user_id), oc.convId, inc.brut);
-      setReplyText(t => (t === inc.brut ? '' : t));
-      setReplyNote('Envoyé — il est dans le fil.');
-    } else setReplyNote("Pas dans le fil : il n'est pas parti, tu peux le renvoyer.");
+    trancherIncertain(oc.acc, oc.convId, oc.request, res, true);
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
@@ -26935,17 +26996,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const sendReply = async () => {
     const oc = openConv; const brut = replyText; const text = brut.trim();
     if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
-    const k = cleConvMsg(oc.acc, oc.convId);
-    if (incertains[k]) return;
+    if (incertainDe(oc.acc, oc.convId)) return;
     const rep = etatReponseVinted(oc.acc.vinted_user_id, accName(oc.acc), sansSourisMsg);
     if (rep.ok === false) { setReplyErr(rep.texte); return; }
     setReplyBusy(true); setReplyErr(null); setReplyNote(null);
+    // Combien de fois ce texte est DÉJÀ dans le fil, à moi, récemment : c'est ce
+    // qui permettra de dire qu'un envoi incertain est parti (`envoiRetrouve`).
+    const at = Date.now(), avant = envoisRecents(oc.messages, text, at);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
     const issue = issueEnvoiVinted(r);
     // Ce qui vaut pour LE FIL, même si on en a ouvert un autre entre-temps : le
     // brouillon d'un message parti s'efface ; un envoi incertain se retient.
     if (issue.issue === 'envoye') brouillonsVinted.effacerSiIdentique(proprietaireBrouillon(), String(oc.acc.vinted_user_id), oc.convId, brut);
-    if (issue.issue === 'incertain') setIncertains(m => ({ ...m, [k]: { texte: text, brut, at: Date.now() } }));
+    if (issue.issue === 'incertain') poserIncertain(oc.acc, oc.convId, { texte: text, brut, at, avant });
     if(conversationRequest.current!==oc.request)return;
     setReplyBusy(false);
     if (issue.issue === 'envoye') {
@@ -26954,7 +27017,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } else if (issue.issue === 'refuse') setReplyErr(issue.texte);
   };
   // L'envoi incertain d'un fil, vérifié SUR VINTED par lui : il lève la garde.
-  const nonParti = (acc, convId) => { const k = cleConvMsg(acc, convId); setIncertains(m => { const n = { ...m }; delete n[k]; return n; }); setReplyNote(null); };
+  const nonParti = (acc, convId) => { leverIncertain(acc, convId); setReplyNote(null); };
 
   // ── LES GESTES D'OFFRE, DEPUIS L'APP (5.135) ────────────────────────────────
   // Julien, 3 octobre : « la messagerie intégrée avec la possibilité de
@@ -28756,7 +28819,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
                           {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                         </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
+                      : <div key={i} data-offre-fil={m.offre?(m.mine===true?'moi':m.mine===false?'acheteur':'passu'):undefined} style={{alignSelf:m.offre&&m.mine===true?'flex-end':m.offre&&m.mine===false?'flex-start':'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
                       <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                       {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
@@ -28776,8 +28839,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 jusqu'à la relecture. Rien ne part sans son clic. */}
             {!openConv.loading && openConv.convId && (()=>{
               const rep = etatReponseVinted(openConv.acc?.vinted_user_id, accName(openConv.acc), sansSourisMsg);
-              const k = cleConvMsg(openConv.acc, openConv.convId);
-              const inc = incertains[k];
+              const inc = incertainDe(openConv.acc, openConv.convId);
               const refuseVinted = openConv.conversation?.allow_reply===false;
               const bloque = rep.ok===false || refuseVinted || !!inc;
               const off = openConv.error ? null : offreEnAttenteDe(openConv.conversation);
@@ -31909,7 +31971,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    pas répondre ». L'ordre : `ordreConversations` (§11).
           const q = messageSearch.trim().toLowerCase();
           const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!q || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(q)));
-          const estompee = c => !!(selEff && uidC(c)!==selEff);
+          // ⚠️⚠️ ICI, ESTOMPÉ VEUT DIRE « LECTURE SEULE » (revue du 15 octobre).
+          //    Le flou suivait le compte CHOISI : Chrome sur compte_a, compte_b
+          //    choisi à la main ⇒ les fils de compte_a — les seuls auxquels on
+          //    peut répondre d'ici — étaient estompés, ceux de compte_b nets et
+          //    en lecture seule. L'inverse de la demande (« floutés comme pour
+          //    les annonces quand on est en lecture seule »).
+          //    ⇒ Restent NETS : le compte choisi (on veut le lire) ET le compte
+          //    ouvert dans Chrome (`compteConnecte` : actions possibles, c'est lui
+          //    qui répond). Tout ce qui est estompé est donc en lecture seule.
+          //    « Tous les comptes » éteint le flou ; sans compte actionnable dans
+          //    Chrome, seul son choix compte (tout est en lecture seule).
+          const compteRep = String(compteSel)!=='*' && compteConnecte ? String(compteConnecte) : '';
+          const nets = [selEff, compteRep].filter(Boolean);
+          const estompee = c => nets.length>0 && !nets.includes(uidC(c));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -31920,22 +31995,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
-          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && estompee(c)).length : 0;
+          const nonLusAilleurs = nets.length ? liste.filter(c=>c.unread && estompee(c)).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
-          // Le compte mis en avant d'abord, puis les plus récentes (§11).
-          const tri=ordreConversations(liste.filter(c=>messageFilter==='all'||c.unread), selEff);
+          // Le compte choisi d'abord, puis celui qui répond d'ici, puis les plus
+          // récentes (§11) — les estompés viennent donc tous après.
+          const tri=ordreConversations(liste.filter(c=>messageFilter==='all'||c.unread), nets);
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
           // Où commencent les autres comptes : UNE ligne de séparation, qui dit
           // pourquoi ils sont estompés (le compte de Chrome répond, eux se
           // lisent) et combien attendent — au lieu d'une phrase par ligne (§7).
-          const iSep = selEff ? affiches.findIndex(estompee) : -1;
-          const sepApres = selEff && iSep < 0 && tri.some(estompee);   // tous au-delà de « Voir plus »
-          const lectureSeule = !!(selEff && selEff===compteConnecte);
+          const iSep = nets.length ? affiches.findIndex(estompee) : -1;
+          const sepApres = nets.length>0 && iSep < 0 && tri.some(estompee);   // tous au-delà de « Voir plus »
+          const lectureSeule = !!compteRep;
           const separateur = (
             <div key="sep-autres" data-conv-autres={lectureSeule?'lecture':'choix'} data-nonlus-ailleurs={nonLusAilleurs>0?nonLusAilleurs:undefined}
               style={{display:'flex',gap:6,alignItems:'baseline',flexWrap:'wrap',padding:'8px 12px',fontSize:11.5,color:C.muted,background:C.bg,borderTop:`1px solid ${C.border}`}}>
@@ -31980,8 +32056,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
               <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
-                <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
-                <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                {/* (revue du 15 octobre) Plus de nombre sur les filtres : « Non lues 3 »
+                    redisait, à 40 px, le « 3 non lus » de la tête (§7 : un nombre
+                    ne s'écrit qu'une fois sur un écran). */}
+                <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes</button>
+                <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues</button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {boitesKO.length>0 && (
@@ -40499,7 +40578,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} ecran={platSub}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>

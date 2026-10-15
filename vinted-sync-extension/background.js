@@ -4566,6 +4566,14 @@ async function visiteVinted() {
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
     // Vinted). Elle relit ses bordereaux quand on la prévient.
     if (Number(genes) > 0) notifierApp({ type: 'maj', quoi: 'label', uid: String(uid) });
+    // ⚠️ Un frein reçu PENDANT la génération (429/403 sur l'adresse, le
+    //    bordereau…) arrête la visite ICI (revue du 15 octobre) : cette ligne
+    //    était partie avec l'appel des réponses automatiques qu'elle précédait.
+    //    Sans elle, la suite consommait la garde de 5 min de la moisson et
+    //    comptait un faux échec (« Rien n'a pu être rangé »), sans requête de
+    //    plus — mais au retour de la pause, un échec passager ne rendait plus
+    //    la garde.
+    if (await pauseVinted()) { await purgeBordereaux(); return; }
     // ⛔ (15 octobre) PLUS AUCUNE RÉPONSE AUTOMATIQUE AUX MESSAGES. Julien :
     //    « l'extension lit les messages et permet de répondre directement sur
     //    VRM, mais elle n'agit pas toute seule ». Le moteur est retiré (voir

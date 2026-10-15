@@ -639,8 +639,8 @@ export default function Accueil({ onEntrer }) {
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
               <p>VRM travaille comme toi : uniquement sur le compte ouvert dans ton Chrome, une action à la fois, jamais plus de 20 par heure.</p>
-              <p>Il lit tes données et prépare le bordereau de ce que tu as déjà vendu ; vendre, publier, écrire à un acheteur, c’est toi qui le décides. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
-              <p>Et VRM refuse ce qui fait repérer un robot : relancer en série les personnes qui ont mis un article en favori, republier tes annonces en boucle, accepter une offre Vinted à ta place, supprimer une annonce.</p>
+              <p>Il lit tes données et prépare le bordereau de ce que tu as déjà vendu ; vendre, publier, écrire à un acheteur, c’est toi qui le décides. Le seul automatisme — <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — reste éteint tant que tu ne l’allumes pas.</p>
+              <p>Et VRM refuse ce qui fait repérer un robot : relancer en série les personnes qui ont mis un article en favori, republier tes annonces en boucle, accepter une offre ou répondre à un acheteur Vinted à ta place, supprimer une annonce.</p>
             </div>
           </div>
         </section>

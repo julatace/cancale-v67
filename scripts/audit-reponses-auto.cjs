@@ -124,6 +124,31 @@ const RE_REPLIES = /\/replies\b/g;
     dit(promesses.length === 0, "aucune phrase de l'app ne promet une réponse automatique", promesses.slice(0, 3).join(' · '));
   });
 
+  // ── 3b. les PAGES PUBLIQUES non plus (revue du 15 octobre) ─────────────────
+  // La page d'accueil (« Les automatismes — répondre aux questions des
+  // acheteurs… — restent éteints tant que tu ne les allumes pas ») et les pages
+  // légales (CGU, confidentialité) promettaient encore la réponse automatique
+  // RETIRÉE — et ce contrôle ne lisait que `App.jsx` : il était vert dessus.
+  // On juge la PROMESSE (une réponse automatique, une réponse aux acheteurs
+  // rangée parmi les automatismes), jamais le mot « répondre » : la phrase
+  // honnête « VRM refuse… de répondre à un acheteur à ta place » doit passer.
+  await essaie('pages publiques', async () => {
+    const PAGES = ['src/Accueil.jsx', 'src/accueil-carte.jsx', 'src/accueil-scenes.jsx', 'src/accueil-demo.js', 'src/AccueilFilm.jsx',
+      'public/legal/cgu.html', 'public/legal/confidentialite.html', 'public/legal/cgv.html', 'public/legal/mentions-legales.html', 'public/legal/cookies.html'];
+    const fautes = [];
+    for (const f of PAGES) {
+      let t = ''; try { t = fs.readFileSync(path.join(RACINE, f), 'utf8'); } catch (_) { continue; }
+      t = /\.html$/.test(f) ? t.replace(/<!--[\s\S]*?-->/g, ' ') : sansCommentaires(t, true);
+      const motifs = [
+        [/r[ée]ponses?\s+automatiques?/gi, 'réponse automatique'],
+        [/r[ée]pon(?:dre|se)\s+aux\s+questions\s+des\s+acheteurs/gi, 'réponse aux questions des acheteurs'],
+        [/data-automatisme[^>]*>[^<]{0,80}r[ée]pon/gi, 'un automatisme qui répond'],
+      ];
+      for (const [re, nom] of motifs) { re.lastIndex = 0; let m; while ((m = re.exec(t))) fautes.push(`${f} l.${ligneDe(t, m.index)} (${nom})`); }
+    }
+    dit(fautes.length === 0, 'ni la page d’accueil ni les pages légales ne promettent une réponse automatique aux acheteurs', fautes.slice(0, 4).join(' · '));
+  });
+
   // ── 4. serveur : aucune route ne poste une réponse Vinted ──────────────────
   await essaie('serveur', async () => {
     const fautes = [];

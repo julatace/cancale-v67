@@ -9029,7 +9029,8 @@ elle n'agit pas toute seule ».
 - ⚠️ **Les offres se lisaient « 📦 INFO COLIS · currency_code: EUR »** : mesuré,
   77 `offer_message` sur 400 messages captés n'ont ni titre ni corps, et le
   balayage des codes de retrait prenait `currency_code` pour un code. Une offre
-  se lit « Offre : 45,00 € » ; un évènement sans texte n'affiche plus son type.
+  se lit « Ton offre : 50,00 € » / « Offre reçue : 45,00 € » (revue, plus bas) ;
+  un évènement sans texte n'affiche plus son type.
 - **Réponse automatique RETIRÉE** (§3) : `repondreAuxMessages`, `sesAnnonces`,
   `convDernierMessageId`, `aiReply` enlevés de `background.js` ;
   `RepondreSetting` et `EXT_CAPACITES.repond` de l'app. `vinted_repond_auto`
@@ -9057,6 +9058,74 @@ elle n'agit pas toute seule ».
 - **Pas fait** : les offres reçues par email (FONC-03, bloc retiré le 13 oct.) ;
   la confirmation à CHAQUE message (le blocage de l'incertain évite le double
   envoi sans alourdir) ; le mode `reply` d'`api/ai.js` reste (plus appelé).
+
+#### Revue du 15 octobre : sept constats, tous reproduits, tous corrigés
+Chaque défaut a d'abord été REPRODUIT (sondes Playwright sur le build de
+9701837, vrai `background.js` dans `_fond-vm.cjs`), puis corrigé.
+- ⚠️⚠️ **LE DOUBLE ENVOI REVENAIT PAR UNE AUTRE PORTE.** La marque « envoi
+  incertain » vivait dans un `useState` : elle disparaissait dès qu'on quittait
+  Messages (Ma journée et retour) ou qu'on rechargeait. Le BROUILLON, lui, vit
+  dans l'onglet et revenait dans le champ, et Entrée renvoyait le message
+  (mesuré : `["Je vous la garde","Je vous la garde"]`, deux fois dans le fil).
+  ⇒ La marque vit au MÊME endroit que le brouillon (`incertainsVinted`,
+  `sessionStorage`, jamais le nuage, même identité vendeur/compte/fil). À
+  l'ouverture, le fil relu EN DIRECT par l'extension tranche tout de suite :
+  « Envoyé — il est dans le fil », et le brouillon s'efface. Lu sur une copie, il
+  ne conclut rien et la garde reste.
+- ⚠️ **« Envoyé » sur un message jamais parti.** La relecture prenait N'IMPORTE
+  QUEL message à moi au même texte. Or un ancien « Merci ! » de 3 h suffisait.
+  ⇒ `envoiRetrouve` compte les messages à moi, au même texte, envoyés depuis le
+  clic (marge de 30 min pour l'horloge de l'appareil), et exige qu'il y en ait
+  PLUS qu'au clic (`avant`, compté sur le fil affiché).
+- **Les pages publiques promettaient encore la réponse automatique.**
+  L'accueil disait « les automatismes — répondre aux questions des acheteurs… ».
+  La CGU et la politique de confidentialité aussi : « Suggestions et réponses
+  automatiques par IA », alors que l'IA ne sert plus qu'à rédiger un titre ou une
+  description, à sa demande. Les deux pages sont datées du 15 octobre. La CGU
+  liste les vrais automatismes : retrait d'eBay et seuil d'acceptation **d'eBay**
+  annonce par annonce. Elle ne parle plus d'offres « au-dessus d'un plancher »
+  sans plateforme : ce serait Vinted, refusé par §3. Elle dit aussi que VRM ne
+  répond jamais à sa place. `audit-reponses-auto.cjs` lit désormais l'accueil et
+  les pages légales : il était vert sur ce défaut, car il ne lisait que
+  `App.jsx`. Il juge la PROMESSE, pas le mot « répondre ».
+- **Extension : une pause Vinted pendant la génération des bordereaux n'arrêtait
+  plus la visite.** La ligne `if (await pauseVinted()) …` était partie avec
+  l'appel des réponses automatiques. La garde de 5 min était alors consommée, un
+  faux échec était compté et le journal mentait. La ligne est remise.
+  `audit-frein-vinted.cjs` §2b compte **3 rouges sur 9701837**.
+  ⇒ **Le code de l'extension a changé : version À POSER**, comme le reste du lot.
+  Pas d'entrée `EXT_CAPACITES`, c'est une correction.
+- **Sur Messages, estompé veut dire « lecture seule ».** Avec Chrome sur
+  compte_a et compte_b choisi à la main, les fils de compte_a étaient estompés,
+  alors que ce sont les seuls auxquels on peut répondre d'ici. Restent nets : le
+  compte choisi (on veut le lire) ET le compte de Chrome (`compteConnecte`, il
+  répond). Tout ce qui est estompé est donc en lecture seule. L'ordre : le choisi,
+  celui de Chrome, puis « Autres comptes ». La note du sélecteur dit « sauf
+  📍 compte_a qui répond d'ici ». Elle se tait quand rien n'est estompé.
+- **Chaque offre dit qui l'a faite.** Mesuré le 15 octobre : 537
+  `offer_message` (534 de lui) et 854 `offer_request_message` (845 de l'autre),
+  avec `user_id` sur TOUS. Le fil écrit « Ton offre : 50,00 € » à droite et
+  « Offre reçue : 45,00 € » à gauche. Sans `user_id`, il écrit « Offre ». Aucun
+  login dans la phrase : un login qui contient « pin » ferait passer la pastille
+  pour une info de retrait.
+- **Le nombre de non-lus s'écrivait deux fois** (« 3 non lus », puis
+  « Non lues 3 » à 40 px). Les filtres n'ont plus de nombre.
+- Preuves (§6.1, build de 9701837) :
+  - banc `messages-compte.cjs` : **117 verts, 23 rouges sur l'avant**. Scénarios
+    D2 (départ et retour), D3 (rechargement), D4 (ancien « Merci ! ») et H (trois
+    comptes). Son faux Vinted garde maintenant ce qui est parti après un
+    rechargement, comme le vrai : sans ça, le rechargement « perdait » le
+    message et le banc mesurait une fiction (§6.3). `SECTIONS=d2,d3,…` ;
+  - `audit-reponses-auto.cjs` : 22 contrôles, 1 rouge sur l'avant (4 endroits
+    nommés) ;
+  - `accueil.cjs` : 1 rouge sur l'avant ;
+  - mutations, chacune rouge : marque non gardée dans l'onglet (4 rouges),
+    ancienne règle de relecture (1), flou qui suit le seul compte choisi (4).
+- **Restés rouges, exprès et sur l'avant aussi** : `audit-extension-zip` et
+  `audit-preuve-vente` (§ version : `background.js` a changé, la version est À
+  POSER par la session qui monte l'extension) ; `messagerie.cjs` (10) et
+  `filtre-compte.cjs` (3), tous dans le bloc « offres reçues par email » retiré le
+  13 octobre.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

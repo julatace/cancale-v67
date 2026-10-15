@@ -26,3 +26,26 @@ export const brouillonsVinted={
  sauver:(owner,compte,id,body,storage)=>sauver('vinted',owner,compte,id,body,storage),
  effacerSiIdentique:(owner,compte,id,texte,storage)=>effacerSiIdentique('vinted',owner,compte,id,texte,storage),
 };
+// ── LES ENVOIS INCERTAINS, GARDÉS COMME LES BROUILLONS (revue du 15 octobre) ──
+// Un envoi sans réponse (délai, 5xx) a PU partir : le renvoi est bloqué jusqu'à
+// la relecture du fil. Cette marque vivait dans un `useState` de l'écran — perdue
+// dès qu'on quittait Messages ou rechargeait la page, alors que le BROUILLON
+// (même texte) revenait dans le champ : une touche Entrée renvoyait le message
+// (mesuré : « 1 → 2 envois »). Elle vit donc au MÊME endroit que le brouillon
+// (l'onglet, jamais le nuage — c'est le texte d'un message privé), sous la même
+// identité (vendeur, compte, fil). `{texte, brut, at, avant, relu?}`.
+const cleIncertain=(owner,compte,id)=>'vrm_vinted_incertain:'+JSON.stringify([owner,compte,String(id)]);
+export const incertainsVinted={
+ lire(owner,compte,id,storage){
+  if(!owner || id==null)return null;
+  try{storage=storage || globalThis.sessionStorage;const v=JSON.parse(storage.getItem(cleIncertain(owner,compte,id)) || 'null');return v && typeof v.texte==='string'?v:null;}catch(_){return null;}
+ },
+ poser(owner,compte,id,valeur,storage){
+  if(!owner || id==null)return false;
+  try{storage=storage || globalThis.sessionStorage;storage.setItem(cleIncertain(owner,compte,id),JSON.stringify(valeur));return true;}catch(_){return false;}
+ },
+ lever(owner,compte,id,storage){
+  if(!owner || id==null)return false;
+  try{storage=storage || globalThis.sessionStorage;storage.removeItem(cleIncertain(owner,compte,id));return true;}catch(_){return false;}
+ },
+};
