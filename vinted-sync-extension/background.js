@@ -7148,7 +7148,10 @@ function lbcCategory(det, raw) {
 // C'est le même principe qu'`URL_PAS_UN_QR` : on ÉCARTE ce qui n'est pas la
 // chose, sans jamais rien supprimer en base (la capture reste, c'est la
 // PUBLICATION qui refuse).
-const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application/i;
+// ⚠️ (15 octobre) 5 sur 150, pas 4 : la protection acheteur de Vinted (« Pour
+// chaque achat effectué, tu bénéficies de notre Politique de remboursement… »)
+// passait. La MÊME expression que `PAS_UNE_DESCRIPTION` d'App.jsx (§11).
+const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application|pour chaque achat effectu[ée].{0,120}politique de rembours|thousands of brands.{0,80}second.?hand/i;
 function lbcDescription(brut) {
   let t = String(brut || '').trim();
   if (!t) return '';

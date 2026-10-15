@@ -11,6 +11,7 @@ import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 //   • (défaut)        → pilotage par l'app : GET santé, POST authurl/apptoken/
 //                       exchange/status/sync/finances/pubinfo/pubverify/publish/
 //                       revise, et (5 octobre) sku · offreinfo · offre · retirer,
+//                       (15 octobre) relirepub (relire une annonce publiée),
 //                       puis programmer · programmees · deprogrammer ·
 //                       reprogrammer · limites (le planificateur) ;
 //   • ?mode=callback  → retour de consentement eBay (redirige vers l'app) ;
@@ -37,7 +38,16 @@ import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessTok
 const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
 const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
 const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
+// (15 octobre) Le PSEUDO du compte d'une action : celui que porte le contexte,
+// sinon — pour le principal, que `resoudreCompte` rend sans pseudo — celui que
+// le registre a appris. Lecture ratée ⇒ '' (rien n'est inventé).
+const pseudoDe = async (ctx) => {
+  if (ctx.compte.pseudo) return ctx.compte.pseudo;
+  if (!ctx.compte.principal) return '';
+  try { const reg = await lireComptes(ctx.owner); const p = reg && reg.comptes.find((e) => e.principal && !e.deconnecteLe); return (p && p.pseudo) || ''; } catch (_) { return ''; }
+};
 import { numeroExterne } from './_lib/numerotation.js';
+import { verifPublication, attenduDePublication } from './_lib/ebay-publication.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -867,17 +877,57 @@ async function handlePublish(b, ctx) {
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
+  // ── « DEMANDÉE » N'EST PAS « PUBLIÉE » (15 octobre) ── Le Success d'eBay dit
+  // qu'il a pris la demande ; ce qu'il a VRAIMENT mis en ligne se RELIT : UN
+  // GetItem au jeton de CE compte, comparé à ce qui est parti (en ligne, compte,
+  // référence, prix, titre, quantité, photos — `verifPublication`). Le MÊME
+  // appel sert la relecture de la règle d'offre (9 octobre) : toujours UNE
+  // seule relecture après l'ajout. Illisible ⇒ `{lu:false}` : l'écran dit
+  // « demandée, pas encore vérifiée », jamais « publiée ».
+  const idPub = String(r.itemId);
+  let relu = null;
+  if (ID_EBAY.test(idPub)) { const t0 = Date.now(); relu = { r: await tradingCall(at.token, 'GetItem', `<ItemID>${idPub}</ItemID>`), t0 }; }
+  const xmlRelu = relu && !sansAck(relu.r) && relu.r.ok ? relu.r.xml : null;
+  const pseudoPub = await pseudoDe(ctx);
+  const verification = xmlRelu ? verifPublication(xmlRelu, idPub, attenduDePublication(it, pseudoPub), { memeSku: (a, b) => !!numDeSku(a) && numDeSku(a) === numDeSku(b) }) : { lu: false, raison: relu ? 'lecture' : 'identifiant' };
   // (9 octobre) Publiée AVEC une règle d'offre : on relit chez eBay ce qu'il en
   // a gardé (une catégorie qui n'accepte pas le seuil le perd sans refuser
   // l'annonce [non mesuré]). Sans règle : aucun appel de plus.
   let offre;
   if (it.regleOffre && ID_EBAY.test(String(r.itemId))) {
     const demande = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
-    const post = await lireRegleOffre(at.token, String(r.itemId));
+    const lr = xmlRelu ? lectureRegleDe(xmlRelu, idPub, relu.t0) : null;
+    const post = lr ? { ok: true, ...lr } : { ok: false };
     const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok && memeRegle(post.lecture,demande,null)!==false?{...post.lecture,par:'publication'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'publication',observee:post.ok?post.lecture:null} });
     offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
-  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
+  // `compte` : le pseudo connu de CE compte, sinon celui qu'eBay a montré comme
+  // vendeur de l'annonce relue (un fait lu chez eBay, jamais deviné).
+  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: pseudoPub || (verification.lu ? verification.vendeur || '' : ''), avertissements: r.avertissements, verification, ...(offre ? { offre } : {}) } };
+}
+
+// ── RELIRE UNE ANNONCE QU'ON VIENT DE PUBLIER (15 octobre) ──────────────────
+// Le bouton « Relire chez eBay » de l'écran de publication, quand la relecture
+// d'après l'ajout n'a rien rendu. UNE lecture (GetItem) au jeton du compte
+// choisi — rien n'est écrit, ni chez eBay ni en base. Ce qui a été envoyé
+// (`attendu`) vient de l'écran : il est NETTOYÉ ici (un SKU qui n'est pas
+// « VRM-{n°} » ne désigne rien), et le compte est celui de la session, jamais
+// un nom envoyé par le navigateur.
+async function handleRelirePublication(b, ctx) {
+  const itemId = String(b.itemId == null ? '' : b.itemId);
+  if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, reason: 'identifiant', error: 'Numéro d\'annonce eBay illisible.' } };
+  const a0 = (b.attendu && typeof b.attendu === 'object' && !Array.isArray(b.attendu)) ? b.attendu : {};
+  const n = numDeSku(a0.sku);
+  const it = { title: typeof a0.titre === 'string' ? a0.titre : '', price: a0.prix, quantity: a0.quantite, photos: Number.isInteger(a0.photos) && a0.photos >= 0 && a0.photos <= 24 ? new Array(a0.photos).fill('') : null, sku: n ? skuDe(n) : '' };
+  const pseudoPub = await pseudoDe(ctx);
+  const attendu = attenduDePublication(it, pseudoPub);
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
+  if (sansAck(r)) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas répondu — réessaie dans un instant.' } };
+  if (!r.ok) return { status: 200, body: { ok: true, verification: { lu: false, raison: 'refus', message: messageEbaySur(r.err) || 'eBay n\'a pas rendu cette annonce.' } } };
+  const verification = verifPublication(r.xml, itemId, attendu, { memeSku: (x, y) => !!numDeSku(x) && numDeSku(x) === numDeSku(y) });
+  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId, compte: pseudoPub || (verification.lu ? verification.vendeur || '' : ''), verification } };
 }
 
 // ── L'HEURE DE PROGRAMMATION, VALIDÉE PAR LE SERVEUR ─────────────────────────
@@ -1776,6 +1826,7 @@ async function handleApp(req, res) {
       pubverify: (ctx) => handleVerify(b, ctx),
       finances: (ctx) => handleFinances(ctx),
       publish: (ctx) => handlePublish(b, ctx),
+      relirepub: (ctx) => handleRelirePublication(b, ctx),
       sku: (ctx) => handleSku(b, ctx),
       offreinfo: (ctx) => handleOffreInfo(ctx),
       offre: (ctx) => handleOffre(b, ctx),

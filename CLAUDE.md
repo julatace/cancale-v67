@@ -8984,6 +8984,58 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### eBay : description et prix repris de Vinted, l'écart montré, et l'annonce RELUE après publication (15 octobre, lot p1-ebay-prep)
+Prompt maître du 15 octobre : reprendre la description et le prix de Vinted
+« sans écraser une personnalisation volontaire », montrer les différences, et
+« vérifier après chaque publication la plateforme, le compte, l'identifiant
+d'annonce et le résultat réel ; ne pas confondre demandé et publié ».
+- **Une règle pour les deux champs** (`repriseVinted`, `EbayPublier`) : un champ
+  VIDE, ou qui porte encore exactement ce que VRM y a posé, prend la valeur de
+  l'annonce Vinted de la paire choisie ; sinon c'est SA saisie (ou un brouillon
+  rouvert) et rien n'est touché. L'écart se dit sous le champ (« Vinted :
+  49,00 € · ici : 55,00 € » + « Reprendre ») et dans la confirmation avant
+  publication (une feuille de plus seulement s'il y a un écart, ou intégré à
+  celle de la règle d'offre / du compte). Un prix Vinted inconnu (autre devise,
+  illisible) laisse le champ VIDE et le dit — jamais deviné ; « Mets un prix »
+  reste exigé. Catégorie et caractéristiques obligatoires inchangées.
+  `lireAnnoncesVintedEnLigne` rend aussi `prix` (`prixVinted`, la règle de
+  l'extension, copiée au caractère près de p0-lbc-pub pour fusionner sans
+  conflit).
+- **Le texte « protection acheteur » de Vinted n'est pas une description**
+  (« pour chaque achat effectué … politique de remboursement »). Mesuré le
+  15 octobre (lecture seule) : **1 des 152 descriptions captées** le porte.
+  `PAS_UNE_DESCRIPTION` l'écarte, **dans l'app ET l'extension** (§11 : la file
+  Leboncoin le partirait sinon) ; l'écran Annonces passe par `lbcDescription`
+  au lieu d'une troisième copie locale de la règle.
+- **Après publication, UNE relecture `GetItem`** (partagée avec celle de la
+  règle d'offre — un seul appel) : `api/_lib/ebay-publication.js`
+  (`verifPublication`) compare annonce en ligne, compte vendeur, référence
+  `VRM-n°` (par le N°, `numDeSku`), prix et devise, titre, quantité, nombre de
+  photos — chaque point `ok` · `ecart` · `pas-lu`, jamais deux états. L'écran
+  dit **eBay · compte « X » · annonce N° …** puis l'état : « Publiée et
+  vérifiée », « à vérifier » (les deux valeurs de l'écart), « Créée sur eBay,
+  mais pas en ligne », ou **« Demandée à eBay — pas encore vérifiée »** quand
+  la relecture n'a rien rendu, avec **« Relire chez eBay »** (action
+  `relirepub`, un GetItem, 503 « pas su » sans `<Ack>`). Le pseudo du compte
+  principal est lu dans le registre `ebay_comptes` (`pseudoDe`) : il était vide.
+- **Tranché** : rien d'eBay n'est prérempli d'autre (photos : chantier
+  p0-ebay-photos ; Vestiaire : p0-ebay-vc) ; pas de nouvelle entrée
+  d'`EXT_CAPACITES` (l'app ne promet rien de neuf de l'extension) — mais
+  `background.js` change d'une ligne : **la version est à monter à
+  l'intégration** (`audit-extension-zip` et `audit-preuve-vente` sont rouges
+  tant que le zip n'est pas régénéré, c'est attendu).
+- **Preuves** : `audit-ebay-publication.cjs` (la vraie route avec un faux eBay,
+  la règle pure, les règles d'App.jsx dans un `vm`) **37 contrôles, 25 rouges**
+  sur w15, **5 mutations sur 5** rouges ; banc `ebay-prep.cjs` (données
+  inventées, 390/1512 × clair/sombre, port 5991) **104 contrôles, 13 rouges** sur
+  le build de w15, et rouge sous trois mutations : reprise qui écrase (9),
+  « demandée » rendue « vérifiée » (4), écarts jamais dits (9).
+  `ebay-write.cjs` cherche `AddFixedPriceItem` par son nom (une relecture part
+  désormais après) ; `audit-ebay-retrait-auto.cjs` charge `prixVinted` (§6.3).
+- **Non mesuré** : la forme de `GetItem` sans `DetailLevel` sur SON compte
+  (une absence vaut « pas lu », jamais « conforme ») ; le planificateur
+  (« Programmer ») n'a pas cette relecture.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
