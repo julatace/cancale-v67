@@ -8984,6 +8984,50 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Achats : colis à retirer lisibles, achats hors Vinted, prix sans paire, boost jamais inventé (15 octobre)
+Demande de Julien du 15 octobre (lot `p1-achats`). Tranché sans lui demander :
+- **Colis à retirer** : une carte à DEUX étages (`CarteRetrait`, une pour l'e-mail
+  ET la conversation, §11) — ce qu'est le colis, puis ce qu'on en fait. « J'ai
+  retiré » vit dans la rangée d'actions, jamais en absolu par-dessus le code (il
+  y était posé par le CSS ; mesuré : −34 px de chevauchement à 1512 px). L'en-tête
+  (`EnteteRetrait`) dit le **commerce** (« Tabavap », plus « point relais TABAVAP »,
+  `lieuRelais`), son **adresse** (calculée depuis des semaines, jamais affichée), le
+  **transporteur** sur sa ligne et la **source**. ⚠️ La conversation Vinted ne nomme
+  PAS le transporteur (mesuré : 0 message d'arrivée sur 7) : plus de pastille
+  « Vinted Go » posée en dur, « Transporteur non indiqué » à la place (§5). Le n° de
+  suivi garde son lien « Suivre » (`trackUrl`) dans le détail. Plus de photo « par
+  titre » sur ces cartes.
+- **Achats hors Vinted** : « + Achat hors Vinted » en haut de l'écran Achats (le
+  bloc vivait replié sous tous les colis) et un onglet « Hors Vinted ». Le
+  formulaire est un composant à part (`FormAchatHors.jsx`) : l'ancien, déclaré dans
+  le rendu, perdait le focus à chaque frappe (« 25 » ⇒ prix « 2 »). Prix (seul
+  obligatoire), frais, quantité, date, provenance (brocante · magasin · lot ·
+  particulier · autre), désignation, **justificatif = une référence texte** (n° de
+  ticket) : ⚠️ pas de pièce jointe tant que le stockage privé n'existe pas (§4.4,
+  jamais de photo dans `main`). « Dépensé » (écran Achats) compte désormais les
+  achats hors Vinted de la période (la Trésorerie le faisait déjà, §11).
+- **Prix d'achat sans paire** : « Prix d'achat » (vente, carte d'annonce) ouvre la
+  modale sur un CHAMP prix (`PrixAchatDirect`) ; relier un achat reste dessous.
+- **Rattachement sans doublon** (`src/achatsHors.js`) : un achat hors Vinted se
+  rattache à une paire ou une vente par un CLIC ; le lien vit sur la cible
+  (`buyFromId = 'hors:<id>'`), « qui est rattaché » se LIT (`liensHors`). Un achat
+  d'une paire n'est plus proposé une fois rattaché ; un lot de N, plus après N
+  rattachements, chacun sa part (`partsHors` : somme exacte, dite « réparti »).
+  ⚠️ **Plus de N° tapé sur l'achat** : il écrivait `vinted_buyprice_by_num[N°]`, et
+  un N° pas encore donné passait à la prochaine annonce numérotée, qui héritait du
+  prix. Supprimer un achat retire son prix des cibles (après confirmation).
+- **Boost** : aucune source ne donne son prix par annonce (mesuré le 15 oct. :
+  extension 5.177, `boost_forme` = une réponse de tarification, ni montant ni
+  annonce). Donc rien n'est calculé : une annonce que Vinted dit boostée sans
+  montant connu affiche « boost inconnu » et « marge hors boost » ; le champ devient
+  « Boost (si connu) », facultatif ; le bandeau « boosts détectés » ne demande plus
+  de recopier à la main. **Extension non touchée.**
+- Preuves : `audit-achats-hors.cjs` (19 contrôles ; `--src` sur une copie dont la
+  garde de doublon est retirée ⇒ 2 rouges) ; banc `bancs/achats.cjs` (port 5911,
+  données inventées, 390/1512 px, clair et sombre) : **95 verts**, **36 rouges sur
+  le build de w15**, **11 rouges** sous mutation (bouton remis en absolu, pastille
+  Vinted Go remise, garde de doublon retirée, boost inconnu tu).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
