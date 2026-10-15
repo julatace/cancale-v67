@@ -146,8 +146,13 @@ async function brancher(p){
   await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
   await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('69,50'));
   check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'frais déduits et bénéfice indiqué estimé');
+  // Vinted : un boost vide est INCONNU (relecture du 15 octobre) — la confirmation
+  // ne passe pas tant qu'il n'est pas écrit (0 s'il n'y en a pas eu).
+  await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).click();await p.waitForTimeout(300);
+  check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'boost vide : la confirmation ne rend pas le bénéfice complet (boost inconnu)');
+  await vente.getByLabel('Boost (si connu)',{exact:true}).fill('0');await vente.getByLabel('Boost (si connu)',{exact:true}).press('Tab');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();
-  check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'confirmation des frais rend le bénéfice complet');
+  check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'boost 0 écrit + confirmation des frais rend le bénéfice complet');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
   await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('66,50'));
   check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'nouveau frais déduit et confirmation invalidée');

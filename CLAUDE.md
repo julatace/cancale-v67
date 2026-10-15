@@ -9198,6 +9198,102 @@ pour 4 d'entre elles (la dernière lecture de « Mes annonces » date du 10 octo
 - **Non fait** : relire « Mes annonces » ne se déclenche pas d'ici (il faut sa
   visite sur leboncoin.fr) ; le statut n'est que celui de la DERNIÈRE capture
   (une annonce vendue depuis peut encore dire « en ligne » — l'âge le dit).
+### Achats : colis à retirer lisibles, achats hors Vinted, prix sans paire, boost jamais inventé (15 octobre)
+Demande de Julien du 15 octobre (lot `p1-achats`). Tranché sans lui demander :
+- **Colis à retirer** : une carte à DEUX étages (`CarteRetrait`, une pour l'e-mail
+  ET la conversation, §11) — ce qu'est le colis, puis ce qu'on en fait. « J'ai
+  retiré » vit dans la rangée d'actions, jamais en absolu par-dessus le code (il
+  y était posé par le CSS ; mesuré : −34 px de chevauchement à 1512 px). L'en-tête
+  (`EnteteRetrait`) dit le **commerce** (« Tabavap », plus « point relais TABAVAP »,
+  `lieuRelais`), son **adresse** (calculée depuis des semaines, jamais affichée), le
+  **transporteur** sur sa ligne et la **source**. ⚠️ La conversation Vinted ne nomme
+  PAS le transporteur (mesuré : 0 message d'arrivée sur 7) : plus de pastille
+  « Vinted Go » posée en dur, « Transporteur non indiqué » à la place (§5). Le n° de
+  suivi garde son lien « Suivre » (`trackUrl`) dans le détail. Plus de photo « par
+  titre » sur ces cartes.
+- **Achats hors Vinted** : « + Achat hors Vinted » en haut de l'écran Achats (le
+  bloc vivait replié sous tous les colis) et un onglet « Hors Vinted ». Le
+  formulaire est un composant à part (`FormAchatHors.jsx`) : l'ancien, déclaré dans
+  le rendu, perdait le focus à chaque frappe (« 25 » ⇒ prix « 2 »). Prix (seul
+  obligatoire), frais, quantité, date, provenance (brocante · magasin · lot ·
+  particulier · autre), désignation, **justificatif = une référence texte** (n° de
+  ticket) : ⚠️ pas de pièce jointe tant que le stockage privé n'existe pas (§4.4,
+  jamais de photo dans `main`). « Dépensé » (écran Achats) compte désormais les
+  achats hors Vinted de la période (la Trésorerie le faisait déjà, §11).
+- **Prix d'achat sans paire** : « Prix d'achat » (vente, carte d'annonce) ouvre la
+  modale sur un CHAMP prix (`PrixAchatDirect`) ; relier un achat reste dessous.
+- **Rattachement sans doublon** (`src/achatsHors.js`) : un achat hors Vinted se
+  rattache à une paire ou une vente par un CLIC ; le lien vit sur la cible
+  (`buyFromId = 'hors:<id>'`), « qui est rattaché » se LIT (`liensHors`). Un achat
+  d'une paire n'est plus proposé une fois rattaché ; un lot de N, plus après N
+  rattachements, chacun sa part (`partsHors` : somme exacte, dite « réparti »).
+  ⚠️ **Plus de N° tapé sur l'achat** : il écrivait `vinted_buyprice_by_num[N°]`, et
+  un N° pas encore donné passait à la prochaine annonce numérotée, qui héritait du
+  prix. Supprimer un achat retire son prix des cibles (après confirmation).
+- **Boost** : aucune source ne donne son prix par annonce (mesuré le 15 oct. :
+  extension 5.177, `boost_forme` = une réponse de tarification, ni montant ni
+  annonce). Donc rien n'est calculé : une annonce que Vinted dit boostée sans
+  montant connu affiche « boost inconnu » et « marge hors boost » ; le champ devient
+  « Boost (si connu) », facultatif ; le bandeau « boosts détectés » ne demande plus
+  de recopier à la main. **Extension non touchée.**
+- Preuves : `audit-achats-hors.cjs` (19 contrôles ; `--src` sur une copie dont la
+  garde de doublon est retirée ⇒ 2 rouges) ; banc `bancs/achats.cjs` (port 5911,
+  données inventées, 390/1512 px, clair et sombre) : **95 verts**, **36 rouges sur
+  le build de w15**, **11 rouges** sous mutation (bouton remis en absolu, pastille
+  Vinted Go remise, garde de doublon retirée, boost inconnu tu).
+
+#### Relecture du lot `p1-achats` (15 octobre) — sept défauts reproduits, corrigés
+Chacun reproduit d'abord au rendu (sondes du relecteur, puis banc), rouge sur
+3bcdb43, vert après, rouge sous mutation.
+- ⚠️⚠️ **Vinted Go par e-mail : le TYPE de casier prenait la place du commerce.**
+  Forme lue en production (3 colis « disponibles » le 15 oct.) : « *Consigne Vinted
+  Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent ». L'écran disait « *Consigne Vinted
+  Go* » en point relais et rangeait le commerce dans l'adresse, astérisques
+  compris ; et Kusmi Tea et Speed Queen tombaient dans le MÊME groupe.
+  `typeDuLieu` (une règle, lue par `cleanLieu` ET `lieuRelais`, §11) retire le gras
+  et met à part un type CONNU (consigne · casier · locker + un réseau nommé, ou le
+  type seul) : « Kusmi Tea » / « 13 Rue Saint-Vincent », étiquette « Consigne ».
+  Même forme chez Chronopost (« Consigne Pickup Super U Cancale » → « Super U
+  Cancale »). Rien n'est deviné : « Consigne Super U » sans réseau reste tel quel.
+  La ligne d'un achat « à retirer » montre aussi le commerce, plus le lieu brut.
+  ⚠️ Pas touché : `cleanLieu` garde « Point Relais Tabavap Tabavap » pour la forme
+  de la conversation (lecteurs de Ma journée, autre lot) — l'écran Achats lit
+  `lieuRelais`, qui la traite.
+- **« Associer à une paire » n'apparaissait jamais** : les annonces ne sont lues
+  que sur Annonces / Ma journée / Colis, et le formulaire ne vit que dans Achats.
+  Elles se lisent quand le formulaire s'ouvre (pas à chaque ouverture d'Achats,
+  §4.4), l'effet est posé APRÈS `horsForm` (§4.6), et le champ a trois états
+  (« lecture… » · « pas pu lire, rattache plus tard » · la liste). Un achat déjà
+  rattaché à toutes ses paires ne repropose rien (un second lien serait refusé).
+- **« Dépensé » comptait tous les achats hors Vinted quelle que soit la recherche**
+  (« 40 € · 0 paire » sur une recherche vide). `matchHors` applique la même période
+  ET la même recherche que `matchOrd` ; les paires d'un lot comptent.
+- ⚠️ **Boost inconnu présenté comme complet** : « laisse la case vide si tu ne le
+  connais pas » juste au-dessus de « cases vides = 0 € » — suivre les deux rendait
+  le bénéfice « complet » avec un boost inconnu. Sur une vente Vinted
+  (`CoutsVente boostRequis`, `beneficeVinted`) : case Boost vide = inconnu, la
+  confirmation ne passe pas (« tape 0 s'il n'y en a pas eu »), le bénéfice reste
+  « estimé ». eBay garde sa règle. Mesuré le 15 oct. : 0 vente ni fiche ne portait
+  `fraisComplets` ou un boost — rien d'existant ne bascule.
+- **Point de retrait sans lieu** : « Lieu non indiqué », UNE phrase (« le lieu et le
+  code sont dans la conversation du colis »), et la source dit « d'après la
+  commande Vinted » — rien n'a été lu de la conversation. Le « · » termine la
+  ligne du transporteur (insécable) : plus de ligne qui commence par « · » sur
+  téléphone.
+- **Transporteur `autre`** : « Transporteur non reconnu », sans pastille 📦 ni faux nom.
+- **Trait vide sous « Hors Vinted »** : la boîte des achats Vinted ne se dessine
+  plus quand elle n'a rien à lister.
+- Preuves : banc `bancs/achats.cjs` **132 verts** (F à J ajoutés : la vraie forme
+  Vinted Go, `autre`, point sans lieu, « · », paire depuis Achats, Dépensé +
+  recherche, boost sur une vente, trait) — **29 rouges sur le build de 3bcdb43**, et
+  **26 rouges** sur un build portant sept mutations (type de lieu, recherche,
+  boost, lecture des annonces, boîte vide, `autre`, source) — chacune attrapée.
+  `agent-benefices.mjs` exécute `beneficeVinted`. `revendeurs.cjs` attendait
+  l'ancienne règle (frais confirmés avec un boost vide) : il exige maintenant le
+  refus, puis 0 tapé ⇒ complet. Constaté et laissé : `retrait.cjs` (vraies
+  fixtures) a 2 rouges identiques sur w15, 3bcdb43 et après (prix+date des cartes
+  de conversation, tableau de bord muet) ; `revendeurs.cjs` garde « action
+  incertaine propose une relecture » rouge avant comme après (eBay).
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

@@ -138,7 +138,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'VrmLogo :: "/logo-vrm-192.png"': 'logo de l’app (fichier du site)',
       'QrColis :: url': 'QR de retrait (adresse du transporteur, extraite de l’email)',
       'LocalPhoto :: cur.img': 'photo de SA pièce, prise sur l’appareil (data:)',
-      'Comptabilite :: qrVivant(t)': 'QR de retrait (transporteur)',
+      'CarteRetrait :: qr.src': 'QR de retrait (transporteur) — la carte de colis à retirer reçoit `qrVivant(t)` (15 oct.)',
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
