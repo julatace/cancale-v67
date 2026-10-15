@@ -14818,11 +14818,16 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // sont lues pour « pas encore reliées » que s'il y a ici une annonce reliée
   // (en ligne ou programmée) qu'une double vente pourrait toucher (§4.4).
   const avecSku = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku))) || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
-  const clePreuve = avecSku ? comptesPreuve.join(',') : '';
+  // (15 octobre) Les comptes dont la liste des ventes CONFIRME la preuve : TOUS
+  // ses comptes liés, écartés compris — les MÊMES que la coque (§11). Sans eux,
+  // l'écran jugeait le retrait automatique sur une preuve sans détail et disait
+  // « je n'ai pas pu tout vérifier » pour chaque paire.
+  const comptesConfirmer = React.useMemo(() => uidsDeComptes(comptes) || [], [comptes]);
+  const clePreuve = avecSku ? comptesPreuve.join(',') + '|' + comptesConfirmer.join(',') : '';
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
-    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
+    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null, confirmer: avecSku ? comptesConfirmer : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
@@ -21132,16 +21137,107 @@ function ventesParCompteDe(lignes, uids) {
   return out;
 }
 // </preuve-vente-regle>
+// Un état qui fait REVENIR la paire pour de bon. L'acheteur qui a perdu la
+// course (« article indisponible » : la paire est partie chez un autre) et un
+// paiement qui a échoué (elle n'est jamais partie) ne disent pas qu'elle est
+// revenue après une vente (`PAS_UN_RETOUR`, une règle pour la transaction ET la
+// liste des ventes).
+const PAS_UN_RETOUR = /indisponible|[ée]chou/i;
+const etatRevient = (s) => !!s && PAS_UNE_VENTE.test(s) && !PAS_UN_RETOUR.test(s);
+// La date (ms) à laquelle la liste des ventes de chaque compte a été captée
+// (`cap:meta->>capturedAt`, jamais `updated_at` qui ment, §4.3). Inconnue ⇒ rien.
+function capturesParCompte(lignes) {
+  const out = {};
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const m = /^harvest_(\d+)_orders_sold$/.exec(String((r && r.id) || ''));
+    const t = Date.parse((r && r.cap) || '');
+    if (m && Number.isFinite(t)) out[m[1]] = t;
+  }
+  return out;
+}
+// ── LE DÉTAIL DE LA PREUVE, POUR LE RETRAIT AUTOMATIQUE D'eBAY (le plus strict)
+// La preuve elle-même (`vendus`) est celle du bloc partagé avec l'extension ;
+// le détail ne la change JAMAIS — il dit, annonce par annonce, ce que le retrait
+// automatique exige en plus (`retraitsEbayAutoPermis`) :
+//   · `preuves` : annonce → [{ tx, etat, frais, date, cap, compte }] — `frais`
+//     quand la liste des ventes (`orders_sold`, relue à chaque visite) CONFIRME
+//     la vente : retrouvée par son n° de transaction (une identité, §5),
+//     vivante (ni annulée, ni remboursée, ni `failed`), et pas plus ancienne
+//     que la transaction (la transaction relue APRÈS la liste fait foi) ;
+//     `cap` = quand cette liste a été captée, `compte` = de quel compte elle vient ;
+//   · `revenues` : les annonces dont une transaction a été au moins une fois
+//     remboursée, retournée, suspendue ou annulée (ou classée `failed`), d'après
+//     la transaction OU la liste — deux sources qui se contredisent ne font pas
+//     une certitude.
+// Un compte dont la liste n'a pas été lue ne confirme rien (et ne retire rien
+// de la preuve). (14 octobre) Les bordereaux : confirmés par la liste du MÊME
+// compte, comme leur preuve.
+function detailPreuvesVinted(rows, bords, parCompte, caps, vendus) {
+  const preuves = new Map(), revenues = new Set();
+  const lues = new Map();
+  for (const u of Object.keys(parCompte || {})) for (const o of (parCompte[u] || [])) if (o && o.transaction_id != null) lues.set(String(o.transaction_id), { o, uid: u });
+  // Revenue d'après la liste : un état qui la fait revenir, ou Vinted qui la
+  // classe `failed` (remboursée, annulée) — jamais l'acheteur qui a perdu la
+  // course ni le paiement échoué.
+  const revient = (o) => { const s = String((o && o.status) || '').trim(); return !!o && !PAS_UN_RETOUR.test(s) && (etatRevient(s) || String(o.transaction_user_status || '') === 'failed'); };
+  const confirme = (lu, capTx) => {
+    if (!lu || !venteVivante(lu.o)) return null;
+    const etat = String(lu.o.status || '').trim();
+    if (!etat) return null;
+    const cap = caps ? caps[lu.uid] : undefined;
+    if (Number.isFinite(capTx) && Number.isFinite(cap) && capTx > cap) return null;   // la transaction relue APRÈS la liste fait foi
+    return { etat, cap: Number.isFinite(cap) ? cap : null, compte: lu.uid, date: lu.o.date || null };
+  };
+  const ajoute = (it, e) => { if (!vendus || !vendus.has(it)) return; if (!preuves.has(it)) preuves.set(it, []); preuves.get(it).push(e); };
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    if (!r || !r.it) continue;
+    const it = String(r.it);
+    const tx = (/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1] || '';
+    const etatTx = String(r.ti || '').trim();
+    const lu = tx ? lues.get(tx) : null;
+    if (etatRevient(etatTx) || revient(lu && lu.o)) revenues.add(it);
+    const c = confirme(lu, Date.parse(r.cap || ''));
+    if (c) ajoute(it, { tx, etat: c.etat, frais: true, date: c.date || r.at || null, cap: c.cap, compte: c.compte });
+    else if (etatTx && !PAS_UNE_VENTE.test(etatTx)) ajoute(it, { tx, etat: etatTx, frais: false, date: r.at || null, cap: null, compte: null });
+  }
+  for (const b of (Array.isArray(bords) ? bords : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    const it = String((b && b.it) == null ? '' : b.it).trim();
+    if (!m || !/^\d+$/.test(it)) continue;
+    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== m[2]) continue;
+    const ventes = parCompte ? parCompte[m[1]] : null;
+    const o = Array.isArray(ventes) ? ventes.find((v) => v && String(v.transaction_id) === m[2]) : null;
+    if (!o) continue;
+    if (revient(o)) revenues.add(it);
+    const c = confirme({ o, uid: m[1] }, NaN);
+    if (c) ajoute(it, { tx: m[2], etat: c.etat, frais: true, date: c.date, cap: c.cap, compte: c.compte });
+  }
+  return { preuves, revenues };
+}
 // Les annonces Vinted PROUVÉES vendues (§5) : la transaction porte l'annonce
 // (`item_id`) et Vinted lui donne un ÉTAT DE COMMANDE qui ne la fait pas
 // revenir — ou son BORDEREAU porte l'annonce et la vente est lue, vivante, dans
 // les ventes du même compte. La MÊME règle que l'extension (`lireVentesProuvees`).
 // Paginée et STRICTE (§4.5) : `null` = pas su (une des lectures n'a pas
 // répondu), jamais une demi-liste.
+// ⚠️⚠️ (15 octobre) C'EST LE SEUL LECTEUR (§11). Le 13 octobre, le retrait
+// automatique d'eBay avait reçu SON lecteur (`lireVentesVintedProuvees` réécrite
+// en seconde lecture des transactions, avec sa propre règle) : la coque et
+// l'écran eBay ne disaient plus « vendue » sur les mêmes paires, et l'écran
+// jugeait le retrait automatique sur une preuve sans détail (« je n'ai pas pu
+// tout vérifier » pour chaque paire). Le détail strict vit ici (`confirmer`,
+// `vendus.preuves`, `vendus.revenues`) ; `lireVentesVintedProuvees` n'est plus
+// qu'une enveloppe.
 // `comptes` (uids, facultatif) : l'appelant veut aussi les ventes EN COURS
 // (à poster, en route) qu'AUCUNE preuve ne relie à leur annonce — l'anti double
 // vente ne les voit pas ; l'écran eBay les compte, une fois.
-// Rend `null` · `{ vendus: Set(annonce), sansPreuve: [{ uid, tx, titre, conv, statut, tus, bordCapte }] | null,
+// `confirmer` (uids ou comptes, facultatif) : les comptes dont la liste des
+// ventes doit CONFIRMER chaque preuve (le retrait automatique) — TOUS ses
+// comptes liés, ceux qu'il a écartés compris (une vente faite sur un compte
+// exclu reste une vente). Leur panne ne fait jamais tomber la preuve : elle ne
+// confirme rien, c'est tout (le retrait automatique ne part pas).
+// Rend `null` · `{ vendus: Set(annonce) (+ `.preuves`, `.revenues`, ci-dessus),
+//   sansPreuve: [{ uid, tx, titre, conv, statut, tus, bordCapte }] | null,
 //   sansPreuveKO: [uid] (comptes demandés dont les ventes n'ont pas pu être lues),
 //   ancienne: Set(annonce) }`.
 // (revue du 11 octobre) `bordCapte` : un bordereau est DÉJÀ rangé pour cette
@@ -21155,40 +21251,44 @@ function ventesParCompteDe(lignes, uids) {
 // de `PREUVE_MAX_PAR_VISITE` (background.js) — `audit-preuve-vente` exige
 // l'égalité, sinon l'écran promettrait un rythme que l'extension ne tient pas.
 const PREUVE_PAR_VISITE = 3;
+// Des comptes (objets `vinted_accounts` ou uids) → leurs uids, dédoublonnés.
+const uidsDeComptes = (l) => Array.isArray(l) ? [...new Set(l.map((a) => String((a && typeof a === 'object') ? (a.vinted_user_id == null ? '' : a.vinted_user_id) : (a == null ? '' : a))).filter((u) => /^\d+$/.test(u)))] : null;
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title', { strict: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
     const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
     if (bords === null) return null;
-    const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
-    const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
+    const comptes = uidsDeComptes(opts.comptes);
+    const confirmer = uidsDeComptes(opts.confirmer) || [];
+    const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders,cap:meta->>capturedAt`, { strict: true });
     // Les ventes dont une PREUVE dépend (bordereau à juger, transaction à un état
     // non terminal) : leur panne vaut « pas su » — jamais une demi-preuve.
     const juger = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
-    const parCompte = {};
+    const parCompte = {}, caps = {};
     if (juger.length) {
       const lignes = await ordres(juger);
       if (lignes === null) return null;
       Object.assign(parCompte, ventesParCompteDe(lignes, juger));
+      Object.assign(caps, capturesParCompte(lignes));
     }
     const parTx = preuvesParTransaction(rows, parCompte);
     const vendus = new Set(parTx.items);
     for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
     // (revue du 11 octobre) Les ventes des AUTRES comptes demandés ne servent
-    // qu'à la ligne « pas reliées » (une information) : leur panne la rend
-    // `null`, elle n'efface JAMAIS la preuve — une vente prouvée par sa
-    // transaction reste « à retirer » même quand cette lecture (la plus lourde)
-    // ne répond pas.
+    // qu'à la ligne « pas reliées » (une information) et à CONFIRMER le détail :
+    // leur panne rend la ligne `null` et ne confirme rien, elle n'efface JAMAIS
+    // la preuve — une vente prouvée par sa transaction reste « à retirer » même
+    // quand cette lecture (la plus lourde) ne répond pas.
     let sansPreuve = null, sansPreuveKO = [];
+    const autres = [...new Set([...(comptes || []), ...confirmer])].filter((u) => !juger.includes(u));
+    const l2 = autres.length ? await ordres(autres) : [];
+    if (l2 === null) sansPreuveKO = (comptes || []).filter((u) => !juger.includes(u));
+    else if (autres.length) { Object.assign(parCompte, ventesParCompteDe(l2, autres)); Object.assign(caps, capturesParCompte(l2)); }
     if (comptes) {
-      const autres = comptes.filter((u) => !juger.includes(u));
-      const l2 = autres.length ? await ordres(autres) : [];
-      if (l2 === null) sansPreuveKO = autres;
       if (l2 !== null) {
-        Object.assign(parCompte, ventesParCompteDe(l2, autres));
         const bordTx = preuvesParBordereau(bords, parCompte).tx;
         // Les bordereaux rangés, quels qu'ils soient (avec ou sans l'annonce).
         const ranges = new Set((bords || []).map((b) => { const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || '')); return m ? m[1] + ':' + m[2] : ''; }).filter(Boolean));
@@ -21203,96 +21303,17 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
         }
       }
     }
+    const detail = detailPreuvesVinted(rows, bords, parCompte, caps, vendus);
+    vendus.preuves = detail.preuves;
+    vendus.revenues = detail.revenues;
     return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
   } catch (_) { return null; }
 };
-// La preuve stricte pour le retrait automatique exige aussi la fraîcheur et la provenance.
-const etatsVentesFrais = (commandes, cap = null, uid = null) => {
-  const m = new Map();
-  for (const o of (Array.isArray(commandes) ? commandes : [])) {
-    if (!o || o.transaction_id == null) continue;
-    const etat = String(o.status || '').trim();
-    if (etat) m.set(String(o.transaction_id), { etat, failed: o.transaction_user_status === 'failed', date: o.date || null, cap: Number.isFinite(cap) ? cap : null, uid: uid != null && String(uid) ? String(uid) : null });
-  }
-  return m;
-};
-// Un état qui fait REVENIR la paire pour de bon. L'acheteur qui a perdu la
-// course (« article indisponible » : la paire est partie chez un autre) et un
-// paiement qui a échoué (elle n'est jamais partie) ne disent pas qu'elle est
-// revenue après une vente.
-const etatRevient = (s) => !!s && PAS_UNE_VENTE.test(s) && !/indisponible|[ée]chou/i.test(s);
-function preuvesVentesVinted(rows, frais) {
-  const preuves = new Map(), revenues = new Set();
-  const lit = frais && typeof frais.get === 'function';
-  for (const r of (Array.isArray(rows) ? rows : [])) {
-    if (!r || !r.it) continue;
-    const it = String(r.it);
-    const tx = r.tx != null ? String(r.tx) : '';
-    const f = (lit && tx) ? frais.get(tx) : null;
-    const etatTx = String(r.ti || '').trim();
-    // La transaction relue APRÈS la liste fait foi ; date inconnue d'un côté ⇒
-    // la liste (relue à chaque visite).
-    const capTx = Date.parse(r.cap || '');
-    const parListe = !!f && !(Number.isFinite(capTx) && Number.isFinite(f.cap) && capTx > f.cap);
-    if (etatRevient(etatTx) || (f && etatRevient(f.etat))) revenues.add(it);
-    const etat = parListe ? f.etat : etatTx;
-    if (!etat) continue;                          // une conversation n'est pas une vente
-    if (PAS_UNE_VENTE.test(etat)) continue;       // annulée, remboursée, retour… : elle revient
-    if (!preuves.has(it)) preuves.set(it, []);
-    // `cap` : quand la liste qui confirme a été captée (le retrait automatique
-    // exige qu'elle soit récente) ; `compte` : de quel compte elle vient.
-    preuves.get(it).push({ tx, etat, frais: parListe, date: (f && f.date) || r.at || null, cap: parListe ? f.cap : null, compte: parListe ? (f.uid || null) : null });
-  }
-  return { vendus: new Set(preuves.keys()), preuves, revenues };
-}
-// La date (ms) à laquelle la liste des ventes d'un compte a été captée — posée
-// par `fetchHarvestOrders` dans `_harvestSeen`. Inconnue ⇒ null.
-const capListeVentes = (uid) => {
-  try { const v = _harvestSeen[`${uid}_orders_sold`]; return Number.isFinite(v) ? v : null; } catch (_) { return null; }
-};
-// `comptes` : ses comptes Vinted liés — TOUS, ceux qu'il a écartés compris (une
-// vente faite sur un compte exclu reste une vente). Leur liste de ventes est lue
-// par `fetchHarvestOrders` (partagée en vol avec les écrans, §4.4) ; un compte
-// illisible laisse ses transactions à leur état d'origine, sans confirmation.
-// Rend le Set des annonces vendues (ce que lisent tous les appelants), qui porte
+// L'enveloppe que lisent la coque (anti double vente, retrait automatique) et
+// les écrans : la preuve de `lirePreuvesVenteVinted`, confirmée par les listes
+// de ventes des comptes donnés. Rend le Set des annonces vendues, qui porte
 // aussi `.preuves` et `.revenues` (le détail, pour le retrait automatique).
-const lireVentesVintedProuvees = async (comptes) => {
-  try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
-    if (rows === null) return null;
-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
-    if (bords === null) return null;
-    const fraisParCompte = new Map();
-    let frais = null;
-    if (Array.isArray(comptes) && comptes.length) {
-      const lus = await Promise.all(comptes.map(async (a) => {
-        const uid = a && a.vinted_user_id;
-        const p = await fetchHarvestOrders(uid, 'sold').catch(() => undefined);
-        const m = etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid), uid);
-        fraisParCompte.set(String(uid), m);
-        return m;
-      }));
-      frais = new Map();
-      for (const m of lus) for (const [k, v] of m) frais.set(k, v);
-    }
-    const { vendus, preuves, revenues } = preuvesVentesVinted(rows, frais);
-    for (const b of bords) {
-      const m = /^harvest_(\d+)_label_(\d+)$/.exec(String(b && b.id || ''));
-      const it = String(b && b.it || '').trim();
-      if (!m || !/^\d+$/.test(it) || (b.tx != null && String(b.tx).trim() && String(b.tx).trim() !== m[2])) continue;
-      const f = fraisParCompte.get(m[1])?.get(m[2]);
-      if (!f) continue;
-      if (f.failed || etatRevient(f.etat)) revenues.add(it);
-      if (f.failed || !f.etat || PAS_UNE_VENTE.test(f.etat)) continue;
-      vendus.add(it);
-      if (!preuves.has(it)) preuves.set(it, []);
-      preuves.get(it).push({ tx: m[2], etat: f.etat, frais: true, date: f.date, cap: f.cap, compte: m[1] });
-    }
-    vendus.preuves = preuves;
-    vendus.revenues = revenues;
-    return vendus;
-  }catch(_){return null;}
-};
+const lireVentesVintedProuvees = async (comptes) => { const p = await lirePreuvesVenteVinted({ confirmer: comptes }); return p ? p.vendus : null; };
 
 
 // ══════════════════════════════════════════════════════════════════════════════
