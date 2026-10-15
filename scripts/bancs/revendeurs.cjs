@@ -212,7 +212,8 @@ async function brancher(p){
   check(droite.x>=gauche.x+gauche.width-1, 'messagerie ordinateur : liste à gauche, fil à droite');
   check(await p.locator('.vrm-chat-column .vrm-chat-panel').count()===1, 'fil intégré dans le panneau de droite');
   await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
-  const send=p.getByRole('button',{name:'Envoyer',exact:true});check(await send.isDisabled(),'conversation sans réponse autorisée bloquée');
+  // Bloquée = aucun bouton Envoyer ACTIF (absent ou grisé) ET la raison est dite.
+  const send=p.getByRole('button',{name:'Envoyer',exact:true});check((await send.count()===0 || await send.isDisabled()) && await p.getByText('Vinted ne permet pas de répondre dans cette conversation.',{exact:true}).isVisible(),'conversation sans réponse autorisée bloquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
   await p.goto(base+'/?tab=dashboard');await p.locator('.vrm-finance-overview').waitFor();check(await p.locator('.vrm-finance-overview').isVisible(),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();

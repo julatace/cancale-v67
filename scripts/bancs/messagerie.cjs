@@ -24,7 +24,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4337;
+const PORT = Number(process.env.BANC_PORT) || 4337;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -38,13 +38,15 @@ const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, 
     { entity_type: 'message', entity: { user_id: 5301, body: 'Bonjour, vous feriez 45 € ?' } },
     { entity_type: 'offer_request_message', entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9001, offer_request_id: 77 } },
   ] };
-const FIL_EXT = { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, transaction: { id: 9002 },
+const FIL_EXT = { id: 304, opposite_user: { id: 5304, login: 'acheteur_4' }, transaction: { id: 9002 },
   messages: [{ entity_type: 'message', entity: { user_id: 5402, body: 'Message lu par extension' } }] };
 // Les conversations de `compte_a` datent d'il y a 26-30 h ; ses ventes (servies
 // à part) disent si sa boîte est figée.
 const vente = (tx, h) => ({ transaction_id: tx, title: 'Vente ' + tx, price: { amount: '40.0', currency_code: 'EUR' }, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(h) });
 const rowsDe = ({ venteA = 3 } = {}) => [
-  { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26)] } } },
+  // (15 octobre) 304 : un fil de compte_a jamais capté — c'est lui que l'extension
+  // lit (Chrome est sur compte_a) ; un fil de compte_b, elle le refuserait.
+  { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26), conv(304, 'acheteur_4', 'Toujours là ?', false, 40)] } } },
   { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 1)] } } },
   { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: FIL_OFFRE } } },
   // Proposition 6 (6 octobre) : les offres reçues PAR EMAIL, en tête de Messages.
@@ -113,7 +115,11 @@ const PONT = ({ version, filExt }) => {
 
 async function rendre(b, { version, tel = false, lignes = rows }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
-  const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
+  // (15 octobre) 390 px = une fenêtre ÉTROITE sur l'ordinateur, pas un
+  // téléphone : l'extension (qui tranche les offres) ne tourne pas sur un écran
+  // tactile sans souris, et l'app le dit (`etatReponseVinted` → « téléphone »).
+  // Le vrai téléphone est rendu par `messages-compte.cjs` (cas F).
+  const ctx = await b.newContext({ viewport: vp });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const execs = [];
@@ -159,8 +165,11 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       const porte = await r.pg.evaluate(() => { const b = document.querySelector('[data-section="messages"]'); return b ? b.getAttribute('aria-current') : 'absente'; });
       dit(porte === 'page', 'l’ancien lien mène aux Messages DANS l’onglet Vinted (section active)', String(porte));
       const liste = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), txt: x.innerText })));
-      dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
-      dit(liste.length === 3 && liste[2].id === '303', 'les non lues d’abord, la lue en dernier', JSON.stringify(liste.map((x) => x.id)));
+      dit(liste.length === 4, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
+      // (15 octobre) « Tous les comptes » : la règle `ordreConversations` — du plus
+      // récent au plus ancien (plus « non lues d'abord » : 115 des 150 non lues
+      // de sa vraie boîte ont plus de 14 jours ; le filtre « Non lues » est là).
+      dit(liste.map((x) => x.id).join(' ') === '402 303 301 304', 'du plus récent au plus ancien (tous comptes choisis)', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
@@ -188,7 +197,9 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(off && off.etat === 'attente' && /45,00/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
       await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click();
       await r.pg.waitForTimeout(500);
-      dit(r.execs.length === 0, 'accepter DEMANDE d’abord (vendre la paire à ce prix) — rien n’est parti', JSON.stringify(r.execs));
+      // (15 octobre) la LECTURE du fil par l'extension (GET) n'est pas un geste :
+      // ce qui ne doit pas partir, c'est une écriture.
+      dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'accepter DEMANDE d’abord (vendre la paire à ce prix) — rien n’est parti', JSON.stringify(r.execs));
       await r.pg.locator('div[style*="z-index: 2000"] button', { hasText: 'Accepter' }).click();
       await r.pg.waitForTimeout(900);
       const acc = r.execs.find((x) => x.method === 'PUT');
@@ -196,6 +207,10 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       // 3. faire une offre
       await r.pg.fill('input[aria-label="Prix de l\'offre"]', '50');
       await r.pg.getByRole('button', { name: 'Envoyer l\'offre' }).click();
+      await r.pg.waitForTimeout(400);
+      // (15 octobre) une offre engage un prix : elle demande d'abord.
+      dit(!r.execs.some((x) => x.method === 'POST' && /offers$/.test(x.endpoint)), 'faire une offre DEMANDE d’abord (un prix engagé) — rien n’est parti');
+      await r.pg.locator('div[style*="z-index: 2000"] button', { hasText: 'Proposer' }).click();
       await r.pg.waitForTimeout(900);
       const of = r.execs.find((x) => x.method === 'POST' && /offers$/.test(x.endpoint));
       dit(of && of.endpoint === '/api/v2/transactions/9001/offers' && of.body && of.body.offer && of.body.offer.price === '50', 'faire une offre envoie le prix saisi sur la bonne transaction', JSON.stringify(of));
@@ -205,12 +220,22 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       await r.pg.keyboard.press('Escape');
       await r.pg.evaluate(() => { const o = [...document.querySelectorAll('div')].find((d) => d.style && d.style.position === 'fixed' && d.style.zIndex === '1000'); if (o) o.click(); });
       await r.pg.waitForTimeout(400);
+      await r.pg.click('[data-conv="304"]');
+      await r.pg.waitForTimeout(1200);
+      const get = r.execs.find((x) => x.method === 'GET' && /\/304$/.test(x.endpoint));
+      const txt2 = await r.pg.evaluate(() => document.body.innerText);
+      dit(get && get.endpoint === '/api/v2/conversations/304' && get.uid === '111', 'un fil pas encore capté est lu PAR L’EXTENSION, au nom du bon compte', JSON.stringify(get));
+      dit(/Message lu par extension/.test(txt2), 'et ses messages s’affichent');
+      // (15 octobre) Un fil de compte_b alors que Chrome est sur compte_a : la
+      // vraie extension REFUSERAIT de le lire (garde stricte) — on ne le lui
+      // demande pas ; il s'ouvre en lecture seule, et la raison est dite.
+      await r.pg.keyboard.press('Escape');
+      await r.pg.evaluate(() => { const o = [...document.querySelectorAll('div')].find((d) => d.style && d.style.position === 'fixed' && d.style.zIndex === '1000'); if (o) o.click(); });
+      await r.pg.waitForTimeout(400);
       await r.pg.click('[data-conv="402"]');
       await r.pg.waitForTimeout(1200);
-      const get = r.execs.find((x) => x.method === 'GET');
-      const txt2 = await r.pg.evaluate(() => document.body.innerText);
-      dit(get && get.endpoint === '/api/v2/conversations/402' && get.uid === '222', 'un fil pas encore capté est lu PAR L’EXTENSION, au nom du bon compte', JSON.stringify(get));
-      dit(/Message lu par extension/.test(txt2), 'et ses messages s’affichent');
+      const z402 = await r.pg.evaluate(() => { const z = document.querySelector('[data-reponse]'); return z ? z.getAttribute('data-reponse') : null; });
+      dit(!r.execs.some((x) => /\/402$/.test(x.endpoint)) && z402 === 'lecture', 'un fil de compte_b (Chrome sur compte_a) n’est PAS demandé à l’extension, et s’ouvre en lecture seule', JSON.stringify({ execs: r.execs.filter((x) => /402/.test(x.endpoint)), z402 }));
       dit(!r.proxy.some((u) => /conversations/.test(u)), 'aucun passage par le serveur pour le lire', JSON.stringify(r.proxy.filter((u) => /conversations/.test(u))));
       const sw = await r.pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
@@ -224,7 +249,7 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       const r = await rendre(b, { version: '5.135.0', lignes: rowsDe({ venteA: 40 }) });
       const n = await r.pg.evaluate(() => document.querySelectorAll('[data-boites-perimees]').length);
       const liste = await r.pg.evaluate(() => document.querySelectorAll('[data-messagerie] [data-conv]').length);
-      dit(liste === 3 && n === 0, 'boîtes à jour : aucune ligne « n’est plus à jour »', `liste=${liste} · lignes=${n}`);
+      dit(liste === 4 && n === 0, 'boîtes à jour : aucune ligne « n’est plus à jour »', `liste=${liste} · lignes=${n}`);
       await r.ctx.close();
     }
     console.log('── extension TROP ANCIENNE (5.134)');
@@ -235,7 +260,11 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       const off = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre]'); return e ? { etat: e.getAttribute('data-offre'), txt: e.innerText } : null; });
       const boutons = await r.pg.getByRole('button', { name: 'Accepter', exact: true }).count();
       dit(off && off.etat === 'indisponible' && boutons === 0, 'aucun bouton d’offre qui ne peut pas marcher', JSON.stringify(off));
-      dit(off && /5\.135\.0/.test(off.txt), 'et la raison est dite (la version qui sait le faire)', off && off.txt);
+      // (15 octobre) la raison est dite UNE fois pour la réponse ET l'offre
+      // (`etatReponseVinted`), avec la version à installer.
+      const raison = await r.pg.evaluate(() => { const e = document.querySelector('[data-reponse-raison]'); return e ? { code: e.getAttribute('data-reponse-raison'), txt: e.innerText } : null; });
+      const attendue = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1];
+      dit(raison && raison.code === 'retard' && raison.txt.includes(attendue), 'et la raison est dite (mettre l’extension à jour, la version à installer)', JSON.stringify(raison));
       await r.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }

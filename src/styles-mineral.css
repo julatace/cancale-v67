@@ -376,11 +376,16 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-inbox-row { border-radius:0 !important; padding:14px 12px !important; }
 .vrm-inbox-row > img { width:46px !important; height:58px !important; border-radius:7px !important; }
 .vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#A63F23); }
+/* Messages (15 octobre) : la conversation d'un autre compte est estompée comme
+   une vente d'un autre compte, mais elle s'ouvre — la survoler ou la viser au
+   clavier la rend nette, et le fil ouvert est net. */
+.vrm-inbox-row.is-estompee:focus-visible, .vrm-inbox-row.is-estompee.is-current { filter:none !important; opacity:1 !important; }
 .vrm-inbox-column input[type="search"] { border-radius:10px !important; background:var(--vrm-surface) !important; }
 .vrm-chat-empty { border-style:dashed; background:transparent; min-height:320px; }
 @media(hover:hover) and (pointer:fine) {
  .vrm-ann-overview > a:hover img { transform:scale(1.04); }
  .vrm-inbox-row:hover { background:var(--vrm-surface) !important; }
+ .vrm-inbox-row.is-estompee:hover { filter:none !important; opacity:1 !important; }
 }
 @media(max-width:767px) {
  .vrm-mobile-nav button { min-height:60px; }
