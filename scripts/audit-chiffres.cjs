@@ -97,7 +97,11 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   : ok('aucun rapport ne calcule plus `ca - cout - frais`');
 
 // 7) le PDF imprime la couverture à côté du bénéfice
-((app.match(/ventes au coût connu\)`:''\)/g) || []).length >= 2)
+// ⚠️ (9 octobre) La RÈGLE, pas son orthographe : la ligne « Bénéfice net » de
+//    chaque PDF porte la couverture. Le bilan annuel l'écrit maintenant dans un
+//    ternaire à trois branches (complet · partiel avec sa couverture · « — »
+//    sans aucun prix d'achat) : l'ancien motif `…connu)`:'')` criait au loup.
+((app.match(/kv\('Bénéfice net'[^\n]*ventes au coût connu\)/g) || []).length >= 2)
   ? ok('les PDF impriment la couverture à côté du bénéfice')
   : nok('les 2 PDF impriment `(sur N/M ventes au coût connu)`');
 

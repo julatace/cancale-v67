@@ -8984,6 +8984,66 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### ⚠️⚠️ DEUX « RÉSULTAT APRÈS CHARGES » POUR LA MÊME ANNÉE — LA COMPTABILITÉ DE MAIN, REVUE (9 octobre)
+Revue de la production (e6bda5c) sur l'onglet Comptabilité arrivé avec main
+(#452-#455) et sur le registre annuel fusionné. **Tout reproduit, puis corrigé à
+la racine** ; ce que l'autre session a apporté (charges, packs, exports) reste.
+- ⚠️⚠️ **Une notion, deux règles, deux nombres (§11).** L'onglet disait « CA −
+  charges » (+260 €), le registre annuel « bénéfice des SEULES ventes au coût
+  connu − charges de TOUTE l'année » (−180 €, **en rouge**, sur le document du
+  comptable — deux ensembles dans une soustraction, le défaut corrigé pour la
+  marge). ⇒ **`resultatApresCharges`**, une fonction de module : bénéfice net
+  (ventes − achat − boosts) − charges, chiffré **seulement si tout est connu** —
+  ventes lues, aucune source muette, aucune vente finalisée pas encore datée qui
+  puisse tomber dans l'année, chaque vente avec son coût d'achat. Sinon `null`
+  et ses **causes** (`raisonResultat`, la phrase vient du même objet que le
+  chiffre, §5). Le registre la calcule, l'écran Ventes **publie** le résumé de
+  l'année en cours (`vrm_resultat_annee`, sur l'appareil, rien publié sur une
+  lecture ratée), l'onglet y applique SES charges par la même fonction et dit
+  l'âge de la publication. Chez Julien (8 paires sur 401 avec un prix d'achat),
+  les deux écrans disent donc « — » et la porte « Saisir mes prix d'achat → ».
+  Plus de rouge sur un bénéfice ou un résultat (`couleurResultat` : ambre si
+  négatif). Le bénéfice d'un MOIS n'est écrit que si toutes ses ventes ont leur
+  coût (`ca − cout − frais` gonflait les mois partiels).
+- **Les ventes finalisées sans date de versement sont DITES, pas traitées** (le
+  traitement est la proposition 2) : à côté du CA du registre, du héro de
+  l'onglet et EN TÊTE du CSV/PDF — nombre et montant, celles qui peuvent tomber
+  dans l'année (`aDaterPeutTomberEn`, la règle extraite de la carte des seuils,
+  §11). Une année dont toutes les ventes sont pas encore datées : CA « — », pas
+  « 0 € » (`caAnnuelInconnu`). Leboncoin/eBay pas lus : dits aussi.
+- **Les exports disent ce que dit l'écran** : grisés pendant la lecture (le CSV
+  sortait « TOTAL 0.00 » et un résultat égal à −charges) ; dates illisibles ⇒
+  cotisations, marge et résultat « — » ; ce qui manque EN TÊTE (c'était la
+  dernière ligne).
+- **Coûts fixes datés** (`debut`, `fin`, mois `YYYY-MM`) : comptés les mois où
+  ils ont couru, jamais au-delà du mois en cours — un abonnement saisi
+  aujourd'hui comptait 12 mois en 2023, 2024 et 2025. « Arrêter » remplace
+  « supprimer » pour un poste résilié (supprimer le retire de toutes les années,
+  une confirmation le dit). Un poste sans début (saisi avant) n'est compté
+  nulle part et demande « depuis quand ? ». **Mesuré : `vrm_compta` n'existe pas
+  encore chez Julien** — rien à migrer.
+- **Fenêtre froide (§5.49)** : les gestes faits avant l'arrivée du nuage sont
+  notés puis **rejoués** sur sa copie (`rejouerCompta`) ; avant, la saisie
+  froide restait seule à l'écran et la suivante effaçait les charges du nuage.
+- **Le calendrier de Paris** (`aujourdhuiParis`, sur `partsParis`) pour la date
+  proposée, l'année et le mois en cours : le 1er janvier à 00:30, `toISOString`
+  proposait le 31 décembre.
+- Preuves : `audit-compta-resultat.cjs` (les vraies règles dans un `vm`) **14
+  rouges** sur cdc9c1d, et rouge sous chacune de ses 6 mutations (`couts`,
+  `adater`, `manque`, `debut`, `utc`, `froid`) ; banc `bancs/compta-resultat.cjs`
+  (port 4371, données inventées, dont les gestes « Arrêter » et « depuis quand ? » à 390 px) **25 rouges** sur le build de cdc9c1d, vert
+  après ; `audit-seuils-vinted.cjs` vert avec ses 13 mutations après
+  l'extraction de `aDaterPeutTomberEn` ; `rapport.cjs` et `seuils-vinted.cjs`
+  verts. `audit-chiffres.cjs` exigeait l'orthographe `…connu)`:'')` de la
+  couverture dans le PDF : il suit la règle (la ligne « Bénéfice net » de chaque
+  PDF porte la couverture), rouge si on la retire (vingt-huitième cri au loup).
+  ⚠️ Le premier jet du banc jugeait le rouge sur la seule couleur du thème
+  clair : vert sur le rouge SOMBRE du code d'avant (le banc rend en sombre).
+- **Non mesuré** : rien n'a tourné sur sa vraie base ni en production ; la
+  bonne tenue de « Arrêter » / « depuis quand ? » sur un iPhone réel (champ
+  `type="month"`) ; l'estimation de 45 jours entre vente et versement reste
+  celle de la carte des seuils, jamais mesurée chez lui.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
