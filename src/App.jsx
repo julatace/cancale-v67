@@ -17336,7 +17336,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         //    chercher ces dates) pour Vinted et Leboncoin. Une cause, une phrase
         //    (§7) : cette carte ne dit que ce que l'autre ne dit pas — les autres
         //    plateformes (eBay sans date de commande), jamais en pratique.
-        const adTout = urssafInfo && urssafInfo.aDater && urssafInfo.aDater.n > 0 ? urssafInfo.aDater : null;
+        // La même ligne publiée que la carte URSSAF (vinted_urssaf_mois) : ici
+        // Dashboard la CONSOMME directement — après la séparation Déclarations
+        // (15 oct.), `urssafInfo` vit dans CarteUrssafMois, plus dans Dashboard.
+        const vUr = load('vinted_urssaf_mois', null);
+        const adTout = vUr && vUr.aDater && vUr.aDater.n > 0 ? vUr.aDater : null;
         const ad = (() => {
           if (!adTout || !adTout.par) return null;          // sans détail : la carte du mois dit tout (Leboncoin)
           const reste = Object.entries(adTout.par).filter(([k, x]) => k !== 'Vinted' && k !== 'Leboncoin' && x && x.n > 0);
