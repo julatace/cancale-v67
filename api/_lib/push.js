@@ -104,6 +104,7 @@ export const PUSH_DEFAUT = {
   expedier: true,   // colis à poster (rappel quotidien)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
+  veille:   true,   // veille d'achat : nouvelles annonces eBay, le matin, SEULEMENT pour les recherches où il a coché l'alerte (api/_lib/veille.js)
   suivi:    false,  // « en transit », « livré » : rien à faire
   achat:    false,  // tu viens de l'acheter, tu le sais
   message:  false,  // le badge de l'app suffit

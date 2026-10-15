@@ -25,6 +25,9 @@ import { aExpedier } from './widget.js';
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+// (15 octobre) La veille d'achat : les recherches où l'alerte est allumée, le matin.
+import { veilleDuMatin } from './_lib/veille.js';
+import { accesVendeur } from './_lib/abonnement.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -320,6 +323,13 @@ async function traiterVendeur() {
     let bilan = null;
     try { bilan = await bilanDeLaSemaine(); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
+    // VEILLE D'ACHAT (15 octobre) — même place et même garde que le bilan : un
+    // échec de la veille n'empêche jamais le rappel d'expédition. Rien ne part
+    // si aucune recherche n'a son alerte allumée (aucun appel à eBay).
+    let veille = null;
+    try { veille = await veilleDuMatin({ owner: proprietaireCourant() || '', envoyer: sendPushToAll, categorieActive: pushCategorieActive, acces: accesVendeur }); }
+    catch (e) { veille = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
     // Seuls les comptes encore liés comptent (comme l'app et le widget) : la
@@ -344,11 +354,11 @@ async function traiterVendeur() {
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) return { urssaf, bilan, skipped: 'resume absent — aucune notification envoyee' };
+    if (!attente) return { urssaf, bilan, veille, skipped: 'resume absent — aucune notification envoyee' };
     // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
     //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
     //    et la notification annoncerait des colis déjà partis. On se tait.
-    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, skipped: 'réglages illisibles — aucune notification envoyée' };
+    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, veille, skipped: 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
@@ -367,7 +377,7 @@ async function traiterVendeur() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, veille, skipped: 'déjà notifié', total };
 
     if (total > 0 && await pushCategorieActive('expedier')) {
       const parts = [];
@@ -382,7 +392,7 @@ async function traiterVendeur() {
       });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total });
-    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total };
+    return { urssaf, bilan, veille, overdue, dueToday, dueTomorrow, total };
 }
 
 export default async function handler(req, res) {

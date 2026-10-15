@@ -38,6 +38,8 @@ const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
 const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
 const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
 import { numeroExterne } from './_lib/numerotation.js';
+// (15 octobre) La veille d'achat : recherche publique, jeton de l'APPLICATION.
+import { actionVeille } from './_lib/veille.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -1688,6 +1690,16 @@ async function handleApp(req, res) {
   if ((await accesVendeur(owner)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', error: "Ton abonnement VRM n'est plus actif." }); return; }
   const b = req.body || {};
   const action = String(b.action || '');
+  // (15 octobre) LA VEILLE D'ACHAT (api/_lib/veille.js) : elle n'ouvre AUCUN
+  // compte eBay du vendeur (recherche publique, jeton de l'application) et
+  // n'achète rien. Routée AVANT le test des clés : ses recherches se lisent et
+  // se modifient même quand la recherche eBay n'est pas configurée — c'est la
+  // vérification elle-même qui le dit (503 « no-key »).
+  if (/^veille[a-z]+$/.test(action)) {
+    try { const r = await actionVeille(action, b, owner); res.status(r.status).json(r.body); }
+    catch (e) { res.status(502).json({ ok: false, error: 'Veille indisponible', detail: String((e && e.message) || '').slice(0, 200) }); }
+    return;
+  }
   if (!keysReady()) { res.status(503).json({ ok: false, reason: 'no-key', error: 'eBay indisponible : EBAY_APP_ID / EBAY_CERT_ID ne sont pas configurés sur Vercel.' }); return; }
   try {
     if (action === 'authurl') {

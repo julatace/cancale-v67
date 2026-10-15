@@ -13,6 +13,8 @@ import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
+// (15 octobre) eBay → Veille : veille d'achat + rentabilité avant achat (règle : api/_lib/veille-regle.js).
+import VeilleAchat from "./VeilleAchat.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -976,6 +978,9 @@ const SYNC_KEYS = [
   'vrm_ebay_baisses',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
+  // Les achats du MOIS, publiés par l'écran Achats (le seul qui les lit, §11) :
+  // la veille d'achat les consomme pour le budget du mois (15 octobre).
+  'vrm_achats_mois',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
@@ -10559,6 +10564,28 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa) {
 const medianeNb = (arr) => { const a = arr.filter(x => x > 0).sort((x, y) => x - y);
   if (!a.length) return 0; const m = Math.floor(a.length / 2);
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+// Les ventes FINALISÉES lues dans les lignes `harvest_*_orders_sold`, une fois
+// chacune (une transaction vue sur deux lignes ne compte qu'une fois). UNE
+// lecture pour « Le prix qui marche » et pour la fourchette de revente de la
+// veille d'achat (§11).
+function ventesFinaliseesDe(lignes) {
+  const sold=[]; const seen=new Set();
+  for(const r of (lignes||[])){ const p=(r&&r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
+    const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
+    if(/finalis/i.test(o.status||'')) sold.push(o); } }
+  return sold;
+}
+// (15 octobre) Pour la veille d'achat : ces ventes ramenées à {titre, prix en
+// centimes, date}. `null` = la base n'a pas répondu (« pas su », jamais « aucune »).
+async function chargerVentesComparables() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=data`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const so = await r.json();
+    if (!Array.isArray(so)) return null;
+    return ventesFinaliseesDe(so).map(o => ({ titre: String(o.title||''), prix: Math.round(montantCommande(o)*100), date: Date.parse(o.date||'')||null }));
+  } catch (_) { return null; }
+}
 function grouperPrixMarche(sold, online) {
   const g = {};
   for (const o of (sold || [])) {
@@ -10686,7 +10713,7 @@ function EntetePlateforme({nom,plateforme}) {
   return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
 }
 function PlatSubNav({ sub, setSub, sections, dark }) {
-  const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear'};
+  const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear',veille:'search'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   return (
     <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
@@ -26921,6 +26948,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { recu, nRecu, attente, nAttente, spent, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
+  // ── LES ACHATS DU MOIS, PUBLIÉS (15 octobre) ─────────────────────────────
+  // Cet écran est le seul à lire les achats (transferts entre ses comptes,
+  // achats masqués, annulés : `loadOrders` + la règle de `treasury` ci-dessus).
+  // Il PUBLIE donc le total du mois en cours (heure de Paris, centimes) ; la
+  // veille d'achat le CONSOMME pour le budget — jamais un second calcul (§11).
+  // Pas encore lu ⇒ rien n'est publié ; un compte illisible ⇒ « complet: false »
+  // et il est nommé (un total partiel n'est jamais présenté comme complet, §5).
+  useEffect(() => {
+    if (!Array.isArray(buys.items)) return;
+    const moisDe = (d) => { try { return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7); } catch (_) { return ''; } };
+    const mois = moisDe(Date.now());
+    let depense = 0, n = 0;
+    for (const o of buysBase) {
+      if (classifyOrderStatus(o.status) === 'cancelled' || !o.date || moisDe(o.date) !== mois) continue;
+      const a = o.price?.amount != null ? Number(o.price.amount) : NaN;
+      if (!isFinite(a)) continue;
+      depense += Math.round(a * 100); n += 1;
+    }
+    for (const b of offBuys) {
+      const quand = b.date || b.createdAt; if (!quand || moisDe(quand) !== mois) continue;
+      const p = parseFloat(String(b.price).replace(',', '.')); if (isNaN(p)) continue;
+      depense += Math.round(p * 100); n += 1;
+    }
+    const v = { mois, depense, n, complet: !(buys.failedUids || []).length, manque: buys.failed || [], at: Date.now() };
+    const avant = load('vrm_achats_mois', null);
+    if (!avant || avant.mois !== v.mois || avant.depense !== v.depense || avant.n !== v.n || avant.complet !== v.complet) save('vrm_achats_mois', v);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buys.items, buys.failedUids, buysBase, offBuys]);
   const [showTreasury, setShowTreasury] = useState(false);
   const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
@@ -35612,6 +35667,7 @@ const PUSH_CATS = [
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
+  { id:'veille',   def:true,  titre:'🔎 Veille d’achat',     desc:"Le matin, les nouvelles annonces eBay de tes recherches où l’alerte est cochée." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
@@ -38390,6 +38446,8 @@ function AppCoeur() {
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
   // où vivent « Retirer d'eBay » et le lien vers l'annonce Vinted.
   React.useEffect(()=>{ if(tab==='ebay_annonces'){ subVoulue.current='annonces'; setTab('plat_ebay'); } },[tab]);
+  // L'alerte du matin de la veille d'achat (15 octobre) mène à eBay → Veille.
+  React.useEffect(()=>{ if(tab==='ebay_veille'){ subVoulue.current='veille'; setTab('plat_ebay'); } },[tab]);
   // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
   // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
   // toujours joignables ; un bouton retour de plus n'apprenait rien.
@@ -38419,7 +38477,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_veille'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -38713,10 +38771,7 @@ function AppCoeur() {
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data');
     if(so===null) return; // pas su ⇒ on laisse `null`, baseKO affiche la panne
-    const sold=[]; const seen=new Set();
-    for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
-      const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
-      if(/finalis/i.test(o.status||'')) sold.push(o); } }
+    const sold=ventesFinaliseesDe(so);
     const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
@@ -40434,7 +40489,7 @@ function AppCoeur() {
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
-          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
+          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['veille','Veille'],['compte','Compte']]} dark/></div>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
@@ -40448,6 +40503,11 @@ function AppCoeur() {
           {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='achats'&&<EbayAchats/>}
+          {/* (15 octobre) La veille d'achat : recherche eBay publique, aucun achat.
+              La fourchette de revente vient de SES ventes finalisées (la même
+              lecture que « Le prix qui marche »), le budget de la publication
+              de l'écran Achats (`vrm_achats_mois`, §11). */}
+          {platSub==='veille'&&<VeilleAchat C={C} headers={enTeteSession} confirm={askConfirm} chargerVentes={chargerVentesComparables} modeleDe={extractModel} lireAchatsMois={()=>load('vrm_achats_mois',null)}/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
