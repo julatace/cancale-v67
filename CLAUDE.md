@@ -9144,6 +9144,64 @@ vendeur reste chez le bon.
   repli (le corps d'un « colis disponible » contient les consignes de retrait).
 - **Un colis caché est un colis perdu** : on n'écarte jamais un colis en silence.
 
+### Comptes et réglages : fiche simple, adresses expliquées, mode stream (15 octobre)
+Julien : « pour les comptes, il y a beaucoup trop d'informations qui ne servent à
+rien », « mes adresses de réception, je ne comprends pas ce que c'est »,
+« mets un mode stream pour les influenceurs, il faut cacher leurs données
+sensibles comme leur CA ou leur nom de compte ».
+- **La fiche d'un compte** (Réglages → Comptes liés) : logo de la plateforme, nom
+  (renommable), identifiant, **synchro** (« capté il y a 3 h », la capture faite
+  avec SA session), « ouvert dans Chrome » sur le seul compte de l'onglet Vinted,
+  et **la place du statut** à droite du nom (`data-statut-compte` — le chantier
+  « comptes bloqués » la remplit, je n'ai pas touché à sa règle). Deux actions :
+  Actif/Masqué et **Détails**, qui ouvre tout le reste (email, téléphone, note,
+  date de liaison, n° Vinted, « Tester la connexion », « Supprimer ce compte ») —
+  rien n'est retiré. Un téléphone partagé reste dit sur la fiche, pas replié.
+  ⚠️ `lastCap` a **trois états** : pendant la lecture et sur une panne, plus
+  aucun « Jamais capté · ouvre ta boutique » (un « pas su » présenté comme un fait).
+- **« Adresses email de réception »** (ex-« Mes adresses de réception ») : le titre
+  et une phrase disent ce que c'est (les adresses où il fait suivre ses emails
+  Vinted, qui disent à VRM qu'un email est à lui) et ce que ce n'est PAS (pas des
+  adresses postales : expédition et retours passent par Vinted, la facturation est
+  dans Factures). **Repliée** quand il est le seul vendeur (le repli
+  « installation » lui rend tout) et que rien n'est mis de côté ; **jamais
+  masquée** — le jour où un second vendeur déclare la sienne, la route le dit et
+  elle se déplie. Les bancs trouvent la rubrique par `data-reglage-adresses`,
+  plus par son titre.
+- **Le mode stream** (Réglages, interrupteur ; pastille « Stream » dans l'en-tête
+  pour le couper, après confirmation). `vrm_mode_stream = { on, at }`,
+  synchronisé ; à l'arrivée du nuage, la valeur la plus RÉCENTE gagne (un nuage
+  périmé ne réaffiche rien en plein live). **UN mécanisme pour tout le document**
+  (`src/modeStream.js`), pas écran par écran : un observateur réécrit le texte
+  AFFICHÉ (nœuds de texte, `title`, `aria-label`, `placeholder`, `alt`) —
+  montants (même coupés en deux nœuds « 45 » + « € »), emails, téléphones, IBAN,
+  SIRET, identifiants ≥ 9 chiffres, n° de suivi, adresses, et SES noms (comptes
+  Vinted, eBay, prénom, ville, entreprise) remplacés par un **alias stable**
+  (« Compte 1 », « Compte eBay 2 » — sur neuf comptes il doit savoir sur lequel
+  agir). Les écrans ne font que MARQUER ce qu'aucun motif ne reconnaît :
+  `data-stream="prive"` (texte des messages, interlocuteur, client d'une facture,
+  pseudo et adresse d'un acheteur eBay, avatar) et `data-stream="chiffres"`. Un
+  code de retrait vu par `codeRetrait`, un point relais vu par `cleanLieu`, un
+  pseudo d'acheteur eBay vu par `marquerEbay` sont notés au passage.
+  ⚠️ **On ne touche JAMAIS à la valeur d'un champ** (React la renverrait en base) :
+  un champ sensible est flouté (`data-stream-flou`). On ne retire ni n'insère
+  aucun nœud. Un document ouvert dans un nouvel onglet (bordereau, facture) n'est
+  pas dans la page : il **demande** avant de s'ouvrir. Les boîtes du système et
+  les notifications du navigateur passent par `textePublic`. **Le serveur** lit
+  le réglage (`api/_lib/push.js`, `streamDuVendeur`, en scalaire) : allumé ou
+  **pas su** ⇒ notification sans montant, nom, code ni texte (`notifStream`).
+  Restent lisibles : titres, N° de rangement, dates, nombres de ventes, %.
+  Preuves : `scripts/bancs/mode-stream.cjs` (21 écrans + recherche, cloche, fil,
+  deux tailles, sombre, données inventées) **24 rouges** sur w15 ;
+  `scripts/audit-mode-stream.cjs` (la règle exécutée dans les deux sens, l'envoi
+  de notification exécuté) **10 rouges** sur w15 ; `bancs/comptes-fiche.cjs`
+  **26 rouges** sur w15.
+  ⚠️ **Pas couvert** : le badge de l'extension sur vinted.fr (email VRM au survol —
+  il faudrait une version d'extension), les fichiers TÉLÉCHARGÉS (CSV, PDF :
+  enregistrés, pas affichés), l'adresse d'un lien survolé (barre d'état du
+  navigateur), et la première demi-seconde d'un appareil qui n'a jamais vu le
+  réglage (avant l'arrivée du nuage).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
