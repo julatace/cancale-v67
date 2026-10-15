@@ -476,11 +476,19 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 // sur les 49 annonces ouvertes), mais la garde doit rester.
 {
   const i = SRC.indexOf('const takenNums');
-  const F = i < 0 ? '' : SRC.slice(i, i + 900);
-  /usedNumeros\.forEach/.test(F)
+  const F = i < 0 ? '' : SRC.slice(Math.max(0, i - 900), i + 900);
+  // (15 octobre) La règle vit dans une fonction PARTAGÉE (`numerosDejaDonnes`,
+  // §11 : l'écran Annonces et l'aperçu des Réglages) : on suit l'appel jusqu'à
+  // sa définition — un audit suit la RÈGLE, pas son orthographe.
+  const appel = /numerosDejaDonnes\(\{([^}]*)\}\)/.exec(F);
+  const d = SRC.indexOf('const numerosDejaDonnes = ');
+  const DEF = d < 0 ? '' : SRC.slice(d, SRC.indexOf('\n};', d));
+  const branche = !!appel && /takenNums = dejaDonnes\.int/.test(F) && /takenCles = dejaDonnes\.cles/.test(F);
+  (/usedNumeros\.forEach/.test(F) || (branche && /pool:\s*usedNumeros/.test(appel[1]) && /\(Array\.isArray\(pool\) \? pool : \[\]\)\.forEach\(ajoute\)/.test(DEF)))
     ? ok('le prochain numéro évite tout le pool `vinted_used_numeros`')
     : nok('sans le pool, la numérotation repart à 1 et redonne des numéros déjà écrits sur des cartons');
-  /Object\.values\(numeros\)\.forEach/.test(F) && /Object\.values\(saleOv\)\.forEach/.test(F)
+  ((/Object\.values\(numeros\)\.forEach/.test(F) && /Object\.values\(saleOv\)\.forEach/.test(F))
+    || (branche && /fiches:\s*numeros/.test(appel[1]) && /ventes:\s*saleOv/.test(appel[1]) && /Object\.values\(fiches \|\| \{\}\)\.forEach/.test(DEF) && /Object\.values\(ventes \|\| \{\}\)\.forEach/.test(DEF)))
     ? ok('et aussi les numéros posés sur les annonces et les ventes')
     : nok('le prochain numéro doit éviter annonces ET ventes');
   // ⚠️ Et le pool doit être RELU quand le nuage atterrit — c'est la cause exacte
