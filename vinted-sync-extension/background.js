@@ -3131,7 +3131,18 @@ async function capterPhotosAnnonces(uid) {
       // Il manque des photos, OU la fiche de codes (pour republier). La même
       // lecture de page donne les deux : aucune requête de plus par annonce.
       return (veut > 1 && a < veut) || !d0.codes;
-    }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
+    })
+    // ⚠️ (15 octobre) LES PHOTOS QUI MANQUENT PASSENT DEVANT. « Une paire publiée
+    //    sur Vinted 2 min avant n'a pas ses photos » : le tri ne regardait que
+    //    `nPhotos`, et une annonce DÉJÀ complète à qui ne manque que la fiche de
+    //    codes (mesuré : `fiche_codes_absents` 253 fois sur 253 — la fiche ne se
+    //    lit jamais, donc ces annonces repassent toutes les 6 h) passait devant
+    //    l'annonce neuve qui n'a que sa couverture. Les mêmes lectures, le même
+    //    plafond — seul l'ORDRE change : d'abord celles à qui il MANQUE des
+    //    photos (le plus de manquantes d'abord), puis les autres.
+    .map((it) => { const veut = Number(it.nPhotos || 0); const a = ((dej[String(it.id)] || {}).photos || []).length; return { it, manque: veut > 1 && a < veut ? veut - a : 0 }; })
+    .sort((x, y) => ((y.manque > 0) - (x.manque > 0)) || (y.manque - x.manque) || (Number(y.it.nPhotos || 0) - Number(x.it.nPhotos || 0)))
+    .map((x) => x.it);
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
     let n = 0, dirty = false;
@@ -3177,7 +3188,9 @@ async function capterPhotosAnnonces(uid) {
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
       else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
     }
-    if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
+    // L'app relit ces photos sans attendre qu'on rouvre l'écran (15 octobre) —
+    // seulement si l'écriture a PRIS.
+    if (dirty && await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id')) notifierApp({ type: 'maj', quoi: 'photos' });
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
@@ -3189,33 +3202,102 @@ async function capterPhotosAnnonces(uid) {
 // déclenchée par SON clic (donc humaine), sous garde de LECTURE, dans la file
 // Vinted (une à la fois). Jamais de rafale. Il ne publie plus une annonce sans
 // ses photos, et il n'attend aucun fond.
-async function completerPhotos(uid, id) {
+// `out` (facultatif) reçoit CE qui s'est passé — `code` et `n` — pour qu'un
+// appelant qui doit le DIRE (la commande « photos » de l'app) ne devine rien.
+// Le retour reste un booléen : vrai = photos lues ET rangées.
+async function completerPhotos(uid, id, out) {
+  const note = (code, n) => { if (out && typeof out === 'object') { out.code = code; if (n != null) out.n = n; } };
   try {
     const accts = await getStoredAccounts();
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
-    if (!acc) return false;
+    if (!acc) { note('compte'); return false; }
     const refus = await gardeLecture(uid, acc, 'clic');      // SON clic : pas de réserve à respecter
-    if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); return false; }
+    if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); note(refus.code || 'garde'); if (out) out.raison = refus.error; return false; }
     const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
-    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
+    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); note('page-' + (rep.status || 0)); return false; }
     const det = extraireDetailPage(rep.text, id);
-    if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
-    await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); note('vide'); return false; }
+    const ecrit = await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    if (ecrit !== true) { note(ecrit === null ? 'lecture' : 'ecriture', det.photos.length); return false; }
     noterDiag('photos_page_ecrit');
+    note('ok', Math.min(20, det.photos.length));
     return true;
-  } catch (_) { return false; }
+  } catch (_) { note('erreur'); return false; }
 }
 // Ne va chercher QUE si ça manque (évite une lecture inutile quand c'est déjà là).
-async function completerPhotosSiManque(uid, id) {
+// `voulu` (facultatif, 15 octobre) : le nombre de photos que VINTED annonce pour
+// l'annonce (`nPhotos`). Sans lui, comme avant : on ne lit que s'il n'y a AUCUNE
+// photo (la publication Leboncoin — le fond complète le reste). Avec lui, on lit
+// dès qu'il en MANQUE (la préparation eBay : « une paire publiée sur Vinted
+// 2 min avant n'a que sa couverture »).
+// Rend ce qui s'est passé : `{ etat, avant, n, code }` — `etat` = 'deja' (rien à
+// lire) · 'lu' · 'echec' · 'passu' (la base n'a pas répondu : on ne force rien).
+async function completerPhotosSiManque(uid, id, voulu) {
   try {
-    if (!uid || !id) return;
+    if (!uid || !id) return { etat: 'echec', code: 'invalide', avant: null, n: null };
     const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-    if (dr === null) return;                       // pas su : on ne force rien
+    if (dr === null) return { etat: 'passu', code: 'lecture', avant: null, n: null };   // pas su : on ne force rien
     const d0 = (dr[0] && dr[0].data && dr[0].data[String(id)]) || null;
     const a = (d0 && Array.isArray(d0.photos)) ? d0.photos.length : 0;
-    if (a > 0) return;                             // on a déjà des photos : le fond complétera le reste
-    await completerPhotos(uid, id);
-  } catch (_) {}
+    const v = Number(voulu);
+    const manque = Number.isFinite(v) && v > 0 ? a < Math.min(20, v) : a === 0;
+    if (!manque) return { etat: 'deja', code: 'deja', avant: a, n: a };   // déjà là : aucune requête Vinted
+    const out = {};
+    const ok = await completerPhotos(uid, id, out);
+    return { etat: ok ? 'lu' : 'echec', code: out.code || (ok ? 'ok' : 'erreur'), raison: out.raison || '', avant: a, n: ok ? (out.n != null ? out.n : null) : a };
+  } catch (_) { return { etat: 'echec', code: 'erreur', avant: null, n: null }; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LES PHOTOS D'UNE PAIRE, LUES SUR SON CLIC DANS L'APP (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « j'ai publié une paire sur Vinted et 2 min après j'ai voulu la mettre
+// sur eBay, VRM n'a pas capté les photos ». MESURÉ : une annonce neuve n'a, dans
+// le dressing, que sa COUVERTURE (`photo`, un objet) et le nombre réel
+// (`nPhotos`) ; le jeu complet n'arrive que par le fond (`capterPhotosAnnonces`,
+// compte connecté seulement, budget de lecture) ou la page ouverte. Le
+// formulaire eBay de l'app (`EbayPublier`, choisir une paire) demande donc, sur
+// SON clic, la lecture de CETTE annonce — la même que « Publier sur
+// Leboncoin » (`completerPhotosSiManque`, 5.144) : UNE page publique
+// (`credentials: 'omit'` — aucune session n'y part), sous garde STRICTE (pause
+// de Vinted, compte connecté dans ce Chrome) puis garde de LECTURE (budget du
+// clic), DANS la file Vinted (une requête à la fois). Rien n'est lu si les
+// photos sont déjà toutes là. L'état vit dans `vrmCmds` (`photos:{id}`) et
+// l'app est prévenue à la fin (`maj · photos`).
+const PHOTOS_CLIC_EN_VOL = new Set();
+async function photosDepuisApp(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  const v = Number(msg && msg.voulu);
+  const voulu = Number.isFinite(v) && v > 0 ? Math.min(40, Math.floor(v)) : 0;
+  const jobId = 'photos:' + id;
+  // Un double clic (ou deux onglets) ne lit pas deux fois : vérifié AVANT toute
+  // attente, comme les bordereaux.
+  if (PHOTOS_CLIC_EN_VOL.has(jobId)) return { accepte: true, jobId, etape: 'file', deja: true };
+  PHOTOS_CLIC_EN_VOL.add(jobId);
+  let parti = false;
+  try {
+    const uid = await compteConnecte('www.vinted.fr');
+    if (!uid) return { accepte: false, code: 'vinted-absent', raison: "aucun compte Vinted n'est connecté dans ce Chrome — ouvre vinted.fr connecté sur n'importe lequel de tes comptes" };
+    const accts = await avecDelai(getStoredAccounts({ ouNull: true }), 4000, null);
+    if (!Array.isArray(accts)) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Vinted, réessaie dans un moment" };
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid)) || null;
+    if (!acc) return { accepte: false, code: 'compte', raison: "le compte Vinted ouvert dans ce Chrome n'est pas dans VRM" };
+    const stop = await gardeStricte(uid, acc, { lecture: true });
+    if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+    await majCmd(jobId, { etape: 'file', id, voulu: voulu || null, n: null, avant: null, code: null, raison: null });
+    parti = true;
+    avecVinted(async () => {
+      try {
+        const r = await completerPhotosSiManque(uid, id, voulu || null);
+        const etape = r.etat === 'lu' ? 'fait' : r.etat === 'deja' ? 'fait' : 'echec';
+        await majCmd(jobId, { etape, deja: r.etat === 'deja', n: r.n, avant: r.avant, code: r.code || null, raison: r.raison || null });
+      } catch (e) {
+        await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) });
+      } finally { PHOTOS_CLIC_EN_VOL.delete(jobId); }
+    }).catch(() => { PHOTOS_CLIC_EN_VOL.delete(jobId); });
+    return { accepte: true, jobId, etape: 'file' };
+  } finally { if (!parti) PHOTOS_CLIC_EN_VOL.delete(jobId); }
 }
 
 // ⚠️ CAPTURE PLUS RAPIDE, SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. :
@@ -4702,12 +4784,15 @@ async function saveListingDate(id, ts, text) {
 // app_data `vinted_item_details` = { id: {description, photos, readAt} }.
 // Sert (1) aux annonces Leboncoin (vraie description au lieu d'un texte
 // générique) et (2) d'archive de tes textes/photos.
+// Rend `true` (écrit) · `false` (la base a refusé l'écriture) · `null` (la base
+// n'a pas répondu à la lecture : rien n'est écrit). Un appelant qui doit DIRE ce
+// qui s'est passé (la commande « photos » de l'app, 15 octobre) le lit.
 async function saveItemDetail(id, detail) {
   const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
   //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
   //    reste. On n'écrit pas.
-  if (rows === null) return;
+  if (rows === null) return null;
   const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
   const prev = cur[key] || {};
@@ -4715,12 +4800,19 @@ async function saveItemDetail(id, detail) {
   const photos = Array.isArray(detail.photos) ? detail.photos.filter(Boolean).slice(0, 20) : [];
   // On complète sans écraser par du vide (une relecture partielle ne doit pas
   // effacer une description déjà captée).
-  cur[key] = {
+  // ⚠️ (15 octobre) `...prev` d'abord : la fiche de codes et les identifiants de
+  //    photos posés par `capterPhotosAnnonces` (`codes`, `photoIds`) étaient
+  //    EFFACÉS à chaque passage ici — la ligne ne gardait que ces trois clés.
+  cur[key] = Object.assign({}, prev, {
     description: desc || prev.description || '',
     photos: photos.length ? photos : (prev.photos || []),
     readAt: new Date().toISOString(),
-  };
-  await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+  });
+  const ok = await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+  // L'app relit les photos de CETTE annonce sans attendre de rouvrir l'écran
+  // (le formulaire eBay, 15 octobre). Rien n'est envoyé si rien n'est écrit.
+  if (ok) notifierApp({ type: 'maj', quoi: 'photos', id: key, n: (cur[key].photos || []).length });
+  return !!ok;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5364,6 +5456,8 @@ async function executerCommande(msg) {
     }).catch(() => {});
     return { accepte: true, jobId, etape: 'file' };
   }
+  // (15 octobre) Les photos d'UNE annonce, lues sur son clic (formulaire eBay).
+  if (msg && msg.cmd === 'photos') return await photosDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');

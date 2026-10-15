@@ -8984,6 +8984,88 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### ⚠️⚠️ « 2 MIN APRÈS L'AVOIR PUBLIÉE SUR VINTED, VRM N'AVAIT PAS SES PHOTOS POUR eBAY » (15 octobre)
+Plainte de Julien (P0 n° 3 de `docs/roadmap/demande-2026-10-15.md`).
+**Mesuré (lecture seule, sa base)** :
+- dans le dressing (`harvest_{uid}_listings`), une annonce n'a que sa
+  COUVERTURE (`photo`, un objet) et le nombre réel (`nPhotos`) ; le jeu complet
+  vit dans `vinted_item_details`, rempli par le fond (`capterPhotosAnnonces` :
+  compte connecté seulement, budget de lecture) ou par la page ouverte ;
+- cinq comptes visités : 49 annonces en ligne, toutes complètes ; `3171228253` (6)
+  et `3191111372` (1), pas ouverts dans Chrome : **aucune photo captée** ;
+- `fiche_codes_absents` **253 sur 253** : la fiche de codes ne se lit jamais, donc
+  les annonces déjà complètes repassent toutes les 6 h — et le tri du fond (par
+  `nPhotos`) les faisait passer DEVANT une annonce neuve qui n'a que sa couverture ;
+- le formulaire eBay (`EbayPublier` ← `useEbayPaires`) lisait les photos UNE fois
+  à l'ouverture, partait avec ce qu'il avait (la couverture seule) sans rien
+  demander, et promettait « elles s'ajouteront ici automatiquement » — ce que
+  rien ne faisait.
+
+**Corrigé** :
+- **Extension** : commande `photos` (`photosDepuisApp`, la liste blanche
+  d'`executerCommande`) — sur SON clic (choisir la paire dans le formulaire eBay),
+  UNE lecture de la page publique de CETTE annonce, la même que « Publier sur
+  Leboncoin » (`completerPhotosSiManque`, qui prend maintenant un `voulu` : il lit
+  dès qu'il en MANQUE ; sans `voulu`, la règle de Leboncoin est inchangée — seulement
+  si aucune). Garde STRICTE (pause de Vinted, compte Vinted ouvert dans ce Chrome),
+  garde de LECTURE (budget du clic), dans la file Vinted, un double clic = une
+  lecture, rien si toutes ses photos sont là, « pas su » (la base) ⇒ rien. L'état
+  vit dans `vrmCmds` (`photos:{id}` : `fait` · `echec` + code) et l'app est
+  prévenue (`maj · photos`, aussi par le fond et la page ouverte).
+  ⚠️ **La page est publique (`credentials: 'omit'`)** : aucune session n'y part ;
+  le budget compté est celui du compte ouvert dans Chrome — la même décision que
+  pour Leboncoin. Une annonce d'un autre de ses comptes se lit donc aussi.
+- `saveItemDetail` **gardait seulement trois clés** : il effaçait `codes` et
+  `photoIds` à chaque relecture. Il fusionne, et rend `true/false/null`.
+- Le fond lit **d'abord** les annonces à qui il manque des photos (le plus de
+  manquantes d'abord) — les mêmes lectures, le même plafond, seul l'ordre change.
+- **App** : `etatPhotosPaire(capt, voulu)` — UNE règle pour demander, dire et
+  confirmer (la couverture n'est jamais comptée comme une photo captée ; `voulu`
+  inconnu ⇒ il manque si rien n'est capté). `useEbayPaires` relit les photos sur
+  `maj · photos` (regroupé), et une relecture RATÉE garde la dernière lue (jamais
+  « 0 captée » sur un hoquet ; jamais lue ⇒ `photosPasSu`). Le formulaire SUIT la
+  paire tant qu'on n'y touche pas ; retouché à la main, il propose « Reprendre les
+  N photos » (une personnalisation n'est pas écrasée ; un brouillon rouvert garde
+  les siennes). La ligne des photos dit `X photo(s) captée(s) sur Y` et LE geste,
+  état porté par `data-ebay-photos` (`toutes` · `lecture` · `manque` · `passu`) :
+  « je lis les autres » n'est écrit qu'APRÈS que l'extension a accepté ;
+  téléphone, extension absente, en retard (« commande inconnue »), refus, échec —
+  chacun sa phrase. **« Publier » demande** avant de partir avec moins de photos
+  que l'annonce Vinted (« Publier avec 1 photo sur 14 ? ») : jamais en silence.
+- ⚠️ **Tranché** : ce que l'extension sait faire se mesure à SA RÉPONSE (une
+  extension qui ne connaît pas `photos` répond « commande inconnue » sur-le-champ
+  ⇒ « mets-la à jour »), pas à un numéro — la commande est une lecture sur son
+  clic, et rien n'est promis avant l'acceptation. `EXT_CAPACITES.photosclic` vaut
+  **`'A_POSER'`** : la session qui monte la version de l'extension pose le vrai
+  numéro (`audit-coherence` est rouge tant que c'est `A_POSER` — exprès). Et
+  `extSait` traite un seuil illisible comme « en retard » (`cmpVersion` lisait
+  « A_POSER » comme 0.0.0 : toute extension aurait été dite « à jour »).
+
+**Preuves** (§6.1 : copie `git archive w15`, contrôle lancé depuis elle) :
+- `scripts/audit-photos-clic-ebay.cjs` (le vrai `background.js`, `_fond-vm.cjs`) :
+  **24 contrôles, 15 rouges sur w15** ; 5 mutations, chacune rouge (`toujours-lire`
+  3 · `lbc-seulement` 1 · `sans-garde` 1 · `sans-tri` 1 · `efface-codes` 1).
+- `scripts/bancs/ebay-photos-clic.cjs` (port 5831, données inventées, vrai dialogue
+  du pont simulé, 1512 et 390 px) : **25 contrôles, 14 rouges sur le build de w15**
+  — dont « Annuler n'envoie RIEN chez eBay — 1 publication » : w15 publiait en
+  silence avec 1 photo sur 14. Mutations du build : demande retirée (7 rouges),
+  relecture retirée, confirmation retirée (3), formulaire écrasé — voir le README.
+
+**Non fait / non mesuré** :
+- un brouillon rouvert ne redemande pas la lecture (il dit le nombre et le geste) ;
+  le planificateur programme un brouillon avec les photos qu'il a ;
+- sur téléphone, le formulaire ne se met pas à jour tout seul (aucun pont : il dit
+  « ouvre cette fiche sur l'ordinateur ») ;
+- le délai réel de la lecture chez lui, et ce que la page Vinted d'une annonce de
+  2 min rend vraiment (mesuré seulement sur des pages synthétiques à la forme
+  `__NEXT_DATA__` déjà lue par le fond) ;
+- **à signaler, hors de ce chantier** : la ligne `main` n'a plus été écrite depuis
+  le **11 octobre 14:58 UTC** (`updated_at`) — les journaux montrent **72 POST
+  `app_data` en 500 sur 24 h** (corps de ~250 Ko, **8,1 s** = le délai d'instruction)
+  et **80 « canceling statement due to statement timeout »** : les numéros des
+  annonces publiées depuis le 12 octobre ne sont que dans son navigateur. C'est
+  très probablement « l'icône nuage barré » (P0).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9011,6 +9093,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
+| `photosclic` | `photosDepuisApp` | **`A_POSER`** (15 oct. — à poser à la montée de version) | rien n'est promis avant que l'extension ACCEPTE la commande : la réponse « commande inconnue » dit « mets-la à jour » (formulaire eBay) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
