@@ -7012,7 +7012,7 @@ const qMain = (cles) => `app_data?id=eq.main&select=${cles.map((k) => `${k}:data
 //    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
 //    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
 const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
-  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
 async function lireMain(cles) {
@@ -7182,6 +7182,9 @@ function lbcTitre(brand, base, size, max) {
   let vue = null;
   t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       // Une taille LETTRE écrite dans son titre (« taille M ») sort aussi : elle
+       // revient en suffixe, une seule fois — sinon « … taille M taille M ».
+       .replace(/\btailles?\s*:?\s*(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|TU)\b/i, (m, n) => { if (!vue) vue = n; return ''; })
        .replace(/\s+/g, ' ').trim();
   const taille = String(size || vue || '').replace(/^t(?=\d)/i, '').trim();
   // 3. La marque une seule fois.
@@ -7190,11 +7193,14 @@ function lbcTitre(brand, base, size, max) {
   t = t.replace(/\s+/g, ' ').trim();
   // 4. Une majuscule : un titre tout en minuscules se lit « bricolé ».
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  // ⚠️ Le « T » n'est une POINTURE que pour un nombre (chaussures) : une taille
-  //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
-  //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
-  const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
-  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
+  // ⚠️⚠️ 15 OCTOBRE — JULIEN TRANCHE : « taille 43 », PAS « T43 ». « Au lieu
+  //    de mettre taille 43 il a mis T43 » : la taille s'écrit EN TOUTES
+  //    LETTRES, pour une pointure (« taille 43 ») comme pour une taille lettre
+  //    (« taille M »). Ça remplace le « T43 » choisi en septembre pour gagner
+  //    six caractères. Elle reste en SUFFIXE et n'est JAMAIS rognée : si le
+  //    titre ne tient pas dans le plafond, c'est un mot du MODÈLE qui part
+  //    (étape 5), jamais la taille. eBay (80 caractères) suit la même règle.
+  const suff = taille ? ' taille ' + taille : '';
   // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
@@ -7206,13 +7212,35 @@ function lbcTitre(brand, base, size, max) {
 }
 
 function firstDefined(...v) { for (const x of v) if (x !== undefined && x !== null && x !== '') return x; return ''; }
+// ── LE PRIX D'UNE ANNONCE VINTED, EN EUROS (§11 : la MÊME règle dans l'app,
+//    `prixVinted` ; `audit-places.cjs` compare leurs sorties) ───────────────
+// Vinted le donne en OBJET `{ amount: "49.0", currency_code: "EUR" }` (mesuré
+// sur son dressing du 15 octobre) ; une capture ancienne peut le porter en
+// nombre ou en chaîne. Une autre devise, un montant illisible, nul ou négatif
+// ⇒ `null` : « pas su », jamais un nombre deviné.
+function prixVinted(p) {
+  if (p === undefined || p === null || p === '') return null;
+  let v = p, dev = '';
+  if (typeof p === 'object') { v = p.amount; dev = String(p.currency_code || p.currency || '').toUpperCase(); }
+  if (dev && dev !== 'EUR') return null;
+  const n = typeof v === 'number' ? v : Number(String(v === undefined || v === null ? '' : v).replace(/[\s  €]/g, '').replace(',', '.'));
+  return (Number.isFinite(n) && n > 0) ? Math.round(n * 100) / 100 : null;
+}
 function buildLbcAd(raw, det, num, account) {
   const brand = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
   const base = String(firstDefined(det.title, raw.title)).trim();
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
   const cond = String(firstDefined(det.status, raw.status)).trim();
   const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
-  const price = String(firstDefined(det.price && det.price.amount, raw.price && raw.price.amount, raw.price, det.price)).replace(',', '.');
+  // ⚠️⚠️ 15 OCTOBRE — « UN PRIX AU PIF ». Le prix vient de l'annonce EN LIGNE
+  //    (`raw` : le dressing, la lecture la plus récente — celle qui décide
+  //    qu'elle est en ligne), relue au clic « Publier ». Avant, le DÉTAIL
+  //    (`det`, capturé une fois, parfois des semaines plus tôt) passait devant :
+  //    une baisse de prix faite depuis sur Vinted repartait à l'ancien prix, et
+  //    l'app (qui lit le dressing) en montrait un autre (§11). Le détail ne sert
+  //    plus qu'en repli, quand le dressing n'en porte aucun. Inconnu ⇒ `null`,
+  //    et la page de dépôt laisse le champ vide et le DIT.
+  const price = prixVinted(raw.price) !== null ? prixVinted(raw.price) : prixVinted(det.price);
   const desc0 = lbcDescription(firstDefined(det.description, ''));
   // Photos HD
   let photos = [];
@@ -7671,8 +7699,26 @@ async function buildEbayData() {
   return { queue, retirees, vendues, aConfirmer, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LE LIEU D'UNE ANNONCE LEBONCOIN = CE QUE LE VENDEUR A REMPLI DANS VRM
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 15 octobre : « pour la localisation il doit mettre ce que le vendeur a
+// rempli dans VRM ». MESURÉ sur sa base le jour même : la seule localisation
+// remplie est `vrm_ville` (« Vannes », ligne `main`, synchronisée) ; l'entité
+// des factures (`vrm_pro_facture`) a ville, code postal et adresse VIDES.
+// ⇒ UNE source, un propriétaire (§11) : `vrm_ville`, qu'il tape dans VRM →
+//   Réglages → « Ta ville ». L'entité de facturation n'est PAS un repli : c'est
+//   l'adresse qui facture, pas forcément celle où est la paire.
+// Rend `{ lieu, lieuEtat }` : `ok` (une valeur) · `vide` (rien de rempli : on ne
+// devine rien, le bandeau dit où le remplir) · `pasSu` (la base n'a pas répondu).
+function lieuVendeur(main) {
+  if (!main) return { lieu: '', lieuEtat: 'pasSu' };
+  const v = String(main.vrm_ville || '').replace(/\s+/g, ' ').trim();
+  return v ? { lieu: v.slice(0, 80), lieuEtat: 'ok' } : { lieu: '', lieuEtat: 'vide' };
+}
 async function buildLbcData() {
-  const main = (await lireMain(MAIN_FILE)) || {};
+  const mainLu = await lireMain(MAIN_FILE);
+  const main = mainLu || {};
   const numeros = main.vinted_annonce_numeros || {};
   const lost = main.vinted_pairs_lost || {};
   const liens = main.vrm_lbc_liens || {};
@@ -7843,7 +7889,8 @@ async function buildLbcData() {
     let hit = null;
     for (const k of vintedKeys(o, num)) { if (lbcByRef.has(k)) { hit = lbcByRef.get(k); break; } }
     if (hit) { autoMatched.set(o.id, hit); continue; }
-    queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
+    // Le LIEU du dépôt : ce que le vendeur a rempli dans VRM (`lieuVendeur`).
+    queue.push(Object.assign(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]), lieuVendeur(mainLu)));
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   // À RETIRER de Leboncoin : une paire publiée sur LBC qui n'est PLUS en ligne
