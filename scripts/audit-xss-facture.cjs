@@ -56,16 +56,40 @@ function extraire(src, noms, jsx) {
   return out;
 }
 
+// (15 octobre) Le HTML d'une facture vient de la règle PARTAGÉE app + serveur
+// (`api/_lib/facturation.js`, `corpsHtmlDocument`). Le banc suit la RÈGLE, pas
+// son orthographe : il prend le constructeur que le serveur utilise vraiment —
+// celui-là s'il l'importe, l'ancien `buildInvoiceHtml` sinon (code d'avant).
+const FACT_SRC = path.join(RACINE, 'api', '_lib', 'facturation.js');
+function codeModuleFacturation() {
+  if (!fs.existsSync(FACT_SRC)) return '';
+  const src = fs.readFileSync(FACT_SRC, 'utf8');
+  const noms = [...src.matchAll(/^export\s+(?:async\s+)?(?:const|function|let)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
+  return 'const FACT = (() => {\n' + src.replace(/^export\s+/gm, '') + '\nreturn { ' + noms.join(', ') + ' };\n})();';
+}
+
 (async () => {
   // ── 1. Le serveur ───────────────────────────────────────────────────────────
   await essaie('serveur', async () => {
     const src = fs.readFileSync(path.join(RACINE, 'api', 'email-inbound.js'), 'utf8');
-    const f = extraire(src, ['buildInvoiceHtml']).buildInvoiceHtml;
-    dit(!!f, 'la facture Pro se construit dans buildInvoiceHtml (serveur)');
-    if (!f) return;
-    const ctx = {}; vm.createContext(ctx); vm.runInContext(f + '\nthis.b = buildInvoiceHtml;', ctx);
-    const html = ctx.b({ nom: 'Ma boutique', adresse: '1 rue', tauxTva: '0' },
-      { nomComplet: PIEGE, adresse: PIEGE, email: 'a@b.c"><script>1</script>', designation: PIEGE, prix: '42' }, 'FA-1', '05/10/2026');
+    const partage = /from '\.\/_lib\/facturation\.js'/.test(src) && /FACT\.corpsHtmlDocument\(/.test(src);
+    const f = partage ? null : extraire(src, ['buildInvoiceHtml']).buildInvoiceHtml;
+    dit(partage || !!f, 'la facture Pro se construit avec la règle partagée (ou buildInvoiceHtml, code d\'avant)');
+    if (!partage && !f) return;
+    const ctx = {}; vm.createContext(ctx);
+    let html;
+    if (partage) {
+      vm.runInContext(codeModuleFacturation() + '\nthis.FACT = FACT;', ctx);
+      const doc = { type: 'facture', numero: '2026-000001', jour: '2026-10-05', dateVente: '2026-10-05', mode: 'franchise', htC: 4200, tvaC: 0, ttcC: 4200,
+        vendeur: { nom: PIEGE, adresse: PIEGE, cp: '35260', ville: PIEGE, siren: '123456782' },
+        client: { nom: PIEGE, adresse: PIEGE, email: 'a@b.c"><script>1</script>' },
+        lignes: [{ designation: PIEGE, quantite: 1, ttcC: 4200, refPaire: PIEGE }], mentions: ['TVA non applicable, art. 293 B du CGI'], piedDePage: PIEGE };
+      html = ctx.FACT.corpsHtmlDocument(doc, { logoSrc: 'cid:logoFacture' });
+    } else {
+      vm.runInContext(f + '\nthis.b = buildInvoiceHtml;', ctx);
+      html = ctx.b({ nom: 'Ma boutique', adresse: '1 rue', tauxTva: '0' },
+        { nomComplet: PIEGE, adresse: PIEGE, email: 'a@b.c"><script>1</script>', designation: PIEGE, prix: '42' }, 'FA-1', '05/10/2026');
+    }
     const RAW = /<img src="data|<svg|<script|onerror="|onload="/i;
     const brut = RAW.test(html);
     dit(!brut, "le HTML de la facture Pro n'embarque ni balise ni gestionnaire venus de l'acheteur",
@@ -76,10 +100,12 @@ function extraire(src, noms, jsx) {
   // ── 2 et 3. L'app, dans un vrai navigateur ───────────────────────────────────
   await essaie('app', async () => {
     const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
-    const f = extraire(src, ['generatePDF', 'xmlEsc', 'fmtDate', 'ouvrirDocumentImprimable', 'CSP_DOCUMENT'], true);
+    const f = extraire(src, ['generatePDF', 'xmlEsc', 'fmtDate', 'ouvrirDocumentImprimable', 'CSP_DOCUMENT', 'pageFactureHtml', 'legacyVersDoc', 'logoFacture'], true);
     dit(!!f.generatePDF, "l'app construit sa facture dans generatePDF");
-    let code = ['const LOGO_CANCALE = "data:image/png;base64,iVBORw0KGgo=";', f.xmlEsc || '', f.fmtDate || 'function fmtDate(d){return String(d||"")}',
-      f.CSP_DOCUMENT || '', f.ouvrirDocumentImprimable || '', f.generatePDF || ''].join('\n');
+    // (15 octobre) generatePDF passe par la page partagée : ses helpers et le
+    // module de facturation sont chargés avec elle, `load` rend « aucun logo ».
+    let code = ['const LOGO_CANCALE = "data:image/png;base64,iVBORw0KGgo=";', 'const load = (k, d) => d;', codeModuleFacturation(), f.xmlEsc || '', f.fmtDate || 'function fmtDate(d){return String(d||"")}',
+      f.CSP_DOCUMENT || '', f.ouvrirDocumentImprimable || '', f.logoFacture || '', f.legacyVersDoc || '', f.pageFactureHtml || '', f.generatePDF || ''].join('\n');
     if (MUTATION === 'sanscsp') code = code.replace(/const CSP_DOCUMENT = `[^`]*`;/, 'const CSP_DOCUMENT = "";');
     const { chromium } = require(path.join(NM, 'playwright'));
     const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome') ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' : undefined, args: ['--no-sandbox'] });
