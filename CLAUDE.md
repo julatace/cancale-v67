@@ -9195,7 +9195,12 @@ sensibles comme leur CA ou leur nom de compte ».
   deux tailles, sombre, données inventées) **24 rouges** sur w15 ;
   `scripts/audit-mode-stream.cjs` (la règle exécutée dans les deux sens, l'envoi
   de notification exécuté) **10 rouges** sur w15 ; `bancs/comptes-fiche.cjs`
-  **26 rouges** sur w15.
+  **26 rouges** sur w15. Et chaque règle réaffaiblie seule repasse au rouge :
+  dictionnaire des noms coupé (16 au banc, 3 à l'audit), montant coupé en deux
+  nœuds (9), bulle de message non marquée (2), document ouvert sans demander
+  (1), nuage périmé qui gagne (1), notification du serveur jamais masquée (2 à
+  l'audit), identifiants longs (1), adresses jamais repliées (2), panne de
+  lecture lue « jamais capté » (4).
   ⚠️ **Pas couvert** : le badge de l'extension sur vinted.fr (email VRM au survol —
   il faudrait une version d'extension), les fichiers TÉLÉCHARGÉS (CSV, PDF :
   enregistrés, pas affichés), l'adresse d'un lien survolé (barre d'état du
