@@ -59,6 +59,10 @@ const filsDe = () => ({
       { id: 61, entity_type: 'offer_request_message', created_at_ts: Math.floor((auj - 2.5 * 3600e3) / 1000), entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9001, offer_request_id: 77 } }] },
   401: { id: 401, allow_reply: true, description: 'Adidas Samba 42', opposite_user: { id: 5401, login: 'acheteur_b1' }, transaction: { id: 9101, item_id: 555 },
     messages: [message(11, 5401, 'Vous faites 40 € ?', 1)] },
+  // 402 : Vinted refuse la réponse (allow_reply:false) — là, « ouvre Vinted sur
+  // compte_b » serait un geste FAUX : même sur le bon compte, rien ne partirait.
+  402: { id: 402, allow_reply: false, description: 'Puma Suede 41', opposite_user: { id: 5402, login: 'acheteur_b2' },
+    messages: [message(21, 5402, 'Encore là ?', 3)] },
 });
 const lignesDe = () => {
   const fils = filsDe();
@@ -67,6 +71,7 @@ const lignesDe = () => {
     { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(401, 'acheteur_b1', 'Vous faites 40 € ?', true, 1), conv(402, 'acheteur_b2', 'Encore là ?', true, 3)] } } },
     { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: fils[301] } } },
     { id: 'harvest_222_conv_401', data: { capturedAt: iso(0), payload: { conversation: fils[401] } } },
+    { id: 'harvest_222_conv_402', data: { capturedAt: iso(0), payload: { conversation: fils[402] } } },
     { id: 'main', data: {} },
   ];
 };
@@ -240,6 +245,13 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
         const off = await r.pg.evaluate(() => { const o = document.querySelector('[data-offre]'); return o ? o.getAttribute('data-offre') : null; });
         dit(off === null, 'aucun bouton d’offre sur un fil qu’on ne peut pas trancher d’ici', String(off));
         await capture(r.pg, 'fil-lecture-' + taille);
+        await fermer(r.pg);
+        // B bis. Vinted refuse la réponse : on le dit, sans geste qui ne débloquerait rien.
+        await ouvrir(r.pg, '402');
+        const zr = await zone(r.pg);
+        dit(zr && zr.etat === 'refusee' && zr.raison === 'vinted-refuse' && /ne permet pas de répondre/.test(zr.raisonTxt) && !/Ouvre Vinted|ouvre vinted\.fr|Chrome est sur/i.test(zr.raisonTxt),
+          'Vinted refuse la réponse : la zone le dit, sans renvoyer ouvrir Vinted sur un autre compte (ça ne débloquerait rien)', JSON.stringify(zr && { etat: zr.etat, raison: zr.raison, txt: zr.raisonTxt }));
+        dit(zr && zr.envoyerGrise !== false && zr.texte === null, 'aucune zone de saisie ni bouton Envoyer actif sur ce fil', JSON.stringify(zr && { envoyer: zr.envoyerGrise, texte: zr.texte }));
         await fermer(r.pg);
       });
       await essaie('C ' + taille, async () => {

@@ -28783,13 +28783,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const off = openConv.error ? null : offreEnAttenteDe(openConv.conversation);
               const tx = openConv.error ? null : (openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id);
               const lienVinted = <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>Ouvrir sur Vinted ↗</a>;
-              const etat = rep.ok===false ? 'lecture' : refuseVinted ? 'refusee' : inc ? 'incertain' : replyBusy ? 'envoi' : 'libre';
+              // Vinted qui refuse la réponse passe AVANT « lecture seule » : ouvrir
+              // Vinted sur le bon compte ne débloquerait rien — ce serait un geste faux.
+              const etat = refuseVinted ? 'refusee' : rep.ok===false ? 'lecture' : inc ? 'incertain' : replyBusy ? 'envoi' : 'libre';
               const brouillon = (v) => { setReplyText(v); brouillonsVinted.sauver(proprietaireBrouillon(), String(openConv.acc?.vinted_user_id||''), openConv.convId, v); };
               return (
               <div data-reponse={etat} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
                 {/* Pourquoi on ne peut pas répondre d'ici — UNE phrase, le geste. */}
-                {rep.ok===false && <div data-reponse-raison={rep.code} role="status" style={{fontSize:12,color:C.text,lineHeight:1.45,marginBottom:8}}>{rep.texte} {lienVinted}</div>}
-                {rep.ok!==false && refuseVinted && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {refuseVinted
+                  ? <div data-reponse-raison="vinted-refuse" role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>
+                  : rep.ok===false && <div data-reponse-raison={rep.code} role="status" style={{fontSize:12,color:C.text,lineHeight:1.45,marginBottom:8}}>{rep.texte} {lienVinted}</div>}
                 {/* L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire une
                     — seulement d'où l'on peut agir ; sinon on dit qu'elle attend. */}
                 {(off || tx) && (rep.ok===false ? (off ? (

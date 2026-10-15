@@ -9022,6 +9022,10 @@ elle n'agit pas toute seule ».
   absent ⇒ on peut renvoyer ; relu sur une copie ⇒ on ne conclut pas (« Il n'est
   pas parti » sur SON clic, après vérification sur Vinted).
 - « Envoyer l'offre » **demande d'abord** (un prix engagé), comme Accepter.
+- **Vinted refuse la réponse** (`allow_reply:false`) passe AVANT « lecture
+  seule » : « ouvre Vinted sur Y » serait un geste faux (même sur le bon compte,
+  rien ne partirait). La zone dit « Vinted ne permet pas de répondre », sans
+  saisie ni bouton (mutation « lecture seule d'abord » ⇒ 4 rouges au banc).
 - ⚠️ **Les offres se lisaient « 📦 INFO COLIS · currency_code: EUR »** : mesuré,
   77 `offer_message` sur 400 messages captés n'ont ni titre ni corps, et le
   balayage des codes de retrait prenait `currency_code` pour un code. Une offre
@@ -9039,13 +9043,16 @@ elle n'agit pas toute seule ».
   qui ENVOIE une réponse (« POST …/301/replies », IA appelée) quand l'ancienne
   valeur est allumée ; mutations rouges : un envoi remis dans `visiteVinted` (2),
   `sendReply` appelé par un effet (1). Banc `bancs/messages-compte.cjs` (port
-  5932, données inventées, 1512/390, clair/sombre, vrai téléphone) **84 verts,
+  5932, données inventées, 1512/390, clair/sombre, vrai téléphone) **92 verts,
   52 rouges sur le build de w15** ; mutations rouges : filtre des comptes remis
   (24), estompage inerte (8), incertain traité en refus (3).
   `messagerie.cjs` et `filtre-compte.cjs` mis à jour (lecture ≠ geste, fil d'un
   autre compte non demandé, 390 px = fenêtre étroite) : il leur reste **10 et 3
   rouges, tous le bloc « offres reçues par email »** retiré par 13f6c89 (13 oct.)
-  — préexistants, hors de ce lot. `audit-repondre.cjs` et `bancs/repondre.cjs`
+  — préexistants, hors de ce lot. `revendeurs.cjs` juge « bloquée » sur l'absence
+  d'un Envoyer ACTIF + la raison dite (il exigeait un bouton grisé) ; il s'arrête
+  ensuite sur l'agent eBay (« action incertaine propose une relecture »), comme
+  sur w15. `audit-repondre.cjs` et `bancs/repondre.cjs`
   retirés avec le moteur.
 - **Pas fait** : les offres reçues par email (FONC-03, bloc retiré le 13 oct.) ;
   la confirmation à CHAQUE message (le blocage de l'incertain évite le double
