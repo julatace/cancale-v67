@@ -22,10 +22,14 @@
 //      rien n'est écrit, la commande le dit ;
 //   5. un double clic ne lit qu'une fois ;
 //   6. la fiche de codes déjà rangée n'est plus effacée par une relecture ;
-//   7. le fond lit D'ABORD l'annonce à qui il manque des photos.
+//   7. le fond lit D'ABORD l'annonce à qui il manque des photos ;
+//   8. une lecture EN COURS se dit « vivante » (l'accusé, l'évènement, l'état
+//      relu par l'app toutes les 20 s) ; une lecture orpheline (service worker
+//      redémarré au milieu) ne l'est plus — sinon l'app dirait « je lis les
+//      autres » pour toujours.
 //  Données inventées. Usage : node scripts/audit-photos-clic-ebay.cjs [--src f]
 //  `--mutation <nom>` réaffaiblit la correction dans une copie (§6.1) :
-//    toujours-lire · lbc-seulement · sans-garde · sans-tri · efface-codes
+//    toujours-lire · lbc-seulement · sans-garde · sans-tri · efface-codes · sans-vivant
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os');
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
@@ -41,6 +45,7 @@ if (iMut > 0) {
   else if (nom === 'sans-garde') remplace('const stop = await gardeStricte(uid, acc, { lecture: true });\n    if (stop) return { accepte: false, code: stop.code, raison: stop.error };\n    await majCmd(jobId', 'const stop = null;\n    await majCmd(jobId');
   else if (nom === 'sans-tri') remplace('.sort((x, y) => ((y.manque > 0) - (x.manque > 0)) || (y.manque - x.manque) ||', '.sort((x, y) =>');
   else if (nom === 'efface-codes') remplace('cur[key] = Object.assign({}, prev, {', 'cur[key] = Object.assign({}, {');
+  else if (nom === 'sans-vivant') remplace("if (/^photos:/.test(j) && PHOTOS_CLIC_EN_VOL.has(j)) return { vivant: true };", '');
   else { console.log('mutation inconnue : ' + nom); process.exit(2); }
   const f = path.join(os.tmpdir(), `bg-mut-${nom}-${process.pid}.js`);
   fs.writeFileSync(f, s); SRC = f;
@@ -190,6 +195,30 @@ const cmd = (ctx, id, voulu) => ctx.executerCommande({ from: 'vmr-bridge', actio
     dit(lues.length > 0 && lues.length < items.length, 'le budget de fond ne lit pas tout d\'un coup (sinon l\'ordre ne compterait pas)', `${lues.length} lue(s) sur ${items.length}`);
     dit(lues[0] === '801', 'la paire neuve (0 photo captée sur 12) est lue EN PREMIER', `ordre : ${lues.join(', ') || 'aucune'}`);
     dit(f.j.evts.some((e) => e && e.type === 'maj' && e.quoi === 'photos'), "l'app est prévenue quand le fond a rangé des photos");
+  });
+
+  console.log('── 8. une lecture en cours se dit vivante ; une orpheline, non');
+  await essaie('vivant', async () => {
+    let lache = null;
+    const lente = (req) => (/^\/items\/801$/.test(req.chemin)
+      ? new Promise((res) => { lache = () => res({ status: 200, body: page('801', 14) }); })
+      : { status: 404, body: {} });
+    const f = faireFond({ src: SRC, lignes: base([listing(801, 14)]), vinted: lente, connecte: UID });
+    const r = await cmd(f.ctx, 801, 14);
+    for (let i = 0; i < 100 && !lache; i++) await new Promise((res) => setTimeout(res, 10));
+    const pendant = await f.ctx.etatPourApp();
+    const evFile = f.j.evts.find((e) => e && e.type === 'cmd' && e.jobId === 'photos:801' && e.etape === 'file');
+    dit(!!(r && r.vivant === true && evFile && evFile.vivant === true), "l'accusé et l'évènement « file » disent la lecture vivante", JSON.stringify({ accuse: r && r.vivant, evt: evFile && evFile.vivant }));
+    dit(!!(pendant && pendant.cmds && pendant.cmds['photos:801'] && pendant.cmds['photos:801'].vivant === true), "l'état relu par l'app la dit vivante tant qu'elle est en vol", JSON.stringify(pendant && pendant.cmds && pendant.cmds['photos:801']));
+    if (lache) lache();
+    await attendreFin(f.store, 'photos:801');
+    // Le service worker est mort au milieu : la demande est restée « file » dans
+    // le stockage, mais plus rien ne la lit.
+    const g = faireFond({ src: SRC, lignes: base([listing(801, 14)]), vinted: vintedPages({ 801: 14 }), connecte: UID,
+      store: { vrmCmds: { 'photos:801': { etape: 'file', id: '801', at: Date.now() } } } });
+    const apres = await g.ctx.etatPourApp();
+    const c = apres && apres.cmds && apres.cmds['photos:801'];
+    dit(!!(c && c.etape === 'file' && !c.vivant), 'une demande orpheline (service worker redémarré) n\'est plus dite vivante', JSON.stringify(c));
   });
 
   console.log(`\n${ko ? '❌ ' + ko + ' rouge(s)' : '✅ tout vert'} · ${ok} contrôle(s)`);

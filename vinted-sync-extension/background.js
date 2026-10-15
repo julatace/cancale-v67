@@ -3273,7 +3273,7 @@ async function photosDepuisApp(msg) {
   const jobId = 'photos:' + id;
   // Un double clic (ou deux onglets) ne lit pas deux fois : vérifié AVANT toute
   // attente, comme les bordereaux.
-  if (PHOTOS_CLIC_EN_VOL.has(jobId)) return { accepte: true, jobId, etape: 'file', deja: true };
+  if (PHOTOS_CLIC_EN_VOL.has(jobId)) return { accepte: true, jobId, etape: 'file', vivant: true, enFile: true };
   PHOTOS_CLIC_EN_VOL.add(jobId);
   let parti = false;
   try {
@@ -3285,7 +3285,7 @@ async function photosDepuisApp(msg) {
     if (!acc) return { accepte: false, code: 'compte', raison: "le compte Vinted ouvert dans ce Chrome n'est pas dans VRM" };
     const stop = await gardeStricte(uid, acc, { lecture: true });
     if (stop) return { accepte: false, code: stop.code, raison: stop.error };
-    await majCmd(jobId, { etape: 'file', id, voulu: voulu || null, n: null, avant: null, code: null, raison: null });
+    await majCmd(jobId, { etape: 'file', id, voulu: voulu || null, n: null, avant: null, code: null, raison: null, deja: false });
     parti = true;
     avecVinted(async () => {
       try {
@@ -3296,7 +3296,7 @@ async function photosDepuisApp(msg) {
         await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) });
       } finally { PHOTOS_CLIC_EN_VOL.delete(jobId); }
     }).catch(() => { PHOTOS_CLIC_EN_VOL.delete(jobId); });
-    return { accepte: true, jobId, etape: 'file' };
+    return { accepte: true, jobId, etape: 'file', vivant: true };
   } finally { if (!parti) PHOTOS_CLIC_EN_VOL.delete(jobId); }
 }
 
@@ -5096,7 +5096,15 @@ async function majCmd(jobId, patch) {
 // worker (pas seulement notée « file » dans le stockage). L'app s'y fie pour
 // garder « En file… » tant qu'elle attend son tour, sans délai arbitraire ;
 // une demande orpheline (service worker redémarré) ne le porte plus.
-const avecVivant = (jobId) => (/^bord:/.test(String(jobId)) && BORD_EN_COURS.has(String(jobId)) ? { vivant: true } : {});
+// (15 octobre) Une lecture de photos demandée par l'app (`photos:{id}`) porte
+// `vivant` de la même façon : un service worker mort au milieu ne laisse pas
+// l'app dire « je lis les autres » pour toujours.
+const avecVivant = (jobId) => {
+  const j = String(jobId);
+  if (/^bord:/.test(j) && BORD_EN_COURS.has(j)) return { vivant: true };
+  if (/^photos:/.test(j) && PHOTOS_CLIC_EN_VOL.has(j)) return { vivant: true };
+  return {};
+};
 // ── « LES INFORMATIONS CIRCULENT-ELLES BIEN ? » ─────────────────────────────
 // Le petit écran de l'extension le dit, plateforme par plateforme : dernier
 // envoi réussi, dernier envoi refusé. MESURÉ aux points d'écriture, jamais

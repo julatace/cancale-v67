@@ -12131,23 +12131,38 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [demande, setDemande] = React.useState(null);     // { id, glob? | envoi? | refus? | pasDeReponse? | jobId? }
   const { jobs: jobsExt } = useExtVivante();
   const sansSourisPub = useSansSouris();
-  const globPhotos = raisonExtGlobale(sansSourisPub, { cap: 'publication', role: 'lit les photos de tes annonces' });
+  // Ce qui empêche l'extension de lire ICI : `publication` (5.160) — en deçà le
+  // pont ne relaie pas `id` —, puis ce que dit `commande` en plus : la PAUSE
+  // demandée par Vinted (une lecture de page va chez Vinted ; `publication`,
+  // elle, ne va pas chez Vinted et ne regarde donc pas la pause).
+  const raisonPhotos = () => raisonExtGlobale(sansSourisPub, { cap: 'publication', role: 'lit les photos de tes annonces' })
+    || raisonExtGlobale(sansSourisPub, { cap: 'commande', role: 'lit les photos de tes annonces' });
+  const globPhotos = raisonPhotos();
   const demanderPhotos = async (p) => {
     const e = etatPhotosPaire(p.nCapt, p.nPhotos);
     if (!e.manque || p.photosPasSu) { setDemande(null); return; }
-    const g = raisonExtGlobale(sansSourisPub, { cap: 'publication', role: 'lit les photos de tes annonces' });
+    const g = raisonPhotos();
     if (g) { setDemande({ id: p.id, glob: g.code }); return; }
     setDemande({ id: p.id, envoi: true });
+    const t0 = Date.now();
     const r = await vmrCmd({ cmd: 'photos', id: String(p.id), voulu: e.voulu || 0 });
     if (pairCourante.current !== p.id) return;            // une autre paire a été choisie entre-temps
     if (!r) { setDemande({ id: p.id, pasDeReponse: true }); return; }
     if (!r.accepte) { setDemande({ id: p.id, refus: r.code === 'inconnue' ? 'retard' : (r.code || 'refus'), raison: r.raison || '' }); return; }
-    __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier();
+    // L'accusé ne recouvre pas une fin DÉJÀ arrivée par l'évènement de
+    // l'extension (une annonce dont les photos sont toutes là finit sans requête
+    // Vinted : son « fait » peut précéder l'accusé).
+    const prev = __vmrJobs[r.jobId];
+    if (!(prev && Number(prev.at || 0) >= t0 && !CMD_ACTIVE.includes(prev.etape))) {
+      __vmrJobs[r.jobId] = Object.assign({}, prev || {}, { etape: r.etape, at: Date.now(), vivant: !!r.vivant }); __vmrNotifier();
+    }
     setDemande({ id: p.id, jobId: r.jobId });
   };
-  // La vérification de l'extension (« un instant ») finie : on demande pour de bon.
+  // La vérification de l'extension (« un instant ») finie, ou la pause demandée
+  // par Vinted terminée : la lecture qu'il a demandée en choisissant la paire
+  // part pour de bon (toujours sous les gardes de l'extension).
   React.useEffect(() => {
-    if (demande && demande.glob === 'verif' && !globPhotos && pairSel && demande.id === pairSel.id) demanderPhotos(pairSel);
+    if (demande && (demande.glob === 'verif' || demande.glob === 'pause') && !globPhotos && pairSel && demande.id === pairSel.id) demanderPhotos(pairSel);
   });
   // Les photos rangées par l'extension arrivent dans la paire (`useEbayPaires`
   // relit) : le formulaire les PREND s'il n'a pas été retouché à la main ;
@@ -12427,18 +12442,20 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     const lienVinted = <a href={vinted} target="_blank" rel="noreferrer" data-ebay-photos-vinted="1" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>Ouvrir l'annonce sur Vinted ↗</a>;
     const reessayer = <button type="button" data-ebay-photos-reessayer="1" onClick={() => demanderPhotos(pairSel)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, padding: 0 }}>Réessayer</button>;
     let etat = 'manque', code = '', texte = null, geste = null;
-    if (d && (d.envoi || (job && (job.etape === 'file' || (job.etape === 'fait' && Number.isFinite(Number(job.n)) && (pairSel.nCapt || 0) < Number(job.n)))))) {
+    if (d && (d.envoi || (job && (jobEnCours(job) || (job.etape === 'fait' && Number.isFinite(Number(job.n)) && (pairSel.nCapt || 0) < Number(job.n)))))) {
       // La lecture est EN COURS (ou finie, et la paire pas encore relue) : là, et
       // là seulement, on dit qu'elles arrivent ici d'elles-mêmes.
       etat = 'lecture'; texte = `${nombre} — je lis les autres sur ta page Vinted, elles s'ajoutent ici dès qu'elles sont rangées.`;
     } else if (d && d.glob) {
-      const g = raisonExtGlobale(sansSourisPub, { cap: 'publication', role: 'lit les photos de tes annonces' });
+      const g = raisonPhotos();
       code = d.glob;
       if (d.glob === 'verif' && g && g.code === 'verif') { etat = 'lecture'; texte = `${nombre} — je vérifie l'extension avant de lire les autres…`; }
       else if (d.glob === 'telephone') { texte = `${nombre}. Les autres se lisent par l'extension VRM, sur l'ordinateur où elle est installée : ouvre cette fiche là-bas.`; }
       else if (d.glob === 'absente') { texte = `${nombre}. Les autres se lisent par l'extension VRM, pas détectée dans ce navigateur : ouvre cette fiche dans le Chrome où elle est installée.`; }
       else if (d.glob === 'retard') { texte = `${nombre}. L'extension installée ne sait pas encore lire les photos d'une annonce à la demande : mets-la à jour (${EXT_ATTENDUE}), ou ouvre l'annonce sur Vinted dans ce Chrome — ses photos seront captées.`; geste = lienVinted; }
-      else { texte = `${nombre}. ${(g && g.texte) || "L'extension ne peut pas lire les autres pour l'instant."}`; geste = reessayer; }
+      // La pause de Vinted : rien à faire de son côté (la lecture repart seule à
+      // la fin de la pause, écran ouvert) — pas de « Réessayer » qui dirait l'inverse.
+      else { texte = `${nombre}. ${(g && g.texte) || "L'extension ne peut pas lire les autres pour l'instant."}`; geste = g && g.code === 'pause' ? null : reessayer; }
     } else if (d && d.pasDeReponse) {
       code = 'sans-reponse'; texte = `${nombre}. L'extension n'a pas répondu — je ne sais pas si elle lit les autres ; si rien n'arrive d'ici une minute, recharge cette page.`; geste = reessayer;
     } else if (d && d.refus) {
@@ -12447,6 +12464,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         ? `${nombre}. L'extension installée ne sait pas encore lire les photos d'une annonce à la demande : mets-la à jour (${EXT_ATTENDUE}), ou ouvre l'annonce sur Vinted dans ce Chrome.`
         : `${nombre}. ${d.raison ? d.raison.charAt(0).toUpperCase() + d.raison.slice(1) + '.' : "L'extension a refusé de les lire."}`;
       geste = d.refus === 'retard' ? lienVinted : reessayer;
+    } else if (job && CMD_ACTIVE.includes(job.etape)) {
+      // Acceptée, mais plus aucune nouvelle (l'extension a été rechargée ou
+      // son service worker arrêté au milieu) : on ne promet plus rien.
+      code = 'sans-nouvelles'; texte = `${nombre}. La lecture demandée à l'extension n'a pas abouti (plus aucune nouvelle d'elle) — réessaie.`; geste = reessayer;
     } else if (job && job.etape === 'echec') {
       code = String(job.code || 'echec');
       const r = RAISON_LECTURE_PHOTOS[code] || job.raison || "la lecture n'a pas abouti";
@@ -12801,12 +12822,25 @@ function useEbayPaires(comptes) {
   // phrase « elles s'ajouteront ici automatiquement » ne pouvait pas être vraie.
   // L'extension prévient (`maj · photos`, et la fin d'une lecture demandée
   // depuis ce formulaire) : on relit, regroupé (une rafale = une relecture).
+  // ⚠️ §4.4 : `vinted_item_details` pèse ~275 Ko (mesuré le 15 octobre, 224
+  //    annonces). On ne la relit QUE pour une annonce à qui il manque des
+  //    photos ici (`manquent`, tenu à chaque lecture) — une photo rangée pour
+  //    une paire déjà complète, ou quand rien ne manque, ne relit rien — et une
+  //    relecture de photos ne relit PAS les dressings (`luDressings`).
   const [photosLues, setPhotosLues] = React.useState(0);
   const detailsLus = React.useRef(null);
+  const manquent = React.useRef(new Set());
+  const luDressings = React.useRef(null);
   React.useEffect(() => {
     const signal = regrouperSignaux(async () => { setPhotosLues((n) => n + 1); }, 1500);
     const f = (e) => { const ev = (e && e.detail) || {};
-      if ((ev.type === 'maj' && ev.quoi === 'photos') || (ev.type === 'cmd' && /^photos:/.test(String(ev.jobId || '')) && ev.etape === 'fait')) signal(); };
+      let id = null;
+      if (ev.type === 'maj' && ev.quoi === 'photos') id = ev.id != null ? String(ev.id) : '';
+      else if (ev.type === 'cmd' && /^photos:/.test(String(ev.jobId || '')) && ev.etape === 'fait') id = String(ev.jobId).slice(7);
+      if (id === null) return;
+      // Sans identifiant (le fond en a rangé plusieurs) : on relit s'il manque
+      // quelque chose quelque part ; avec : seulement si CETTE paire en manque.
+      if (id ? manquent.current.has(id) : manquent.current.size > 0) signal(); };
     window.addEventListener('vrm:ext', f);
     return () => { signal.arreter(); window.removeEventListener('vrm:ext', f); };
   }, []);
@@ -12818,7 +12852,13 @@ function useEbayPaires(comptes) {
       // paires déjà vendues »). Aucune annonce lisible ⇒ `online` reste `null` :
       // on ne filtre pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
-      const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
+      // Seul le signal des photos a changé : les dressings lus pour CES comptes
+      // valent toujours (on ne relit que les photos).
+      const memo = luDressings.current;
+      const lu = memo && memo.comptes === comptes && memo.nuage === nuage ? memo.lu
+        : (Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} });
+      if (stop) return;
+      luDressings.current = { comptes, nuage, lu };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
@@ -12852,7 +12892,9 @@ function useEbayPaires(comptes) {
         out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, nCapt: dphotos.length, photosPasSu, desc, nPhotos: nPhotosMap[String(id)] });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      if (!stop) setPaires(out);
+      if (stop) return;
+      manquent.current = new Set(out.filter((p) => etatPhotosPaire(p.nCapt, p.nPhotos).manque).map((p) => p.id));
+      setPaires(out);
     } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); } }
   })(); return () => { stop = true; }; }, [comptes, nuage, photosLues]);
   return { paires, enLigne, toutesLues };

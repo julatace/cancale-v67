@@ -23,7 +23,15 @@
 //      l'annonce Vinted — et « Publier » DEMANDE avant de partir avec 1 photo
 //      sur 14 (Annuler n'envoie rien ; « Publier quand même » publie) ;
 //   A bis. (390 px, téléphone) rien n'est demandé, le geste est dit ;
-//   E. sans extension dans ce navigateur : rien n'est demandé, l'écran le dit.
+//   E. sans extension dans ce navigateur : rien n'est demandé, l'écran le dit ;
+//   F. (§4.4) la fin de la lecture relit les photos (`vinted_item_details`, ~275 Ko
+//      chez lui) SANS relire les dressings, et une photo rangée pour une paire
+//      déjà complète ne relit RIEN ;
+//   G. Vinted a demandé de ralentir (la pause de l'extension) : rien n'est
+//      demandé, l'écran le dit ;
+//   H. (§4.4) une lecture qui finit APRÈS la minute du cache des lignes
+//      (`ROW_TTL_MS`) ne relit toujours pas les dressings (~470 Ko chez lui) —
+//      dans la minute, le cache le cachait (prouvé : la mutation passait au vert).
 //   Aucun débordement horizontal, aucune erreur de page.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
@@ -44,7 +52,7 @@ const LISTINGS = { capturedAt: new Date(MAINTENANT).toISOString(), payload: { it
 const FICHES = { '7031': { numero: '31', title: 'Nike Air Max 1 blanc taille 43', photo: img(7031, 0) }, '7032': { numero: '32', title: 'Adidas Samba noir taille 41', photo: img(7032, 0) } };
 const DETAILS0 = () => ({ '7032': { photos: [0, 1, 2].map((i) => img(7032, i)), description: 'Très bon état' } });
 
-let rows = [], envois = [];
+let rows = [], envois = [], lectures = {};
 const remettre = () => {
   rows = [
     { id: 'main', data: { vinted_annonce_numeros: FICHES } },
@@ -55,7 +63,7 @@ const remettre = () => {
     { id: 'ebay_brouillons', data: { items: {}, majAt: MAINTENANT } },
     { id: 'ebay_programmees', data: { items: [], enLigne: [], complet: true, capturedAt: MAINTENANT } },
   ];
-  envois = [];
+  envois = []; lectures = {};
 };
 // Ce que l'extension (simulée) range quand elle a lu la page de l'annonce.
 const ranger = (id, n) => {
@@ -95,6 +103,7 @@ const projette = (row, sel) => {
 //    range) · 'inconnue' (une version qui ne connaît pas la commande) ·
 //    'absente' (rien). `delai` : quand la lecture finit (ms).
 const PONT = ({ mode, version, extId, delai }) => {
+  const pause = mode === 'pause' ? { jusqua: Date.now() + 10 * 60000 } : null;
   window.__cmds = [];
   if (mode === 'absente') return;
   const post = (m) => window.postMessage(m, '*');
@@ -102,7 +111,7 @@ const PONT = ({ mode, version, extId, delai }) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: extId });
     if (d.__vmr === 'etat' && d.reqId) post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, code: version, ext: extId,
-      vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+      vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {}, ...(pause ? { pause } : {}) } });
     if (d.__vmr !== 'cmd' || !d.reqId) return;
     window.__cmds.push(JSON.parse(JSON.stringify(Object.assign({}, d, { reqId: undefined, __vmr: undefined }))));
     if (d.cmd === 'ventes') { post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } }); return; }
@@ -137,7 +146,7 @@ async function ouvrir(b, vp, { mode = 'ok', delai = 2500 } = {}) {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data && r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) { lectures[eq[1]] = (lectures[eq[1]] || 0) + 1; return j(rows.filter((r) => r.id === eq[1]).map(forme)); }
     const inn = /id=in\.\(([^)]*)\)/.exec(u);
     if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
@@ -164,6 +173,18 @@ async function ouvrir(b, vp, { mode = 'ok', delai = 2500 } = {}) {
   return { ctx, pg, errs };
 }
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
+// ⚠️ Sous forte charge (d'autres bancs tournent : charge mesurée à 40 sur
+//    4 cœurs), les images de la page arrivent si lentement que Playwright juge
+//    le bouton de la feuille « pas stable » pendant toute son attente. On attend
+//    la fin des animations de la feuille, puis on clique sans ce contrôle-là —
+//    le bouton est visé par son NOM, dans la feuille.
+const cliquerFeuille = async (pg, nom, ms = 8000) => {
+  const btn = feuille(pg).getByRole('button', { name: nom });
+  const vu = await btn.waitFor({ timeout: ms }).then(() => true).catch(() => false);
+  if (!vu) return false;
+  await pg.waitForFunction(() => !document.getAnimations().some((a) => /cancale(FadeIn|Sheet)/.test(a.animationName || '') && a.playState === 'running'), null, { timeout: ms }).catch(() => {});
+  return btn.click({ force: true, timeout: ms }).then(() => true).catch(() => false);
+};
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
 const etatPhotos = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-ebay-photos]'); return e ? { etat: e.getAttribute('data-ebay-photos'), capt: e.getAttribute('data-ebay-photos-capt'), voulu: e.getAttribute('data-ebay-photos-voulu'), raison: e.getAttribute('data-ebay-photos-raison'), txt: e.innerText } : null; });
 const vignettes = (pg) => pg.$$eval('button[aria-label="Retirer"]', (els) => els.length);
@@ -173,10 +194,10 @@ const photo = async (pg, nom) => { try { const e = await pg.$('[data-ebay-photos
 async function versFormulaire(pg, num) {
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(2500);                    // le pont répond, l'état de l'extension est lu
-  await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
-  await pg.waitForSelector('[data-poster="ebay"]', { timeout: 15000 });
+  await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 20000 });
+  await pg.waitForSelector('[data-poster="ebay"]', { timeout: 25000 });
   await pg.click('[data-poster="ebay"]');
-  await pg.locator('button', { hasText: 'N°' + num }).first().click({ timeout: 8000 });
+  await pg.locator('button', { hasText: 'N°' + num }).first().click({ timeout: 20000 });
 }
 
 (async () => {
@@ -193,6 +214,7 @@ async function versFormulaire(pg, num) {
         const c = await cmdsPhotos(pg);
         dit(c.length === 1 && String(c[0].id) === '7031' && Number(c[0].voulu) === 14, 'choisir la N°31 DEMANDE à l\'extension de lire CETTE annonce (id 7031, 14 voulues)', JSON.stringify(c));
         const e1 = await etatPhotos(pg);
+        const det0 = lectures.vinted_item_details || 0, dr0 = lectures.harvest_111_listings || 0;   // avant la fin de la lecture
         dit(!!(e1 && e1.etat === 'lecture' && e1.capt === '0' && e1.voulu === '14'), 'pendant la lecture, l\'écran le dit (« lecture », 0 sur 14)', JSON.stringify(e1));
         await photo(pg, 'ebay-photos-lecture-' + vp.width);
         await pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-photos]'); return e && e.getAttribute('data-ebay-photos') === 'toutes'; }, null, { timeout: 12000 }).catch(() => {});
@@ -201,6 +223,15 @@ async function versFormulaire(pg, num) {
         dit(!!(e2 && e2.etat === 'toutes' && e2.capt === '14'), 'la lecture finie, l\'écran dit « toutes » (14 sur 14) — sans recharger', JSON.stringify(e2));
         dit(nv === 14, 'le formulaire porte les 14 photos rangées (il SUIT la paire tant qu\'on n\'y touche pas)', `${nv} vignette(s)`);
         await photo(pg, 'ebay-photos-toutes-' + vp.width);
+        // F. Ce que la fin de la lecture a relu (§4.4) — puis une photo rangée
+        //    pour une paire DÉJÀ complète (la N°32) : rien à relire.
+        const det1 = lectures.vinted_item_details || 0, dr1 = lectures.harvest_111_listings || 0;
+        dit(det1 > det0 && dr1 === dr0, 'F. la fin de la lecture relit les photos, PAS les dressings', `photos relues ${det1 - det0} fois, dressing ${dr1 - dr0} fois (avant : ${det0} / ${dr0})`);
+        await pg.evaluate(() => window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: 'photos', id: '7032', n: 3 } }, '*'));
+        await pg.evaluate(() => window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: 'photos' } }, '*'));
+        await pg.waitForTimeout(3500);
+        const det2 = lectures.vinted_item_details || 0;
+        dit(det2 === det1, 'F. une photo rangée pour une paire déjà complète (et rien ne manque) ne relit RIEN', `photos lues ${det2 - det1} fois de plus`);
         const d = await deborde(pg);
         dit(d.sw <= d.cw + 1, 'aucun débordement horizontal', `${d.sw} / ${d.cw}`);
         dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
@@ -280,21 +311,24 @@ async function versFormulaire(pg, num) {
         const href = await pg.$eval('[data-ebay-photos-vinted]', (a) => a.getAttribute('href')).catch(() => '');
         dit(/\/items\/7031$/.test(href), 'le geste : l\'annonce sur Vinted, celle-là', href || 'aucun lien');
         await photo(pg, 'ebay-photos-retard-1512');
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
-        await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 20000 });
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 20000 });
         await pg.fill('input[placeholder="ex. 74"]', '90');
         await pg.waitForTimeout(300);
         await pg.click('[data-publier-ebay]');
-        const vue = await feuille(pg).getByRole('button', { name: 'Publier quand même' }).waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+        const vue = await feuille(pg).getByRole('button', { name: 'Publier quand même' }).waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
         const texte = vue ? await feuille(pg).innerText() : '';
         dit(vue && /1 photo sur 14/.test(texte), '« Publier » DEMANDE avant de partir avec 1 photo sur 14', texte.replace(/\s+/g, ' ').slice(0, 140) || 'aucune question posée');
-        if (vue) await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
+        if (vue) await cliquerFeuille(pg, 'Annuler');
+        // La feuille se referme en s'animant : un clic pendant ce temps tombe
+        // sur elle, pas sur « Publier » (vu au banc : il faut attendre qu'elle parte).
+        await feuille(pg).first().waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
         await pg.waitForTimeout(400);
         const p1 = envois.filter((x) => x.action === 'publish').length;
         dit(vue && p1 === 0, '« Annuler » n\'envoie RIEN chez eBay', `${p1} publication(s)`);
         await pg.click('[data-publier-ebay]');
-        await feuille(pg).getByRole('button', { name: 'Publier quand même' }).click({ timeout: 5000 }).catch(() => {});
-        await pg.waitForTimeout(800);
+        await cliquerFeuille(pg, 'Publier quand même');
+        for (let i = 0; i < 20 && !envois.some((x) => x.action === 'publish'); i++) await pg.waitForTimeout(150);
         const pub = envois.filter((x) => x.action === 'publish');
         dit(pub.length === 1 && pub[0].item && pub[0].item.photos.length === 1, '« Publier quand même » publie, avec la photo qu\'il a', `${pub.length} publication(s)`);
         dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
@@ -311,6 +345,39 @@ async function versFormulaire(pg, num) {
         await pg.waitForTimeout(800);
         const e = await etatPhotos(pg);
         dit(!!(e && e.etat === 'manque' && e.raison === 'absente' && e.capt === '0'), 'rien n\'est demandé, l\'écran dit qu\'il en manque et pourquoi (extension absente ici)', JSON.stringify(e));
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+    console.log('── G. Vinted a demandé de ralentir : rien n\'est demandé (1512 px)');
+    {
+      remettre();
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { mode: 'pause' });
+      await essaie('G', async () => {
+        await versFormulaire(pg, 31);
+        await pg.waitForTimeout(800);
+        const c = await cmdsPhotos(pg);
+        const e = await etatPhotos(pg);
+        dit(c.length === 0, 'G. pendant la pause demandée par Vinted, aucune commande n\'est envoyée', JSON.stringify(c));
+        dit(!!(e && e.etat === 'manque' && e.raison === 'pause' && e.capt === '0' && e.voulu === '14'), 'G. l\'écran dit 0 sur 14 et la pause', JSON.stringify(e));
+        dit(!(await pg.$('[data-ebay-photos-reessayer]')), 'G. pas de « Réessayer » à côté de « rien à faire de ton côté » (§7 : la lecture repart seule à la fin de la pause)');
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+    console.log('── H. une lecture qui finit après la minute du cache : les dressings ne sont pas relus (1512 px, ~70 s)');
+    {
+      remettre();
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { mode: 'ok', delai: 65000 });
+      await essaie('H', async () => {
+        await versFormulaire(pg, 31);
+        await pg.waitForTimeout(600);
+        const det0 = lectures.vinted_item_details || 0, dr0 = lectures.harvest_111_listings || 0;
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-photos]'); return e && e.getAttribute('data-ebay-photos') === 'toutes'; }, null, { timeout: 110000 }).catch(() => {});
+        const e = await etatPhotos(pg);
+        const det1 = lectures.vinted_item_details || 0, dr1 = lectures.harvest_111_listings || 0;
+        dit(!!(e && e.etat === 'toutes' && e.capt === '14'), 'H. la lecture finie 65 s plus tard, le formulaire a ses 14 photos', JSON.stringify(e && { etat: e.etat, capt: e.capt }));
+        dit(det1 > det0 && dr1 === dr0, 'H. les photos sont relues, les dressings NON (au-delà de la minute du cache)', `photos relues ${det1 - det0} fois, dressing ${dr1 - dr0} fois`);
         dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       });
       await ctx.close();
