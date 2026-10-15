@@ -4566,10 +4566,11 @@ async function visiteVinted() {
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
     // Vinted). Elle relit ses bordereaux quand on la prévient.
     if (Number(genes) > 0) notifierApp({ type: 'maj', quoi: 'label', uid: String(uid) });
-    // ⚠️ ET LES MESSAGES, sur sa décision du 19 septembre (« tout, elle répond à
-    //    tout »). Éteint par défaut : c'est lui qui allume depuis l'app.
-    if (await pauseVinted()) { await purgeBordereaux(); return; }
-    try { await avecVinted(() => repondreAuxMessages(uid)); } catch (_) {}
+    // ⛔ (15 octobre) PLUS AUCUNE RÉPONSE AUTOMATIQUE AUX MESSAGES. Julien :
+    //    « l'extension lit les messages et permet de répondre directement sur
+    //    VRM, mais elle n'agit pas toute seule ». Le moteur est retiré (voir
+    //    plus bas) ; une réponse ne part QUE sur son clic dans l'app
+    //    (`executerPourApp`, liste blanche `EXEC_PERMIS`).
 
     // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
     // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
@@ -5942,288 +5943,22 @@ const BORD_RATTRAPAGE_J = 21;
 // LECTURE, sur ses propres achats, plafonnée en volume — la même forme que la
 // récupération du bordereau (§5.29). Elle ne décide de rien et n'engage rien.
 // ══════════════════════════════════════════════════════════════════════════════
-// RÉPONDRE AUX MESSAGES — IL A TRANCHÉ : « TOUT, ELLE RÉPOND À TOUT »
+// ⛔ LA RÉPONSE AUTOMATIQUE AUX MESSAGES EST RETIRÉE (15 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
-// Demande de Julien, 19 septembre, après que je lui ai posé la question et
-// présenté le risque : « tout, elle répond à tout ». C'est SA décision, elle est
-// prise, elle ne se re-négocie pas.
-//
-// Les trois morceaux existaient déjà et ne se parlaient pas :
-//   · `convLastMessage(convId)` — le dernier message de l'ACHETEUR, lu dans la
-//     donnée moissonnée (pas dans la page) ;
-//   · `aiReply(...)` — `/api/ai` mode `reply`, qui rend une intention, une
-//     confiance et 3 à 5 suggestions ;
-//   · `POST /api/v2/conversations/{id}/replies` — **mesuré dans SES propres
-//     requêtes**. ⚠️ Remesuré le 30 sept. sur les 9 captures (`wreq_…_replies`) :
-//     `reply` est un OBJET — `{reply:{body, photo_temp_uuids:null,
-//     is_personal_data_sharing_check_skipped:false}}` — pas une chaîne. La
-//     5.77→5.118 envoyait `{reply: texte}` : l'endpoint était juste, la FORME
-//     du corps non (§6 : vérifier le nom ET la forme du champ).
-// Il ne manquait que le maillon qui envoie. C'est exactement l'histoire du
-// bordereau : le pipeline était là, le dernier chaînon absent.
-//
-// ⚠️ LES GARDE-FOUS RESTENT, ET CE N'EST PAS UNE RE-NÉGOCIATION DE SON CHOIX :
-//    ce sont des protections ANTI-BLOCAGE (§3), pas des scrupules. `vanessa5723`
-//    a été bloqué, et neuf comptes sont son gagne-pain :
-//      · uniquement le compte connecté dans l'onglet (`garde`) ;
-//      · plafond de 20 actions/heure par compte, déjà tenu par `garde` —
-//        **c'est LUI la vraie protection anti-blocage**, pas le plafond par
-//        visite (§ « répond à tout mais étalé ») ;
-//      · **8 réponses par visite** — Julien, 24 septembre : « améliore la
-//        fiabilité, tu peux mettre plus de 3 répétitions… répond à tout mais
-//        étalé ». Le plafond par visite n'évite qu'une RAFALE sur une seule
-//        page ; répondre à tout se fait sur plusieurs visites, borné par le
-//        plafond horaire de 20 qui, lui, ne bouge pas. Monté de 3 à 8 : plus de
-//        3 (sa demande), mais jamais une salve de vingt d'un coup.
-//      · une requête à la fois, jamais deux en vol.
-// ⚠️ ET DEUX RÈGLES DE FOND, celles du dossier :
-//    1. **JAMAIS DEUX FOIS LE MÊME MESSAGE.** L'identité est l'`id` du message
-//       de l'acheteur — pas le texte, pas la date (§5 : jamais une
-//       ressemblance). Sans ça, un acheteur reçoit trois réponses au même
-//       message et ça se lit comme un robot.
-//    2. **MIEUX VAUT UN BLANC QU'UN FAUX.** Si l'IA ne rend rien, ou rend une
-//       réponse vide, on n'envoie RIEN. Un silence d'une heure coûte moins
-//       qu'une réponse inventée sur un prix ou une disponibilité.
-// ⚠️ ET ON DIT CE QU'ON A ENVOYÉ EN SON NOM. Le texte parti est gardé dans
-//    `panel_msg_repondus` et le journal l'annonce : un message envoyé à sa place
-//    qu'il ne peut pas relire serait le pire de tout — c'est « un colis caché
-//    est un colis perdu » appliqué à ce qu'on dit à ses acheteurs.
-const MSG_MAX_PAR_VISITE = 8;
-const MSG_MIN_CONFIANCE = 55;    // en dessous, l'IA hésite : on ne parle pas à sa place
-const MSG_DEMANDES_MAX = 300;    // questions à l'IA mémorisées (une par message, voir `demandes`)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ⚠️⚠️ QUI VEND ? C'EST UNE IDENTITÉ, ET ELLE M'A ÉVITÉ D'ÉCRIRE N'IMPORTE QUOI
-// ══════════════════════════════════════════════════════════════════════════════
-// MESURÉ LE 19 SEPTEMBRE, avant de brancher quoi que ce soit, sur ses 32
-// conversations NON LUES : **deux** sont des échanges où c'est LUI l'acheteur —
-// « Trainers are in post, thanks for buying », « juste pour vous dire que
-// j'envoie demain, le colis est prêt ». Or `api/ai` répond en VENDEUR (sa
-// consigne dit mot pour mot « on te donne le message d'un ACHETEUR ») : sur ces
-// deux-là elle aurait envoyé, EN SON NOM, une réponse à côté de la plaque à
-// quelqu'un qui lui expédie un colis. « toute conversation non lue = un acheteur
-// qui demande » est une RESSEMBLANCE (§5), et elle se trompait 2 fois sur 5.
-// ⇒ L'identité, c'est l'ARTICLE : `transaction.item_id` est-il une de SES
-//    annonces captées ? (§5, identité d'annonce — jamais le titre.) Mesuré :
-//    les 3 vraies questions d'acheteur passent, les 2 conversations où il achète
-//    sont écartées, 0 erreur.
-// ⚠️ CE QUE J'AI ESSAYÉ ET ÉCARTÉ, mesuré aussi :
-//    · `transaction.user_side` — **null sur les 1 030 conversations** captées ;
-//    · l'identifiant de participant déduit de `harvest_*_txn_*` : ces lignes
-//      portent AUSSI ses achats, donc `seller_id` y varie (162 fois l'un, une
-//      fois chacun des autres). Le prendre « le plus fréquent » serait un
-//      rapprochement par fréquence, exactement ce que ce projet s'interdit.
-//      Et ancré sur l'article il n'apportait **rien** (0 conversation de plus).
-// ⚠️ « PAS SU » NE VAUT PAS « OUI » : lecture ratée ⇒ `null` ⇒ on ne répond pas.
-async function sesAnnonces(uid) {
-  const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_listings&select=data`);
-  if (rows === null) return null;                 // pas su ≠ « aucune annonce à lui »
-  const items = (rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.items) || [];
-  const s = new Set();
-  for (const it of items) if (it && it.id != null) s.add(String(it.id));
-  return s;
-}
-
-async function repondreAuxMessages(uid) {
-  try {
-    if (!uid) return 0;
-    const reglages = await lireMain(['vinted_repond_auto']);
-    // ⚠️ ÉTEINT PAR DÉFAUT, comme le moteur d'offres (§3). C'est lui qui allume,
-    //    depuis l'app — et « pas su » (lecture ratée) ne vaut pas « allumé ».
-    if (reglages === null) return 0;
-    if (!reglages.vinted_repond_auto) return 0;
-    const accts = await getStoredAccounts();
-    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
-    if (!acc) return 0;
-
-    // Les conversations NON LUES de ce compte, telles que Vinted les a rendues.
-    const inbox = await sbGetMemo(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
-    if (inbox === null) return 0;                  // pas su ≠ aucune conversation
-    const convs = (inbox[0] && inbox[0].data && inbox[0].data.payload && inbox[0].data.payload.conversations) || [];
-    const nonLues = convs.filter((c) => c && c.unread && c.id != null);
-    if (!nonLues.length) return 0;
-
-    // Ses annonces : c'est ce qui dit s'il VEND dans cette conversation.
-    const miennes = await sesAnnonces(uid);
-    if (miennes === null) return 0;
-
-    // Ce à quoi on a DÉJÀ répondu — par l'identité du message, jamais son texte.
-    const rows = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
-    if (rows === null) return 0;                   // on ne risque pas de répondre deux fois
-    const deja = (rows[0] && rows[0].data) || {};
-    // ⚠️⚠️ LA FUITE DE L'IA (11 octobre). Cette fonction tourne à CHAQUE page
-    //    Vinted chargée — mesuré : ~255 passages par jour chez Julien. Un message
-    //    où l'IA HÉSITE (confiance sous le seuil) ou rend une réponse vide n'était
-    //    mémorisé nulle part : il repartait chez l'IA au passage suivant, tant
-    //    qu'il restait non lu. Un seul message hésitant ≈ 255 appels payés par
-    //    jour (≈ 15 à 18 $ par mois, plus que l'abonnement). Même chose pour une
-    //    réponse sûre que `garde` a empêchée de partir (plafond horaire atteint) :
-    //    redemandée à chaque page.
-    // ⇒ UNE question à l'IA par message, jamais deux. L'identité est la même que
-    //    pour les envois (`conversation:message`, jamais le texte ni la date) et
-    //    elle vit dans la MÊME ligne, sous une clé réservée (`demandes`) — lue et
-    //    réécrite avec la même garde (lecture ratée ⇒ rien ne part, plus haut).
-    //    · réponse sûre pas encore partie ⇒ on garde son texte et on le RÉUTILISE ;
-    //    · hésitation ou réponse vide ⇒ on ne la redemande plus (un NOUVEAU
-    //      message de l'acheteur a un autre id : lui, il est redemandé) ;
-    //    · IA injoignable (rien de facturé) ⇒ rien n'est mémorisé, on retentera.
-    const demandes = (deja.demandes && typeof deja.demandes === 'object' && !Array.isArray(deja.demandes)) ? deja.demandes : {};
-    const demandesNeuves = {};
-
-    let envoyes = 0;
-    const neufs = {};
-    // ⚠️ LE BILAN, PARCE QUE « ELLE RÉPOND À TOUT » SERAIT FAUX. Mesuré sur ses
-    //    32 non lues : 17 n'ont AUCUNE conversation captée, 9 n'ont aucun
-    //    message de l'acheteur dedans, 1 est refusée à la réponse par Vinted,
-    //    1 est un échange où il achète — il en reste **3**. L'app écrit ces
-    //    nombres ; un total partiel présenté comme complet est pire qu'absent.
-    // ⚠️ `iaKO` (revue du 11 octobre) : quand c'est l'IA qui n'a rien rendu
-    //    d'utilisable (pas branchée, injoignable, sortie illisible), ce n'est PAS
-    //    une hésitation — l'app l'écrivait « elle n'était pas sûre ». Compté à
-    //    part, avec sa cause (`iaKOcauses` : pasBranchee · injoignable · illisible).
-    const bilan = { nonLues: nonLues.length, pasCaptee: 0, sansMessage: 0, pasVendeur: 0,
-      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, iaKO: 0, iaKOcauses: {}, envoyes: 0, refusees: 0, at: new Date().toISOString() };
-    const iaKO = (cause) => { bilan.iaKO++; bilan.iaKOcauses[cause] = (bilan.iaKOcauses[cause] || 0) + 1; };
-    for (const c of nonLues) {
-      const cid = String(c.id);
-      const det = await convDernierMessageId(uid, cid);
-      if (!det) { bilan.pasCaptee++; continue; }
-      if (!det.id || !det.body) { bilan.sansMessage++; continue; }
-      if (det.allowReply === false) { bilan.replyRefuse++; continue; }   // Vinted refuse la réponse
-      // L'IDENTITÉ : cette conversation porte-t-elle une de SES annonces ?
-      if (!(det.itemId && miennes.has(String(det.itemId)))) { bilan.pasVendeur++; continue; }
-      const cle = cid + ':' + det.id;
-      if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
-      // Déjà demandé à l'IA pour CE message, et elle a hésité : on ne la repaie pas.
-      const dejaDemande = demandesNeuves[cle] || demandes[cle] || null;
-      if (dejaDemande && !dejaDemande.texte) {
-        if (dejaDemande.raison === 'illisible') { iaKO('illisible'); noterDiag('repond_illisible_memorisee'); }
-        else { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); }
-        continue;
-      }
-      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
-      let texte = '', sugg = null;
-      if (dejaDemande && dejaDemande.texte) {
-        // Une réponse SÛRE déjà obtenue pour ce message, qui n'a pas pu partir :
-        // on la renvoie telle quelle, sans redemander (ni repayer) l'IA.
-        texte = String(dejaDemande.texte);
-        sugg = { intent: dejaDemande.intention || '', confidence: Number(dejaDemande.confiance || 0) };
-        noterDiag('repond_reponse_reutilisee');
-      } else {
-        sugg = await aiReply(det.body, det.article || c.description || '', det.price);
-        if (!(sugg && sugg.ok)) {
-          // ⚠️⚠️ REVUE DU 11 OCTOBRE : une réponse PAYÉE mais illisible (JSON
-          //    tronqué, texte libre, réponse vide — le serveur dit `facture: true`,
-          //    et `reason: 'parse'` pour un serveur d'avant) se range comme une
-          //    hésitation : on ne la repaie pas à chaque page Vinted. Seuls les
-          //    refus d'AVANT l'appel payé (clé absente, session, abonnement,
-          //    réseau, Anthropic en panne) ne sont pas mémorisés : on retentera.
-          if (sugg && (sugg.facture === true || sugg.reason === 'parse')) {
-            demandesNeuves[cle] = { at: new Date().toISOString(), confiance: 0, raison: 'illisible' };
-            iaKO('illisible'); noterDiag('repond_illisible');
-            continue;
-          }
-          iaKO(sugg && sugg.reason === 'no-key' ? 'pasBranchee' : 'injoignable');
-          noterDiag(sugg && sugg.reason === 'no-key' ? 'repond_ia_pas_branchee' : 'repond_ia_injoignable');
-          continue;
-        }
-        texte = (Array.isArray(sugg.suggestions) && sugg.suggestions[0]
-          && String(sugg.suggestions[0].text || '').trim()) || '';
-        const conf = Number(sugg.confidence || 0);
-        const sure = !!texte && conf >= MSG_MIN_CONFIANCE;
-        demandesNeuves[cle] = sure
-          ? { at: new Date().toISOString(), confiance: conf, intention: String(sugg.intent || ''), texte: texte.slice(0, 1000) }
-          : { at: new Date().toISOString(), confiance: conf, raison: texte ? 'peu-sur' : 'vide' };
-        // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
-        if (!sure) {
-          bilan.pasSure++;
-          noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
-          continue;
-        }
-      }
-      // ⚠️ LE PLAFOND HORAIRE SE CONSOMME AU MOMENT DE L'ENVOI, JAMAIS AVANT.
-      //    `garde` → `compterAction` POUSSE un créneau du budget 20/h à chaque
-      //    appel. L'appeler avant l'IA brûlait un créneau pour une conversation
-      //    « pas sûre » qui n'envoyait rien : invisible à 3 par visite, mais dès
-      //    qu'on monte le plafond (sa demande « plus de 3 »), le budget de
-      //    l'heure s'épuisait sur des NON-réponses et les vraies réponses
-      //    suivantes se faisaient refuser à tort. On ne compte une action que
-      //    quand une réponse VA réellement partir. (Le contrôle « autre compte »
-      //    de `garde` reste ici : au pire on a payé un appel à NOTRE serveur IA,
-      //    jamais une requête à Vinted.)
-      const stop = await garde(uid, acc);          // compte de l'onglet + plafond horaire
-      if (stop) break;
-      const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${cid}/replies`,
-        { reply: { body: texte, photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } });
-      noterDiag(r.ok ? 'repond_envoye' : `repond_refuse_${r.status}`);
-      if (!r.ok) {
-        bilan.refusees++;
-        logActivity(`⚠️ Réponse non envoyée (Vinted a répondu ${r.status})`);
-        if (r.status === 401 || r.status === 403) break;   // inutile d'insister
-        continue;
-      }
-      envoyes++;
-      neufs[cle] = { conv: cid, at: new Date().toISOString(), texte: texte.slice(0, 400),
-        intention: String(sugg.intent || ''), confiance: Number(sugg.confidence || 0),
-        login: (c.opposite_user && c.opposite_user.login) || '', titre: String(c.description || '').slice(0, 80) };
-      // ⚠️ IL DOIT POUVOIR RELIRE CE QUE J'AI DIT EN SON NOM.
-      logActivity(`💬 Répondu à ${neufs[cle].login || 'un acheteur'} — « ${texte.slice(0, 60)}${texte.length > 60 ? '…' : ''} »`);
-    }
-    bilan.envoyes = envoyes;
-    // Lire-fusionner-réécrire, avec la garde du dossier : on ne fusionne que si
-    // on a lu (la lecture plus haut a déjà refusé le cas `null`). Le bilan vit
-    // sous une clé réservée, jamais confondue avec un envoi (`conv:message`).
-    // Les questions à l'IA : les anciennes + celles de ce passage, sans celles
-    // dont la réponse est partie (l'envoi les remplace), bornées aux 300 plus
-    // récentes (une ligne lue à chaque visite ne grossit pas sans fin, §4.4).
-    const toutesDemandes = Object.assign({}, demandes, demandesNeuves);
-    const gardees = Object.keys(toutesDemandes)
-      .filter((k) => !deja[k] && !neufs[k] && toutesDemandes[k] && typeof toutesDemandes[k] === 'object')
-      .sort((a, b) => String(toutesDemandes[b].at || '').localeCompare(String(toutesDemandes[a].at || '')))
-      .slice(0, MSG_DEMANDES_MAX);
-    const demandesEcrites = {};
-    for (const k of gardees) demandesEcrites[k] = toutesDemandes[k];
-    await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus',
-      data: Object.assign({}, deja, neufs, { demandes: demandesEcrites, bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
-    return envoyes;
-  } catch (_) { return 0; }
-}
-
-// Le dernier message de l'acheteur AVEC SON IDENTITÉ — c'est elle qui empêche
-// de répondre deux fois. `convLastMessage` ne rendait que le texte.
-// ⚠️ Et il rend AUSSI `itemId` et `allowReply` : sans l'article on ne sait pas
-//    s'il VEND dans cette conversation (voir `sesAnnonces`), et `allow_reply`
-//    est mesuré `false` sur une de ses conversations non lues — Vinted y refuse
-//    la réponse, insister ne ferait qu'un refus de plus au compteur.
-// ⚠️ La ligne est lue sur SON compte (`id=eq.harvest_{uid}_conv_{cid}`) :
-//    vérifié sur ses vraies données, une conversation est toujours captée sous
-//    le compte de sa boîte — et une identité exacte coûte moins qu'un `like`.
-async function convDernierMessageId(uid, convId) {
-  try {
-    const rows = await sbGet(`app_data?id=eq.harvest_${encodeURIComponent(String(uid))}_conv_${encodeURIComponent(String(convId))}&select=data`);
-    for (const r of (rows || [])) {
-      const conv = r.data && r.data.payload && r.data.payload.conversation;
-      if (!conv || !Array.isArray(conv.messages)) continue;
-      const oppId = conv.opposite_user && conv.opposite_user.id;
-      let last = null;
-      for (const m of conv.messages) {
-        if ((m.entity_type || '') !== 'message') continue;
-        const e = m.entity || {};
-        if (oppId != null && e.user_id !== oppId) continue;   // uniquement l'acheteur
-        if (e.body) last = { id: String(e.id != null ? e.id : (m.id != null ? m.id : '')), body: String(e.body).slice(0, 1000) };
-      }
-      const t = conv.transaction || {};
-      const commun = { itemId: t.item_id != null ? String(t.item_id) : '', allowReply: conv.allow_reply,
-        article: String(conv.description || conv.title || '').slice(0, 160),
-        price: t.offer_price != null ? t.offer_price : undefined };
-      // ⚠️ On rend l'objet MÊME sans message lisible : c'est ce qui permet au
-      //    bilan de distinguer « pas de conversation captée » de « captée, mais
-      //    aucun message de l'acheteur dedans » — deux causes, deux phrases.
-      return Object.assign({ id: '', body: '' }, commun, last || {});
-    }
-    return null;
-  } catch (_) { return null; }
-}
+// Julien, 15 octobre : « ils répondent à mes messages Vinted : enlève, parce que
+// l'extension lit les messages et permet de répondre directement sur VRM, mais
+// elle n'agit pas toute seule ». C'est SA décision ; elle remplace celle du
+// 19 septembre (« tout, elle répond à tout »). Mesuré le 15 octobre avant de
+// retirer : `vinted_repond_auto` absent des 3 lignes `main`, aucune ligne
+// `panel_msg_repondus` — le moteur n'avait jamais rien envoyé.
+// Retirés ensemble : l'appel à chaque visite, le moteur, l'identité « qui
+// vend ? » qui ne servait qu'à lui, la lecture du dernier message de
+// l'acheteur, et la question à l'IA (`/api/ai` mode `reply`). Ce qui RESTE :
+// lire les conversations (moisson, `GET /conversations/{id}` sur son clic) et
+// répondre sur SON clic depuis l'app (`executerPourApp`, `EXEC_PERMIS`).
+// ⚠️ Un message envoyé par un programme ressemble à un robot (§3, le compte
+//    bloqué). `audit-reponses-auto.cjs` refuse tout autre chemin vers
+//    `/conversations/{id}/replies` que la liste blanche.
 
 // ══ UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (relecture croisée de la 5.174) ══════
 // Les lecteurs bornés (`capterRetraits` 6 h, `capterDatesVersement` 24 h,
@@ -6953,27 +6688,9 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
   } catch (_) { return 0; }
 }
 
-// ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
-// Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
-// reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
-// RIEN sur Vinted : Julien relit, choisit, adapte et envoie LUI-MÊME (assistance
-// stricte, conforme). La clé de l'IA reste côté serveur (Vercel), jamais ici.
+// L'adresse de l'app (routes `/api/*` : détourage). Gardée quand l'assistant de
+// réponse a été retiré (15 octobre) — il n'en était pas le seul lecteur.
 const VRM_APP_API = 'https://vrm.center';
-async function aiReply(message, article, price) {
-  try {
-    // La clé de l'IA est celle du serveur : il exige la session du vendeur
-    // (sinon n'importe qui la dépenserait — audit de sécurité, 4 octobre).
-    let s = null; try { s = await authToken(); } catch (_) {}
-    const r = await fetch(`${VRM_APP_API}/api/ai`, {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, s && s.access_token ? { Authorization: `Bearer ${s.access_token}` } : {}),
-      body: JSON.stringify({ mode: 'reply', message: String(message || '').slice(0, 1000), article: String(article || '').slice(0, 160), price }),
-    });
-    const j = await r.json().catch(() => ({}));
-    return (j && typeof j === 'object') ? j : { ok: false, reason: 'network' };
-  } catch (e) { return { ok: false, reason: 'network', detail: String(e) }; }
-}
-
 async function sbGet(query) {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: await sbHeaders() });

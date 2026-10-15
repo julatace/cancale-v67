@@ -76,6 +76,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
+| **répondre automatiquement aux messages Vinted** — ⛔ **RETIRÉ le 15 octobre, sa décision** | « ils répondent à mes messages Vinted : enlève, parce que l'extension lit les messages et permet de répondre directement sur VRM, mais elle n'agit pas toute seule ». Remplace sa décision du 19 septembre (« elle répond à tout »). Le moteur de l'extension, l'interrupteur de Réglages et la capacité `repond` sont retirés ; une réponse ne part QUE sur son clic dans Messages (`executerPourApp`). `audit-reponses-auto.cjs` refuse tout autre chemin vers `/conversations/{id}/replies`. Ne pas le reproposer. |
 | envoyer des messages en série aux favoris | **Vinted ne dit jamais QUI a mis en favori** (mesuré : aucun endpoint, aucun champ). Il n'y a pas de destinataire. La remise aux favoris de Vinted, elle, touche tout le monde en un clic. |
 
 **Ce qui EST autorisé et automatique** : générer un bordereau et récupérer son
@@ -2540,6 +2541,8 @@ réécrite que si le corps change, donc ça ne coûte qu'une fois. `fforms` n'es
 toujours pas arrivé.
 
 ### ⚠️⚠️⚠️ « QU'ELLE RÉPONDE À MA PLACE AUX MESSAGES » — ET 2 SUR 5 N'ÉTAIENT PAS DES ACHETEURS
+> ⛔ **RETIRÉ LE 15 OCTOBRE** (sa décision, voir §3 et « Messages : le compte de Chrome d'abord » plus bas). Ce qui suit est l'HISTOIRE du moteur — il n'existe plus.
+
 Demande de Julien, 18 septembre : « je veux également que tu puisses répondre à
 ma place au message Vinted ». Mis devant le risque, il a tranché : **« Tout, elle
 répond à tout »**. C'est SA décision, elle n'est pas à re-négocier.
@@ -8984,6 +8987,70 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### ⚠️⚠️ MESSAGES : LE COMPTE DE CHROME D'ABORD, LES AUTRES SE LISENT, RIEN NE PART TOUT SEUL (15 octobre)
+Julien : « lorsque l'extension d'un compte est activée, seulement ses messages ;
+les autres floutés comme pour les annonces ; on doit pouvoir tout voir même si on
+ne peut pas répondre ; il y a beaucoup trop d'informations », « les messages
+envoyés, les notifications : beaucoup plus clair », et « enlève [la réponse
+automatique] : l'extension lit les messages et permet de répondre sur VRM, mais
+elle n'agit pas toute seule ».
+- ⚠️⚠️ **MESURÉ SUR w15 : LES AUTRES COMPTES DISPARAISSAIENT.** Compte de Chrome
+  mis en avant, la liste FILTRAIT les autres (`uid===selEff`) — le commentaire
+  disait « floutés, pas masqués » (filtre-compte : « 1 conversation » au lieu de
+  3). Tous les comptes sont listés ; `ordreConversations` (une règle) met le
+  compte en avant d'abord puis les plus récentes — pas « non lues d'abord » :
+  115 des 150 non lues de sa vraie boîte ont plus de 14 jours. Les autres sont
+  estompés (le flou des ventes) mais **s'ouvrent** ; une ligne « Autres comptes ·
+  lecture seule · N non lus » le dit UNE fois. La tête dit l'état (« 3 non lus »,
+  « Tout est lu », « Lecture incomplète »).
+- **Peut-on répondre d'ici ?** `etatReponseVinted(uid)` — une règle pour la
+  réponse, les offres et la lecture par l'extension (§11), sur
+  `raisonExtGlobale` + le compte du cookie. Trois issues : oui · non (UNE phrase
+  et le geste : « Chrome est sur X. Ouvre Vinted sur Y… » + lien) · pas su (rien
+  bloqué, l'extension tranche). Un fil d'un autre compte n'est même pas DEMANDÉ
+  à l'extension (garde stricte : elle refuserait) — `parExtension:false`. « Tous
+  les comptes » éteint le flou, pas la règle. L'ancienne phrase « « Tous les
+  comptes » pour y répondre » était le mauvais geste : retirée.
+- **Brouillons** par vendeur/compte/fil (`brouillonsVinted`, même module que
+  eBay, `sessionStorage` — jamais le nuage) : changer de fil ne perd plus le
+  texte ; effacé seulement après un envoi CONFIRMÉ.
+- **L'issue d'un envoi, en clair** (`issueEnvoiVinted`, trois issues) : envoyé
+  (« Envoyé » sous la bulle) · refusé (« Pas envoyé — … », le texte reste) ·
+  ⚠️ **incertain** (pas de réponse, 5xx) : le message a PU partir — mesuré sur
+  w15, Entrée renvoyait (3 → 4 envois). Le renvoi est BLOQUÉ par fil jusqu'à la
+  relecture EN DIRECT du fil (↻) : retrouvé ⇒ « Envoyé — il est dans le fil » ;
+  absent ⇒ on peut renvoyer ; relu sur une copie ⇒ on ne conclut pas (« Il n'est
+  pas parti » sur SON clic, après vérification sur Vinted).
+- « Envoyer l'offre » **demande d'abord** (un prix engagé), comme Accepter.
+- ⚠️ **Les offres se lisaient « 📦 INFO COLIS · currency_code: EUR »** : mesuré,
+  77 `offer_message` sur 400 messages captés n'ont ni titre ni corps, et le
+  balayage des codes de retrait prenait `currency_code` pour un code. Une offre
+  se lit « Offre : 45,00 € » ; un évènement sans texte n'affiche plus son type.
+- **Réponse automatique RETIRÉE** (§3) : `repondreAuxMessages`, `sesAnnonces`,
+  `convDernierMessageId`, `aiReply` enlevés de `background.js` ;
+  `RepondreSetting` et `EXT_CAPACITES.repond` de l'app. `vinted_repond_auto`
+  RESTE synchronisé (une extension d'avant le lit : absent ⇒ éteinte ; mesuré
+  absent des 3 lignes `main`, aucune ligne `panel_msg_repondus`) et l'app le
+  rééteint après le nuage (`eteindreReponseAuto`). **Version de l'extension À
+  POSER** par la session qui la monte (zip non régénéré ici : `audit-extension-zip`
+  est rouge tant que ce n'est pas fait — exprès).
+- Preuves (§6.1, copie `git archive w15`, contrôles lancés depuis elle) :
+  `audit-reponses-auto.cjs` **21 contrôles, 11 rouges sur w15** — dont la visite
+  qui ENVOIE une réponse (« POST …/301/replies », IA appelée) quand l'ancienne
+  valeur est allumée ; mutations rouges : un envoi remis dans `visiteVinted` (2),
+  `sendReply` appelé par un effet (1). Banc `bancs/messages-compte.cjs` (port
+  5932, données inventées, 1512/390, clair/sombre, vrai téléphone) **84 verts,
+  52 rouges sur le build de w15** ; mutations rouges : filtre des comptes remis
+  (24), estompage inerte (8), incertain traité en refus (3).
+  `messagerie.cjs` et `filtre-compte.cjs` mis à jour (lecture ≠ geste, fil d'un
+  autre compte non demandé, 390 px = fenêtre étroite) : il leur reste **10 et 3
+  rouges, tous le bloc « offres reçues par email »** retiré par 13f6c89 (13 oct.)
+  — préexistants, hors de ce lot. `audit-repondre.cjs` et `bancs/repondre.cjs`
+  retirés avec le moteur.
+- **Pas fait** : les offres reçues par email (FONC-03, bloc retiré le 13 oct.) ;
+  la confirmation à CHAQUE message (le blocage de l'incertain évite le double
+  envoi sans alourdir) ; le mode `reply` d'`api/ai.js` reste (plus appelé).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -8999,7 +9066,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
 | `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
-| `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
+| ~~`repond`~~ | ~~`repondreAuxMessages`~~ | 5.77.0 → **retirée le 15 oct.** | plus rien : la réponse automatique est retirée (sa décision) ; le moteur est enlevé de `background.js` (version À POSER) |
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 | `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |

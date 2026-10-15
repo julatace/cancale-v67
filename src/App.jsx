@@ -10,6 +10,7 @@ import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
+import { brouillonsVinted } from "./brouillonsMessages.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
@@ -200,7 +201,15 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
+// ⛔ `repond` (la réponse AUTOMATIQUE aux messages, `repondreAuxMessages`, 5.77) :
+//    RETIRÉE le 15 octobre — Julien : « l'extension lit les messages et permet de
+//    répondre directement sur VRM, mais elle n'agit pas toute seule ». Le moteur
+//    est enlevé de `background.js` : ⚠️ VERSION DE L'EXTENSION À POSER (A_POSER)
+//    par la session qui la monte — le zip livré porte encore le moteur, ÉTEINT
+//    (`vinted_repond_auto` absent des 3 lignes `main`, mesuré ; l'app le garde à
+//    `false`, voir `SYNC_KEYS`). Aucune capacité nouvelle n'est promise : rien à
+//    poser dans cette table. `audit-reponses-auto.cjs` porte l'invariant.
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -953,6 +962,11 @@ const ENTREPRISE_VIDE = {
 // rester à `false` dans la ligne `main`. (Une 5.128, la sienne, n'a que
 // l'interrupteur local : aucune annonce en ligne n'a de plancher — mesuré —
 // donc elle n'accepte rien.)
+// ⚠️ `vinted_repond_auto` RESTE synchronisé alors que la réponse automatique aux
+// messages est retirée (15 octobre) : les extensions 5.77 à aujourd'hui encore
+// installées lisent cette clé, et c'est elle qui les garde éteintes. Mesuré le
+// 15 octobre : absente des 3 lignes `main` (donc éteinte partout). L'app la
+// remet à `false` si un appareil l'avait encore allumée (`eteindreReponseAuto`).
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
@@ -1353,6 +1367,13 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+// ⛔ LA RÉPONSE AUTOMATIQUE AUX MESSAGES EST RETIRÉE (15 octobre). Une extension
+// d'avant le retrait la lit encore dans `main` : si un appareil l'avait allumée,
+// on la rééteint dès que le nuage est chargé (jamais avant : une écriture avant
+// le chargement repartirait d'un navigateur vide). Idempotent, ne touche à rien
+// d'autre.
+const eteindreReponseAuto = () => { try { if (load('vinted_repond_auto', false) === true) save('vinted_repond_auto', false); } catch (_) {} };
+onCloudReady(eteindreReponseAuto);
 
 // ============ COMPTES VINTED CONNECTES DIRECTEMENT (API interne) ============
 // Un compte Vinted est capture par l'extension Chrome "Shop Cancale35 - Vinted
@@ -4440,13 +4461,15 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
 // action_message) qu'on affiche comme evenements. Pour distinguer "moi" de
 // "l'acheteur" on compare entity.user_id a opposite_user.id (fiable meme si
 // l'id vendeur differe du vinted_user_id du compte).
-const fetchVintedConversationDetail = async (account, conversationId, {force=false}={}) => {
+const fetchVintedConversationDetail = async (account, conversationId, {force=false, parExtension=true}={}) => {
   // 1) Données moissonnées (si tu as déjà ouvert ce fil sur vinted.fr).
   const h = await fetchHarvestConversation(account.vinted_user_id, conversationId);
   if (!force && h && h.conversation) return { ok:true,conversation:h.conversation,source:'harvest' };
   // 2) L'extension, depuis TON navigateur (5.135) : une lecture, au nom du
   //    compte connecté dans Chrome. Refusée (autre compte, absente) ⇒ repli.
-  if (extSait('messagerie') === 'ok') {
+  //    (15 octobre) `parExtension:false` : l'appelant SAIT qu'elle refusera (le
+  //    fil est sur un autre compte que celui de Chrome) — on ne lui demande pas.
+  if (parExtension && extSait('messagerie') === 'ok') {
     const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
     if (r && r.ok && r.data && r.data.conversation) { const c = fusionnerConversation(h?.conversation, r.data.conversation); if (c) return { ok: true, conversation: c, source: 'extension' }; }
   }
@@ -4529,8 +4552,28 @@ const normalizeConversationMessages = (conversation) => {
     }
     // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
     // codes de retrait compris.
-    return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
-  });
+    // ⚠️⚠️ (15 octobre) LES OFFRES SE LISAIENT « INFO COLIS · currency_code: EUR ».
+    //    Mesuré sur 400 messages captés : les 77 `offer_message` n'ont ni titre
+    //    ni corps (`price_label`, `price:{amount,currency_code}`…). Le balayage
+    //    des CODES de retrait prenait `currency_code` pour un code (« code »
+    //    dans la clé) : le fil affichait un faux encadré « Info colis /
+    //    retrait — currency_code: EUR ». Une offre se lit pour ce qu'elle est
+    //    (« Offre : 45,00 € », son état s'il est dit), sans balayage ; un
+    //    évènement qui n'a vraiment rien à dire (et aucun lien) n'est pas
+    //    affiché — jamais son type brut.
+    let body;
+    if (/^offer(_request)?_message$/.test(String(m.entity_type || ''))) {
+      const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+      const prix = e.price_label || (px != null && isFinite(Number(px)) ? Number(px).toFixed(2).replace('.', ',') + ' €' : '');
+      const dit = [e.title, e.body].filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim()).join(' · ');
+      body = dit || (prix ? `Offre : ${prix}` : '');
+      if (typeof e.status_title === 'string' && e.status_title.trim() && !body.includes(e.status_title.trim())) body += (body ? ' · ' : '') + e.status_title.trim();
+    } else {
+      body = extractEventText(e, m.entity_type);
+      if (body === m.entity_type) body = '';
+    }
+    return { kind: 'event', body, ts, links };
+  }).filter((m) => m.kind !== 'event' || m.body || (m.links && m.links.length));
   return messages.every(m=>m.ts!=null)?messages.sort((a,b)=>a.ts-b.ts):messages;
 };
 // L'offre d'un ACHETEUR encore en attente dans ce fil — la règle qu'utilisait le
@@ -5531,6 +5574,87 @@ const compteEffectif = (sel, connecte, estChoisissable) => {
   const c = String(connecte || '');
   return c && estChoisissable(c) ? c : '';
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// MESSAGES : LE COMPTE DE CHROME D'ABORD, LES AUTRES CONSULTABLES (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « lorsque l'extension d'un compte est activée, seulement ses
+// messages ; les autres doivent être floutés comme pour les annonces ; on doit
+// pouvoir tout voir même si on ne peut pas répondre ; il y a beaucoup trop
+// d'informations ».
+// ⚠️⚠️ MESURÉ SUR w15 AVANT D'ÉCRIRE : quand le compte de Chrome était mis en
+//    avant, la liste FILTRAIT les autres comptes (`!selEff || uid===selEff`) —
+//    leurs conversations n'étaient ni floutées ni lisibles : elles avaient
+//    disparu (filtre-compte.cjs : « 1 conversation » au lieu de 3). Le
+//    commentaire disait « floutés, pas masqués » ; le code masquait.
+// ⇒ Une règle pour l'ORDRE (§11) : le compte mis en avant (`selEff`, la même
+//    règle que le flou des ventes et des annonces) d'abord, puis les plus
+//    récentes. Les autres restent dans la liste, estompées, et S'OUVRENT.
+// ⚠️ PAS « les non lues d'abord » : mesuré le 15 octobre, 115 des 150
+//    conversations non lues ont plus de 14 jours — elles enterreraient les
+//    échanges frais. Le filtre « Non lues » est là pour elles.
+function ordreConversations(liste, compte) {
+  const uid = (c) => String((c && c._acc && c._acc.vinted_user_id) || '');
+  const t = (c) => Date.parse((c && c.updated_at) || '') || 0;
+  const k = String(compte || '');
+  return [...(Array.isArray(liste) ? liste : [])].sort((a, b) => {
+    if (k) { const pa = uid(a) === k ? 0 : 1, pb = uid(b) === k ? 0 : 1; if (pa !== pb) return pa - pb; }
+    return t(b) - t(a);
+  });
+}
+// PEUT-ON RÉPONDRE D'ICI À UNE CONVERSATION DE CE COMPTE ? Une règle pour la
+// zone de réponse, les offres du fil et la lecture par l'extension (§11).
+// L'extension juge de toute façon au clic (garde STRICTE : le compte du cookie
+// Vinted doit être celui de la conversation) ; l'app le dit AVANT, avec le
+// geste, au lieu de laisser taper une réponse qui partira en « refusé ».
+// Trois issues, jamais deux : `ok:true` · `ok:false` (on SAIT, et on dit
+// pourquoi) · `ok:null` (on demande encore à l'extension : rien n'est bloqué
+// d'avance, c'est elle qui tranchera — « pas su » n'est ni oui ni non).
+function etatReponseVinted(uid, nom, sansSouris) {
+  const glob = raisonExtGlobale(sansSouris, { cap: 'messagerie', role: 'envoie tes réponses' });
+  if (glob && (glob.code === 'verif' || glob.code === 'vrm-encours')) return { ok: null, code: glob.code };
+  if (glob) return { ok: false, code: glob.code, texte: glob.texte };
+  const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  if (e && e.vintedPasSu) return { ok: null, code: 'vinted-passu' };
+  const v = vintedDeChrome();
+  if (v === undefined) return { ok: null, code: 'vinted-passu' };
+  const n = nom || 'ce compte';
+  if (!v) return { ok: false, code: 'vinted-aucun', texte: `Lecture seule — ouvre vinted.fr sur ${n} dans ce Chrome pour répondre d'ici.` };
+  if (String(v.uid) !== String(uid)) return { ok: false, code: 'vinted-autre', texte: `Lecture seule — Chrome est sur ${v.login || 'un autre compte'}. Ouvre Vinted sur ${n} pour répondre d'ici.` };
+  return { ok: true, code: 'ok' };
+}
+// CE QUE DIT LA RÉPONSE DE L'EXTENSION À UN ENVOI — trois issues, jamais deux.
+//   'envoye'    Vinted a accepté (2xx).
+//   'refuse'    on SAIT que rien n'est parti : la garde de l'extension a dit non
+//               AVANT d'envoyer (elle répond un `code`), ou Vinted a refusé
+//               (4xx), ou la demande n'a jamais quitté la page.
+//   'incertain' pas de réponse (délai, pont orphelin) ou Vinted en panne
+//               (5xx) : le message a PU partir. On ne renvoie pas avant d'avoir
+//               relu le fil — un message envoyé deux fois à un acheteur se lit
+//               comme un robot (§3). C'était « timeout » ou « HTTP 504 », et le
+//               bouton laissait renvoyer.
+function issueEnvoiVinted(r) {
+  if (r && r.ok) return { issue: 'envoye' };
+  const statut = Number(r && r.status) || 0;
+  const err = String((r && r.error) || '');
+  const phrase = /\s/.test(err) && !/^erreur \d+$/.test(err) ? err : '';
+  if (r && r.code) {
+    const garde = ['vinted-pause', 'vinted-absent', 'vinted-autre', 'plafond', 'plafond-bordereaux', 'plusieurs', 'perime'].includes(String(r.code));
+    return { issue: 'refuse', texte: `Pas envoyé — ${garde && phrase ? phrase : "l'extension a refusé cette action"}.`.replace(/\.\.$/, '.') };
+  }
+  if (statut >= 400 && statut < 500) return { issue: 'refuse', texte: `Pas envoyé — Vinted a refusé (code ${statut}${phrase ? ' : ' + phrase : ''}).` };
+  if (err === 'compte introuvable') return { issue: 'refuse', texte: "Pas envoyé — l'extension ne connaît pas ce compte (recharge la page)." };
+  if (err === 'no window') return { issue: 'refuse', texte: 'Pas envoyé.' };
+  return { issue: 'incertain' };
+}
+// Le même message, relu dans le fil (espaces normalisés) — c'est ce qui dit
+// qu'un envoi « incertain » est en réalité parti.
+const memeMessage = (a, b) => String(a || '').replace(/\s+/g, ' ').trim() === String(b || '').replace(/\s+/g, ' ').trim();
+// L'identité d'un fil pour ses brouillons et ses envois incertains : le compte
+// et la conversation (jamais le titre ni l'acheteur).
+const cleConvMsg = (acc, convId) => String((acc && acc.vinted_user_id) || '') + ':' + String(convId);
+// Le vendeur VRM dont c'est le brouillon (cloisonnement, §5) ; sans session
+// (installation à un seul vendeur), l'appareil.
+const proprietaireBrouillon = () => String((AUTH && AUTH.user && AUTH.user.id) || 'local');
 // Ce qui empêche l'app de faire agir l'extension, au niveau de l'EXTENSION (pas
 // du compte) : la même raison pour toutes les ventes, donc dite UNE fois au
 // lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
@@ -23999,6 +24123,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyErr, setReplyErr] = useState(null);
+  // (15 octobre) L'issue d'un envoi, dite clairement : 'envoye' (la bulle le
+  // porte), 'refuse' (`replyErr`, rien n'est parti), 'incertain' (relire le fil
+  // avant de renvoyer). Un envoi incertain se retient PAR FIL (`compte:fil`) :
+  // changer de conversation ne lève pas la garde — c'est là que partait le
+  // second message. `replyNote` : ce que la relecture a établi.
+  const [incertains, setIncertains] = useState({});
+  const [replyNote, setReplyNote] = useState(null);
+  // Peut-on répondre d'ici ? (`etatReponseVinted`) — l'état de l'extension change
+  // pendant que le fil est ouvert (battement de 20 s, compte de Chrome) : on
+  // se redessine, seulement fil ouvert.
+  const sansSourisMsg = useSansSouris();
+  const [, majExtMsg] = React.useReducer((x) => x + 1, 0);
+  useEffect(() => { if (!openConv) return undefined; return onVmrExt(majExtMsg); }, [!!openConv]);
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
   const [convMax, setConvMax] = useState(40);
   const [prixOffre, setPrixOffre] = useState('');
@@ -24695,6 +24832,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const selEff = compteEffectif(compteSel, compteConnecte, (u) => accountUids.has(u) && !acctOff(u));
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
+  // Messages (15 octobre) : le MÊME estompage, mais la ligne s'ouvre — un fil
+  // d'un autre compte se lit, il ne se répond pas d'ici (`etatReponseVinted`).
+  const STYLE_FLOU_CONSULTABLE = { filter: STYLE_FLOU.filter, opacity: STYLE_FLOU.opacity, transition: STYLE_FLOU.transition };
   const ventesAffichees = useMemo(() => {
     const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = (sales.items || [])
@@ -26713,15 +26853,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!conv?._acc || conv.id==null)return;
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
-    setReplyText('');setReplyErr(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
+    // (15 octobre) Le brouillon de CE fil revient (il était effacé à chaque
+    // changement de conversation).
+    setReplyText(brouillonsVinted.lire(proprietaireBrouillon(), String(conv._acc.vinted_user_id), conv.id));
+    setReplyErr(null);setReplyNote(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
     setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.description,photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
-    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
+    // L'extension ne lit un fil QUE pour le compte ouvert dans Chrome (garde
+    // stricte) : on ne lui demande pas ce qu'elle refusera — un fil d'un autre
+    // compte s'ouvre sur ce qui est enregistré (lecture seule).
+    const lisible = extSait('messagerie')==='ok' && etatReponseVinted(conv._acc.vinted_user_id, '', sansSourisMsg).ok !== false;
+    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:lisible,parExtension:lisible});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:res.conversation,messages:normalizeConversationMessages(res.conversation)}):o);
   };
   const actualiserConversation=async()=>{
     const oc=openConv;if(!oc || oc.loading)return;
-    const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
+    const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true,parExtension:etatReponseVinted(oc.acc?.vinted_user_id,'',sansSourisMsg).ok!==false});
+    if(conversationRequest.current!==oc.request)return;
     setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?res.conversation:o.conversation,messages:res.ok?normalizeConversationMessages(res.conversation):o.messages}):o);
+    // ── UN ENVOI INCERTAIN SE TRANCHE PAR LA RELECTURE DU FIL CHEZ VINTED ──
+    // Relu EN DIRECT (par l'extension) : le message y est ⇒ il est parti (le
+    // brouillon s'efface) ; il n'y est pas ⇒ il n'est pas parti (on peut
+    // renvoyer). Relu sur une copie enregistrée : on ne peut rien conclure — la
+    // garde reste, et c'est dit.
+    const k = cleConvMsg(oc.acc, oc.convId), inc = incertains[k];
+    if (!inc) return;
+    if (!(res.ok && res.source === 'extension')) { setIncertains(m => ({ ...m, [k]: { ...inc, relu: 'ko' } })); return; }
+    const parti = normalizeConversationMessages(res.conversation).some(m => m.kind==='message' && m.mine && memeMessage(m.body, inc.texte));
+    setIncertains(m => { const n = { ...m }; delete n[k]; return n; });
+    if (parti) {
+      brouillonsVinted.effacerSiIdentique(proprietaireBrouillon(), String(oc.acc.vinted_user_id), oc.convId, inc.brut);
+      setReplyText(t => (t === inc.brut ? '' : t));
+      setReplyNote('Envoyé — il est dans le fil.');
+    } else setReplyNote("Pas dans le fil : il n'est pas parti, tu peux le renvoyer.");
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
@@ -26763,21 +26926,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ()=>{arrete=true;clearTimeout(timer);captures.clear();window.removeEventListener('vrm:ext',ecoute);};
   },[curSub,cleComptes,openConv?.request]);
 
+  // ── RÉPONDRE : SUR SON CLIC SEULEMENT (15 octobre) ─────────────────────────
+  // Rien ne part tout seul (la réponse automatique est retirée, voir
+  // `audit-reponses-auto.cjs`) : Envoyer (ou Entrée) est SON geste. L'issue est
+  // dite en clair (`issueEnvoiVinted`) et un envoi dont on ne sait pas s'il est
+  // parti BLOQUE le renvoi de ce fil jusqu'à la relecture — jamais deux fois le
+  // même message à un acheteur.
   const sendReply = async () => {
-    const oc = openConv; const text = replyText.trim();
+    const oc = openConv; const brut = replyText; const text = brut.trim();
     if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
-    if (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
-    setReplyBusy(true); setReplyErr(null);
+    const k = cleConvMsg(oc.acc, oc.convId);
+    if (incertains[k]) return;
+    const rep = etatReponseVinted(oc.acc.vinted_user_id, accName(oc.acc), sansSourisMsg);
+    if (rep.ok === false) { setReplyErr(rep.texte); return; }
+    setReplyBusy(true); setReplyErr(null); setReplyNote(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
+    const issue = issueEnvoiVinted(r);
+    // Ce qui vaut pour LE FIL, même si on en a ouvert un autre entre-temps : le
+    // brouillon d'un message parti s'efface ; un envoi incertain se retient.
+    if (issue.issue === 'envoye') brouillonsVinted.effacerSiIdentique(proprietaireBrouillon(), String(oc.acc.vinted_user_id), oc.convId, brut);
+    if (issue.issue === 'incertain') setIncertains(m => ({ ...m, [k]: { texte: text, brut, at: Date.now() } }));
     if(conversationRequest.current!==oc.request)return;
     setReplyBusy(false);
-    if (r && r.ok) {
+    if (issue.issue === 'envoye') {
       setReplyText('');
-      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}] }):o);
-    } else {
-      setReplyErr((r && (r.error || (r.status ? 'HTTP '+r.status : ''))) || "Échec de l'envoi");
-    }
+      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[],etat:'envoye'}] }):o);
+    } else if (issue.issue === 'refuse') setReplyErr(issue.texte);
   };
+  // L'envoi incertain d'un fil, vérifié SUR VINTED par lui : il lève la garde.
+  const nonParti = (acc, convId) => { const k = cleConvMsg(acc, convId); setIncertains(m => { const n = { ...m }; delete n[k]; return n; }); setReplyNote(null); };
 
   // ── LES GESTES D'OFFRE, DEPUIS L'APP (5.135) ────────────────────────────────
   // Julien, 3 octobre : « la messagerie intégrée avec la possibilité de
@@ -26797,6 +26974,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       p = Number(String(prixOffre).replace(',', '.'));
       if (!tx) { setOffreMsg({ err: "Pas d'article rattaché à cette conversation : rien à proposer." }); return; }
       if(!(p>0) || !Number.isFinite(p) || !/^\d+(?:[,.]\d{1,2})?$/.test(prixOffre.trim())) { setOffreMsg({ err: 'Indique un prix.' }); return; }
+      // (15 octobre) Une offre ENGAGE un prix : l'acheteur peut payer à ce prix
+      // tout de suite. Une confirmation, comme pour accepter (règle 0.5 de la
+      // demande du 15 octobre : action sensible ⇒ confirmation explicite).
+      if (!(await askConfirm({ title: `Proposer ${fmtE(p)} ?`, desc: `${oc.header?.login || 'L’acheteur'} pourra acheter la paire à ce prix.`, ok: 'Proposer', cancel: 'Annuler' }))) return;
       method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
     }
     if(conversationRequest.current!==oc.request)return;
@@ -26804,13 +26985,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body });
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
-    if (r && r.ok) {
+    const issue = issueEnvoiVinted(r);
+    if (issue.issue === 'envoye') {
       setOffreMsg({ ok: quoi === 'accept' ? 'Offre acceptée sur Vinted.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
       setPrixOffre('');
       const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
       if (res.ok) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: res.conversation, messages: normalizeConversationMessages(res.conversation) }) : o);
     } else {
-      setOffreMsg({ err: (r && (r.error || (r.status ? 'HTTP ' + r.status : ''))) || "Vinted n'a pas répondu." });
+      // Pas de réponse : le geste a PU partir — on ne le dit ni fait ni raté.
+      setOffreMsg({ err: issue.issue === 'refuse' ? issue.texte : "Résultat non confirmé — relis le fil (↻) avant de recommencer." });
     }
   };
 
@@ -28555,7 +28738,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
-              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {openConv.error && <div data-fil-erreur style={{fontSize:13,color:C.text,lineHeight:1.45}}>Je n'ai pas pu lire ce fil{/\s/.test(String(openConv.error)) ? <> ({String(openConv.error).replace(/[.\s]+$/,'')})</> : null} — ↻ pour réessayer, ou <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>ouvre-le sur Vinted</a>.</div>}
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
               {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
                 <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'10px 12px',marginBottom:4}}>
@@ -28578,68 +28761,94 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                       {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
-                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}{m.etat==='envoye' ? <span data-envoye=""> · Envoyé</span> : null}</time>}
                       {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
                     </div>
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
-            {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (
-              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
-                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
-                    une. Par l'extension, sur le compte connecté dans Chrome. */}
-                {(()=>{
-                  const off = offreEnAttenteDe(openConv.conversation);
-                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
-                  if (!off && !tx) return null;
-                  const etat = extSait('messagerie');
-                  if (etat !== 'ok' || __vmrPlusieurs) return (
-                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
-                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
-                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
-                    </div>
-                  );
-                  return (
-                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
-                      {off && (
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
-                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
-                        </div>
-                      )}
-                      {tx && (
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
-                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
-                        </div>
-                      )}
-                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
-                    </div>
-                  );
-                })()}
-                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
-                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+            {/* ── LA ZONE DE RÉPONSE (15 octobre) ─────────────────────────────
+                Une règle (`etatReponseVinted`) pour la réponse ET les offres :
+                le compte ouvert dans Chrome répond ; les autres se LISENT (on
+                peut tout voir, même sans pouvoir répondre — Julien), avec UNE
+                phrase qui dit pourquoi et le geste. Le texte tapé reste en
+                brouillon pour ce fil ; un envoi incertain bloque le renvoi
+                jusqu'à la relecture. Rien ne part sans son clic. */}
+            {!openConv.loading && openConv.convId && (()=>{
+              const rep = etatReponseVinted(openConv.acc?.vinted_user_id, accName(openConv.acc), sansSourisMsg);
+              const k = cleConvMsg(openConv.acc, openConv.convId);
+              const inc = incertains[k];
+              const refuseVinted = openConv.conversation?.allow_reply===false;
+              const bloque = rep.ok===false || refuseVinted || !!inc;
+              const off = openConv.error ? null : offreEnAttenteDe(openConv.conversation);
+              const tx = openConv.error ? null : (openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id);
+              const lienVinted = <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>Ouvrir sur Vinted ↗</a>;
+              const etat = rep.ok===false ? 'lecture' : refuseVinted ? 'refusee' : inc ? 'incertain' : replyBusy ? 'envoi' : 'libre';
+              const brouillon = (v) => { setReplyText(v); brouillonsVinted.sauver(proprietaireBrouillon(), String(openConv.acc?.vinted_user_id||''), openConv.convId, v); };
+              return (
+              <div data-reponse={etat} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {/* Pourquoi on ne peut pas répondre d'ici — UNE phrase, le geste. */}
+                {rep.ok===false && <div data-reponse-raison={rep.code} role="status" style={{fontSize:12,color:C.text,lineHeight:1.45,marginBottom:8}}>{rep.texte} {lienVinted}</div>}
+                {rep.ok!==false && refuseVinted && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {/* L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire une
+                    — seulement d'où l'on peut agir ; sinon on dit qu'elle attend. */}
+                {(off || tx) && (rep.ok===false ? (off ? (
+                  <div data-offre="indisponible" style={{fontSize:12,color:C.muted,marginBottom:8}}><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente.</div>
+                ) : null) : (
+                  <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
+                    {off && (
+                      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
+                        <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
+                        <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
+                        <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                      </div>
+                    )}
+                    {tx && (
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
+                        <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
+                        <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                      </div>
+                    )}
+                    {offreMsg && <div data-offre-issue={offreMsg.err?'ko':'ok'} style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.warn:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                  </div>
+                ))}
+                {/* L'issue de l'envoi, en clair. */}
+                {inc && (
+                  <div data-envoi-incertain={inc.relu==='ko'?'relecture-ko':'oui'} role="status" style={{fontSize:12,color:C.text,lineHeight:1.45,marginBottom:8,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'7px 10px'}}>
+                    {inc.relu==='ko'
+                      ? <>Je n'ai pas pu relire ce fil chez Vinted. Regarde s'il y est : {lienVinted} · <button type="button" onClick={()=>nonParti(openConv.acc, openConv.convId)} style={{border:'none',background:'transparent',color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0,fontSize:12}}>Il n'est pas parti</button></>
+                      : <>Envoi non confirmé — il est peut-être parti. Relis le fil (↻) avant de renvoyer.</>}
+                  </div>
+                )}
+                {replyErr && <div data-envoi-refuse="" role="alert" style={{fontSize:12,color:C.warn,marginBottom:6,lineHeight:1.4}}>{replyErr}</div>}
+                {replyNote && !inc && <div data-envoi-note="" role="status" style={{fontSize:12,color:C.muted,marginBottom:6}}>{replyNote}</div>}
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
+                {!refuseVinted && (
                 <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
+                    <button key={i} type="button" onClick={()=>brouillon(q.t)} title={q.t}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
+                )}
+                {!refuseVinted && (
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                  <textarea aria-label="Réponse à la conversation" value={replyText} onChange={e=>brouillon(e.target.value)} readOnly={replyBusy} rows={1}
+                    placeholder={rep.ok===false?'Brouillon (gardé pour ce fil)…':'Écrire une réponse…'}
+                    onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); if(!bloque) sendReply(); } }}
+                    style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" data-envoyer="" onClick={sendReply} disabled={bloque||replyBusy||!replyText.trim()}
+                    title={rep.ok===false ? rep.texte : inc ? 'Relis le fil avant de renvoyer' : undefined}
+                    style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(bloque||replyBusy||!replyText.trim())?C.border:C.accent,color:(bloque||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff'),fontSize:13,fontWeight:600,cursor:(bloque||replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'Envoi…':'Envoyer'}</button>
                 </div>
-                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
+                )}
               </div>
-            )}
+              );
+            })()}
           </div>
         </div></ResponsiveChatPortal>
   );
@@ -31690,8 +31899,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
-          // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!selEff || uidC(c)===selEff) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          // ⚠️⚠️ (15 octobre) Compte mis en avant ⇒ les AUTRES restent dans la
+          //    liste, estompés et CONSULTABLES. Le filtre `uidC(c)===selEff` les
+          //    faisait DISPARAÎTRE (mesuré sur w15 : « 1 conversation » au lieu
+          //    de 3) — Julien : « on doit pouvoir tout voir même si on ne peut
+          //    pas répondre ». L'ordre : `ordreConversations` (§11).
+          const q = messageSearch.trim().toLowerCase();
+          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!q || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(q)));
+          const estompee = c => !!(selEff && uidC(c)!==selEff);
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -31702,17 +31917,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
-          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && estompee(c)).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
-          // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
-          const coMsg = selEff;
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+          // Le compte mis en avant d'abord, puis les plus récentes (§11).
+          const tri=ordreConversations(liste.filter(c=>messageFilter==='all'||c.unread), selEff);
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
+          // Où commencent les autres comptes : UNE ligne de séparation, qui dit
+          // pourquoi ils sont estompés (le compte de Chrome répond, eux se
+          // lisent) et combien attendent — au lieu d'une phrase par ligne (§7).
+          const iSep = selEff ? affiches.findIndex(estompee) : -1;
+          const sepApres = selEff && iSep < 0 && tri.some(estompee);   // tous au-delà de « Voir plus »
+          const lectureSeule = !!(selEff && selEff===compteConnecte);
+          const separateur = (
+            <div key="sep-autres" data-conv-autres={lectureSeule?'lecture':'choix'} data-nonlus-ailleurs={nonLusAilleurs>0?nonLusAilleurs:undefined}
+              style={{display:'flex',gap:6,alignItems:'baseline',flexWrap:'wrap',padding:'8px 12px',fontSize:11.5,color:C.muted,background:C.bg,borderTop:`1px solid ${C.border}`}}>
+              <span style={{fontWeight:600,color:C.text}}>Autres comptes</span>
+              <span>{lectureSeule ? '· lecture seule' : '· estompés'}</span>
+              {nonLusAilleurs>0 && <span>· {nonLusAilleurs} non lu{nonLusAilleurs>1?'s':''}</span>}
+            </div>
+          );
+          const etatTete = nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide';
+          const motTete = etatTete==='nonlus' ? `${nonLus} non lu${nonLus>1?'s':''}` : etatTete==='passu' ? 'Lecture incomplète' : etatTete==='toutlu' ? 'Tout est lu' : 'Aucune conversation';
           // ⚠️ UNE BOÎTE FIGÉE SE DIT (6 octobre). Mesuré : deux comptes avaient
           // leur boîte bloquée sur une page ANCIENNE (dernière conversation captée
           // le 27 juillet pour une vente du 2 octobre). Chaque vente ouvre une
@@ -31741,8 +31971,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
-                  {liste.length} conversation{liste.length>1?'s':''}
+                <div data-messagerie-tete={etatTete} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+                  {motTete}
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
@@ -31751,18 +31981,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
-              {nonLusAilleurs>0 && (
-                <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
-                  Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
-                </div>
-              )}
               {boitesKO.length>0 && (
                 <div data-boites-ko={boitesKO.map(a=>String(a.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
                   <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
                   <span>
-                    {boitesKO.length===1 ? <>La boîte de <b>{accName(boitesKO[0])}</b> n'a pas pu être lue</>
-                      : <>Les boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} n'ont pas pu être lues</>}
-                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Réessaie avec « ↻ Actualiser » ; si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                    {boitesKO.length===1 ? <>Boîte de <b>{accName(boitesKO[0])}</b> pas lue</>
+                      : <>Boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} pas lues</>}
+                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages manquent ici. ↻ Actualiser ; si ça dure, ouvre {boitesKO.length===1?'sa':'leur'} messagerie Vinted.
                   </span>
                 </div>
               )}
@@ -31771,19 +31996,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
                   <span>
                     {boitesPerimees.length===1
-                      ? <>La boîte de <b>{accName(boitesPerimees[0].acc)}</b> n'est plus à jour (dernière conversation captée le {jourCourt(boitesPerimees[0].conv)}, dernière vente le {jourCourt(boitesPerimees[0].vente)}) — ouvre ta messagerie Vinted sur ce compte.</>
-                      : <>Les boîtes de {boitesPerimees.map((b,i)=><React.Fragment key={String(b.acc.vinted_user_id)}>{i?(i===boitesPerimees.length-1?' et ':', '):''}<b>{accName(b.acc)}</b></React.Fragment>)} ne sont plus à jour (leur dernière vente est plus récente que leur dernière conversation captée) — ouvre ta messagerie Vinted sur chacun de ces comptes.</>}
+                      ? <>Boîte de <b>{accName(boitesPerimees[0].acc)}</b> pas à jour (dernier message capté le {jourCourt(boitesPerimees[0].conv)}, dernière vente le {jourCourt(boitesPerimees[0].vente)}) — ouvre sa messagerie Vinted.</>
+                      : <>Boîtes de {boitesPerimees.map((b,i)=><React.Fragment key={String(b.acc.vinted_user_id)}>{i?(i===boitesPerimees.length-1?' et ':', '):''}<b>{accName(b.acc)}</b></React.Fragment>)} pas à jour (vente plus récente que le dernier message capté) — ouvre leur messagerie Vinted.</>}
                   </span>
                 </div>
               )}
               {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
-              {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée — elles arrivent quand l'extension passe sur ta messagerie Vinted.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
-                  return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
+                  const flou = estompee(c);
+                  return (<React.Fragment key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id}>
+                    {i===iSep && separateur}
+                    {/* Estompée comme une vente d'un autre compte (STYLE_FLOU), mais
+                        elle S'OUVRE : le fil se lit, la réponse dit pourquoi elle
+                        attend. La survoler la rend nette. */}
+                    <button className={(openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row')+(flou?' is-estompee':'')} type="button" data-conv={c.id} data-estompee={flou?'':undefined} onClick={()=>openConversation(c)}
+                      aria-label={flou ? `${(c.opposite_user&&c.opposite_user.login)||'Conversation'} — ${c._acc?accName(c._acc):'autre compte'}, lecture seule` : undefined}
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i && i!==iSep)?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(flou?STYLE_FLOU_CONSULTABLE:null)}}>
                       {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
@@ -31795,14 +32026,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                       {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
                     </button>
-                  );
+                  </React.Fragment>);
                 })}
+                {sepApres && separateur}
               </div>
               {tri.length>convMax && <button type="button" onClick={()=>setConvMax(m=>m+40)} style={{display:'block',margin:'8px auto 0',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'7px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
             </div>
           );
         })()}
-        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div></div>
+        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div></div>
         <details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
@@ -35908,7 +36140,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {voirReglages && (<>
       {MULTI_USER && (<>
         <NumerosSetting/>
-        <RepondreSetting/>
+        {/* ⛔ « Répondre à mes messages Vinted » (RepondreSetting) est RETIRÉ le
+            15 octobre, à sa demande : rien ne répond à sa place, une réponse ne
+            part que sur son clic dans Messages. */}
         <DetourageSetting/>
       </>)}
 
@@ -36648,132 +36882,6 @@ function NumerosSetting() {
         Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même carton.
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// RÉPONDRE AUX MESSAGES À SA PLACE — SA DÉCISION DU 19 SEPTEMBRE
-// ══════════════════════════════════════════════════════════════════════════════
-// Je lui ai posé la question avec le risque écrit noir sur blanc, et il a
-// répondu « tout, elle répond à tout ». C'est tranché ; l'interrupteur ne le
-// redemande pas, il dit seulement ce qui se passe et montre ce qui est parti.
-// ⚠️ ÉTEINT PAR DÉFAUT, comme le moteur d'offres (§3) : allumer est un geste,
-//    et un geste se fait une fois, en connaissance.
-// ⚠️⚠️ ET LE DÉFAUT LE PLUS COÛTEUX DU PROJET NE SE REFAIT PAS : c'est
-//    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
-//    promettrait « elle répond à tes messages » à une extension qui ne sait pas
-//    le faire — pour la septième fois. Trois états, jamais deux.
-const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
-// Les causes d'une IA qui n'a rien rendu, tirées du bilan de l'extension (une
-// cause à zéro n'est pas écrite).
-const causesIaKO = (c) => {
-  const m = (c && typeof c === 'object') ? c : {};
-  const l = [
-    m.pasBranchee ? 'pas branchée sur le serveur' : '',
-    m.injoignable ? 'injoignable' : '',
-    m.illisible ? 'réponse inutilisable, elle ne sera pas redemandée' : '',
-  ].filter(Boolean);
-  return l.length ? ` (${l.join(' · ')})` : '';
-};
-function RepondreSetting() {
-  const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
-  const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
-  const [bilan, setBilan] = React.useState(undefined);
-  const touche = React.useRef(false);
-  React.useEffect(() => onCloudReady(() => {
-    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
-    setOn((p) => p || !!load('vinted_repond_auto', false));
-  }), []);
-  React.useEffect(() => {
-    let vivant = true;
-    (async () => {
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_msg_repondus&select=data`, { headers: sbAuth() });
-        if (!vivant) return;
-        // « Rien lu » ne vaut pas « rien envoyé » : trois états.
-        if (!r.ok) { setEnvois(null); setBilan(null); return; }
-        const j = await r.json();
-        const d = (j && j[0] && j[0].data) || {};
-        // `bilan` et `demandes` sont des clés réservées : ce ne sont pas des
-        // envois, on ne les liste pas. (`demandes` = ce que l'extension a déjà
-        // demandé à l'IA, une fois par message — 5.168, la « fuite » du 11 oct.)
-        setBilan(d.bilan || null);
-        setEnvois(Object.keys(d).filter((k) => !CLES_RESERVEES_REPONDUS.includes(k)).map((k) => d[k]).filter(Boolean)
-          .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
-      } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
-    })();
-    return () => { vivant = false; };
-  }, [on]);
-  const cap = extSait('repond');
-  const basculer = () => { touche.current = true; const n = !on; setOn(n); save('vinted_repond_auto', n); };
-  // ⚠️⚠️ « ELLE RÉPOND À TOUT » SERAIT FAUX, ET MESURÉ FAUX. Sur ses 32
-  //    conversations non lues du 19 septembre, **3** portaient une question
-  //    d'acheteur sur une de SES annonces : les autres n'ont pas de conversation
-  //    captée, pas de message dedans, sont refusées à la réponse par Vinted, ou
-  //    sont des échanges où c'est LUI qui achète. Un total partiel présenté
-  //    comme complet est pire qu'un total absent (§5) : on écrit les deux
-  //    nombres et la RAISON, jamais le seul « à tout ».
-  const ecartees = bilan ? [
-    bilan.pasVendeur ? `${bilan.pasVendeur} où c’est toi qui achètes (là, c’est au vendeur de parler)` : '',
-    bilan.pasCaptee ? `${bilan.pasCaptee} dont l’extension n’a pas encore lu l’échange` : '',
-    bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
-    bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
-    bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
-    // ⚠️ Revue du 11 octobre : quand c'est l'IA qui n'a rien rendu d'utilisable
-    //    (pas branchée, injoignable, sortie illisible), ce n'est PAS « elle
-    //    n'était pas sûre ». L'extension ≥ 5.173 le compte à part, avec la cause.
-    bilan.iaKO ? `${bilan.iaKO} où l’IA n’a pas répondu${causesIaKO(bilan.iaKOcauses)} — rien n’est parti` : '',
-  ].filter(Boolean) : [];
-  return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Répondre à mes messages Vinted</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-            À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>plusieurs par visite</b> (le reste à la visite suivante, sans jamais dépasser une limite sûre par heure), jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
-          </div>
-        </div>
-        <button className="vrm-setting-switch" aria-label="Répondre automatiquement aux messages Vinted" type="button" role="switch" onClick={basculer} aria-checked={on}
-          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
-          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
-        </button>
-      </div>
-      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
-      {on && cap === 'absente' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-          C’est l’extension, dans ton Chrome, qui répond — pas cette page. Ouvre l’app sur l’ordinateur où elle est installée pour voir ce qui est parti.
-        </div>
-      )}
-      {on && cap === 'retard' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.warn,lineHeight:1.5}}>
-          L’extension installée ici ne sait pas encore répondre. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, rien ne partira.
-        </div>
-      )}
-      {on && (
-        <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:9}} data-bilan={bilan ? 'lu' : bilan === null ? 'pasSu' : 'attente'}>
-          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:4}}>Ce qui est parti en ton nom</div>
-          {bilan ? (
-            <div style={{fontSize:11.5,color:C.muted,lineHeight:1.5,marginBottom:6}}>
-              Au dernier passage&nbsp;: <b style={{color:C.text}}>{bilan.envoyes || 0}</b> réponse{(bilan.envoyes || 0) > 1 ? 's' : ''} envoyée{(bilan.envoyes || 0) > 1 ? 's' : ''} sur <b style={{color:C.text}}>{bilan.nonLues || 0}</b> conversation{(bilan.nonLues || 0) > 1 ? 's' : ''} non lue{(bilan.nonLues || 0) > 1 ? 's' : ''}.
-              {ecartees.length ? <> Les autres ne sont pas pour elle&nbsp;: {ecartees.join(' · ')}.</> : null}
-            </div>
-          ) : null}
-          {envois === undefined ? <div style={{fontSize:11.5,color:C.muted}}>Chargement…</div>
-            : envois === null ? <div style={{fontSize:11.5,color:C.muted}}>Je n’ai pas pu lire la liste. Rien n’est perdu — rouvre cet écran dans un moment.</div>
-            : !envois.length ? <div style={{fontSize:11.5,color:C.muted}}>Aucune réponse envoyée pour l’instant.</div>
-            : <div style={{display:'grid',gap:6}}>
-                {envois.slice(0, 8).map((e, i) => (
-                  <div key={i} style={{fontSize:11.5,lineHeight:1.5}}>
-                    <span style={{color:C.text,fontWeight:600}}>{e.login || 'un acheteur'}</span>
-                    {e.titre ? <span style={{color:C.muted}}> · {e.titre}</span> : null}
-                    <div style={{color:C.muted}}>« {e.texte} »</div>
-                  </div>
-                ))}
-                {envois.length > 8 ? <div style={{fontSize:11,color:C.muted}}>et {envois.length - 8} autre{envois.length - 8 > 1 ? 's' : ''}.</div> : null}
-              </div>}
-        </div>
-      )}
     </div>
   );
 }
