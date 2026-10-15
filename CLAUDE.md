@@ -9060,6 +9060,50 @@ serveur atteigne `img.leboncoin.fr` depuis Vercel ; que SON extension réponde.
 montée par la session principale), puis ouvrir une fois **Mes transactions** sur
 leboncoin.fr pour que les photos des achats arrivent avec la liste.
 
+### Leboncoin → Annonces liste enfin SES annonces en ligne, avec leur photo (15 octobre)
+Suite de la plainte du 15 octobre (« j'ai beau actualiser, les photos des
+annonces n'apparaissent pas »). Le correctif des photos (`PhotoLeboncoin`)
+était juste, mais **l'écran ne listait pas ses annonces en ligne** : seulement
+celles « à relier », vendues, ou non reliées, plus la file Vinted.
+**Mesuré (sa base, lecture seule)** : `lbc_listings` = **183** annonces captées,
+**8 à lui** par les règles existantes (`annonceLbcALui` : réf/`lbcUser`, ou un
+compte PROUVÉ par une vente où il est le vendeur — 1 compte, 3 ventes) ;
+**3 vendues** ici ⇒ **5 en ligne**, toutes avec 12 à 15 photos `img.leboncoin.fr`,
+toutes sur le même compte ; **3 reliées** (lien posé à la main, dont une avec sa
+réf VRM), **2 à relier**. Statut capturé « active » mais **vues le 20 septembre**
+pour 4 d'entre elles (la dernière lecture de « Mes annonces » date du 10 octobre).
+- **La carte du compteur porte la liste** (§7 : le nombre n'est écrit qu'une
+  fois) : photo (`PhotoVinted` ⇒ `PhotoLeboncoin`), titre, prix, statut
+  (`statutAnnonceLbc` : active ⇒ « en ligne », inactive ⇒ « désactivée »), lien
+  « Voir » (seulement vers `leboncoin.fr`), le N° **seulement par identité**
+  (`clesAnnonceLbc` + une paire qui porte ce N°, la règle de « non reliées »), le
+  compte **seulement s'il y en a plusieurs**, « vue il y a N j » seulement pour
+  une date CONNUE de plus de 2 jours, et le geste une fois.
+- Les annonces **à relier** sont DANS la liste (le même `LbcRelier`) : la carte
+  « non reliées » à part montrait la même annonce une seconde fois.
+- **Trois états** (`lbcEtat`) : `passu` (lecture ratée — dite UNE fois en haut,
+  jamais « aucune annonce ») · `jamais` (rien de capté qui soit à lui : « ouvre
+  « Mes annonces » sur leboncoin.fr dans le Chrome de l'extension ») · lu
+  (`aucune` quand tout ce qui est à lui est vendu ou retiré, avec la date).
+  Avant, « jamais » valait aussi « tout vendu », et ne se disait que sans aucune
+  paire marquée publiée.
+- **Aucun second lecteur** : l'écran lisait déjà `lbc_listings` ; la liste est
+  calculée sur ses `liveAds` (`lignesAnnoncesLbc`).
+- ⚠️⚠️ **TROUVÉ AU RENDU, ET C'ÉTAIT SUR SON IPHONE** : à 390 px la page entière
+  sortait de l'écran à droite (« ↻ Actualiser » et « Relier » coupés) dès qu'un
+  titre était long. Le bloc de l'écran (`margin: 0 auto`) est un élément de
+  grille : sans largeur, il se dimensionne au contenu, donc au plus long titre
+  `nowrap`. ⚠️ Et `scrollWidth` ne le voyait PAS (la racine coupe ce qui
+  dépasse) : le banc mesure les **bords réels** des boutons et des lignes.
+  `width: 100%` + `box-sizing`.
+- Preuves (§6.1, build de `p0-lbc-photos` dans une copie) : banc
+  `lbc-annonces.cjs` (port 5891, données inventées) **31 rouges avant, 0 après** ;
+  mutations : annonce d'un inconnu affichée ⇒ **12 rouges** (elle sortait même en
+  « N°12 » par son titre) ; lecture ratée lue « jamais » ⇒ **2 rouges**.
+- **Non fait** : relire « Mes annonces » ne se déclenche pas d'ici (il faut sa
+  visite sur leboncoin.fr) ; le statut n'est que celui de la DERNIÈRE capture
+  (une annonce vendue depuis peut encore dire « en ligne » — l'âge le dit).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
