@@ -9012,6 +9012,10 @@ Demande de Julien du 15 octobre (lot P2 « Ventes »). Tranché sans lui demande
   versement, comme « Reçu en {mois} », §11). Pas encore publié sur l'appareil ⇒ la
   série est absente et la carte dit d'ouvrir Ventes. `CourbeVentes` (lissée) et
   `moisMoisson` sont retirés (plus d'appelant).
+- **« Chiffre d'affaires entre deux dates » (Statistiques) sommait l'archive vide** :
+  0,00 € sur toute période, présenté comme un fait. Remplacé par une porte vers la
+  période de Ventes (un propriétaire, §11). L'analyse de Ventes dit « CA finalisé
+  Vinted » (la liste est Vinted ; le bilan de période compte toutes plateformes).
 - **« Prix qui marche » ⇒ gardé, renommé « Prix de revente »**, rendu vérifiable :
   chaque modèle+taille ouvre la liste de SES ventes (date, compte, prix, titre —
   la médiane se recompte), dit la date de la dernière, et la fenêtre se choisit
@@ -9023,7 +9027,7 @@ Demande de Julien du 15 octobre (lot P2 « Ventes »). Tranché sans lui demande
 - Preuves : `audit-bilan-periode.cjs` (la vraie règle exécutée, cas à la main +
   400 jeux au hasard ; `--prouve` : 4 mutations, toutes rouges) ; banc
   `bancs/ventes-periode.cjs` (port 5951, données inventées, 390/1512, clair/sombre)
-  — **115 verts**, **39 rouges** sur le build de w15, **4 rouges** sur un build
+  — **118 verts**, **42 rouges** sur le build de w15, **4 rouges** sur un build
   muté (reçu illisible dessiné à 0, fenêtre ignorée).
 - ⚠️ **Non fait** : la courbe vit dans Ma journée (bloc replié sous 768 px) — si la
   refonte de Ma journée la retire, la remettre ailleurs, ne pas la perdre ; « Ventes
