@@ -49,6 +49,19 @@ const DEVISE_APRES = `(?:€|EUR\\b|euros?\\b|\\$|£|k€)`;
 // devise devant.
 const RE_MONTANT_APRES = new RegExp(`(?:[+\\-−]${ESP}?)?${NOMBRE}(?:${ESP}?[kK](?=${ESP}?€))?${ESP}?${DEVISE_APRES}`, 'g');
 const RE_MONTANT_AVANT = new RegExp(`(?:€|\\$|£)${ESP}?[+\\-−]?${NOMBRE}`, 'g');
+// ⚠️ UNE FOURCHETTE OU UNE BAISSE PORTE DEUX MONTANTS ET UNE SEULE DEVISE
+//    (relecture du 15 octobre, sur ses vraies données : 115 lignes « de 26,71 à
+//    ••• € » sur « Le prix qui marche », « fourchette 20–••• € », le prix barré
+//    « 60 → ••• € » du conseil de baisse, « 1 234 / ••• € » de l'objectif du
+//    mois). Seul le nombre collé à la devise était reconnu : le PREMIER montant
+//    restait lisible. Un nombre suivi d'un connecteur de fourchette puis d'un
+//    montant (ou d'un montant déjà masqué) est un montant.
+// ⚠️ Ni le tiret long « — » ni un « - » entre espaces : ce sont des SÉPARATEURS
+//    (« taille 42 — 45 € » garde sa taille, c'est ce qu'un streamer montre).
+const CONNECT = `(?:${ESP}*(?:–|→|->|➜|⟶|\\/)${ESP}*|-|${ESP}+(?:à|au)${ESP}+)`;
+const SECOND = `(?:[+\\-−]${ESP}?)?(?:${NOMBRE}|•••)(?:${ESP}?[kK](?=${ESP}?€))?${ESP}?${DEVISE_APRES}`;
+const RE_PLAGE = new RegExp(`(?<![\\p{L}\\p{N}.,])(?:[+\\-−]${ESP}?)?${NOMBRE}(?=${CONNECT}${SECOND})`, 'gu');
+const RE_SUITE_PLAGE = new RegExp(`^${CONNECT}${SECOND}`, 'u');
 const RE_EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const RE_TEL = /(?<![\d])(?:\+33[\s.]?\(?0?\)?[\s.]?[1-9]|0[1-9])(?:[\s.-]?\d{2}){4}(?![\d])/g;
 const RE_IBAN = /\b[A-Z]{2}\d{2}(?:[ ]?[0-9A-Z]{4}){3,7}(?:[ ]?[0-9A-Z]{1,4})?\b/g;
@@ -106,10 +119,14 @@ export function masquerTexte(texte, noms) {
   // Les emails d'abord : un login peut être le début d'une adresse.
   t = t.replace(RE_EMAIL, `${MASQUE}@${MASQUE}`);
   if (re) t = t.normalize('NFC').replace(re, (m) => d.get(m.toLowerCase()) || MASQUE);
+  if (reCodeCourt) t = t.replace(reCodeCourt, (m, avant) => `${avant}${MASQUE}`);
   t = t.replace(RE_IBAN, (m) => (/\d{2}/.test(m.slice(2, 4)) && m.replace(/\s/g, '').length >= 15 ? MASQUE : m));
   t = t.replace(RE_RUE, MASQUE);
   t = t.replace(RE_CP, '•••••');
   t = t.replace(RE_MONTANT_AVANT, (m) => `${m[0]} ${MASQUE}`);
+  // Le premier montant d'une fourchette, AVANT que le second ne soit masqué
+  // (le second, collé à la devise, part juste après).
+  t = t.replace(RE_PLAGE, MASQUE);
   t = t.replace(RE_MONTANT_APRES, (m) => { const dev = /€|k€/.test(m) ? '€' : (/\$/.test(m) ? '$' : (/£/.test(m) ? '£' : '€')); return `${MASQUE} ${dev}`; });
   t = t.replace(RE_TEL, '•• •• •• •• ••');
   t = t.replace(RE_SIRET, MASQUE);
@@ -139,12 +156,34 @@ export function definirNoms(source, entrees) {
   if (actif && typeof document !== 'undefined') passeComplete();
 }
 // Un code de retrait vu par l'app (`codeRetrait`) : noté pour être masqué
-// partout où il s'écrit. ≥ 5 caractères : en dessous il croiserait un N°.
+// partout où il s'écrit.
+// ⚠️ UN CODE COURT NE SE MASQUE PAS PARTOUT (relecture du 15 octobre) : un code
+//    de casier Chronopost tient en QUATRE chiffres (« 4821 », ses deux colis de
+//    consigne le prouvent), et l'ignorer — comme on le faisait sous 5
+//    caractères — le laissait en clair dans Achats. Mais le chercher dans tout
+//    le document masquerait aussi un N° de rangement, un nombre de vues, une
+//    année (« 2026 » est un code possible). Un code de 3 ou 4 caractères n'est
+//    donc masqué que là où il se lit COMME UN CODE : après « code »,
+//    « retrait », « identifiant », « ouverture », « casier » ou « consigne »,
+//    dans le même texte ou dans l'étiquette juste avant lui. (Les écrans qui le
+//    dessinent le marquent aussi `data-stream="prive"` : deux filets.)
 const codesVus = new Set();
+const codesCourts = new Set();
+let reCodeCourt = null;
+const MOT_CODE = 'code|retrait|identifiant|ouverture|casier|consigne|pin';
+const RE_MOT_CODE = new RegExp(`(?:^|[^\\p{L}])(?:${MOT_CODE})`, 'iu');
 let codesTimer = null;
 export function noterValeurSensible(v) {
   const s = String(v || '').trim();
-  if (s.length < 5 || codesVus.has(s)) return;
+  if (!s || codesVus.has(s) || codesCourts.has(s.toLowerCase())) return;
+  if (s.length < 5) {
+    if (!/^[A-Z]{0,2}\d{3,4}$/i.test(s)) return;
+    codesCourts.add(s.toLowerCase());
+    const cles = [...codesCourts].sort((a, b) => b.length - a.length).map(echap).join('|');
+    reCodeCourt = new RegExp(`((?:^|[^\\p{L}])(?:${MOT_CODE})[^\\n]{0,40}?)(?<![\\p{L}\\p{N}_])(?:${cles})(?![\\p{L}\\p{N}_])`, 'giu');
+    if (actif && typeof document !== 'undefined') passeComplete();
+    return;
+  }
   codesVus.add(s);
   if (codesTimer) return;
   // Regroupé : un écran qui affiche 20 codes ne reconstruit qu'une fois.
@@ -155,6 +194,7 @@ export function noterValeurSensible(v) {
   const cles = [...dico.keys()].sort((a, b) => b.length - a.length);
   reDico = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${cles.map(echap).join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
 }
+const estCodeCourt = (t) => codesCourts.has(String(t || '').trim().toLowerCase());
 
 // ── LE DOCUMENT ───────────────────────────────────────────────────────────────
 const ATTRS = ['title', 'aria-label', 'placeholder', 'alt'];
@@ -182,6 +222,17 @@ function texteVoisin(n, sens) {
   } catch (_) {}
   return '';
 }
+// Le texte qui suit, sur plusieurs nœuds (48 caractères au plus) : « → », « 53 »,
+// « € » sont trois nœuds en JSX.
+function suite(n) {
+  let out = '';
+  try {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    w.currentNode = n;
+    for (let i = 0; i < 6 && out.length < 48; i++) { const x = w.nextNode(); if (!x) break; out += x.nodeValue || ''; }
+  } catch (_) {}
+  return out.slice(0, 48);
+}
 // Les deux textes non vides qui précèdent (rognés), dans l'ordre du document.
 function textesAvant(n) {
   const out = [];
@@ -203,6 +254,14 @@ function masquerNoeud(orig, n) {
   let t = masquerTexte(orig);
   // Un nombre seul dont le nœud suivant commence par une devise.
   if (/\d[\s\u00a0\u202f]*$/.test(t) && /^(?:€|EUR|euro|\$|£|k€)/.test(texteVoisin(n, 1))) t = t.replace(FIN_NOMBRE, (m) => MASQUE + (/\s$/.test(m) ? ' ' : ''));
+  // Le premier montant d'une fourchette coupée en nœuds : « de {min} à {max} € »,
+  // « <s>{prix}</s> → {conseil} € », « {lo}–{hi} € ». Le texte qui SUIT (sur
+  // plusieurs nœuds) est un connecteur puis un montant — ou un montant déjà
+  // masqué, si son nœud est passé avant.
+  else if (/\d[\s\u00a0\u202f]*$/.test(t) && RE_SUITE_PLAGE.test(suite(n))) t = t.replace(FIN_NOMBRE, (m) => MASQUE + (/\s$/.test(m) ? ' ' : ''));
+  // Un code court seul dans son nœud, sous son étiquette (« Code de retrait »
+  // puis <strong>4821</strong>).
+  if (codesCourts.size && estCodeCourt(t) && RE_MOT_CODE.test(textesAvant(n).join(' '))) t = t.replace(/\S+/, MASQUE);
   // La devise DEVANT, dans un nœud à elle seule (`€{n}`). ⚠️ Pas « un nœud qui
   // finit par € » : « marge +12 € » suivi de « 👁 40 » masquait les vues.
   //    Et pas non plus un « € » qui TERMINE le montant d'avant (« 456 » « € »

@@ -9204,8 +9204,99 @@ sensibles comme leur CA ou leur nom de compte ».
   ⚠️ **Pas couvert** : le badge de l'extension sur vinted.fr (email VRM au survol —
   il faudrait une version d'extension), les fichiers TÉLÉCHARGÉS (CSV, PDF :
   enregistrés, pas affichés), l'adresse d'un lien survolé (barre d'état du
-  navigateur), et la première demi-seconde d'un appareil qui n'a jamais vu le
-  réglage (avant l'arrivée du nuage).
+  navigateur). (La première demi-seconde d'un appareil qui n'a pas encore lu le
+  réglage EST couverte depuis la relecture ci-dessous.)
+
+#### Relecture du 15 octobre : sept constats, tous reproduits, tous corrigés
+Chacun reproduit d'abord (vraies fixtures en lien symbolique, vrai module dans un
+vrai navigateur, vraie route `push.js`, base de production en lecture seule).
+- ⚠️⚠️ **Le PREMIER montant d'une fourchette restait lisible** (haute). Sur ses
+  vraies fixtures, « Le prix qui marche » : **115 lignes « N ventes · de X à
+  ••• € »**, aux deux tailles ; « fourchette 20–••• € » (aide à la vente) ; le
+  prix barré « 60 → ••• € » du conseil de baisse — et, trouvé en cherchant la
+  même forme, **« 1 234 / ••• € » de l'objectif du mois, c'est-à-dire son CA du
+  mois**. Seul le nombre collé à la devise était reconnu, et `texteVoisin` ne
+  regardait que le nœud suivant (« à », « → »). ⇒ Un nombre suivi d'un
+  CONNECTEUR (–, →, /, « à », « au », un « - » collé) puis d'un montant — ou d'un
+  montant déjà masqué — est un montant : dans un même texte (`RE_PLAGE`) et à
+  travers les nœuds (`suite()`, 48 caractères, six nœuds). ⚠️ Ni « — » ni « - »
+  entre espaces : ce sont des SÉPARATEURS — « taille 42 — 45 € » garde sa taille.
+  Mesuré après sur ses fixtures : **115 → 0**.
+- **Un code de casier de 4 chiffres restait en clair dans Achats** (moyenne) :
+  `noterValeurSensible` ignorait tout code de moins de 5 caractères, or ses deux
+  colis Chronopost en consigne portent `code` ET `code2` de 4 chiffres. Mais un
+  code court cherché PARTOUT masquerait un N°, des vues, une année (« 2026 » est
+  un code possible). ⇒ Un code de 3-4 caractères n'est masqué que là où il se
+  lit COMME UN CODE — après « code », « retrait », « identifiant », « ouverture »,
+  « casier », « consigne », dans le même texte ou l'étiquette juste avant lui — et
+  les cinq endroits qui dessinent un code (`CodeRetraitCopiable`, les deux
+  vignettes Identifiant/Ouverture, « colis jamais retirés ») le marquent
+  `data-stream="prive"`. Deux filets.
+- **Les noms de ses comptes Leboncoin** (Leboncoin → Messages, « Comptes
+  Leboncoin détectés ») n'étaient dans aucune source du dictionnaire. ⇒
+  `noterComptesLbc` : UN registre pour les deux lecteurs (la réunion de ce qu'ils
+  ont lu, numérotée dans l'ordre des identifiants) — « Compte Leboncoin 1, 2 »,
+  le même sur les deux écrans ; l'initiale de l'avatar est privée. Mesuré : il a
+  1 compte nommé dans `lbc_accounts` (pas encore recoupé avec le compteur).
+- ⚠️⚠️ **« Pas su » valait « coupé » côté app** (moyenne). Allumé sur
+  l'ordinateur du live, un téléphone resté sur « coupé » (ou neuf) montrait
+  logins et montants jusqu'à l'arrivée du nuage — **9 s** sur un nuage lent, et
+  **pour toujours** si `main` répond 522 (le nuage se relit sans fin). Le serveur
+  appliquait déjà la règle inverse. ⇒ Dès qu'une session est ouverte
+  (`AppCoeur`, `useLayoutEffect` : avant la première peinture), tant que le
+  réglage du nuage n'est pas lu, l'écran est masqué (`streamEnAttenteDuNuage`) ;
+  le nuage dit « coupé » — ou ne dit rien — et tout revient. Au-delà de 2 s
+  d'attente, une pastille GRISE « Masqué » propose « Afficher ici » : un geste
+  LOCAL, jamais écrit au nuage (la valeur la plus récente gagne : l'écrire
+  couperait le mode sur l'ordinateur du live) — si le nuage dit ensuite
+  « allumé », l'écran se recache. L'interrupteur de Réglages ne dit ni oui ni non
+  pendant l'attente (`data-reglage-stream="pas-su"`). Avant la session (porte de
+  connexion), rien n'est masqué : il n'y a pas de données.
+  ⚠️ **Coût assumé** : à chaque ouverture, tant que `main` n'est pas lu (~0,5 s
+  d'ordinaire), ce qui est déjà affiché reste masqué ; pendant une panne de
+  `main`, jusqu'à « Afficher ici ».
+  ⚠️ **Le banc a attrapé un défaut que j'ai introduit** : `useModeStream`
+  s'abonnait APRÈS que `AppCoeur` eut posé l'attente — la notification était
+  partie avant l'abonnement, la pastille ne s'affichait jamais. Il relit
+  maintenant l'état en s'abonnant.
+- **Le serveur reprenait le dernier état lu** sur une lecture ratée (basse) :
+  « coupé » lu juste avant, puis 522 ⇒ la vente partait avec son montant et son
+  login. La mémoire par instance est retirée : lecture ratée = « pas su », à
+  chaque envoi. L'audit envoie trois notifications de suite sur la MÊME instance
+  (il appelait `oublierStreamVu()` avant chaque cas : il ne pouvait pas le voir).
+- **La fiche disait la synchro deux fois, et se contredisait** : « capté il y a
+  5 j » ET, dans la pastille, « Pas capté (il y a 5 j) » ; « dernière capture :
+  pas pu la lire » ET « Pas pu lire ». Quand la pastille parle de la capture
+  (`capture: true` dans `acctHealth`), la ligne se tait ; pour un compte exclu
+  aussi (sa date ne veut plus rien dire). « À jour » + « capté il y a 2 h »
+  restent (ils ne disent pas la même chose).
+- **« Adresses email de réception » ne décrivait pas ce qu'il a déclaré.**
+  Mesuré (lecture seule) : 15 adresses, dont **10 iCloud et 2 relais Apple** ;
+  **6** sont aussi l'« Email du compte Vinted » d'une fiche, et **6 de ses 12**
+  emails de comptes ne sont pas déclarés. Ce sont les adresses où VINTED lui
+  écrit (l'en-tête « À » que lit la règle d'arrivée), pas des destinations de
+  renvoi. ⇒ La phrase dit « l'email de chacun de tes comptes Vinted (souvent un
+  alias iCloud), ou la boîte vers laquelle tu les fais suivre » ; l'email d'un
+  compte pas encore déclaré est **proposé** (à son clic, « email du compte X ») ;
+  la fiche (Détails) dit que c'est là que Vinted lui écrit. Les deux saisies sont
+  reliées sans être fusionnées.
+- **Preuves** (§6.1 : banc et audit copiés dans l'arbre de 9de0216, `dist`
+  construit là) : `audit-mode-stream.cjs` **7 rouges** sur 9de0216, 0 après, et
+  chaque règle réaffaiblie seule repasse au rouge (fourchette dans un
+  texte : 2 · à travers les nœuds : 1 · codes courts ignorés : 2 · la mémoire du
+  serveur remise dans `push.js` : 1) ;
+  `bancs/mode-stream.cjs` **14 rouges** sur le build de 9de0216 (le premier
+  montant de la fourchette sur « Le prix qui marche », les codes 4821/7364 dans
+  Achats, les deux noms Leboncoin, et les six passes « pas su » — nuage lent ×2
+  appareils, nuage illisible, pastille — aux deux tailles), tout vert après ;
+  `bancs/comptes-fiche.cjs` **10 rouges** (synchro dite deux fois et qui se
+  contredit, « pas pu la lire » ×2, phrase des adresses, suggestion de l'email
+  du compte absente), tout vert après. Et sur ses VRAIES fixtures (la sonde de
+  relecture, hors dépôt, 23 écrans × 390/1512) : « Le prix qui marche » passe de
+  **115 lignes « de X à ••• € » à 0**, aucune fuite nouvelle ailleurs (les
+  dates, les N° et les années devant un « · » restent lisibles, c'est voulu).
+  `npm run build` + audit-tdz/chiffres/variables/coherence/icones/boutons/
+  secrets : verts.
 
 ---
 

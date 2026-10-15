@@ -31,6 +31,11 @@
 //     ne réaffiche rien : c'est le cas d'une écriture ratée pendant le live ;
 //   • ouvrir un document dans un nouvel onglet (bordereau, facture) DEMANDE
 //     avant, et ne s'ouvre pas si on refuse.
+// Relecture du 15 octobre, sur ses vraies données — quatre trous, tous servis :
+//   • le PREMIER montant d'une fourchette (« de 120,37 à 141,59 € ») ;
+//   • un code de casier de QUATRE chiffres (deux, comme chez lui) ;
+//   • les noms de ses comptes LEBONCOIN (Leboncoin → Messages) ;
+//   • « pas su » : le nuage dit « allumé » mais il est lent, ou illisible.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
@@ -54,12 +59,19 @@ const S = {
   client: 'Marcel Pagnolux', clientEmail: 'marcel.p@exemple.test', clientRue: '3 impasse des Mouettes',
   reception: 'reception.zorglub@exemple.test', ebay: 'ebay_tresor_secret', acheteurEbay: 'acheteur_ebay_secret',
   uid1: '730001', uid2: '730002',
+  // Un casier Chronopost : DEUX codes de quatre chiffres (la forme mesurée chez
+  // lui) — trop courts pour être cherchés partout, ils doivent partir là où ils
+  // se lisent comme des codes.
+  codeCourt: '4821', codeCourt2: '7364',
+  lbcNom1: 'Hortense Lbcmartin', lbcNom2: 'Gaspard Lbcboutique',
 };
 // Les valeurs cherchées (minuscules, espaces insécables ramenées) : chacune
 // sous ses formes d'affichage.
 const CHERCHES = [
   ...Object.values(S),
   '0612345678', '+33 6 12 34 56 78', '487,13', '487.13', '312,77', '312.77', '64,21', '401,99', '99,31', '31,50', '29280', 'mouettes', 'glycines',
+  // Le PREMIER montant d'une fourchette (« de 120,37 à 141,59 € », Le prix qui marche).
+  '120,37', '120.37', '141,59', '141.59',
 ];
 // Ce qui DOIT rester lisible : un titre d'annonce et son N° de rangement.
 const TITRE_ANNONCE = 'Zephyr Runner taille 42';
@@ -74,6 +86,10 @@ const LISTING = { id: 5550001, title: TITRE_ANNONCE, price: { amount: '487.13', 
 const VENTES1 = [
   { transaction_id: 9901, title: 'Quasar Runner taille 41', price: { amount: '312.77', currency_code: 'EUR' }, status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: iso(30), user_login: S.acheteur },
   { transaction_id: 9902, title: 'Pulsar Runner taille 40', price: { amount: '99.31', currency_code: 'EUR' }, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(2), user_login: S.acheteur },
+  // Deux ventes du MÊME modèle et de la même taille : « Le prix qui marche » en
+  // tire une fourchette « de 120,37 à 141,59 € ».
+  { transaction_id: 9903, title: 'Adidas Samba noire taille 41', price: { amount: '120.37', currency_code: 'EUR' }, status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: iso(80), user_login: S.acheteur },
+  { transaction_id: 9904, title: 'Adidas Samba noire taille 41', price: { amount: '141.59', currency_code: 'EUR' }, status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: iso(60), user_login: S.acheteur },
 ];
 const ACHATS2 = [
   { transaction_id: 7701, title: 'Nebula Relay taille 40', price: { amount: '64.21', currency_code: 'EUR' }, conversation_id: 802,
@@ -104,6 +120,10 @@ const rowsDe = (extraMain) => [
   { id: 'panel_colis_relais', data: { 7701: { code: S.code, lieu: `${S.relais}, 8 avenue Foch 29200 Brest`, at: iso(3) } } },
   { id: 'email_track_mondial_relay_MRZ9988776655', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: S.code,
     lieu: `${S.relais}, 8 avenue Foch 29200 Brest`, carrier: 'mondial_relay', suivi: 'MRZ9988776655', receivedAt: iso(3), dateLimite: dansJ(6) } },
+  { id: 'email_track_chronopost_XW000111222SP', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: S.codeCourt, code2: S.codeCourt2, consigne: true,
+    lieu: 'Consigne Pickup Gare, 1 place de la Gare 29200 Brest', carrier: 'chronopost', suivi: 'XW000111222SP', receivedAt: iso(4), dateLimite: dansJ(5) } },
+  { id: 'lbc_messages', data: { compteurs: { lbc1: { unread: 3, at: iso(0) } }, comptes: { lbc1: { name: S.lbcNom1, pro: false, at: iso(0) }, lbc2: { name: S.lbcNom2, pro: true, at: iso(0) } } } },
+  { id: 'lbc_accounts', data: { accounts: { lbc1: { id: 'lbc1', name: S.lbcNom1, seenAt: iso(1) }, lbc2: { id: 'lbc2', name: S.lbcNom2, seenAt: iso(2) } } } },
   { id: 'email_offer_os1', data: { type: 'offre', receivedAt: iso(2), article: TITRE_ANNONCE, montant: '401,99', qui: S.negociateur, uid: S.uid1, account: S.login1 } },
   { id: 'email_invoice_f1', data: { type: 'facture_pro', status: 'draft', number: 'F-2026-0007', designation: 'Quasar Runner', prix: 312.77,
     buyerName: S.client, buyerEmail: S.clientEmail, buyerAddress: `${S.clientRue} 29200 Brest`, createdAt: iso(20), account: S.login1 } },
@@ -144,7 +164,7 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function preparer(b, vp, { local = null, extraMain = {}, sombre = false } = {}) {
+async function preparer(b, vp, { local = null, extraMain = {}, sombre = false, retardMain = 0, mainKO = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -155,9 +175,14 @@ async function preparer(b, vp, { local = null, extraMain = {}, sombre = false } 
   if (sombre) await pg.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {} });
   const lignes = rowsDe(sombre ? { vinted_dark: true, ...extraMain } : extraMain);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  await pg.route('**/rest/v1/**', (route) => {
+  await pg.route('**/rest/v1/**', async (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
+    // Le nuage (ligne `main`) lent, ou illisible (522) — la base debout par ailleurs.
+    if (req.method() === 'GET' && /id=eq\.main/.test(u)) {
+      if (mainKO) return route.fulfill({ status: 522, contentType: 'text/html', body: '<!DOCTYPE html><title>522</title>' });
+      if (retardMain) await new Promise((r) => setTimeout(r, retardMain));
+    }
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (req.method() !== 'GET') { try { ecrits.push(req.postData() || ''); } catch (_) {} return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
@@ -297,9 +322,76 @@ const ALLUME = { on: true, at: MAINTENANT };
         dit(f.length === 0, `${T} : le fil ouvert ne laisse rien passer`, f.join(', '));
         await pg.screenshot({ path: path.join(CAPTURES, `stream-fil-${vp.width}.png`) }).catch(() => {});
       });
+      // Leboncoin → Messages : les noms de SES comptes Leboncoin (relecture du
+      // 15 octobre : ils n'étaient pas dans le dictionnaire).
+      await essaie(`${T} · messages Leboncoin`, async () => {
+        await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(2500);
+        await pg.click('[data-section="messages"]', { timeout: 5000 });
+        await pg.waitForSelector('[data-messages-lbc]', { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(500);
+        const t = await pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); return e ? e.innerText : ''; });
+        const f = fuites(await lireAffiche(pg));
+        dit(!!t && f.length === 0, `${T} : Leboncoin → Messages ne laisse passer aucun nom de compte`, f.join(', ') || t.slice(0, 80));
+        dit(/Compte Leboncoin 1/.test(t) && /Compte Leboncoin 2/.test(t), `${T} : chaque compte Leboncoin garde un alias distinct (il sait sur lequel répondre)`, t.replace(/\n/g, ' · ').slice(0, 140));
+      });
       dit(errs.length === 0, `${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();
     }
+
+    // ── « PAS SU » NE VAUT PAS « COUPÉ » (relecture du 15 octobre) ─────────
+    // Le mode est allumé AILLEURS (le nuage le dit), mais cet appareil ne le
+    // sait pas encore : il était resté sur « coupé » il y a une heure, ou il
+    // est neuf, et la ligne `main` est lente — ou ne répond pas du tout.
+    // Avant : ses logins et ses montants s'affichaient jusqu'à l'arrivée du
+    // nuage (9 s), et pour toujours sur un 522. Et l'autre sens : un nuage qui
+    // dit « coupé » démasque ; « Afficher ici » démasque sans rien écrire au nuage.
+    const COUPE_IL_Y_A_1H = { on: false, at: MAINTENANT - 3600e3 };
+    const NUAGE_ALLUME = { vrm_mode_stream: { on: true, at: MAINTENANT } };
+    const sonder = async (pg, ms, t0) => { await pg.waitForTimeout(Math.max(0, ms - (Date.now() - t0))); return { st: await pg.evaluate(() => document.documentElement.hasAttribute('data-mode-stream')), f: fuites(await lireAffiche(pg)) }; };
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      const T = vp.width < 600 ? '390 px' : '1512 px';
+      await essaie(`${T} · nuage lent`, async () => {
+        for (const [nom, local] of [['appareil resté sur « coupé » il y a 1 h', COUPE_IL_Y_A_1H], ['appareil neuf', null]]) {
+          const { ctx, pg } = await preparer(b, vp, { local, extraMain: NUAGE_ALLUME, retardMain: 6000 });
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+          const t0 = Date.now(); const obs = [];
+          for (const ms of [1500, 4000, 9000]) obs.push([ms, await sonder(pg, ms, t0)]);
+          const fuyants = obs.filter(([, o]) => o.f.length || !o.st);
+          dit(fuyants.length === 0, `${T} · ${nom}, nuage « allumé » lent (6 s) : rien ne s'affiche en attendant, ni après`, fuyants.map(([ms, o]) => `${ms} ms stream=${o.st} ${o.f.slice(0, 3).join(' | ')}`).join(' ; '));
+          await ctx.close();
+        }
+      });
+      await essaie(`${T} · nuage illisible`, async () => {
+        const { ctx, pg, ecrits } = await preparer(b, vp, { local: null, mainKO: true });
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(6000);
+        const o = { st: await pg.evaluate(() => document.documentElement.hasAttribute('data-mode-stream')), f: fuites(await lireAffiche(pg)) };
+        dit(o.st && o.f.length === 0, `${T} · réglage illisible (main en 522) : l'écran reste masqué`, `stream=${o.st} ${o.f.slice(0, 3).join(' | ')}`);
+        await pg.screenshot({ path: path.join(CAPTURES, `stream-pas-su-${vp.width}.png`) }).catch(() => {});
+        const p = await pg.$('[data-pastille-stream="pas-su"]');
+        dit(!!p, `${T} · la pastille dit que c'est caché en attendant (et comment l'afficher)`);
+        if (p) {
+          await p.click(); await pg.waitForTimeout(500);
+          await pg.locator('button', { hasText: 'Afficher ici' }).last().click();
+          await pg.waitForTimeout(900);
+          const t = norm(await lireAffiche(pg));
+          dit(t.includes('312,77') || t.includes(norm(S.login1)), `${T} · « Afficher ici » montre ses données sur cet appareil`);
+          await pg.waitForTimeout(1200);
+          dit(!ecrits.some((e) => /vrm_mode_stream/.test(e)), `${T} · … sans rien écrire au nuage (sinon le mode se couperait sur l'ordinateur du live)`, String(ecrits.filter((e) => /vrm_mode_stream/.test(e)).length));
+        }
+        await ctx.close();
+      });
+    }
+    await essaie('nuage lent qui dit coupé', async () => {
+      const { ctx, pg } = await preparer(b, { width: 1512, height: 950 }, { local: null, extraMain: { vrm_mode_stream: { on: false, at: MAINTENANT - 60e3 } }, retardMain: 2500 });
+      await pg.goto(`http://localhost:${PORT}/?tab=vintedaccounts`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(7000);
+      const st = await pg.evaluate(() => document.documentElement.hasAttribute('data-mode-stream'));
+      const t = norm(await lireAffiche(pg));
+      dit(!st && t.includes(norm(S.login1)) && !(await pg.$('[data-pastille-stream]')), 'l’autre sens : le nuage arrive et dit « coupé » — tout se réaffiche, sans pastille', `stream=${st}`);
+      await ctx.close();
+    });
 
     // ── L'INTERRUPTEUR, LA PASTILLE, LE NUAGE ──────────────────────────────
     await essaie('interrupteur et pastille', async () => {

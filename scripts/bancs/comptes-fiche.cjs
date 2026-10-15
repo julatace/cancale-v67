@@ -76,7 +76,7 @@ const PONT = () => {
   post({ __vmr: 'ready', version });
 };
 
-async function ouvrir(b, { vp, captureKO = false, repli = true, pont = true, tab = 'vintedaccounts', sombre = false }) {
+async function ouvrir(b, { vp, captureKO = false, repli = true, pont = true, tab = 'vintedaccounts', sombre = false, ages = [2, 5] }) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -97,7 +97,7 @@ async function ouvrir(b, { vp, captureKO = false, repli = true, pont = true, tab
     // La dernière capture de chaque compte (balayage `harvest_*`).
     if (/id=like\.harvest_\*&select=id,updated_at,cap/.test(u)) {
       if (captureKO) return r.fulfill({ status: 522, contentType: 'text/html', body: '<!DOCTYPE html><title>522</title>' });
-      return j([{ id: 'harvest_810001_orders_sold', updated_at: iso(2), cap: iso(2) }, { id: 'harvest_810002_listings', updated_at: iso(5), cap: iso(5) }], { 'content-range': '0-1/2' });
+      return j([{ id: 'harvest_810001_orders_sold', updated_at: iso(ages[0]), cap: iso(ages[0]) }, { id: 'harvest_810002_listings', updated_at: iso(ages[1]), cap: iso(ages[1]) }], { 'content-range': '0-1/2' });
     }
     return j([], { 'content-range': '0-0/0' });
   });
@@ -183,6 +183,22 @@ async function sain(pg, ecran) {
         dit(!/Jamais capté/.test(t) && !/Ouvre ta boutique/.test(t), `${T} : lecture de la capture en panne — aucune fiche ne dit « Jamais capté » ni ne réclame une capture`, (t.match(/Jamais capté|Ouvre ta boutique[^\n]*/g) || []).join(' | '));
         const f = await lireFiches(pg);
         dit(f.length === 2 && f.every((x) => x.synchro === 'passu'), `${T} : chaque fiche dit « pas su » pour sa synchro`, JSON.stringify(f.map((x) => x.synchro)));
+        dit(f.length === 2 && f.every((x) => (x.texte.match(/pas pu (?:la )?lire/gi) || []).length === 1), `${T} : et elle le dit UNE fois (la pastille), pas deux`, f.map((x) => x.texte.replace(/\n/g, ' ').slice(0, 90)).join(' | '));
+        await ctx.close();
+      });
+      // ⚠️ RELECTURE DU 15 OCTOBRE : en retard, la fiche disait « capté il y a
+      //    5 j » ET « Pas capté (il y a 5 j) » — deux phrases, et qui se
+      //    contredisent. La synchro se dit UNE fois, quelle que soit sa fraîcheur.
+      await essaie(`${T} · capture en retard`, async () => {
+        const { ctx, pg } = await ouvrir(b, { vp, ages: [30, 24 * 5] });
+        const f = await lireFiches(pg);
+        dit(f.length === 2, `${T} : deux fiches (captures de 30 h et 5 j)`, String(f.length));
+        for (const x of f) {
+          const nom = /compte_alpha/.test(x.texte) ? 'alpha' : 'beta';
+          const n = (x.texte.match(/capt[ée]/gi) || []).length;
+          dit(n === 1 && /il y a \d+ (?:h|j)/.test(x.statut || ''), `${T} · ${nom} : la synchro est dite UNE fois, par la pastille de statut`, `${n}× · ${x.texte.replace(/\n/g, ' ').slice(0, 110)}`);
+        }
+        await pg.screenshot({ path: path.join(CAPTURES, `fiches-retard-${vp.width}.png`), fullPage: true }).catch(() => {});
         await ctx.close();
       });
 
@@ -198,6 +214,13 @@ async function sain(pg, ecran) {
         if (bt) { await bt.click(); await pg.waitForTimeout(400); }
         const a2 = await pg.evaluate(() => { const r = document.querySelector('[data-reglage-adresses]'); return r ? { etat: r.getAttribute('data-reglage-adresses'), texte: r.innerText } : null; });
         dit(!!a2 && a2.etat !== 'replie' && /reception1@exemple\.test/.test(a2.texte), `${T} : un clic la déplie, les adresses sont là`, a2 && a2.etat);
+        // ⚠️ RELECTURE DU 15 OCTOBRE (mesuré chez lui : 6 de ses 15 adresses sont
+        //    aussi l'« Email du compte Vinted » d'une fiche) : la phrase nomme
+        //    l'email de ses comptes Vinted, et celui qui n'est pas déclaré est
+        //    PROPOSÉ (à son clic) — les deux saisies sont reliées.
+        dit(!!a && /email de chacun de tes comptes Vinted|email de tes comptes Vinted/i.test(a.texte), `${T} : la phrase dit que ce sont en général les emails de ses comptes Vinted`, a && a.texte.replace(/\n/g, ' ').slice(0, 200));
+        const sg = await pg.evaluate(() => { const e = document.querySelector('[data-suggestion="alpha@exemple.test"]'); return e ? { t: e.innerText, src: (e.querySelector('[data-suggestion-source]') || {}).getAttribute && e.querySelector('[data-suggestion-source]').getAttribute('data-suggestion-source') } : null; });
+        dit(!!sg && sg.src === 'compte' && /email du compte compte_alpha/.test(sg.t), `${T} : l'email du compte Vinted (Détails de sa fiche), pas encore déclaré, est proposé — et dit de quel compte il vient`, sg ? sg.t.replace(/\n/g, ' · ') : 'absent');
         await pg.screenshot({ path: path.join(CAPTURES, `adresses-${vp.width}.png`), fullPage: true }).catch(() => {});
         await ctx.close();
       });

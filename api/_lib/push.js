@@ -330,10 +330,11 @@ const cleSansRapport = (e) => {
 // l'APP qui possède le réglage (§11) ; le serveur le LIT, en scalaire (§4.4).
 // Trois états : allumé · coupé · PAS SU ⇒ on TAIT le détail. Une notification
 // sans détail coûte peu ; un chiffre d'affaires à l'écran pendant un live, non.
-const _streamVu = new Map();                        // vendeur → dernier état lu
-export const oublierStreamVu = () => _streamVu.clear();
+// ⚠️ AUCUN « DERNIER ÉTAT CONNU » (relecture du 15 octobre) : une mémoire par
+//    instance rendait « coupé » sur une lecture RATÉE — il pouvait l'avoir
+//    allumé entre-temps, et la vente partait avec son montant et son login. Une
+//    lecture ratée vaut « pas su », à chaque envoi.
 export async function streamDuVendeur() {
-  const qui = vendeurDuPush() || '';
   for (let i = 0; i < 2; i++) {                     // un hoquet : on relit une fois
     try {
       const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=s:data->vrm_mode_stream`);
@@ -343,12 +344,10 @@ export async function streamDuVendeur() {
       const rows = await res.json();
       if (!Array.isArray(rows)) continue;            // 522 : du HTML, pas du JSON
       const v = rows[0] ? rows[0].s : null;
-      const on = v === true || !!(v && typeof v === 'object' && v.on === true);
-      _streamVu.set(qui, on);
-      return on;
+      return v === true || !!(v && typeof v === 'object' && v.on === true);
     } catch (_) { /* relire */ }
   }
-  return _streamVu.has(qui) ? _streamVu.get(qui) : null;
+  return null;
 }
 const MONTANT_SRV = /[+\-−]?\d[\d\s.,\u00a0\u202f]*\s*(?:€|EUR\b|euros?\b)/gi;
 // Le titre garde ce qui s'est passé, jamais qui ni combien ; le corps, rien.
