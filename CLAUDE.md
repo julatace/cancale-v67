@@ -10150,6 +10150,120 @@ de 7 jours), puis rouge sur 4c1e3cb, vert après, rouge sous mutation.
   `messagerie` 16 et `filtre-compte` 8 : les MÊMES rouges que sur 4c1e3cb
   (vérifié ligne à ligne), chantier `p1-messages`. Les bancs lancés acceptent
   `BANC_PORT`.
+### eBay : description et prix repris de Vinted, l'écart montré, et l'annonce RELUE après publication (15 octobre, lot p1-ebay-prep)
+Prompt maître du 15 octobre : reprendre la description et le prix de Vinted
+« sans écraser une personnalisation volontaire », montrer les différences, et
+« vérifier après chaque publication la plateforme, le compte, l'identifiant
+d'annonce et le résultat réel ; ne pas confondre demandé et publié ».
+- **Une règle pour les deux champs** (`repriseVinted`, `EbayPublier`) : un champ
+  VIDE, ou qui porte encore exactement ce que VRM y a posé, prend la valeur de
+  l'annonce Vinted de la paire choisie ; sinon c'est SA saisie (ou un brouillon
+  rouvert) et rien n'est touché. L'écart se dit sous le champ (« Vinted :
+  49,00 € · ici : 55,00 € » + « Reprendre ») et dans la confirmation avant
+  publication (une feuille de plus seulement s'il y a un écart, ou intégré à
+  celle de la règle d'offre / du compte). Un prix Vinted inconnu (autre devise,
+  illisible) laisse le champ VIDE et le dit — jamais deviné ; « Mets un prix »
+  reste exigé. Catégorie et caractéristiques obligatoires inchangées.
+  `lireAnnoncesVintedEnLigne` rend aussi `prix` (`prixVinted`, la règle de
+  l'extension, copiée au caractère près de p0-lbc-pub pour fusionner sans
+  conflit).
+- **Le texte « protection acheteur » de Vinted n'est pas une description**
+  (« pour chaque achat effectué … politique de remboursement »). Mesuré le
+  15 octobre (lecture seule) : **1 des 152 descriptions captées** le porte.
+  `PAS_UNE_DESCRIPTION` l'écarte, **dans l'app ET l'extension** (§11 : la file
+  Leboncoin le partirait sinon) ; l'écran Annonces passe par `lbcDescription`
+  au lieu d'une troisième copie locale de la règle.
+- **Après publication, UNE relecture `GetItem`** (partagée avec celle de la
+  règle d'offre — un seul appel) : `api/_lib/ebay-publication.js`
+  (`verifPublication`) compare annonce en ligne, compte vendeur, référence
+  `VRM-n°` (par le N°, `numDeSku`), prix et devise, titre, quantité, nombre de
+  photos — chaque point `ok` · `ecart` · `pas-lu`, jamais deux états. L'écran
+  dit **eBay · compte « X » · annonce N° …** puis l'état : « Publiée et
+  vérifiée », « à vérifier » (les deux valeurs de l'écart), « Créée sur eBay,
+  mais pas en ligne », ou **« Demandée à eBay — pas encore vérifiée »** quand
+  la relecture n'a rien rendu, avec **« Relire chez eBay »** (action
+  `relirepub`, un GetItem, 503 « pas su » sans `<Ack>`). Le pseudo du compte
+  principal est lu dans le registre `ebay_comptes` (`pseudoDe`) : il était vide.
+- **Tranché** : rien d'eBay n'est prérempli d'autre (photos : chantier
+  p0-ebay-photos ; Vestiaire : p0-ebay-vc) ; pas de nouvelle entrée
+  d'`EXT_CAPACITES` (l'app ne promet rien de neuf de l'extension) — mais
+  `background.js` change d'une ligne : **la version est à monter à
+  l'intégration** (`audit-extension-zip` et `audit-preuve-vente` sont rouges
+  tant que le zip n'est pas régénéré, c'est attendu).
+- **Preuves** : `audit-ebay-publication.cjs` (la vraie route avec un faux eBay,
+  la règle pure, les règles d'App.jsx dans un `vm`) **37 contrôles, 25 rouges**
+  sur w15, **5 mutations sur 5** rouges ; banc `ebay-prep.cjs` (données
+  inventées, 390/1512 × clair/sombre, port 5991) **104 contrôles, 13 rouges** sur
+  le build de w15, et rouge sous trois mutations : reprise qui écrase (9),
+  « demandée » rendue « vérifiée » (4), écarts jamais dits (9).
+  `ebay-write.cjs` cherche `AddFixedPriceItem` par son nom (une relecture part
+  désormais après) ; `audit-ebay-retrait-auto.cjs` charge `prixVinted` (§6.3).
+- **Non mesuré** : la forme de `GetItem` sans `DetailLevel` sur SON compte
+  (une absence vaut « pas lu », jamais « conforme ») ; le planificateur
+  (« Programmer ») n'a pas cette relecture.
+
+#### Revue du 15 octobre — six défauts, tous reproduits, tous corrigés
+Chacun reproduit d'abord (sonde de rendu du relecteur sur le build de
+dc174e7, 390 clair et 1512 sombre ; la vraie `verifPublication` exécutée),
+corrigé, puis rouge sur dc174e7 et rouge sous mutation.
+- ⚠️ **« Relire chez eBay » refusé effaçait une relecture réussie** : un écart
+  de prix relu (« à vérifier ») repassait en « Demandée à eBay — pas encore
+  vérifiée » dès qu'eBay répondait Ack Failure à la relecture suivante. **Un
+  « pas su » n'efface jamais un « su »** : la vérification affichée n'est
+  remplacée que par une relecture LUE ; sinon la phrase dit que cette
+  relecture-ci n'a rien rendu (le message d'eBay) et que ce qui est affiché est
+  la précédente.
+- ⚠️ **Le planificateur programmait un brouillon à 59 € quand la paire est à
+  49 € sur Vinted, sans un mot** (l'écart n'était dit que dans « Publier »).
+  `ecartsBrouillonVinted` compare un brouillon à l'annonce Vinted de SA paire —
+  par son IDENTITÉ `pairId`, jamais le titre (§5) ; une autre annonce au même
+  titre ne désigne rien — avec LA règle du formulaire (`ecartsVintedEbay`,
+  §11), et `texteEcartsBrouillon` en fait UNE phrase. Elle est dite dans la
+  liste des brouillons (avec **« Reprendre le prix »** : son clic, relire-
+  modifier-écrire, l'identifiant d'envoi GARDÉ, un brouillon parti n'est pas
+  touché), sur la ligne du planificateur (qui dit aussi le prix qui partira),
+  et dans sa confirmation, ligne par ligne. Paire plus en ligne ou prix Vinted
+  inconnu : rien n'est comparé, aucun écart inventé.
+- **« NaN € » dans la confirmation** pour un prix tapé « 55 € » :
+  `itemDeBrouillon` exige un prix LISIBLE (`montantSaisi`, la règle des
+  montants, §11) — « Prix illisible : tape un montant comme 74 ou 74,50. »,
+  dit sous le champ (avec le prix Vinted et « Reprendre ») et refusé par
+  « Vérifier », « Publier », la liste et le planificateur. Mesuré (lecture
+  seule) : **0 brouillon** eBay en base, la règle ne bloque rien d'existant.
+  La liste des brouillons écrivait « 0,00 € » pour un tel prix : « prix
+  illisible ».
+- **§7 : le prix eBay écrit deux fois dans la feuille** (« … à 70,00 € » puis
+  « Prix : 70,00 € sur eBay, 49,00 € sur Vinted »). La phrase principale porte
+  le prix eBay dans TOUTES les branches (règle d'offre, plusieurs comptes,
+  écarts) ; la ligne d'écart ne dit que ce qui manque : « Sur Vinted, elle est
+  à 49,00 €. » Et le bouton « Reprendre 49,00 € » de la ligne d'écart redisait
+  le prix écrit juste avant : il dit « Reprendre ».
+- **Faux « à vérifier » sur le compte quand le pseudo eBay a changé** : le
+  pseudo attendu vient du registre `ebay_comptes`, appris à la CONNEXION.
+  C'est le jeton qui choisit le compte : sur un écart de compte (et seulement
+  là — aucun appel de plus sinon), la route demande à eBay qui porte le jeton
+  (UN `GetUser`, `identiteEbay`) et `confirmerCompte` tranche : même pseudo que
+  le vendeur relu ⇒ même compte renommé (`ok`, l'ancien gardé en `renomme`,
+  l'écran nomme l'actuel et dit l'ancien une fois) ; autre pseudo ⇒ l'écart
+  reste (attendu = le pseudo ACTUEL du jeton) ; eBay muet ⇒ `pas-lu`, jamais
+  « écart » ni « conforme ». `compteANommer` : le vendeur relu quand il est
+  prouvé le sien, sinon le pseudo mémorisé. Les points non vérifiés disent
+  « Pas vérifié chez eBay » (« pas montré » était faux pour un compte relu mais
+  non confirmé). ⚠️ **Le registre n'est pas mis à jour** (la relecture ne
+  doit rien écrire) : ailleurs, l'ancien pseudo reste jusqu'à la prochaine
+  connexion eBay.
+- **À 390 px, « Vinted : 49,00 € · ici : 70,00 € » tombait sous « Quantité »**
+  (la grille passe sur une colonne) : la ligne vit DANS la case du prix.
+- **Preuves** : `audit-ebay-publication.cjs` **49 contrôles, 7 rouges** sur
+  dc174e7 (compte renommé ×3, jeton autre, `confirmerCompte`,
+  `ecartsBrouillonVinted`), et rouge sous 4 mutations (route sans
+  confirmation du compte 4 · autre jeton accepté 4 · jeton illisible =
+  conforme 2 · brouillon relié par le titre 1). Banc `ebay-prep.cjs` **152
+  contrôles** (étapes 11 à 13 + géométrie et §7 en 3 et 5), **36 rouges** sur
+  le build de dc174e7 (9 par taille), et 5 builds réaffaiblis, une règle à la
+  fois, chacun rouge sur SA règle : relecture qui écrase (1), ligne sortie de
+  la case (1), prix illisible accepté (2), planificateur muet (2), prix écrit
+  deux fois (2).
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

@@ -57,7 +57,7 @@ const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay','skuEbayDe','traductionAnnonce'
   // (15 octobre) LE lecteur de la preuve (§11) : le bloc partagé avec
   // l'extension, le détail du retrait automatique, et l'enveloppe.
   'PREUVE_RECENTE_MS', 'venteVivante', 'venteEnCoursPreuve', 'ETAT_TXN_TERMINAL', 'preuvesParTransaction', 'preuvesParBordereau', 'comptesAJuger', 'ventesParCompteDe',
-  'PAS_UN_RETOUR', 'etatRevient', 'capturesParCompte', 'detailPreuvesVinted', 'uidsDeComptes', 'lirePreuvesVenteVinted', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
+  'PAS_UN_RETOUR', 'etatRevient', 'capturesParCompte', 'detailPreuvesVinted', 'uidsDeComptes', 'lirePreuvesVenteVinted', 'lireVentesVintedProuvees', 'isOnlineListing', 'prixVinted', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
   'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe', 'LISTE_VENTES_FRAICHE_MS', 'noterRetraitAutoIncertain'];
 
@@ -190,13 +190,16 @@ async function controles(APP, journal) {
   // ── 2. LES ANNONCES EN VENTE : TOUS SES COMPTES, ÉCARTÉS COMPRIS ──────────
   await essaie('annonces en vente', async () => {
     const LIST = {
-      A: { items: [{ id: 101, is_closed: false }, { id: 102, is_closed: true }] },
+      A: { items: [{ id: 101, is_closed: false, price: { amount: '49.0', currency_code: 'EUR' } }, { id: 102, is_closed: true }] },
       X: { items: [{ id: 901, is_closed: false }] },   // un compte qu'il a EXCLU : la paire y est en vente
     };
     const F = charger(APP, { fetchHarvest: async (uid) => LIST[uid] || null }, dit); if (!F || !F.lireAnnoncesVintedEnLigne) { dit(false, '`lireAnnoncesVintedEnLigne` existe (une lecture partagée par l\'écran eBay et la coque, §11)'); return; }
     const r = await F.lireAnnoncesVintedEnLigne([{ vinted_user_id: 'A' }, { vinted_user_id: 'X' }]);
     dit(r && r.enLigne && r.enLigne.has('101') && r.enLigne.has('901') && !r.enLigne.has('102') && r.toutesLues === true,
       'une paire en vente sur un compte EXCLU est en vente (l\'exclusion règle l\'affichage) ; une fermée ne l\'est pas', JSON.stringify(r && { e: [...(r.enLigne || [])], t: r.toutesLues }));
+    // (15 octobre) la même lecture rend le prix de l'annonce en vente (l'écran
+    // eBay le reprend) — `prixVinted`, la règle de prix de l'extension (§11).
+    if (r && r.prix) dit(r.prix['101'] === 49 && !('102' in r.prix), 'le prix d\'une annonce en vente est lu (49 €) ; une fermée n\'en a pas', JSON.stringify(r.prix));
     const r2 = await F.lireAnnoncesVintedEnLigne([{ vinted_user_id: 'A' }, { vinted_user_id: 'Y' }]);
     dit(r2 && r2.enLigne && r2.enLigne.has('101') && r2.toutesLues === false, 'un compte illisible ⇒ `toutesLues` faux (le retrait automatique ne partira pas)', JSON.stringify(r2 && { t: r2.toutesLues }));
   });
