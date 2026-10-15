@@ -305,7 +305,7 @@ async function traiterVendeur() {
             title: '🧾 Déclaration URSSAF',
             body: 'Nouveau mois : pense à déclarer ton chiffre d\'affaires sur autoentrepreneur.urssaf.fr.',
             tag: 'urssaf-' + mois,
-            url: '/?tab=dashboard',
+            url: '/?tab=fiscal',
           });
           await ecrireDedup('urssaf_reminder_dedup', { mois });
           urssaf = 'envoyé';

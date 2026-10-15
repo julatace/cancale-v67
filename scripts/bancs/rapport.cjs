@@ -16,7 +16,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4331;
+const PORT = Number(process.env.BANC_PORT) || 4331;
 
 const auj = new Date();
 const jour = (d) => new Date(auj.getFullYear(), auj.getMonth(), d, 12).toISOString();
@@ -148,9 +148,12 @@ const brancher = async (pg, etat = {}) => {
       await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3000);
       try {
+        // (15 octobre) Le rapport vit dans Déclarations : Ventes → Outils y mène.
         await pg.getByText('Outils', { exact: false }).first().click({ timeout: 5000 });
+        await pg.getByText('Déclarations URSSAF', { exact: true }).first().click({ timeout: 5000 });
+        await pg.waitForTimeout(1500);
         await pg.getByText('Rapport comptable', { exact: true }).first().click({ timeout: 5000 });
-      } catch (e) { dit(false, 'le rapport s’ouvre depuis « Outils »', String(e.message).slice(0, 100)); await ctx.close(); continue; }
+      } catch (e) { dit(false, 'le rapport s’ouvre depuis Ventes → Outils → Déclarations', String(e.message).slice(0, 100)); await ctx.close(); continue; }
       await pg.waitForTimeout(1500);
       const r = await pg.evaluate(() => {
         const reg = document.querySelector('[data-registre="ventes"]');
@@ -239,6 +242,10 @@ const brancher = async (pg, etat = {}) => {
         await pg.keyboard.press('Escape').catch(() => {});
         await pg.evaluate(() => { const x = [...document.querySelectorAll('button[aria-label="Fermer"]')].pop(); if (x) x.click(); });
         await pg.waitForTimeout(400);
+        // (15 octobre) Le rapport est ouvert depuis Déclarations : le repère,
+        // lui, est resté sur l'écran Ventes.
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3000);
         // Il vit sous « Analyse de tes ventes » (replié par défaut).
         if (!(await pg.$('[data-repere-modeles]'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 });
         await pg.waitForTimeout(400);
@@ -278,8 +285,13 @@ const brancher = async (pg, etat = {}) => {
       await pg.waitForTimeout(3000);
       return { ctx, pg, errs };
     };
+    // (15 octobre) Rapport et registre : Ventes → Outils → Déclarations, puis le bouton.
     const outil = async (pg, nom) => {
-      await pg.getByText('Outils', { exact: false }).first().click({ timeout: 5000 });
+      if (!(await pg.$('[data-espace-fiscal]'))) {
+        await pg.getByText('Outils', { exact: false }).first().click({ timeout: 5000 });
+        await pg.getByText('Déclarations URSSAF', { exact: true }).first().click({ timeout: 5000 });
+        await pg.waitForTimeout(1500);
+      }
       await pg.getByText(nom, { exact: true }).first().click({ timeout: 5000 });
       await pg.waitForTimeout(1200);
     };

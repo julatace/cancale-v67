@@ -24,7 +24,7 @@ catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwri
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4337;
+const PORT = Number(process.env.BANC_PORT) || 4337;
 
 const maintenant = new Date();
 // Un jour « il y a n jours », à midi heure locale (jamais près de minuit).
@@ -231,10 +231,11 @@ const lire = (pg) => pg.evaluate(() => {
       dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
       dit(lu.recuMois === String(attendu.recuMois + 5500), '« Reçu en {mois} » = argent VERSÉ ce mois, y compris une vente déclarée le mois d’avant (même chiffre que les barres)', `rendu ${lu.recuMois} · attendu ${attendu.recuMois + 5500}`);
       if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'journee-recu-declaree.png') });
-      // La carte URSSAF du tableau de bord lit ce que Ventes vient de publier.
-      await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForFunction(() => document.querySelector('[data-dash-vendu-jour],[data-dash-vendu-pas-su]'), null, { timeout: 15000 }).catch(() => {});
-      await pg.waitForTimeout(1200);
+      // La carte URSSAF vit dans Déclarations (15 octobre) : l'écran calcule et
+      // publie lui-même la ligne, puis la carte la lit.
+      await pg.goto(`http://localhost:${PORT}/?tab=fiscal`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForFunction(() => document.querySelector('[data-urssaf-ailleurs]'), null, { timeout: 20000 }).catch(() => {});
+      await pg.waitForTimeout(600);
       if (process.env.CAPTURES) { await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.screenshot({ path: path.join(process.env.CAPTURES, 'dashboard-urssaf-ailleurs.png') }); }
       const u = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-ailleurs]'); return e ? { cents: e.getAttribute('data-urssaf-ailleurs'), n: e.getAttribute('data-urssaf-ailleurs-n') } : null; });
       dit(u && u.cents === '5500' && u.n === '1', 'la carte URSSAF dit qu’1 vente (55 €) versée ce mois-ci est déjà déclarée ailleurs — la phrase vient de la même ligne que le chiffre', JSON.stringify(u));
@@ -244,7 +245,11 @@ const lire = (pg) => pg.evaluate(() => {
       const ym = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`;
       const publie = { mois: [{ ym, n: 1, ca: 50, nMasq: 0, caMasq: 0, par: { Vinted: { n: 1, ca: 50 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, declare: null }],
         aDater: { n: 0, ca: 0, par: {} }, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' }, declare: 'pasSu', at: Date.now() };
-      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { publie });
+      // (15 octobre) La carte vit dans Déclarations, qui REPUBLIE dès que ses
+      // ventes sont lues : on fait échouer leur lecture (le cas réel où la carte
+      // garde la dernière ligne publiée) pour juger ce qu'elle dit de cette ligne.
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'fiscal', { publie, ventesKO: ['111'] });
+      await pg.waitForFunction(() => document.querySelector('[data-urssaf-declare]'), null, { timeout: 15000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); return e ? e.getAttribute('data-urssaf-declare') : null; });
       dit(v === 'pasSu', 'la carte URSSAF lit « registre pas encore lu » et le dit (le chiffre peut encore compter une vente déclarée ailleurs)', `declare=${v}`);
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));

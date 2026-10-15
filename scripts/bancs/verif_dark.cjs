@@ -49,14 +49,15 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4322);
+const PORT_BANC=Number(process.env.BANC_PORT)||4322;
+srv.listen(PORT_BANC);
 // ⚠️ TOUS LES ÉCRANS, PAS DIX SUR TREIZE. `vintedaccounts` (« Comptes liés »)
 // n'etait rendu par AUCUN banc — et c'est la qu'un bouton « ↻ Actualiser »
 // posait sa propre ligne de titre au lieu de passer par le slot `right` de
 // `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
 // Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
 // (l'ancienne appli) etaient dans le meme angle mort.
-const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted','compta'];
+const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted','compta','fiscal'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
@@ -98,7 +99,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
     const vides=[], deb=[], susp=[], sousIle=[], morts=[];
     for(const t of TABS){
-      await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
+      await pg.goto('http://localhost:'+PORT_BANC+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
         sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth,
