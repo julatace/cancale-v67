@@ -9079,6 +9079,126 @@ tant que le manifeste est en 5.177, `audit-coherence` dit ces seuils
 **Geste de Julien** : vérifier « Ta ville » dans Réglages (Vannes), installer
 l'extension montée, et publier une paire depuis VRM.
 
+### ⚠️⚠️ « LEBONCOIN : J'AI BEAU ACTUALISER, LES PHOTOS DES ANNONCES N'APPARAISSENT PAS » (15 octobre)
+**Mesuré avant de coder** (sa base, lecture seule ; aucun appel à Leboncoin) :
+- `lbc_listings.items[].images` : un tableau de **chaînes**, et les **1 071**
+  adresses sont toutes `https://img.leboncoin.fr/api/v1/lbcpb1/images/…/<hash>.jpg?rule=ad-image`
+  — aucune signature ni date : **pas** des liens périmés, **pas** un mauvais champ ;
+- ces photos (Leboncoin → Annonces : « quelle paire ? », « non reliées »,
+  « vendue ici, encore sur Vinted ») passaient par un `<img>` **ordinaire** :
+  référent de VRM compris, **aucun secours** — un refus du CDN laissait une case
+  vide, qu'« Actualiser » ne pouvait pas remplir ;
+- `lbc_ventes` : **1 transaction sur 16** porte une `image` ; les **3 ventes
+  prouvées n'en ont aucune**, alors que LEUR annonce (même `itemId`) est dans
+  `lbc_listings` avec 12 à 13 photos. Cause : la **liste** v3 porte
+  `[].item.thumbnail_url` (mesuré dans `lbc_recon.schemas`) et l'extension la
+  jetait — seul le détail, ouvert transaction par transaction, donnait l'image.
+  Leboncoin → Ventes / Achats / Colis n'affichaient donc qu'un pictogramme ;
+- les photos Vinted de la file « à publier » (`vinted_item_details`, 768 lues le
+  14-15, `images1.vinted.net`, signées) ne sont **pas** en cause : `diag_photos`
+  dit 9 affichées, 0 échec (Mac Chrome, 14 oct.).
+
+**Corrigé (une règle : `src/photosLeboncoin.js`)** :
+- `PhotoVinted` est devenu un **aiguillage sans hook** : une adresse
+  `img.leboncoin.fr` (l'hôte EXACT mesuré, rien d'autre) passe par
+  `PhotoLeboncoin` — sans référent ; refusée ⇒ le secours (la route serveur
+  `/api/compte?mode=photo`, puis l'extension) ⇒ sinon le **pictogramme**, jamais
+  une case vide ; ≤ 3 demandes en vol ; un SVG jamais accepté ; rien de figé
+  (recul 1-2-4-5 min au remontage, `online`, retour de l'extension). Le rendu
+  Vinted vit dans `PhotoVintedCdn`, inchangé.
+- ⚠️ **`referrerPolicy` AVANT `src`** (les deux `<img>`, Vinted compris) :
+  mesuré au banc, une photo déjà dans le cache mémoire du navigateur (vue sur un
+  autre écran) se recharge **dès que `src` est posé** — React 18 pose les
+  attributs dans l'ordre — donc **avec** le référent. Un CDN qui refuse les
+  référents la refusait au deuxième écran.
+- **La photo d'une transaction** (`photoTransactionLbc`) : la sienne, sinon celle
+  de **SON annonce par l'identifiant** (`itemId` = la clé de `lbc_listings.items`,
+  et l'annonce doit porter CET `id`) — jamais une autre annonce au même titre
+  (§5). La coque la résout une fois (`photoLbc`), Ventes/Achats/Colis la lisent
+  (`photoLbcDe`). Les annonces (226 Ko) ne sont lues que s'il en manque une, via
+  le lecteur de session déjà partagé (`lbcAnnoncesSession`). Sur sa base : les
+  **3 ventes** retrouvent leur photo ; les 5 achats sans image restent un
+  pictogramme (leur annonce n'est pas captée — mieux vaut un blanc qu'un faux).
+- **Extension (code seulement, version NON montée — la session principale le
+  fera)** : le pont « photo » admet `img.leboncoin.fr` (et lui seul :
+  `PHOTO_PONT_PERMISE`), et la liste v3 garde `image` (`imageDeVente(t)`).
+  Aucune entrée d'`EXT_CAPACITES` : aucune phrase ne promet le secours ; une
+  extension plus ancienne refuse, la photo garde son pictogramme.
+
+**Prouvé** (§6.1, banc et audit FINAUX lancés depuis une copie de `w15`) :
+- banc `photos-leboncoin.cjs` (ports 5821/5822, données inventées aux formes
+  mesurées, faux CDN = **vrai serveur HTTPS** résolu sous `img.leboncoin.fr`, et
+  le secours de l'extension = le **vrai** `background.js` dans un `vm`) :
+  **39 contrôles, 20 rouges sur w15**, vert après ; et rouge sous 4 mutations de
+  l'app/extension rebâties : aiguillage retiré (20), identité retirée (4),
+  `src` avant `referrerPolicy` (4), pont limité à Vinted (8).
+  ⚠️ **Piège de banc, corrigé avant de conclure** : les photos Leboncoin vivent
+  sous `/api/v1/…` — un `**/api/**` (la forme des autres bancs) les avalait et
+  servait du JSON : une image « cassée » fabriquée par le banc. Seules les routes
+  de l'APP (`localhost`) sont servies.
+- `audit-photos-leboncoin.cjs` : **26 contrôles, 5 rouges sur w15**, et rouge
+  sous 7 mutations (`hote-large`, `liste-sans-image`, `titre`, `svg`, `fige`,
+  `sans-borne`, `ordre`).
+- `audit-photos-vinted.cjs` : sa liste fermée connaît `PhotoVintedCdn` et
+  `PhotoLeboncoin`.
+- Bancs voisins relancés un par un sur le build final : `photos-vinted` (171,
+  vert — il couvre l'aiguillage et le nouvel ordre des attributs côté Vinted),
+  `lbc-relier`, `lbc-bordereau`, `verif_visuel` (vraies fixtures) verts ;
+  `double-vente` (2 : « le tableau de bord annonce les mêmes 2 paires »),
+  `lbc-preuve` (4, scénario D) et `revendeurs` (agent eBay) sont rouges
+  **à l'identique sur `w15`** — pas de ce correctif.
+
+**Non mesuré** : si le CDN de Leboncoin refuse VRAIMENT l'affichage hors de son
+site (aucun appel d'ici) — la règle tient dans les deux cas ; que la route
+serveur atteigne `img.leboncoin.fr` depuis Vercel ; que SON extension réponde.
+**Geste de Julien** : installer l'extension qui portera ce correctif (version
+montée par la session principale), puis ouvrir une fois **Mes transactions** sur
+leboncoin.fr pour que les photos des achats arrivent avec la liste.
+
+### Leboncoin → Annonces liste enfin SES annonces en ligne, avec leur photo (15 octobre)
+Suite de la plainte du 15 octobre (« j'ai beau actualiser, les photos des
+annonces n'apparaissent pas »). Le correctif des photos (`PhotoLeboncoin`)
+était juste, mais **l'écran ne listait pas ses annonces en ligne** : seulement
+celles « à relier », vendues, ou non reliées, plus la file Vinted.
+**Mesuré (sa base, lecture seule)** : `lbc_listings` = **183** annonces captées,
+**8 à lui** par les règles existantes (`annonceLbcALui` : réf/`lbcUser`, ou un
+compte PROUVÉ par une vente où il est le vendeur — 1 compte, 3 ventes) ;
+**3 vendues** ici ⇒ **5 en ligne**, toutes avec 12 à 15 photos `img.leboncoin.fr`,
+toutes sur le même compte ; **3 reliées** (lien posé à la main, dont une avec sa
+réf VRM), **2 à relier**. Statut capturé « active » mais **vues le 20 septembre**
+pour 4 d'entre elles (la dernière lecture de « Mes annonces » date du 10 octobre).
+- **La carte du compteur porte la liste** (§7 : le nombre n'est écrit qu'une
+  fois) : photo (`PhotoVinted` ⇒ `PhotoLeboncoin`), titre, prix, statut
+  (`statutAnnonceLbc` : active ⇒ « en ligne », inactive ⇒ « désactivée »), lien
+  « Voir » (seulement vers `leboncoin.fr`), le N° **seulement par identité**
+  (`clesAnnonceLbc` + une paire qui porte ce N°, la règle de « non reliées »), le
+  compte **seulement s'il y en a plusieurs**, « vue il y a N j » seulement pour
+  une date CONNUE de plus de 2 jours, et le geste une fois.
+- Les annonces **à relier** sont DANS la liste (le même `LbcRelier`) : la carte
+  « non reliées » à part montrait la même annonce une seconde fois.
+- **Trois états** (`lbcEtat`) : `passu` (lecture ratée — dite UNE fois en haut,
+  jamais « aucune annonce ») · `jamais` (rien de capté qui soit à lui : « ouvre
+  « Mes annonces » sur leboncoin.fr dans le Chrome de l'extension ») · lu
+  (`aucune` quand tout ce qui est à lui est vendu ou retiré, avec la date).
+  Avant, « jamais » valait aussi « tout vendu », et ne se disait que sans aucune
+  paire marquée publiée.
+- **Aucun second lecteur** : l'écran lisait déjà `lbc_listings` ; la liste est
+  calculée sur ses `liveAds` (`lignesAnnoncesLbc`).
+- ⚠️⚠️ **TROUVÉ AU RENDU, ET C'ÉTAIT SUR SON IPHONE** : à 390 px la page entière
+  sortait de l'écran à droite (« ↻ Actualiser » et « Relier » coupés) dès qu'un
+  titre était long. Le bloc de l'écran (`margin: 0 auto`) est un élément de
+  grille : sans largeur, il se dimensionne au contenu, donc au plus long titre
+  `nowrap`. ⚠️ Et `scrollWidth` ne le voyait PAS (la racine coupe ce qui
+  dépasse) : le banc mesure les **bords réels** des boutons et des lignes.
+  `width: 100%` + `box-sizing`.
+- Preuves (§6.1, build de `p0-lbc-photos` dans une copie) : banc
+  `lbc-annonces.cjs` (port 5891, données inventées) **31 rouges avant, 0 après** ;
+  mutations : annonce d'un inconnu affichée ⇒ **12 rouges** (elle sortait même en
+  « N°12 » par son titre) ; lecture ratée lue « jamais » ⇒ **2 rouges**.
+- **Non fait** : relire « Mes annonces » ne se déclenche pas d'ici (il faut sa
+  visite sur leboncoin.fr) ; le statut n'est que celui de la DERNIÈRE capture
+  (une annonce vendue depuis peut encore dire « en ligne » — l'âge le dit).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

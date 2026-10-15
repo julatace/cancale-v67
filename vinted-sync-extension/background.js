@@ -1664,9 +1664,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'photo') {
       (async () => {
         try {
-          // Seulement le CDN d'images de Vinted : ce pont ne doit pas devenir un
-          // téléchargeur d'URL arbitraire pour n'importe quelle page.
-          if (!/^https:\/\/[\w.-]*vinted\.net\//i.test(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
+          // Seulement les CDN d'images : celui de Vinted, et (15 octobre) l'hôte
+          // d'images de Leboncoin EXACT mesuré sur sa base (`img.leboncoin.fr`,
+          // 1 071 adresses sur 1 071 dans `lbc_listings`) — rien d'autre, ni
+          // `www.`/`api.leboncoin.fr`, ni un nom qui l'imite. Ce pont ne doit pas
+          // devenir un téléchargeur d'URL arbitraire pour n'importe quelle page.
+          if (!PHOTO_PONT_PERMISE(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
           const r = await photoBytes(msg.url);
           sendResponse(r);
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -5756,6 +5759,10 @@ async function pdfBordereauLbc(url) {
   } catch (e) { return { ok: false, error: String(e).slice(0, 80) }; }
 }
 
+// Les adresses que le pont « photo » de l'app peut faire lire (voir le
+// gestionnaire `action: 'photo'`) : le CDN de Vinted, et l'hôte d'images de
+// Leboncoin — EXACTEMENT celui-là (mesuré le 15 octobre).
+const PHOTO_PONT_PERMISE = (u) => /^https:\/\/[\w.-]*vinted\.net\//i.test(u) || /^https:\/\/img\.leboncoin\.fr\//i.test(u);
 async function photoBytes(url) {
   try {
     if (!/^https:/i.test(String(url || ''))) return { ok: false };
@@ -8375,6 +8382,13 @@ function extraireVentesLbc(url, body) {
       prixListe: (t.item && t.item.price != null) ? t.item.price : (t.price != null ? t.price : null),
       dateVente: dateVenteLbc(t),
       stepStatus: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
+      // ⚠️ (15 octobre) LA PHOTO EST DANS LA LISTE AUSSI : mesuré dans
+      //    `lbc_recon.schemas`, la liste v3 porte `[].item.thumbnail_url`. Elle
+      //    était jetée : seul le DÉTAIL (ouvert transaction par transaction)
+      //    donnait une image — 1 transaction sur 16 en avait une. La même
+      //    lecture que le détail (`imageDeVente`) ; rien trouvé ⇒ '' (un vide
+      //    n'écrase jamais une image connue, `rangerLbcVentes`).
+      image: imageDeVente(t),
     }).filter((x) => x && x.txId);
   }
   // Détail : une transaction (v2 API, ou page Next enveloppée).

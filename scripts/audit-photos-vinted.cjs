@@ -132,6 +132,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
       'PhotoVente :: secours': 'octets raster du secours serveur, convertis en data:image (type et taille vérifiés)',
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
+      'PhotoVintedCdn :: *': 'la règle elle-même : `PhotoVinted` n’est plus qu’un aiguillage (15 octobre), le rendu Vinted vit ici',
+      'PhotoLeboncoin :: *': 'les photos du CDN de Leboncoin (img.leboncoin.fr) : leur propre règle — no-referrer, secours serveur puis extension, pictogramme (src/photosLeboncoin.js, scripts/audit-photos-leboncoin.cjs)',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'VrmLogo :: "/logo-vrm-192.png"': 'logo de l’app (fichier du site)',
       'QrColis :: url': 'QR de retrait (adresse du transporteur, extraite de l’email)',

@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
+import * as photosLbc from "./photosLeboncoin.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
@@ -5319,6 +5320,25 @@ if (typeof window !== 'undefined') {
     setTimeout(() => photosVinted.secoursChange(), PHOTOS_GRACE_EXT_MS + 200);
   } catch (_) {}
 }
+// Les photos du CDN de LEBONCOIN (15 octobre, `src/photosLeboncoin.js`) : le
+// même secours que Vinted — la route serveur des photos d'abord (elle admet
+// `img.leboncoin.fr`), puis l'extension (son pont « photo » admet cet hôte, et
+// lui seul, depuis le 15 octobre). Une extension plus ancienne refuse : la
+// photo garde le pictogramme et retente au retour de l'extension, sans phrase
+// (aucune promesse n'est faite à une version qui ne sait pas).
+photosLbc.configurer({
+  demander: async (u) => {
+    const debut = Date.now();
+    const parServeur = await photoViaServeur(u);
+    if (parServeur) return parServeur;
+    if (!__vmrExtReady) return null;
+    const r = await vmrPhotoIssue(u, Math.max(1000, photosVinted.DELAI_SECOURS_MS - (Date.now() - debut)));
+    return (r && r.dataUrl) || null;
+  },
+});
+if (typeof window !== 'undefined') {
+  try { onVmrExt(() => photosLbc.reprendre()); } catch (_) {}
+}
 // Le cadre du pictogramme reprend la PLACE de l'image (jamais un trou, jamais
 // l'icône « image cassée » du navigateur) : mêmes dimensions, mêmes arrondis.
 const CLES_CADRE_PHOTO = ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'borderRadius', 'flexShrink', 'flex', 'margin', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom', 'border', 'boxShadow', 'position', 'top', 'left', 'right', 'bottom', 'aspectRatio', 'background'];
@@ -5349,7 +5369,54 @@ const taillePicto = (style) => {
 //     de quelques secondes et ne les remontrait jamais. Ce composant dessine
 //     lui-même le pictogramme à leur place. Pour une autre adresse (un <img>
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
-function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+// ⚠️ Un AIGUILLAGE, sans hook : une adresse du CDN de Leboncoin passe par SA
+//    règle (`PhotoLeboncoin`), toute autre par celle de Vinted (qui laisse les
+//    autres adresses en `<img>` ordinaire, comme avant). Deux composants
+//    distincts : une vignette qui changerait d'hôte se remonte, l'ordre des
+//    hooks ne bouge jamais.
+function PhotoVinted(props) {
+  return photosLbc.estPhotoLbc(props && props.src) ? <PhotoLeboncoin {...props}/> : <PhotoVintedCdn {...props}/>;
+}
+// ── LES PHOTOS DU CDN DE LEBONCOIN (15 octobre) ──────────────────────────────
+// Julien : « j'ai beau actualiser la page, les photos des annonces
+// n'apparaissent pas ». Elles étaient rendues par un `<img>` ordinaire : le
+// référent de VRM partait avec, et un refus du CDN laissait une case vide, sans
+// secours. Ici : sans référent ; refusée ⇒ le secours (serveur, puis extension)
+// ⇒ sinon le pictogramme, et rien n'est figé (`src/photosLeboncoin.js`).
+// `onError` n'est JAMAIS appelé : ce composant dessine lui-même le pictogramme
+// (comme pour une photo Vinted), et un appelant qui relancerait son propre
+// secours referait la même demande.
+function PhotoLeboncoin({ src, repli, onError, onLoad, style, loading, ...reste }) {
+  void onError;
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  const vu = React.useRef('');
+  const etat = photosLbc.etat(src);
+  vu.current = etat;
+  React.useEffect(() => {
+    const off = photosLbc.monter(src, maj);
+    if (photosLbc.etat(src) !== vu.current) maj();
+    return off;
+  }, [src]);
+  if (etat === 'ok') {
+    return <img src={photosLbc.donnees(src)} style={style} {...reste} data-photo-lbc="secours" onLoad={onLoad}
+      onError={() => photosLbc.echecDonnees(src)}/>;
+  }
+  if (etat === 'natif') {
+    // ⚠️ `referrerPolicy` et `loading` AVANT `src` (React 18 pose les attributs
+    //    dans l'ordre) : mesuré au banc, une photo déjà dans le cache mémoire du
+    //    navigateur (vue sur un autre écran) se charge DÈS que `src` est posé —
+    //    avec le référent par défaut, l'interdiction n'étant pas encore là.
+    return <img referrerPolicy="no-referrer" loading={loading || 'lazy'} src={src} style={style} {...reste} data-photo-lbc="natif"
+      onLoad={onLoad} onError={() => photosLbc.echecNatif(src)}/>;
+  }
+  if (repli === null) return null;
+  return (
+    <span aria-hidden="true" data-photo-lbc={etat === 'vol' ? 'attente' : 'perdue'} style={cadrePhoto(style)}>
+      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
+    </span>
+  );
+}
+function PhotoVintedCdn({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const qui = React.useRef(null); if (!qui.current) qui.current = {};
@@ -5390,7 +5457,8 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} {...reste} data-photo-vinted="natif"
+    // `referrerPolicy` AVANT `src` : voir `PhotoLeboncoin` (mesuré le 15 octobre).
+    return <img referrerPolicy="no-referrer" loading={loading || 'lazy'} src={src} style={style} {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -10843,6 +10911,10 @@ function LigneVente({ photo, titre, meta, montant, actions }) {
     </div>
   </article>;
 }
+// La photo d'une transaction Leboncoin : celle que la coque a résolue par la
+// règle (`photosLbc.photoTransactionLbc` : la sienne, sinon celle de SON annonce
+// par l'identifiant), sinon sa propre image (§11 : une règle, la coque la porte).
+const photoLbcDe = (o) => (o && o.photoLbc) || photosLbc.photoTransactionLbc(o, null) || photoArticle(o);
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
 // peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
 // sinon la porte vers elle. Même principe que PhotoVente.
@@ -10938,7 +11010,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     return (
       <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <PhotoVente src={photoArticle(o)} size={58} />
+          <PhotoVente src={photoLbcDe(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {badgeNum(n)}
@@ -10996,7 +11068,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
           <Card>
             {postes.map((o, i) => { const n = numDe(o); const lbl = o.label || {}; return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <PhotoVente src={photoArticle(o)} size={40} />
+                <PhotoVente src={photoLbcDe(o)} size={40} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{estFait(o) ? 'Posté' : (o.stepLabel || 'Posté')}{lbl.reference ? ` · ${lbl.reference}` : ''}</div>
@@ -11063,7 +11135,7 @@ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.'
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o }) {
-  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
+  return <LigneVente photo={photoLbcDe(o)} titre={o.title} montant={lbcEuro(o.price)}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
 function lbcArgent(lbcVentes) {
@@ -34244,6 +34316,47 @@ function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
 
+// ── SES ANNONCES LEBONCOIN, TELLES QUE L'ÉCRAN LES MONTRE (15 octobre) ───────
+// Julien : « pour Leboncoin, j'ai beau actualiser la page, les photos des
+// annonces n'apparaissent pas ». Mesuré : l'écran Leboncoin → Annonces ne
+// LISTAIT pas ses annonces en ligne — seulement celles à relier, vendues, ou
+// non reliées. Ses 5 annonces en ligne (sur 8 qui sont à lui, parmi 183
+// captées) n'apparaissaient nulle part avec leur photo.
+// Une ligne par annonce À LUI (`annonceLbcALui`), pas morte, pas vendue ici ;
+// le N° seulement s'il vient d'une IDENTITÉ (`clesAnnonceLbc` : lien posé à la
+// main, réf VRM, « nXXX » de son titre) ET qu'une paire le porte — sinon elle
+// est « à relier », jamais devinée (§5). Le lien n'est gardé que s'il mène à
+// leboncoin.fr (la capture vient d'une page, elle ne dicte pas une adresse).
+const RE_URL_LBC = /^https:\/\/(?:www\.)?leboncoin\.fr\//i;
+const statutAnnonceLbc = (s) => {
+  const t = String(s == null ? '' : s).trim();
+  if (!t) return '';
+  if (/^(active|online|published|en ligne)$/i.test(t)) return 'en ligne';
+  if (/inactiv|disabled|d[ée]sactiv|paus/i.test(t)) return 'désactivée';
+  if (/pending|moderat|review|attente|validat/i.test(t)) return 'en validation';
+  return t.toLowerCase();
+};
+function lignesAnnoncesLbc(liveAds, cles, connus) {
+  return (liveAds || []).map((ad) => {
+    const numero = cles(ad).find((k) => connus.has(k)) || '';
+    const imgs = Array.isArray(ad.images) ? ad.images : (ad.image ? [ad.image] : []);
+    const photo = imgs.map((x) => (typeof x === 'string' ? x : (x && (x.url || x.src)) || '')).find((u) => /^https:\/\//i.test(u)) || '';
+    const p = Array.isArray(ad.price) ? ad.price[0] : ad.price;
+    const vu = Date.parse(ad.seenAt || '');
+    return {
+      id: String(ad.id), ad, numero, photo,
+      titre: String(ad.subject || ad.title || ''),
+      prix: p != null && p !== '' && Number.isFinite(Number(p)) ? Number(p) : null,
+      statut: statutAnnonceLbc(ad.status),
+      url: RE_URL_LBC.test(String(ad.url || '')) ? String(ad.url) : '',
+      compte: String(ad.account || ad.lbcUser || ''),
+      nomCompte: String(ad.accountName || ad.lbcUserName || ''),
+      vuAt: Number.isFinite(vu) ? vu : null,
+    };
+  }).sort((a, b) => (a.numero ? 1 : 0) - (b.numero ? 1 : 0)
+    || (a.numero && b.numero ? triNum(a.numero, b.numero) : (b.vuAt || 0) - (a.vuAt || 0)));
+}
+
 // Les annonces Leboncoin captées (226 Ko mesurés le 4 octobre) : lues une fois
 // par session au plus pour le centre de notifications. `null` = pas su.
 let _lbcAnnoncesSession = null;
@@ -34993,8 +35106,7 @@ function LeboncoinScreen() {
     //    rapprochement par référence est impossible, donc « vendue sur Vinted →
     //    à retirer » ne peut RIEN trouver. L'écran doit le dire, pas afficher 0.
     // « jamais capté » = aucune annonce QUI SOIT À LUI (la ligne peut exister et
-    // ne contenir que des annonces d'autres).
-    const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
+    // ne contenir que des annonces d'autres) — décidé plus bas (`lbcEtat`).
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
     // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
@@ -35121,7 +35233,16 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    // ── LA LISTE DE SES ANNONCES EN LIGNE (15 octobre) ─────────────────────────
+    // Trois états, jamais deux : `passu` (la ligne n'a pas pu être lue — dit UNE
+    // fois en haut, jamais « aucune annonce ») · `jamais` (rien de capté qui soit
+    // à lui : le geste) · lu (`aucune` quand tout ce qui est à lui est vendu ou
+    // retiré, avec la date de la lecture).
+    const nALui = lbcAds.filter(aLui).length;
+    const lbcEtat = lbcRows === null ? 'passu' : nALui === 0 ? 'jamais' : liveAds.length === 0 ? 'aucune' : 'lu';
+    const annoncesLbc = lbcEtat === 'lu' ? lignesAnnoncesLbc(liveAds, adKeys, keysKnown) : [];
+    const majLbc = Date.parse((lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.updatedAt) || '');
+    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcEtat === 'jamais', lbcEtat, annoncesLbc, majLbc: Number.isFinite(majLbc) ? majLbc : null, lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -35140,7 +35261,12 @@ function LeboncoinScreen() {
   const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
   const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '13px 15px', marginBottom: 12, ...style }}>{children}</div>;
   return (
-    <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
+    // ⚠️ `width: 100%` (15 octobre) : avec `margin: 0 auto` SEUL, ce bloc est
+    //    un élément de grille dimensionné « au contenu » — il prenait la largeur
+    //    de son titre le plus long (un `nowrap`), et sur iPhone la page sortait
+    //    de l'écran à droite (« ↻ Actualiser » et « Relier » coupés, vu au rendu
+    //    à 390 px). Il prend la colonne ; les titres s'abrègent.
+    <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
@@ -35203,7 +35329,7 @@ function LeboncoinScreen() {
         const effets = [
           data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
           data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted",
-          data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
+          data.lbcKO && 'je ne peux ni te montrer tes annonces Leboncoin ni te dire lesquelles retirer',
           data.echecLecture && 'la file à publier est incomplète',
         ].filter(Boolean);
         return (
@@ -35219,12 +35345,68 @@ function LeboncoinScreen() {
             <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
           </div>
-          {data.lbcJamaisLu && !data.postedCount && (
-            <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
-              Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
-              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.
+          {/* ⚠️ Trois états (15 octobre). « Jamais capté » se disait seulement
+              sans aucune paire marquée publiée, et confondait « rien à lui » avec
+              « tout vendu ». Une lecture ratée (`passu`) est dite UNE fois, en
+              haut de l'écran — ici rien, et surtout jamais « aucune annonce ». */}
+          {data.lbcEtat === 'jamais' && (
+            <div data-lbc-annonces="jamais" style={{ fontSize: 12, color: C.text, marginTop: 6, lineHeight: 1.5 }}>
+              Pas encore vues. Ouvre <b>« Mes annonces »</b> sur leboncoin.fr, dans le Chrome où l'extension VRM est installée : elles s'afficheront ici avec leurs photos.
+              <span style={{ display: 'block', color: C.muted, fontSize: 11.5, marginTop: 2 }}>D'ici là, je ne peux pas te dire lesquelles retirer quand une paire se vend sur Vinted.</span>
             </div>
           )}
+          {data.lbcEtat === 'aucune' && (
+            <div data-lbc-annonces="aucune" style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+              Aucune en ligne à ta dernière visite sur leboncoin.fr{data.majLbc ? ` (${ilYaCourt(data.majLbc)})` : ''}. Ouvre « Mes annonces » là-bas pour les relire.
+            </div>
+          )}
+          {data.lbcEtat === 'lu' && (data.annoncesLbc || []).length > 0 && (() => {
+            const rows = data.annoncesLbc;
+            const aRelier = rows.filter((a) => !a.numero);
+            const reliees = rows.filter((a) => a.numero);
+            const plusieurs = new Set(rows.map((a) => a.compte).filter(Boolean)).size > 1;
+            const nomDe = (a) => a.nomCompte || (((data.lbcAccounts || []).find((x) => String(x.id) === a.compte) || {}).name) || '';
+            const VIEUX = 48 * 3600e3;
+            // « Vue il y a 25 j » n'est écrit que pour une date CONNUE : un âge
+            // inconnu n'est pas un âge ancien (« pas su » ne vaut pas « oui »).
+            const vieille = (a) => a.vuAt != null && Date.now() - a.vuAt > VIEUX;
+            const euros = (p) => p == null ? '' : p.toFixed(2).replace('.', ',') + ' €';
+            const sousTitre = (a, avecNum) => [avecNum ? `N°${a.numero}` : '', euros(a.prix), a.statut,
+              vieille(a) ? `vue ${ilYaCourt(a.vuAt)}` : '', plusieurs ? nomDe(a) : ''].filter(Boolean).join(' · ');
+            const vignette = (a) => (
+              <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
+              </div>
+            );
+            return (
+              <div data-lbc-annonces="lu" data-n={rows.length} style={{ marginTop: 10 }}>
+                {n !== rows.length && <div style={{ fontSize: 11, color: C.muted, marginBottom: 2 }}>{rows.length} relue{rows.length > 1 ? 's' : ''} sur leboncoin.fr :</div>}
+                {aRelier.length > 0 && (<>
+                  <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, margin: '4px 0 2px' }}>
+                    <b style={{ color: C.text }}>{aRelier.length} à relier</b> : VRM ne sait pas quelle paire c'est. Clique la paire proposée ou tape son N°.
+                  </div>
+                  {aRelier.map((a) => (
+                    <div key={a.id} data-annonce-lbc={a.id} data-numero="">
+                      <LbcRelier ad={a.ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={a.ad.suggestions} detail={sousTitre(a, false)}/>
+                    </div>
+                  ))}
+                </>)}
+                {reliees.map((a) => (
+                  <div key={a.id} data-annonce-lbc={a.id} data-numero={a.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+                    {vignette(a)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.titre || '—'}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{sousTitre(a, true)}</div>
+                    </div>
+                    {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Voir</a>}
+                  </div>
+                ))}
+                {rows.some(vieille) && (
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Ce qui a changé sur Leboncoin depuis la date indiquée n'y est pas : ouvre « Mes annonces » là-bas pour les relire.</div>
+                )}
+              </div>
+            );
+          })()}
           {/* ⚠️ « Offre : Gratuit » s'affichait quand AUCUNE offre n'était connue
               (mesuré : `plan` et `limit` jamais renseignés) — une valeur inventée. */}
           {data.plan ? <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan}</div> : null}
@@ -35283,16 +35465,9 @@ function LeboncoinScreen() {
             n'a pas pu vérifier. */}
         {/* « Je n'ai pas pu vérifier lesquelles sont déjà vendues » est dit une fois,
             dans le bloc des lectures ratées en haut de l'écran. */}
-        {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
-            présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
-        {data.unlinked && data.unlinked.length > 0 && (
-          <Card>
-            <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 4 }}>❔ {data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Clique la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
-            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions}/>)}
-            {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
-          </Card>
-        )}
+        {/* Les annonces non reliées vivent maintenant DANS la liste de ses annonces
+            (carte du compteur, 15 octobre) : la même annonce, deux fois sur un
+            écran, se lisait comme deux choses à faire (§7). */}
         {/* Diagnostic fourni par Leboncoin lui-même sur tes annonces en ligne. */}
         {(() => {
           const flagged = (data.liveAds || []).filter(a => a.issue);
@@ -38787,9 +38962,25 @@ function AppCoeur() {
       // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
       // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
       const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
-      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
+      const ranger = (liste) => setLbcVentes({ ventes: liste.filter(o => o && o.isSeller === true), achats: liste.filter(o => o && o.isSeller === false), inconnues: inc.length,
         maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
+      // ⚠️ LA PHOTO D'UNE TRANSACTION (15 octobre). Mesuré : 1 transaction sur
+      //    16 porte son `image`, et les 3 ventes prouvées AUCUNE — alors que LEUR
+      //    annonce (même identifiant) est dans `lbc_listings`, avec ses photos.
+      //    Les cartes n'affichaient donc qu'un pictogramme, quoi qu'il actualise.
+      //    Une règle (`photoTransactionLbc`) : sa propre image, sinon celle de
+      //    SON annonce — par l'identifiant, jamais par le titre (§5). Les annonces
+      //    (226 Ko) ne sont lues que s'il en manque une, une fois par session
+      //    (`lbcAnnoncesSession`, le lecteur déjà partagé) ; illisibles ⇒ on
+      //    garde ce qu'on a (la carte garde son pictogramme, rien n'est inventé).
+      const avecPhoto = (items) => arr.map((o) => (o && typeof o === 'object' ? { ...o, photoLbc: photosLbc.photoTransactionLbc(o, items) } : o));
+      const ventesAvecPhoto = avecPhoto(null);
+      ranger(ventesAvecPhoto);
       setLbcCoqueLu(true);
+      if (ventesAvecPhoto.some((o) => o && !o.photoLbc && o.itemId != null && String(o.itemId).trim() !== '')) {
+        const items = await lbcAnnoncesSession();
+        if (items) ranger(avecPhoto(items));
+      }
     } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
