@@ -9028,6 +9028,59 @@ Demande de Julien du 15 octobre (lot `p1-achats`). Tranché sans lui demander :
   le build de w15**, **11 rouges** sous mutation (bouton remis en absolu, pastille
   Vinted Go remise, garde de doublon retirée, boost inconnu tu).
 
+#### Relecture du lot `p1-achats` (15 octobre) — sept défauts reproduits, corrigés
+Chacun reproduit d'abord au rendu (sondes du relecteur, puis banc), rouge sur
+3bcdb43, vert après, rouge sous mutation.
+- ⚠️⚠️ **Vinted Go par e-mail : le TYPE de casier prenait la place du commerce.**
+  Forme lue en production (3 colis « disponibles » le 15 oct.) : « *Consigne Vinted
+  Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent ». L'écran disait « *Consigne Vinted
+  Go* » en point relais et rangeait le commerce dans l'adresse, astérisques
+  compris ; et Kusmi Tea et Speed Queen tombaient dans le MÊME groupe.
+  `typeDuLieu` (une règle, lue par `cleanLieu` ET `lieuRelais`, §11) retire le gras
+  et met à part un type CONNU (consigne · casier · locker + un réseau nommé, ou le
+  type seul) : « Kusmi Tea » / « 13 Rue Saint-Vincent », étiquette « Consigne ».
+  Même forme chez Chronopost (« Consigne Pickup Super U Cancale » → « Super U
+  Cancale »). Rien n'est deviné : « Consigne Super U » sans réseau reste tel quel.
+  La ligne d'un achat « à retirer » montre aussi le commerce, plus le lieu brut.
+  ⚠️ Pas touché : `cleanLieu` garde « Point Relais Tabavap Tabavap » pour la forme
+  de la conversation (lecteurs de Ma journée, autre lot) — l'écran Achats lit
+  `lieuRelais`, qui la traite.
+- **« Associer à une paire » n'apparaissait jamais** : les annonces ne sont lues
+  que sur Annonces / Ma journée / Colis, et le formulaire ne vit que dans Achats.
+  Elles se lisent quand le formulaire s'ouvre (pas à chaque ouverture d'Achats,
+  §4.4), l'effet est posé APRÈS `horsForm` (§4.6), et le champ a trois états
+  (« lecture… » · « pas pu lire, rattache plus tard » · la liste). Un achat déjà
+  rattaché à toutes ses paires ne repropose rien (un second lien serait refusé).
+- **« Dépensé » comptait tous les achats hors Vinted quelle que soit la recherche**
+  (« 40 € · 0 paire » sur une recherche vide). `matchHors` applique la même période
+  ET la même recherche que `matchOrd` ; les paires d'un lot comptent.
+- ⚠️ **Boost inconnu présenté comme complet** : « laisse la case vide si tu ne le
+  connais pas » juste au-dessus de « cases vides = 0 € » — suivre les deux rendait
+  le bénéfice « complet » avec un boost inconnu. Sur une vente Vinted
+  (`CoutsVente boostRequis`, `beneficeVinted`) : case Boost vide = inconnu, la
+  confirmation ne passe pas (« tape 0 s'il n'y en a pas eu »), le bénéfice reste
+  « estimé ». eBay garde sa règle. Mesuré le 15 oct. : 0 vente ni fiche ne portait
+  `fraisComplets` ou un boost — rien d'existant ne bascule.
+- **Point de retrait sans lieu** : « Lieu non indiqué », UNE phrase (« le lieu et le
+  code sont dans la conversation du colis »), et la source dit « d'après la
+  commande Vinted » — rien n'a été lu de la conversation. Le « · » termine la
+  ligne du transporteur (insécable) : plus de ligne qui commence par « · » sur
+  téléphone.
+- **Transporteur `autre`** : « Transporteur non reconnu », sans pastille 📦 ni faux nom.
+- **Trait vide sous « Hors Vinted »** : la boîte des achats Vinted ne se dessine
+  plus quand elle n'a rien à lister.
+- Preuves : banc `bancs/achats.cjs` **132 verts** (F à J ajoutés : la vraie forme
+  Vinted Go, `autre`, point sans lieu, « · », paire depuis Achats, Dépensé +
+  recherche, boost sur une vente, trait) — **29 rouges sur le build de 3bcdb43**, et
+  **26 rouges** sur un build portant sept mutations (type de lieu, recherche,
+  boost, lecture des annonces, boîte vide, `autre`, source) — chacune attrapée.
+  `agent-benefices.mjs` exécute `beneficeVinted`. `revendeurs.cjs` attendait
+  l'ancienne règle (frais confirmés avec un boost vide) : il exige maintenant le
+  refus, puis 0 tapé ⇒ complet. Constaté et laissé : `retrait.cjs` (vraies
+  fixtures) a 2 rouges identiques sur w15, 3bcdb43 et après (prix+date des cartes
+  de conversation, tableau de bord muet) ; `revendeurs.cjs` garde « action
+  incertaine propose une relecture » rouge avant comme après (eBay).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

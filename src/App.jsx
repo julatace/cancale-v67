@@ -1,6 +1,6 @@
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
-import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+import {centimes,coutsVente,beneficeVinted,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import FormAchatHors, { PrixAchatDirect } from "./FormAchatHors.jsx";
 import { libelleProvenance, quantiteHors, coutHorsCentimes, cleHors, idHors, liensHors as liensHorsDe, achatsHorsDisponibles, partsDesLiens, prixTexte, instantaneHors } from "./achatsHors.js";
@@ -10841,19 +10841,31 @@ function CarteRetrait({ photo, titre, lignes, details, detailsTitre = 'Détails 
 // transporteur et la source, sur une ligne à part — jamais l'un à la place de
 // l'autre. `transporteur` : clé connue, `null` quand la source ne le dit pas,
 // `false` quand les colis du point n'ont pas tous le même (dit sur chaque carte).
-function EnteteRetrait({ nom, adresse, inconnu, transporteur, source, sousLigne }) {
+// `consigne` : la source dit que c'est un casier — l'étiquette le dit, le nom
+// reste celui du commerce. `source` : 'email' · 'conversation' (le lieu a été lu
+// dans la conversation) · 'commande' (rien n'a été lu : seul le statut de la
+// commande Vinted dit que le colis attend en point relais).
+// ⚠️ Le « · » termine la ligne du transporteur (insécable) : sur téléphone la
+//    source passe à la ligne, et une ligne qui COMMENCE par « · » se lit comme
+//    un débris (vu en capture, 15 octobre).
+const SOURCE_RETRAIT = { email: "d'après l'e-mail du transporteur", conversation: 'd’après la conversation Vinted', commande: 'd’après la commande Vinted' };
+function EnteteRetrait({ nom, adresse, inconnu, transporteur, source, sousLigne, consigne }) {
   const cle = transporteur ? carrierKey(transporteur) : null;
+  // `autre` = le filet du serveur pour un transporteur qu'il ne connaît pas :
+  // ce n'est pas un nom (« 📦 Transporteur » se lisait comme un transporteur).
+  const nomme = !!(cle && cle !== 'autre' && CARRIERS[cle]);
   return (
     <div style={{flex:'1 1 140px',minWidth:0}}>
-      <div className="vrm-retrait-etiquette" style={{fontSize:10.5,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>Point relais</div>
+      <div className="vrm-retrait-etiquette" data-type-lieu={consigne ? 'consigne' : 'relais'} style={{fontSize:10.5,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{consigne ? 'Consigne' : 'Point relais'}</div>
       <div data-point-relais style={{fontSize:15,fontWeight:700,color:C.text,lineHeight:1.25,overflowWrap:'anywhere'}}>{nom}</div>
       {adresse ? <div data-adresse style={{fontSize:12,color:C.muted,marginTop:1,overflowWrap:'anywhere'}}>{adresse}</div> : null}
       {inconnu ? <div style={{fontSize:11.5,color:C.muted,marginTop:1}}>{inconnu}</div> : null}
-      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginTop:5,fontSize:12}}>
-        {cle ? <><CarrierBadge carrier={cle} size={18}/><span data-transporteur={cle} style={{fontWeight:600,color:C.text}}>{CARRIERS[cle].name}</span></>
-          : transporteur === false ? <span data-transporteur="variable" style={{color:C.muted}}>Transporteur indiqué sur chaque colis</span>
-          : <span data-transporteur="inconnu" title="La source ne nomme pas le transporteur : VRM ne le devine pas" style={{color:C.muted}}>Transporteur non indiqué</span>}
-        <span data-source={source} style={{color:C.muted}}>· {source === 'email' ? "d'après l'e-mail du transporteur" : "d'après la conversation Vinted"}</span>
+      <div style={{display:'flex',alignItems:'center',columnGap:6,rowGap:2,flexWrap:'wrap',marginTop:5,fontSize:12}}>
+        {nomme ? <><CarrierBadge carrier={cle} size={18}/><span data-transporteur={cle} style={{fontWeight:600,color:C.text}}>{CARRIERS[cle].name}{'\u00a0·'}</span></>
+          : transporteur === false ? <span data-transporteur="variable" style={{color:C.muted}}>Transporteur indiqué sur chaque colis{'\u00a0·'}</span>
+          : cle === 'autre' ? <span data-transporteur="inconnu" title="L’e-mail vient d’un transporteur que VRM ne connaît pas : il ne le devine pas" style={{color:C.muted}}>Transporteur non reconnu{'\u00a0·'}</span>
+          : <span data-transporteur="inconnu" title="La source ne nomme pas le transporteur : VRM ne le devine pas" style={{color:C.muted}}>Transporteur non indiqué{'\u00a0·'}</span>}
+        <span data-source={source} style={{color:C.muted}}>{SOURCE_RETRAIT[source] || ''}</span>
       </div>
       {sousLigne}
     </div>
@@ -21598,9 +21610,31 @@ const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retire
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
 // Retrouvez… »). Renvoie { nom, adresse, display } propres.
 const titleCasePR = (s) => s.toLowerCase().replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase()).replace(/\b(De|Du|La|Le|Les|Des|Et)\b/g, w => w.toLowerCase());
+// ── LE TYPE DU LIEU N'EST PAS LE LIEU (15 octobre, relecture) ──────────────
+// Lu en production (e-mails Vinted Go, 3 colis « disponibles » le 15 oct.) :
+// « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent ». Les « * »
+// sont le gras de l'e-mail recopié tel quel, et le premier morceau est un TYPE
+// (une consigne) : le commerce vient après. L'écran prenait la consigne pour le
+// point relais, rangeait « Kusmi Tea » dans l'adresse avec ses astérisques — et
+// deux casiers de deux commerces différents tombaient dans le même groupe.
+// Même forme chez Chronopost, en un seul morceau : « Consigne Pickup Super U
+// Cancale ». On retire le gras, et un type CONNU (consigne · casier · locker,
+// suivi au plus du nom d'un réseau) se met à part. Rien n'est deviné : sans
+// réseau reconnu (« Consigne Super U »), le texte reste tel quel.
+const RESEAU_CONSIGNE = '(?:pick-?up|vinted\\s*go|mondial\\s*relay|inpost|relais\\s*colis|chronopost|shop\\s*2\\s*shop|amazon|la\\s*poste|ups|dpd|gls)';
+const TYPE_LIEU_SEUL = new RegExp(`^(?:consigne|casier|locker)(?:\\s+${RESEAU_CONSIGNE})?$`, 'i');
+const TYPE_LIEU_EN_TETE = new RegExp(`^(?:consigne|casier|locker)\\s+${RESEAU_CONSIGNE}\\s+(\\S.{2,})$`, 'i');
+const typeDuLieu = (raw) => {
+  const seg = String(raw || '').replace(/\*+/g, ' ').replace(/\s+/g, ' ').split(',').map(x => x.trim()).filter(Boolean);
+  if (seg.length && TYPE_LIEU_SEUL.test(seg[0])) return { s: seg.slice(1).join(', '), consigne: true };   // seul : un type, pas un lieu
+  const m = seg.length ? TYPE_LIEU_EN_TETE.exec(seg[0]) : null;
+  if (m) return { s: [m[1], ...seg.slice(1)].join(', '), consigne: true };
+  return { s: seg.join(', '), consigne: false };
+};
 const cleanLieu = (raw) => {
   let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return { nom: '', adresse: '', display: '' };
+  s = typeDuLieu(s).s; if (!s) return { nom: '', adresse: '', display: '' };
   // Coupe le baratin après l'adresse.
   s = s.replace(/\s+(super\s*pratique|retrouvez|horaires?|ouvert|du lundi|https?:\/\/|www\.).*$/i, '').trim();
   // Adresse = « <n°> <rue> <CP 5 chiffres> <ville> » si présente.
@@ -21632,21 +21666,27 @@ const cleanLieu = (raw) => {
 // répété). Le transporteur, lui, ne se lit QUE dans l'e-mail du transporteur —
 // mesuré le 15 oct. : les messages d'arrivée de la conversation ne le nomment
 // pas (0 sur 7), et le déduire du nom du commerce serait une ressemblance (§5).
+// `consigne` : la source dit que c'est un casier (« Consigne Vinted Go »…) — lu,
+// jamais déduit du transporteur. Un remplissage de l'e-mail (« juste ici ») n'est
+// pas un nom : mieux vaut « lieu non indiqué » qu'un faux commerce (§5).
+const NOM_REMPLISSAGE = /^(?:juste\s*ici|ici|super\s*pratique|voir|cliquez?(?:\s*ici)?|en\s*savoir\s*plus)\s*!?$/i;
 const lieuRelais = (raw) => {
   let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!s) return { nom: '', adresse: '' };
+  if (!s) return { nom: '', adresse: '', consigne: false };
   s = s.replace(/^(?:au\s+|le\s+)?point\s+relais\s+/i, '').trim();
   // Le baratin qui suit l'adresse dans un e-mail (même coupe que `cleanLieu`).
   s = s.replace(/\s+(super\s*pratique|retrouvez|horaires?|ouvert|du lundi|https?:\/\/|www\.).*$/i, '').trim();
+  const t = typeDuLieu(s); s = t.s;
+  if (!s) return { nom: '', adresse: '', consigne: t.consigne };
   if (s.includes(',')) {
     const maj = (x) => (x === x.toUpperCase() && /[A-ZÀ-Ý]/.test(x)) ? titleCasePR(x) : x;
     const seg = s.split(',').map(x => x.trim()).filter(Boolean);
-    const nom = seg[0] || '';
+    const nom = NOM_REMPLISSAGE.test(seg[0] || '') ? '' : (seg[0] || '');
     const reste = seg.slice(1).filter(x => x.toLowerCase() !== nom.toLowerCase());
-    return { nom: maj(nom), adresse: reste.map(maj).join(', ') };
+    return { nom: maj(nom), adresse: reste.map(maj).join(', '), consigne: t.consigne };
   }
   const c = cleanLieu(s);
-  return { nom: c.nom, adresse: c.adresse };
+  return { nom: c.nom, adresse: c.adresse, consigne: t.consigne };
 };
 // Clé photo stable (indépendante de la taille d'image) extraite d'une URL Vinted :
 //   https://images1.vinted.net/t/{JETON}/{taille}/{n}.jpeg  ->  {JETON}
@@ -24757,6 +24797,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
     return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
   };
+  // Un achat HORS VINTED passe le même filtre que `matchOrd` : la période (sa
+  // date d'achat) puis la recherche — sur ce qu'il porte (désignation, N° saisi
+  // avant le 15 octobre, justificatif, provenance). Lu par « Dépensé » (§11).
+  const matchHors = (x) => {
+    if (!x || !dansPeriodeDate(Date.parse(x.date||x.createdAt||''), periode)) return false;
+    const q = ordSearchDiff.trim().toLowerCase(); if (!q) return true;
+    return [x.title, x.numero, x.justif, libelleProvenance(x.source)].some(v => String(v==null?'':v).toLowerCase().includes(q));
+  };
 
   // ── LA LISTE DES VENTES AFFICHÉES — calculée UNE fois (§11) ───────────────
   // ⚠️ MESURÉ AU BANC LE 7 SEPTEMBRE : l'écran rendait **287 cartes** d'un
@@ -26974,6 +27022,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
   // Le formulaire : null (fermé) · { b: null } (nouvel achat) · { b } (modifier).
   const [horsForm, setHorsForm] = useState(null);
+  // ⚠️ « ASSOCIER À UNE PAIRE » LIT LES ANNONCES (relecture du 15 octobre). Elles ne
+  //    se chargent que sur Annonces / Ma journée / Colis : ouvert depuis Achats,
+  //    le formulaire recevait une liste VIDE et le champ ne s'affichait jamais —
+  //    on ne pouvait rattacher qu'après coup. On les lit quand le formulaire
+  //    s'ouvre (pas à chaque ouverture d'Achats : §4.4), et le champ dit « je
+  //    lis » / « pas pu lire » au lieu de disparaître (trois états).
+  //    Placé APRÈS `horsForm` : un tableau de dépendances est lu au rendu (§4.6).
+  useEffect(() => { if (horsForm && accounts.length && !listings.loading && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [!!horsForm, cleComptes]);
+  const pairesHors = !horsForm ? [] : !accounts.length ? []
+    : listings.items===null ? (listings.error ? null : undefined)
+    : (listings.error && !(listings.items||[]).length) ? null
+    : annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id:it.id, numero:(numeros[it.id]||{}).numero, title:it.title }));
   // Qui est rattaché à quoi — LU sur les fiches et les ventes (§11), jamais tenu
   // en double sur l'achat. `saleOv` et `numeros` sont déclarés plus haut (§4.6).
   const liensHors = useMemo(() => liensHorsDe(numeros, saleOv), [numeros, saleOv]);
@@ -28663,7 +28723,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : '';
       const fee = chargesVente(e);
-      const bilan=beneficePaire(o.price?.amount,e);
+      const bilan=beneficeVinted(o.price?.amount,e);   // boost vide = inconnu, jamais « complet » (§5)
       const benef = st!=='cancelled' && bilan.benefice!=null ? bilan.benefice.toFixed(2) : '';
       rows.push([
         o.date?new Date(o.date).toLocaleDateString('fr-FR'):'', accName(o._acc), num, o.title||'',
@@ -29362,7 +29422,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
             const fees = chargesVente(e);
-            const bilan = beneficePaire(o.price?.amount,e);
+            const bilan = beneficeVinted(o.price?.amount,e);   // boost vide = inconnu, jamais « complet » (§5)
             const benef = st==='cancelled'?null:bilan.benefice;
             const ov = saleOv[String(o.transaction_id)] || {};
             const baseE = resolvedEntry(o);
@@ -29374,7 +29434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div className="vrm-sale-row" key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <div className="vrm-sale-row" key={o.transaction_id} data-vente-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -29411,7 +29471,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small data-benefice-estime={bilan.boostInconnu?'boost-inconnu':'frais'} title={bilan.boostInconnu?'Boost inconnu : tape 0 dans « Boost (si connu) » s’il n’y en a pas eu':'Frais pas encore confirmés'} style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
@@ -29431,7 +29491,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
                <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
-               {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
+               {!hidden && <CoutsVente entry={e} boostRequis onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
                     (30 sept. : une ligne de moins par vente). */}
@@ -30034,7 +30094,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
             return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null],['hors','Hors Vinted',offBuys.length]].map(([id,label,cnt])=>(
-            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
+            <button type="button" key={id} data-filtre-achats={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -30112,11 +30172,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    entraient déjà dans la Trésorerie (« argent dépensé ») mais pas ici :
           //    deux « dépensé » différents pour une même notion (§11). Même
           //    période (date de l'achat), même règle de coût (prix + frais).
-          const hors = offBuys.filter(x=>dansPeriodeDate(Date.parse(x.date||x.createdAt||''), periode));
+          // ⚠️ ET LA MÊME RECHERCHE (relecture du 15 octobre) : `matchOrd` filtre les
+          //    achats Vinted sur la période ET la recherche, les achats hors Vinted
+          //    ne l'étaient que sur la période — « zzzaucune » donnait « Dépensé
+          //    40 € · 0 paire · dont 40 € hors Vinted ». Une boîte, une règle (§11) :
+          //    `matchHors`. Les paires comptent aussi celles d'un lot (sa quantité).
+          const hors = offBuys.filter(matchHors);
           const horsE = hors.reduce((a,x)=>{ const c=coutHorsCentimes(x); return a+(c==null?0:c/100); },0);
+          const nPaires = vrais.length + hors.reduce((a,x)=>a+quantiteHors(x),0);
           return (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(150px, 100%), 1fr))',gap:8,marginBottom:12}}>
-              <StatBox label="Dépensé" value={fmtE0(somme(vrais)+horsE)} sub={`${vrais.length} paire${vrais.length>1?'s':''}${hors.length?` · dont ${fmtE0(horsE)} hors Vinted`:''}`}/>
+            <div data-chiffres-achats data-depense-c={Math.round((somme(vrais)+horsE)*100)} data-depense-hors-c={Math.round(horsE*100)} data-depense-paires={nPaires} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(150px, 100%), 1fr))',gap:8,marginBottom:12}}>
+              <StatBox label="Dépensé" value={fmtE0(somme(vrais)+horsE)} sub={`${nPaires} paire${nPaires>1?'s':''}${hors.length?` · dont ${fmtE0(horsE)} hors Vinted`:''}`}/>
               <StatBox label="Prix médian" value={fmtE0(med)} sub="par paire achetée"/>
               <StatBox label="En route" value={fmtE0(somme(rte))} color={rte.length?C.warn:C.muted} sub={`${rte.length} paire${rte.length>1?'s':''} en chemin`}/>
               <StatBox label="Annulés" value={fmtE0(somme(ann))} color={tauxAnn>=20?C.danger:C.muted} sub={`${ann.length} sur ${dans.length} · ${tauxAnn} %`}/>
@@ -30184,7 +30250,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    le transporteur a sa propre ligne (`EnteteRetrait`). Un lieu que
           //    l'e-mail ne nomme pas reste groupé par transporteur (la clé), et
           //    s'affiche « Lieu non indiqué ».
-          avail.forEach(t=>{ const cl=lieuRelais(t.lieu); const lieuInconnu=!cl.nom; const ck=carrierKey(t.carrier)||'autre'; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `__inconnu_${ck}`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{nomAff: cl.nom || (t.consigne ? 'Consigne Pick-up' : 'Lieu non indiqué'),colis:[],carrier:t.carrier,cles:new Set(),adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); groups[nom].cles.add(ck); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          // ⚠️ « Consigne » (casier) se lit dans l'e-mail : le type du lieu
+          //    (`lieuRelais(...).consigne`) ou le drapeau Pickup du serveur. Il
+          //    va sur l'étiquette, jamais à la place du commerce. Un groupe n'est
+          //    dit « consigne » que si TOUS ses colis le sont.
+          avail.forEach(t=>{ const cl=lieuRelais(t.lieu); const lieuInconnu=!cl.nom; const ck=carrierKey(t.carrier)||'autre'; const casier = !!(cl.consigne || t.consigne); const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `__inconnu_${ck}`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{nomAff: cl.nom || 'Lieu non indiqué',colis:[],carrier:t.carrier,cles:new Set(),adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu,consigne:casier}).colis.push(t); if(!casier) groups[nom].consigne=false; groups[nom].cles.add(ck); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
             <div className="vrm-pickup-board" style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
@@ -30264,7 +30334,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       deviné (§5) ; l'adresse aussi, ou la liste officielle de
                       Vinted par nom EXACT. */}
                   <div style={{display:'flex',alignItems:'flex-start',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
-                    <EnteteRetrait nom={g.nomAff} adresse={g.adresse} source="email"
+                    <EnteteRetrait nom={g.nomAff} adresse={g.adresse} source="email" consigne={g.consigne}
                       inconnu={g.lieuInconnu ? "L'adresse exacte est dans l'e-mail du transporteur." : ''}
                       transporteur={g.cles.size===1 ? (g.carrier || [...g.cles][0]) : false}/>
                   </div>
@@ -30315,7 +30385,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         const ok = d && !isNaN(d);
                         const titre = t.artTitle || (ok ? `Colis arrivé le ${d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}` : 'Colis');
                         const lignes = (<>
-                          {g.cles.size>1 && <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11.5,color:C.text,marginTop:2}}><CarrierBadge carrier={t.carrier} size={16}/><span data-transporteur-colis={carrierKey(t.carrier)||'autre'}>{carrierName(t.carrier)}</span></div>}
+                          {g.cles.size>1 && ((carrierKey(t.carrier)||'autre')==='autre'
+                            ? <div style={{fontSize:11.5,color:C.muted,marginTop:2}}><span data-transporteur-colis="autre">Transporteur non reconnu</span></div>
+                            : <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11.5,color:C.text,marginTop:2}}><CarrierBadge carrier={t.carrier} size={16}/><span data-transporteur-colis={carrierKey(t.carrier)}>{carrierName(t.carrier)}</span></div>)}
                           {!code && !qrImage(t) && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas encore reçu</div>}
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite.
@@ -30371,7 +30443,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const lr = lieuRelais(rel && rel.lieu);
                   const nom = lr.nom;
                   const k = nom ? nom.toLowerCase() : '__inconnu';
-                  (pts[k] = pts[k] || { nom, adresse: lr.adresse, colis: [] }).colis.push(o);
+                  (pts[k] = pts[k] || { nom, adresse: lr.adresse, consigne: lr.consigne, colis: [] }).colis.push(o);
+                  if (!lr.consigne) pts[k].consigne = false;
                 });
                 const ordre = Object.entries(pts).sort((a,b)=>{
                   if ((a[0]==='__inconnu') !== (b[0]==='__inconnu')) return a[0]==='__inconnu' ? 1 : -1;
@@ -30404,8 +30477,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Vinted Go. On écrit « Transporteur non indiqué » plutôt qu'un
                       faux (§5). Le commerce et son adresse viennent du message. */}
                   <div style={{display:'flex',alignItems:'flex-start',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
-                    <EnteteRetrait nom={pt.nom || 'À voir dans ta conversation Vinted'} adresse={pt.adresse} source="conversation" transporteur={null}
-                      inconnu={pt.nom ? '' : 'Le lieu exact et le code sont écrits dans la conversation du colis.'}
+                    {/* ⚠️ UN POINT SANS LIEU (relecture du 15 octobre) : la case du nom
+                        disait « À voir dans ta conversation Vinted », la ligne dessous
+                        la même chose, et la source « d'après la conversation » — trois
+                        fois une cause, et la dernière fausse : rien n'en a été lu, c'est
+                        le statut de la commande qui dit que le colis attend. Le nom dit
+                        ce qu'on sait (rien), UNE phrase dit où le trouver, la source
+                        dit d'où vient l'information. */}
+                    <EnteteRetrait nom={pt.nom || 'Lieu non indiqué'} adresse={pt.adresse} source={pt.nom ? 'conversation' : 'commande'} transporteur={null} consigne={!!pt.nom && pt.consigne}
+                      inconnu={pt.nom ? '' : 'Le lieu et le code sont dans la conversation du colis.'}
                       sousLigne={memeCompte ? <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>compte <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b></div> : null}/>
                   </div>
                   <details className="vrm-pickup-method"><summary aria-label="Informations sur ce retrait" title="Informations sur ce retrait">i</summary><div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
@@ -30763,7 +30843,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             séparées par un filet fin, beaucoup d'air — plus de cartes encadrées
             séparées. La couleur ne sert qu'au point de statut ; les actions sont
             de petites icônes discrètes à droite. */}
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+        {/* ⚠️ Rien à lister ⇒ pas de boîte : vide, elle se dessinait comme un
+            trait orphelin sous la liste « Hors Vinted » (relecture du 15 oct.). */}
+        {achatsAffiches.length>0 && <div data-liste-achats style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           {achatsAffiches.slice(0, achatsMax).map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
@@ -30783,7 +30865,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
                   {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
-                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
+                  {/* Le COMMERCE, jamais le lieu brut de l'e-mail (« *Consigne Vinted Go*, * Kusmi Tea *… », §11 : `lieuRelais`). */}
+                  {tk && st.step===3 && (()=>{ const l = lieuRelais(tk.lieu).nom; return l ? <span style={{color:C.text}}>· {l}</span> : null; })()}
                   {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
@@ -30851,7 +30934,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })()}
             </div>
           );})}
-        </div>
+        </div>}
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
@@ -32449,7 +32532,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setHorsForm(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:40,minHeight:40}}>×</button>
             </div>
             <FormAchatHors theme={C} initial={horsForm.b} liensN={horsForm.b?((liensHors[horsForm.b.id]||[]).length):0}
-              paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id:it.id, numero:(numeros[it.id]||{}).numero, title:it.title }))}
+              paires={pairesHors && horsForm.b ? pairesHors.filter(p=>!(liensHors[horsForm.b.id]||[]).some(x=>x.type==='paire'&&String(x.cle)===String(p.id))) : pairesHors}
               onCancel={()=>setHorsForm(null)}
               onSave={(rec, paireId)=>{
                 let b;

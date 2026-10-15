@@ -34,6 +34,7 @@ export default function FormAchatHors({ initial, paires, liensN = 0, onSave, onC
   const qOk = /^\d{1,3}$/.test(qBrut) && Number(qBrut) >= 1 && Number(qBrut) <= QUANTITE_MAX;
   const q = qOk ? Number(qBrut) : 1;
   const qSousLiens = qOk && q < liensN;   // on ne retire pas en silence une paire déjà rattachée
+  const pleinDeja = liensN > 0 && liensN >= q;   // toutes ses paires sont déjà rattachées
   const total = prixOk && fraisOk ? coutHorsCentimes({ price: d.price, frais: d.frais }) : null;
   const parts = total != null && q > 1 ? partsHors(total, q) : null;
   const pret = prixOk && fraisOk && qOk && !qSousLiens;
@@ -51,7 +52,7 @@ export default function FormAchatHors({ initial, paires, liensN = 0, onSave, onC
       date: d.date || aujourdhui,
       title: String(d.title).trim(),
       justif: String(d.justif).trim(),
-    }, d.paire || null);
+    }, (!pleinDeja && d.paire) || null);
   };
   const lab = { display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 120px', minWidth: 0, fontSize: 11.5, fontWeight: 600, color: C.muted };
   const inp = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 11px', fontSize: 15, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', fontWeight: 500 };
@@ -85,7 +86,19 @@ export default function FormAchatHors({ initial, paires, liensN = 0, onSave, onC
       <label style={{ ...lab, flex: 'none' }}>Justificatif
         <input data-champ="justif" value={d.justif} onChange={maj('justif')} placeholder="facultatif — n° de ticket, de facture" style={inp} />
       </label>
-      {Array.isArray(paires) && paires.length > 0 && (
+      {/* « Associer à une paire » : TROIS états (relecture du 15 octobre) —
+          `undefined` les annonces se lisent · `null` elles n'ont pas pu être lues ·
+          une liste. Avant, une liste pas encore chargée cachait le champ, et il
+          ne s'affichait jamais depuis l'écran Achats. Un achat déjà rattaché à
+          toutes ses paires (quantité atteinte) ne propose plus rien : un second
+          lien serait refusé — on ne le propose pas pour rien. */}
+      {!pleinDeja && paires === undefined && (
+        <div data-champ-paire="lecture" style={{ fontSize: 11.5, color: C.muted }}>Associer à une paire : lecture de tes annonces…</div>
+      )}
+      {!pleinDeja && paires === null && (
+        <div data-champ-paire="ko" style={{ fontSize: 11.5, color: C.muted }}>Tes annonces n'ont pas pu être lues : tu pourras l'associer plus tard, depuis l'annonce ou la vente.</div>
+      )}
+      {!pleinDeja && Array.isArray(paires) && paires.length > 0 && (
         <label style={{ ...lab, flex: 'none' }}>Associer à une paire
           <select data-champ="paire" value={d.paire} onChange={maj('paire')} style={inp}>
             <option value="">facultatif — aucune pour l'instant</option>

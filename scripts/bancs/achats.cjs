@@ -34,6 +34,23 @@
 //      plus là (« Boost (si connu) »).
 //   E. Aucune erreur, aucun débordement, aucun écran tombé — en clair ET en
 //      sombre.
+//   F. RELECTURE DU 15 OCTOBRE — la VRAIE forme des e-mails Vinted Go (lue en
+//      production) : « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue
+//      Saint-Vincent ». Le point relais est le COMMERCE (« Kusmi Tea »), jamais
+//      le type de casier ; aucun « * » ; « consigne » sur l'étiquette ; deux
+//      casiers de deux commerces = deux groupes. Un transporteur « autre » ne
+//      s'affiche pas comme un nom (« 📦 Transporteur »). Un point SANS lieu dit
+//      la cause une fois, et sa source n'est pas « la conversation » (rien n'en
+//      a été lu). Sur téléphone, aucune ligne d'en-tête ne commence par « · ».
+//   G. « Associer à une paire » APPARAÎT dans le formulaire ouvert depuis
+//      Achats (il ne s'affichait jamais : les annonces n'y étaient pas lues),
+//      rattache pour de vrai, et ne se propose plus sur un achat déjà plein.
+//   H. « Dépensé » suit la RECHERCHE pour les achats hors Vinted aussi.
+//   I. Vente Vinted : un boost vide est INCONNU — « tous les frais sont
+//      renseignés » ne se coche pas, le bénéfice reste « estimé » ; 0 tapé ⇒
+//      complet. Aucune consigne « laisse la case vide » à côté de « cases vides
+//      = 0 € ».
+//   J. Pas de boîte vide (trait orphelin) sous la liste « Hors Vinted ».
 // On juge des attributs (`data-*`), des rectangles et des valeurs écrites,
 // jamais une formulation libre.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -62,11 +79,20 @@ const ROWS0 = () => [
   ] } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(MAINTENANT - 60000), payload: { my_orders: [
     { transaction_id: 7001, title: 'Paire relais conversation', price: { amount: '40.0', currency_code: 'EUR' }, status: 'Colis déposé en bureau de Poste ou point relais', transaction_user_status: 'needs_action', date: iso(MAINTENANT - 3 * 86400000), conversation_id: 55001 },
+    // F. Un colis au relais dont la conversation n'a donné AUCUN lieu.
+    { transaction_id: 7003, title: 'Paire sans lieu', price: { amount: '33.0', currency_code: 'EUR' }, status: 'Colis déposé en bureau de Poste ou point relais', transaction_user_status: 'needs_action', date: iso(MAINTENANT - 2 * 86400000), conversation_id: 55003 },
   ] } } },
-  { id: 'panel_colis_relais', data: { '7001': { tx: '7001', item: '', titre: 'Paire relais conversation', lieu: 'point relais TABAVAP, TABAVAP, 12 RUE HOCHE, 56000 VANNES', code: 'C01234', qr: '', conv: '55001', url: 'https://www.vinted.fr/inbox/55001', photo: null, at: iso(MAINTENANT - 3600000) } } },
+  { id: 'panel_colis_relais', data: { '7001': { tx: '7001', item: '', titre: 'Paire relais conversation', lieu: 'point relais TABAVAP, TABAVAP, 12 RUE HOCHE, 56000 VANNES', code: 'C01234', qr: '', conv: '55001', url: 'https://www.vinted.fr/inbox/55001', photo: null, at: iso(MAINTENANT - 3600000) },
+    '7003': { tx: '7003', item: '', titre: 'Paire sans lieu', lieu: '', code: '', qr: '', conv: '55003', url: 'https://www.vinted.fr/inbox/55003', photo: null, at: iso(MAINTENANT - 3600000) } } },
   { id: 'email_track_mr1', data: { id: 'mr1', carrier: 'mondial', status: 'available', lieu: 'TABAC DU PORT 12 RUE HOCHE 56000 VANNES', code: '012345', suivi: 'MR-TRACK-1', receivedAt: iso(MAINTENANT - 86400000), limite: jour(3) } },
   // Une consigne Chronopost : DEUX nombres (identifiant + code d'ouverture), délai dépassé.
   { id: 'email_track_ch1', data: { id: 'ch1', carrier: 'chronopost', status: 'available', consigne: true, lieu: 'CONSIGNE PICKUP GARE 1 PLACE DE LA GARE 35000 RENNES', code: '004567', code2: '009876', suivi: 'CH-TRACK-2', receivedAt: iso(MAINTENANT - 2 * 86400000), limite: jour(-1) } },
+  // F. La forme RÉELLE d'un e-mail Vinted Go (lue en production le 15 oct.) : le
+  //    gras de l'e-mail (« * ») et le TYPE en tête. Deux casiers, deux commerces.
+  { id: 'email_track_vg1', data: { id: 'vg1', carrier: 'vinted', status: 'available', consigne: false, lieu: '*Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent', code: 'C49341', suivi: 'VGS-TRACK-1', receivedAt: iso(MAINTENANT - 3 * 3600000), limite: jour(4) } },
+  { id: 'email_track_vg2', data: { id: 'vg2', carrier: 'vinted', status: 'available', consigne: false, lieu: '*Consigne Vinted Go*, * Speed Queen - Vannes *, * 24 Rue Hoche', code: 'C77777', suivi: 'VGS-TRACK-2', receivedAt: iso(MAINTENANT - 4 * 3600000), limite: jour(5) } },
+  // F. Un transporteur que le serveur ne connaît pas (`carrier: 'autre'`, son filet).
+  { id: 'email_track_au1', data: { id: 'au1', carrier: 'autre', status: 'available', lieu: 'BAR DES SPORTS, 3 RUE DE LA PAIX, 35000 RENNES', code: '445566', suivi: 'XX-TRACK-3', receivedAt: iso(MAINTENANT - 5 * 3600000), limite: jour(6) } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: iso(MAINTENANT - 60000), payload: { my_orders: [
     { transaction_id: 8001, title: 'Vente Delta taille 41', price: { amount: '70.0', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(MAINTENANT - 2 * 86400000) },
     { transaction_id: 8002, title: 'Vente Echo taille 42', price: { amount: '65.0', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(MAINTENANT - 3 * 86400000) },
@@ -218,6 +244,40 @@ const ouvrirDetails = (pg, sel) => pg.evaluate((sel) => { const e = document.que
         await sain(pg, 'Achats · à retirer');
       });
 
+      // ── F. Relecture : la vraie forme Vinted Go, « autre », un point sans lieu ──
+      await essaie('F. en-têtes de retrait', async () => {
+        const f = await pg.evaluate(() => {
+          const grp = (v) => [...document.querySelectorAll('.vrm-pickup-point')].find((p) => p.querySelector(`[data-code="${v}"]`) || p.querySelector(`[data-tx="${v}"]`));
+          const lire = (p) => p ? ({
+            nom: ((p.querySelector('[data-point-relais]') || {}).innerText || '').trim(),
+            adresse: ((p.querySelector('[data-adresse]') || {}).innerText || '').trim(),
+            type: p.querySelector('[data-type-lieu]') ? p.querySelector('[data-type-lieu]').getAttribute('data-type-lieu') : null,
+            transp: p.querySelector('[data-transporteur]') ? p.querySelector('[data-transporteur]').getAttribute('data-transporteur') : null,
+            transpTexte: ((p.querySelector('[data-transporteur]') || {}).innerText || '').replace(/[\s\u00a0·]+$/, '').trim(),
+            src: p.querySelector('[data-source]') ? p.querySelector('[data-source]').getAttribute('data-source') : null,
+            entete: (p.firstElementChild || p).innerText,
+          }) : null;
+          const ga = grp('C49341'), gb = grp('C77777');
+          const debris = [...document.querySelectorAll('.vrm-pickup-point')].flatMap((p) => (p.firstElementChild || p).innerText.split('\n').map((l) => l.trim()).filter((l) => /^·/.test(l)));
+          return { a: lire(ga), b: lire(gb), au: lire(grp('445566')), sl: lire(grp('7003')), meme: !!(ga && gb && ga === gb), debris };
+        });
+        const a = f.a || {}, bb = f.b || {}, au = f.au || {}, sl = f.sl || {};
+        dit(!!f.a && a.nom === 'Kusmi Tea', 'Vinted Go (e-mail) : le point relais est le COMMERCE (« Kusmi Tea »), pas le type de casier', JSON.stringify(a.nom));
+        dit(!!f.a && a.adresse === '13 Rue Saint-Vincent', 'Vinted Go : l’adresse est l’adresse, sans le commerce', JSON.stringify(a.adresse));
+        dit(!!f.a && !/\*/.test(a.entete), 'Vinted Go : aucun « * » de l’e-mail à l’écran', JSON.stringify((a.entete || '').slice(0, 90)));
+        dit(!!f.a && a.type === 'consigne' && a.transp === 'vinted', 'Vinted Go : « consigne » sur l’étiquette, « Vinted Go » sur la ligne du transporteur', JSON.stringify([a.type, a.transp]));
+        dit(!!f.b && bb.nom === 'Speed Queen - Vannes' && !f.meme, 'deux casiers de deux commerces = deux points distincts', JSON.stringify([bb.nom, f.meme]));
+        dit(!!f.au && au.transp === 'inconnu' && !/📦/.test(au.entete) && au.transpTexte !== 'Transporteur', 'transporteur « autre » : pas de pastille ni de faux nom (« 📦 Transporteur »)', JSON.stringify([au.transp, au.transpTexte]));
+        const nConv = ((sl.entete || '').match(/conversation/gi) || []).length;
+        dit(!!f.sl && sl.src !== 'conversation' && !/conversation/i.test(sl.nom), 'point sans lieu : la case du nom ne porte pas une consigne, et la source n’est pas « la conversation » (rien n’en a été lu)', JSON.stringify([sl.nom, sl.src]));
+        dit(!!f.sl && nConv <= 1, 'point sans lieu : la cause est dite UNE fois', `${nConv} × « conversation »`);
+        if (tactile) dit(f.debris.length === 0, 'téléphone : aucune ligne d’en-tête ne commence par « · »', JSON.stringify(f.debris.slice(0, 3)));
+        const g = await pg.$('.vrm-pickup-point:has([data-code="C49341"])');
+        if (g) { await g.scrollIntoViewIfNeeded(); await g.screenshot({ path: path.join(CAPT, `achats-vintedgo-${vp.width}.png`) }).catch(() => {}); }
+        const g2 = await pg.$('.vrm-pickup-point:has([data-tx="7003"])');
+        if (g2) { await g2.scrollIntoViewIfNeeded(); await g2.screenshot({ path: path.join(CAPT, `achats-sanslieu-${vp.width}.png`) }).catch(() => {}); }
+      });
+
       // ── B. Achat hors Vinted ─────────────────────────────────────────────
       let idLot = null;
       await essaie('B. hors Vinted', async () => {
@@ -267,6 +327,72 @@ const ouvrirDetails = (pg, sel) => pg.evaluate((sel) => { const e = document.que
         await pg.screenshot({ path: path.join(CAPT, `achats-hors-${vp.width}.png`), fullPage: true }).catch(() => {});
         await sain(pg, 'Achats · hors Vinted');
       });
+
+      // ── G. « Associer à une paire » depuis l'écran Achats ────────────────
+      await essaie('G. associer à une paire', async () => {
+        await pg.evaluate(() => window.scrollTo(0, 0));
+        await pg.click('[data-ajout-achat-hors]');
+        const champ = await pg.waitForSelector('[data-champ="paire"]', { timeout: 8000 }).catch(() => null);
+        const opts = champ ? await pg.$$eval('[data-champ="paire"] option', (l) => l.map((o) => o.value)) : [];
+        dit(!!champ && ['9001', '9002', '9003'].every((v) => opts.includes(v)), 'ouvert depuis Achats, « Associer à une paire » apparaît et propose les paires numérotées', champ ? JSON.stringify(opts) : 'champ absent');
+        if (!champ) { await pg.click('button[aria-label="Fermer"]').catch(() => {}); return; }
+        await pg.fill('[data-champ="prix"]', '40');
+        await pg.fill('[data-champ="titre"]', 'Brocante une paire');
+        await pg.selectOption('[data-champ="paire"]', '9003');
+        await pg.click('[data-enregistrer-achat]');
+        await pg.waitForTimeout(1200);
+        const x = ((await ls(pg, 'vinted_offvinted_buys')) || []).find((y) => y.title === 'Brocante une paire') || {};
+        const num = ((await ls(pg, 'vinted_annonce_numeros')) || {})['9003'] || {};
+        dit(!!x.id && num.buyFromId === `hors:${x.id}` && num.buyPrice === '40.00', 'l’achat est rattaché à la paire choisie : 40 €, lien posé sur la fiche', JSON.stringify({ f: num.buyFromId, p: num.buyPrice }));
+        if (x.id) {
+          await pg.click(`[data-achat-hors="${x.id}"] button[aria-label="Modifier cet achat"]`);
+          await pg.waitForTimeout(500);
+          dit(!(await pg.$('[data-champ="paire"]')) && !(await pg.$('[data-champ-paire]')), 'un achat déjà rattaché à toutes ses paires ne repropose pas de paire (un second lien serait refusé)');
+          await pg.click('button[aria-label="Fermer"]').catch(() => {});
+          await pg.waitForTimeout(300);
+        }
+      });
+
+      // ── J. Pas de boîte vide sous « Hors Vinted » ─────────────────────────
+      await essaie('J. trait orphelin', async () => {
+        const trait = await pg.evaluate(() => {
+          const l = document.querySelector('[data-liste-hors]'); if (!l) return 'liste « Hors Vinted » introuvable';
+          for (let e = l.nextElementSibling; e; e = e.nextElementSibling) {
+            const r = e.getBoundingClientRect(), st = getComputedStyle(e);
+            if (r.height > 0 && r.height < 6 && !e.children.length && !(e.innerText || '').trim() && parseFloat(st.borderTopWidth) > 0) return e.outerHTML.slice(0, 140);
+          }
+          return '';
+        });
+        dit(trait === '', 'aucune boîte vide (trait orphelin) sous la liste « Hors Vinted »', trait);
+      });
+
+      // ── H. « Dépensé » suit la recherche, hors Vinted compris ──────────────
+      await essaie('H. dépensé', async () => {
+        await pg.evaluate(() => window.scrollTo(0, 0));
+        if (await pg.$('[data-filtre-achats="all"]')) await pg.click('[data-filtre-achats="all"]');
+        else await pg.evaluate(() => { const t = [...document.querySelectorAll('button')].find((x) => /^Tous\b/.test(x.innerText.trim())); if (t) t.click(); });
+        await pg.waitForTimeout(600);
+        // Le montant : l'attribut quand il existe, sinon le chiffre rendu (pour
+        // mesurer le build d'avant, qui ne le porte pas).
+        const depense = () => pg.evaluate(() => {
+          const g = document.querySelector('[data-chiffres-achats]');
+          if (g) return Number(g.getAttribute('data-depense-c'));
+          const b = [...document.querySelectorAll('*')].find((e) => e.children.length < 6 && /^Dépensé/i.test((e.innerText || '').trim()) && (e.innerText || '').length < 90);
+          const m = b && /([\d\s\u202f\u00a0]+)\s*€/.exec(b.innerText); return m ? Number(m[1].replace(/[\s\u202f\u00a0]/g, '')) * 100 : null;
+        });
+        const champ = await pg.$('input[placeholder^="Rechercher (titre"]');
+        if (!champ) throw new Error('recherche des achats introuvable');
+        await champ.fill('zzzaucune'); await pg.waitForTimeout(900);
+        const d0 = await depense();
+        dit(d0 === 0, 'une recherche qui ne trouve aucun achat ⇒ « Dépensé » 0 €, hors Vinted compris', String(d0));
+        await champ.fill('lot brocante'); await pg.waitForTimeout(900);
+        const d1 = await depense();
+        dit(d1 != null && Math.abs(d1 - 2850) < 100, 'la recherche « lot brocante » ne compte que le lot (28,50 €)', String(d1));
+        await champ.fill('brocante'); await pg.waitForTimeout(900);
+        const d2 = await depense();
+        dit(d2 != null && Math.abs(d2 - 6850) < 100, 'l’autre sens : « brocante » compte les DEUX achats hors Vinted (68,50 €)', String(d2));
+        await champ.fill(''); await pg.waitForTimeout(500);
+      });
       await pg.waitForTimeout(2500);   // la synchro du nuage part (debounce)
 
       // ── C. Prix d'achat sans relier, puis rattachement sans doublon ───────
@@ -301,6 +427,33 @@ const ouvrirDetails = (pg, sel) => pg.evaluate((sel) => { const e = document.que
         await pg.keyboard.press('Escape').catch(() => {});
         await pg.screenshot({ path: path.join(CAPT, `achats-ventes-${vp.width}.png`), fullPage: false }).catch(() => {});
         await sain(pg, 'Ventes');
+      });
+
+      // ── I. Vente Vinted : un boost vide est INCONNU, jamais 0 ─────────────
+      await essaie('I. boost inconnu sur une vente', async () => {
+        const etat = () => pg.evaluate(() => {
+          const row = document.querySelector('[data-vente-tx="8001"]') || [...document.querySelectorAll('.vrm-sale-row')].find((r) => /Vente Delta/.test(r.innerText)); if (!row) return null;
+          const d = row.querySelector('[data-couts-vente]') || [...row.querySelectorAll('details')].find((x) => /Détail des frais/.test(((x.querySelector('summary') || {}).innerText) || ''));
+          if (d) { d.open = true; d.scrollIntoView({ block: 'center' }); }
+          const prix = row.querySelector('.vrm-sale-price');
+          return { estime: /estimé/.test(prix ? prix.innerText : ''), texte: d ? d.innerText : '', a: !!d };
+        });
+        const coche = () => pg.evaluate(() => { const row = document.querySelector('[data-vente-tx="8001"]') || [...document.querySelectorAll('.vrm-sale-row')].find((r) => /Vente Delta/.test(r.innerText)); const d = row && (row.querySelector('[data-couts-vente]') || [...row.querySelectorAll('details')].find((x) => /Détail des frais/.test(((x.querySelector('summary') || {}).innerText) || ''))); const c = d && d.querySelector('input[type=checkbox]'); if (c) c.click(); return !!c; });
+        const e0 = await etat();
+        if (!e0 || !e0.a) throw new Error('détail des frais de la vente 8001 introuvable');
+        dit(!(/laisse la case vide/i.test(e0.texte) && /\(cases vides = 0/i.test(e0.texte)), 'pas de « laisse la case vide » à côté de « cases vides = 0 € »', e0.texte.slice(0, 160));
+        await coche(); await pg.waitForTimeout(900);
+        const ov = ((await ls(pg, 'vinted_sale_overrides')) || {})['8001'] || {};
+        const e1 = await etat();
+        dit(ov.fraisComplets !== true && e1.estime, 'boost vide : « tous les frais sont renseignés » ne passe pas, le bénéfice reste « estimé »', JSON.stringify({ fraisComplets: ov.fraisComplets, estime: e1.estime }));
+        const boost = await pg.evaluateHandle(() => { const row = document.querySelector('[data-vente-tx="8001"]') || [...document.querySelectorAll('.vrm-sale-row')].find((r) => /Vente Delta/.test(r.innerText)); return row && row.querySelector('input[aria-label="Boost (si connu)"]'); });
+        if (!boost || !(await boost.asElement())) throw new Error('champ « Boost (si connu) » de la vente 8001 introuvable');
+        await boost.asElement().fill('0');
+        await pg.keyboard.press('Tab'); await pg.waitForTimeout(700);
+        await etat(); await coche(); await pg.waitForTimeout(900);
+        const ov2 = ((await ls(pg, 'vinted_sale_overrides')) || {})['8001'] || {};
+        const e2 = await etat();
+        dit(ov2.fraisComplets === true && ov2.fees === '0' && !e2.estime, 'l’autre sens : boost 0 tapé ⇒ frais confirmés, bénéfice complet', JSON.stringify({ fraisComplets: ov2.fraisComplets, fees: ov2.fees, estime: e2.estime }));
       });
 
       // ── D. Boost : jamais inventé ────────────────────────────────────────

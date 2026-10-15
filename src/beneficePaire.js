@@ -16,3 +16,12 @@ export function beneficePaire(prix,e){
  const vente=centimes(prix),achat=centimes(e?.buyPrice),charges=coutsVente(e);
  return {...charges,vente,achat,benefice:vente==null || achat==null || !charges.valid?null:(vente-achat-charges.cents)/100};
 }
+// Sur VINTED, le boost est le seul frais que rien ne donne (mesuré le 15 oct. :
+// aucune source n'a son prix par annonce). Une case « Boost » vide veut donc
+// dire INCONNU, jamais 0 : le bénéfice d'une vente Vinted n'est complet que si
+// le boost est écrit (0 s'il n'y en a pas eu). eBay garde sa règle.
+export const boostConnu=(e)=>centimes(e?.fees)!=null;
+export function beneficeVinted(prix,e){
+ const b=beneficePaire(prix,e);
+ return {...b,complet:b.complet && boostConnu(e),boostInconnu:!boostConnu(e)};
+}
