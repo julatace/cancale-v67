@@ -7352,6 +7352,10 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
   const fs = !L ? 'clamp(22px,7.4vw,34px)' : L <= 5 ? 'clamp(22px,7.4vw,34px)' : L <= 7 ? 'clamp(19px,6.2vw,28px)' : L <= 9 ? 'clamp(16px,4.8vw,21px)' : L <= 11 ? 'clamp(14px,3.9vw,17px)' : 'clamp(12px,3.2vw,14px)';
+  // Compact (trois chiffres côte à côte) : un montant AU CENTIME (« 4 224,77 € »,
+  // bilan de période, 15 octobre) se coupait à 390 px. Mesuré : il tient à 4 vw
+  // jusqu'à 320 px ; les montants courts (≤ 8 caractères) gardent leur taille.
+  const fsCompact = L <= 8 ? 'clamp(17px,5vw,22px)' : L <= 10 ? 'clamp(12px,4vw,22px)' : 'clamp(11px,3.6vw,22px)';
   // ⚠️ Un chiffre CLIQUABLE reste un chiffre : bouton nu (pas de fond, pas de
   // contour), aligné à gauche comme les autres. Le geste s'apprend au survol.
   const Balise = onClick ? 'button' : 'div';
@@ -7367,7 +7371,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
         ? {flex:1,minWidth:0,...(extra.style||{}),padding:'2px 14px',boxShadow:`-1px 0 0 ${C.border}`}
         : {flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
       <div className={compact?undefined:'vrm-label'} style={compact?{fontSize:11.5,color:C.muted,fontWeight:500}:{color:C.muted,minHeight:'2.44em'}}>{label}</div>
-      <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
+      <div className="vrm-display" style={{fontSize:compact?fsCompact:fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
   );
@@ -8213,11 +8217,14 @@ const bilanPeriode = ({ vendus, declarables, periode } = {}) => {
   if (declarables === undefined || declarables === null) return { ...base, verse: declarables, ecart: null, possibles: null };
   const debut = periode && periode.from ? debutJour(periode.from).getTime() : -Infinity;
   const fin_ = periode && periode.to ? finJour(periode.to).getTime() : Infinity;
-  const verse = vide(), verses = new Map(), lignesDecl = new Map();
+  // `verseParPlat` : le versé par plateforme. Leboncoin et eBay n'ont pas de
+  // date de VERSEMENT captée — `ventesDeclarables` les date à la vente (Leboncoin)
+  // ou à la commande payée (eBay) ; l'écran le dit quand ils sont dans le versé.
+  const verse = vide(), verses = new Map(), lignesDecl = new Map(), verseParPlat = {};
   for (const l of (declarables.lignes || [])) {
     if (!l) continue;
     lignesDecl.set(l.id, l);
-    if (l.ts && dans(l.ts)) { const c = cts(l.eur); ajoute(verse, c); verses.set(l.id, { c, l }); }
+    if (l.ts && dans(l.ts)) { const c = cts(l.eur); ajoute(verse, c); ajoute(verseParPlat[l.plateforme] || (verseParPlat[l.plateforme] = vide()), c); verses.set(l.id, { c, l }); }
   }
   const aDater = new Set((declarables.aDater || []).map(l => l && l.id));
   const ecart = { avant: vide(), masquees: vide(), apres: vide(), sansDate: vide(), nonLus: vide(), autres: vide() };
@@ -8246,7 +8253,7 @@ const bilanPeriode = ({ vendus, declarables, periode } = {}) => {
     if (tv && (tv > fin_ || tv < plancher)) continue;
     ajoute(possibles, cts(l.eur));
   }
-  return { ...base, verse: eur(verse), possibles: eur(possibles),
+  return { ...base, verse: { ...eur(verse), par: Object.fromEntries(Object.entries(verseParPlat).map(([k, v]) => [k, eur(v)])) }, possibles: eur(possibles),
     ecart: Object.fromEntries(Object.entries(ecart).map(([k, v]) => [k, eur(v)])) };
 };
 const libellePeriode = (p) => {
@@ -8591,53 +8598,74 @@ function PeriodePicker({ value, onChange, compact = false }) {
 }
 
 // ── LE BILAN DE LA PÉRIODE CHOISIE, sous le sélecteur de l'écran Ventes ──────
-// Trois chiffres (`bilanPeriode`) puis UNE ligne qui explique les écarts — le
-// chiffre, jamais la promesse (§5). Les montants sont en centimes dans les
-// `data-*` : le banc vérifie que les écarts somment exactement à la différence.
+// Trois chiffres (`bilanPeriode`) puis ce qui explique les écarts — le chiffre,
+// jamais la promesse (§5). Les montants sont en centimes dans les `data-*` : le
+// banc vérifie que les écarts somment exactement à la différence.
 // `sans` = ce qui n'a pas pu être lu (comptes, Leboncoin, eBay) : les totaux
 // sont alors partiels, et c'est dit UNE fois (§7).
+// ⚠️ (revue du 15 octobre) LES TROIS CHIFFRES SONT ÉCRITS AU CENTIME, comme les
+//    écarts. Arrondis à l'euro, « 3 776 € + 657,80 − 157 − 1 547 » donnait
+//    2 729,80 pour un versé affiché « 2 730 € » : un calcul que Julien refait et
+//    qui ne tombe pas juste (la famille « 157,00 − 21,20 = 135,81 » de l'URSSAF).
+// ⚠️ PEU DE TEXTE (demande du 15 octobre) : la part « en cours » se lit sous
+//    « Vendu » (vendu − finalisé, au centime, se recompte) ; « sans date de
+//    versement » n'est écrit qu'UNE fois, même quand des ventes d'avant la période
+//    attendent aussi leur date (elles font du versé un minimum : « au moins »).
+// `bilan.lecture` : les ventes ne couvrent pas encore les comptes d'aujourd'hui,
+// ou Leboncoin / eBay se lisent encore — trois « … », jamais un total partiel.
 const centimesLisibles = (cts) => {
   const v = Math.abs(cts) / 100;
   return (cts < 0 ? '−' : '') + v.toLocaleString('fr-FR', { minimumFractionDigits: cts % 100 ? 2 : 0, maximumFractionDigits: 2 }) + ' €';
 };
 function BilanPeriode({ bilan, sans = [] }) {
   if (!bilan) return null;
-  const e0 = (s) => Math.round(s.cts / 100).toLocaleString('fr-FR') + ' €';
-  const nb = (s) => `${s.n} vente${s.n > 1 ? 's' : ''}`;
-  const v = bilan.verse, ec = bilan.ecart;
+  const lecture = !!bilan.lecture;
+  // Espaces insécables : « 7 en cours » ne se coupe pas en « 7 en / cours » à 390 px.
+  const nb = (n) => `${n}\u00a0vente${n > 1 ? 's' : ''}`;
+  const v = lecture ? undefined : bilan.verse, ec = lecture ? null : bilan.ecart;
   const auMoins = !!(v && bilan.possibles && bilan.possibles.n > 0);
   const dejaDit = (ec && ec.sansDate) || { n: 0, cts: 0 };
   const autresPossibles = auMoins ? { n: bilan.possibles.n - dejaDit.n, cts: bilan.possibles.cts + dejaDit.cts } : { n: 0, cts: 0 };
-  const autres = Object.entries(bilan.par || {}).filter(([k]) => k !== 'Vinted').map(([k, s]) => `${s.n} ${k}`);
-  const LIB = { avant: 'vendues avant, versées dans la période', apres: 'versées après', sansDate: 'sans date de versement', masquees: 'masquées d’un ✕', nonLus: 'comptes non lus', autres: 'autres' };
+  const autres = lecture ? [] : Object.entries(bilan.par || {}).filter(([k]) => k !== 'Vinted').map(([k, s]) => `${s.n} ${k}`);
+  // Leboncoin et eBay n'ont pas de date de versement : `ventesDeclarables` les date
+  // à la vente. Dit seulement s'ils sont DANS le versé de cette période.
+  const dateVente = v ? ['Leboncoin', 'eBay'].filter((k) => v.par && v.par[k] && v.par[k].n > 0) : [];
+  const LIB = { avant: 'vendues avant', apres: 'versées après', sansDate: 'sans date de versement', masquees: 'masquées', nonLus: 'comptes non lus', autres: 'autres' };
+  // « Au moins » : d'autres ventes finalisées (vendues avant la période, ou
+  // masquées) n'ont pas non plus de date de versement et pourraient tomber ici.
+  // Même cause que l'écart « sans date de versement » ⇒ dites DANS ce morceau,
+  // sans redire la cause (§7) ; sans cet écart, une phrase à elles.
+  const plusAutres = autresPossibles.n > 0
+    ? <span data-possibles={bilan.possibles.cts}> (et {autresPossibles.n}{'\u00a0'}autre{autresPossibles.n > 1 ? 's' : ''}, {centimesLisibles(autresPossibles.cts)})</span> : null;
   const morceaux = ec ? Object.entries(LIB).filter(([k]) => ec[k] && ec[k].cts).map(([k, lib]) => (
-    <span key={k} data-ecart={k} data-ecart-cts={ec[k].cts}>{ec[k].cts > 0 ? '+' : ''}{centimesLisibles(ec[k].cts)} {lib}</span>
+    <span key={k} data-ecart={k} data-ecart-cts={ec[k].cts}>{ec[k].cts > 0 ? '+' : ''}{centimesLisibles(ec[k].cts)} {lib}{k === 'sansDate' ? plusAutres : null}</span>
   )) : [];
   const sep = (arr) => arr.flatMap((x, i) => i ? [<span key={'s' + i} aria-hidden="true"> · </span>, x] : [x]);
+  const e = (s) => centimesLisibles(s.cts);
+  const venduSub = lecture ? 'lecture…' : nb(bilan.vendu.n) + (bilan.enCours.n > 0 ? ` · ${bilan.enCours.n}\u00a0en\u00a0cours` : '') + (autres.length ? ` · dont ${autres.join(', ')}` : '');
   return (
-    <div data-bilan-periode="" data-vendu={bilan.vendu.cts} data-finalise={bilan.fin.cts} data-en-cours={bilan.enCours.cts}
-      data-verse={v ? v.cts : ''} data-verse-etat={v === undefined ? 'encours' : v === null ? 'passu' : 'lu'} data-au-moins={auMoins ? '1' : ''}
+    <div data-bilan-periode="" data-vendu={lecture ? '' : bilan.vendu.cts} data-finalise={lecture ? '' : bilan.fin.cts} data-en-cours={lecture ? '' : bilan.enCours.cts}
+      data-verse={v ? v.cts : ''} data-verse-etat={lecture || v === undefined ? 'encours' : v === null ? 'passu' : 'lu'} data-au-moins={auMoins ? '1' : ''}
+      data-lecture={lecture ? '1' : ''}
       style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 0 10px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-        <StatBox compact label="Vendu" value={e0(bilan.vendu)} sub={nb(bilan.vendu) + (autres.length ? ` · dont ${autres.join(', ')}` : '')}/>
-        <StatBox compact label="Finalisé" value={e0(bilan.fin)} sub={nb(bilan.fin)}/>
-        <StatBox compact label="Versé" value={v === undefined ? '…' : v === null ? '—' : e0(v)}
-          sub={v === undefined ? 'lecture…' : v === null ? 'dates illisibles' : (auMoins ? 'au moins · ' : '') + nb(v)}/>
+        <StatBox compact label="Vendu" value={lecture ? '…' : e(bilan.vendu)} sub={venduSub}/>
+        <StatBox compact label="Finalisé" value={lecture ? '…' : e(bilan.fin)} sub={lecture ? 'lecture…' : nb(bilan.fin.n)}/>
+        <StatBox compact label="Versé" value={v === undefined ? '…' : v === null ? '—' : e(v)}
+          sub={v === undefined ? 'lecture…' : v === null ? 'dates illisibles' : (auMoins ? 'au\u00a0moins · ' : '') + nb(v.n)}/>
       </div>
-      <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, padding: '8px 14px 0', borderTop: `1px solid ${C.border}`, marginTop: 10 }}>
-        <div>Vendu et finalisé : à la date de vente. Versé : à la date du versement.</div>
-        {(bilan.enCours.n > 0 || morceaux.length > 0) && (
-          <div data-bilan-ecart="">
-            {bilan.enCours.n > 0 && <span data-ecart="enCours">{centimesLisibles(bilan.enCours.cts)} encore en cours ({bilan.enCours.n}).</span>}
-            {morceaux.length > 0 && <>{bilan.enCours.n > 0 ? ' ' : ''}Versé − finalisé : {sep(morceaux)}.</>}
-          </div>
-        )}
-        {v === null && <div>Les dates de versement n’ont pas pu être lues : le versé n’est pas calculé — ce n’est pas zéro.</div>}
-        {/* « Au moins » : la cause est déjà dite si ce sont les « sans date de
-            versement » de l'écart ; sinon (vendues avant la période) on la dit. */}
-        {auMoins && autresPossibles.n > 0 && <div data-possibles={bilan.possibles.cts}>{autresPossibles.n} autre{autresPossibles.n > 1 ? 's' : ''} vente{autresPossibles.n > 1 ? 's' : ''} finalisée{autresPossibles.n > 1 ? 's' : ''} sans date de versement ({centimesLisibles(autresPossibles.cts)}) pourrai{autresPossibles.n > 1 ? 'ent' : 't'} aussi tomber dans la période.</div>}
-        {sans.length > 0 && <div data-bilan-sans={sans.join(',')} style={{ color: C.text }}>Sans {sans.join(', ')} : pas lu{sans.length > 1 ? 's' : ''} pour l’instant, ces totaux sont partiels.</div>}
-      </div>
+      {!lecture && (
+        <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, padding: '8px 14px 0', borderTop: `1px solid ${C.border}`, marginTop: 10 }}>
+          {morceaux.length > 0 && <div data-bilan-ecart="">Versé − finalisé : {sep(morceaux)}.{!dejaDit.n && plusAutres ? <span data-possibles={bilan.possibles.cts}> Le versé peut monter : {nb(autresPossibles.n)} finalisée{autresPossibles.n > 1 ? 's' : ''} ({centimesLisibles(autresPossibles.cts)}) sans date de versement.</span> : null}</div>}
+          {morceaux.length === 0 && autresPossibles.n > 0 && <div data-possibles={bilan.possibles.cts}>Le versé peut monter : {nb(autresPossibles.n)} finalisée{autresPossibles.n > 1 ? 's' : ''} ({centimesLisibles(autresPossibles.cts)}) sans date de versement.</div>}
+          {v === null && <div>Les dates de versement n’ont pas pu être lues : le versé n’est pas calculé — ce n’est pas zéro.</div>}
+          {/* Leboncoin et eBay n'ont pas de date de versement captée : ils sont
+              datés à la vente (`ventesDeclarables`). Dit seulement quand ils sont
+              DANS le versé de la période. */}
+          <div data-bilan-dates={dateVente.join(',')}>Vendu, finalisé : à la vente · versé : au versement{dateVente.length ? ` (${dateVente.join(', ')} : à la vente)` : ''}.</div>
+          {sans.length > 0 && <div data-bilan-sans={sans.join(',')} style={{ color: C.text }}>Sans {sans.join(', ')} : pas lu{sans.length > 1 ? 's' : ''} pour l’instant, ces trois totaux sont partiels.</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -10842,7 +10870,9 @@ function PrixMarche({ data, baseKO, fenetre = 12, setFenetre }) {
             <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
               Sur <b>{valo.reconnu}</b> annonce{valo.reconnu > 1 ? 's' : ''} en ligne dont le modèle et la taille ont au moins 2 ventes {libFen}{valo.total > valo.reconnu ? <> (sur {valo.total})</> : null}.
               {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / valo.marche - 1) * 100);
-                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <> — <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'}</> : ' — au même niveau'}.</>; })()}
+                // ⚠️ (revue du 15 octobre) « +8% au-dessus. » avait perdu son
+                //    complément en passant au nouveau libellé : au-dessus de QUOI ?
+                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <>, <b style={{ color: C.text }}>{Math.abs(ec)} %</b> {ec > 0 ? 'au-dessus' : 'en dessous'} du prix de revente</> : ', au niveau du prix de revente'}.</>; })()}
             </div>
           </Card>
         )}
@@ -16764,7 +16794,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const somme = (k) => pts.reduce((a, p) => a + (p.v[k] ? (mesure === 'n' ? p.v[k].n : p.v[k].eur) : 0), 0);
         if (!series.length || !series.some(s => somme(s.k) > 0)) return null;
         const tot = Object.fromEntries(series.map(s => [s.k, mesure === 'n' ? `${somme(s.k)}` : fmt(somme(s.k))]));
-        const ad = urssafInfo && urssafInfo.aDater && urssafInfo.aDater.n > 0 ? urssafInfo.aDater : null;
+        // ⚠️ (revue du 15 octobre) « 145 ventes finalisées (4 423,80 €) attendent
+        //    leur date de versement » était écrit DEUX fois : ici et dans la carte
+        //    du mois juste dessous, qui le dit avec le geste (l'extension va
+        //    chercher ces dates) pour Vinted et Leboncoin. Une cause, une phrase
+        //    (§7) : cette carte ne dit que ce que l'autre ne dit pas — les autres
+        //    plateformes (eBay sans date de commande), jamais en pratique.
+        const adTout = urssafInfo && urssafInfo.aDater && urssafInfo.aDater.n > 0 ? urssafInfo.aDater : null;
+        const ad = (() => {
+          if (!adTout || !adTout.par) return null;          // sans détail : la carte du mois dit tout (Leboncoin)
+          const reste = Object.entries(adTout.par).filter(([k, x]) => k !== 'Vinted' && k !== 'Leboncoin' && x && x.n > 0);
+          if (!reste.length) return null;
+          return { n: reste.reduce((t, [, x]) => t + x.n, 0), ca: reste.reduce((t, [, x]) => t + (x.ca || 0), 0), quoi: reste.map(([k]) => k).join(', ') };
+        })();
         return (
           <Card style={{padding:'16px 16px 14px',background:C.card,border:`1px solid ${C.border}`,marginTop:12}}>
             <div data-courbe-mois="" style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
@@ -16779,10 +16821,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <CourbePoints points={pts} series={series} mesure={mesure} hauteur={140} attr={{'data-mois':''}}/>
             <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
               <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au mois de la vente, toutes plateformes, en cours compris. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au mois du versement. Le mois en cours n'est pas fini.
-              {!pub && <span data-recu-absent=""> Le reçu se calcule sur l'écran <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{display:'inline',border:0,background:'transparent',padding:0,margin:0,minHeight:0,height:'auto',lineHeight:'inherit',verticalAlign:'baseline',color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit'}}>Ventes</button> : ouvre-le une fois sur cet appareil.</span>}
-              {pub && ad && <span data-a-dater-mois={ad.n}> {ad.n} vente{ad.n>1?'s':''} finalisée{ad.n>1?'s':''} ({fmt(ad.ca)}) attend{ad.n>1?'ent':''} encore {ad.n>1?'leur':'sa'} date de versement : dans aucun mois.</span>}
+              {pub && ad && <span data-a-dater-mois={ad.n}> {ad.n} vente{ad.n>1?'s':''} {ad.quoi} sans date ({fmt(ad.ca)}) : dans aucun mois.</span>}
               {!venduLu && liveStats.venduPasSu && <span> Les ventes n'ont pas pu être lues : la courbe « vendu » n'est pas tracée.</span>}
             </div>
+            {/* ⚠️ (revue du 15 octobre) Le geste était un bouton DANS la phrase :
+                sur téléphone, la règle des cibles tactiles (44 px, styles-mineral)
+                le faisait haut de 44 px dans une ligne de 17 — de grands trous
+                dans le paragraphe. Un vrai bouton, sous la phrase, à sa taille. */}
+            {!pub && (
+              <div data-recu-absent="" style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:10,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+                <span style={{flex:'1 1 220px'}}>Le reçu se calcule sur l'écran Ventes, une fois par appareil.</span>
+                <Btn small outline onClick={()=>onGo&&onGo('cat_ventes')} style={{padding:'6px 14px'}}>Ouvrir Ventes</Btn>
+              </div>
+            )}
           </Card>
         );
       })()}
@@ -24492,7 +24543,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
   // La période choisie sur l'écran Ventes : VENDU · FINALISÉ · VERSÉ, chacun par
   // sa règle (`bilanPeriode`, 15 octobre). Rien sans période choisie.
-  const bilanVentesPeriode = useMemo(() => (periode && (periode.from || periode.to)) ? bilanPeriode({ vendus, declarables, periode }) : null, [vendus, declarables, periode]);
+  // ⚠️⚠️ (revue du 15 octobre) LES TROIS CHIFFRES SUR LES MÊMES COMPTES. Le vendu
+  //    et le finalisé venaient de `vendus` (toute la liste, dont les ventes
+  //    d'avant d'un compte qui n'a pas répondu à la relecture discrète), le versé
+  //    de `declarables` (sur `ventesComptees`, qui l'écarte) : après une relecture
+  //    ratée, Vendu 4 225 € et Finalisé 3 776 € CONTENAIENT julatace35260 quand
+  //    Versé 1 848 € ne le contenait plus — sous la phrase « Sans julatace35260 :
+  //    ces totaux sont partiels ». C'est le défaut du 9 octobre (« un compte en
+  //    échec n'entre dans AUCUN total »), revenu dans le nouveau bloc. Le bilan
+  //    calcule donc son vendu sur `ventesComptees` (la même liste que le versé),
+  //    et tant qu'elle n'existe pas (lecture qui ne couvre pas encore les comptes
+  //    d'aujourd'hui) ou que Leboncoin / eBay se lisent encore : « … » partout,
+  //    jamais un total partiel. `vendus` (Ma journée, la courbe) ne change pas.
+  const vendusComptes = useMemo(() => ventesComptees ? ventesFaites({ vinted: ventesComptees, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], cachee: isHidden }) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd]);
+  const bilanVentesPeriode = useMemo(() => {
+    if (!(periode && (periode.from || periode.to))) return null;
+    if (!vendusComptes || lbcLu === undefined || ebayCmd === undefined) return { lecture: true };
+    return bilanPeriode({ vendus: vendusComptes, declarables, periode });
+  }, [vendusComptes, lbcLu, ebayCmd, declarables, periode]);
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
     // On attend de savoir ; et les dates de versement illisibles : on ne publie

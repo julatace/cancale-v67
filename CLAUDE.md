@@ -9036,6 +9036,47 @@ Demande de Julien du 15 octobre (lot P2 « Ventes »). Tranché sans lui demande
   mois » (D-ventes-12) et les blocs morts de l'archive (D-ventes-11) ne sont pas
   touchés.
 
+#### Relecture du même jour — sept défauts, tous reproduits puis corrigés
+Reproduits sur c6f701e (vraies fixtures en lien, jamais dans git), corrigés,
+prouvés rouges sur le build de c6f701e.
+- ⚠️⚠️ **Relecture discrète ratée** : Vendu (4 225 €) et Finalisé (3 776 €) gardaient
+  les ventes du compte en panne, Versé (2 730 → 1 848 €) les retirait, sous « Sans
+  julatace35260 : ces totaux sont partiels ». C'est le défaut du 9 octobre revenu
+  dans le nouveau bloc. ⇒ Le bilan calcule son vendu sur `ventesComptees` (la même
+  liste que le versé, `vendusComptes`) ; tant qu'elle ne couvre pas les comptes
+  d'aujourd'hui, ou que Leboncoin / eBay se lisent encore : « … » partout
+  (`bilan.lecture`). Mesuré après : 3 350,47 · 2 966,80 · 1 847,60 €, plus d'écart
+  « comptes non lus ». `vendus` (Ma journée, la courbe) ne change pas.
+- **Le calcul ne tombait pas juste à l'écran** (3 776 + 657,80 − 157 − 1 547 =
+  2 729,80 pour « 2 730 € ») : les trois chiffres sont écrits **au centime**, comme
+  les écarts. `StatBox compact` réduit la police d'un montant de 9 caractères et
+  plus (4 vw, mesuré sans coupure jusqu'à 320 px) ; les montants courts gardent
+  leur taille.
+- **« Versé : à la date du versement » faux pour Leboncoin et eBay** (datés à la
+  vente par `ventesDeclarables`) : `bilanPeriode` rend `verse.par`, et la ligne de
+  dates dit « (Leboncoin, eBay : à la vente) » seulement quand ils sont dans le versé.
+- **Sept lignes de texte sur iPhone** ⇒ quatre sur ses données : « en cours » passe
+  sous Vendu (« 67 ventes · 7 en cours » — le montant se recompte au centime) ;
+  « sans date de versement » n'est écrit qu'une fois (les autres ventes sans date
+  sont comptées dans le même morceau : « (et 15 autres, 406 €) ») ; ligne de dates
+  raccourcie.
+- **Statistiques : « 145 ventes finalisées (4 423,80 €) attendent leur date » écrit
+  deux fois** (nouvelle carte + carte du mois, qui le dit avec le geste) : la carte
+  « Vendu et reçu » ne dit plus que ce que l'autre ne dit pas (eBay sans date).
+- **Le lien « Ventes » DANS la phrase faisait 44 px sur téléphone** (règle des
+  cibles tactiles, styles-mineral) : un vrai bouton « Ouvrir Ventes », sous la phrase.
+- **« +8 % au-dessus. »** ⇒ « 8 % au-dessus du prix de revente ».
+- Preuves : banc `ventes-periode.cjs` — **154 verts**, **25 rouges** sur le build de
+  c6f701e (calcul relu dans le TEXTE rendu, relecture ratée avec une panne 522 posée
+  après le chargement, dates Leboncoin/eBay, une seule « sans date de versement »,
+  ≤ 5 lignes à 390 px, bouton dans une phrase, phrase « à dater » unique,
+  comparaison qui nomme sa référence) ; `audit-bilan-periode.cjs` 18 contrôles
+  (+ `verse.par`), ses 4 mutations toujours rouges.
+- ⚠️ Constaté, laissé : sur un appareil neuf, la carte du mois (Statistiques) dit
+  encore « ce chiffre se calcule sur l'écran Ventes » à côté du « Ouvrir Ventes » de
+  la carte « Vendu et reçu » — deux cartes, deux chiffres absents, même geste ; la
+  carte du mois explique SON tiret et vit sur l'écran URSSAF, pas touchée ici.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

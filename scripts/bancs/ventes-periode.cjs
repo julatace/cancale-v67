@@ -21,6 +21,21 @@
 //      compte supprimé n'entre pas), fenêtre de 12 mois (une vente de 2 ans
 //      n'entre que dans « Tout »), et chaque groupe montre ses ventes, dont la
 //      médiane se recompte.
+// Revue du 15 octobre (défauts reproduits sur c6f701e, vraies données) :
+//   6. LE CALCUL TOMBE JUSTE À L'ÉCRAN : les trois chiffres et chaque écart sont
+//      relus dans le TEXTE rendu (pas dans les `data-*`) — finalisé + Σ écarts
+//      = versé, vendu − finalisé = en cours, au centime. Arrondis à l'euro,
+//      « 3 776 € + 657,80 − 157 − 1 547 » ne donnait pas « 2 730 € » ;
+//   7. RELECTURE DISCRÈTE RATÉE (un compte ne répond plus) : AUCUN des trois
+//      totaux ne garde ses ventes — Vendu et Finalisé les gardaient, Versé les
+//      retirait, sous « Sans X : ces totaux sont partiels » ;
+//   8. Leboncoin et eBay dans le versé ⇒ la règle de date le dit (ils sont datés
+//      à la vente : aucune date de versement captée) ; « sans date de versement »
+//      écrit au plus une fois ; peu de lignes de texte à 390 px ;
+//   9. Statistiques : « N ventes attendent leur date de versement » dit UNE fois
+//      sur l'écran (la carte du mois le dit, avec le geste) ; le geste « Ventes »
+//      n'est plus un bouton de 44 px DANS une phrase (téléphone) ;
+//  10. Prix de revente : « +8 % au-dessus » dit au-dessus DE QUOI.
 // Lancer : npm run build && node scripts/bancs/ventes-periode.cjs   (PORT=5951)
 const path = require('path');
 let chromium;
@@ -48,6 +63,7 @@ const V = {
   E: { o: vente(7005, 65, 'Commande finalisée', il(9)), verse: null, sansDate: true }, // finalisée sans date de versement
   F: { o: vente(7006, 90, 'Commande annulée', il(11)), verse: null },             // annulée : nulle part
   G: { o: vente(7007, 25.5, 'Commande finalisée', il(14)), verse: il(7), masquee: true }, // masquée d'un ✕
+  H: { o: vente(7008, 35, 'Commande finalisée', il(30)), verse: null },          // vendue AVANT, finalisée, sans date : peut tomber dans la période (« au moins »)
 };
 const LBC = { L1: { txId: 'L1', isSeller: true, price: 4000, stepLabel: 'Paiement effectué', dateVente: il(13).toISOString(), title: 'lbc' } };
 const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: il(16).toISOString(), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'ebay' }] }];
@@ -103,7 +119,7 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
 srv.listen(PORT);
 
-const ouvrir = async (b, vp, { versements = true, onglet = 'cat_ventes', sombre = false, publie = null } = {}) => {
+const ouvrir = async (b, vp, { versements = true, onglet = 'cat_ventes', sombre = false, publie = null, panne = null } = {}) => {
   const ctx = await b.newContext({ viewport: vp, colorScheme: sombre ? 'dark' : 'light', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -123,6 +139,8 @@ const ouvrir = async (b, vp, { versements = true, onglet = 'cat_ventes', sombre 
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if (!versements && /_txn_/.test(u) && /like\./.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+    // Une panne posée APRÈS le chargement (relecture discrète ratée) : 522 + HTML, la vraie forme.
+    if (panne && [...panne].some((p) => u.includes(p))) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
     const forme = (r) => {
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
@@ -155,11 +173,21 @@ const choisirPeriode = async (pg) => {
   await pg.locator('.vrm-period-panel button.vrm-button').click();
   await pg.waitForTimeout(400);
 };
+// Un montant tel qu'il est ÉCRIT (« 4 224,77 € », « −157 € », « +25,50 € ») → centimes.
+const ecritEnCts = (t) => { const m = /([+−-]?)\s*([\d\s\u202f\u00a0]+)(?:,(\d{1,2}))?\s*€/.exec(String(t || '')); if (!m) return null;
+  const v = Number(m[2].replace(/[\s\u202f\u00a0]/g, '')) * 100 + (m[3] ? Number(m[3].padEnd(2, '0')) : 0); return (m[1] === '−' || m[1] === '-') ? -v : v; };
 const lireBilan = (pg) => pg.evaluate(() => {
   const e = document.querySelector('[data-bilan-periode]'); if (!e) return null;
-  const ec = {}; for (const x of e.querySelectorAll('[data-ecart-cts]')) ec[x.getAttribute('data-ecart')] = Number(x.getAttribute('data-ecart-cts'));
+  const ec = {}, ecTexte = {};
+  for (const x of e.querySelectorAll('[data-ecart-cts]')) { ec[x.getAttribute('data-ecart')] = Number(x.getAttribute('data-ecart-cts')); ecTexte[x.getAttribute('data-ecart')] = x.textContent; }
+  const bloc = e.lastElementChild; const lh = bloc ? parseFloat(getComputedStyle(bloc).lineHeight) : 0;
   return { vendu: e.getAttribute('data-vendu'), fin: e.getAttribute('data-finalise'), enCours: e.getAttribute('data-en-cours'), verse: e.getAttribute('data-verse'),
-    etat: e.getAttribute('data-verse-etat'), auMoins: e.getAttribute('data-au-moins'), ec, texte: e.innerText };
+    etat: e.getAttribute('data-verse-etat'), auMoins: e.getAttribute('data-au-moins'), ec, ecTexte, texte: e.innerText,
+    affiches: [...e.querySelectorAll('.vrm-display')].map((x) => x.textContent),
+    coupes: [...e.querySelectorAll('.vrm-display')].filter((x) => { const r = document.createRange(); r.selectNodeContents(x); return r.getBoundingClientRect().width > x.clientWidth + 0.5; }).map((x) => x.textContent),
+    dates: (e.querySelector('[data-bilan-dates]') || {}).getAttribute ? e.querySelector('[data-bilan-dates]').getAttribute('data-bilan-dates') : null,
+    sans: (e.querySelector('[data-bilan-sans]') || {}).getAttribute ? e.querySelector('[data-bilan-sans]').getAttribute('data-bilan-sans') : null,
+    lignesTexte: bloc && lh ? Math.round((bloc.getBoundingClientRect().height - parseFloat(getComputedStyle(bloc).paddingTop)) / lh) : null };
 });
 
 (async () => {
@@ -187,9 +215,46 @@ const lireBilan = (pg) => pg.evaluate(() => {
         const somme = Object.values(r.ec).reduce((a, x) => a + x, 0);
         dit(somme === Number(r.verse) - Number(r.fin), 'Σ écarts = versé − finalisé, au centime', `${somme} · ${Number(r.verse) - Number(r.fin)}`);
         dit(r.auMoins === '1', 'une finalisée sans date de versement ⇒ le versé est un MINORANT (« au moins »)');
+        // ── 6. Le calcul tombe juste À L'ÉCRAN, au centime (revue du 15 octobre)
+        const [aV, aF, aVe] = r.affiches.map(ecritEnCts);
+        dit(aV === Number(r.vendu) && aF === Number(r.fin) && aVe === Number(r.verse), 'les trois chiffres sont ÉCRITS au centime (ceux qu’on recompte)', r.affiches.join(' · '));
+        const ecEcrits = Object.values(r.ecTexte).map(ecritEnCts);
+        dit(ecEcrits.every((x) => x != null) && aF + ecEcrits.reduce((t, x) => t + x, 0) === aVe, 'finalisé + Σ écarts ÉCRITS = versé ÉCRIT, au centime', `${aF} + (${ecEcrits.join(' ')}) · versé ${aVe}`);
+        dit(r.coupes.length === 0, 'aucun chiffre coupé', r.coupes.join(' · '));
+        // ── 8. La règle de date et le peu de texte
+        dit(r.dates === 'Leboncoin,eBay', 'Leboncoin et eBay dans le versé ⇒ la règle de date dit qu’ils sont datés à la vente', `« ${r.dates} »`);
+        const sd = (r.texte.match(/sans date de versement/g) || []).length;
+        dit(sd <= 1, '« sans date de versement » écrit au plus une fois', `${sd} fois`);
+        if (vp.width < 600) dit(r.lignesTexte != null && r.lignesTexte <= 5, 'le texte sous les chiffres tient en 5 lignes au plus à 390 px', `${r.lignesTexte} lignes`);
         await ctx.close();
       });
     }
+
+    // ── 7. Relecture discrète ratée : un compte ne répond plus ─────────────
+    console.log('\n── Ventes, relecture discrète ratée (compte_un ne répond plus)');
+    await essaie('relecture ratée', async () => {
+      const panne = new Set();
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { panne });
+      await choisirPeriode(pg);
+      await pg.waitForFunction(() => { const e = document.querySelector('[data-bilan-periode]'); return e && e.getAttribute('data-verse-etat') === 'lu'; }, null, { timeout: 15000 }).catch(() => {});
+      const r0 = await lireBilan(pg);
+      await pg.waitForTimeout(4500);   // l'écran regroupe deux signaux à moins de 4 s
+      panne.add('harvest_111_');
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes' } })));
+      await pg.waitForFunction(() => !!document.querySelector('[data-bilan-sans]'), null, { timeout: 15000 }).catch(() => {});
+      await pg.waitForTimeout(800);
+      const r = await lireBilan(pg);
+      // Sans compte_un, il ne reste que Leboncoin et eBay (4000 + 6000), tous finalisés et versés.
+      const hors = 4000 + 6000;
+      dit(!(await tombe(pg)) && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
+      dit(r0 && r0.vendu === String(ATT.vendu), 'avant la panne : le bilan complet', r0 && r0.vendu);
+      dit(r && /111|compte_un/.test(r.sans || ''), 'le compte qui n’a pas répondu est nommé (« Sans compte_un »)', r && r.sans);
+      dit(r && r.vendu === String(hors), 'VENDU ne garde pas les ventes du compte qui n’a pas répondu', r && `${r.vendu} · attendu ${hors}`);
+      dit(r && r.fin === String(hors), 'FINALISÉ non plus', r && `${r.fin} · attendu ${hors}`);
+      dit(r && r.verse === String(hors), 'VERSÉ non plus — les trois sur les mêmes comptes', r && `${r.verse} · attendu ${hors}`);
+      dit(r && !('nonLus' in r.ec), 'aucun écart « comptes non lus » (il venait de deux listes différentes)', r && JSON.stringify(r.ec));
+      await ctx.close();
+    });
     console.log('\n── Ventes, dates de versement illisibles (522)');
     await essaie('versements illisibles', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, { versements: false });
@@ -273,6 +338,15 @@ const lireBilan = (pg) => pg.evaluate(() => {
         dit(r.recuAbsent && r.polyR === 0, 'reçu pas encore publié sur cet appareil : dit, aucune ligne inventée', `${r.recuAbsent} · ${r.polyR}`);
         // « CA entre deux dates » sommait l'archive vide : 0,00 € sur toute période.
         dit(r.dates === 0 && r.porte, 'plus de « CA entre deux dates » à zéro : une porte vers la période de Ventes', `${r.dates} champ(s) date · porte ${r.porte}`);
+        // ── 9. Un bouton DANS une phrase ne doit pas casser l'interligne (téléphone : 44 px).
+        const casse = await pg.evaluate(() => {
+          const c = document.querySelector('[data-courbe-mois]'); const carte = c && c.parentElement; if (!carte) return null;
+          return [...carte.querySelectorAll('button')].filter((bt) => { const p = bt.parentElement;
+            const dansPhrase = [...p.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+            return dansPhrase && bt.getBoundingClientRect().height > 1.5 * parseFloat(getComputedStyle(p).lineHeight || '0'); }).map((bt) => `${bt.textContent} ${Math.round(bt.getBoundingClientRect().height)} px`);
+        });
+        dit(casse && casse.length === 0, 'aucun bouton haut de 44 px au milieu d’une phrase (l’interligne tient)', casse && casse.join(' · '));
+        dit(await pg.evaluate(() => { const z = document.querySelector('[data-recu-absent]'); return !!(z && z.querySelector('button')); }), 'le geste « ouvrir Ventes » reste là, en vrai bouton');
         if (vp.width > 600) {
           await pg.locator('[data-porte-periode]').click();
           await pg.waitForSelector('.vrm-period', { timeout: 15000 }).catch(() => {});
@@ -293,6 +367,10 @@ const lireBilan = (pg) => pg.evaluate(() => {
       const pub = r.pub && Object.fromEntries(r.pub.mois.map((m) => [m.ym, Math.round((m.recu || 0) * 100)]));
       dit(r.polyR > 0, 'la série « reçu » apparaît une fois publiée par l’écran Ventes');
       dit(pub && r.recu.every(([k, v]) => String(pub[k] || 0) === v), 'chaque point « reçu » = le reçu publié du mois (consommé, pas recalculé)', JSON.stringify(r.recu.slice(-3)));
+      // ── 9. Une cause, une phrase : la vente finalisée sans date de versement est
+      //    dite par la carte du mois (avec le geste), pas une seconde fois au-dessus.
+      const dits = await pg.evaluate(() => (document.body.innerText.match(/[^\n]*(sans date de versement|attend\w* encore (?:leur|sa) date de versement)[^\n]*/g) || []));
+      dit(dits.length === 1, '« ventes sans date de versement » dit UNE fois sur l’écran Statistiques', `${dits.length} : ${dits.map((x) => x.slice(0, 70)).join(' | ')}`);
       await ctx.close();
     });
 
@@ -312,6 +390,9 @@ const lireBilan = (pg) => pg.evaluate(() => {
         dit(!!am && am.n === 3, '12 mois : les 3 ventes des comptes LIÉS (ni le compte supprimé, ni la vente de 2 ans)', am && `${am.n} · ${am.ventes.join(',')}`);
         dit(!!am && !am.ventes.includes(99900), 'aucune vente du compte supprimé', am && am.ventes.join(','));
         dit(!!am && am.ventes.length === am.n && med(am.ventes) === am.med, 'chaque groupe montre ses ventes, et sa médiane se recompte', am && `${am.ventes.join(',')} → ${am.med}`);
+        // ── 10. « +8 % au-dessus. » — au-dessus de QUOI ? La comparaison nomme sa référence.
+        const comp = await pg.evaluate(() => (document.body.innerText.match(/Tu les affiches[^\n]*/) || [''])[0]);
+        dit(/(%\s*(au-dessus|en dessous) du prix de revente|au niveau du prix de revente)/.test(comp), 'la comparaison au prix de revente nomme sa référence', comp.slice(0, 120));
         if (CAPTURES) { await pg.evaluate(() => { const d = document.querySelector('[data-pqm-groupe]'); if (d) d.open = true; }); await pg.screenshot({ path: path.join(CAPTURES, `prix-revente-${vp.width}.png`), fullPage: true }); }
         await pg.locator('button[aria-pressed]', { hasText: 'Tout' }).click();
         await pg.waitForTimeout(300);

@@ -72,6 +72,11 @@ const lancer = (mutation) => {
     dit(ec.masquees && ec.masquees.cts === 2550, 'écart « masquée » = +25,50 €', ec.masquees && ec.masquees.cts);
     dit(ec.autres && ec.autres.cts === 0, 'rien dans « autres » quand chaque vente a son identité', ec.autres && ec.autres.cts);
     dit(b.possibles && b.possibles.n === 1 && b.possibles.cts === 6500, 'la finalisée sans date ⇒ le versé est un minorant (« au moins »)', b.possibles && `${b.possibles.n} · ${b.possibles.cts}`);
+    // Revue du 15 octobre : l'écran dit « Leboncoin, eBay : à la vente » quand ils
+    // sont DANS le versé (aucune date de versement captée pour eux).
+    const par = (b.verse && b.verse.par) || {};
+    dit(par.Leboncoin && par.Leboncoin.cts === 4000 && par.eBay && par.eBay.cts === 6000 && par.Vinted && par.Vinted.cts === 5000 + 3000 + 2550,
+      'le versé dit ses plateformes (Leboncoin et eBay y sont datés à la vente)', JSON.stringify(Object.fromEntries(Object.entries(par).map(([k, x]) => [k, x.cts]))));
     const u = R.bilanPeriode({ vendus, declarables: undefined, periode: { from: il(20), to: il(5) } });
     const n = R.bilanPeriode({ vendus, declarables: null, periode: { from: il(20), to: il(5) } });
     dit(u.verse === undefined && n.verse === null && n.ecart === null, '« pas su » : en cours ⇒ undefined, illisible ⇒ null — jamais 0', `${u.verse} · ${n.verse && n.verse.cts}`);
@@ -81,7 +86,7 @@ const lancer = (mutation) => {
   essaie('au hasard', () => {
     let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     const STATUTS = ['Commande finalisée', 'Commande finalisée', 'Paiement validé', 'Colis en transit', 'Commande annulée', 'Remboursée'];
-    let mauvais = { somme: 0, vendu: 0, verse: 0, recompte: 0 }, vus = 0;
+    let mauvais = { somme: 0, vendu: 0, verse: 0, recompte: 0, par: 0 }, vus = 0;
     for (let k = 0; k < 400; k++) {
       const V = [], vers = {}, decl = {};
       const nV = 1 + Math.floor(rnd() * 25);
@@ -109,12 +114,14 @@ const lancer = (mutation) => {
       const attenduVendu = vendus.lignes.filter((x) => R.dansPeriodeDate(x.ts, periode)).reduce((t, x) => t + c(x.eur), 0);
       if (attenduVendu !== b.vendu.cts) mauvais.recompte++;
       if (b.verse.cts !== b.fin.cts) vus++;
+      if (Object.values(b.verse.par || {}).reduce((t, x) => t + x.cts, 0) !== b.verse.cts) mauvais.par++;
     }
     dit(mauvais.somme === 0, 'Σ écarts = versé − finalisé, au centime (400 jeux)', `${mauvais.somme} faux`);
     dit(mauvais.vendu === 0, 'vendu = finalisé + en cours (400 jeux)', `${mauvais.vendu} faux`);
     dit(mauvais.verse === 0, 'versé = Σ des lignes versées dans la période, à la date du VERSEMENT (400 jeux)', `${mauvais.verse} faux`);
     dit(mauvais.recompte === 0, 'vendu = Σ de `ventesFaites` dans la période (400 jeux)', `${mauvais.recompte} faux`);
     dit(vus > 100, 'les jeux exercent vraiment un écart (sinon l’égalité ne prouve rien)', `${vus}/400`);
+    dit(mauvais.par === 0, 'le versé par plateforme somme au versé (400 jeux)', `${mauvais.par} faux`);
   });
   return { ok, ko };
 };
