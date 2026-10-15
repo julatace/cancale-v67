@@ -9436,6 +9436,98 @@ Chaque défaut a d'abord été REPRODUIT (sondes Playwright sur le build de
   POSER par la session qui monte l'extension) ; `messagerie.cjs` (10) et
   `filtre-compte.cjs` (3), tous dans le bloc « offres reçues par email » retiré le
   13 octobre.
+### Ventes et statistiques : trois chiffres par période, points reliés, « Prix de revente » (15 octobre)
+Demande de Julien du 15 octobre (lot P2 « Ventes »). Tranché sans lui demander :
+- **Écran Ventes, période choisie** ⇒ `BilanPeriode` sous le sélecteur :
+  **Vendu** (`ventesFaites`, date de vente, en cours comprises) · **Finalisé** (leur
+  part finalisée, `fin` porté par chaque ligne) · **Versé** (`ventesDeclarables`,
+  date du VERSEMENT `l.ts`, jamais le mois de déclaration). Toutes plateformes,
+  comme Ma journée (la liste dessous reste Vinted). Une règle, `bilanPeriode`
+  (module) : l'écart finalisé → versé s'explique **vente par vente, par identité**
+  (vendues avant · versées après · sans date de versement · masquées · comptes non
+  lus · autres), en centimes : Σ écarts = versé − finalisé, exactement. Versements
+  en cours ⇒ « … », illisibles ⇒ « — » (jamais 0) ; une finalisée sans date qui
+  pourrait tomber dans la période ⇒ « au moins ».
+  ⚠️ `ventesFaites` porte désormais `id` et `fin` : le miroir serveur
+  `api/_lib/ventes-regle.js` a été refabriqué (`--recopie`), aucun total ne change.
+- **14 derniers jours ⇒ points reliés** (`CourbePoints`, `CourbeVenduRecu`, Ma
+  journée) : bascule 7 / 14 jours (choix gardé sur l'appareil), un point par jour
+  et par série (vendu plein, reçu creux : jamais la couleur seule), les chiffres du
+  jour SOUS l'axe (un tableau aligné, pas un nombre sur chaque point), un détail au
+  toucher/survol. Une valeur inconnue coupe la ligne — reçu illisible ⇒ aucune
+  ligne « reçu », jamais une ligne à 0. `BarresVenduRecu` est retiré.
+- **Statistiques : UNE carte « Vendu et reçu · 12 derniers mois »** remplace
+  « Chiffre d'affaires · 12 derniers mois » (c'était le VENDU) et « Évolution —
+  ventes finalisées » (c'était le CA DÉCLARÉ, avec un détail faux « se finalise ~2
+  semaines après la vente »). Vendu = `liveStats.caParMois` ; Reçu = `recu`/`nRecu`
+  ajoutés à chaque mois de `vinted_urssaf_mois` par l'écran Ventes (au mois du
+  versement, comme « Reçu en {mois} », §11). Pas encore publié sur l'appareil ⇒ la
+  série est absente et la carte dit d'ouvrir Ventes. `CourbeVentes` (lissée) et
+  `moisMoisson` sont retirés (plus d'appelant).
+- **« Chiffre d'affaires entre deux dates » (Statistiques) sommait l'archive vide** :
+  0,00 € sur toute période, présenté comme un fait. Remplacé par une porte vers la
+  période de Ventes (un propriétaire, §11). L'analyse de Ventes dit « CA finalisé
+  Vinted » (la liste est Vinted ; le bilan de période compte toutes plateformes).
+- **« Prix qui marche » ⇒ gardé, renommé « Prix de revente »**, rendu vérifiable :
+  chaque modèle+taille ouvre la liste de SES ventes (date, compte, prix, titre —
+  la médiane se recompte), dit la date de la dernière, et la fenêtre se choisit
+  (6 mois · **12 mois** par défaut · tout). Les ventes viennent de `ventesCoque`
+  (les comptes LIÉS, comptes exclus et ventes masquées écartés — décisions du
+  3 octobre), plus d'une relecture de toutes les lignes `orders_sold` du
+  propriétaire. Mesuré sur la copie du 5 octobre : 115 groupes (dont 1 013 ventes
+  de comptes supprimés) → **32 groupes** sur ses 7 comptes liés.
+- Preuves : `audit-bilan-periode.cjs` (la vraie règle exécutée, cas à la main +
+  400 jeux au hasard ; `--prouve` : 4 mutations, toutes rouges) ; banc
+  `bancs/ventes-periode.cjs` (port 5951, données inventées, 390/1512, clair/sombre)
+  — **118 verts**, **42 rouges** sur le build de w15, **4 rouges** sur un build
+  muté (reçu illisible dessiné à 0, fenêtre ignorée).
+- ⚠️ **Non fait** : la courbe vit dans Ma journée (bloc replié sous 768 px) — si la
+  refonte de Ma journée la retire, la remettre ailleurs, ne pas la perdre ; « Ventes
+  par jour » (calendrier de la période, Analyse) reste en liste ; l'écart eBay
+  « total acheteur ≠ net versé » attend la session eBay ; les deux « Objectif du
+  mois » (D-ventes-12) et les blocs morts de l'archive (D-ventes-11) ne sont pas
+  touchés.
+
+#### Relecture du même jour — sept défauts, tous reproduits puis corrigés
+Reproduits sur c6f701e (vraies fixtures en lien, jamais dans git), corrigés,
+prouvés rouges sur le build de c6f701e.
+- ⚠️⚠️ **Relecture discrète ratée** : Vendu (4 225 €) et Finalisé (3 776 €) gardaient
+  les ventes du compte en panne, Versé (2 730 → 1 848 €) les retirait, sous « Sans
+  julatace35260 : ces totaux sont partiels ». C'est le défaut du 9 octobre revenu
+  dans le nouveau bloc. ⇒ Le bilan calcule son vendu sur `ventesComptees` (la même
+  liste que le versé, `vendusComptes`) ; tant qu'elle ne couvre pas les comptes
+  d'aujourd'hui, ou que Leboncoin / eBay se lisent encore : « … » partout
+  (`bilan.lecture`). Mesuré après : 3 350,47 · 2 966,80 · 1 847,60 €, plus d'écart
+  « comptes non lus ». `vendus` (Ma journée, la courbe) ne change pas.
+- **Le calcul ne tombait pas juste à l'écran** (3 776 + 657,80 − 157 − 1 547 =
+  2 729,80 pour « 2 730 € ») : les trois chiffres sont écrits **au centime**, comme
+  les écarts. `StatBox compact` réduit la police d'un montant de 9 caractères et
+  plus (4 vw, mesuré sans coupure jusqu'à 320 px) ; les montants courts gardent
+  leur taille.
+- **« Versé : à la date du versement » faux pour Leboncoin et eBay** (datés à la
+  vente par `ventesDeclarables`) : `bilanPeriode` rend `verse.par`, et la ligne de
+  dates dit « (Leboncoin, eBay : à la vente) » seulement quand ils sont dans le versé.
+- **Sept lignes de texte sur iPhone** ⇒ quatre sur ses données : « en cours » passe
+  sous Vendu (« 67 ventes · 7 en cours » — le montant se recompte au centime) ;
+  « sans date de versement » n'est écrit qu'une fois (les autres ventes sans date
+  sont comptées dans le même morceau : « (et 15 autres, 406 €) ») ; ligne de dates
+  raccourcie.
+- **Statistiques : « 145 ventes finalisées (4 423,80 €) attendent leur date » écrit
+  deux fois** (nouvelle carte + carte du mois, qui le dit avec le geste) : la carte
+  « Vendu et reçu » ne dit plus que ce que l'autre ne dit pas (eBay sans date).
+- **Le lien « Ventes » DANS la phrase faisait 44 px sur téléphone** (règle des
+  cibles tactiles, styles-mineral) : un vrai bouton « Ouvrir Ventes », sous la phrase.
+- **« +8 % au-dessus. »** ⇒ « 8 % au-dessus du prix de revente ».
+- Preuves : banc `ventes-periode.cjs` — **154 verts**, **25 rouges** sur le build de
+  c6f701e (calcul relu dans le TEXTE rendu, relecture ratée avec une panne 522 posée
+  après le chargement, dates Leboncoin/eBay, une seule « sans date de versement »,
+  ≤ 5 lignes à 390 px, bouton dans une phrase, phrase « à dater » unique,
+  comparaison qui nomme sa référence) ; `audit-bilan-periode.cjs` 18 contrôles
+  (+ `verse.par`), ses 4 mutations toujours rouges.
+- ⚠️ Constaté, laissé : sur un appareil neuf, la carte du mois (Statistiques) dit
+  encore « ce chiffre se calcule sur l'écran Ventes » à côté du « Ouvrir Ventes » de
+  la carte « Vendu et reçu » — deux cartes, deux chiffres absents, même geste ; la
+  carte du mois explique SON tiret et vit sur l'écran URSSAF, pas touchée ici.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

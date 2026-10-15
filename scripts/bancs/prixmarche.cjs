@@ -30,6 +30,7 @@ let M;
 try {
   M=new Function(`const normTitle=(t)=>(t||'').toLowerCase().replace(/\\s+/g,' ').trim();
 ${grab('montantCommande')}
+${grab('tsCommande')}
 ${grab('KNOWN_MODELS')}
 ${grab('extractModel')}
 ${grab('extractSize')}
