@@ -16,6 +16,9 @@
 //   · ← → tournent la vue (aucune touche ne faisait rien) ;
 //   · un double-clic sur une case met en face sans ouvrir la case ;
 //   · aucune erreur.
+// (15 octobre) Le Stock s'ouvre en 2D par défaut ; ce banc choisit la 3D comme
+// le ferait l'utilisateur (`vrm_stock_rendu`, mémorisé par appareil). Le plan 2D
+// a son propre banc : `stock-2d.cjs`.
 // ⚠️ WebGL logiciel = lent : on juge des ÉTATS finaux (la sonde `data-cam-*`
 //    posée par l'app), jamais des durées.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -49,7 +52,7 @@ srv.listen(PORT);
     const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-    await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_garage_view', '"plan"'); } catch (_) {} });
+    await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_garage_view', '"plan"'); localStorage.setItem('vrm_stock_rendu', '"3d"'); } catch (_) {} });
     await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
     await pg.route('**/rest/v1/**', (route) => {
       const u = decodeURIComponent(metaVersData(route.request().url()));

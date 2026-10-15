@@ -7412,6 +7412,57 @@ faisait ~11 px, la molette avançait de 5 % par cran vers le CENTRE de la pièce
   avant » n'y prouverait rien) : remettre le clic droit qui tape → **2 rouges** ;
   retirer l'attente du clic → le double-clic **rouge**.
 
+### Le Stock en 2D (plan → face du meuble) et « Tes numéros de rangement » assistés (15 octobre)
+Julien : « tes numéros de rangement, ce n'est pas intuitif, ça doit être assisté,
+il y a des phrases partout » et « en 2D, avec au loin une vue du dessus ; quand
+on clique à côté ça avance et ça nous met face à l'endroit où sont rangés les
+articles ». **Mesuré d'abord** (lecture seule) : « Ma pièce » 17 × 10 m,
+8 meubles, 29 cartons — **26 dans UNE pile**, tous des anciens « B » ; série en
+chiffres, pool 1…24 ⇒ prochain carton **25**.
+- **Plan (vue du dessus) par défaut, 3D en option** (`vrm_stock_rendu`, local à
+  l'appareil ; la 3D n'est plus chargée tant qu'on ne la demande pas). Chaque
+  rangement est un bouton qui dit son nombre de paires ; toucher un meuble **ou
+  le sol à côté** (≤ 2,5 m) fait « avancer » la pièce jusqu'à lui, puis on est
+  **en face** : niveaux, cases, cartons et leurs N° (police à la largeur réelle
+  de la case, `cqw`), ‹ › = meuble voisin dans l'ordre du tour de la pièce.
+  Une seule source (§11) : le même `vrm_room`, la même empreinte et la même
+  règle « face au centre de la pièce » que la 3D (`empreintePlan`,
+  `postesDeLaPiece`, `pileNumsDe`).
+- **Tranché : on représente des NUMÉROS**, pas des chaussures ou des sacs (ça
+  vaut pour tout vendeur) ; la photo et le titre viennent dans la liste, **par
+  le N°** (jamais un titre deviné). La liste ne répète pas le dessin : elle ne
+  montre que les paires dont on a une fiche ; « anciens » et « N sans fiche »
+  se disent UNE fois au-dessus (§7).
+- ⚠️⚠️ **`contenuMeuble` ne lisait que les cases** : une pile (`nums`) ou une
+  boîte (`num`) ne listait rien — son rangement principal. `contenuDuPoste`
+  lit les trois. ⚠️ **Sortir une paire en 2D n'écrivait rien** : c'est la scène
+  3D qui jouait l'animation puis appelait `fini` ; sans elle, rien ne partait.
+- ⚠️⚠️ **`vrm_room` en trois états** (`loadRoomPlan` : `undefined` pas su ·
+  `null` aucune ligne · objet). Avant, une lecture ratée sur un appareil sans
+  copie montrait la pièce vide par défaut et le premier geste **réécrivait
+  `vrm_room` en entier** (ses 8 meubles, 29 cartons). Tant que `lu !== 'ok'`,
+  `persist` n'écrit rien et l'écran le dit (« Réessayer »).
+- **« Ajouter un rangement »** : un assistant (dessin → niveaux × cases → nom),
+  rangement créé **vide** ; une pile reçoit les N° de ses cartons (dits par lui,
+  la suite monte) et **un N° déjà rangé ailleurs bloque l'ajout**. Remplace la
+  rangée de dix pastilles et les trois invites texte d'affilée.
+- **Réglages → « Tes numéros de rangement »** : une carte (le prochain carton
+  dessiné) + un assistant forme → (lettre) → récapitulatif. Rien n'est écrit
+  avant « Enregistrer » ; la lettre des anciens (`archiveNumeros()`) est grisée
+  et refusée deux fois ; l'aperçu vient de LA règle de l'écran Annonces
+  (`numerosDejaDonnes` + `prochainLibre`) et vaut « pas encore lu » avant le
+  nuage, jamais « 1 ». La même carte vit aussi dans Stock → Aménager.
+- Preuves : banc `stock-2d.cjs` (port 5961, pièce inventée à la forme de la
+  sienne, 390/1512, clair/sombre) — **35 rouges** sur le build de w15 ; 5
+  mutations (pas su, sortie 2D, lecture ratée, pile ignorée, enregistrement au
+  choix) chacune rouge. `audit-numerotation-lecteurs` et `audit-identite`
+  suivent maintenant la règle dans le nouveau code (pas son orthographe) ;
+  `garage3d.cjs` choisit la 3D, `numeros-remise-a-zero.cjs` §G suit l'assistant.
+- **Pas fait** : « Ranger au stock » depuis Annonces ouvre toujours la vue par
+  défaut sans le bandeau du N° (D-stock-9, une règle « rangée » pour trois
+  lecteurs) ; le rendu 3D à la demande ; `pileAdd` propose « 1 » sur une pile
+  en B ; points de vue mémorisés au-delà du tour de la pièce.
+
 ### Messages dans Vinted, et un écran Leboncoin qui commence par ce qu'on fait (4 octobre)
 Julien : « dans Vinted et dans Leboncoin il y ait les messages », « Leboncoin
 beaucoup plus intuitif ».

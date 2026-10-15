@@ -286,25 +286,35 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
       const ctx = await contexte(); const pg = await page(ctx, etat);
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(6000);
+      // (15 octobre) Le réglage est un ASSISTANT : une carte (« prochain carton »)
+      // puis forme → lettre → récapitulatif. Les mêmes règles, jugées au rendu.
       const R = pg.locator('[data-numeros-reglage]');
       await R.scrollIntoViewIfNeeded();
-      const t0 = await R.innerText();
-      dit(!/B125/.test(t0), 'les exemples ne proposent pas « B125 » (la lettre des anciens, que l\'app refuse)', (t0.match(/[^\n]*à la main[^\n]*/) || [''])[0]);
       const prefixe = () => pg.evaluate(() => localStorage.getItem('vrm_num_prefixe'));
-      await R.getByRole('button', { name: /lettre/i }).first().click();
+      await R.locator('[data-numeros-changer]').click();
+      await pg.waitForSelector('[data-numeros-assistant][data-etape="forme"]', { timeout: 4000 });
+      const t0 = await pg.innerText('[data-numeros-assistant]');
+      dit(!/B1\b|B125/.test(t0), 'les exemples ne proposent pas la lettre des anciens (« B1 », « B125 »)', t0.replace(/\n/g, ' ').slice(0, 80));
+      await pg.click('[data-choix="lettre"]');
       await pg.waitForTimeout(1200);
       const p1 = await prefixe();
-      dit(p1 == null || p1 === '""', '« Avec une lettre » n\'enregistre RIEN tout seul (la série change à la lettre tapée)', `vrm_num_prefixe = ${p1}`);
-      await R.locator('input').fill('B');
+      dit(p1 == null || p1 === '""', '« Une lettre devant » n\'enregistre RIEN tout seul (la série change à « Enregistrer »)', `vrm_num_prefixe = ${p1}`);
+      await pg.click('button:has-text("Plusieurs lettres")');
+      await pg.fill('[aria-label="Deux ou trois lettres"]', 'B');
+      await pg.click('[data-numeros-assistant] button[type="submit"]');
       await pg.waitForTimeout(1200);
-      const p2 = await prefixe(), t2 = await R.innerText();
-      dit((p2 == null || p2 === '""') && /lettre de tes anciens/.test(t2) && /chiffres/.test(t2), '« B » refusé : rien n\'est enregistré, et l\'écran dit que les prochains restent en chiffres', `vrm_num_prefixe = ${p2}`);
+      const p2 = await prefixe(), t2 = await pg.innerText('[data-numeros-assistant]');
+      const bGrise = await pg.$eval('[data-lettre="B"]', (b) => b.disabled).catch(() => false);
+      dit((p2 == null || p2 === '""') && bGrise && /anciens numéros/.test(t2) && (await pg.getAttribute('[data-numeros-assistant]', 'data-etape')) === 'lettre',
+        '« B » refusé (pastille grisée, saisie refusée) : rien n\'est enregistré, on reste sur le choix de la lettre', `vrm_num_prefixe = ${p2}`);
       await pg.waitForTimeout(1500);
       const parti = etat.ecrits.some((d) => d && typeof d.vrm_num_prefixe === 'string' && d.vrm_num_prefixe !== '');
       dit(!parti, 'et aucune lettre n\'est partie au nuage', `${etat.ecrits.length} écriture(s)`);
-      await R.locator('input').fill('C');
+      await pg.click('[data-lettre="C"]');
+      await pg.waitForSelector('[data-numeros-assistant][data-etape="recap"]', { timeout: 3000 });
+      await pg.click('[data-numeros-enregistrer]');
       await pg.waitForTimeout(1200);
-      dit((await prefixe()) === '"C"', 'une AUTRE lettre (C), tapée, est bien enregistrée (l\'autre sens)', String(await prefixe()));
+      dit((await prefixe()) === '"C"', 'une AUTRE lettre (C), choisie puis enregistrée, l\'est bien (l\'autre sens)', String(await prefixe()));
       dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
       await ctx.close();
     }

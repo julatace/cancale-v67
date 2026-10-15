@@ -37288,7 +37288,10 @@ function NumerosSetting() {
     return () => { window.removeEventListener('vrm-prefixe', maj); if (typeof off === 'function') off(); };
   }, []);
   const [ouvert, setOuvert] = React.useState(false);
-  const prochain = nuage ? prochainNumeroPrevu(pref) : null;
+  // `nuage` ne sert qu'à se redessiner à l'arrivée du nuage : c'est
+  // `prochainNumeroPrevu` qui décide du « pas su » (une règle, un propriétaire).
+  void nuage;
+  const prochain = prochainNumeroPrevu(pref);
   return (
     <div data-numeros-reglage={pref ? 'lettre' : 'chiffres'} data-prochain={prochain || ''} style={{ padding: '12px 14px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
       <CartonNum n={prochain || '—'} attenue={!prochain}/>
@@ -37337,7 +37340,7 @@ function NumerosAssistant({ actuel, onClose }) {
   const pas = etape === 'forme' ? 0 : etape === 'lettre' ? 1 : 2;
   const option = (on) => ({ flex: '1 1 180px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '14px 10px 12px', borderRadius: 12, border: `${on ? 2 : 1}px solid ${on ? C.accent : C.border}`, background: C.card, cursor: 'pointer', fontFamily: 'inherit', color: C.text, minWidth: 0 });
   const bouton = { border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, padding: '10px 14px', cursor: 'pointer', fontFamily: 'inherit' };
-  const suite = nuage ? prochainsNumerosPrevus(choix, 3) : null;
+  const suite = prochainsNumerosPrevus(choix, 3);   // null = pas su (le nuage n'est pas arrivé)
   return (
     <SheetShell onClose={onClose}>
       <div data-numeros-assistant data-etape={etape}>
