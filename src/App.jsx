@@ -5879,13 +5879,19 @@ const numerosDeLaGrille = (grille) => {
 // Annonces, sur les données de cet appareil. ⚠️ `null` = PAS SU : tant que le
 // nuage n'est pas arrivé, la liste locale est vide sur un appareil neuf et
 // l'aperçu annoncerait « 1 » — un numéro déjà écrit sur un carton (§5).
-const prochainNumeroPrevu = (pref) => {
+// Les numéros déjà donnés, lus sur cet appareil par LA règle (`numerosDejaDonnes`)
+// — `null` = pas su (le nuage n'est pas arrivé). Ensembles neufs à chaque appel :
+// `prochainLibre` y ajoute ce qu'il prend.
+const numerosDonnesConnus = () => {
   if (!isCloudReady()) return null;
-  const { int, cles } = numerosDejaDonnes({
+  return numerosDejaDonnes({
     pool: load('vinted_used_numeros', []), fiches: load('vinted_annonce_numeros', {}),
     ventes: load('vinted_sale_overrides', {}), garage: numerosDeLaGrille(load('vinted_garage_grid', {})),
   });
-  return prochainLibre(int, cles, pref);
+};
+const prochainNumeroPrevu = (pref) => {
+  const d = numerosDonnesConnus(); if (!d) return null;
+  return prochainLibre(d.int, d.cles, pref);
 };
 
 // Les numéros PHYSIQUEMENT présents (annonce en ligne ou colis pas encore
@@ -18963,6 +18969,20 @@ const placeDansPoste = (p, e) => {
   return isNaN(r) || isNaN(c) ? '' : `colonne ${c + 1} · ${nr - r}ᵉ depuis le bas`;
 };
 
+// La largeur RÉELLE d'une étiquette du plan (le texte mesuré dans la police de
+// l'app) : une estimation trop large faisait croire à des chevauchements qui
+// n'existent pas, trop étroite à des places libres qui ne le sont pas.
+let _mesureEtiquette = null;
+const largeurEtiquettePlan = (txt) => {
+  try {
+    if (!_mesureEtiquette) _mesureEtiquette = document.createElement('canvas').getContext('2d');
+    _mesureEtiquette.font = `700 10.5px ${getComputedStyle(document.body).fontFamily || 'sans-serif'}`;
+    const w = _mesureEtiquette.measureText(String(txt)).width;
+    if (w > 0) return Math.ceil(w) + 16;   // marges 6 + 6, bordure 1 + 1, 2 de jeu
+  } catch (_) {}
+  return String(txt).length * 6.1 + 14;
+};
+
 // ── LE PLAN (vue du dessus) ────────────────────────────────────────────────
 // Un meuble de rangement est un BOUTON (nom accessible, nombre de paires) ; le
 // décor est dessiné, pas cliquable (sauf en mode déplacement). Une cible au
@@ -18985,28 +19005,54 @@ function PlanPiece({ room, items, postes, compteDe, couleurDe, choisiId, trouveI
   const drag = React.useRef(null);
   const pct = (v, tot) => `${(v / tot) * 100}%`;
   const posteDe = {}; postes.forEach(p => { posteDe[p.id] = p; (p.boites || []).forEach(b => { posteDe[b.id] = p; }); });
-  // ── Les étiquettes : le nombre de paires toujours, le NOM quand il tient sans
-  // chevaucher une autre étiquette (sur un téléphone, 17 m tiennent en 360 px :
-  // on n'écrit pas tout, on n'écrit rien par-dessus).
+  // ── Les étiquettes : le NOM et le nombre de paires quand ils tiennent, sinon
+  // le nombre seul ; jamais par-dessus une autre étiquette ni sur un AUTRE
+  // meuble (sur un téléphone, 17 m tiennent en 360 px : on n'écrit pas tout,
+  // on n'écrit rien par-dessus).
+  // ⚠️ Le repli IMPOSAIT le nombre même quand il chevauchait une autre
+  //    étiquette (vu à 390 px : « Pile de boîtes · 26 » collé à « 2 », lu
+  //    « 26 2 »). Le nombre essaie maintenant les quatre côtés du meuble ; s'il
+  //    ne tient nulle part, il n'est pas écrit sur le plan — le meuble le dit au
+  //    toucher (et dans son nom accessible) : un blanc plutôt qu'un chiffre
+  //    qu'on attribue au voisin.
   const etiquettes = {};
   if (ppm > 0) {
     const posees = [];
-    const chevauche = (r) => posees.some(o => r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h);
+    const Wpx = W * ppm, Hpx = H * ppm;
+    const coupe = (r, o) => r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h;
+    // Une étiquette posée sur un AUTRE meuble se lit comme la sienne (« 2 » sur
+    // l'étagère) : les corps des autres rangements comptent comme obstacles.
+    const corpsDe = (p) => { const e = empreintePlan(p.it); return { id: p.id, r: { x: (e.cx - e.W / 2) * ppm, y: (e.cy - e.D / 2) * ppm, w: e.W * ppm, h: e.D * ppm } }; };
+    const corps = postes.map(corpsDe);
     const ordre = postes.slice().sort((a, b) => (compteDe(b) - compteDe(a)) || (empreintePlan(b.it).W - empreintePlan(a.it).W));
     for (const p of ordre) {
+      const chevauche = (r) => posees.some(o => coupe(r, o)) || corps.some(c => c.id !== p.id && coupe(r, c.r));
       const e = empreintePlan(p.it), n = compteDe(p), nom = String(p.it.name || (FURN_TYPES[p.it.type] || {}).label || 'Meuble');
-      const larg = (txt) => txt.length * 6.1 + 14, haut = 18;
+      const larg = largeurEtiquettePlan, haut = 18;
       const wpx = e.W * ppm, dpx = e.D * ppm, cx = e.cx * ppm, cy = e.cy * ppm;
       const dx = W / 2 - e.cx, dy = H / 2 - e.cy;
+      const cote = (txt, w, pos) => pos === 'bas' ? { txt, pos, r: { x: cx - w / 2, y: cy + dpx / 2 + 2, w, h: haut } }
+        : pos === 'haut' ? { txt, pos, r: { x: cx - w / 2, y: cy - dpx / 2 - haut - 2, w, h: haut } }
+        : pos === 'droite' ? { txt, pos, r: { x: cx + wpx / 2 + 2, y: cy - haut / 2, w, h: haut } }
+        : { txt, pos, r: { x: cx - wpx / 2 - w - 2, y: cy - haut / 2, w, h: haut } };
+      // Le côté tourné vers le centre de la pièce d'abord (le dégagement), puis les autres.
+      const prefere = Math.abs(dy) >= Math.abs(dx) ? (dy > 0 ? 'bas' : 'haut') : (dx > 0 ? 'droite' : 'gauche');
+      // Un côté tourné vers un mur (son milieu hors de la pièce) est écarté ;
+      // un dépassement de quelques pixels est ramené dans le plan.
+      const dansLePlan = (t) => {
+        const r = t.r, mx = r.x + r.w / 2, my = r.y + r.h / 2;
+        if (mx < 0 || mx > Wpx || my < 0 || my > Hpx) return null;
+        return { ...t, r: { ...r, x: Math.max(0, Math.min(Wpx - r.w, r.x)), y: Math.max(0, Math.min(Hpx - r.h, r.y)) } };
+      };
       const essais = [];
       for (const txt of [n ? `${nom} · ${n}` : nom, n ? String(n) : '']) {
         if (!txt) continue;
         const w = larg(txt);
         if (wpx >= w + 4 && dpx >= haut + 4) essais.push({ txt, pos: 'centre', r: { x: cx - w / 2, y: cy - haut / 2, w, h: haut } });
-        if (Math.abs(dy) >= Math.abs(dx)) essais.push(dy > 0 ? { txt, pos: 'bas', r: { x: cx - w / 2, y: cy + dpx / 2 + 2, w, h: haut } } : { txt, pos: 'haut', r: { x: cx - w / 2, y: cy - dpx / 2 - haut - 2, w, h: haut } });
-        else essais.push(dx > 0 ? { txt, pos: 'droite', r: { x: cx + wpx / 2 + 2, y: cy - haut / 2, w, h: haut } } : { txt, pos: 'gauche', r: { x: cx - wpx / 2 - w - 2, y: cy - haut / 2, w, h: haut } });
+        const cotes = txt === String(n) ? [prefere, ...['bas', 'droite', 'gauche', 'haut'].filter(c => c !== prefere)] : [prefere];
+        for (const c of cotes) { const t = dansLePlan(cote(txt, w, c)); if (t) essais.push(t); }
       }
-      const ok = essais.find(t => !chevauche(t.r)) || (n ? essais.filter(t => t.txt === String(n))[0] : null);
+      const ok = essais.find(t => !chevauche(t.r));
       if (ok) { posees.push(ok.r); etiquettes[p.id] = ok; }
     }
   }
@@ -19084,11 +19130,15 @@ function PlanPiece({ room, items, postes, compteDe, couleurDe, choisiId, trouveI
           if (estDeco && !moveMode) return <span key={it.id} data-plan-decor={it.type} style={{ ...boite, pointerEvents: 'none' }}>{corps}</span>;
           const n = p ? compteDe(p) : 0, et = p ? etiquettes[p.id] : null;
           const nom = String(it.name || ft.label || 'Meuble');
-          const posEt = !et ? null : et.pos === 'centre' ? { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }
-            : et.pos === 'bas' ? { left: '50%', top: `calc(${50 + (e.D / hd) * 50}% + 2px)`, transform: 'translateX(-50%)' }
-            : et.pos === 'haut' ? { left: '50%', bottom: `calc(${50 + (e.D / hd) * 50}% + 2px)`, transform: 'translateX(-50%)' }
-            : et.pos === 'droite' ? { top: '50%', left: `calc(${50 + (e.W / hw) * 50}% + 2px)`, transform: 'translateY(-50%)' }
-            : { top: '50%', right: `calc(${50 + (e.W / hw) * 50}% + 2px)`, transform: 'translateY(-50%)' };
+          // L'étiquette se pose là où la place a été CALCULÉE (en px du plan,
+          // relatifs au bouton) : ce qui a été vérifié sans chevauchement est ce
+          // qui est dessiné. Ancrée au milieu (ou au bord, sur les côtés), pour
+          // que sa largeur réelle ne la décale pas.
+          const bx = (e.cx - hw / 2) * ppm, by = (e.cy - hd / 2) * ppm;
+          const posEt = !et ? null
+            : et.pos === 'droite' ? { left: et.r.x - bx, top: et.r.y + et.r.h / 2 - by, transform: 'translateY(-50%)' }
+            : et.pos === 'gauche' ? { left: et.r.x + et.r.w - bx, top: et.r.y + et.r.h / 2 - by, transform: 'translate(-100%,-50%)' }
+            : { left: et.r.x + et.r.w / 2 - bx, top: et.r.y + et.r.h / 2 - by, transform: 'translate(-50%,-50%)' };
           return (
             <button type="button" key={it.id} data-plan-poste={p ? p.id : it.id} data-plan-choisi={on ? '1' : undefined} data-plan-trouve={trouve ? '1' : undefined}
               aria-label={estDeco ? nom : `${nom} — ${n} paire${n > 1 ? 's' : ''}`} title={estDeco ? nom : `${nom} · ${n} paire${n > 1 ? 's' : ''}`}
@@ -19171,9 +19221,14 @@ function ElevationMeuble({ poste, couleur, trouve, onCase, onCarton, onBoite, ap
 }
 // La face + ce qu'il y a dedans. ‹ › : le meuble voisin (l'ordre du tour de la
 // pièce). Les flèches du clavier font pareil quand la face a le focus.
-function FaceMeuble({ poste, nom, couleur, trouve, fiches, prec, suiv, nomDe, onPlan, onPrec, onSuiv, onCase, onCarton, onBoite, onLigne, modifier, onModifier }) {
+function FaceMeuble({ poste, nom, couleur, trouve, fiches, prec, suiv, nomDe, onPlan, onPrec, onSuiv, onCase, onCarton, onBoite, onLigne, modifier, onModifier, reglages }) {
   const ref = React.useRef(null);
+  const refReglages = React.useRef(null);
   React.useEffect(() => { try { ref.current && ref.current.focus({ preventScroll: true }); } catch (_) {} }, [poste.id]);
+  // Les réglages s'ouvrent sous « Modifier » ; s'ils dépassent l'écran (une pile
+  // de 26 cartons, un téléphone), on les amène en vue — jamais un geste sans effet visible.
+  const avecReglages = !!reglages;
+  React.useEffect(() => { if (!avecReglages) return; try { refReglages.current && refReglages.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {} }, [avecReglages]);
   const tout = contenuDuPoste(poste).slice().sort((a, b) => triNum(a.numero, b.numero));
   const arch = archiveNumeros();
   // §7 : ce qui vaut pour TOUTES les lignes se dit UNE fois, au-dessus — la
@@ -19201,6 +19256,7 @@ function FaceMeuble({ poste, nom, couleur, trouve, fiches, prec, suiv, nomDe, on
         </div>
         <button type="button" data-face-modifier aria-pressed={!!modifier} onClick={onModifier} style={{ flexShrink: 0, border: `1px solid ${modifier ? C.accent : C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Modifier</button>
       </div>
+      {reglages && <div ref={refReglages} style={{ scrollMarginTop: 72, scrollMarginBottom: 96 }}>{reglages}</div>}
       <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
         {fleche('prec', prec, onPrec)}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -19255,7 +19311,7 @@ const tailleParDefaut = (type, room) => {
   if (type === 'grille') return { rows: Math.max(3, Math.min(8, Math.floor(((room && room.wallH) || 3.4) / (t.cell || 0.5)))), cols: t.cols };
   return { rows: Math.max(1, t.rows || 1), cols: Math.max(1, t.cols || 1) };
 };
-const libellesTaille = (type) => type === 'pile' ? ['Cartons de haut', 'Colonnes'] : type === 'commode' ? ['Tiroirs', 'Colonnes'] : ['Niveaux', 'Cases par niveau'];
+const libellesTaille = (type) => type === 'pile' ? ['Cartons de haut', 'Cartons'] : type === 'commode' ? ['Tiroirs', 'Colonnes'] : ['Niveaux', 'Cases par niveau'];
 // La suite d'une pile : « C5 » → C5, C6… ; « 40 » → 40, 41… ; invalide ⇒ null.
 const suiteDePile = (debut, n) => {
   const c = cleNum(debut); if (!c || !NUM_OK.test(c)) return null;
@@ -19267,15 +19323,26 @@ function AjoutRangement({ room, dejaPose, onAjouter, onClose }) {
   const [type, setType] = React.useState(null);
   const [autres, setAutres] = React.useState(false);
   const [rows, setRows] = React.useState(4), [cols, setCols] = React.useState(3);
+  const [total, setTotal] = React.useState(5);     // une pile : combien de cartons
   const [nom, setNom] = React.useState('');
   const [debut, setDebut] = React.useState('');
-  const choisir = (t) => { const d = tailleParDefaut(t, room); setType(t); setRows(d.rows); setCols(d.cols); setNom(t === 'autre' ? '' : (FURN_TYPES[t] || {}).label || ''); setDebut(''); };
+  const choisir = (t) => { const d = tailleParDefaut(t, room); setType(t); setRows(d.rows); setCols(d.cols); setTotal(d.rows * d.cols); setNom(t === 'autre' ? '' : (FURN_TYPES[t] || {}).label || ''); setDebut(''); };
   const t = type ? FURN_TYPES[type] : null;
   const pile = type === 'pile';
-  const nums = pile ? suiteDePile(debut, rows * cols) : null;
+  const nums = pile ? suiteDePile(debut, total) : null;
   const conflit = nums ? nums.map(n => ({ n, ou: dejaPose(n) })).find(x => x.ou) : null;
-  const pret = !!type && nom.trim() && (!pile || (nums && !conflit));
-  const apercu = type ? { id: 'apercu', it: { id: 'apercu', type, rows, cols, cell: t.cell, slots: {}, ...(pile ? { nums: nums || Array.from({ length: rows * cols }, () => '') } : {}) } } : null;
+  // ⚠️⚠️ UN CARTON NE PORTE QUE LE N° D'UNE PAIRE DÉJÀ NUMÉROTÉE. La suite
+  //    montait à l'aveugle (hauteur 5 par défaut : 22 → 26) : 25 et 26, jamais
+  //    donnés, étaient affirmés rangés pendant que l'écran Annonces allait
+  //    donner 25 à la prochaine paire — deux paires sous un N° (§5, relecture
+  //    du 15 octobre). On lit LA règle des numéros donnés (`numerosDejaDonnes`,
+  //    §11) ; pas su (nuage pas arrivé) ⇒ pas d'ajout.
+  const donnes = pile ? numerosDonnesConnus() : null;
+  const jamais = nums && donnes ? nums.filter(n => !donnes.cles.has(cleNum(n))) : [];
+  const iJamais = jamais.length ? nums.indexOf(jamais[0]) : -1;
+  const etatPile = !pile || !debut ? '' : !nums ? 'invalide' : conflit ? 'conflit' : !donnes ? 'pas-su' : jamais.length ? 'pas-donne' : 'ok';
+  const pret = !!type && nom.trim() && (!pile || etatPile === 'ok');
+  const apercu = type ? { id: 'apercu', it: { id: 'apercu', type, rows, cols, cell: t.cell, slots: {}, ...(pile ? { nums: nums || Array.from({ length: total }, () => '') } : {}) } } : null;
   const pas = (v, set, min, max) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <button type="button" aria-label="Moins" onClick={() => set(Math.max(min, v - 1))} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 18, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>−</button>
@@ -19313,7 +19380,7 @@ function AjoutRangement({ room, dejaPose, onAjouter, onClose }) {
           <div style={{ height: Math.min(220, 26 + rows * 28), maxWidth: Math.min(360, 40 + cols * 64), margin: '0 auto 14px' }}><ElevationMeuble poste={apercu} apercu/></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13, color: C.text }}>{libRows}{pas(rows, setRows, 1, pile ? 40 : 20)}</label>
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13, color: C.text }}>{libCols}{pas(cols, setCols, 1, 16)}</label>
+            <label data-ajout-nombre={pile ? total : undefined} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13, color: C.text }}>{libCols}{pile ? pas(total, setTotal, 1, 400) : pas(cols, setCols, 1, 16)}</label>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13, color: C.text }}>Nom
               <input value={nom} onChange={(e) => setNom(e.target.value.slice(0, 40))} placeholder="Étagère du fond" aria-label="Nom du rangement"
                 style={{ width: 180, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 14, fontFamily: 'inherit' }}/>
@@ -19324,9 +19391,19 @@ function AjoutRangement({ room, dejaPose, onAjouter, onClose }) {
                   style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 14, fontFamily: 'inherit', textTransform: 'uppercase' }}/>
               </label>
             )}
-            {pile && debut && (
-              <div data-ajout-pile={conflit ? 'conflit' : nums ? 'ok' : 'invalide'} style={{ fontSize: 12, color: conflit ? C.text : C.muted, lineHeight: 1.45 }}>
-                {!nums ? 'Un numéro comme 25 ou C5.' : conflit ? <>N°{conflit.n} est déjà rangé dans « {conflit.ou.meuble} » : retire-le de là-bas d'abord.</> : <>{nums[0]} → {nums[nums.length - 1]}, de bas en haut.</>}
+            {etatPile && (
+              <div data-ajout-pile={etatPile} style={{ fontSize: 12, color: etatPile === 'ok' || etatPile === 'invalide' ? C.muted : C.text, lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ flex: '1 1 180px', minWidth: 0 }}>
+                  {etatPile === 'invalide' ? 'Un numéro comme 25 ou C5.'
+                    : etatPile === 'conflit' ? <>N°{conflit.n} est déjà rangé dans « {conflit.ou.meuble} » : retire-le de là-bas d'abord.</>
+                    : etatPile === 'pas-su' ? 'Tes numéros ne sont pas encore chargés : réessaie dans un instant.'
+                    : etatPile === 'pas-donne' ? <>{jamais.slice(0, 2).map(n => 'N°' + n).join(', ')}{jamais.length > 2 ? ` et ${jamais.length - 2} autre${jamais.length > 3 ? 's' : ''}` : ''} : {jamais.length > 1 ? 'aucune paire n’a encore reçu ces numéros' : 'aucune paire n’a encore reçu ce numéro'}.</>
+                    : <>{nums[0]} → {nums[nums.length - 1]}, de bas en haut.</>}
+                </span>
+                {etatPile === 'pas-donne' && iJamais > 0 && (
+                  <button type="button" data-ajout-arreter={iJamais} onClick={() => setTotal(iJamais)}
+                    style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>S'arrêter au N°{nums[iJamais - 1]}</button>
+                )}
               </div>
             )}
           </div>
@@ -19343,6 +19420,10 @@ function AjoutRangement({ room, dejaPose, onAjouter, onClose }) {
 
 function RoomPlan({ locate, onLocateConsumed }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
+  // Une copie de SA pièce existe-t-elle sur cet appareil ? Sans elle, `plan` est
+  // la pièce VIDE par défaut (« Ma pièce · 10 × 8 m ») : tant que la base n'a pas
+  // répondu, on ne l'affiche pas comme si c'était la sienne.
+  const [copieLocale] = useState(() => load('vrm_room_plan', null) != null);
   const [sel, setSel] = useState(null);
   const [openItem, setOpenItem] = useState(null);
   const [search, setSearch] = useState('');
@@ -19375,6 +19456,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
     setLu('ok');
   }, []);
   useEffect(() => { relire(); }, [relire]);
+  // Ce que l'écran peut AFFIRMER de la pièce : lue, ou la dernière copie de cet
+  // appareil. Sinon (appareil neuf, lecture en cours ou ratée), rien : ni « Ma
+  // pièce · 10 × 8 m », ni « Aucun rangement », ni « Aucune case ne contient »
+  // (relecture du 15 octobre : « rien lu » ne vaut pas « rien »).
+  const planConnu = lu === 'ok' || copieLocale;
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
   const saveTimer = React.useRef(null);
@@ -19560,25 +19646,49 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // et rend les réglages faciles à trouver.
   // GRAVITÉ des numéros (comme la grille 2D) : dans chaque colonne, les boîtes
   // tombent en bas, sans trou. Une case vidée fait descendre la colonne au-dessus.
+  // ⚠️ Une case peut porter PLUSIEURS N° (des boîtes empilées sur un plateau
+  //    d'étagère) : on déplace la case ENTIÈRE, jamais son seul premier N° —
+  //    garder `a[0]` effaçait les autres du stock sans un mot.
+  const casePropre = (a) => (a || []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
   const compactSlots = (slots, nr, nc) => {
     const out = {};
     for (let c = 0; c < nc; c++) {
       const vals = [];
-      for (let r = 0; r < nr; r++) { const a = slots[r + '_' + c]; if (a && a.length && String(a[0]).trim()) vals.push(String(a[0])); }
+      for (let r = 0; r < nr; r++) { const a = casePropre(slots[r + '_' + c]); if (a.length) vals.push(a); }
       let r = nr - 1;
-      for (let i = vals.length - 1; i >= 0; i--) { out[r + '_' + c] = [vals[i]]; r--; }
+      for (let i = vals.length - 1; i >= 0; i--) { out[r + '_' + c] = vals[i]; r--; }
     }
+    return out;
+  };
+  // ⚠️⚠️ LA GRAVITÉ N'EST VRAIE QUE POUR UNE GRILLE DE BOÎTES (une boîte posée
+  //    sur une autre). Une étagère, une commode, des casiers : chaque niveau est
+  //    un PLATEAU. Appliquée à tout meuble, elle posait la paire rangée « en
+  //    haut » sur le niveau du BAS, faisait descendre les cartons déjà rangés
+  //    sans aucun geste sur eux, et gardait un seul N° par case (relecture du
+  //    15 octobre, devenu le geste par défaut avec la face 2D). Une règle pour
+  //    ranger, sortir et annoncer la case (§11).
+  const aGravite = (it) => (FURN_TYPES[(it || {}).type] || {}).build === 'grille';
+  const caseDePose = (it, slots, cellKey) => {
+    if (!aGravite(it)) return cellKey;
+    const nr = Math.max(1, it.rows || 3), c0 = Number(String(cellKey).split('_')[1]);
+    for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c0; if (!casePropre((slots || {})[k]).length) return k; }
+    return cellKey;
+  };
+  const rangerCases = (it, slots) => {
+    if (aGravite(it)) return compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4));
+    const out = {}; Object.entries(slots || {}).forEach(([k, a]) => { const p = casePropre(a); if (p.length) out[k] = p; });
     return out;
   };
   const fillCell = async (itemId, cellKey) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
-    const cur = ((it.slots || {})[cellKey] || [])[0] || '';
+    const cur = casePropre((it.slots || {})[cellKey])[0] || '';
     // ⚠️ CASE VIDE → on CHOISIT une paire, on ne tape plus un numéro de mémoire.
     // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
     // rangée ailleurs, passait sans un mot. La feuille ne propose que des paires
-    // réellement chez lui et pas encore posées.
-    if (!cur && aRanger.length) { setRanger({ itemId, cellKey }); return; }
+    // réellement chez lui et pas encore posées. Elle nomme la case où la paire
+    // va VRAIMENT (dans une grille, la boîte tombe sur celle du dessous).
+    if (!cur && aRanger.length) { setRanger({ itemId, cellKey: caseDePose(it, it.slots, cellKey) }); return; }
     poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
   };
 
@@ -19616,20 +19726,19 @@ function RoomPlan({ locate, onLocateConsumed }) {
       }
     }
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
-    const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
-    const cur = (slots[cellKey] || [])[0] || '';
+    const dans = casePropre(slots[cellKey]);
+    const cur = dans[0] || '';
     const n = saisie;
     if (n == null) return; // annulé
     const v = String(n).trim();
-    if (cur) { // boîte existante → on modifie / efface EN PLACE
-      if (v) slots[cellKey] = [v]; else delete slots[cellKey];
-    } else if (v) { // AJOUT → va le plus BAS possible de la colonne (case vide la plus basse)
-      let target = cellKey;
-      for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c0; if (!(slots[k] && slots[k].length)) { target = k; break; } }
-      slots[target] = [v];
+    if (cur) { // boîte existante → on modifie / efface EN PLACE ; les N° empilés dessus restent
+      const reste = dans.slice(1).filter(x => x !== v);
+      if (v) slots[cellKey] = [v, ...reste]; else if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
+    } else if (v) { // AJOUT → la case touchée (grille : la case vide la plus basse de sa colonne)
+      slots[caseDePose(it, slots, cellKey)] = [v];
     }
-    const compacted = compactSlots(slots, nr, nc); // gravité : tout retombe en bas, sans trou
+    const compacted = rangerCases(it, slots); // gravité : seulement une grille de boîtes
     // GRILLE PLEINE → on ajoute automatiquement une rangée VERS LE HAUT (jusqu'au
     // plafond) : tu continues à ranger sans jamais avoir à redimensionner ni
     // déplacer la grille. (Uniquement à l'ajout, sur une grille de boîtes.)
@@ -19662,7 +19771,16 @@ function RoomPlan({ locate, onLocateConsumed }) {
       const it = list.find(o => o.id === id); if (!it) return list;
       if (!(FURN_TYPES[it.type] || {}).box) {
         const build = (FURN_TYPES[it.type] || {}).build;
-        if (build === 'pile') return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
+        // ⚠️ Une pile se BORNE aux murs comme un meuble (la 3D le faisait, le plan
+        //    2D non : glissée au-delà du mur, elle était enregistrée hors de la
+        //    pièce — relecture du 15 octobre). Pas d'anti-chevauchement : une
+        //    pile peut être posée SUR un meuble.
+        if (build === 'pile') {
+          const ef = effFoot(it.w, it.h, rot);
+          const borne = (c, e, tot) => (e >= tot ? tot / 2 : Math.max(e / 2, Math.min(tot - e / 2, c)));
+          const cx = borne(x + it.w / 2, ef.w, room.w), cy = borne(y + it.h / 2, ef.h, room.h);
+          return list.map(o => o.id === id ? { ...o, x: +(cx - it.w / 2).toFixed(2), y: +(cy - it.h / 2).toFixed(2), rot, lift: lift != null ? lift : o.lift } : o);
+        }
         // MEUBLE : anti-chevauchement — s'il retombe sur un autre meuble, on le POUSSE
         // au plus court jusqu'à ne plus se chevaucher (arrangement naturel).
         const ef = effFoot(it.w, it.h, rot);
@@ -19692,6 +19810,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
         list.forEach(o => { if (o.id === id || !(FURN_TYPES[o.type] || {}).box) return; const dx = o.x - x, dy = o.y - y, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; best = o; } });
         if (best && bd <= 0.55 * 0.55) { sx = best.x; sy = best.y; }
         else { sx = Math.round(x / BOX_S) * BOX_S; sy = Math.round(y / BOX_S) * BOX_S; } // sinon, pose au sol
+        sx = Math.max(0, Math.min(Math.max(0, room.w - (it.w || BOX_S)), sx)); sy = Math.max(0, Math.min(Math.max(0, room.h - (it.h || BOX_S)), sy)); // dans la pièce
       }
       const colKey = (o) => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S);
       const updated = list.map(o => o.id === id ? { ...o, x: sx, y: sy } : o);
@@ -19807,7 +19926,15 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // Venue d'Annonces (« Voir au stock ») : on attend d'avoir LU la pièce — sur
   // un appareil neuf, chercher dans la pièce vide par défaut disait « aucune
   // case » à tort, et la demande était consommée.
-  useEffect(() => { if (lu === undefined) return; if (locate != null && String(locate).trim() !== '') { setSearch(String(locate)); doSearch(String(locate), { allerVoir: true }); onLocateConsumed && onLocateConsumed(); } /* eslint-disable-next-line */ }, [locate, lu]);
+  // ⚠️ Et une lecture RATÉE ne la consomme pas non plus : « Réessayer » la reprend.
+  useEffect(() => {
+    if (locate == null || String(locate).trim() === '') return;
+    setSearch(String(locate));
+    if (lu !== 'ok') { setHi(lu === null ? { notFound: true } : null); return; }
+    doSearch(String(locate), { allerVoir: true }); onLocateConsumed && onLocateConsumed();
+    /* eslint-disable-next-line */ }, [locate, lu]);
+  // Une recherche tapée pendant la lecture est rejouée dès que la pièce est lue.
+  useEffect(() => { if (lu === 'ok' && search && !(locate != null && String(locate).trim() !== '')) doSearch(search); /* eslint-disable-next-line */ }, [lu]);
 
   const selItem = items.find(it => it.id === sel);
   const opened = items.find(it => it.id === openItem);
@@ -19911,7 +20038,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       const slots = { ...(it.slots || {}) };
       const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
-      updateItem(itemId, { slots: compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) });
+      updateItem(itemId, { slots: rangerCases(it, slots) });
       setSortie(null);
       toast(`N°${numero} sorti du stock.`);
     };
@@ -20000,13 +20127,125 @@ function RoomPlan({ locate, onLocateConsumed }) {
     if (rendu === '2d') { setVol(null); setFaceId(id); }
   };
 
+  // La barre du meuble (réglages, renommer, supprimer…). ⚠️ En 2D, « Modifier »
+  // sur la face l'ouvrait SOUS la recherche, les pièces et « Aménager » : sur un
+  // téléphone, à 912 px pour un écran de 844 — rien ne bougeait à l'écran, et
+  // c'est le SEUL accès pour supprimer, renommer ou redimensionner un meuble en
+  // 2D (relecture du 15 octobre). Sur la face, elle s'ouvre donc SOUS le bouton
+  // qui l'a demandée ; ailleurs (3D, déplacement), à sa place d'avant.
+  const barreFace = !!selItem && rendu === '2d' && !!posteFace && modifier;
+  const barreHors = !!selItem && !barreFace && (rendu === '3d' || (!posteFace && (moveMode || !!putOnSrc || !!stackSrc)));
+  const barreMeuble = selItem ? (
+    <div data-barre-meuble={selItem.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
+      <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
+      {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
+          Le garage savait ranger, pas MONTRER. On voit maintenant chaque
+          paire du meuble — photo, N°, titre — et on peut la SORTIR d'un
+          tap (elle monte et s'efface avant d'être retirée). */}
+      {(() => {
+        const dedans = rendu === '3d' && !(FURN_TYPES[selItem.type] || {}).box ? contenuMeuble(selItem) : [];
+        if (!dedans.length) return null;
+        return (
+          <div style={{ flex: '1 1 100%', marginBottom: 6 }}>
+            <div className="vrm-label" style={{ color: C.muted, marginBottom: 6 }}>
+              {dedans.length} paire{dedans.length > 1 ? 's' : ''} dans ce meuble
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 6, maxHeight: 230, overflowY: 'auto' }}>
+              {dedans.map(p => (
+                <div key={p.cell + '_' + p.numero} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, minWidth: 0 }}>
+                  {p.photo
+                    ? <PhotoVinted src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
+                    : <span style={{ width: 36, height: 36, borderRadius: 9, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  <span style={{ flex: '1 1 90px', minWidth: 0 }}>
+                    <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
+                    </span>
+                  </span>
+                  <button type="button" onClick={() => (p.kind === 'pile' ? pileRetirer(selItem.id, p.idx) : sortirDeCase(selItem.id, p.cell, p.numero))} title="Sortir cette paire du stock"
+                    style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
+      {(FURN_TYPES[selItem.type] || {}).box && (
+        <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+          <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
+          {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
+          <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+        </div>
+      )}
+      {/* Personnalisation : couleur + hauteur */}
+      <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+        <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
+        {FURN_COLORS.map(c => (<button type="button" aria-label={`Couleur de meuble ${FURN_COLORS.indexOf(c)+1}`} aria-pressed={colorOf(selItem)===c} key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
+        <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
+          <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+        </label>
+        {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+        {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
+          <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
+          {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+        </>}
+      </div>
+      {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
+      {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
+        const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+        const cellCm = Math.round((selItem.cell || 0.5) * 100);
+        return (
+          <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
+            <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
+            <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
+            <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
+            <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
+          </div>
+        );
+      })()}
+      {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
+      {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
+        const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+        const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
+        return (
+          <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
+            <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+            <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
+            <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
+            {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
+            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
+          </div>
+        );
+      })()}
+      {rendu === '3d' && !(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+      {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
+      {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
+        <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
+        <button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
+        <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+        <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+        <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+      </>}
+      <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
+      <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
+      <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+    </div>
+  ) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* ⚠️ LA PIÈCE D'ABORD, LES RÉGLAGES ENSUITE (on regarde, puis on modifie).
           Le PLAN 2D par défaut ; la 3D en option, mémorisée sur cet appareil. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          <b style={{ color: C.text, fontWeight: 600 }}>{activeRoom.name}</b> · {room.w} × {room.h} m
+          {planConnu ? <><b style={{ color: C.text, fontWeight: 600 }}>{activeRoom.name}</b> · {room.w} × {room.h} m</> : null}
         </span>
         <div role="group" aria-label="Vue du stock" style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, flexShrink: 0 }}>
           {[['2d', 'Plan'], ['3d', '3D']].map(([v, l]) => (
@@ -20021,7 +20260,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button type="button" onClick={relire} style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer</button>
         </div>
       )}
-      {rendu === '3d' ? (
+      {!planConnu ? (
+        lu === undefined ? <div data-stock-lecture style={{ padding: '28px 16px', border: `1px dashed ${C.border}`, borderRadius: 12, background: C.card, textAlign: 'center', fontSize: 13, color: C.muted }}>Lecture de ton stock…</div> : null
+      ) : rendu === '3d' ? (
         <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
           <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
         </React.Suspense>
@@ -20037,13 +20278,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
           onCarton={(idx, n) => setFiche({ kind: 'pile', itemId: posteFace.it.id, idx, numero: n })}
           onBoite={(b) => setFiche({ kind: 'boite', itemId: b.id, numero: String(b.num == null ? '' : b.num).trim() })}
           onLigne={(e) => setFiche({ ...e, itemId: e.kind === 'boite' ? e.id : posteFace.it.id })}
-          modifier={modifier} onModifier={() => setModifier(m => !m)}/>
+          modifier={modifier} onModifier={() => setModifier(m => !m)} reglages={barreFace ? barreMeuble : null}/>
       ) : items.length ? (<>
         <PlanPiece room={room} items={items} postes={postes} compteDe={posteCompte} couleurDe={colorOf}
           choisiId={sel} trouveId={hi && hi.itemId} vol={vol} moveMode={moveMode} onPoste={toucherPoste}
           onDeplacer={(it, x, y) => moveItem(it.id, x, y, it.rot)}/>
         {!moveMode && !putOnSrc && !stackSrc && <div data-plan-aide style={{ fontSize: 11.5, color: C.muted, textAlign: 'center' }}>Touche un meuble pour te mettre en face.</div>}
-      </>) : (
+      </>) : lu !== 'ok' ? null : (
         <div data-stock-vide style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '28px 16px', border: `1px dashed ${C.border}`, borderRadius: 12, background: C.card, textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Aucun rangement dans « {activeRoom.name} »</div>
           <button type="button" data-stock-ajouter="vide" onClick={() => setAjout(true)} className="vrm-btn-primary"
@@ -20093,7 +20334,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode={clavierNum() === 'numeric' && !archiveNumeros() ? 'numeric' : 'text'} autoCapitalize="characters" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
         {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
       </div>
-      {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
+      {hi && hi.notFound && (lu === 'ok'
+        ? <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>
+        : <div data-stock-recherche-pas-lu style={{ fontSize: 12, color: C.muted }}>{lu === undefined ? `Je cherche « ${search} » dès que ton stock est lu.` : `Je ne sais pas encore où est « ${search} ».`}</div>)}
       {hi && hi.itemId && (()=>{
         const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
         let pos=null;
@@ -20105,8 +20348,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
         </div>;
       })()}
 
-      {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Sélecteur de pièces — passer d'une pièce à l'autre (rien à choisir tant que la pièce n'est pas lue) */}
+      {planConnu && <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>
         {plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
@@ -20119,7 +20362,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ Pièce</button>
         <button className="vrm-icon-control" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
         {plan.rooms.length > 1 && <button className="vrm-icon-control" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
-      </div>
+      </div>}
       {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
           revendeur pour son rangement, ça doit être plus facile à prendre en
           main ». Un revendeur ouvre son garage pour DEUX choses : retrouver une
@@ -20127,7 +20370,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           de construction (meubles, dimensions, murs, déplacement) part donc
           derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
           recherche. */}
-      <details style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
+      {planConnu && <details style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
         {/* ⚠️ `listStyle:none` retire le triangle du navigateur : sans repère
             ajouté, plus rien ne dit que ça s'ouvre. On pose donc un chevron. */}
         <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -20147,8 +20390,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
             pastilles puis des invites texte : un assistant le dessine (type →
             niveaux × cases → ajouter). Le décor, lui, reste une pastille. */}
         <NumerosSetting/>
-        <button type="button" data-stock-ajouter="amenager" onClick={() => setAjout(true)} className="vrm-btn-primary"
-          style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 700, padding: '9px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>Ajouter un rangement</button>
+        {/* Pas lu ⇒ grisé (le bandeau du haut dit pourquoi) : un bouton qui ne peut rien enregistrer n'est pas proposé comme s'il marchait. */}
+        <button type="button" data-stock-ajouter="amenager" disabled={lu !== 'ok'} onClick={() => setAjout(true)} className="vrm-btn-primary"
+          style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 700, padding: '9px 14px', cursor: lu === 'ok' ? 'pointer' : 'not-allowed', opacity: lu === 'ok' ? 1 : 0.5, fontFamily: 'inherit' }}>Ajouter un rangement</button>
         {(() => {
           const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
           const groupes = [
@@ -20187,10 +20431,10 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button type="button" onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
             {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
           </button>
-          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
+          <span data-amenager-note style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? (rendu === '3d' ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Glisse un meuble sur le plan. Re-clique pour verrouiller.') : (rendu === '3d' ? 'Les meubles sont verrouillés — glisse pour tourner la vue.' : 'Les meubles sont verrouillés.')}</span>
         </div>
         </div>
-      </details>
+      </details>}
 
       {/* Bandeau « poser une pile sur un meuble » actif */}
       {putOnSrc && (
@@ -20221,109 +20465,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {/* Barre du meuble sélectionné — en 3D comme avant ; en 2D, seulement quand
           on la DEMANDE (« Modifier » sur la face) ou en mode déplacement : sur
           la face, ce que contient le meuble est déjà dessiné et listé. */}
-      {selItem && (rendu === '3d' || (posteFace ? modifier : (moveMode || !!putOnSrc || !!stackSrc))) && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
-          <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
-          {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
-              Le garage savait ranger, pas MONTRER. On voit maintenant chaque
-              paire du meuble — photo, N°, titre — et on peut la SORTIR d'un
-              tap (elle monte et s'efface avant d'être retirée). */}
-          {(() => {
-            const dedans = rendu === '3d' && !(FURN_TYPES[selItem.type] || {}).box ? contenuMeuble(selItem) : [];
-            if (!dedans.length) return null;
-            return (
-              <div style={{ flex: '1 1 100%', marginBottom: 6 }}>
-                <div className="vrm-label" style={{ color: C.muted, marginBottom: 6 }}>
-                  {dedans.length} paire{dedans.length > 1 ? 's' : ''} dans ce meuble
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 6, maxHeight: 230, overflowY: 'auto' }}>
-                  {dedans.map(p => (
-                    <div key={p.cell + '_' + p.numero} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, minWidth: 0 }}>
-                      {p.photo
-                        ? <PhotoVinted src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
-                        : <span style={{ width: 36, height: 36, borderRadius: 9, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                      <span style={{ flex: '1 1 90px', minWidth: 0 }}>
-                        <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
-                        <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
-                        </span>
-                      </span>
-                      <button type="button" onClick={() => (p.kind === 'pile' ? pileRetirer(selItem.id, p.idx) : sortirDeCase(selItem.id, p.cell, p.numero))} title="Sortir cette paire du stock"
-                        style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-          {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
-          {(FURN_TYPES[selItem.type] || {}).box && (
-            <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
-              {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
-            </div>
-          )}
-          {/* Personnalisation : couleur + hauteur */}
-          <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
-            {FURN_COLORS.map(c => (<button type="button" aria-label={`Couleur de meuble ${FURN_COLORS.indexOf(c)+1}`} aria-pressed={colorOf(selItem)===c} key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
-            <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
-              <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
-            </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
-            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
-              <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
-              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
-            </>}
-          </div>
-          {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
-          {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
-            const cellCm = Math.round((selItem.cell || 0.5) * 100);
-            return (
-              <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
-                <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
-                <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
-              </div>
-            );
-          })()}
-          {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
-          {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
-            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
-            const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
-            return (
-              <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
-                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
-                <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
-                {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
-              </div>
-            );
-          })()}
-          {rendu === '3d' && !(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
-          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            <button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
-            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
-          </>}
-          <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
-          <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
-          <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
-        </div>
-      )}
+      {barreHors && barreMeuble}
       {/* ⚠️ MODE D'EMPLOI PERMANENT → DÉPLIANT. Ce paragraphe de cinq lignes
           restait affiché sous la pièce, tous les jours, et parlait de piles de
           boîtes même quand la pièce est vide. On le lit UNE fois (§5.66). */}
@@ -37270,12 +37412,8 @@ function CartonNum({ n, taille = 'm', attenue }) {
 // Les K prochains cartons d'une série, par la même règle (`prochainLibre` sur
 // les mêmes ensembles : chaque appel prend le suivant LIBRE, jamais un pris).
 const prochainsNumerosPrevus = (pref, k = 3) => {
-  const premier = prochainNumeroPrevu(pref); if (premier == null) return null;
-  const { int, cles } = numerosDejaDonnes({
-    pool: load('vinted_used_numeros', []), fiches: load('vinted_annonce_numeros', {}),
-    ventes: load('vinted_sale_overrides', {}), garage: numerosDeLaGrille(load('vinted_garage_grid', {})),
-  });
-  const out = []; for (let i = 0; i < k; i++) out.push(prochainLibre(int, cles, pref));
+  const d = numerosDonnesConnus(); if (!d) return null;
+  const out = []; for (let i = 0; i < k; i++) out.push(prochainLibre(d.int, d.cles, pref));
   return out;
 };
 function NumerosSetting() {
@@ -37298,7 +37436,7 @@ function NumerosSetting() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Tes numéros de rangement</div>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-          {pref ? `${pref}1, ${pref}2, ${pref}3…` : '1, 2, 3…'}
+          {pref ? `Avec la lettre ${pref}` : 'En chiffres'}
           {prochain ? <> · prochain carton <b style={{ color: C.text }}>{prochain}</b></> : <> · prochain carton : pas encore lu</>}
         </div>
       </div>
@@ -37333,7 +37471,10 @@ function NumerosAssistant({ actuel, onClose }) {
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
-    toast(n ? `Tes prochains cartons : ${n}1, ${n}2…` : 'Tes prochains cartons : en chiffres.');
+    // ⚠️ La phrase vient de la MÊME règle que le chiffre (§5) : elle disait
+    //    « C1, C2… » en dur pendant que la carte annonçait C3 (C1 et C2 déjà donnés).
+    const prochain = prochainNumeroPrevu(n);
+    toast(prochain ? `Ton prochain carton : ${prochain}` : 'Enregistré.');
     onClose();
   };
   const titre = { forme: 'Comment tu écris tes numéros ?', lettre: 'Quelle lettre ?', recap: 'Ton prochain carton' }[etape];

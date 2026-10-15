@@ -7467,6 +7467,70 @@ chiffres, pool 1…24 ⇒ prochain carton **25**.
   défaut sans le bandeau du N° (D-stock-9, une règle « rangée » pour trois
   lecteurs) ; le rendu 3D à la demande ; `pileAdd` propose « 1 » sur une pile
   en B ; points de vue mémorisés au-delà du tour de la pièce.
+- ⚠️⚠️ **RELECTURE DU MÊME JOUR : HUIT DÉFAUTS, TOUS REPRODUITS AVANT D'ÊTRE
+  CORRIGÉS** (sondes du relecteur rejouées sur le build de 38fac47) :
+  - ⚠️⚠️ **Ranger une paire sur une étagère ou une commode la posait sur le
+    niveau du BAS**, faisait descendre les cartons déjà rangés sans aucun geste
+    sur eux, et ne gardait qu'UN N° par case (B302 effacé du stock, l'en-tête
+    disait toujours « 2 paires »). `compactSlots` appliquait la gravité d'une
+    grille de boîtes à TOUT meuble ; la face 2D en a fait le geste par défaut.
+    ⇒ `aGravite` (grille seulement), `caseDePose`, `rangerCases` : une règle
+    pour ranger, sortir et ANNONCER la case — la feuille « Ranger une paire »
+    nomme la case où la boîte va vraiment (dans une grille, elle tombe), et une
+    case déplacée l'est ENTIÈRE (jamais `a[0]` seul). Vaut aussi pour la 3D.
+  - ⚠️⚠️ **L'assistant « pile » inventait des N° jamais donnés** (hauteur 5 par
+    défaut : 22 → 26 avec un pool 1…24) : le Stock affirmait N°25 rangé pendant
+    que l'écran Annonces allait donner 25 à la prochaine paire. ⇒ Un carton ne
+    porte que le N° d'une paire DÉJÀ numérotée : chaque N° de la suite doit être
+    dans `numerosDejaDonnes` (LA règle, lue par `numerosDonnesConnus`, §11 —
+    `prochainNumeroPrevu` la lit aussi). Sinon l'ajout est refusé, la phrase
+    nomme les N° jamais donnés, et « S'arrêter au N°24 » propose la pile juste.
+    Pas su (nuage pas arrivé) ⇒ pas d'ajout. La pile se règle en **Cartons**
+    (combien) × **Cartons de haut** — plus en colonnes.
+  - **« Modifier » sur la face ouvrait la barre du meuble hors de l'écran**
+    (912 px pour 844 sur un téléphone) : c'est le SEUL accès, en 2D, pour
+    supprimer, renommer ou redimensionner. Elle s'ouvre maintenant SOUS le
+    bouton, dans la face (`barreMeuble` : une barre, deux places).
+  - **Stock pas encore lu, ou illisible, sur un appareil neuf** : l'écran
+    affirmait « Ma pièce · 10 × 8 m », « Aucun rangement » avec un bouton qui ne
+    pouvait rien enregistrer, et « Aucune case ne contient « B110 » » alors que
+    B110 est dans sa pile. ⇒ `planConnu` (lue, ou la dernière copie de
+    l'appareil) : sinon « Lecture de ton stock… » ou le seul bandeau, aucun
+    bouton qui écrit ; la recherche dit « je ne sais pas encore » et se rejoue
+    une fois la pièce lue (une demande venue d'Annonces n'est consommée qu'à ce
+    moment-là).
+  - **Une pile glissée sur le plan sortait de la pièce** (x = 18 m dans 17 m,
+    enregistré) : `moveItem` la borne aux murs comme un meuble (sans
+    anti-chevauchement : une pile peut être posée sur un meuble).
+  - **Le message « Tes prochains cartons : C1, C2… » était écrit en dur**
+    pendant que la carte disait C3 : il vient de la même règle que le chiffre ;
+    la carte dit « Avec la lettre C · prochain carton C3 », plus un motif fixe.
+  - **Étiquettes du plan** : le repli imposait le nombre même par-dessus une
+    autre étiquette (« 26 2 »). Elles sont posées là où leur place est
+    CALCULÉE (largeur mesurée dans la police de l'app), essaient les quatre
+    côtés, n'empiètent ni sur une étiquette ni sur un AUTRE meuble ; sinon rien
+    n'est écrit (à 390 px, le « 2 » de la grille n'a plus de place : il est
+    dans son nom accessible et sur sa face — un blanc plutôt qu'un chiffre
+    qu'on attribue au voisin).
+  - En vue Plan, le mode déplacement ne parle plus de « tourner la vue ».
+  - Preuves : banc `stock-2d.cjs` élargi (A étiquettes, G/G2/Gbis lecture
+    ratée · copie · lente, H pile jamais donnée, I ter message, J étagère ·
+    commode · grille, K « Modifier » aux deux tailles, L pile au mur) —
+    **116 verts** ; **23 rouges sur le build de 38fac47** (un 24ᵉ, la 3D en F,
+    était un délai sous charge : vert relancé seul) ; et chaque règle remise
+    seule à l'état fautif repasse au rouge : gravité partout 3 · pile sans garde
+    3 · pièce « connue » d'office 2 · recherche qui affirme 2 · barre hors de la
+    face 2 · pile sans borne 2 · étiquette imposée 1 · message en dur 1.
+    `numeros-remise-a-zero` 32 verts ; `garage3d` garde ses 3 rouges hérités
+    (molette, ←, double-clic — les mêmes sur 38fac47) ; 97 audits verts.
+    Les contrôles se jugent sur le CONTENU (cases écrites, N° de la pile,
+    position de la barre trouvée par son texte, géométrie des étiquettes), pas
+    sur un attribut neuf.
+  - **Laissé tel quel, à savoir** : la même invention de N° existe encore sur
+    les gestes LIBRES de la barre (« + » d'une pile, « Renuméroter », « Remplir
+    en série », « Ajouter une boîte », la saisie libre d'une case) — l'assistant
+    était celui présenté comme gardé ; les autres restent à aligner sur
+    `numerosDonnesConnus`.
 
 ### Messages dans Vinted, et un écran Leboncoin qui commence par ce qu'on fait (4 octobre)
 Julien : « dans Vinted et dans Leboncoin il y ait les messages », « Leboncoin
