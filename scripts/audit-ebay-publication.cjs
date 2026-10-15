@@ -68,11 +68,14 @@ const projette = (r, sel) => {
 //   ok · prix (un autre prix) · devise (en dollars) · terminee (ListingStatus
 //   Completed) · sans-sku · minimal (ni titre, ni photos, ni vendeur) ·
 //   autre-vendeur · autre-id · ko (Ack Failure) · reseau (coupure).
+// `mode.getuser` : qui porte le jeton (GetUser) — ok (julien_part) · ko (Ack
+//   Failure) · autre (un autre pseudo).
+// `mode.vendeur` : le vendeur que montre la relecture (défaut julien_part).
 let mode = {};
 const annonces = new Map();
 let prochainId = 120000000100;
 const journal = [];
-const remettre = () => { mode = { getitem: 'ok' }; annonces.clear(); journal.length = 0; remettreBase(); };
+const remettre = () => { mode = { getitem: 'ok', getuser: 'ok' }; annonces.clear(); journal.length = 0; remettreBase(); };
 const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
 const balise = (s, t) => (new RegExp('<' + t + '>([\\s\\S]*?)</' + t + '>').exec(s || '') || [])[1] || '';
 const OK = (appel, inner) => `<?xml version="1.0"?><${appel}Response xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack>${inner || ''}</${appel}Response>`;
@@ -84,7 +87,7 @@ function itemRelu(a) {
   const dev = md === 'devise' ? 'USD' : 'EUR';
   const titre = md === 'minimal' ? '' : `<Title>${a.titre}</Title>`;
   const photos = md === 'minimal' ? '' : `<PictureDetails>${new Array(a.photos).fill(0).map((_, i) => `<PictureURL>https://i.ebayimg.test/${a.itemId}/${i}.jpg</PictureURL>`).join('')}</PictureDetails>`;
-  const vendeur = md === 'minimal' ? '' : `<Seller><UserID>${md === 'autre-vendeur' ? 'quelquun_dautre' : 'julien_part'}</UserID></Seller>`;
+  const vendeur = md === 'minimal' ? '' : `<Seller><UserID>${md === 'autre-vendeur' ? 'quelquun_dautre' : (mode.vendeur || 'julien_part')}</UserID></Seller>`;
   const sku = md === 'sans-sku' || !a.sku ? '' : `<SKU>${a.sku}</SKU>`;
   const id = md === 'autre-id' ? '999999999999' : a.itemId;
   return `<Item><ItemID>${id}</ItemID>${titre}${sku}<Quantity>${a.qte}</Quantity><Currency>${dev}</Currency><StartPrice currencyID="${dev}">${prix}</StartPrice>${vendeur}${photos}<SellingStatus><CurrentPrice currencyID="${dev}">${prix}</CurrentPrice><QuantitySold>0</QuantitySold><ListingStatus>${md === 'terminee' ? 'Completed' : 'Active'}</ListingStatus></SellingStatus><ListingDetails><StartTime>2026-10-15T10:00:00.000Z</StartTime></ListingDetails></Item>`;
@@ -103,7 +106,10 @@ global.fetch = async (url, opts = {}) => {
     const corps = String(opts.body || '');
     journal.push({ ou: 'ebay', appel, u: u.replace(/\?.*$/, ''), corps });
     if (u.includes('/identity/v1/oauth2/token')) return rep({ access_token: 'at-J', expires_in: 7200 });
-    if (appel === 'GetUser') return xmlRep(OK(appel, '<User><UserID>julien_part</UserID><EIASToken>EIAS-JULIEN-PART-000000001</EIASToken></User>'));
+    if (appel === 'GetUser') {
+      if (mode.getuser === 'ko') return xmlRep(ECHEC(appel, 'Erreur interne au système (message inventé).'));
+      return xmlRep(OK(appel, `<User><UserID>${mode.getuser === 'autre' ? 'pas_ce_compte' : (mode.vendeur || 'julien_part')}</UserID><EIASToken>EIAS-JULIEN-PART-000000001</EIASToken></User>`));
+    }
     if (appel === 'GetMyeBaySelling') return xmlRep(OK(appel, ''));
     if (appel === 'AddFixedPriceItem') {
       const id = String(prochainId++);
@@ -160,7 +166,7 @@ const APP = lire('src/App.jsx');
 const EXT = lire('vinted-sync-extension/background.js');
 const RA = {};
 {
-  const noms = ['montantSaisi', 'eurEbay', 'prixVinted', 'PAS_UNE_DESCRIPTION', 'lbcDescription', 'prixChampEbay', 'memePrixEbay', 'normDescEbay', 'repriseVinted', 'ecartsVintedEbay', 'etatPublicationEbay', 'NOMS_POINTS_PUB', 'textePointPub'];
+  const noms = ['montantSaisi', 'eurEbay', 'prixVinted', 'PAS_UNE_DESCRIPTION', 'lbcDescription', 'prixChampEbay', 'memePrixEbay', 'normDescEbay', 'repriseVinted', 'ecartsVintedEbay', 'ecartsBrouillonVinted', 'texteEcartsBrouillon', 'etatPublicationEbay', 'NOMS_POINTS_PUB', 'textePointPub'];
   const srcs = noms.map((n) => [n, extraire(APP, n)]);
   const manque = srcs.filter(([, s]) => !s).map(([n]) => n);
   RA._manque = manque;
@@ -219,6 +225,47 @@ const lignePas = (src) => { const m = /^const PAS_UNE_DESCRIPTION = (\/.*\/[a-z]
         `[A-ecart] ${quoi} ⇒ « ${verdict} », le point « ${cle} » le dit (jamais « verifiee »)`, `verdict ${v.verdict} · ${cle}=${p.etat} vu=${p.vu}`);
     });
   }
+  // ── (revue du 15 octobre) LE COMPTE SE JUGE SUR LE JETON ─────────────────
+  // Le registre garde le pseudo appris à la CONNEXION ; renommé chez eBay, il
+  // faisait sortir « à vérifier · Compte chez eBay : nouveau (envoyé : ancien) »
+  // — un écart qui ne pouvait jamais révéler un mauvais compte.
+  const registre = (pseudo) => lignes.push({ owner: J, id: 'ebay_comptes', data: { comptes: [{ cle: 'a1b2c3d4e5f60718', pseudo, principal: true, ajouteLe: 1 }] } });
+  const getUsers = (j) => chezEbay(j).filter((x) => x.appel === 'GetUser').length;
+  await essaie('[A-renomme] pseudo renommé chez eBay', async () => {
+    remettre(); registre('julien_ancien'); mode.vendeur = 'julien_nouveau';
+    const o = await app({ action: 'publish', item });
+    const v = o.corps.verification || {};
+    const p = point(v, 'compte');
+    dit(o.code === 200 && v.verdict === 'verifiee' && p.etat === 'ok' && p.renomme === 'julien_ancien' && o.corps.compte === 'julien_nouveau' && getUsers(o.journal) === 1,
+      '[A-renomme] pseudo renommé depuis la connexion : eBay confirme que le jeton est ce vendeur (UN GetUser) ⇒ « verifiee », le compte nommé est l\'ACTUEL, l\'ancien est gardé', `verdict ${v.verdict} · compte=${p.etat} renomme=${p.renomme} · nommé « ${o.corps.compte} » · GetUser ×${getUsers(o.journal)}`);
+    const id = String(o.corps.itemId || '');
+    const r = await app({ action: 'relirepub', itemId: id, attendu: { sku: 'VRM-401', prix: 49, titre: item.title, quantite: 1, photos: 3 } });
+    const pr = point(r.corps.verification, 'compte');
+    dit(r.code === 200 && r.corps.verification && r.corps.verification.verdict === 'verifiee' && pr.etat === 'ok' && r.corps.compte === 'julien_nouveau' && r.journal.filter((x) => x.ou === 'base').length === 0,
+      '[A-renomme] « Relire chez eBay » juge pareil (même règle), et n\'écrit toujours rien', `verdict ${r.corps.verification && r.corps.verification.verdict} · compte=${pr.etat} · « ${r.corps.compte} »`);
+  });
+  await essaie('[A-renomme] jeton illisible', async () => {
+    remettre(); registre('julien_ancien'); mode.vendeur = 'julien_nouveau'; mode.getuser = 'ko';
+    const o = await app({ action: 'publish', item });
+    const v = o.corps.verification || {};
+    const p = point(v, 'compte');
+    dit(o.code === 200 && p.etat === 'pas-lu' && v.verdict === 'verifiee' && o.corps.compte === 'julien_ancien',
+      '[A-renomme] eBay ne dit pas qui porte le jeton ⇒ le compte est « pas vérifié » (ni écart, ni conforme), le pseudo mémorisé reste nommé', `verdict ${v.verdict} · compte=${p.etat} · « ${o.corps.compte} »`);
+  });
+  await essaie('[A-autre-jeton] vendeur ≠ jeton', async () => {
+    remettre(); registre('julien_ancien'); mode.vendeur = 'julien_nouveau'; mode.getuser = 'autre';
+    const o = await app({ action: 'publish', item });
+    const v = o.corps.verification || {};
+    const p = point(v, 'compte');
+    dit(o.code === 200 && v.verdict === 'ecarts' && p.etat === 'ecart' && p.attendu === 'pas_ce_compte' && p.vu === 'julien_nouveau',
+      '[A-autre-jeton] l\'autre sens : le jeton porte un AUTRE pseudo que le vendeur relu ⇒ l\'écart reste dit (attendu = le pseudo ACTUEL du jeton)', `verdict ${v.verdict} · vu ${p.vu} · attendu ${p.attendu}`);
+  });
+  await essaie('[A-meme-pseudo] aucun GetUser de trop', async () => {
+    remettre(); registre('julien_part');
+    const o = await app({ action: 'publish', item });
+    dit(o.code === 200 && point(o.corps.verification, 'compte').etat === 'ok' && getUsers(o.journal) === 0,
+      '[A-meme-pseudo] pseudo mémorisé = vendeur relu ⇒ AUCUN GetUser (on ne demande qui porte le jeton que sur un écart)', `GetUser ×${getUsers(o.journal)}`);
+  });
   await essaie('[A-minimal] champs absents', async () => {
     remettre(); mode.getitem = 'minimal';
     const o = await app({ action: 'publish', item });
@@ -274,6 +321,21 @@ const lignePas = (src) => { const m = /^const PAS_UNE_DESCRIPTION = (\/.*\/[a-z]
       '[B] « vrm-007 » est la référence VRM-7 (même N°) ; une quantité non montrée est « pas lu »', `${v2.verdict} · ref=${point(v2, 'reference').etat} · qte=${point(v2, 'quantite').etat}`);
     const v3 = lib.verifPublication(xml('<Item><ItemID>1</ItemID><SKU>VRM-7</SKU><SellingStatus><CurrentPrice currencyID="EUR">49.5</CurrentPrice></SellingStatus></Item>'), '1', a);
     dit(v3.verdict === 'partielle' && point(v3, 'annonce').etat === 'pas-lu', '[B] un statut d\'annonce non montré ⇒ « partielle » (jamais « verifiee » sans savoir qu\'elle est en ligne)', v3.verdict);
+    // (revue du 15 octobre) confirmerCompte : un écart de compte revu par ce
+    // que dit eBay du JETON.
+    if (typeof lib.confirmerCompte !== 'function') throw new Error('confirmerCompte absente');
+    const aC = lib.attenduDePublication({ title: 'T', price: '49', quantity: '1', photos: ['a'], sku: 'VRM-7' }, 'julien_ancien');
+    const vC = lib.verifPublication(xml('<Item><ItemID>1</ItemID><SKU>VRM-7</SKU><Seller><UserID>julien_nouveau</UserID></Seller><SellingStatus><CurrentPrice currencyID="EUR">49</CurrentPrice><ListingStatus>Active</ListingStatus></SellingStatus></Item>'), '1', aC);
+    const c1 = lib.confirmerCompte(vC, { pseudo: 'JULIEN_NOUVEAU' });
+    const c2 = lib.confirmerCompte(vC, { pseudo: 'pas_ce_compte' });
+    const c3 = lib.confirmerCompte(vC, null);
+    const c4 = lib.confirmerCompte({ lu: false }, { pseudo: 'x' });
+    dit(vC.verdict === 'ecarts' && c1.verdict === 'verifiee' && point(c1, 'compte').etat === 'ok' && point(c1, 'compte').renomme === 'julien_ancien',
+      '[B] confirmerCompte : le jeton s\'appelle comme le vendeur relu (casse comprise) ⇒ même compte renommé, « verifiee »', `${vC.verdict} → ${c1.verdict}`);
+    dit(c2.verdict === 'ecarts' && point(c2, 'compte').attendu === 'pas_ce_compte' && c3.verdict === 'verifiee' && point(c3, 'compte').etat === 'pas-lu' && c4.lu === false,
+      '[B] confirmerCompte : autre pseudo de jeton ⇒ écart ; jeton illisible ⇒ « pas lu » ; une relecture ratée reste « pas lu »', `${c2.verdict} · ${point(c3, 'compte').etat} · ${c4.lu}`);
+    dit(lib.compteANommer(c1, 'julien_ancien') === 'julien_nouveau' && lib.compteANommer(c2, 'julien_ancien') === 'julien_ancien' && lib.compteANommer({ lu: false }, 'julien_ancien') === 'julien_ancien',
+      '[B] compteANommer : le vendeur relu quand il est prouvé le sien, sinon le pseudo mémorisé');
   });
 
   // ── C. LES RÈGLES DE L'APP ──────────────────────────────────────────────────
@@ -305,6 +367,23 @@ const lignePas = (src) => { const m = /^const PAS_UNE_DESCRIPTION = (\/.*\/[a-z]
     dit(c3.length === 1 && c3[0].cle === 'description', '[C-ecarts] une description personnalisée ⇒ l\'écart de description', JSON.stringify(c3.map((x) => x.cle)));
     dit(c4.length === 0, '[C-ecarts] prix et description Vinted inconnus ⇒ aucun écart inventé', JSON.stringify(c4));
     dit(c5.length === 2 && c5.find((x) => x.cle === 'prix').ici === null, '[C-ecarts] champs vidés ⇒ deux écarts, « ici » vaut « pas de prix »', JSON.stringify(c5));
+  });
+  await essaie('[C-brouillon] ecartsBrouillonVinted', async () => {
+    // (revue du 15 octobre) Le planificateur programmait un brouillon à 59 €
+    // pendant que la paire était à 49 € sur Vinted, sans un mot.
+    const F = RA.ecartsBrouillonVinted, T = RA.texteEcartsBrouillon;
+    const paires = [{ id: '7041', title: 'Nike Air Max 1 bleu taille 44', prixVinted: 49, desc: 'Très bon état.' }, { id: '7099', title: 'Nike Air Max 1 bleu taille 44', prixVinted: 59, desc: 'Mon texte' }];
+    const b1 = F({ pairId: '7041', prix: '59', description: 'Mon texte' }, paires);
+    const b2 = F({ pairId: '7041', prix: '49,00', description: 'Très bon état.' }, paires);
+    const b3 = F({ pairId: '7777', titre: 'Nike Air Max 1 bleu taille 44', prix: '59', description: 'Mon texte' }, paires);
+    const b4 = F({ prix: '59' }, paires);
+    dit(b1.ecarts.map((e) => e.cle).join(',') === 'prix,description' && b1.ecarts[0].vinted === 49 && b1.ecarts[0].ici === 59,
+      '[C-brouillon] un brouillon à 59 € de la paire 7041 (49 € sur Vinted) ⇒ l\'écart de prix et de description', JSON.stringify(b1.ecarts.map((e) => [e.cle, e.vinted, e.ici].join(':'))));
+    dit(b2.ecarts.length === 0, '[C-brouillon] au prix de Vinted, sa description ⇒ aucun écart', JSON.stringify(b2.ecarts));
+    dit(b3.ecarts.length === 0 && !b3.pair && b4.ecarts.length === 0,
+      '[C-brouillon] §5 : la paire par son IDENTITÉ (`pairId`) — une autre annonce au MÊME titre ne désigne rien ; sans `pairId`, rien n\'est comparé', `${JSON.stringify(b3)} · ${JSON.stringify(b4)}`);
+    dit(T(b1.ecarts) === 'sur Vinted : 49,00 € · description différente' && T(b2.ecarts) === '' && T([{ cle: 'description' }]) === 'description différente de Vinted',
+      '[C-brouillon] une seule phrase pour la liste, l\'aperçu et la confirmation', T(b1.ecarts));
   });
   await essaie('[C-etat] etatPublicationEbay', async () => {
     const S = RA.etatPublicationEbay;

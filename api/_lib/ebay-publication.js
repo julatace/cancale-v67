@@ -88,11 +88,53 @@ export function verifPublication(xml, itemId, attendu, opts = {}) {
   const nPh = pd ? liste(pd.PictureURL).filter((x) => espaces(texte(x))).length : null;
   if (a.photos != null) points.push({ cle: 'photos', etat: nPh == null ? 'pas-lu' : (nPh === a.photos ? 'ok' : 'ecart'), vu: nPh, attendu: a.photos });
 
+  return { lu: true, itemId: String(itemId), verdict: verdictDe(points), points, vendeur: vendeur || null };
+}
+
+// Le verdict d'une liste de points — UNE règle pour la relecture et pour la
+// confirmation du compte ci-dessous (§11).
+function verdictDe(points) {
   const ecart = (k) => points.some((p) => p.cle === k && p.etat === 'ecart');
   const pasLu = (k) => points.some((p) => p.cle === k && p.etat === 'pas-lu');
-  let verdict = 'verifiee';
-  if (ecart('annonce')) verdict = 'pas-active';
-  else if (points.some((p) => p.etat === 'ecart')) verdict = 'ecarts';
-  else if (pasLu('annonce') || pasLu('prix') || pasLu('reference')) verdict = 'partielle';
-  return { lu: true, itemId: String(itemId), verdict, points, vendeur: vendeur || null };
+  if (ecart('annonce')) return 'pas-active';
+  if (points.some((p) => p.etat === 'ecart')) return 'ecarts';
+  if (pasLu('annonce') || pasLu('prix') || pasLu('reference')) return 'partielle';
+  return 'verifiee';
+}
+
+// ── LE COMPTE SE JUGE SUR LE JETON, PAS SUR UN PSEUDO MÉMORISÉ (revue du
+// 15 octobre) ── Le pseudo attendu vient du registre `ebay_comptes`, appris à la
+// CONNEXION ; un pseudo se renomme chez eBay (api/_lib/ebay.js le dit : « le
+// pseudo, qui peut changer »). Comparé tel quel, un compte renommé sortait
+// « Publiée sur eBay — à vérifier · Compte chez eBay : nouveau (envoyé :
+// ancien) » — un écart qui ne pouvait JAMAIS révéler un mauvais compte, puisque
+// c'est le jeton qui choisit le compte. Quand eBay nomme un autre vendeur que
+// le pseudo mémorisé, la route demande à eBay QUI porte le jeton (`GetUser`,
+// `identiteEbay`) et passe la réponse ici :
+//   · le jeton s'appelle comme le vendeur relu ⇒ même compte, renommé : `ok`
+//     (`renomme` garde l'ancien pseudo, `attendu` devient l'actuel) ;
+//   · le jeton s'appelle autrement ⇒ une AUTRE annonce que la sienne : `ecart`,
+//     `attendu` = le pseudo actuel du jeton ;
+//   · eBay n'a pas dit qui porte le jeton (`null`) ⇒ `pas-lu` : ni « conforme »,
+//     ni « écart » sur une mesure qui n'a pas eu lieu.
+// Seul un point `compte` en ÉCART est revu ; le reste est rendu tel quel.
+export function confirmerCompte(v, idJeton) {
+  if (!v || v.lu !== true || !Array.isArray(v.points)) return v;
+  const i = v.points.findIndex((p) => p && p.cle === 'compte' && p.etat === 'ecart');
+  if (i < 0) return v;
+  const p = v.points[i];
+  const jeton = espaces(idJeton && idJeton.pseudo);
+  let np;
+  if (!jeton) np = { ...p, etat: 'pas-lu' };
+  else if (jeton.toLowerCase() === espaces(p.vu).toLowerCase()) np = { ...p, etat: 'ok', attendu: jeton, renomme: p.attendu || null };
+  else np = { ...p, etat: 'ecart', attendu: jeton };
+  const points = v.points.map((x, k) => (k === i ? np : x));
+  return { ...v, points, verdict: verdictDe(points) };
+}
+// Le compte à NOMMER après une relecture : celui qu'eBay montre quand c'est
+// prouvé le sien (point `ok`), sinon le pseudo mémorisé — jamais deviné.
+export function compteANommer(v, pseudoMemorise) {
+  const p = v && v.lu === true && Array.isArray(v.points) ? v.points.find((x) => x && x.cle === 'compte') : null;
+  if (p && p.etat === 'ok' && p.vu) return String(p.vu);
+  return espaces(pseudoMemorise || '');
 }

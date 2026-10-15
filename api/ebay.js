@@ -29,7 +29,7 @@ import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
-  montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
+  montantOk, valideRegleOffre, seuilTropBas, identiteEbay } from './_lib/ebay.js';
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
 // COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
@@ -47,7 +47,16 @@ const pseudoDe = async (ctx) => {
   try { const reg = await lireComptes(ctx.owner); const p = reg && reg.comptes.find((e) => e.principal && !e.deconnecteLe); return (p && p.pseudo) || ''; } catch (_) { return ''; }
 };
 import { numeroExterne } from './_lib/numerotation.js';
-import { verifPublication, attenduDePublication } from './_lib/ebay-publication.js';
+import { verifPublication, attenduDePublication, confirmerCompte, compteANommer } from './_lib/ebay-publication.js';
+// (revue du 15 octobre) Quand eBay nomme un autre vendeur que le pseudo que VRM
+// a MÉMORISÉ, on demande à eBay qui porte le jeton (UN GetUser, seulement dans
+// ce cas) : un compte renommé n'est pas « à vérifier » (`confirmerCompte`).
+const compteVerifie = async (v, token) => {
+  const p = v && v.lu === true && Array.isArray(v.points) ? v.points.find((x) => x && x.cle === 'compte') : null;
+  if (!p || p.etat !== 'ecart') return v;
+  const id = await identiteEbay(token);
+  return confirmerCompte(v, id ? { pseudo: id.pseudo } : null);
+};
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -889,7 +898,7 @@ async function handlePublish(b, ctx) {
   if (ID_EBAY.test(idPub)) { const t0 = Date.now(); relu = { r: await tradingCall(at.token, 'GetItem', `<ItemID>${idPub}</ItemID>`), t0 }; }
   const xmlRelu = relu && !sansAck(relu.r) && relu.r.ok ? relu.r.xml : null;
   const pseudoPub = await pseudoDe(ctx);
-  const verification = xmlRelu ? verifPublication(xmlRelu, idPub, attenduDePublication(it, pseudoPub), { memeSku: (a, b) => !!numDeSku(a) && numDeSku(a) === numDeSku(b) }) : { lu: false, raison: relu ? 'lecture' : 'identifiant' };
+  const verification = xmlRelu ? await compteVerifie(verifPublication(xmlRelu, idPub, attenduDePublication(it, pseudoPub), { memeSku: (a, b) => !!numDeSku(a) && numDeSku(a) === numDeSku(b) }), at.token) : { lu: false, raison: relu ? 'lecture' : 'identifiant' };
   // (9 octobre) Publiée AVEC une règle d'offre : on relit chez eBay ce qu'il en
   // a gardé (une catégorie qui n'accepte pas le seuil le perd sans refuser
   // l'annonce [non mesuré]). Sans règle : aucun appel de plus.
@@ -901,9 +910,10 @@ async function handlePublish(b, ctx) {
     const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok && memeRegle(post.lecture,demande,null)!==false?{...post.lecture,par:'publication'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'publication',observee:post.ok?post.lecture:null} });
     offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
-  // `compte` : le pseudo connu de CE compte, sinon celui qu'eBay a montré comme
-  // vendeur de l'annonce relue (un fait lu chez eBay, jamais deviné).
-  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: pseudoPub || (verification.lu ? verification.vendeur || '' : ''), avertissements: r.avertissements, verification, ...(offre ? { offre } : {}) } };
+  // `compte` : le vendeur qu'eBay montre quand il est prouvé être CE compte (un
+  // fait lu chez eBay — à jour même si le pseudo a changé), sinon le pseudo
+  // mémorisé de CE compte (`compteANommer`, jamais deviné).
+  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: compteANommer(verification, pseudoPub), avertissements: r.avertissements, verification, ...(offre ? { offre } : {}) } };
 }
 
 // ── RELIRE UNE ANNONCE QU'ON VIENT DE PUBLIER (15 octobre) ──────────────────
@@ -926,8 +936,8 @@ async function handleRelirePublication(b, ctx) {
   const r = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
   if (sansAck(r)) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas répondu — réessaie dans un instant.' } };
   if (!r.ok) return { status: 200, body: { ok: true, verification: { lu: false, raison: 'refus', message: messageEbaySur(r.err) || 'eBay n\'a pas rendu cette annonce.' } } };
-  const verification = verifPublication(r.xml, itemId, attendu, { memeSku: (x, y) => !!numDeSku(x) && numDeSku(x) === numDeSku(y) });
-  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId, compte: pseudoPub || (verification.lu ? verification.vendeur || '' : ''), verification } };
+  const verification = await compteVerifie(verifPublication(r.xml, itemId, attendu, { memeSku: (x, y) => !!numDeSku(x) && numDeSku(x) === numDeSku(y) }), at.token);
+  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId, compte: compteANommer(verification, pseudoPub), verification } };
 }
 
 // ── L'HEURE DE PROGRAMMATION, VALIDÉE PAR LE SERVEUR ─────────────────────────

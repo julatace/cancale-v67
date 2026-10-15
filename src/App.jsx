@@ -11462,6 +11462,7 @@ const uuidEnvoiEbay = () => { try { if (crypto && crypto.randomUUID) return cryp
 // Un brouillon → l'annonce qui part chez eBay. UNE règle pour le formulaire
 // (« Vérifier », « Publier ») ET la liste des brouillons (§11) : impossible de
 // vérifier autre chose que ce qu'on programme.
+const PRIX_ILLISIBLE_EBAY = 'Prix illisible : tape un montant comme 74 ou 74,50.';
 function itemDeBrouillon(d) {
   if (!d) return { err: 'Brouillon introuvable.' };
   const cat = d.categorie || {};
@@ -11472,6 +11473,13 @@ function itemDeBrouillon(d) {
   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
   if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
   if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
+  // (revue du 15 octobre) Un prix ILLISIBLE (« 55 € », « environ 50 ») ne part
+  // pas : il s'affichait « NaN € » dans la confirmation et partait chez eBay en
+  // « NaN ». La règle de saisie des montants (`montantSaisi`, §11) : des chiffres,
+  // une virgule ou un point, deux décimales au plus.
+  const prixN = montantSaisi(d.prix);
+  if (Number.isNaN(prixN)) return { err: PRIX_ILLISIBLE_EBAY };
+  if (!(prixN > 0)) return { err: 'Mets un prix au-dessus de 0.' };
   // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
   // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
   // qu'un faux.
@@ -12038,6 +12046,30 @@ function ecartsVintedEbay(pair, prix, desc) {
   if (pair.desc && normDescEbay(desc) !== normDescEbay(pair.desc)) out.push({ cle: 'description', vinted: pair.desc, ici: normDescEbay(desc) });
   return out;
 }
+// (revue du 15 octobre) UN BROUILLON comparé à l'annonce Vinted de SA paire :
+// le planificateur programmait un brouillon à 59 € pendant que la paire était à
+// 49 € sur Vinted, sans un mot — l'écart n'était dit que dans « Publier ». La
+// paire est trouvée par son IDENTITÉ (`pairId`, l'annonce Vinted, §5 — jamais
+// le titre) parmi les paires en ligne ; la comparaison est LA règle du
+// formulaire (`ecartsVintedEbay`, §11). Paire plus en ligne, prix Vinted
+// inconnu : rien à comparer, aucun écart inventé. Rend aussi la paire (pour
+// « Reprendre » son prix).
+function ecartsBrouillonVinted(d, paires) {
+  if (!d || !d.pairId || !Array.isArray(paires)) return { pair: null, ecarts: [] };
+  const pair = paires.find((x) => x && String(x.id) === String(d.pairId)) || null;
+  return { pair, ecarts: pair ? ecartsVintedEbay(pair, d.prix, d.description || '') : [] };
+}
+// Les écarts d'un brouillon, en clair et en UNE phrase (§7) : la liste des
+// brouillons, l'aperçu et la confirmation du planificateur disent la même chose.
+// (en minuscule : il se place dans une phrase ; `majuscule` en tête de ligne).
+function texteEcartsBrouillon(ecarts) {
+  const p = (ecarts || []).find((e) => e.cle === 'prix');
+  const desc = (ecarts || []).some((e) => e.cle === 'description');
+  if (p && desc) return `sur Vinted : ${eurEbay(p.vinted)} · description différente`;
+  if (p) return `sur Vinted : ${eurEbay(p.vinted)}`;
+  return desc ? 'description différente de Vinted' : '';
+}
+const majuscule = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 // ── APRÈS LA PUBLICATION : « DEMANDÉE » N'EST PAS « PUBLIÉE » (15 octobre) ───
 // La route relit l'annonce chez eBay (`verification`, api/_lib/ebay-publication.js)
 // et rend un verdict ; l'écran le DIT sans le réinterpréter. Pas de relecture
@@ -12370,8 +12402,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     // deux feuilles à la suite). Rien de différent ⇒ rien de plus à confirmer.
     const ecartsPub = ecartsVintedEbay(pairSel, prix, desc);
     const prixPub = Number(String(b.item.price).replace(',', '.'));
+    // (revue du 15 octobre, §7) Le prix eBay est dit UNE fois : dans la phrase
+    // « sera mise en vente … à X » (chaque branche le porte) ; la ligne d'écart
+    // ne dit que ce qui manque, le prix de Vinted.
     const lignesEcarts = ecartsPub.map((e) => e.cle === 'prix'
-      ? `Prix : ${eurEbay(prixPub)} sur eBay, ${eurEbay(e.vinted)} sur Vinted.`
+      ? `Sur Vinted, elle est à ${eurEbay(e.vinted)}.`
       : 'Description : pas celle de ton annonce Vinted.');
     const surCompte = comptesPub.some((c) => c && c.pseudo) || plusieursPub ? ` sur ton compte eBay « ${nomComptePub} »` : ' sur eBay';
     if (offre) {
@@ -12393,7 +12428,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
-        desc: `« ${titre || 'cette paire'} » sera mise en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}` + (lignesEcarts.length ? '\n\n' + lignesEcarts.join('\n') : ''),
+        desc: `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixPub)} sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}` + (lignesEcarts.length ? '\n\n' + lignesEcarts.join('\n') : ''),
         ok: 'Oui, publier', cancel: 'Annuler',
       });
       if (!ok) return;
@@ -12434,8 +12469,21 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     if (!res || !res.ok || !res.itemId) return;
     setRelecture('en-cours');
     const { j } = await appelEbay({ action: 'relirepub', itemId: String(res.itemId), attendu: res.attendu || {}, ...corpsCompteEbay(res.compteRef || comptePub) });
-    if (j && j.ok && j.verification) { setRes((r) => (r && r.itemId === res.itemId ? { ...r, verification: j.verification, compte: j.compte || r.compte } : r)); setRelecture(j.verification.lu ? '' : (j.verification.message ? `eBay n'a pas rendu l'annonce : « ${j.verification.message} »` : 'eBay n\'a pas rendu l\'annonce — réessaie dans un instant.')); }
-    else setRelecture((j && j.error) || 'eBay n\'a pas répondu — réessaie dans un instant.');
+    // (revue du 15 octobre) Un « pas su » n'efface JAMAIS un « su » : une
+    // relecture qu'eBay refuse (Ack Failure, « Erreur interne au système »)
+    // remettait l'écran à « Demandée à eBay — pas encore vérifiée » et faisait
+    // disparaître l'écart de prix qu'eBay venait de montrer. Ce qui a été relu
+    // reste affiché ; la phrase dit que cette relecture-ci n'a rien rendu.
+    const dejaRelue = !!(res.verification && res.verification.lu === true);
+    if (j && j.ok && j.verification) {
+      const lu = j.verification.lu === true;
+      setRes((r) => (r && r.itemId === res.itemId && (lu || !(r.verification && r.verification.lu === true)) ? { ...r, verification: j.verification, compte: j.compte || r.compte } : r));
+      const pourquoi = j.verification.message ? ` : « ${j.verification.message} »` : '';
+      setRelecture(lu ? '' : dejaRelue
+        ? `eBay n'a pas rendu l'annonce cette fois${pourquoi} — ci-dessus, la relecture d'avant.`
+        : (pourquoi ? `eBay n'a pas rendu l'annonce${pourquoi}` : 'eBay n\'a pas rendu l\'annonce — réessaie dans un instant.'));
+    }
+    else setRelecture(((j && j.error) || 'eBay n\'a pas répondu — réessaie dans un instant.') + (dejaRelue ? ' Ci-dessus, la relecture d\'avant.' : ''));
   };
   const lab = { fontSize: 12.5, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 500 };
   // ⚠️ fontSize 16 MINIMUM : en dessous, iOS Safari ZOOME automatiquement dès
@@ -12476,6 +12524,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         const okP = pts.filter((p) => p.etat === 'ok' && p.cle !== 'reference' && p.cle !== 'compte');
         const pasLuP = pts.filter((p) => p.etat === 'pas-lu');
         const refOk = pts.some((p) => p.cle === 'reference' && p.etat === 'ok');
+        const renommeP = ((pts.find((p) => p.cle === 'compte' && p.etat === 'ok' && p.renomme) || {}).renomme) || '';
         const titreEtat = { verifiee: 'Publiée et vérifiée sur eBay', ecarts: 'Publiée sur eBay — à vérifier', partielle: 'Publiée sur eBay — à vérifier', 'pas-active': 'Créée sur eBay, mais pas en ligne', demandee: 'Demandée à eBay — pas encore vérifiée' }[etat];
         const couleur = etat === 'verifiee' ? C.accent : etat === 'demandee' ? C.muted : C.warn;
         return (
@@ -12483,11 +12532,14 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 26, background: `${couleur}15`, color: couleur, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 800 }}>{etat === 'verifiee' ? '✓' : etat === 'demandee' ? '…' : '!'}</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 4 }}>{titreEtat}</div>
           {/* Plateforme · compte · numéro : les trois faits qui disent OÙ elle est. */}
-          <div data-publie-plateforme="ebay" data-publie-compte={res.compte || ''} data-publie-itemid={String(res.itemId || '')} style={{ fontSize: 12.5, color: C.muted, marginBottom: 10, overflowWrap: 'anywhere' }}>eBay · {res.compte ? <>compte « {res.compte} »</> : 'ton compte eBay'} · <span style={{ whiteSpace: 'nowrap' }}>annonce N° {res.itemId}</span></div>
+          {/* (revue du 15 octobre) Un pseudo renommé chez eBay depuis la connexion :
+              eBay a confirmé que c'est le même compte (le jeton) — on nomme
+              l'actuel, et l'ancien une fois, puisque VRM l'affiche encore ailleurs. */}
+          <div data-publie-plateforme="ebay" data-publie-compte={res.compte || ''} data-publie-itemid={String(res.itemId || '')} style={{ fontSize: 12.5, color: C.muted, marginBottom: 10, overflowWrap: 'anywhere' }}>eBay · {res.compte ? <>compte « {res.compte} »{renommeP ? <span data-publie-compte-renomme={renommeP}> (nouveau pseudo — avant : « {renommeP} »)</span> : null}</> : 'ton compte eBay'} · <span style={{ whiteSpace: 'nowrap' }}>annonce N° {res.itemId}</span></div>
           {etat === 'demandee' && <div style={{ fontSize: 12.5, color: C.text, marginBottom: 10, lineHeight: 1.5 }}>eBay a pris la demande et donné ce numéro, mais je n'ai pas pu relire l'annonce.</div>}
           {okP.length > 0 && <div data-publie-relu={okP.map((p) => p.cle).join(',')} style={{ fontSize: 12, color: C.muted, marginBottom: 6, lineHeight: 1.5 }}>Relu chez eBay : {okP.map(textePointPub).join(' · ')}.</div>}
           {ecartsP.map((p) => <div key={p.cle} data-publie-ecart={p.cle} style={{ fontSize: 12.5, color: C.warn, marginBottom: 4, lineHeight: 1.5 }}>{textePointPub(p)}</div>)}
-          {pasLuP.length > 0 && <div data-publie-pas-lu={pasLuP.map((p) => p.cle).join(',')} style={{ fontSize: 12, color: C.muted, marginBottom: 6, lineHeight: 1.5 }}>Pas montré par eBay : {pasLuP.map((p) => NOMS_POINTS_PUB[p.cle] || p.cle).join(', ')}.</div>}
+          {pasLuP.length > 0 && <div data-publie-pas-lu={pasLuP.map((p) => p.cle).join(',')} style={{ fontSize: 12, color: C.muted, marginBottom: 6, lineHeight: 1.5 }}>Pas vérifié chez eBay : {pasLuP.map((p) => NOMS_POINTS_PUB[p.cle] || p.cle).join(', ')}.</div>}
           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
               sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, margin: '8px 0 14px', lineHeight: 1.5 }}>{res.sku
@@ -12655,25 +12707,41 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 confirme qu'il est accepté avant toute publication. */}
             <BlocEbay n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
+                {/* (15 octobre) LE PRIX DE VINTED : repris tout seul, l'écart dit
+                    avec « Reprendre » quand il a tapé autre chose — jamais
+                    remplacé sans son clic. Inconnu : vide, et dit.
+                    (revue du 15 octobre) La ligne vit DANS la case du prix : sur
+                    téléphone la grille passe sur une colonne, et posée sous la
+                    grille elle tombait sous « Quantité » (« ici : 70,00 € » se
+                    lisait comme une quantité). Un prix illisible (« 55 € ») le
+                    dit ici, plutôt que « ici : — » puis « NaN € » à la publication. */}
+                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} />
+                  {(() => {
+                    const ligne = { fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 };
+                    const illisible = Number.isNaN(montantSaisi(prix));
+                    const pv = pairSel && pairSel.prixVinted != null ? pairSel.prixVinted : null;
+                    const reprendre = pv == null ? null : (
+                      <button type="button" data-ebay-prix-reprendre="1" aria-label={`Reprendre le prix de Vinted (${eurEbay(pv)})`} onClick={() => { const v = prixChampEbay(pv); prixAuto.current = v; setPrix(v); setCheck(null); setOffreBasOk(false); }}
+                        style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 28 }}>Reprendre</button>
+                    );
+                    if (illisible) return (
+                      <div data-ebay-prix-vinted="illisible" style={{ ...ligne, color: C.warn, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 12px' }}>
+                        <span>{PRIX_ILLISIBLE_EBAY}{pv != null ? <> Vinted : <b>{eurEbay(pv)}</b>.</> : null}</span>{reprendre}
+                      </div>
+                    );
+                    if (!pairSel) return null;
+                    if (pv == null) return <div data-ebay-prix-vinted="inconnu" style={ligne}>Prix Vinted inconnu pour cette paire — mets le tien.</div>;
+                    const e = ecartsVinted.find((x) => x.cle === 'prix');
+                    if (!e) return <div data-ebay-prix-vinted="repris" style={ligne}>Même prix que sur Vinted.</div>;
+                    return (
+                      <div data-ebay-prix-vinted="ecart" style={{ ...ligne, color: C.text, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 12px' }}>
+                        <span>Vinted : <b>{eurEbay(e.vinted)}</b> · ici : <b>{e.ici == null ? '—' : eurEbay(e.ici)}</b></span>{reprendre}
+                      </div>
+                    );
+                  })()}
+                </div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
-              {/* (15 octobre) LE PRIX DE VINTED : repris tout seul, l'écart dit
-                  avec « Reprendre » quand il a tapé autre chose — jamais
-                  remplacé sans son clic. Inconnu : vide, et dit. */}
-              {pairSel && (() => {
-                const e = ecartsVinted.find((x) => x.cle === 'prix');
-                const ligne = { fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 };
-                if (pairSel.prixVinted == null) return <div data-ebay-prix-vinted="inconnu" style={ligne}>Prix Vinted inconnu pour cette paire — mets le tien.</div>;
-                if (!e) return <div data-ebay-prix-vinted="repris" style={ligne}>Même prix que sur Vinted.</div>;
-                return (
-                  <div data-ebay-prix-vinted="ecart" style={{ ...ligne, color: C.text, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 12px' }}>
-                    <span>Vinted : <b>{eurEbay(e.vinted)}</b> · ici : <b>{e.ici == null ? '—' : eurEbay(e.ici)}</b></span>
-                    <button type="button" data-ebay-prix-reprendre="1" onClick={() => { const v = prixChampEbay(pairSel.prixVinted); prixAuto.current = v; setPrix(v); setCheck(null); setOffreBasOk(false); }}
-                      style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 28 }}>Reprendre {eurEbay(e.vinted)}</button>
-                  </div>
-                );
-              })()}
               {/* (9 octobre) LA RÈGLE D'OFFRE, facultative : c'est eBay qui
                   acceptera, au montant fixé ici. Validée contre le prix tapé. */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10, marginTop: 10 }}>
@@ -13847,6 +13915,22 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
     if (w.ok) { setChoix((s) => { const n = new Set(s); n.delete(d.id); return n; }); if (onBrouillons) onBrouillons(w.items); }
     else setMsg(w.raison === 'lecture' ? 'Je n\'ai pas pu relire tes brouillons — rien n\'a été supprimé.' : 'La suppression a échoué — réessaie.');
   };
+  // (revue du 15 octobre) « Reprendre le prix » de Vinted dans un brouillon :
+  // SON clic, jamais tout seul (sa saisie n'est pas écrasée dans son dos). Relire-
+  // modifier-écrire (une lecture ratée n'écrit RIEN) ; un brouillon déjà parti
+  // (programmé, publié) n'est pas touché. L'identifiant d'envoi est GARDÉ (c'est
+  // lui qui empêche une seconde annonce après une coupure) ; la vérification des
+  // frais, elle, ne vaut plus pour ce prix et redevient « à vérifier ».
+  const reprendrePrixVinted = async (d, pair) => {
+    const v = pair ? prixChampEbay(pair.prixVinted) : '';
+    if (!v) return;
+    setBusy(true); setMsg('');
+    let pasTouche = '';
+    const w = await modifierBrouillonsEbay((items) => { const cur = items[d.id]; if (!cur) { pasTouche = 'Ce brouillon n\'existe plus — rien n\'a été changé.'; return false; } if (cur.etatBrouillon && cur.etatBrouillon !== 'brouillon') { pasTouche = 'Ce brouillon est déjà parti chez eBay — son prix n\'a pas été changé.'; return false; } items[d.id] = { ...cur, prix: v }; return items; });
+    if (w.ok) { if (onBrouillons) onBrouillons(w.items); if (pasTouche) setMsg(pasTouche); }
+    else setMsg(w.raison === 'lecture' ? 'Je n\'ai pas pu relire tes brouillons — rien n\'a été changé.' : 'Le changement de prix a échoué — réessaie.');
+    setBusy(false);
+  };
   const etatListe = brouillons === undefined ? 'charge' : brouillons === null ? 'pas-su' : 'lu';
   const btn = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" style={{ fontSize: 12, color: E.muted, margin: '12px 2px 0', lineHeight: 1.5 }}>Aucun brouillon eBay. Prépare une annonce ci-dessus et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</div>;
@@ -13873,7 +13957,22 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
             <PhotoVente src={couverture(d)} size={48} />
             <div style={{ flex: '1 1 auto', minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: E.text, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d.numero ? <b>N°{cleNum(d.numero)} · </b> : null}{d.titre || '(sans titre)'}</div>
-              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{d.prix ? eurEbay(Number(String(d.prix).replace(',', '.')) || 0) : 'prix —'}{d.categorie && d.categorie.nom ? ` · ${String(d.categorie.nom).split(':').pop()}` : ''}{plusieurs && vue === '*' && d.compte ? <span data-brouillon-compte={d.compte}>{` · ${nomCompteEbay(comptesPub.find((c) => c.ref === d.compte) || { principal: d.compte === 'principal' })}`}</span> : null}{!d.numero ? <span style={{ color: E.warn }}> · pas de N°</span> : null}{(() => { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? <span data-brouillon-offre={a.toFixed(2)}>{` · offres dès ${eurEbay(a)}`}</span> : null; })()}</div>
+              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{(() => { const n = montantSaisi(d.prix); return n == null ? 'prix —' : Number.isNaN(n) ? 'prix illisible' : eurEbay(n); })()}{d.categorie && d.categorie.nom ? ` · ${String(d.categorie.nom).split(':').pop()}` : ''}{plusieurs && vue === '*' && d.compte ? <span data-brouillon-compte={d.compte}>{` · ${nomCompteEbay(comptesPub.find((c) => c.ref === d.compte) || { principal: d.compte === 'principal' })}`}</span> : null}{!d.numero ? <span style={{ color: E.warn }}> · pas de N°</span> : null}{(() => { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? <span data-brouillon-offre={a.toFixed(2)}>{` · offres dès ${eurEbay(a)}`}</span> : null; })()}</div>
+              {(() => {
+                // (revue du 15 octobre) L'écart avec l'annonce Vinted de SA paire,
+                // dit UNE fois ici, avec « Reprendre le prix » — le planificateur
+                // et sa confirmation le redisent pour ce qui part.
+                const ev = ecartsBrouillonVinted(d, paires);
+                const t = texteEcartsBrouillon(ev.ecarts);
+                if (!t) return null;
+                const pe = ev.ecarts.find((e) => e.cle === 'prix');
+                return (
+                  <div data-brouillon-ecart-vinted={ev.ecarts.map((e) => e.cle).join(',')} style={{ fontSize: 11.5, color: E.text, marginTop: 3, lineHeight: 1.45, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 10px' }}>
+                    <span>{majuscule(t)}</span>
+                    {pe && <button type="button" data-brouillon-prix-reprendre={d.id} disabled={busy} onClick={() => reprendrePrixVinted(d, ev.pair)} style={{ ...btn, border: 'none', padding: 0, minHeight: 28, color: E.accentSoft, fontWeight: 700 }}>Reprendre le prix</button>}
+                  </div>
+                );
+              })()}
               {d.envoi && d.envoi.ok === false && <div data-brouillon-echec={d.id} style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>Échec de la programmation : {d.envoi.err}</div>}
               {b.err ? <div style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>{b.err}</div>
                 : etat === 'verif-en-cours' ? <div style={{ fontSize: 11.5, color: E.muted, marginTop: 3 }}>eBay vérifie…</div>
@@ -13912,7 +14011,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
 //    annonce programmée par l'API n'est pas garantie, et une paire vendue
 //    ailleurs avant son heure peut quand même partir. Il le lit et coche
 //    « j'ai compris » avant sa PREMIÈRE programmation — c'est sa décision.
-function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
+function EbayPlanificateur({ brouillons = [], paires = [], annoncesEbay, programmees, ventes, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
   const E = EBAY_SKIN;
   // (9 octobre) Le lot part sur UN compte eBay, choisi ici (pré-choisi comme le
   // formulaire) ; la confirmation le NOMME. `annoncesEbay` et `programmees`
@@ -13989,10 +14088,14 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
   const departConcret = depart.mode === 'libre' ? { date: depart.date, heure: depart.heure } : departDePreregle(preregle, ancre);
   const plan = React.useMemo(() => heuresDuLot({ depart: departConcret, parJour: rythme.parJour, de: rythme.de, a: rythme.a, jours: rythme.jours, ecart: rythme.ecart, n: ordonnes.length, maintenant: ancre }),
     [JSON.stringify(departConcret), rythme.parJour, rythme.de, rythme.a, JSON.stringify(rythme.jours), rythme.ecart, ordonnes.length, ancre]);
+  // (revue du 15 octobre) Chaque ligne porte ses écarts avec l'annonce Vinted
+  // de SA paire (`ecartsBrouillonVinted`, la règle du formulaire, §11) : un
+  // brouillon enregistré avant une baisse de prix sur Vinted partait à l'ancien
+  // prix sans un mot.
   const lignes = React.useMemo(() => (plan.heures || []).map((h, i) => {
     const x = ordonnes[i];
-    return { ...x, h, cle: cleVerifEbay(x.item, h.utc) };
-  }), [plan, ordonnes]);
+    return { ...x, h, cle: cleVerifEbay(x.item, h.utc), ecartsV: ecartsBrouillonVinted(x.d, paires).ecarts };
+  }), [plan, ordonnes, paires]);
   const verifDe = (l) => { const v = verifs[l.d.id]; return v && v.cle === l.cle ? v : null; };
   // Réancrer : quand il change un réglage (départ, rythme, préréglages) — et
   // quand une heure est VRAIMENT passée sous 16 min (eBay en exige 15). Jamais
@@ -14060,13 +14163,20 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         return `\n« ${l.item.title || ''} » ${eurEbay(p)} → dès ${eurEbay(o.accepte)} (${p > 0 ? Math.round(o.accepte / p * 100) : '—'} %)${o.sousMoitie ? ' — moins de la moitié, confirmé dans le brouillon' : ''}`;
       }).join('')
       : '';
+    // (revue du 15 octobre) Ce qui part autrement que sur Vinted se CONFIRME,
+    // ligne par ligne, comme dans « Publier » — jamais en silence.
+    const avecEcart = lot.filter(({ l }) => l.ecartsV && l.ecartsV.length);
+    const texteEcarts = avecEcart.length
+      ? `\n${avecEcart.length === 1 ? '1 annonce ne part pas' : `${avecEcart.length} annonces ne partent pas`} comme sur Vinted :` + avecEcart.map(({ l }) => `\n${l.d.numero ? `N°${cleNum(l.d.numero)}` : `« ${l.item.title || ''} »`} à ${eurEbay(Number(String(l.item.price).replace(',', '.')))} — ${texteEcartsBrouillon(l.ecartsV)}`).join('')
+      : '';
     const ok = await askConfirm({
       title: `Programmer ${lot.length} annonce${lot.length > 1 ? 's' : ''} sur eBay${plusieursPub ? ` (compte « ${nomCompteLot} »)` : ''} ?`,
       desc: `De ${quand(premiere)} à ${quand(derniere)} (heure de Paris, ± 15 min : c'est eBay qui arrondit).`
         + `\nFrais annoncés par eBay : ${eurEbay(lot.reduce((s, x) => s + x.v.fees, 0))}${progConnues.length ? ` (dont programmation ${eurEbay(totalProg)})` : ''}${progPayante ? ' — facturés à la création, non remboursés si tu annules.' : '.'}`
         + (progPasSu ? `\nFrais de programmation pas annoncés par eBay pour ${progPasSu} annonce${progPasSu > 1 ? 's' : ''}.` : '')
         + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
-        + texteOffres,
+        + texteOffres
+        + texteEcarts,
       ok: 'Oui, programmer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -14252,6 +14362,8 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
                     <div key={l.d.id} data-planif-ligne={l.d.id} data-heure-paris={`${l.h.date} ${l.h.heure}`} data-utc={l.h.utc} data-immediat={l.h.immediat ? '1' : '0'} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '4px 0', flexWrap: 'wrap' }}>
                       <span className="vrm-display" style={{ fontSize: 14, fontWeight: 800, color: E.text, width: 92, flexShrink: 0 }}>{l.h.immediat ? 'tout de suite' : l.h.heure}</span>
                       <span style={{ flex: '1 1 140px', minWidth: 0, fontSize: 12.5, color: E.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.d.numero ? <b>N°{cleNum(l.d.numero)} · </b> : null}{l.d.titre}</span>
+                      <span data-planif-prix={l.d.id} style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: E.text }}>{eurEbay(Number(String(l.item.price).replace(',', '.')))}</span>
+                      {l.ecartsV && l.ecartsV.length > 0 && <span data-planif-ecart-vinted={l.ecartsV.map((e) => e.cle).join(',')} style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 11.5, color: E.text, lineHeight: 1.45 }}>{majuscule(texteEcartsBrouillon(l.ecartsV))}</span>}
                       {v && v.etat === 'ok' && <span data-planif-frais={l.d.id} data-frais-total={v.fees == null ? 'pas-su' : String(v.fees)} data-frais-programmation={l.h.immediat ? 'sans' : (v.frais && v.frais.programmation != null ? String(v.frais.programmation) : 'pas-su')} style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>
                         {lignesFraisEbay(v.frais, !l.h.immediat).map((f) => `${f.nom} ${f.montant == null ? 'pas su' : eurEbay(f.montant)}`).join(' · ')} · total {v.fees == null ? 'pas su' : eurEbay(v.fees)}
                       </span>}
@@ -15330,7 +15442,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       onPlanifier={(ids) => setPlanif(ids)}
       onBrouillons={(b) => setBrouillons(b)} />
     {planif && brouillonsChoisis.length > 0 && (
-      <EbayPlanificateur key={planif.join(',')} brouillons={brouillonsChoisis}
+      <EbayPlanificateur key={planif.join(',')} brouillons={brouillonsChoisis} paires={paires}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub}
         annoncesEbay={Array.isArray(items) ? items : null}
         programmees={programmees && typeof programmees === 'object' ? listeProgrammees : (programmees === 'jamais' ? [] : null)}

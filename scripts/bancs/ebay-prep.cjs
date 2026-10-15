@@ -26,6 +26,17 @@
 //      refuse (les champs obligatoires ne sont pas contournés) ; texte de
 //      Vinted ⇒ jamais repris comme description ;
 //  10. un brouillon rouvert garde SES valeurs, l'écart avec Vinted se voit.
+// (revue du 15 octobre)
+//  11. une relecture qu'eBay REFUSE ne fait pas oublier ce qui a été relu
+//      (« à vérifier » reste, l'écart de prix reste) ;
+//  12. un prix illisible (« 55 € ») est dit sous le champ et « Publier »
+//      refuse — jamais « NaN € » ;
+//  13. le brouillon à 59 € d'une paire à 49 € sur Vinted : l'écart se dit dans
+//      la liste ET dans le planificateur, sa confirmation le redit, « Annuler »
+//      n'envoie rien ; « Reprendre le prix » écrit 49 dans le brouillon ;
+//   3. (§7) le prix eBay n'est écrit qu'UNE fois dans la confirmation, et la
+//      ligne « Vinted · ici » reste DANS la case du prix (sur téléphone elle
+//      tombait sous « Quantité »).
 // Données INVENTÉES : il vit dans le dépôt.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
@@ -48,7 +59,7 @@ const ph = (n) => [`https://img.test/v${idDe(n)}.jpg`, `https://img.test/v${idDe
 const DETAILS = { [idDe(41)]: { description: DESC_41, photos: ph(41) }, [idDe(42)]: { description: DESC_42, photos: ph(42) }, [idDe(43)]: { photos: ph(43) }, [idDe(44)]: { description: PUB_VINTED, photos: ph(44) } };
 const BROUILLONS = () => ({ 'b-41': { id: 'b-41', creeLe: MAINTENANT - 60000, majLe: MAINTENANT - 60000, pairId: String(idDe(41)), numero: '41', titre: 'Nike Air Max 1 bleu taille 44', prix: '59', quantite: '1', etat: '3000', description: 'Mon texte de brouillon', photos: ph(41), categorie: { id: '15709', nom: 'Baskets', requis: ['Marque'] }, aspects: { Marque: 'Nike' }, etatBrouillon: 'brouillon' } });
 
-let rows = [], envois = [], pubMode = 'demandee';
+let rows = [], envois = [], pubMode = 'demandee', relireMode = 'verifiee';
 // `vinted_dark` est un réglage SYNCHRONISÉ : le nuage (`main`) le remplace au
 // démarrage — servi là aussi ; et la bascule « Minéral » (une fois par
 // appareil) le remet en clair si `vrm_bascule_mineral_v1` n'est pas posé.
@@ -62,7 +73,7 @@ const remettre = (sombre) => {
     { id: 'ebay_programmees', data: { items: [], enLigne: [], complet: true, capturedAt: MAINTENANT } },
     { id: 'ebay_brouillons', data: { items: BROUILLONS(), majAt: MAINTENANT } },
   ];
-  envois = []; pubMode = 'demandee';
+  envois = []; pubMode = 'demandee'; relireMode = 'verifiee';
 };
 
 let ko = 0, okN = 0;
@@ -150,7 +161,9 @@ async function ouvrir(b, vp, sombre) {
     if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }], attributs: [{ nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas', 'Salomon', 'Vans'] }], attributsObligatoires: ['Marque'] });
     if (body.action === 'pubverify') return j({ ok: true, fees: 0, frais: { total: 0, insertion: 0, programmation: null, remises: null, devise: 'EUR', lignes: [] } });
     if (body.action === 'publish') return j({ ok: true, plateforme: 'ebay', itemId: '110000000555', url: 'https://www.ebay.fr/itm/110000000555', sku: 'VRM-' + body.item.numero, compte: 'julien_part', avertissements: [], verification: verifDe(body, pubMode) });
-    if (body.action === 'relirepub') return j({ ok: true, plateforme: 'ebay', itemId: body.itemId, compte: 'julien_part', verification: verifDe({ item: { numero: '41', price: String((body.attendu || {}).prix), title: (body.attendu || {}).titre || '', photos: new Array((body.attendu || {}).photos || 0).fill('') } }, 'verifiee') });
+    // `relireMode = 'refus'` : ce que rend la VRAIE route quand eBay répond Ack
+    // Failure au GetItem (`handleRelirePublication`).
+    if (body.action === 'relirepub') return j({ ok: true, plateforme: 'ebay', itemId: body.itemId, compte: 'julien_part', verification: relireMode === 'refus' ? { lu: false, raison: 'refus', message: 'Erreur interne au système.' } : verifDe({ item: { numero: '41', price: String((body.attendu || {}).prix), title: (body.attendu || {}).titre || '', photos: new Array((body.attendu || {}).photos || 0).fill('') } }, 'verifiee') });
     return j({ ok: true });
   });
   return { ctx, pg, errs };
@@ -229,8 +242,19 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
         dit(p === '70' && d === 'Ma description perso', `${T} 3. une autre paire choisie : CE QU'IL A TAPÉ reste (70 · « Ma description perso ») — jamais écrasé`, `prix=${p} · desc=${d}`);
         const e2 = await pg.$eval('[data-ebay-prix-vinted="ecart"]', (e) => e.innerText).catch(() => '');
         dit(/49,00\s*€/.test(e2) && await attr(pg, '[data-ebay-desc-vinted]', 'data-ebay-desc-vinted') === 'ecart', `${T} 3. et l'écart montre la NOUVELLE paire (Vinted : 49,00 €), description « pas celle de Vinted »`, e2.replace(/\s+/g, ' '));
-        const n49 = await pg.evaluate(() => (document.querySelector('main').innerText.match(/Vinted : 49,00/g) || []).length);
+        // Compté dans le FORMULAIRE : la liste des brouillons, plus bas, parle
+        // d'un autre objet (le brouillon b-41) et dit son propre écart.
+        const n49 = await pg.evaluate(() => ((document.querySelector('[data-publier-brouillon-id]') || document.querySelector('main')).innerText.match(/Vinted : 49,00/g) || []).length);
         dit(n49 === 1, `${T} 3. §7 : l'écart de prix est dit UNE fois`, `×${n49}`);
+        // (revue du 15 octobre) La ligne « Vinted · ici » reste avec le PRIX :
+        // au-dessus du champ Quantité (une colonne, téléphone) ou à sa gauche
+        // (deux colonnes) — jamais sous lui.
+        const geo = await pg.evaluate(() => {
+          const l = document.querySelector('[data-ebay-prix-vinted]'); const q = [...document.querySelectorAll('label')].find((x) => /^Quantité$/.test(x.textContent.trim()));
+          if (!l || !q) return null; const a = l.getBoundingClientRect(), b = q.getBoundingClientRect();
+          return { dessus: a.bottom <= b.top + 1, gauche: a.right <= b.left + 1, ligne: [Math.round(a.left), Math.round(a.top), Math.round(a.right), Math.round(a.bottom)], qte: [Math.round(b.left), Math.round(b.top)] };
+        });
+        dit(!!geo && (geo.dessus || geo.gauche), `${T} 3. la ligne « Vinted · ici » reste avec le champ Prix (jamais sous « Quantité »)`, JSON.stringify(geo));
         await photo(pg, '[data-ebay-prix-vinted]', `${tag}-3-ecart-prix`);
       });
       // ── 4. VOIR · REPRENDRE · ANNULER ───────────────────────────────────────
@@ -254,7 +278,9 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
         await photo(pg, 'div[style*="z-index: 2000"]', `${tag}-5-confirmation`);
         await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
         await pg.waitForTimeout(300);
-        dit(/70,00\s*€ sur eBay, 49,00\s*€ sur Vinted/.test(t) && /Description : pas celle de ton annonce Vinted/.test(t), `${T} 5. la feuille dit les deux écarts (prix et description)`, t.replace(/\s+/g, ' ').slice(0, 160));
+        dit(/à 70,00\s*€/.test(t) && /Sur Vinted, elle est à 49,00\s*€/.test(t) && /Description : pas celle de ton annonce Vinted/.test(t), `${T} 5. la feuille dit les deux écarts (prix et description)`, t.replace(/\s+/g, ' ').slice(0, 200));
+        const n70 = (t.match(/70,00\s*€/g) || []).length;
+        dit(n70 === 1, `${T} 5. §7 : le prix eBay (70,00 €) n'est écrit qu'UNE fois dans la feuille`, `×${n70}`);
         dit(envois.filter((x) => x.action === 'publish').length === n0, `${T} 5. « Annuler » : AUCUN \`publish\` envoyé`);
       });
       // ── 6+7. SANS ÉCART : AUCUNE FEUILLE ; « DEMANDÉE » PUIS « RELIRE » ─────
@@ -295,6 +321,19 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
         const ec = await pg.$eval('[data-publie-ecart="prix"]', (e) => e.innerText).catch(() => '');
         dit(etat === 'ecarts' && /^Prix chez eBay/.test(ec) && /50,00\s*€/.test(ec) && /49,00\s*€/.test(ec), `${T} 8. eBay montre un autre prix ⇒ « à vérifier », les deux valeurs dites`, `${etat} · ${ec}`);
         await photo(pg, '[data-publie-etat]', `${tag}-8-ecarts`);
+        // ── 11. RELECTURE REFUSÉE APRÈS UNE RELECTURE RÉUSSIE ──
+        relireMode = 'refus';
+        const nR = envois.filter((x) => x.action === 'relirepub').length;
+        await pg.click('[data-publie-relire]');
+        await pg.waitForFunction(() => !!document.querySelector('[data-publie-relire-msg]'), null, { timeout: 8000 });
+        const e2 = await attr(pg, '[data-publie-etat]', 'data-publie-etat');
+        const ec2 = await pg.$eval('[data-publie-ecart="prix"]', (e) => e.innerText).catch(() => '');
+        const m2 = await pg.$eval('[data-publie-relire-msg]', (e) => e.innerText).catch(() => '');
+        dit(envois.filter((x) => x.action === 'relirepub').length === nR + 1 && e2 === 'ecarts' && /50,00\s*€/.test(ec2),
+          `${T} 11. eBay refuse la relecture suivante ⇒ l'écran reste « à vérifier » avec l'écart relu (jamais « demandée » : un pas-su n'efface pas un su)`, `${etat} → ${e2} · ${ec2}`);
+        dit(/Erreur interne au système/.test(m2) && /relecture d'avant/.test(m2), `${T} 11. et il dit que CETTE relecture n'a rien rendu (le message d'eBay), et que ce qui est affiché est la précédente`, m2);
+        await photo(pg, '[data-publie-etat]', `${tag}-11-relecture-refusee`);
+        relireMode = 'verifiee';
         await pg.getByRole('button', { name: 'Terminé', exact: true }).click();
       });
       // ── 9. PRIX INCONNU, TEXTE DE VINTED ────────────────────────────────────
@@ -310,6 +349,25 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
         dit(envois.filter((x) => x.action === 'publish').length === n0 && /Mets un prix/.test(await pg.evaluate(() => document.body.innerText)), `${T} 9. sans prix, « Publier » refuse (« Mets un prix. ») — rien ne part`);
         await choisir(pg, 44);
         dit(await valPrix(pg) === '30' && await valDesc(pg) === '' && await attr(pg, '[data-ebay-desc-vinted]', 'data-ebay-desc-vinted') === 'absente', `${T} 9. la N°44 : 30 €, et le texte de Vinted (protection acheteur) n'est PAS repris comme description`);
+      });
+      // ── 12. UN PRIX ILLISIBLE ───────────────────────────────────────────────
+      await essaie(`${T} 12. prix illisible`, async () => {
+        await choisir(pg, 41);
+        await pg.fill('input[placeholder="ex. 74"]', '55 €');
+        await pg.waitForTimeout(200);
+        const l = await pg.$eval('[data-ebay-prix-vinted]', (e) => [e.getAttribute('data-ebay-prix-vinted'), e.innerText]).catch(() => [null, '']);
+        dit(l[0] === 'illisible' && /49,00\s*€/.test(l[1]) && /Reprendre/.test(l[1]), `${T} 12. « 55 € » ⇒ « Prix illisible » sous le champ, avec le prix Vinted et « Reprendre »`, l[1].replace(/\s+/g, ' '));
+        const n0 = envois.filter((x) => x.action === 'publish').length;
+        await publierClic(pg);
+        await pg.waitForTimeout(500);
+        const feuilleOuverte = await feuille(pg).count();
+        const corps = await pg.evaluate(() => document.body.innerText);
+        dit(envois.filter((x) => x.action === 'publish').length === n0 && !feuilleOuverte && !/NaN/.test(corps) && /Prix illisible/.test(corps),
+          `${T} 12. « Publier » refuse (aucune feuille, rien n'est envoyé) et « NaN » n'apparaît nulle part`, `feuille ×${feuilleOuverte} · NaN ${/NaN/.test(corps)}`);
+        await photo(pg, '[data-ebay-prix-vinted]', `${tag}-12-illisible`);
+        await pg.click('[data-ebay-prix-reprendre]');
+        await pg.waitForTimeout(150);
+        dit(await valPrix(pg) === '49', `${T} 12. « Reprendre » remet 49`);
       });
       // ── 10. UN BROUILLON ROUVERT GARDE SES VALEURS ──────────────────────────
       // On repart d'un écran NEUF (aucune paire choisie) : rouvrir le brouillon
@@ -327,6 +385,39 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
         const e = await pg.$eval('[data-ebay-prix-vinted="ecart"]', (x) => x.innerText).catch(() => '');
         dit(p === '59' && d === 'Mon texte de brouillon' && /49,00\s*€/.test(e) && /59,00\s*€/.test(e), `${T} 10. le brouillon garde SON prix (59) et SON texte ; l'écart avec Vinted (49 €) se voit`, `prix=${p} · ${e.replace(/\s+/g, ' ')}`);
         await photo(pg, '[data-ebay-prix-vinted]', `${tag}-10-brouillon`);
+      });
+      // ── 13. LE BROUILLON DANS LA LISTE ET LE PLANIFICATEUR ──────────────────
+      await essaie(`${T} 13. brouillon programmé`, async () => {
+        await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(1500);
+        await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+        await pg.waitForSelector('[data-ebay-brouillons="lu"]', { timeout: 15000 });
+        await pg.waitForSelector('[data-brouillon-ecart-vinted]', { timeout: 8000 });
+        const li = await pg.$eval('[data-brouillon="b-41"] [data-brouillon-ecart-vinted]', (e) => [e.getAttribute('data-brouillon-ecart-vinted'), e.innerText]).catch(() => [null, '']);
+        dit(/prix/.test(li[0] || '') && /49,00\s*€/.test(li[1]) && /Reprendre le prix/.test(li[1]), `${T} 13. la liste dit l'écart du brouillon (59 € ici, 49 € sur Vinted), avec « Reprendre le prix »`, li[1].replace(/\s+/g, ' '));
+        await pg.click('[data-brouillon-choix="b-41"]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif-ligne="b-41"]', { timeout: 8000 });
+        const pl = await pg.$eval('[data-planif-ligne="b-41"]', (e) => { const x = e.querySelector('[data-planif-ecart-vinted]'); return [x && x.getAttribute('data-planif-ecart-vinted'), e.innerText]; }).catch(() => [null, '']);
+        dit(/prix/.test(pl[0] || '') && /59,00\s*€/.test(pl[1]) && /49,00\s*€/.test(pl[1]), `${T} 13. le planificateur dit le prix qui partira (59 €) et celui de Vinted (49 €)`, pl[1].replace(/\s+/g, ' '));
+        await photo(pg, '[data-planif-ligne="b-41"]', `${tag}-13-planif`);
+        await pg.click('[data-planif-verifier]');
+        await pg.waitForFunction(() => { const b = document.querySelector('[data-planif-confirmer]'); return b && b.getAttribute('data-planif-confirmer') !== '0'; }, null, { timeout: 10000 });
+        const compris = await pg.$('[data-planif-compris]');
+        if (compris) await compris.check();
+        await pg.waitForFunction(() => { const b = document.querySelector('[data-planif-confirmer]'); return b && !b.disabled; }, null, { timeout: 10000 });
+        await pg.click('[data-planif-confirmer]');
+        await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).waitFor({ timeout: 5000 });
+        const t = await feuille(pg).innerText();
+        await photo(pg, 'div[style*="z-index: 2000"]', `${tag}-13-confirmation`);
+        await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
+        await pg.waitForTimeout(300);
+        dit(/ne part pas comme sur Vinted/.test(t) && /N°41 à 59,00\s*€ — sur Vinted : 49,00\s*€/.test(t), `${T} 13. la confirmation du planificateur redit l'écart, ligne par ligne`, t.replace(/\s+/g, ' ').slice(-160));
+        dit(!envois.some((x) => x.action === 'programmer'), `${T} 13. « Annuler » : AUCUNE programmation envoyée`);
+        await pg.click('[data-brouillon-prix-reprendre="b-41"]');
+        await pg.waitForFunction(() => !document.querySelector('[data-brouillon="b-41"] [data-brouillon-ecart-vinted*="prix"]'), null, { timeout: 8000 });
+        const b41 = (rows.find((r) => r.id === 'ebay_brouillons') || { data: { items: {} } }).data.items['b-41'] || {};
+        dit(b41.prix === '49' && b41.description === 'Mon texte de brouillon' && b41.etatBrouillon === 'brouillon', `${T} 13. « Reprendre le prix » écrit 49 dans CE brouillon (sa description reste la sienne), et l'écart de prix disparaît`, JSON.stringify({ prix: b41.prix, desc: b41.description }));
       });
       await essaie(`${T} rendu`, async () => {
         const fond = await pg.evaluate(() => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(getComputedStyle(document.body).backgroundColor) || [0, 255, 255, 255]; return (Number(m[1]) + Number(m[2]) + Number(m[3])) / 3; });
