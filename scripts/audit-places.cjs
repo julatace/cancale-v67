@@ -78,7 +78,7 @@ function projette(rows, url) {
   });
 }
 
-function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
+function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef, mainPlus) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -104,8 +104,8 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       //    §4.4). Servir la ligne brute ferait lire `main.vinted_annonce_numeros`
       //    sur un objet qui ne l'a pas → file VIDE, et l'audit crierait au loup
       //    sur un code intact. C'est le piège de l'écran Colis, deuxième fois.
-      if (/id=eq\.main/.test(u)) return j(projette([{ data: { vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
-        { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }], u));
+      if (/id=eq\.main/.test(u)) return j(projette([{ data: Object.assign({ vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
+        { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] }, mainPlus || {}) }], u));
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
       // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
       // ⚠️⚠️ ET ON APPLIQUE LA PROJECTION POUR DE VRAI (§6.3). Le code demande
@@ -236,8 +236,9 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
     // ── LE TITRE eBAY : LA MÊME RÈGLE QUE LEBONCOIN, AVEC 80 CARACTÈRES ──────
     // Mesuré le 13 septembre sur ses 53 annonces en ligne : l'ancien
     // `buildEbayAd` recollait marque + titre sans regarder si le titre portait
-    // déjà la marque → **18 titres sur 53 en « Nike nike shox tl »**, et 51 en
-    // « taille 42 » au lieu de « T42 ». Deux règles pour une notion, c'est §11.
+    // déjà la marque → **18 titres sur 53 en « Nike nike shox tl »**. Deux règles
+    // pour une notion, c'est §11. ⚠️ 15 octobre : Julien tranche « taille 42 » en
+    // toutes lettres (plus « T42 ») — la MÊME règle, donc eBay aussi.
     {
       const cas = [
         ['Nike', 'nike shox tl noir et vert', '36'],
@@ -253,8 +254,9 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
           if (mots[i] && mots[i].toLowerCase() === mots[i - 1].toLowerCase()) mauvais.push('doublon : « ' + titre + ' »');
         }
         if (titre.length > 80) mauvais.push('trop long : ' + titre.length);
-        if (/\btaille\s/i.test(titre)) mauvais.push('« taille » au long : « ' + titre + ' »');
-        if (z2 && !new RegExp('T' + z2.replace('.', '[.,]') + '$').test(titre)) mauvais.push('taille absente de la fin : « ' + titre + ' »');
+        if (/\bT\d/.test(titre)) mauvais.push('« T42 » au lieu de « taille 42 » : « ' + titre + ' »');
+        if ((titre.match(/\btaille\b/gi) || []).length > 1) mauvais.push('« taille » écrit deux fois : « ' + titre + ' »');
+        if (z2 && !new RegExp('taille ' + z2.replace('.', '[.,]') + '$').test(titre)) mauvais.push('« taille ' + z2 + ' » absente de la fin : « ' + titre + ' »');
       }
       dit(mauvais.length === 0, 'eBay : la marque n\'est jamais doublée et la taille est en suffixe',
         mauvais[0] || '4 cas réels vérifiés');
@@ -526,11 +528,17 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
         if (r2.length > 50) { dit(false, 'aucun titre ne dépasse 50 caractères', `${r2.length} : « ${r2} »`); break; }
       }
       dit(cas.every(([b, t, z]) => lbcApp(b, t, z).length <= 50), 'aucun titre ne dépasse les 50 caractères de Leboncoin');
-      // ⚠️ Coupé en plein mot : c'est LE défaut mesuré (6 titres sur 59).
-      const coupe = cas.map(([b, t, z]) => lbcApp(b, t, z)).filter(r2 => {
-        if (r2.length < 45) return false;                    // pas au plafond
-        return /[a-zà-ÿ]$/i.test(r2) && !/\bT\d/.test(r2.slice(-6));
-      });
+      // ⚠️ Coupé en plein mot : c'est LE défaut mesuré (6 titres sur 59). On
+      //    juge le DERNIER MOT du modèle (avant « taille … ») : il doit exister
+      //    tel quel dans le titre Vinted ou la marque — un morceau de mot n'y est pas.
+      const motsDe = (x) => new Set(String(x || '').toLowerCase().split(/[\s/]+/).filter(Boolean));
+      const coupe = cas.map(([b, t, z]) => [b, t, lbcApp(b, t, z), z]).filter(([b, t, r2, z]) => {
+        // Le suffixe de taille (quelle que soit sa forme) n'est pas le modèle.
+        const zq = String(z || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const coeur = (zq ? r2.replace(new RegExp('\\s+(?:taille\\s+|T)?' + zq + '$', 'i'), '') : r2).trim();
+        const der = (coeur.split(/\s+/).pop() || '').toLowerCase();
+        return !!der && !motsDe(t).has(der) && !motsDe(b).has(der);
+      }).map((x) => x[2]);
       dit(coupe.length === 0, 'aucun titre ne se termine au milieu d\'un mot', coupe[0] || '');
       // ⚠️ NON-CHAUSSURES : une taille LETTRE ne devient jamais « TM »/« TL »
       //    (le « T » n'est une pointure que pour un nombre). Et la taille lettre
@@ -538,8 +546,8 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       //    donnait « … TM » → ce contrôle rougit.
       const mSweat = lbcApp('Nike', 'sweat tech fleece gris', 'M');
       const lPolo = lbcApp('Lacoste', 'polo piqué blanc', 'L');
-      dit(!/\bT[A-Za-zÀ-ÿ]\b/.test(mSweat) && !/\bT[A-Za-zÀ-ÿ]\b/.test(lPolo) && /\bM$/.test(mSweat) && /\bL$/.test(lPolo),
-        'une taille LETTRE (M, L) n\'est pas corrompue en « TM »/« TL »',
+      dit(!/\bT[A-Za-zÀ-ÿ]\b/.test(mSweat) && !/\bT[A-Za-zÀ-ÿ]\b/.test(lPolo) && /\btaille M$/.test(mSweat) && /\btaille L$/.test(lPolo),
+        'une taille LETTRE s\'écrit « taille M » / « taille L » (jamais « TM »/« TL »)',
         `« ${mSweat} » · « ${lPolo} »`);
       // Et l'app == extension sur ces cas non-chaussures (une seule règle, §11).
       const divNS = [['Nike', 'sweat tech fleece gris', 'M'], ['Louis Vuitton', 'sac speedy 30 monogram', '']]
@@ -550,16 +558,21 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
         .filter(([b, r2]) => b && (r2.toLowerCase().split(b.toLowerCase()).length - 1) > 1);
       dit(double.length === 0, 'la marque n\'apparaît jamais deux fois', double.length ? double[0][1] : '');
       // La taille survit TOUJOURS : c'est sur elle qu'un acheteur filtre.
-      // ⚠️ Numérique (pointure) → suffixe « T{n} » ; lettre (M/L…) → « {z} » sans
-      //    le T (une taille lettre n'est pas une pointure — Julien, 20 sept.).
+      // ⚠️⚠️ 15 octobre — Julien : « au lieu de mettre taille 43 il a mis T43 ».
+      //    Pointure ET taille lettre : « taille {z} » en toutes lettres, à la fin,
+      //    une seule fois, et jamais « T{n} ».
       const sansTaille = cas.filter(([b, t, z]) => {
         if (!z) return false;
-        const est = /^\d{1,2}([.,]\d)?$/.test(z);
-        const attendu = est ? 'T' + z.replace('.', '[.,]') + '$' : z + '$';
-        return !new RegExp(attendu).test(lbcApp(b, t, z));
+        const r2 = lbcApp(b, t, z);
+        return !new RegExp(' taille ' + z.replace('.', '[.,]') + '$').test(r2) || /\bT\d/.test(r2) || (r2.match(/\btaille\b/gi) || []).length !== 1;
       });
-      dit(sansTaille.length === 0, 'la taille est toujours à la fin, même sur un titre long',
+      dit(sansTaille.length === 0, '« taille 43 » en toutes lettres, à la fin, une fois (jamais « T43 »), même sur un titre long',
         sansTaille.length ? '« ' + lbcApp(...sansTaille[0]) + ' »' : '');
+      // Le cas réel du 15 octobre, au plafond : un titre long — c'est un mot du
+      // MODÈLE qui part, jamais la taille, et rien n'est coupé en plein mot.
+      const long = lbcApp('Nike', 'nike air max plus tn ultra triple black reflective taille 43', '43');
+      dit(long.length <= 50 && / taille 43$/.test(long) && !/\bT43\b/.test(long),
+        'titre long : « taille 43 » tient dans les 50 caractères, un mot du modèle part avant elle', `« ${long} » (${long.length})`);
     }
   }
 
@@ -593,6 +606,53 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       const a3 = ctxD.buildLbcAd(raw, { description: vraie }, '603', 'x');
       dit(/dunk low sb/.test(a3.description) && a3.aDescription === true,
         'mais une VRAIE description est gardée entière', 'un filtre trop large viderait ses annonces');
+    }
+  }
+
+  // ── 15 OCTOBRE : « UN PRIX AU PIF » ET « LA LOCALISATION QUE LE VENDEUR A
+  //    REMPLIE DANS VRM » ─────────────────────────────────────────────────────
+  // Mesuré sur SON dépôt du 15 octobre (`lbc_recon`) : Leboncoin pré-remplit le
+  // prix (`price_reco`), et l'annonce partait avec. Le prix posé doit être
+  // EXACTEMENT celui de l'annonce Vinted EN LIGNE (le dressing, relu au clic),
+  // et l'app doit montrer le MÊME (§11). Le lieu : la ville qu'il a remplie dans
+  // VRM (`vrm_ville`), ou rien — jamais une ville devinée.
+  {
+    const ctxP = ctxAvec({});
+    // ⚠️ Un audit ne meurt pas et ne saute pas ses contrôles : chaque moitié est
+    //    jugée pour elle-même (sur le code d'avant, `prixVinted` n'existe pas,
+    //    mais `buildLbcAd` si — et c'est lui qui prenait le prix d'un vieux détail).
+    dit(typeof ctxP.prixVinted === 'function', 'l\'extension a UNE règle de prix (`prixVinted`)', typeof ctxP.prixVinted === 'function' ? '' : 'introuvable');
+    if (typeof ctxP.buildLbcAd !== 'function') {
+      dit(false, 'l\'extension a `buildLbcAd`', 'introuvable');
+    } else {
+      // Le DRESSING (la lecture la plus récente) prime sur un détail ancien.
+      const a = ctxP.buildLbcAd({ id: '7001', title: 'nike air max 1', brand_title: 'Nike', size_title: '43', price: { amount: '49.0', currency_code: 'EUR' } },
+        { price: { amount: '120.0', currency_code: 'EUR' } }, '7', 'x');
+      dit(a.price === 49, 'le prix posé est celui de l\'annonce EN LIGNE (dressing), pas celui d\'un détail ancien', 'price = ' + JSON.stringify(a.price) + ' (attendu 49)');
+      const b2 = ctxP.buildLbcAd({ id: '7002', title: 'x', price: null }, {}, '8', 'x');
+      dit(b2.price === null, 'prix inconnu ⇒ `null`, jamais un nombre deviné', 'price = ' + JSON.stringify(b2.price));
+      const c2 = ctxP.buildLbcAd({ id: '7003', title: 'x', price: { amount: '30', currency_code: 'GBP' } }, {}, '9', 'x');
+      dit(c2.price === null, 'une autre devise n\'est jamais convertie au hasard', 'price = ' + JSON.stringify(c2.price));
+      const t43 = ctxP.buildLbcAd({ id: '7004', title: 'Nike air force 1 blanche T43', brand_title: 'Nike', size_title: '43', price: { amount: '45' } }, {}, '10', 'x');
+      dit(/ taille 43$/.test(t43.title) && !/\bT43\b/.test(t43.title), 'le titre publié écrit « taille 43 », jamais « T43 »', `« ${t43.title} »`);
+      // L'app et l'extension : le MÊME prix sur les mêmes entrées (§11).
+      const mP = /const prixVinted = \(p\) => \{[\s\S]*?\n\};/.exec(APP);
+      dit(!!mP, 'l\'app a sa copie de `prixVinted` (le prix qu\'elle affiche dans la file)');
+      if (mP && typeof ctxP.prixVinted === 'function') {
+        const pApp = new Function('"use strict"; ' + mP[0] + ' return prixVinted;')();
+        const casP = [{ amount: '49.0', currency_code: 'EUR' }, { amount: '49,90' }, '35.5', 60, '0', null, '', { amount: 'abc' }, { amount: '12', currency_code: 'USD' }, '1 200,00 €'];
+        const div = casP.filter((x) => JSON.stringify(pApp(x)) !== JSON.stringify(ctxP.prixVinted(x)));
+        dit(div.length === 0, `l'app et l'extension rendent le MÊME prix (${casP.length - div.length}/${casP.length})`, div.length ? JSON.stringify(div[0]) : '');
+      }
+      const ctxV = ctxAvec(NUMEROS, [], undefined, undefined, undefined, undefined, { vrm_ville: 'Vannes' });
+      const rV = await ctxV.buildLbcData();
+      const adV = (rV.queue || [])[0] || {};
+      dit(adV.lieu === 'Vannes' && adV.lieuEtat === 'ok', 'le dépôt reçoit la ville que le vendeur a remplie dans VRM', JSON.stringify({ lieu: adV.lieu, lieuEtat: adV.lieuEtat }));
+      dit(adV.price === 40, 'et le prix de l\'annonce en ligne (40 €), en nombre', 'price = ' + JSON.stringify(adV.price));
+      const rS = await ctxAvec(NUMEROS).buildLbcData();
+      const adS = (rS.queue || [])[0] || {};
+      dit(adS.lieu === '' && adS.lieuEtat === 'vide', 'rien de rempli dans VRM ⇒ aucun lieu deviné, et l\'état le DIT', JSON.stringify({ lieu: adS.lieu, lieuEtat: adS.lieuEtat }));
+      dit(/vrm_ville/.test(APP) && /function VilleSetting/.test(APP), 'l\'app a un endroit où remplir « Ta ville » (Réglages)');
     }
   }
 

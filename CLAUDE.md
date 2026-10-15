@@ -2779,6 +2779,9 @@ existant, sur-exclure fait perdre). `audit-places.cjs` sert un compte dans
   rien de neuf. Extension en **5.81.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
 ### ⚠️⚠️ LE PRIX PARTAIT À 0,54 € — LE CHAMP LEBONCOIN EST EN CENTIMES
+> ⚠️⚠️ **FAUX — remesuré le 15 octobre** (section « Publication Leboncoin : le
+> prix de Vinted, « taille 43 », le lieu… ») : le champ `price_cents` s'écrit
+> en **EUROS**. Cette règle venait du NOM du champ, jamais d'une page vue.
 Julien a fait ses dépôts le 17 septembre, et la **carte du formulaire est enfin
 arrivée** (`lbc_recon.etapes`). Mesuré le 19 septembre — l'étape cœur porte
 `subject` (titre), **`body`** (description), **`price_cents`** (prix), `location`.
@@ -8984,6 +8987,98 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### ⚠️⚠️ PUBLICATION LEBONCOIN : LE PRIX DE VINTED, « TAILLE 43 », LE LIEU, LA LIVRAISON (15 octobre)
+Plainte de Julien : « dans le titre au lieu de mettre taille 43 il a mis T43, et
+il a mis un prix au pif, je veux le même que sur Vinted ; la localisation doit
+être ce que le vendeur a rempli dans VRM ; activer la livraison, puis continuer ».
+**Mesuré d'abord, sur SON dépôt du 15 octobre à 06:19** (`lbc_recon.etapes` et
+`lbc_recon.envois`, lecture seule, structure seulement) :
+- **Le prix au pif est celui de LEBONCOIN.** Le champ `price_cents` (« Prix de
+  vente souhaité* ») était **déjà rempli (3 caractères)** à la première seconde
+  de l'étape — pas par nous : son prix Vinted est 49 €, « 4900 » en centimes
+  (4 caractères). L'envoi du dépôt porte `attributes.price_reco` et
+  `attributes.predicted_price` : Leboncoin **recommande un prix et l'écrit**.
+  L'ancien `poserPrix(…, siVide)` ne touchait pas un champ rempli → la
+  recommandation partait. Même mécanique le 20 septembre (3 caractères).
+- **Le champ s'écrit en EUROS.** Il l'a corrigé à la main : 2 caractères
+  (« 49 »). La règle « centimes » de la 5.82 venait du nom (`price_cents`, celui
+  de l'ENVOI), jamais d'une page vue — elle aurait écrit 4 900 € le jour où le
+  champ aurait été vide.
+- **Le lieu** : `name="location"`, `role="combobox"` (« Adresse »), liste
+  `role="listbox"` d'options « Vannes (56000) », « Rocade de Vannes, Vannes
+  (56000) », « Vannes-sur-Cosson (45510) »… Il a tapé « Vannes » (6 car.) puis
+  choisi « Vannes (56000) » (14 car.). Rien ne le remplissait.
+- **La livraison** : un `button role="checkbox"` (« Désactiver la livraison »,
+  `aria-checked="true"`) qui n'apparaît **qu'après** le choix du lieu.
+- **Ce que VRM a de rempli** (sa base) : `vrm_ville` = « Vannes » (ligne `main`,
+  synchronisée) ; `vrm_pro_facture` a ville, CP et adresse **vides**. Et plus
+  aucun écran ne permettait de changer `vrm_ville` (recherche de relais par
+  ville retirée, #245).
+
+**Tranché (Julien ne veut pas de questions)** :
+1. **Titre : « taille 43 » en toutes lettres** (« taille M » pour une lettre),
+   à la fin, une fois, jamais rognée — un mot du modèle part avant elle (50
+   car. Leboncoin, 80 eBay : la MÊME `lbcTitre`, app = extension, §11). Ça
+   remplace le « T43 » de septembre. `ebayTitre` (app) n'est plus qu'un appel à
+   `lbcTitre` (sinon « taille 44 taille 44 »).
+2. **Prix : celui de l'annonce Vinted EN LIGNE** (`prixVinted`, la même dans
+   l'app et l'extension : `{amount, currency_code}`, autre devise ou illisible ⇒
+   `null`), lu dans le **dressing** relu au clic « Publier » — le détail ancien
+   passait devant et l'app affichait déjà le dressing (§11). Posé **en euros
+   par-dessus la recommandation de Leboncoin**, puis **relu** ; Leboncoin qui
+   réécrit après ⇒ reposé (3 fois au plus) ; relu n/100 ⇒ centimes (mesuré, pas
+   deviné). Inconnu ⇒ champ **vidé** (la recommandation est un nombre deviné),
+   dit au bandeau. Ce qu'il **tape** (frappe réelle, `isTrusted`) n'est jamais
+   touché. **« Continuer » ne part pas** tant que le prix n'est pas relu juste,
+   et **« Publier » non plus** : prix inconnu, faux ou jamais vu sur la page ⇒
+   rien n'est publié, le bandeau dit pourquoi (« pas su » ne vaut pas « oui »).
+3. **Lieu : `vrm_ville`, une source, un propriétaire** — Réglages → « Ta ville »
+   (`VilleSetting`, rattrapé par `onCloudReady`). L'entité de facturation n'est
+   PAS un repli (c'est l'adresse qui facture). L'extension tape la ville et ne
+   choisit que la suggestion « Ville (CP) » **identique** (accents, casse et
+   tirets mis à part ; CP identique s'il l'a donné) — une rue, « Vannes-sur-
+   Cosson » ou deux villes homonymes ⇒ rien de choisi, et c'est dit. Vide ⇒ rien
+   de deviné, le bandeau renvoie à Réglages.
+4. **Livraison** : `activerLivraison` (déjà là) l'active si elle est éteinte —
+   jamais une option payante (la garde ARGENT de `publierSansBooster` est
+   intacte) ; pas trouvée alors que le lieu est choisi ⇒ dit au bandeau.
+5. Le bandeau dit en UNE ligne « Prix 49 € (celui de Vinted) · Lieu Vannes
+   (56000) · Livraison activée », l'ambre seulement s'il a un geste à faire.
+
+**Preuves** (§6.1 : copie `git archive w15`, contrôles lancés depuis la copie) :
+- `audit-places.cjs` : **14 rouges sur w15**, 0 après (titre « taille », eBay,
+  prix du dressing, `prixVinted` app = extension sur 10 cas, lieu `ok`/`vide`,
+  « Ta ville »). L'heuristique « coupé en plein mot » juge le dernier mot du
+  MODÈLE (suffixe de taille ôté), plus la forme du suffixe.
+- `bancs/leboncoin.cjs` (port `LBC_PORT`, `LBC_SRC` pour une copie mutée) sert
+  la vraie forme de l'étape (recommandation « 120 » posée avant ET réécrite en
+  retard, combobox du lieu, livraison qui apparaît après le lieu, « Continuer »
+  grisé) et le parcours jusqu'aux options (SPA, « Continuer » remplace l'étape
+  sur place). **21 rouges sur w15, 102 verts après**, et rouge sous trois
+  mutations de `lbc.js` : prix pré-rempli cru (5 rouges), « la première ville
+  de la liste » (2), publication sans prix vu (2).
+- `audit-places.cjs` réaffaibli : l'ancien suffixe « T43 » (4 rouges), le détail
+  ancien avant le dressing (1).
+- Rendu : « Ta ville » à 1512 et 390 px (lit « Vannes » du nuage, écrit à la
+  frappe) ; `verif_visuel`, `publier`, `detourage-reglage` verts ; `ebay-form`
+  (« taille 44 » vert) et `capacites` gardent les mêmes rouges que sur w15
+  (bouton eBay en double · grille d'Annonces non rendue sur les fixtures du jour).
+- Audits : `audit-chiffres`, `audit-commandes` et la ligne « lireVentesVinted-
+  Prouvees » d'`audit-preuve-vente` sont rouges sur w15 aussi ; `audit-extension-
+  zip`, la ligne « version déjà publiée » d'`audit-preuve-vente` et les seuils
+  5.178 d'`audit-coherence` attendent le bump de version (session principale).
+  `audit-numerotation-lecteurs` exigeait l'ORDRE des clés de `MAIN_FILE` : il
+  suit maintenant la règle (le marqueur est projeté).
+
+**Non mesuré** : la page réelle (Leboncoin rend 403 ici) — que le combobox réel
+réponde au `setField` + clic d'option comme le banc (forme mesurée, interaction
+pas vue) ; qu'aucune autre étape ne pré-remplisse le prix. `EXT_CAPACITES.lbctitre`
+et `lbclieu` valent **5.178.0** (la version que la session principale montera) :
+tant que le manifeste est en 5.177, `audit-coherence` dit ces seuils
+« inatteignables » — c'est attendu, ça se règle au bump.
+**Geste de Julien** : vérifier « Ta ville » dans Réglages (Vannes), installer
+l'extension montée, et publier une paire depuis VRM.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -8996,7 +9091,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
 | `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
 | `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
-| `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
+| `lbctitre` | `lbcTitre` | **5.178.0** (15 oct. — « taille 43 » ; 5.55.4 pour l'ancienne règle) | « le titre exactement tel qu'il partira sur Leboncoin, au prix Vinted » |
+| `lbclieu` | `lieuVendeur` | **5.178.0** (15 oct.) | « Ta ville » = le lieu des annonces Leboncoin |
 | `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |

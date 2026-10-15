@@ -107,6 +107,18 @@ const lbcDescription = (brut) => {
   return t.replace(/^\s*Description\s*(?=\S)/, '').trim();
 };
 
+// ⚠️ COPIE EXACTE de `prixVinted` de background.js (audit-places compare les
+// sorties) : le prix d'une annonce Vinted, en euros — `{amount, currency_code}`,
+// un nombre ou une chaîne ; autre devise, illisible, nul ⇒ `null` (pas su).
+const prixVinted = (p) => {
+  if (p === undefined || p === null || p === '') return null;
+  let v = p, dev = '';
+  if (typeof p === 'object') { v = p.amount; dev = String(p.currency_code || p.currency || '').toUpperCase(); }
+  if (dev && dev !== 'EUR') return null;
+  const n = typeof v === 'number' ? v : Number(String(v === undefined || v === null ? '' : v).replace(/[\s  €]/g, '').replace(',', '.'));
+  return (Number.isFinite(n) && n > 0) ? Math.round(n * 100) / 100 : null;
+};
+
 const LBC_TITRE_MAX = 50;
 const lbcTitre = (brand, base, size, max) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
@@ -117,17 +129,17 @@ const lbcTitre = (brand, base, size, max) => {
   let vue = null;
   t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       .replace(/\btailles?\s*:?\s*(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|TU)\b/i, (m, n) => { if (!vue) vue = n; return ''; })
        .replace(/\s+/g, ' ').trim();
   const taille = String(size || vue || '').replace(/^t(?=\d)/i, '').trim();
   const b = String(brand || '').trim();
   if (b && !new RegExp('\\b' + bq + '\\b', 'i').test(t)) t = b + ' ' + t;
   t = t.replace(/\s+/g, ' ').trim();
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  // ⚠️ Le « T » n'est une POINTURE que pour un nombre (chaussures) : une taille
-  //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
-  //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
-  const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
-  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
+  // ⚠️⚠️ 15 octobre — Julien : « taille 43 », pas « T43 » (ni « TM ») : la
+  //    taille en toutes lettres, en suffixe, jamais rognée (un mot du modèle
+  //    part avant elle). Même règle qu'à `background.js`, eBay compris.
+  const suff = taille ? ' taille ' + taille : '';
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);
@@ -200,7 +212,13 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
+// ⚠️ `lbctitre` / `lbclieu` (15 octobre) : « taille 43 » au lieu de « T43 », le
+//    prix Vinted posé par-dessus la recommandation de Leboncoin, et la ville du
+//    vendeur dans « Location » arrivent ENSEMBLE, dans la version que la
+//    session principale montera (5.178.0 prévue). Jusqu'à ce bump, le seuil est
+//    plus haut que le manifeste : l'app dit « mets à jour » plutôt que de
+//    promettre un titre, un prix ou un lieu que l'extension installée ne pose pas.
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.178.0', lbclieu: '5.178.0', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11156,24 +11174,12 @@ const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1
 // `ebayGere:true` et eBay applique sa livraison gérée (il propose le prix à
 // l'acheteur, l'encaisse, fournit le bordereau). Plus de table de transporteurs
 // côté app : ce serait promettre un choix qu'eBay ne nous laisse pas faire.
-// Titre eBay : comme lbcTitre mais la pointure s'écrit « taille 36 » en toutes
-// lettres (demande de Julien : pas « T36 »). ≤ 80 caractères, coupé sur un mot.
+// Titre eBay : LA règle de `lbcTitre`, avec le plafond d'eBay (80 caractères).
+// Depuis le 15 octobre `lbcTitre` écrit lui-même « taille 36 » en toutes lettres
+// (Leboncoin comme eBay) : la seconde règle qui retirait « T36 » pour le
+// réécrire n'a plus lieu d'être — elle aurait rendu « … taille 36 taille 36 ».
 function ebayTitre(base, taille, max) {
-  const M = max || 80;
-  const t = String(taille || '').replace(/^t(?=\d)/i, '').trim();
-  const estNum = /^\d{1,2}(?:[.,]\d)?$/.test(t);
-  // Taille lettre (M, L…) : lbcTitre suffit (il n'écrit pas « TM »). Pointure
-  // numérique : Julien veut « taille 44 » en toutes lettres, pas « T44 ». Or
-  // lbcTitre rajoute toujours « T44 » même quand on ne lui passe pas de taille
-  // (il la relit dans le titre) : on retire ce « T44 » final et on réécrit.
-  if (!estNum) return lbcTitre('', base, taille, M);
-  const suff = ' taille ' + t;
-  let core = lbcTitre('', base, '', M).replace(/\s+T\d{1,2}(?:[.,]\d)?$/i, '').trim();
-  if ((core + suff).length > M) {
-    const c = core.slice(0, M - suff.length); const e = c.lastIndexOf(' ');
-    core = (e > 12 ? c.slice(0, e) : c).replace(/[\s,;:/-]+$/, '');
-  }
-  return (core + suff).trim();
+  return lbcTitre('', base, taille, max || 80);
 }
 // ⚠️ DÉFINI AU NIVEAU MODULE, PAS DANS EbayPublier. Un composant défini dans le
 // rendu prend une NOUVELLE identité à chaque frappe → React démonte/remonte tout
@@ -34938,7 +34944,7 @@ function LeboncoinScreen() {
           : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
         if (it.is_closed || it.is_hidden || it.is_draft) continue;
         onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid);
-        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
+        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: prixVinted(it.price), photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
       }
     }
     // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
@@ -35043,7 +35049,7 @@ function LeboncoinScreen() {
       queue.push({
         id: o.id, numero: String(num), vinted: o.title || (e && e.title) || '',
         title: lbcTitre(d.brand || o.brand, d.title || o.title, d.size || o.size),
-        prix: o.price != null ? Number(o.price) : null,
+        prix: o.price,   // `prixVinted` (§11) : le prix EXACT de l'annonce en ligne, celui que l'extension posera — `null` = pas su
         photos, photosAll, nReelles, vignette: photosAll[0] || '',
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
@@ -35086,7 +35092,7 @@ function LeboncoinScreen() {
     // Les paires qu'il a encore en ligne sur Vinted, avec leur N° : ce sont elles
     // qu'une annonce Leboncoin peut désigner. Proposées, jamais reliées seules.
     const candidats = online.filter((o) => numeros[o.id] && numeros[o.id].numero)
-      .map((o) => ({ numero: String(numeros[o.id].numero), titre: o.title || '', marque: o.brand || '', taille: o.size || '', prix: o.price != null ? Number(o.price) : null, photo: o.photo || '' }));
+      .map((o) => ({ numero: String(numeros[o.id].numero), titre: o.title || '', marque: o.brand || '', taille: o.size || '', prix: o.price, photo: o.photo || '' }));
     const suggPour = (titre, prix) => suggestionsPaires({ titre, prix }, candidats);
     const aRelierVentes = dv.aRelier.map(({ vente, ad }) => ({ vente, ad, suggestions: suggPour(vente.title || ad.subject, vente.price != null ? Number(vente.price) / 100 : ad.price) }));
     const doublons = dv.doublons.map((d) => ({ ...d, vintedUrl: d.surVinted[0] ? 'https://www.vinted.fr/items/' + d.surVinted[0] : '' }));
@@ -35342,10 +35348,10 @@ function LeboncoinScreen() {
                 quatre fois (le zip, les codes de retrait, les places, eBay). */}
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
               {extSait('lbctitre') === 'ok'
-                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). L'extension y joint la description et les photos, puis publie sans option payante.</>
+                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, « taille … » à la fin), au prix Vinted affiché. L'extension y joint la description et les photos, puis publie sans option payante.</>
                 : extSait('lbctitre') === 'absente'
                   ? <>Voici le titre <b>que l'extension proposera</b> sur Leboncoin (50 caractères max, la taille à la fin). La publication se fait depuis ton ordinateur, avec l'extension.</>
-                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
+                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (« T43 » au lieu de « taille 43 »). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
             </div>
             {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
                 C'est la loi de l'écran Colis : mesuré ici, 54 des 59 annonces
@@ -35890,6 +35896,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         <RepondreSetting/>
         <DetourageSetting/>
       </>)}
+      <VilleSetting/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
@@ -36544,6 +36551,37 @@ function PrenomSetting() {
         Il sert uniquement à te dire bonjour sur l'écran d'accueil. Laisse vide et l'app dira simplement «&nbsp;Bonjour&nbsp;».
       </div>
       <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
+        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
+    </div>
+  );
+}
+
+// ── TA VILLE : LE LIEU DE TES ANNONCES LEBONCOIN (15 octobre) ──────────────
+// Julien : « pour la localisation il doit mettre ce que le vendeur a rempli dans
+// VRM ». Mesuré : la seule localisation remplie chez lui est `vrm_ville`
+// (« Vannes », synchronisée) — et plus AUCUN écran ne permettait de la changer
+// depuis le retrait de la recherche de points relais par ville (#245). Elle a
+// donc UN propriétaire (ce champ) et UN lecteur (l'extension, `lieuVendeur`,
+// qui la tape dans le champ « Location » du dépôt et ne choisit que la
+// suggestion « Ville (CP) » qui lui correspond exactement). Vide ⇒ l'extension
+// ne devine rien et le bandeau du dépôt renvoie ici.
+function VilleSetting() {
+  const [v, setV] = React.useState(() => String(load('vrm_ville', '') || ''));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
+    setV((p) => p || String(load('vrm_ville', '') || ''));
+  }), []);
+  const ecrire = (t) => { touche.current = true; const n = t.slice(0, 80); setV(n); save('vrm_ville', n.replace(/\s+/g, ' ').trim()); };
+  const cap = extSait('lbclieu');
+  return (
+    <div data-reglage-ville style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ta ville</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+        Le lieu de tes annonces Leboncoin (ex. « Vannes » ou « Vannes 56000 »).
+        {cap === 'retard' ? <> Ton extension doit être en {EXT_CAPACITES.lbclieu} ou plus pour la poser.</> : null}
+      </div>
+      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Ville" autoComplete="address-level2"
         style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
     </div>
   );
