@@ -4088,6 +4088,49 @@ d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
 - Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
   modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
 
+### « Mets un petit logo à côté » — où est chaque paire, et Vestiaire Collective (15 octobre)
+Julien : « on ne sait pas sur quelle plateforme est postée chaque annonce ».
+**Mesuré (lecture seule)** : `vinted_lbc_posted` = 1 identifiant, écrit au
+**clic** « Publier » le 15 oct. (`markPosted`, sans preuve) ; `lbc_listings` pas
+relu depuis le 10 oct., ses 3 annonces reliées portent B233/B247/B271 (annonces
+Vinted fermées) ; `ebay_listings` = 1 annonce **sans SKU** ; `vc_recon` absente.
+- **Une règle** `presencesPaires` (App.jsx, §11) pour la carte, les filtres, la
+  ligne de chiffres, la fiche et la baisse des paires qui dorment. Un logo
+  (monochrome, `/brands/*.svg`, ouvre l'annonce) seulement sur une présence
+  **PROUVÉE** : Vinted (la carte) · Leboncoin (annonce À LUI, active, pas vendue
+  là-bas, une clé `clesAnnonceLbc` = le N°) · eBay (SKU via `numEbayLu`, remise à
+  zéro comprise ; ni épuisée ni terminée). Un N° porté par deux fiches ne désigne
+  personne. **« Demandée » ≠ « publiée »** : `vinted_lbc_posted` seul donne
+  « Leboncoin à vérifier », jamais un logo — l'ancien « Aussi sur Leboncoin »
+  déduit du clic est retiré. Chez lui aujourd'hui : logo Vinted partout, N°2
+  « à vérifier », aucun autre logo (rien n'est prouvé).
+- Le compte n'est écrit que s'il distingue (§7) ; la fiche (« Gérer l'annonce »)
+  dit, par plateforme : en ligne · compte · « vue il y a N j » · voir ↗ /
+  demandée / aucune annonce reliée / pas pu lire / pas jugé (N° ambigu).
+- Filtres Leboncoin · eBay · À vérifier · Seulement Vinted : n'existent que s'ils
+  trouvent quelque chose ; « Seulement Vinted » seulement si Leboncoin ET eBay
+  sont lus en entier. Une source illisible se dit UNE fois. Sur téléphone la
+  rangée défile au doigt.
+- ⚠️ Égress : les annonces Leboncoin (227 Ko) passent par `lbcAnnoncesSession`
+  (une lecture par session, partagée avec le tableau de bord) ; eBay 2 Ko,
+  ventes Leboncoin projetées. Lues seulement sur l'écran Annonces.
+- **Vestiaire Collective** : nom complet (navigation, en-tête), monogramme « VC »
+  dessiné pour VRM (pas le logo officiel, `public/brands/README.md`), mêmes
+  sections que les autres (Ventes · Achats · Annonces · Compte). « Bientôt
+  disponible » sur les trois premières, jamais sur Compte (la mesure de forme,
+  qui marche). Pas de bande de chiffres : elle ne pourrait rien afficher (§7).
+  L'ancien hub `Plateforme`, sans autre appelant, est retiré (§4.11).
+- Preuves : `audit-presences.cjs` (la vraie règle dans un `vm`) **22 contrôles**,
+  mutations demandée→en ligne **3 rouges**, rapprochement par titre **2**,
+  N° ambigu **1**, statut ignoré **1**, SKU sans remise à zéro **1** ; banc
+  `annonces-plateformes.cjs` (port 5921, inventé, 390/1512, clair/sombre)
+  **87 contrôles** ; **55 rouges** sur le build de w15, mutations « demandée =
+  en ligne » **20 rouges**, « Bientôt sur Compte + nom court » **3**. Bancs
+  `annonces-carte*.cjs` et `vestiaire.cjs` mis à jour (la règle a changé).
+- **Non fait** : Vestiaire ne montre aucune annonce (rien n'est capté) ; le
+  « publiée » Leboncoin attend la confirmation de dépôt (chantier
+  D-publication-11) et la relecture de « Mes annonces ».
+
 ### Numéros à lettres : B125, C123… (3 octobre, 5.137)
 Demande du 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
 des fois B125, C123 ; rends la chose adaptable ». Cartographie complète d'abord

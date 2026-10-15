@@ -405,6 +405,21 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-stock-views { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
 .vrm-stock-views button { border:1px solid var(--vrm-line); border-radius:8px; background:transparent; color:var(--vrm-muted); padding:7px 10px; font:500 12px Inter,system-ui,sans-serif; cursor:pointer; }
 .vrm-stock-views button[aria-pressed="true"] { background:var(--vrm-ink); border-color:var(--vrm-ink); color:var(--vrm-bg); }
+/* Un logo de plateforme sur un filtre ALLUMÉ (fond encre) : la teinte inverse
+   de l'ordinaire, sinon il disparaît dans son fond (15 oct.). */
+.vrm-stock-views button[aria-pressed="true"] .vrm-brand-icon { filter:invert(1); }
+html[data-theme="dark"] .vrm-stock-views button[aria-pressed="true"] .vrm-brand-icon { filter:none; }
+/* Pareil dans le menu du téléphone : l'entrée active a le fond d'accent (encre
+   en clair, bleu en sombre) et le texte blanc — le logo (Vestiaire Collective y
+   vit) est blanc aussi, dans les deux thèmes. */
+[role="menuitem"][aria-current="page"] .vrm-brand-icon { filter:invert(1); }
+/* Sur téléphone, les vues rapides (dont les filtres par plateforme) DÉFILENT
+   au doigt au lieu de s'empiler sur trois lignes (§7, `.vrm-rangee`). */
+@media (max-width:1023px) {
+  .vrm-stock-views { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; min-width:0; max-width:100%; }
+  .vrm-stock-views::-webkit-scrollbar { display:none; }
+  .vrm-stock-views button { flex-shrink:0; white-space:nowrap; }
+}
 .vrm-filter-recap { display:flex; align-items:center; gap:8px; justify-content:space-between; color:var(--vrm-muted); font-size:11px; margin:6px 0 10px; }
 .vrm-filter-recap button { border:0; background:transparent; color:var(--vrm-ink); font:500 11px Inter,system-ui,sans-serif; padding:6px 0; cursor:pointer; }
 .vrm-photo-open { position:relative; display:block; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:zoom-in; overflow:hidden; }

@@ -7,7 +7,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4345;
+const PORT = Number(process.env.PORT) || 4345;
 const auj = new Date();
 const META = { vuAt: new Date(auj.getTime() - 2 * 3600e3).toISOString(), ver: '5.154.0', nChemins: '23', nPages: '6', nSchemas: '9' };
 let ko = 0;
@@ -44,13 +44,17 @@ srv.listen(PORT);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       await pg.goto(`http://localhost:${PORT}/?tab=plat_vestiaire`, { waitUntil: 'domcontentloaded' });
+      // 15 oct. : l'onglet a les mêmes sections que les autres plateformes ; la
+      // mesure (ce qui marche déjà) vit dans « Compte ».
+      await pg.waitForSelector('.vrm-platform-tabs [data-section="compte"]', { timeout: 10000 }).catch(() => {});
+      await pg.click('.vrm-platform-tabs [data-section="compte"]').catch(() => {});
       await pg.waitForSelector('[data-vc-mesure]', { timeout: 10000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-vc-mesure]'); return e ? { etat: e.getAttribute('data-vc-mesure'), t: e.innerText } : null; });
       const page = await pg.evaluate(() => document.body.innerText);
       if (etat === 'lu') dit(v && v.etat === 'lu' && /6 pages/.test(v.t) && /23 appels/.test(v.t) && /il y a 2 h/.test(v.t), 'relevé : les chiffres de la MESURE et sa date', v && v.t.slice(0, 120));
       if (etat === 'jamais') dit(v && v.etat === 'jamais' && /Vestiaire/.test(v.t), 'jamais relevé : le geste qui fait avancer', v && v.t.slice(0, 120));
       if (etat === 'panne') dit(v && v.etat === 'pas-su' && !/pages,/.test(v.t), 'lecture ratée : ni chiffre, ni « jamais »', v && v.t.slice(0, 120));
-      dit(/pas encore reliée/.test(page) && !/Vestiaire[^\n]{0,40}\d+,\d{2}\s?€/.test(page), 'aucun chiffre d’affaires Vestiaire n’est inventé');
+      dit(/Vestiaire Collective/.test(page) && !/Vestiaire[^\n]{0,40}\d+,\d{2}\s?€/.test(page) && !/\d+,\d{2}\s?€/.test(page), 'aucun chiffre d’affaires Vestiaire n’est inventé');
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
