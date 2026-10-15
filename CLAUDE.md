@@ -7453,11 +7453,16 @@ chiffres, pool 1…24 ⇒ prochain carton **25**.
   (`numerosDejaDonnes` + `prochainLibre`) et vaut « pas encore lu » avant le
   nuage, jamais « 1 ». La même carte vit aussi dans Stock → Aménager.
 - Preuves : banc `stock-2d.cjs` (port 5961, pièce inventée à la forme de la
-  sienne, 390/1512, clair/sombre) — **35 rouges** sur le build de w15 ; 5
-  mutations (pas su, sortie 2D, lecture ratée, pile ignorée, enregistrement au
-  choix) chacune rouge. `audit-numerotation-lecteurs` et `audit-identite`
-  suivent maintenant la règle dans le nouveau code (pas son orthographe) ;
-  `garage3d.cjs` choisit la 3D, `numeros-remise-a-zero.cjs` §G suit l'assistant.
+  sienne, 390/1512, clair/sombre) — **83 contrôles verts**, **35 rouges** sur
+  le build de w15 ; 5 mutations, chacune rouge (pas su 1 · sortie 2D 6 ·
+  lecture ratée 3 · pile ignorée 8 · enregistrement au choix 2).
+  `audit-numerotation-lecteurs` et `audit-identite` suivent maintenant la
+  règle dans le nouveau code (pas son orthographe) ; `garage3d.cjs` choisit la
+  3D, `numeros-remise-a-zero.cjs` §G suit l'assistant. ⚠️ Rouges AUSSI sur le
+  build de w15, donc pas de ce lot : `garage3d` (molette, ←, double-clic — non
+  élucidé : bouton visible et stable, clic qui expire ; machine à 24 de
+  charge), `annonces-carte` (1512 px), `verif_visuel` (vente eBay dans
+  « À faire »), `verif_dark` (rail < page).
 - **Pas fait** : « Ranger au stock » depuis Annonces ouvre toujours la vue par
   défaut sans le bandeau du N° (D-stock-9, une règle « rangée » pour trois
   lecteurs) ; le rendu 3D à la demande ; `pileAdd` propose « 1 » sur une pile
