@@ -150,6 +150,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
       'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
+      'AnnonceVeille :: a.image': 'photo d’une annonce eBay de la veille d’achat (src/VeilleAchat.jsx) : hôte d’images d’eBay seul (*.ebayimg.com, borné par le point), UNE règle PHOTO_EBAY (api/_lib/veille-regle.js) vérifiée par le serveur (lireItemEbay) ET à l’écran — jamais une photo Vinted',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];

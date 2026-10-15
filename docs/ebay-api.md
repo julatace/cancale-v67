@@ -88,3 +88,37 @@ publication réelle peut être refusée — c'est côté eBay, pas VRM.
   l'aveugle : un mauvais attribut sur une annonce publiée est le plus coûteux.
 
 Quand 1→4 sont faits, dis-moi **« eBay prêt »** — je branche la connexion.
+
+---
+
+## Veille d'achat — la recherche publique eBay (API Browse), 15 octobre
+
+La veille d'achat (eBay → Veille) cherche des annonces eBay **pour acheter**.
+Elle n'utilise **aucun compte eBay du vendeur** : elle lit avec le jeton de
+**l'application VRM** (`client_credentials`, scope
+`https://api.ebay.com/oauth/api_scope`), fabriqué avec `EBAY_APP_ID` /
+`EBAY_CERT_ID` (présentes en production, vérifié le 15 octobre — noms seuls).
+
+| ce que VRM appelle | pour quoi |
+|---|---|
+| `POST /identity/v1/oauth2/token` (`grant_type=client_credentials`) | le jeton de l'application, gardé en mémoire de l'instance jusqu'à 2 min avant son expiration (jamais en base) |
+| `GET /buy/browse/v1/item_summary/search` (`X-EBAY-C-MARKETPLACE-ID: EBAY_FR`, `X-EBAY-C-ENDUSERCTX: contextualLocation=country%3DFR`) | une requête par nom du modèle, les 100 plus récentes (`sort=newlyListed`), filtres `buyingOptions`, `price:[..max]`, `priceCurrency:EUR`, `deliveryCountry:FR`, `conditionIds`, `itemLocationCountry` |
+
+**Jamais** : `/buy/order`, `/buy/offer`, une enchère, un paiement. Le seul geste
+vers eBay est un lien `https://www.ebay.fr/itm/{n°}`.
+
+⚠️ **NON MESURÉ — aucun appel n'a été fait d'ici (réseau fermé vers eBay)** :
+- que le jeu de clés de production de VRM a bien l'accès à l'API Browse (si eBay
+  répond 403, l'écran dit « eBay refuse la recherche à l'application VRM ») ;
+- le quota quotidien réel de l'application (VRM se borne de lui-même : 30
+  vérifications par vendeur et par jour, 6 appels par vendeur au passage du
+  matin) ;
+- la forme exacte de la réponse sur eBay.fr (`itemSummaries`, `total`,
+  `shippingOptions[].shippingCost`) — une réponse sans annonces ni total est
+  dite « inattendue », jamais « 0 annonce » ; une livraison absente est « total
+  non confirmé », jamais 0.
+
+**Le geste qui le mesure** : eBay → Veille → « + Recherche » → « Tester sans
+enregistrer ». Si eBay refuse (403), ouvrir le portail développeur eBay
+(*Application Keys* → le jeu de clés **Production**) et vérifier que l'accès aux
+« Buy APIs / Browse » est accordé.

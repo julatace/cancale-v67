@@ -6782,6 +6782,181 @@ racine, rouge sur c4fa405 (copie `git archive`, contrôle lancé DEPUIS elle,
   relit) ; ce qu'il rend quand une programmée part sans que la liste la porte
   encore (servi par le faux de l'audit et du banc).
 
+### Veille d'achat (prototype eBay) et rentabilité avant achat (15 octobre)
+Demande du 15 octobre (VEILLE-CONCEPT-01, VEILLE-50, COMPLEMENT-01…10, « achat et
+rentabilité »). eBay → **Veille**. Aucun achat, aucun paiement, aucune offre :
+le seul geste vers eBay est un lien vers l'annonce.
+- **Ce qui est interrogé** : eBay seulement, API Browse
+  (`/buy/browse/v1/item_summary/search`, eBay.fr), avec le jeton de
+  l'APPLICATION (`client_credentials` — jamais le compte eBay du vendeur), gardé
+  en mémoire de l'instance. Clés présentes en production (vérifié le 15 octobre,
+  noms seuls). **Vinted et Leboncoin : aucune requête** (§3) — l'écran le dit une
+  fois. Détail et non-mesuré : `docs/ebay-api.md` § « Veille d'achat ».
+- **Une règle, un propriétaire** : `api/_lib/veille-regle.js` (pur) — le serveur
+  juge, l'app montre, l'audit l'exécute. Une requête eBay par nom du modèle (la
+  syntaxe « OU » de `q` n'est pas mesurée), la pointure n'est jamais dans `q` :
+  chaque titre est rejugé. « 42 2/3 » n'est PAS du 42 ; une pointure UK/US est
+  nommée, jamais convertie (une table fausse ferait acheter la mauvaise taille) ;
+  livraison inconnue ⇒ « total non confirmé », jamais 0 ; neuf avec défauts,
+  reconditionné, pour pièces ⇒ écartés et dits ; le pseudo du vendeur n'est
+  jamais gardé (son pays et son % d'avis, source eBay).
+- **Ses lignes** : `veille_recherches` (≤ 8 recherches, budget, horaires
+  silencieux) et `veille_resultats` (≤ 40 annonces par recherche, mémoire des
+  refus ≤ 150 — une refusée ne revient jamais —, mémoire des annonces déjà
+  montrées ≤ 300 (`connues` : une annonce revenue n'est pas « nouvelle »),
+  historique ≤ 200, quota, passage du matin). Au nom du vendeur (`owner=eq.`), compare-et-échange
+  (`modifierDonnee`) ; lecture ratée ⇒ 503 et RIEN d'écrit.
+- **La route** : actions `veille*` de `api/ebay.js` (pas de 13ᵉ fonction),
+  après la session et l'abonnement, avant le test des clés. 30 vérifications par
+  vendeur et par jour, pas deux de la même recherche en 2 min — réservées AVANT
+  eBay. « Tester sans enregistrer » est la simulation : rien n'est rangé (hors le
+  compteur du jour).
+- **Les alertes** : FACULTATIVES (« Alerte du matin » par recherche), par le
+  passage quotidien DÉJÀ en place (`ship-reminders`, ~10 h) — **aucun nouveau
+  cron**. ≤ 6 appels eBay par vendeur, mémo du passage écrit AVANT, seules les
+  annonces que la lecture de CE MATIN trouve pour la première fois (`vuLe` =
+  le passage), marquées AVANT l'envoi dans la même écriture (jamais deux fois),
+  écriture ratée
+  ⇒ aucune notification, horaires silencieux (Paris), catégorie `veille` dans
+  Réglages → Notifications (même défaut dans l'app et `PUSH_DEFAUT`).
+  ⚠️ « Immédiat » n'existe pas : il faudrait une tâche plus fréquente.
+- **Rentabilité avant achat** (sur chaque annonce, et « Rentabilité avant
+  achat » libre) : coûts en centimes, ce qui n'est pas saisi est NOMMÉ à côté du
+  bénéfice ; prix d'achat maximum pour un bénéfice voulu (sur le coût TOTAL quand
+  la livraison est inconnue). La fourchette prudente/moyenne/ambitieuse (Q1,
+  médiane, Q3) vient de SES ventes finalisées (même lecture que « Le prix qui
+  marche », `ventesFinaliseesDe`), même modèle ET même pointure exacte, jamais
+  un lot ; < 3 ventes ⇒ « pas assez de ventes comparables » ; nombre et
+  ancienneté affichés, liste dépliable. « Même modèle » (`cleComparables`,
+  `cleLibre`, règle partagée) : le modèle tapé dans la recherche quand le titre
+  le porte — connu de l'app (`extractModel`) ou, sinon, son NOM cherché tel quel
+  dans ses ventes (« 2002R ») —, sinon `extractModel` du titre. Un montant se
+  tape comme on l'écrit (« 45 € », « 60 euros ») ; illisible ⇒ dit, jamais lu
+  « pas saisi ».
+- **Budget du mois** : l'écran Achats PUBLIE `vrm_achats_mois` (synchronisée,
+  centimes, compte illisible ⇒ partiel et nommé) ; la veille le CONSOMME (§11).
+  Pas publié ce mois-ci ⇒ « ouvre une fois Vinted → Achats », jamais un reste
+  inventé. S'y ajoutent ses achats MARQUÉS « achetée » dans la veille ce mois-ci
+  (`achatsVeilleDuMois`, lus dans l'historique : la dernière décision de chaque
+  annonce compte, « Remettre » la retire, une note n'en est pas une) — eBay
+  n'est compté nulle part ailleurs. Les « à examiner » sont dites à côté (dont
+  celles sans livraison), au prix de la dernière lecture.
+- **Preuves (premier jet)** : `audit-veille.cjs` **80 contrôles** — sur w15 **2 OK / 32 KO**
+  (sans mourir) ; **12 mutations, chacune rouge** (livraison comptée 0, tiers
+  ignorés, alerte en double, refus qui revient, borne retirée, quota ignoré,
+  lecture ratée prise pour vide, simulation qui range, prix sans livraison,
+  silence ignoré, session retirée, écriture ratée qui notifie). Banc
+  `bancs/veille.cjs` (port 6001, données inventées, la VRAIE route exécutée)
+  **109 OK** à 390/1512 px en clair et en sombre — **35 rouges** sur le build
+  de w15 ; quatre mutations de l'écran, chacune rouge (livraison inconnue
+  affichée 0, coûts manquants tus, annonce montrée deux fois, Vinted/Leboncoin
+  présentés comme surveillés). `verif_visuel` (vraies fixtures, onglet
+  `ebay_veille` ajouté dans une copie non commitée) : rendu conforme aux deux
+  tailles. ⚠️ `ebay-comptes.cjs` sort 0 à 4 rouges selon la charge, **sur w15
+  comme ici** (un clic « Oui, publier » qui expire laisse la feuille ouverte,
+  la suite cascade) ; `ebay-form.cjs` a 2 rouges **déjà sur w15** (« Compte
+  eBay » compté 1) — ni l'un ni l'autre ne vient de ce lot.
+- **Livré** : VEILLE-CONCEPT-01 (eBay) · VEILLE-50 : 03, 04, 05, 07, 08,
+  09, 10, 11, 12, 13, 15 (eBay seul, les autres dites indisponibles), 16, 17, 18,
+  19, 21 et 22 (récapitulatif du matin), 24, 25, 26, 27, 29, 30, 31, 32, 34, 35,
+  36, 38 (avis du vendeur, source eBay), 39, 40, 43, 44 (frais saisis), 45, 46,
+  47 (dans l'écran), 48, 49, 50 · COMPLEMENT : 01, 02, 04, 07, 08, 09, 10.
+  **Pas fait** : 01 (depuis un lien), 02 (plusieurs modèles dans UNE recherche :
+  une recherche par modèle), 06 couleur, 14 distance, 20, 23 immédiat,
+  28 « plus disponible » (on dit « pas revue », jamais « vendue »), 33 côte à
+  côte, 37 collaborateur, 41/42 question et offre au vendeur (Buy Offer API
+  réservée, et §3) · COMPLEMENT 03 (équivalences de tailles), 05, 06.
+- ⚠️ **Le geste de Julien** : eBay → Veille → « + Recherche » → « Tester sans
+  enregistrer ». Si eBay répond « refuse la recherche à l'application VRM »,
+  activer l'accès Browse du jeu de clés Production dans le portail développeur.
+
+#### Relecture du 15 octobre — 14 défauts reproduits, tous corrigés (p1-veille)
+Chacun REPRODUIT d'abord sur 8b90e42 (route exécutée, écran rendu), puis corrigé.
+Tranché sans lui demander :
+- ⚠️⚠️ **L'alerte du matin annonçait « 3 nouvelles » pour 1** : elle prenait
+  toute annonce « nouvelle » jamais signalée — y compris celles qu'il venait de
+  VOIR à l'écran après un « Vérifier », et celles qu'eBay ne rendait même plus ce
+  matin. `marquerAlertes` ne prend que ce que la lecture de CE passage trouve
+  pour la première fois (`vuLe` = `revuLe` = le passage). `connues` (numéro →
+  première vue, ≤ 300 par recherche) : une annonce déjà montrée qui revient
+  (après la borne des 40, ou repassée sous le prix maximum) n'est plus
+  recomptée « nouvelle », ni à l'écran ni dans l'alerte ; une annonce trouvée et
+  retirée par la borne dans la même lecture n'y entre pas (jamais montrée).
+- ⚠️ **Un prix qui monte figeait la fiche** : une « à examiner » relue à 70 €
+  gardait 45 € et « ≤ 60 € livraison comprise », passait « pas revue », et le
+  budget prévu restait l'ancien montant. `jugerLectures` rend aussi les
+  annonces lues mais écartées (`horsCriteres`) : une « à examiner » prend son
+  prix d'AUJOURD'HUI (le total est calculé même écartée pour son prix) et la
+  carte dit « Ne correspond plus à ta recherche : article à 70,00 € » ; une
+  « nouvelle » qui ne correspond plus quitte la liste. Achetées et refusées ne
+  bougent pas.
+- **Fourchette pour un modèle hors liste** (un tiers de ses ventes : 2002R,
+  530, Shox TL, 1906D…) : le nom tapé, cherché dans ses ventes avec
+  `titrePorte` ; un nom tout en chiffres (« 530 ») exige la marque ; un lot
+  n'est jamais comparable. Mesuré sur la copie locale de ses ventes (rien
+  commité) : « 2002R » en 42 → 6 ventes (avant : aucune clé) ; 350 des 419
+  ventes sans modèle connu ont maintenant une clé.
+- **« pack » seul n'est plus un lot** (« 2002R Protection Pack ») : un pack
+  doit être compté (« pack de 2 », « 2-pack »). Mesuré : ses 27 ventes au titre
+  « pack » étaient TOUTES rangées « lot » (76 lots sur 1 478 → 49).
+- **Au clavier** : « 42,5 » est UNE pointure (la virgule décimale ne coupe pas,
+  `decouperPointures`, la même au serveur et à l'écran) ; « 60 € », « 45 € »,
+  « 1 234,50 » se lisent (`centimesDe`) ; un montant illisible est DIT
+  (« Montant illisible : prix d'achat »), jamais lu « pas saisi ».
+- **Le nom suit la recherche** : il se refait TOUJOURS depuis marque, modèle et
+  pointures (`nomRecherche`) — l'écran n'a pas de champ Nom ; la carte et la
+  notification du matin le lisent. Pointures écrites à la française (« 42,5 »).
+- **« Précise la pointure » retiré** : la pointure n'est pas envoyée à eBay. Le
+  geste ne propose que ce qui change la lecture d'eBay (modèle, prix maximum,
+  état si « tous », vendeurs en France si « partout »).
+- **« Je l'ai achetée » sortait la dépense du budget** : les achats marqués
+  dans la veille ce mois-ci (`achatsVeilleDuMois`, sur l'historique — il
+  survit à la suppression d'une recherche ; la dernière décision compte,
+  « Remettre » retire, une note ne compte pas ; plein et encore dans le mois ⇒
+  « au moins ») s'ajoutent à `vrm_achats_mois`. ⚠️ S'il saisit AUSSI cet achat
+  eBay en « hors plateforme », il compte deux fois : la ligne dit d'où vient
+  chaque montant (« 1 achat marqué dans la veille ») pour qu'il le voie.
+- **Onglets d'eBay sur iPhone** : 7 onglets, « Compte » tombait seul sur une
+  seconde ligne à 390/414 px. Sur téléphone la rangée est UNE ligne, chaque
+  onglet au moins large comme son libellé (`max-content`) : les 7 tiennent dès
+  360 px, en dessous la rangée défile et `PlatSubNav` garde l'onglet ouvert
+  visible. Vinted et Leboncoin (4-5) inchangés.
+- **§7** : « prix lu il y a 8 h » ×5 et « pas revue » ×5 retirés — « pas revue »
+  se juge sur la dernière lecture RÉUSSIE (une vérification ratée est la faute
+  d'eBay, pas des annonces) ; si aucune n'est revenue, UNE phrase au-dessus de
+  la liste ; plus de « (503).. ». « Pourquoi » ne recopie plus la recherche sur
+  chaque carte : une phrase par liste, et sur la carte seulement ce qui
+  distingue (`faits` : le nom trouvé, la pointure lue, quand la liste en
+  mélange plusieurs).
+- **Rentabilité libre** : le prix maximum dit les coûts non saisis comptés 0
+  (« Sans remise en état et frais de vente ») ; plus de « — — ».
+- **Historique** : une note est « Note » (`type: 'note'`), jamais « Remise ».
+- **Photo** : `PHOTO_EBAY` borné par le point (`*.ebayimg.com`), UNE règle
+  importée par l'écran (« pixel-espion-ebayimg.com » refusé).
+- **Preuves** : `audit-veille.cjs` **105 contrôles** — **15 rouges** sur
+  8b90e42, et **15 mutations de la règle, chacune rouge** (virgule, euro, nom,
+  pack, hôte, prix qui monte, alerte, mémoire `connues`, modèle hors liste,
+  marque pour un nom en chiffres, lot comparable, budget, « Remettre », note,
+  route sans achats du mois). Banc `bancs/veille.cjs` **126 OK** (390/1512,
+  clair/sombre) — **26 rouges** sur le build de 8b90e42 (dont 4 de pure
+  formulation, « remise en état, frais » → « remise en état et frais ») ;
+  **12 mutations de l'écran, chacune rouge** (banc en mode rapide, build
+  refait à chaque fois : « Pourquoi » recopié, « pas revue » jugé sur une
+  vérification ratée, virgule qui coupe, achats de la veille ignorés, note lue
+  « Remise », « précise la pointure », grille des onglets d'avant, raison du
+  prix monté tue, nom renvoyé par l'écran ET gardé par le serveur, montant
+  illisible tu, coûts non comptés tus, modèle hors liste ignoré). Sondes du
+  relecteur rejouées sur le build corrigé : toutes inversées (matin « 1
+  nouvelle annonce », 2002R gardée, hôte refusé, « 42,5 » accepté, « Adidas
+  Samba 44 », reste 36,00 €, « Note »…). Les 98 audits verts. Bancs voisins de
+  la rangée d'onglets, un par un sur des ports à part : `lbc-messages`,
+  `fluidite`, `accueil`, `ebay-annonces`, `annonces-carte` et `photos-vinted`
+  verts (les deux derniers relancés SEULS : sous la charge, des clics à 4 s
+  expiraient) ; `ebay-form` garde ses 2 rouges connus de w15 ; `messagerie`
+  (16) et `supprimees` (5) sortent les MÊMES rouges sur le build de w15 — ils
+  ne viennent pas de ce lot ; `revendeurs` ne se lance pas dans ce conteneur
+  (il cherche `/usr/bin/chromium`).
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
