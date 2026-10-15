@@ -35,6 +35,23 @@
 //   5. 390 px : la barre tient sur UNE ligne, dans le premier écran ; 1512 px :
 //      les dernières ventes visibles sans défiler ;
 //   6. clair et sombre, aucun débordement, aucune erreur, aucun écran tombé.
+// Revue du 15 octobre (chaque point rouge sur 4c1e3cb) :
+//   7. la case « Messages » ouvre l'écran SUR une puce qui dit le MÊME nombre
+//      (avant : « 1 » dans la barre, « Non lues 3 » à l'arrivée) ;
+//   8. « prix à baisser » : même nombre sur Collectif depuis un appareil neuf
+//      (avant : « 2 » par l'ancienne règle des 30 jours, puis « 1 ») ; la
+//      publication se rafraîchit même quand le nombre ne change pas ;
+//   9. les CARTES des dernières ventes (prix et statut compris) tiennent dans
+//      un écran réaliste — 1512×860 et 1440×800 — avec une exception affichée ;
+//  10. « N nouvelles » = les cartes marquées ; le reste est dit et marqué sur
+//      l'écran Ventes, où « tout voir » emmène ;
+//  11. un « — » ou un « ≥ » a sa raison ÉCRITE sous la barre (un téléphone n'a
+//      pas d'infobulle), et le nom d'une case partielle dit « Au moins » ;
+//  12. la carte « en attente » est un vrai bouton (elle portait « › » et ne
+//      réagissait pas).
+// ⚠️ Les mesures de place se font sur les CARTES entières, plus sur le haut du
+//    titre « Dernières ventes » : un titre visible au-dessus de cartes coupées
+//    passait le contrôle d'avant.
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
@@ -68,14 +85,14 @@ const ANNONCES_A = [
 // Une base. `scen` : { panne:[motifs d'id qui répondent 522], calme:bool, deuxComptes:bool }
 const lignes = (scen) => {
   const cap = ilYa(5 * 60000);
-  const R = [{ id: 'main', data: {} }];
-  const ventes = scen.calme ? VENTES_A.filter((v) => v.status === 'Commande finalisée') : VENTES_A;
+  const R = [{ id: 'main', data: scen.main || {} }];
+  const ventes = [...(scen.calme ? VENTES_A.filter((v) => v.status === 'Commande finalisée') : VENTES_A), ...(scen.ventesEnPlus || [])];
   R.push({ id: 'harvest_111_orders_sold', data: { capturedAt: cap, payload: { my_orders: ventes } } });
   R.push({ id: 'harvest_111_orders_purchased', data: { capturedAt: cap, payload: { my_orders: scen.calme ? [] : ACHATS_A } } });
   R.push({ id: 'harvest_111_inbox', data: { capturedAt: cap, payload: { conversations: scen.calme ? [conv(5004, false, J)] : INBOX_A } } });
   // (Une moisson vide « n'est pas une réponse » pour l'app : la journée calme
   //  garde une annonce, qui n'est simplement pas à baisser.)
-  R.push({ id: 'harvest_111_listings', data: { capturedAt: cap, payload: { items: scen.calme ? [ANNONCES_A[1]] : ANNONCES_A } } });
+  R.push({ id: 'harvest_111_listings', data: { capturedAt: cap, payload: { items: scen.calme ? [ANNONCES_A[1]] : [...ANNONCES_A, ...(scen.annoncesEnPlus || [])] } } });
   if (scen.deuxComptes) {
     R.push({ id: 'harvest_222_orders_sold', data: { capturedAt: cap, payload: { my_orders: [] } } });
     R.push({ id: 'harvest_222_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [] } } });
@@ -120,14 +137,17 @@ async function ouvrir(b, vp, scen = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(({ sombre, vues }) => {
+  await pg.addInitScript(({ sombre, vues, ls }) => {
     try {
       localStorage.setItem('vrm_acces_direct', '1');
       localStorage.setItem('vinted_dark', sombre ? 'true' : 'false');
       localStorage.setItem('vrm_bascule_mineral_v1', '1');   // sinon la bascule « Minéral » remet le clair une fois
       if (vues) localStorage.setItem('vinted_notif_seen_ventes', JSON.stringify(vues));
+      // Posé UNE fois (premier chargement) : une navigation suivante garde ce
+      // que l'app y a écrit.
+      if (ls && !sessionStorage.getItem('__banc_ls')) { for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, JSON.stringify(v)); sessionStorage.setItem('__banc_ls', '1'); }
     } catch (_) {}
-  }, { sombre: !!scen.sombre, vues: scen.vues || null });
+  }, { sombre: !!scen.sombre, vues: scen.vues || null, ls: scen.ls || null });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   const R = lignes(scen);
   const panne = scen.panne || [];
@@ -150,7 +170,8 @@ async function ouvrir(b, vp, scen = {}) {
   // (il lit ses jetons dans la base) : 503, jamais un faux « 0 ».
   await pg.route('**/api/vinted-proxy**', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"base"}' }));
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${scen.tab || 'journee'}`, { waitUntil: 'domcontentloaded' });
+  if (scen.tab && scen.tab !== 'journee') { await pg.waitForTimeout(800); return { ctx, pg, errs }; }
   // On attend que la barre ait fini de lire (plus aucun « … »), borné.
   try {
     await pg.waitForFunction(() => { const b = document.querySelectorAll('[data-journee]'); return b.length === 4 && ![...b].some((x) => x.getAttribute('data-etat') === 'encours'); }, null, { timeout: 15000, polling: 200 });
@@ -163,6 +184,8 @@ const barre = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-jou
   return { id: x.getAttribute('data-journee'), etat: x.getAttribute('data-etat'), n: x.getAttribute('data-n'), txt: x.innerText.replace(/\s+/g, ' ').trim(), nom: x.getAttribute('aria-label') || '', top: Math.round(r.top), bas: Math.round(r.bottom), droite: Math.round(r.right) };
 }));
 const entree = (bs, id) => bs.find((x) => x.id === id) || {};
+// Le bas de chaque carte des dernières ventes (prix et statut compris).
+const basDesCartes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-derniere-vente]')].map((x) => Math.round(x.getBoundingClientRect().bottom)));
 async function sain(pg, ecran, errs) {
   const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, t: document.body.innerText }));
   dit(r.sw <= r.cw + 1, `${ecran} : aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
@@ -188,7 +211,7 @@ const ANCIENS = [
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const VUES = VENTES_A.map((v) => String(v.transaction_id)).filter((t) => t !== '9301');   // 9301 = arrivée depuis la dernière ouverture
 
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 860 }]) {
       for (const sombre of [false, true]) {
         const nomVue = `${vp.width} px ${sombre ? 'sombre' : 'clair'}`;
         console.log(`\n── ${nomVue} : la barre, l'en-tête, les dernières ventes`);
@@ -225,7 +248,8 @@ const ANCIENS = [
             dit(bs.length && Math.max(...bs.map((x) => x.bas)) <= vp.height, '390 px : les quatre cases sont dans le premier écran', `bas ${Math.max(...bs.map((x) => x.bas))} / ${vp.height}`);
             dit(ventes != null && ventes < vp.height * 1.5, '390 px : les dernières ventes à moins d’une demi-hauteur de défilement', `titre à ${ventes} px`);
           } else {
-            dit(ventes != null && ventes < vp.height - 120, '1512 px : les dernières ventes visibles sans défiler', `titre à ${ventes} px / ${vp.height}`);
+            const bas = await basDesCartes(pg);
+            dit(bas.length > 0 && Math.max(...bas) <= vp.height, `${vp.width}×${vp.height} : les cartes des dernières ventes, prix et statut compris, visibles sans défiler`, `bas des cartes ${bas.join(',')} / ${vp.height}`);
           }
           await sain(pg, nomVue, errs);
           await ctx.close();
@@ -242,8 +266,14 @@ const ANCIENS = [
       dit(await pg.evaluate(() => [...document.querySelectorAll('h2')].some((h) => h.innerText.trim() === 'Paramètres')), 'et il ouvre les réglages');
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-journee="messages"]', { timeout: 10000 });
+      const nBarre = (entree(await barre(pg), 'messages')).n;
       await pg.click('[data-journee="messages"]'); await pg.waitForTimeout(2500);
       dit(await pg.locator('[data-messagerie-tete]').count() > 0, 'la case « Messages » ouvre la messagerie Vinted');
+      // §11 (revue du 15 octobre) : le nombre cliqué est celui qu'on y lit.
+      const puce = await pg.evaluate(() => { const b = document.querySelector('[data-filtre-recentes]'); const toutes = [...document.querySelectorAll('.vrm-inbox-filters button')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()); return { n: b ? b.getAttribute('data-filtre-recentes') : null, presse: b ? b.getAttribute('aria-pressed') : null, lignes: document.querySelectorAll('[data-conv]').length, toutes }; });
+      dit(puce.n === nBarre && puce.presse === 'true', 'elle l’ouvre SUR la puce « Non lues · 7 j », qui dit le MÊME nombre que la case', `barre ${nBarre} · puce ${JSON.stringify(puce)}`);
+      dit(puce.lignes === Number(nBarre), 'et la liste montre exactement ces conversations-là', `${puce.lignes} ligne(s) pour ${nBarre}`);
+      dit(puce.toutes.some((t) => /^Non lues 3$/.test(t)), 'l’autre sens : « Non lues » (toutes) garde son propre nombre, sous son nom', JSON.stringify(puce.toutes));
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-journee="prix"]', { timeout: 10000 });
       await pg.waitForTimeout(1500);
@@ -265,6 +295,86 @@ const ANCIENS = [
       await ctx.close();
     });
 
+    console.log('\n── « Prix à baisser » : un nombre, sur tous les écrans, même sur un appareil neuf');
+    // Deux paires qui DORMENT (45 et 50 j) mais déjà à leur prix d'achat (40 €
+    // pour un prix de 30 €) : rien à baisser. L'ancien repli du tableau de
+    // bord (« annonces de 30 jours ou plus ») les comptait : « 2 ».
+    const DORMENT = [
+      { id: 503, title: 'Paire Dort Une taille 40', price: { amount: '30.0', currency_code: 'EUR' }, view_count: 2, favourite_count: 0, is_closed: false, created_at_ts: Math.floor((MAINTENANT - 45 * J) / 1000) },
+      { id: 504, title: 'Paire Dort Deux taille 41', price: { amount: '30.0', currency_code: 'EUR' }, view_count: 2, favourite_count: 0, is_closed: false, created_at_ts: Math.floor((MAINTENANT - 50 * J) / 1000) },
+    ];
+    const MAIN_PLANCHER = { vinted_annonce_numeros: { 503: { numero: '7', buyPrice: 40 }, 504: { numero: '8', buyPrice: 40 } } };
+    const nPrixTexte = (pg) => pg.evaluate(() => { const m = /(\d+) prix à baisser/.exec(document.body.innerText); return m ? Number(m[1]) : null; });
+    await essaie('prix, appareil neuf', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 860 }, { vues: VUES, main: MAIN_PLANCHER, annoncesEnPlus: DORMENT, tab: 'collectif' });
+      let neuf = null;
+      for (let i = 0; i < 40 && neuf == null; i++) { await pg.waitForTimeout(300); neuf = await nPrixTexte(pg); }
+      const publie = await pg.evaluate(() => localStorage.getItem('vrm_prix_a_baisser'));
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      try { await pg.waitForFunction(() => { const x = document.querySelector('[data-journee="prix"]'); return x && x.getAttribute('data-etat') === 'lu'; }, null, { timeout: 15000, polling: 200 }); } catch (_) {}
+      const p = entree(await barre(pg), 'prix');
+      dit(publie === null && neuf === Number(p.n) && neuf === 1, 'appareil neuf, rien de publié : Collectif dit le même nombre que la barre (la même règle, pas les 30 jours)', `collectif ${neuf} · barre ${p.n} · publié ${publie}`);
+      await sain(pg, 'prix', errs);
+      await ctx.close();
+    });
+    await essaie('prix, publication de la veille', async () => {
+      const veille = MAINTENANT - 13 * H;
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 860 }, { vues: VUES, ls: { vrm_prix_a_baisser: { total: 1, at: veille } } });
+      await pg.waitForTimeout(800);
+      const v = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_prix_a_baisser')); } catch (_) { return null; } });
+      dit(!!v && v.total === 1 && v.at > Date.now() - 10 * 60000, 'même nombre que la veille : Ma journée rafraîchit la date (sinon le tableau de bord retombe sur son repli au bout de 12 h)', JSON.stringify(v));
+      await sain(pg, 'publication', errs);
+      await ctx.close();
+    });
+
+    console.log('\n── Les dernières ventes tiennent dans un écran réel, AVEC une exception');
+    for (const vp of [{ width: 1512, height: 860 }, { width: 1440, height: 800 }]) {
+      await essaie(`exception ${vp.width}×${vp.height}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, { vues: VUES, main: { vinted_ship_done: { '9302': MAINTENANT - 3 * J } } });
+        await pg.waitForTimeout(1200);
+        const ex = await pg.evaluate(() => [...document.querySelectorAll('[data-job]')].map((x) => x.getAttribute('data-job')));
+        const bas = await basDesCartes(pg);
+        await pg.screenshot({ path: path.join(CAPTURES, `journee-exception-${vp.width}x${vp.height}.png`) });
+        dit(ex.includes('poste-sans-depart'), 'l’exception « colis coché posté » est affichée (la situation du contrôle)', JSON.stringify(ex));
+        dit(bas.length > 0 && Math.max(...bas) <= vp.height, `${vp.width}×${vp.height} : les cartes entières (prix et statut) sans défiler`, `bas ${bas.join(',')} / ${vp.height}`);
+        await sain(pg, `exception ${vp.width}`, errs);
+        await ctx.close();
+      });
+    }
+
+    console.log('\n── « N nouvelles » = les cartes marquées ; le reste est dit et marqué sur Ventes');
+    await essaie('nouvelles', async () => {
+      // 8 ventes arrivées depuis la dernière ouverture, et une vente DÉJÀ VUE
+      // plus récente que certaines d'entre elles : 5 tiennent dans les six
+      // cartes, 3 non.
+      const huit = Array.from({ length: 8 }, (_, i) => vente(9400 + i, 'Neuve ' + i + ' taille 40', 'Commande finalisée', 'completed', (i + 1) * H, '30.0'));
+      const vuesToutes = VENTES_A.map((v) => String(v.transaction_id));
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 860 }, { vues: vuesToutes, ventesEnPlus: huit });
+      await pg.waitForTimeout(1200);
+      const nv = await pg.evaluate(() => { const h = document.querySelector('[data-nouvelles-ventes]'); const a = document.querySelector('[data-nouvelles-ailleurs]'); return { entete: h ? Number(h.getAttribute('data-nouvelles-ventes')) : 0, ailleurs: a ? Number(a.getAttribute('data-nouvelles-ailleurs')) : 0, lien: a ? a.innerText.trim() : null, cartes: document.querySelectorAll('[data-derniere-vente] [data-vente-nouvelle]').length }; });
+      dit(nv.entete === nv.cartes && nv.cartes > 0, '« N nouvelles » = le nombre de cartes marquées « Nouvelle »', JSON.stringify(nv));
+      dit(nv.entete + nv.ailleurs === 8 && nv.ailleurs > 0 && /\d+ nouvelles?/.test(nv.lien || ''), 'les autres sont DITES sur le lien « tout voir » (aucune ne disparaît)', JSON.stringify(nv));
+      if (await pg.locator('[data-nouvelles-ailleurs]').count()) await pg.click('[data-nouvelles-ailleurs]');
+      try { await pg.waitForFunction(() => document.querySelectorAll('.vrm-sale-row').length > 0, null, { timeout: 12000, polling: 250 }); } catch (_) {}
+      const ventesMarquees = await pg.evaluate(() => document.querySelectorAll('.vrm-sale-row [data-vente-nouvelle]').length);
+      dit(ventesMarquees === 8, '« tout voir » mène à l’écran Ventes, où les 8 portent « Nouvelle »', `${ventesMarquees} marquée(s)`);
+      await sain(pg, 'nouvelles', errs);
+      await ctx.close();
+    });
+
+    console.log('\n── La carte « en attente » est un vrai bouton');
+    await essaie('en attente', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 860 }, { vues: VUES });
+      const ea = await pg.evaluate(() => { const x = document.querySelector('[data-en-attente]'); return x ? { tag: x.tagName, txt: x.innerText.replace(/\s+/g, ' ').slice(0, 60) } : null; });
+      dit(!!ea && ea.tag === 'BUTTON' && /en attente/.test(ea.txt), 'la carte qui porte « › » est un bouton', JSON.stringify(ea));
+      if (ea) await pg.click('[data-en-attente]');
+      try { await pg.waitForFunction(() => document.querySelectorAll('.vrm-sale-row').length > 0, null, { timeout: 12000, polling: 250 }); } catch (_) {}
+      const v = await pg.evaluate(() => ({ lignes: document.querySelectorAll('.vrm-sale-row').length, filtre: /Filtres actifs/.test(document.body.innerText) }));
+      dit(v.lignes === 2 && v.filtre, 'elle ouvre les ventes EN COURS — celles dont elle fait la somme (2 ici)', JSON.stringify(v));
+      await sain(pg, 'en attente', errs);
+      await ctx.close();
+    });
+
     console.log('\n── Trois états : une lecture ratée s’écrit « — », jamais 0');
     await essaie('panne ventes + boîte', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, { panne: ['harvest_111_orders_', '_inbox'] });
@@ -276,22 +386,58 @@ const ANCIENS = [
       dit(r.etat === 'passu' && r.txt.startsWith('—'), 'achats illisibles (même lecture que les ventes) : « à retirer » dit « — », pas « ≥ 0 »', JSON.stringify(r));
       dit(p.etat === 'lu' && p.n === '1', 'l’autre sens : ce qui a été lu garde son nombre', JSON.stringify(p));
       dit(!/Tout est à jour/.test(await pg.evaluate(() => document.body.innerText)), 'et rien n’est fêté sur une lecture ratée');
-      const vm = await pg.evaluate(() => { const v = document.querySelector('[data-vendu-mois]'); return { carte: v ? v.getAttribute('data-vendu-mois') : null, ligne: document.querySelectorAll('[data-ventes-illisibles]').length }; });
+      const vm = await pg.evaluate(() => { const v = document.querySelector('[data-vendu-mois]'); return { carte: v ? v.getAttribute('data-vendu-mois') : null, ligne: document.querySelectorAll('[data-ventes-illisibles]').length, raisons: document.querySelectorAll('[data-barre-raison]').length }; });
       dit(vm.carte === null && vm.ligne === 1, 'et « Vendu en octobre » ne dit pas 0 € : une ligne dit que les ventes n’ont pas pu être lues', JSON.stringify(vm));
+      dit(vm.raisons === 1, 'UNE ligne dit tout ce qui n’a pas pu être lu (ventes, achats, boîte) — pas une par cause (§7)', JSON.stringify(vm));
       await sain(pg, 'panne', errs);
+      await ctx.close();
+    });
+    // ⚠️ (revue du 15 octobre) La boîte seule en panne : le « — » de
+    //    « Messages » n'avait sa raison que dans l'infobulle — invisible sur
+    //    un téléphone. La raison s'écrit, dans le premier écran.
+    await essaie('panne boîte seule, 390 px', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, { panne: ['_inbox'] });
+      const m = entree(await barre(pg), 'messages');
+      const r = await pg.evaluate(() => { const x = document.querySelector('[data-barre-raison]'); if (!x) return null; const rc = x.getBoundingClientRect(); return { ids: x.getAttribute('data-barre-raison'), txt: x.innerText.replace(/\s+/g, ' ').trim(), top: Math.round(rc.top), bas: Math.round(rc.bottom), vis: rc.height > 0 }; });
+      await pg.screenshot({ path: path.join(CAPTURES, 'journee-boite-ko-390.png') });
+      dit(m.etat === 'passu', 'boîte illisible : « Messages » dit « — »', JSON.stringify(m));
+      dit(!!r && r.vis && r.ids === 'messages' && /boîte de réception/.test(r.txt) && r.bas <= 844, 'sa raison est ÉCRITE sous la barre, dans le premier écran (pas seulement dans l’infobulle)', JSON.stringify(r));
+      dit(/boîte de réception/.test(m.nom), 'et le nom de la case dit ce qui manque', m.nom);
+      await sain(pg, 'boîte', errs);
+      await ctx.close();
+    });
+    await essaie('rien en panne', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, {});
+      dit(await pg.locator('[data-barre-raison]').count() === 0, 'l’autre sens : tout lu ⇒ aucune ligne de raison (pas de fausse alerte)');
+      await sain(pg, 'rien en panne', errs);
       await ctx.close();
     });
     await essaie('un compte muet', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { deuxComptes: true, panne: ['harvest_222_inbox'] });
       const m = entree(await barre(pg), 'messages');
       dit(m.etat === 'partiel' && /^≥\s*1/.test(m.txt), 'un compte dont la boîte n’a pas répondu : « ≥ 1 », jamais un total', JSON.stringify(m));
+      dit(/^Au moins /.test(m.nom) && /compte_b/.test(m.nom), 'et son NOM le dit aussi : « Au moins … », avec le compte qui manque (avant : annoncé comme un total exact)', m.nom);
+      const r = await pg.evaluate(() => { const x = document.querySelector('[data-barre-raison]'); return x ? x.innerText.replace(/\s+/g, ' ').trim() : null; });
+      dit(!!r && /compte_b/.test(r) && /≥/.test(r), 'la ligne sous la barre nomme le compte et dit ce que veut dire « ≥ »', r);
       await sain(pg, 'partiel', errs);
+      await ctx.close();
+    });
+    // Un compte EXCLU de l'app n'entre dans aucun total (décision du
+    // 3 octobre) : sa boîte qui ne répond pas ne rend pas le nombre partiel.
+    await essaie('un compte exclu muet', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 860 }, { deuxComptes: true, panne: ['harvest_222_'], ls: { vinted_accounts_hidden: ['222'] } });
+      const bs = await barre(pg);
+      const m = entree(bs, 'messages');
+      dit(m.etat === 'lu' && m.n === '1', 'la boîte d’un compte EXCLU qui ne répond pas ne fait pas écrire « ≥ » (il ne compte nulle part)', JSON.stringify(m));
+      dit(await pg.locator('[data-barre-raison]').count() === 0, 'et aucune ligne de raison pour lui', bs.map((x) => `${x.id}:${x.etat}`).join(' '));
+      await sain(pg, 'exclu', errs);
       await ctx.close();
     });
     await essaie('suivis illisibles', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { panne: ['email_track_'] });
       const r = entree(await barre(pg), 'retrait');
       dit(r.etat === 'partiel' && /^≥\s*1/.test(r.txt), 'emails de suivi illisibles : « à retirer » dit « ≥ 1 »', JSON.stringify(r));
+      dit(/^Au moins /.test(r.nom) && /suivis/.test(r.nom), 'et son NOM dit « Au moins … — pas pu lire tes suivis »', r.nom);
       await sain(pg, 'suivis', errs);
       await ctx.close();
     });

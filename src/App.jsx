@@ -4392,9 +4392,16 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
 // des vendeurs qui LUI expédient, mesuré le 19 septembre).
 // ⇒ UNE règle, deux faits que Vinted donne lui-même : la conversation est
 //    marquée non lue ET son dernier mouvement date de moins de 7 jours. Rien
-//    de plus n'est affirmé (ni « acheteur », ni « à répondre ») : le libellé
-//    dit « non lus · 7 j ». Lue par la barre de Ma journée, le point de
-//    l'onglet Messages et le widget (§11).
+//    de plus n'est affirmé (ni « acheteur », ni « à répondre »). Lue par la
+//    barre de Ma journée, le point de l'onglet Messages, le widget ET la puce
+//    « Non lues · 7 j » de l'écran Messages (§11).
+// ⚠️ (revue du 15 octobre) LA CASE ET L'ÉCRAN QU'ELLE OUVRE DISAIENT DEUX
+//    NOMBRES : « 14 Messages » dans la barre, « Non lues 149 » un clic plus loin
+//    (mesuré sur sa base, lecture seule). La case ouvre désormais l'écran SUR
+//    la puce « Non lues · 7 j », qui compte avec cette règle-ci, sur tous les
+//    comptes comme la case : le nombre qu'il a cliqué est celui qu'il y lit.
+//    « Non lues » (toutes, y compris les 115 fils de plus de deux semaines)
+//    reste à côté, sous son propre nom.
 const MESSAGES_RECENTS_J = 7;
 function estNonLueRecente(c, maintenant = Date.now()) {
   if (!c || c.unread !== true) return false;
@@ -4418,14 +4425,60 @@ function etatCompteur(n, sources) {
   if (partiel && v === 0) return null;
   return { n: v, partiel };
 }
+// Les comptes dont une lecture n'a pas répondu, par IDENTITÉ : `failedUids`
+// (ventes, achats, conversations), `ko` (annonces : des uid ; conversations :
+// des objets compte).
+function uidsEnEchec(st) {
+  const out = new Set();
+  for (const u of (Array.isArray(st && st.failedUids) ? st.failedUids : [])) out.add(String(u));
+  for (const a of (Array.isArray(st && st.ko) ? st.ko : [])) out.add(String(a && typeof a === 'object' ? a.vinted_user_id : a));
+  out.delete(''); out.delete('undefined'); out.delete('null');
+  return [...out];
+}
 // L'état d'une lecture de l'écran (`{loading, items, error, failedUids|ko}`).
-function etatLecture(st, baseKO) {
+// `estExclu(uid)` : un compte qu'il a EXCLU de l'app n'entre dans aucun total
+// (décision du 3 octobre) — sa lecture ratée ne rend donc pas un nombre
+// « partiel » (revue du 15 octobre : un compte masqué qui ne répond pas
+// faisait écrire « ≥ » sur des nombres complets).
+function etatLecture(st, baseKO, estExclu) {
   if (baseKO) return 'ko';
   if (!st) return 'encours';
   if (st.error) return 'ko';
   if (!Array.isArray(st.items)) return 'encours';
-  const echecs = (Array.isArray(st.failedUids) && st.failedUids.length) || (Array.isArray(st.ko) && st.ko.length) || st.incomplet;
+  const connus = Array.isArray(st.failedUids) || Array.isArray(st.ko);
+  const echecs = connus ? uidsEnEchec(st).filter(u => !(estExclu && estExclu(u))).length > 0 : !!st.incomplet;
   return echecs ? 'partiel' : 'lu';
+}
+// ── « PRIX À BAISSER » : UNE RÈGLE, DEUX LECTEURS (§11, revue du 15 octobre) ─
+// Le conseil de baisse d'UNE annonce : elle dort (≥ 30 j) ou elle est très vue
+// sans favori — et jamais sous le prix d'achat connu (pas de vente à perte) ;
+// déjà au plancher ⇒ rien à conseiller. Rend `null` ou `{ sugg, drop, why,
+// atFloor }`. Lue par la liste du repricing (écran Annonces, barre de Ma
+// journée) ET par le repli du tableau de bord quand aucune publication
+// récente n'existe : avant, ce repli comptait « les annonces de 30 jours ou
+// plus » sous le même libellé « N prix à baisser » — mesuré au banc : « 2 prix
+// à baisser » sur un appareil neuf, « 1 » une fois Ma journée ouverte.
+const JOURS_SOMMEIL = 30;
+function conseilPrix({ price, age, views, favs, buy }) {
+  const p = price != null ? Number(price) : 0;
+  if (!p || !(p > 1)) return null;
+  let drop = 0; const why = [];
+  if (age != null && age >= JOURS_SOMMEIL) { drop = Math.max(drop, age >= 90 ? 0.30 : age >= 60 ? 0.20 : 0.12); why.push(`dort ${age} j`); }
+  if (views != null && views >= 30 && (favs ?? 0) <= 1) { drop = Math.max(drop, 0.12); why.push(`${views} vues · ${favs ?? 0} ❤️`); }
+  else if (views != null && views >= 60 && favs != null && favs >= 1 && favs / views < 0.03) { drop = Math.max(drop, 0.10); why.push(`${views} vues pour ${favs} ❤️`); }
+  if (drop <= 0) return null;
+  let sugg = Math.round(p * (1 - drop));
+  let atFloor = false;
+  if (buy != null && sugg < buy) { sugg = Math.ceil(buy); atFloor = true; }
+  sugg = Math.max(1, sugg);
+  if (sugg >= p) return null;          // déjà au plancher : rien à conseiller
+  return { sugg, drop, why, atFloor };
+}
+// Écrire le choix d'une vue AVANT d'y emmener (la vue le lit à son montage).
+// Même clé que `useVueSession` : un écran qui n'est pas encore monté ne peut
+// pas recevoir d'événement, il lit la valeur rangée.
+function poserVueSession(nom, valeur) {
+  try { vuesSession.set(`${readSession()?.user?.id || 'local'}:${nom}`, valeur); } catch (_) {}
 }
 
 // Recupere la liste des conversations (boite de reception).
@@ -7257,8 +7310,14 @@ function BarreJournee({ entrees }) {
         const texte = v === undefined ? '…' : v === null ? '—' : `${v.partiel ? '≥ ' : ''}${v.n}`;
         const zero = v && v.n === 0 && !v.partiel;
         const couleur = v && v.n > 0 && e.urgent ? C.warn : (zero || !v ? C.muted : C.text);
+        // ⚠️ (revue du 15 octobre) Le NOM suit l'état, comme le chiffre : un
+        //    « ≥ 1 » s'annonçait « 1 conversation non lue… » (un total partiel
+        //    présenté comme complet, §5), et un « — » ne disait pas QUOI n'a
+        //    pas pu être lu. `manque` = ce qui manque, la même phrase que la
+        //    ligne sous la barre.
         const nom = v === undefined ? `${e.libelle} : lecture en cours`
-          : v === null ? `${e.libelle} : pas su, la lecture a échoué`
+          : v === null ? `${e.libelle} : pas su — pas pu lire ${e.manque || 'les données'}`
+          : v.partiel ? `Au moins ${e.titre} — pas pu lire ${e.manque || 'toutes les données'}`
           : e.titre;
         return (
           <button key={e.id} type="button" data-journee={e.id} data-etat={etat} data-n={v && Number.isFinite(v.n) ? v.n : ''}
@@ -24735,7 +24794,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Ancienneté d'une annonce (jours en ligne). On prend la date Vinted de mise en
   // ligne si dispo (createdTs, en secondes ou ms), sinon la date de numérotation
   // (quand on a commencé à la suivre). null si on ne sait pas.
-  const SLEEP_DAYS = 30; // seuil « paire qui dort »
+  const SLEEP_DAYS = JOURS_SOMMEIL; // seuil « paire qui dort » (la règle de `conseilPrix`)
   // ⚠️ On n'utilise PLUS la date de numérotation comme substitut : elle dit
   // quand TU as numéroté la paire, pas depuis quand elle est en ligne. Comme la
   // numérotation a été refaite en bloc, toutes les paires paraissaient neuves
@@ -25607,21 +25666,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = [];
     for (const it of annBase) {
       const price = it.price != null ? Number(it.price) : 0;
-      if (!price || price <= 1) continue;
       const age = listedAgeDays(it);
       const views = it.views ?? null, favs = it.favourites ?? null;
-      let drop = 0; const why = [];
-      if (age != null && age >= SLEEP_DAYS) { drop = Math.max(drop, age >= 90 ? 0.30 : age >= 60 ? 0.20 : 0.12); why.push(`dort ${age} j`); }
-      if (views != null && views >= 30 && (favs ?? 0) <= 1) { drop = Math.max(drop, 0.12); why.push(`${views} vues · ${favs ?? 0} ❤️`); }
-      else if (views != null && views >= 60 && favs != null && favs >= 1 && favs / views < 0.03) { drop = Math.max(drop, 0.10); why.push(`${views} vues pour ${favs} ❤️`); }
-      if (drop <= 0) continue;
-      let sugg = Math.round(price * (1 - drop));
-      // Le prix d'achat comme la carte le lit (fiche, sinon par N°) : §11.
-      const buy = prixAchatDe(numeros[it.id], buyByNum);
-      let atFloor = false;
-      if (buy != null && sugg < buy) { sugg = Math.ceil(buy); atFloor = true; }
-      sugg = Math.max(1, sugg);
-      if (sugg >= price) continue; // déjà au plancher : rien à conseiller
+      // La règle vit dans `conseilPrix` (§11) : le repli du tableau de bord la
+      // lit aussi. Le prix d'achat comme la carte le lit (fiche, sinon par N°).
+      const c = conseilPrix({ price, age, views, favs, buy: prixAchatDe(numeros[it.id], buyByNum) });
+      if (!c) continue;
+      const { sugg, why, atFloor } = c;
       out.push({ it, price, sugg, saving: price - sugg, age, views, favs, why, atFloor, score: (views ?? 0) + (age ?? 0) * 2 });
     }
     out.sort((a, b) => b.score - a.score);
@@ -25640,11 +25691,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const v = { total: repriceList.length, at: Date.now() };
       const avant = load('vrm_prix_a_baisser', null);
-      if (!avant || avant.total !== v.total) {
+      // ⚠️ (revue du 15 octobre) La date se RAFRAÎCHIT aussi quand le nombre ne
+      //    change pas : la coque n'écoute qu'une publication de moins de 12 h,
+      //    et un total stable depuis la veille la faisait retomber sur son
+      //    repli alors que Ma journée venait de recompter. Au plus une
+      //    écriture par heure quand rien ne change.
+      const change = !avant || avant.total !== v.total;
+      if (change || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_prix_a_baisser', v);
         // `vrm:colis` est le signal « une ligne publiée a changé » que la coque
         // écoute pour recalculer ses actions (nom historique, §11).
-        try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+        if (change) { try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {} }
       }
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -28888,22 +28945,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « ≥ n » quand un compte n'a pas répondu.
         const etatBords = Array.isArray(emailBords) || emailBordsKO ? null : 'encours';
         const etatSuivis = Array.isArray(tracking) ? 'lu' : (trackingKO ? 'ko' : 'encours');
+        // Un compte EXCLU de l'app ne rend pas un nombre partiel (`etatLecture`).
+        const exclu = (u) => acctOff(u);
+        const etS = etatLecture(sales, baseKO, exclu), etA = etatLecture(buys, baseKO, exclu);
+        const etC = etatLecture(convs, baseKO, exclu), etL = etatLecture(listings, baseKO, exclu);
+        // ── CE QUI N'A PAS PU ÊTRE LU, NOMMÉ (revue du 15 octobre) ─────────────
+        // Un « — » ou un « ≥ » sans sa raison ne se lit pas sur un téléphone
+        // (pas d'infobulle) : la raison s'écrit UNE fois sous la barre
+        // (`lecturesKO`) et la MÊME phrase finit le nom de chaque case.
+        const nomsKO = (st) => uidsEnEchec(st).filter(u => !exclu(u))
+          .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; });
+        const joindre = (l) => l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} et ${l[l.length - 1]}`;
+        const cause = (et, st, tout, deQui) => et === 'ko' ? tout : et === 'partiel' ? (nomsKO(st).length ? `${deQui} ${joindre(nomsKO(st))}` : tout) : null;
+        const manques = {
+          colis: cause(etS, sales, 'tes ventes', 'les ventes de'),
+          retrait: joindre([cause(etA, buys, 'tes achats', 'les achats de'), etatSuivis === 'ko' ? 'tes suivis de colis (emails)' : null].filter(Boolean)),
+          messages: cause(etC, convs, 'ta boîte de réception', 'la boîte de'),
+          prix: cause(etL, listings, 'tes annonces', 'les annonces de'),
+        };
         const entrees = [
-          { id:'colis', icon:'truck', libelle:'À envoyer', urgent: late>0, titre: colisTitre,
-            etat: etatCompteur(toShip.length, [etatLecture(sales, baseKO), baseKO ? null : etatBords]),
+          { id:'colis', icon:'truck', libelle:'À envoyer', urgent: late>0, titre: colisTitre, manque: manques.colis,
+            etat: etatCompteur(toShip.length, [etS, baseKO ? null : etatBords]),
             onClick: () => onNav && onNav('cat_bord') },
-          { id:'retrait', icon:'box', libelle:'À retirer', urgent: pickupUnion.horsDelai.length>0, titre: retraitTitre,
-            etat: etatCompteur(pickupCount, [etatLecture(buys, baseKO), baseKO ? 'ko' : etatSuivis]),
+          { id:'retrait', icon:'box', libelle:'À retirer', urgent: pickupUnion.horsDelai.length>0, titre: retraitTitre, manque: manques.retrait,
+            etat: etatCompteur(pickupCount, [etA, baseKO ? 'ko' : etatSuivis]),
             onClick: () => onNav && onNav('cat_achats') },
-          { id:'messages', icon:'chat', libelle:'Messages', urgent:false,
+          // ⚠️ La case ouvre Messages SUR la puce « Non lues · 7 j » : le
+          //    nombre cliqué est celui qu'il y lit (§11, revue du 15 octobre).
+          { id:'messages', icon:'chat', libelle:'Messages', urgent:false, manque: manques.messages,
             titre: `${msgsRecents} conversation${msgsRecents>1?'s':''} non lue${msgsRecents>1?'s':''} ces ${MESSAGES_RECENTS_J} derniers jours`,
-            etat: etatCompteur(msgsRecents, [etatLecture(convs, baseKO)]),
-            onClick: () => onNav && onNav('cat_msg') },
-          { id:'prix', icon:'tag', libelle:'Prix à baisser', urgent:false,
+            etat: etatCompteur(msgsRecents, [etC]),
+            onClick: () => { poserVueSession('messages-filtre', 'recentes'); poserVueSession('messages-recherche', ''); if (onNav) onNav('cat_msg'); } },
+          { id:'prix', icon:'tag', libelle:'Prix à baisser', urgent:false, manque: manques.prix,
             titre: `${repriceList.length} prix à baisser — paires vues sans acheteur ou qui dorment, jamais sous le prix d'achat`,
-            etat: etatCompteur(repriceList.length, [etatLecture(listings, baseKO)]),
+            etat: etatCompteur(repriceList.length, [etL]),
             onClick: () => { DEMANDE_REPRICING.on = true; if (onNav) onNav('cat_annonces'); } },
         ];
+        // La ligne sous la barre : chaque case « — » ou « ≥ » y dit sa cause,
+        // une seule fois (§7). Base injoignable : le bloc de la coque le dit.
+        const casesKO = baseKO ? [] : entrees.filter(e => e.etat === null || (e.etat && e.etat.partiel));
+        const lecturesKO = (() => {
+          if (!casesKO.length) return null;
+          const causes = [...new Set(casesKO.map(e => e.manque).filter(Boolean))];
+          const tirets = casesKO.some(e => e.etat === null), minima = casesKO.some(e => e.etat && e.etat.partiel);
+          return { ids: casesKO.map(e => e.id), causes, tirets, minima, ventes: etS === 'ko' };
+        })();
+        const relireKO = () => {
+          if (etS !== 'lu') loadOrders('sold', setSales, true);
+          if (etA !== 'lu') loadOrders('purchased', setBuys, true);
+          if (etC !== 'lu') loadConvs(true);
+          if (etL !== 'lu') loadListings(true);
+          if (etatSuivis === 'ko') fetchEmailTracking({ force: true }).then(t => { if (t) { setTracking(t); setTrackingKO(false); } else setTrackingKO(true); });
+        };
         // « Tout est à jour » ne se dit QUE si les quatre nombres sont LUS, tous
         // à zéro, sans compte manquant, et qu'aucune exception n'attend.
         const toutAJour = !baseKO && jobs.length===0 && entrees.every(e => e.etat && !e.etat.partiel && e.etat.n===0);
@@ -28942,7 +29035,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Ventes arrivées depuis la dernière ouverture (identités, décidées par
         // la coque — le mémo `vinted_notif_seen_ventes`, jamais un total).
         const nouvellesSet = new Set((nouvellesVentes || []).map(String));
-        const nNouvelles = nouvellesSet.size;
+        // ⚠️ (revue du 15 octobre) L'EN-TÊTE NE COMPTE QUE CE QU'IL MONTRE.
+        //    « · 8 nouvelles » au-dessus de 5 cartes marquées : une vente
+        //    captée en retard (un compte pas ouvert depuis des jours) peut être
+        //    plus ANCIENNE qu'une vente déjà vue, donc hors des six cartes. Les
+        //    autres sont dites sur le lien, et marquées sur l'écran Ventes, où
+        //    « tout voir » emmène.
+        const nouvellesListe = new Set((sales.items || []).filter(o => o && o.transaction_id != null && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled' && nouvellesSet.has(String(o.transaction_id))).map(o => String(o.transaction_id)));
+        const nNouvelles = dernieresVentes.filter(o => nouvellesListe.has(String(o.transaction_id))).length;
+        const nNouvellesAilleurs = Math.max(0, nouvellesListe.size - nNouvelles);
         return (
           <div className="vrm-day-layout">
             <ScreenHead icon="sun" title="Ma journée"/>
@@ -28975,6 +29076,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 « — » (le bloc de la coque explique) : jamais « 0 », jamais
                 « tout va bien » (le mensonge du 10 septembre). */}
             {!premierJour && <BarreJournee entrees={entrees}/>}
+            {/* ⚠️ (revue du 15 octobre) POURQUOI UN « — » OU UN « ≥ ». Sur
+                téléphone il n'y a pas d'infobulle : seules les ventes avaient
+                leur ligne (« pas lues, ce n'est pas zéro ») ; une boîte de
+                réception ou des suivis illisibles laissaient un « — » muet.
+                UNE ligne, sous la barre, nomme ce qui n'a pas pu être lu, dit ce
+                que veulent dire les signes affichés, et offre de réessayer. Les
+                ventes en font partie (avant : une ligne à part plus bas — deux
+                phrases pour une cause, §7). */}
+            {!premierJour && lecturesKO && (
+              <div data-barre-raison={lecturesKO.ids.join(',')} {...(lecturesKO.ventes ? {'data-ventes-illisibles':''} : {})}
+                style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',margin:'-6px 0 14px',fontSize:12.5,color:C.muted,lineHeight:1.45}}>
+                <span style={{flex:'1 1 220px'}}>
+                  Pas pu lire <b style={{color:C.text,fontWeight:600}}>{(() => { const l = lecturesKO.causes; return l.length <= 1 ? (l[0] || 'tes données') : `${l.slice(0, -1).join(', ')} et ${l[l.length - 1]}`; })()}</b>
+                  {' — '}{lecturesKO.tirets && <>{'«\u00a0—\u00a0»'} veut dire pas su, pas zéro</>}{lecturesKO.tirets && lecturesKO.minima && ' ; '}{lecturesKO.minima && <>{'«\u00a0≥\u00a0»'} est un minimum</>}.
+                  {lecturesKO.ventes && <> Vendu et reçu ne sont pas affichés.</>}
+                </span>
+                <button type="button" onClick={relireKO} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
+              </div>
+            )}
             {loading && <Skeleton variant="card" count={2}/>}
 
             {/* LES EXCEPTIONS, hors des quatre : un colis coché « posté » que
@@ -28988,7 +29108,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     style={{display:'flex',alignItems:'center',gap:11,padding:'11px 14px',border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     <span aria-hidden="true" style={{display:'flex',flexShrink:0,color:j.color}}><Icon name={j.icon} size={18}/></span>
                     <span style={{flex:1,minWidth:0}}>
-                      <span className="vrm-day-task-title" style={{display:'block',fontSize:14,fontWeight:600,color:j.urgent?j.color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{j.title}</span>
+                      {/* ⚠️ (revue du 15 octobre) Le titre PASSE À LA LIGNE : coupé en
+                          « …que personne ne pe… », il perdait la moitié de ce
+                          qu'il annonce sur un téléphone. */}
+                      <span className="vrm-day-task-title" style={{display:'block',fontSize:14,fontWeight:600,color:j.urgent?j.color:C.text,lineHeight:1.3,overflowWrap:'anywhere'}}>{j.title}</span>
                       {/* Le GESTE reste écrit sur ces exceptions (§2.7 : une alerte
                           qui ne dit pas quoi faire ne sert à rien) — rares, et
                           chacune a le sien : quel compte, quelle adresse. */}
@@ -29025,13 +29148,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* ⚠️ (15 octobre) VENTES ILLISIBLES ⇒ PAS DE « 0 € ». Vu au banc :
                 la lecture des ventes en échec, la carte écrivait « Vendu en
                 octobre 0 € · 0 vente » — une donnée absente devenue zéro (§5).
-                La carte se tait, UNE ligne dit pourquoi et offre le geste. */}
-            {!baseKO && !premierJour && etatLecture(sales, false)==='ko' && (
-              <div data-ventes-illisibles="" style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',marginBottom:14,fontSize:13,color:C.muted}}>
-                <span style={{flex:'1 1 220px'}}>Tes ventes n'ont pas pu être lues : vendu et reçu ne sont pas affichés — ce n'est pas zéro.</span>
-                <button type="button" onClick={()=>loadOrders('sold',setSales,true)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
-              </div>
-            )}
+                La carte se tait ; la ligne sous la barre (`lecturesKO`) dit
+                pourquoi et offre le geste. */}
+            {/* ⚠️ (revue du 15 octobre) SUR ORDINATEUR, « VENDU AUJOURD'HUI »
+                SE RANGE À CÔTÉ DU MOIS, pas dessous : empilés, les deux cartes
+                poussaient les dernières ventes sous le bas d'un écran de 860 px
+                (MacBook 14", Chrome ouvert) dès qu'une exception s'affichait —
+                prix et statut coupés. Sur téléphone, rien ne change. */}
+            <div className="vrm-day-argent">
             {!baseKO && !premierJour && !loading && sales.items && !sales.error && (
               <button type="button" className="vrm-day-money" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none',display:'block',padding:'18px 18px 16px'}}>
@@ -29052,7 +29176,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {/* Vendu AUJOURD'HUI — le soir, la première chose qu'on veut voir. */}
             {jourN>0 && (
-              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+              <button type="button" className="vrm-day-jour" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <div data-vendu-jour={Math.round(jourEur*100)} style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
@@ -29061,6 +29185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </button>
             )}
+            </div>
 
             {/* ⚠️ L'ACCUEIL S'ARRÊTAIT AU TIERS DE L'ÉCRAN. Sur ordinateur il
                 restait 500 px d'aplat gris sous la dernière carte — ce vide est
@@ -29084,8 +29209,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{marginTop:14,marginBottom:14}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                   <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes{nNouvelles>0 && <span data-nouvelles-ventes={nNouvelles} style={{marginLeft:8,color:C.accent,textTransform:'none',letterSpacing:0,fontWeight:600}}>· {nNouvelles} nouvelle{nNouvelles>1?'s':''}</span>}</div>
-                  <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+                  {/* « tout voir » ouvre TOUTES les ventes (filtre remis à
+                      « Toutes ») : c'est là que les nouvelles hors de ces six
+                      cartes portent leur marque. */}
+                  <button type="button" data-nouvelles-ailleurs={nNouvellesAilleurs||undefined} onClick={()=>{ poserVueSession('ventes-filtre','all'); if (onNav) onNav('cat_ventes'); }}
+                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0,textAlign:'right'}}>{nNouvellesAilleurs>0 ? `${nNouvelles>0?'+ ':''}${nNouvellesAilleurs} nouvelle${nNouvellesAilleurs>1?'s':''} · ` : ''}tout voir ›</button>
                 </div>
                 <div className="vrm-carrousel">
                   {dernieresVentes.map((o,i)=>{
@@ -29093,9 +29221,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const e = effEntry(o); const num = e?.numero;
                     const vs = venteStage(o);
                     return (
-                      <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                      <button key={o.transaction_id||i} type="button" data-derniere-vente={o.transaction_id!=null?String(o.transaction_id):''} onClick={()=>onNav&&onNav('cat_ventes')}
                         style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',padding:0,display:'block'}}>
-                        <div style={{position:'relative',aspectRatio:'1 / 1',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <div className="vrm-derniere-photo" style={{position:'relative',aspectRatio:'1 / 1',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
                           {/* Le CDN Vinted expire : sans ce repli, la vignette
                               devient l'icône « image cassée » du navigateur (§5.76). */}
                           {ph && !imgMortes.has(ph)
@@ -29127,8 +29255,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
+              // ⚠️ (revue du 15 octobre) UN CHEVRON PROMET UN CLIC. Cette carte
+              //    portait « › » sans réagir (un faux bouton, §7) : elle ouvre
+              //    les ventes EN COURS, celles dont elle fait la somme (le filtre
+              //    `encours` de l'écran Ventes = `classifyOrderStatus` 'pending',
+              //    la même règle que `inRoute`).
               return (
-              <div style={{marginBottom:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+              <button type="button" data-en-attente="" onClick={()=>{ poserVueSession('ventes-filtre','encours'); if (onNav) onNav('cat_ventes'); }}
+                style={{width:'100%',textAlign:'left',cursor:'pointer',fontFamily:'inherit',color:C.text,marginBottom:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
                 <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:13,color:C.muted,fontWeight:500}}>en attente</span></div>
@@ -29142,7 +29276,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   )}
                 </div>
                 <span aria-hidden="true" style={{color:C.muted,fontSize:22,fontWeight:700}}>›</span>
-              </div>
+              </button>
               );
             })()}
 
@@ -29343,6 +29477,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    {/* « Nouvelle » : arrivée depuis la dernière ouverture (par
+                        IDENTITÉ, la liste de la coque) — la même marque que les
+                        dernières ventes de Ma journée, dont « tout voir » mène ici. */}
+                    {Array.isArray(nouvellesVentes) && nouvellesVentes.some(t => String(t) === String(o.transaction_id)) && <span data-vente-nouvelle="" style={{flexShrink:0,fontSize:10.5,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:8,padding:'1px 7px'}}>Nouvelle</span>}
                     {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
                     {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
@@ -31813,13 +31951,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
           const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          // ⚠️⚠️ (revue du 15 octobre) LA CASE « MESSAGES » DE MA JOURNÉE OUVRE
+          //    ICI : son nombre doit s'y lire. Elle compte les non lues de moins
+          //    de 7 jours sur TOUS les comptes (`estNonLueRecente`, §11) — la
+          //    puce « Non lues · 7 j » compte la même chose, sur les mêmes
+          //    comptes (les autres que celui mis en avant restent estompés,
+          //    comme ailleurs). « Non lues » (toutes) garde son nombre à côté.
+          const qMsg = messageSearch.trim().toLowerCase();
+          const tousComptes = (convs.items||[]).filter(c=>!acctOffOf(c) && (!qMsg || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(qMsg)));
+          const recentes = tousComptes.filter(c=>estNonLueRecente(c));
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           const coMsg = selEff;
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+          const tri=(messageFilter==='recentes' ? recentes : liste.filter(c=>messageFilter==='all'||c.unread)).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
@@ -31858,9 +32005,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
                 <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
+                <button type="button" aria-pressed={messageFilter==='recentes'} data-filtre-recentes={recentes.length} onClick={()=>{setMessageFilter('recentes');setConvMax(40);}}>Non lues · {MESSAGES_RECENTS_J} j <span>{recentes.length}</span></button>
                 <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
+              {messageFilter==='recentes' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue ces {MESSAGES_RECENTS_J} derniers jours.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
                   Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
@@ -39582,7 +39731,8 @@ function AppCoeur() {
       const nums = load('vinted_annonce_numeros', {}); // pour repérer les annonces sans N°
       const acctLabels = load('vinted_account_labels', {}); // pour dire SUR QUEL COMPTE aller voir
       const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
-      let newMsgs=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
+      let newMsgs=0, unreadTotal=0, toShipCount=0, noNumCount=0, prixRepli=0;
+      const buyByNumN = load('vinted_buyprice_by_num', {}) || {};
       const venteIds=[]; // identités (transaction) des ventes lues — jamais un total
       // ⚠️ DEUX PAIRES AVEC LE MÊME NUMÉRO = la mauvaise chaussure dans le carton
       // (§19, le risque n°1). C'est signalé sur l'écran Annonces, mais il faut y
@@ -39637,8 +39787,8 @@ function AppCoeur() {
           // masquées à la main, hors colis cochés « posté ».
           toShipCount += sold.my_orders.filter(o=>aExpedier(o) && !shipDoneN[String(o.transaction_id)] && !ventesMasqueesN.has(String(o.transaction_id))).length;
         }
-        // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
-        // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
+        // Annonces en ligne (moisson, 0 requête) : compte celles dont le prix
+        // est à baisser (repli, règle `conseilPrix`) et celles SANS numéro.
         if(listH && Array.isArray(listH.items)){
           for(const raw of listH.items){
             if(!isOnlineListing(raw)) continue;
@@ -39648,7 +39798,9 @@ function AppCoeur() {
             if(soldIdsN.has(String(it.id))) continue;
             lbcOnlineIds.add(String(it.id));
             const age=ageDays(it);
-            if(age!=null && age>=30) sleepCount+=1;
+            // Repli de « prix à baisser » : la MÊME règle que le repricing
+            // (`conseilPrix`, §11), jamais « les annonces de 30 jours ».
+            if(conseilPrix({ price: it.price, age, views: it.views ?? null, favs: it.favourites ?? null, buy: prixAchatDe(nums[it.id], buyByNumN) })) prixRepli+=1;
             if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
             const nn=String((nums[it.id]||{}).numero||'').trim();
             if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push(it.title||'');
@@ -39814,10 +39966,12 @@ function AppCoeur() {
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
       // « Prix à baisser » : on CONSOMME le nombre publié par l'écran qui a la
       // règle (`repriceList`, Ma journée/Annonces — §11), comme les colis. Sans
-      // publication récente, on retombe sur ce qu'on sait (les annonces de plus
-      // de 30 jours) — jamais sur zéro.
+      // publication récente (appareil neuf), on compte avec la MÊME règle
+      // (`conseilPrix`) sur ce que la coque a lu — plus jamais « les annonces
+      // de 30 jours » sous ce libellé (revue du 15 octobre : « 2 prix à
+      // baisser » ici, « 1 » sur Ma journée, sur les mêmes annonces).
       { const pub = load('vrm_prix_a_baisser', null);
-        const nPrix = (pub && Number.isFinite(pub.total) && Date.now() - (Number(pub.at) || 0) < 12 * 3600000) ? pub.total : sleepCount;
+        const nPrix = (pub && Number.isFinite(pub.total) && Date.now() - (Number(pub.at) || 0) < 12 * 3600000) ? pub.total : prixRepli;
         if(nPrix>0) items.push({icon:'🏷️', ic:'tag', text:`${nPrix} prix à baisser`, n:nPrix, tab:'cat_annonces'}); }
       // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
       // jours suivants, pour qui n'ouvre pas l'app le 1er). Julien, 30 sept. :
@@ -40445,7 +40599,7 @@ function AppCoeur() {
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} nouvellesVentes={nouvellesVentes} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
@@ -40524,7 +40678,7 @@ function AppCoeur() {
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} nouvellesVentes={nouvellesVentes} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
       </main>

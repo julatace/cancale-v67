@@ -581,3 +581,20 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
  .vrm-day-bar > button > span:first-child { flex-direction:column; gap:5px !important; }
  .vrm-day-bar-label { white-space:normal !important; line-height:1.2; text-align:center; overflow:visible !important; }
 }
+
+/* Ma journée — sur ordinateur, « Vendu aujourd'hui » se range à côté de la
+   carte du mois (revue du 15 octobre) : empilées, elles poussaient les
+   dernières ventes sous le bas d'un écran de 860 px. Sur téléphone, rien ne
+   change (bloc ordinaire, les cartes restent l'une sous l'autre). */
+@media(min-width:1024px) {
+ .vrm-day-argent { display:flex; gap:14px; align-items:stretch; }
+ .vrm-day-argent > .vrm-day-money { flex:1 1 auto; min-width:0; }
+ .vrm-day-argent > .vrm-day-jour { flex:0 0 220px; width:auto !important; display:flex; flex-direction:column; justify-content:center; }
+}
+/* Sur un écran d'ordinateur BAS (un portable de 13-14 pouces, Chrome ouvert :
+   800 à 900 px utiles), la photo des dernières ventes passe du carré au 5:4 —
+   toujours grande, mais la carte entière (prix et statut) tient dans le
+   premier écran même quand une exception s'affiche au-dessus. */
+@media(min-width:1024px) and (max-height:900px) {
+ .vrm-derniere-photo { aspect-ratio:5 / 4 !important; }
+}

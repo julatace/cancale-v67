@@ -8997,10 +8997,9 @@ seule et la loupe ».
   « Un acheteur attend » n'était jamais prouvé.
 - **« Messages » = `estNonLueRecente`** : marquée non lue PAR VINTED et dernier
   mouvement de moins de `MESSAGES_RECENTS_J` (7) jours. Une règle pour la barre,
-  le point de l'onglet Messages et le widget (`liveStats.unread`, §11). Rien de
-  plus n'est affirmé (ni « acheteur », ni « à répondre »). ⚠️ L'écran Messages
-  (« Non lues N ») compte encore toutes les non lues : à brancher sur la même
-  règle par le chantier Messages.
+  le point de l'onglet Messages, le widget (`liveStats.unread`) et la puce
+  « Non lues · 7 j » de l'écran Messages, où la case emmène (§11, revue
+  ci-dessous). Rien de plus n'est affirmé (ni « acheteur », ni « à répondre »).
 - **`BarreJournee`** : quatre cases FIXES (une case à zéro reste), icône +
   nombre + deux mots ; le détail (en retard, prêts à imprimer, hors délai, le
   compte où manquent des codes) vit dans le nom accessible et l'infobulle.
@@ -9040,6 +9039,77 @@ seule et la loupe ».
   `filtre-compte` 8, `capacites` 20 (grille Annonces jamais rendue),
   `tout-generer` 3, `retrait` 2. Pas « corrigés » ici : ce ne sont pas des
   écrans de ce lot.
+
+#### Revue du 15 octobre : huit défauts du lot, tous reproduits, tous corrigés
+Chacun reproduit d'abord (les sondes du relecteur, sur un build de 4c1e3cb ;
+Messages vérifié aussi sur sa base en lecture seule : 149 non lues, 14 de moins
+de 7 jours), puis rouge sur 4c1e3cb, vert après, rouge sous mutation.
+- ⚠️⚠️ **« 14 Messages » dans la barre, « Non lues 149 » un clic plus loin.**
+  Avant le lot les deux étaient égaux ; la règle des 7 jours n'était que dans le
+  nom accessible. ⇒ La case ouvre Messages **sur la puce « Non lues · 7 j »**
+  (`poserVueSession('messages-filtre','recentes')`, recherche vidée), qui compte
+  avec `estNonLueRecente` sur TOUS les comptes non exclus — exactement la
+  portée de la case, même quand un compte est mis en avant (les autres restent
+  estompés). « Non lues » (toutes, y compris les 115 vieux fils) garde son
+  nombre à côté, sous son nom. Tranché : le libellé de la case reste
+  « Messages » (deux mots, sa demande) ; c'est l'arrivée qui dit la règle.
+  ⚠️ **Pour l'intégration** : `p1-messages` réécrit la même zone (liste de tous
+  les comptes, `ordreConversations`) — garder la puce et son `tri`.
+- **« Prix à baisser » : l'ancienne règle sous le nouveau libellé.** Sans
+  publication récente, Collectif/Tableau de bord comptaient « les annonces de
+  30 jours ou plus » sous « N prix à baisser » (« 2 » sur un appareil neuf,
+  « 1 » après Ma journée). ⇒ La règle d'UNE annonce vit dans `conseilPrix`
+  (module) : `repriceList` la lit, et le repli de la coque aussi — plus de
+  second calcul. Et la publication `vrm_prix_a_baisser` **rafraîchit sa date**
+  même quand le nombre ne change pas (au plus une écriture par heure) : un
+  total stable depuis la veille faisait retomber la coque sur son repli au bout
+  de 12 h.
+- **Les dernières ventes coupées sur un vrai écran d'ordinateur.** Le contrôle
+  ne mesurait que le haut du TITRE à 950 px : vert sur des cartes dont le prix
+  et le statut étaient sous le bas d'un MacBook 14" (≈ 860 px utiles) dès
+  qu'une exception s'affichait. ⇒ Sur ordinateur, « Vendu aujourd'hui » se
+  range **à côté** de la carte du mois (`.vrm-day-argent`, rien ne change sur
+  téléphone), et sur un écran bas (≤ 900 px) la photo passe au 5:4. Mesuré avec
+  une exception : 1512×860 → bas des cartes 778, 1440×800 → 776. Le banc
+  mesure désormais les CARTES (`data-derniere-vente`).
+- **« · 8 nouvelles » au-dessus de 5 cartes marquées**, et aucune sur Ventes.
+  Une vente captée en retard peut être plus ancienne qu'une vente déjà vue.
+  ⇒ L'en-tête compte les cartes marquées ; le reste est dit sur le lien
+  (« + 3 nouvelles · tout voir ›», `data-nouvelles-ailleurs`), qui ouvre Ventes
+  sur « Toutes », où elles portent « Nouvelle » (même liste d'identités, la
+  coque la passe à l'écran Ventes). `demarrage.cjs` compte les deux.
+- **Un « — » sans raison sur téléphone** (boîte seule ou suivis seuls
+  illisibles : la raison n'était que dans l'infobulle). ⇒ **UNE ligne sous la
+  barre** (`data-barre-raison`) nomme ce qui n'a pas pu être lu (« tes ventes »,
+  « la boîte de compte_b », « tes suivis de colis (emails) »…), dit ce que
+  veulent dire « — » et « ≥ », et offre « Réessayer ». Elle remplace la ligne
+  « ventes illisibles » (qui porte toujours `data-ventes-illisibles`) — une
+  cause, une phrase. Rien quand tout est lu ; rien pendant une panne de base
+  (le bloc de la coque le dit).
+- **Le nom d'une case partielle l'annonçait comme un total exact.** ⇒ « Au moins
+  … — pas pu lire … » ; un « — » dit ce qui manque. Et un compte **exclu** qui
+  ne répond pas ne rend plus un nombre partiel (`etatLecture(st, baseKO,
+  estExclu)` : il ne compte nulle part, décision du 3 octobre).
+- **Le titre d'une exception coupé** (« …que personne ne pe… ») : il passe à la
+  ligne. `emails-mis-de-cote.cjs` le mesure à 390 px par la LARGEUR dessinée
+  (`innerText` rend le texte entier même coupé à l'écran).
+- **La carte « en attente » portait « › » sans réagir** (faux bouton, d'avant
+  le lot) : c'est un bouton qui ouvre Ventes sur les ventes **en cours**
+  (filtre `encours` = `classifyOrderStatus` 'pending', la règle de sa somme).
+- Preuves : `journee-barre.cjs` **149 contrôles** — **20 rouges** sur 4c1e3cb
+  (build frais, méthode §6.1) ; sur un build où les dix correctifs sont
+  réaffaiblis à la fois, **19 rouges**, chacun sur SON contrôle (puce non
+  pressée, « 2 » sur Collectif, date non rafraîchie, cartes à 905/903 px,
+  « 8 nouvelles » sur 5 cartes, carte « en attente » pas un bouton, aucune ligne
+  de raison, noms « 1 conversation… » sur un « ≥ 1 », compte exclu en « ≥ »).
+  `emails-mis-de-cote.cjs` : **1 rouge** sur 4c1e3cb et sous mutation (titre
+  `nowrap` + `ellipsis`, 356 px dessinés dans 291).
+  `demarrage`, `vendu-recu`, `premierjour`, `poste-sans-depart`,
+  `statuts-colis`, `seuils-vinted`, `annonces-carte` (la baisse eBay 60 → 53 €
+  passe par `conseilPrix`), `emails-mis-de-cote` (55), `mobile` (222) : verts.
+  `messagerie` 16 et `filtre-compte` 8 : les MÊMES rouges que sur 4c1e3cb
+  (vérifié ligne à ligne), chantier `p1-messages`. Les bancs lancés acceptent
+  `BANC_PORT`.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

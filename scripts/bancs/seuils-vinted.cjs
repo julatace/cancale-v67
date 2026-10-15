@@ -39,7 +39,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4802;
+const PORT = Number(process.env.BANC_PORT) || 4802;
 
 const maintenant = Date.now();
 const AN = new Date(maintenant).getFullYear();

@@ -57,7 +57,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4351;
+const PORT = Number(process.env.BANC_PORT) || 4351;
 
 const MAINTENANT = Date.now();
 const ilYa = (j, h = 0) => new Date(MAINTENANT - j * 86400000 - h * 3600000).toISOString();
