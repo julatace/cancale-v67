@@ -19,8 +19,15 @@
 //      rien, quota et délai réservés AVANT eBay, la simulation ne range rien,
 //      un refus d'eBay est dit — jamais « 0 annonce » ;
 //    · le passage du matin : rien sans alerte cochée, une annonce n'est jamais
-//      signalée deux fois, horaires silencieux, catégorie coupée, écriture
-//      ratée ⇒ aucune notification ;
+//      signalée deux fois, ni annoncée « nouvelle » quand il l'a déjà vue à
+//      l'écran ou qu'eBay ne la rend plus ce matin, horaires silencieux,
+//      catégorie coupée, écriture ratée ⇒ aucune notification ;
+//    · la relecture du 15 octobre (14 défauts) : « 42,5 » est UNE pointure,
+//      « 60 € » se lit, « pack » seul n'est pas un lot, le nom suit la
+//      recherche modifiée, un prix qui monte met la fiche à jour, un modèle
+//      hors de la liste connue (« 2002R ») a sa fourchette, l'achat marqué
+//      compte dans le budget, une note n'est pas une décision, l'hôte des
+//      photos est borné ;
 //    · ce qui ne doit JAMAIS exister : une requête à Vinted ou Leboncoin, une
 //      route d'achat, d'offre ou d'enchère eBay.
 //  Données INVENTÉES (le dépôt est public).
@@ -195,6 +202,35 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     dit(!titre && R.titrePorte('Salomon XT6 noir', 'XT-6'), '« Air Max 1 » ne trouve pas « Air Max 100 » ; « XT-6 » trouve « XT6 »');
     dit(!R.normaliserRecherche({ noms: ['Spezial'], prixMaxEuros: '60', tailles: ['41 1/4'] }).ok, 'une pointure illisible est refusée avec sa raison (jamais devinée)');
   });
+  await essaie('saisie', async () => {
+    // « 42,5 » est UNE pointure : la virgule décimale ne coupe pas le champ.
+    const d = (x) => JSON.stringify(R.decouperPointures(x));
+    dit(d('42,5') === '["42,5"]' && d('42, 43') === '["42","43"]' && d('42,5, 43') === '["42,5","43"]' && d('42 2/3; 44') === '["42 2/3","44"]',
+      '« 42,5 » est une pointure ; « 42, 43 » en sont deux (la virgule décimale ne coupe pas)', [d('42,5'), d('42, 43'), d('42,5, 43')].join(' '));
+    const n = R.normaliserRecherche({ noms: ['Spezial'], prixMaxEuros: '60 €', tailles: '42,5' }, { nouvelId: 'r0000000009' });
+    dit(n.ok && n.recherche.tailles.join() === '42.5' && n.recherche.prixMax === 6000, '« 42,5 » et « 60 € » tapés au clavier : acceptés (42,5 et 60 €)', JSON.stringify(n.ok ? { t: n.recherche.tailles, p: n.recherche.prixMax } : n));
+    dit(R.centimesDe('45 €') === 4500 && R.centimesDe('60 euros') === 6000 && R.centimesDe('1 234,50') === 123450 && R.centimesDe('45,5') === 4550 && R.centimesDe('quarante') === null && R.centimesDe('') === null,
+      'un montant se lit comme on l\'écrit (« 45 € », « 60 euros », « 1 234,50 ») ; illisible ⇒ null, jamais 0');
+    // Le nom suit la recherche : modifiée en Samba 44, elle ne s'appelle plus « Spezial 42 ».
+    const m = R.normaliserRecherche({ nom: 'Adidas Spezial 42', marque: 'Adidas', noms: ['Samba'], tailles: ['44'], prixMaxEuros: '60' }, { nouvelId: 'r0000000009' });
+    dit(m.ok && m.recherche.nom === 'Adidas Samba 44' && R.nomRecherche({ marque: 'Adidas', noms: ['Spezial'], tailles: ['42.5'] }) === 'Adidas Spezial 42,5',
+      'le nom se refait TOUJOURS depuis la marque, le modèle et les pointures (un nom rangé ne reste jamais en arrière)', m.ok && m.recherche.nom);
+  });
+  await essaie('lots et photos', async () => {
+    // « pack » est un nom de coloris (« Protection Pack ») : un lot seulement s'il est compté.
+    const lots = ['Lot de 2 paires Adidas Spezial 42', 'Adidas Spezial 42 pack de 2', 'Nike Dunk 2-pack 42', 'Samba 42 x2', 'Gazelle bundle 42'];
+    const pasLots = ['New Balance 2002R Protection Pack gris 42', 'New Balance 1906D Protection Pack Rain Cloud 42', 'Yeezy 350 V2 pack 42', 'Air Max 90 42'];
+    dit(lots.every(R.estUnLot) && !pasLots.some(R.estUnLot), '« Protection Pack » n\'est pas un lot ; « pack de 2 », « 2-pack », « x2 », « lot » en sont',
+      'faux lots : ' + pasLots.filter(R.estUnLot).join(' | ') + ' · lots manqués : ' + lots.filter((t) => !R.estUnLot(t)).join(' | '));
+    const r = R.normaliserRecherche({ marque: 'New Balance', noms: ['2002R'], tailles: ['42'], prixMaxEuros: '120' }, { nouvelId: 'r0000000009' }).recherche;
+    const pp = R.analyserAnnonce(R.lireItemEbay(item(140001, 'New Balance 2002R Protection Pack gris 42', '90.00', '6.00', '3000')), r);
+    dit(pp.garde && !pp.drapeaux.includes('lot'), 'une 2002R « Protection Pack » est gardée avec le défaut « Sans lots », sans drapeau « lot »', JSON.stringify(pp.exclusion));
+    const img = (u) => R.lireItemEbay(item(140002, 'Adidas Spezial 42', '40.00', '5.00', '3000', { image: { imageUrl: u } })).image;
+    dit(img('https://i.ebayimg.com/images/g/x/s-l500.jpg') !== '' && img('https://pixel-espion-ebayimg.com/t.gif') === '' && img('https://notebayimg.com/x.jpg') === '' && img('https://i.ebayimg.com.espion.fr/x.jpg') === '',
+      'la photo : l\'hôte d\'images d\'eBay seul (« pixel-espion-ebayimg.com », « notebayimg.com » refusés)');
+    const ecran = lire('src/VeilleAchat.jsx') || '';
+    dit(/PHOTO_EBAY[^;]*from '\.\.\/api\/_lib\/veille-regle\.js'/.test(ecran.replace(/\n/g, ' ')) && !/const PHOTO_EBAY\s*=/.test(ecran), 'l\'écran lit la MÊME règle de photo que le serveur (importée, jamais recopiée)');
+  });
 
   console.log('── 2. La règle : une vérification, sa mémoire, ses alertes');
   await essaie('fusion', async () => {
@@ -247,6 +283,36 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     const partiel = R.jugerLectures([{ ok: true, items: ITEMS_SPEZIAL(), total: 9 }, { ok: false, erreur: 'y' }], r);
     dit(partiel.ok && partiel.partiel && !partiel.complet, 'une requête sur deux en échec ⇒ partielle, et dite');
   });
+  await essaie('prix qui monte', async () => {
+    const r = R.normaliserRecherche(RECHERCHE, { maintenant: T0, nouvelId: 'r0000000001' }).recherche;
+    const j1 = R.jugerLectures([{ ok: true, items: ITEMS_SPEZIAL(), total: 9 }], r);
+    let d = R.fusionnerVerification(null, r.id, j1, T0, 'clic', r).data;
+    d = R.appliquerDecision(d, r.id, '110001', { statut: 'a-examiner' }, T0 + MIN).data;
+    // eBay rend maintenant 110001 à 70 € et 110007 (nouvelle) à 70 € : toutes deux hors du prix maximum.
+    const plusCher = () => ITEMS_SPEZIAL().map((x) => (x.legacyItemId === '110001' || x.legacyItemId === '110007' ? { ...x, price: { value: '70.00', currency: 'EUR' } } : x));
+    const j2 = R.jugerLectures([{ ok: true, items: plusCher(), total: 9 }], r);
+    const f = R.fusionnerVerification(d, r.id, j2, T0 + H, 'clic', r);
+    const a1 = f.data.parRecherche[r.id].annonces['110001'];
+    dit(a1 && a1.statut === 'a-examiner' && a1.prix === 7000 && a1.total === 7650 && a1.revuLe === T0 + H && /70,00/.test(a1.horsCriteres || '') && !(a1.raisons || []).some((x) => /≤/.test(x)),
+      '« à examiner » relue à 70 € : sa décision reste, son prix est celui d\'AUJOURD\'HUI (76,50 € livraison comprise), la raison est dite — jamais « ≤ 60 € »', JSON.stringify(a1 && { p: a1.prix, t: a1.total, h: a1.horsCriteres, r: a1.raisons }));
+    dit(!f.data.parRecherche[r.id].annonces['110007'], 'une « nouvelle » qui ne correspond plus (prix monté) quitte la liste');
+    const j3 = R.jugerLectures([{ ok: true, items: ITEMS_SPEZIAL(), total: 9 }], r);
+    const f3 = R.fusionnerVerification(f.data, r.id, j3, T0 + 2 * H, 'clic', r);
+    const a3 = f3.data.parRecherche[r.id].annonces['110001'];
+    dit(a3 && a3.total === 5150 && !a3.horsCriteres && !f3.nouvelles.includes('110007') && f3.data.parRecherche[r.id].annonces['110007'],
+      'repassée sous le prix maximum : elle correspond de nouveau, et la « nouvelle » déjà montrée revient SANS être recomptée « nouvelle »', `nouvelles=${f3.nouvelles.join(',')}`);
+  });
+  await essaie('alerte : seulement ce que ce matin a trouvé', async () => {
+    const r = R.normaliserRecherche(RECHERCHE, { maintenant: T0, nouvelId: 'r0000000001' }).recherche;
+    const A = item(150001, 'Adidas Spezial 42 bleu', '40.00', '5.00', '3000'), B = item(150002, 'Adidas Spezial 42 noir', '40.00', '5.00', '3000'), Cc = item(150003, 'Adidas Spezial 42 rouge', '40.00', '5.00', '3000');
+    // Il clique « Vérifier » : A et B s'affichent à l'écran.
+    const vue = R.fusionnerVerification(null, r.id, R.jugerLectures([{ ok: true, items: [A, B], total: 2 }], r), T0, 'clic', r).data;
+    // Le lendemain matin, eBay ne rend plus que C.
+    const matin = T0 + JOUR;
+    const f = R.fusionnerVerification(vue, r.id, R.jugerLectures([{ ok: true, items: [Cc], total: 1 }], r), matin, 'matin', r);
+    const m = R.marquerAlertes(f.data, r.id, matin);
+    dit(m.alertees.join() === '150003', 'l\'alerte ne compte QUE ce que ce matin a trouvé pour la première fois — ni A et B déjà vues à l\'écran, ni ce qu\'eBay ne rend plus', m.alertees.join(','));
+  });
   await essaie('silence', async () => {
     const nuit = Date.parse('2026-10-15T21:30:00.000Z');   // 23:30 à Paris
     const matin = Date.parse('2026-10-15T08:00:00.000Z');  // 10:00 à Paris
@@ -274,6 +340,27 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
       'prudente / moyenne / ambitieuse = 80 / 90 / 100 €, sur 3 ventes, la plus récente il y a 10 j', JSON.stringify(f));
     const f2 = R.fourchetteRevente(comp.slice(0, 2), T0);
     dit(!f2.assez && f2.n === 2 && f2.prudente == null, 'moins de 3 ventes ⇒ « pas assez de ventes comparables », aucun chiffre');
+    // Un modèle hors de la liste connue (« 2002R ») : le nom qu'il a tapé.
+    const connu = (t) => (/spezial/i.test(t) ? 'spezial' : null);
+    const nb = [
+      { titre: 'New balance 2002R protection pack gris taille 42', prix: 9500, date: T0 - 10 * JOUR },
+      { titre: 'New balance 2002R noir taille 42', prix: 10500, date: T0 - 20 * JOUR },
+      { titre: 'New balance 2002R gris 42', prix: 11000, date: T0 - 40 * JOUR },
+      { titre: 'Lot New balance 2002R x2 taille 42', prix: 18000, date: T0 - 5 * JOUR },
+      { titre: 'New balance 2002R gris taille 43', prix: 12000, date: T0 - 5 * JOUR },
+      { titre: 'New balance 530 blanc 42', prix: 7000, date: T0 - 5 * JOUR }, { titre: 'Nike 530 gris 42', prix: 9900, date: T0 - 5 * JOUR },
+      { titre: 'New balance 530 noir 42', prix: 7500, date: T0 - 6 * JOUR }, { titre: 'New balance 530 vert 42', prix: 8000, date: T0 - 7 * JOUR },
+    ];
+    const rech = { marque: 'New Balance', noms: ['2002R'] };
+    const cle = R.cleComparables('New Balance 2002R Protection Pack gris 42', rech, connu);
+    const c2 = cle ? R.ventesComparables(nb, cle, connu) : [];
+    dit(cle && cle.taille === '42' && c2.length === 3 && R.fourchetteRevente(c2, T0).assez,
+      'modèle hors liste (« 2002R ») : SES 3 ventes de 2002R en 42 — ni le lot, ni la 43', JSON.stringify(cle) + ' · ' + c2.map((v) => v.prix).join(','));
+    const c530 = R.ventesComparables(nb, R.cleComparables('New Balance 530 gris 42', { marque: 'New Balance', noms: ['530'] }, connu), connu);
+    dit(c530.length === 3 && !c530.some((v) => /nike/i.test(v.titre)), 'un nom tout en chiffres (« 530 ») exige la marque : la « Nike 530 » n\'en est pas', c530.map((v) => v.titre).join(' | '));
+    const lib = R.cleLibre('New Balance 2002R 42', connu);
+    dit(lib && lib.taille === '42' && R.ventesComparables(nb, lib, connu).length === 3 && R.cleLibre('New Balance 2002R', connu) === null && R.cleLibre('Spezial 42', connu).modele === 'spezial',
+      '« Rentabilité avant achat » libre : « New Balance 2002R 42 » trouve ses 3 ventes ; sans pointure, aucune clé ; un modèle connu passe par la liste', JSON.stringify(lib));
   });
   await essaie('budget', async () => {
     const pub = { mois: '2026-10', depense: 31250, n: 12, complet: true };
@@ -282,6 +369,24 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     dit(R.budgetDuMois(40000, { ...pub, mois: '2026-09' }, T0).etat === 'pas-su', 'une publication d\'un autre mois ⇒ « pas su », jamais un reste inventé');
     const p = R.budgetDuMois(30000, { ...pub, complet: false, manque: ['compte_b'] }, T0);
     dit(p.etat === 'partiel' && p.depasse && p.manque[0] === 'compte_b', 'un compte illisible ⇒ « partiel », nommé ; dépassement signalé');
+    // « Je l'ai achetée » dans la veille : la dépense entre dans le budget (eBay
+    // n'est compté NULLE PART ailleurs), et une note ou un « Remettre » se lisent juste.
+    const r = R.normaliserRecherche(RECHERCHE, { maintenant: T0, nouvelId: 'r0000000001' }).recherche;
+    let d = R.fusionnerVerification(null, r.id, R.jugerLectures([{ ok: true, items: ITEMS_SPEZIAL(), total: 9 }], r), T0, 'clic', r).data;
+    d = R.appliquerDecision(d, r.id, '110001', { statut: 'a-examiner' }, T0 + MIN).data;
+    d = R.appliquerDecision(d, r.id, '110001', { statut: 'achetee' }, T0 + 2 * MIN).data;
+    d = R.appliquerDecision(d, r.id, '110001', { note: 'boîte d\'origine' }, T0 + 3 * MIN).data;
+    d = R.appliquerDecision(d, r.id, '110005', { statut: 'achetee' }, T0 + 4 * MIN).data;
+    const v = R.achatsVeilleDuMois(d, T0 + H);
+    dit(v.n === 2 && v.total === 5150 + 5000 && !v.complet && v.sansLivraison === 1, 'achats marqués ce mois : 2, 101,50 € — dont un sans livraison connue (« au moins ») ; la note après l\'achat ne l\'annule pas', JSON.stringify(v));
+    const bv = R.budgetDuMois(40000, pub, T0 + H, v);
+    dit(bv.depense === 31250 + 10150 && bv.reste === 40000 - 41400 && bv.depasse && bv.etat === 'partiel', 'le budget compte ses achats de la veille : 312,50 + 101,50 = 414 € ⇒ dépassé, « au moins »', JSON.stringify({ d: bv.depense, r: bv.reste, e: bv.etat }));
+    const d2 = R.appliquerDecision(d, r.id, '110005', { statut: 'nouvelle' }, T0 + 5 * MIN).data;
+    const v2 = R.achatsVeilleDuMois(d2, T0 + H);
+    dit(v2.n === 1 && v2.total === 5150 && v2.complet, '« Remettre » après « Je l\'ai achetée » : l\'achat sort du budget', JSON.stringify(v2));
+    dit(R.achatsVeilleDuMois(d2, Date.parse('2026-11-02T08:00:00.000Z')).n === 0, 'un achat d\'octobre ne compte pas dans le budget de novembre');
+    const h = d.historique[1];
+    dit(h && h.type === 'note' && h.a === 'achetee' && d.historique[2].type === 'statut', 'une note est rangée comme une NOTE dans l\'historique, jamais comme une décision', JSON.stringify(h));
   });
 
   console.log('── 4. La route, exécutée');
@@ -304,6 +409,11 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     dit(lectures.length > 0 && lectures.every((j) => j.owner === J), 'toutes ses lectures sont filtrées sur son identifiant (owner=eq.)');
     const rB = await appel('veillelire', {}, { authorization: 'Bearer ' + JWT_B });
     dit(rB.code === 200 && rB.corps.recherches.length === 0, 'un autre vendeur ne voit pas ses recherches');
+    const conf0 = ligne(J, 'veille_recherches').recherches[0];
+    const mod = await appel('veillesauver', { recherche: { ...conf0, nom: conf0.nom, noms: ['Samba'], tailles: ['44'] } });
+    const r2 = ligne(J, 'veille_recherches').recherches[0];
+    dit(mod.code === 200 && r2.nom === 'Adidas Samba 44', 'modifiée (Samba, 44) : son nom suit — jamais l\'ancien « Adidas Spezial 42 »', r2.nom);
+    await appel('veillesauver', { recherche: { ...conf0 } });
     const vide = await appel('veillesauver', { recherche: { ...RECHERCHE, noms: [] } });
     dit(vide.code === 400 && vide.corps.champ === 'noms', 'sans modèle : refusée, champ nommé');
   });
@@ -331,14 +441,20 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     dit(r.code === 200 && r.corps.annonce.statut === 'refusee' && r.corps.bilan.refusee === 1, 'refuser une annonce, avec son motif');
     const n = await appel('veilledecision', { id: rid, itemId: '110001', note: 'semelle à vérifier' });
     dit(n.code === 200 && ligne(J, 'veille_resultats').parRecherche[rid].annonces['110001'].note === 'semelle à vérifier', 'une note privée se garde');
+    const a = await appel('veilledecision', { id: rid, itemId: '110001', statut: 'achetee' });
+    dit(a.code === 200 && a.corps.achatsMois && a.corps.achatsMois.n === 1 && a.corps.achatsMois.total === 5150, '« Je l\'ai achetée » : la route rend l\'achat du mois (51,50 €) pour le budget', JSON.stringify(a.corps && a.corps.achatsMois));
+    const l = await appel('veillelire', {});
+    dit(l.code === 200 && l.corps.achatsMois && l.corps.achatsMois.n === 1, 'la lecture de la veille rend aussi ses achats du mois');
+    await appel('veilledecision', { id: rid, itemId: '110001', statut: 'nouvelle' });
   });
   await essaie('simulation', async () => {
     journal.length = 0;
     const avant = JSON.stringify(ligne(J, 'veille_resultats').parRecherche);
+    const avantH = JSON.stringify(ligne(J, 'veille_resultats').historique || []);
     const r = await appel('veilletester', { recherche: { ...RECHERCHE, tailles: ['42'], prixMaxEuros: '50' } });
     const apres = JSON.stringify(ligne(J, 'veille_resultats').parRecherche);
     dit(r.code === 200 && r.corps.simulation === true && Array.isArray(r.corps.annonces), 'Tester : des résultats rendus', `HTTP ${r.code}`);
-    dit(avant === apres && (ligne(J, 'veille_resultats').historique || []).length === 2, 'la SIMULATION ne range rien (ni annonce, ni historique, ni alerte)');
+    dit(avant === apres && avantH === JSON.stringify(ligne(J, 'veille_resultats').historique || []) && JSON.parse(avantH).length === 4, 'la SIMULATION ne range rien (ni annonce, ni historique, ni alerte)');
     dit((r.corps.exemples || []).some((x) => /pointure 42 2\/3/.test(x.motif)), 'elle montre des exemples d\'écartées AVEC leur motif');
   });
   await essaie('lecture ratée', async () => {
@@ -414,6 +530,27 @@ const RECHERCHE = { marque: 'Adidas', noms: ['Spezial', 'Handball Spezial'], tai
     const coupe = await V.veilleDuMatin(deps({ maintenant: T0 + 6 * JOUR, acces: async () => false }));
     dit(coupe === 'abonnement coupé', 'abonnement coupé ⇒ aucun appel à eBay pour lui');
     void rid2;
+  });
+  await essaie('matin après une vérification à l\'écran', async () => {
+    // Le parcours normal : il crée la recherche, clique « Vérifier » (A et B
+    // s'affichent), coche l'alerte. Le lendemain matin, eBay ne rend plus que C.
+    base = []; journal.length = 0;
+    if (V.oublierJetonVeille) V.oublierJetonVeille();
+    const envois = [];
+    const deps = (extra) => ({ owner: J, envoyer: async (p) => { envois.push(p); return { sent: 1 }; }, categorieActive: async () => true, acces: async () => true, ...(extra || {}) });
+    const A = item(160001, 'Adidas Spezial 42 bleu', '40.00', '5.00', '3000'), B = item(160002, 'Adidas Spezial 42 noir', '40.00', '5.00', '3000'), Cc = item(160003, 'Adidas Spezial 42 rouge', '40.00', '5.00', '3000');
+    await appel('veillesauver', { recherche: { ...RECHERCHE, noms: ['Spezial'] } });
+    const id = ligne(J, 'veille_recherches').recherches[0].id;
+    mode = { items: () => [A, B] };
+    const v = await appel('veilleverifier', { id });
+    await appel('veillesauver', { recherche: { ...ligne(J, 'veille_recherches').recherches[0], alerte: true } });
+    mode = { items: () => [Cc] };
+    const out = await V.veilleDuMatin(deps({ maintenant: T0 + JOUR }));
+    mode = {};
+    const ann = ligne(J, 'veille_resultats').parRecherche[id].annonces;
+    dit(v.corps && v.corps.nouvelles === 2 && envois.length === 1 && /^1 nouvelle annonce : Adidas Spezial 42 \(1\)/.test(envois[0].body),
+      'il a VU A et B à l\'écran ; ce matin eBay ne rend que C ⇒ « 1 nouvelle annonce » — jamais 3', envois[0] && envois[0].body);
+    dit(!ann['160001'].alerteLe && !ann['160002'].alerteLe && ann['160003'].alerteLe === T0 + JOUR, 'seule C est marquée signalée', JSON.stringify(out));
   });
 
   console.log('── 6. Ce qui ne doit jamais exister');

@@ -235,7 +235,13 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ann-card [data-chiffres] { padding-block:4px; }
 .vrm-ann-actions > summary { min-height:32px; display:flex; align-items:center; }
 @media(max-width:767px) {
-  .vrm-main .vrm-platform-tabs { display:grid !important; grid-template-columns:repeat(auto-fit,minmax(54px,1fr)); gap:3px !important; padding:4px 12px !important; overflow:visible; }
+  /* UNE rangée, toujours : chaque onglet a au moins la largeur de son libellé
+     (max-content) et ils se partagent le reste. eBay en a 7 : ils tiennent dès
+     360 px (« Compte » ne tombe plus seul sur une seconde ligne à 390/414 px),
+     et en dessous la rangée défile au doigt, l'onglet ouvert gardé visible
+     (PlatSubNav). Vinted et Leboncoin (4-5 onglets) : inchangés. */
+  .vrm-main .vrm-platform-tabs { display:grid !important; grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(max-content,1fr); gap:3px !important; padding:4px 12px !important; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
+  .vrm-main .vrm-platform-tabs::-webkit-scrollbar { display:none; }
   .vrm-main .vrm-platform-tabs > button { min-width:0; min-height:56px !important; padding:5px 2px !important; flex-direction:column; gap:4px !important; font-size:11px !important; border-radius:8px 8px 0 0 !important; }
   .vrm-section-icon { display:inline-flex; }
   .vrm-ann-grid { gap:10px !important; }

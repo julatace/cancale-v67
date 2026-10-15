@@ -30,7 +30,7 @@ import { keysReady, appId, certId, lireDonnee, modifierDonnee } from './ebay.js'
 import {
   normaliserRecherche, requetesEbay, jugerLectures, fusionnerVerification, noterEchec, rejuger,
   marquerAlertes, appliquerDecision, reserverQuota, bilanRecherche, dansSilence, resultatsVides,
-  centimesDe, PLATEFORMES_VEILLE, VEILLE_MAX_RECHERCHES, VEILLE_QUOTA_JOUR, VEILLE_DELAI_MS,
+  centimesDe, nomRecherche, achatsVeilleDuMois, PLATEFORMES_VEILLE, VEILLE_MAX_RECHERCHES, VEILLE_QUOTA_JOUR, VEILLE_DELAI_MS,
   VEILLE_MATIN_MAX_APPELS, LIBELLES_EXCLUSION,
 } from './veille-regle.js';
 
@@ -152,6 +152,8 @@ export async function actionVeille(action, b, owner, opts = {}) {
       return R(200, {
         ok: true, recherches: conf.recherches, reglages: conf.reglages, resultats,
         historique: ((res && res.historique) || []).slice(0, 60), matin: (res && res.matin) || null,
+        // Ses achats marqués dans la veille ce mois-ci (le budget les compte).
+        achatsMois: achatsVeilleDuMois(res, maintenant),
         quota: vueQuota(res, maintenant), plateformes: plateformes(), libellesExclusion: LIBELLES_EXCLUSION,
       });
     }
@@ -235,7 +237,7 @@ export async function actionVeille(action, b, owner, opts = {}) {
         return R(200, {
           ok: true, simulation: true, quota: resa.quota,
           verif: { at: maintenant, ok: true, partiel: jug.partiel, lus: jug.lus, totalEbay: jug.totalEbay, complet: jug.complet, retenues: jug.retenues.length, ecartees: jug.ecartees, erreur: jug.partiel ? erreur : '' },
-          annonces: jug.retenues.map(({ analyse, ...a }) => ({ ...a, raisons: analyse.raisons, inverifiables: analyse.inverifiables, drapeaux: analyse.drapeaux, total: analyse.total, totalConfirme: analyse.totalConfirme, statut: 'nouvelle', vuLe: maintenant, revuLe: maintenant })),
+          annonces: jug.retenues.map(({ analyse, ...a }) => ({ ...a, raisons: analyse.raisons, faits: analyse.faits, inverifiables: analyse.inverifiables, drapeaux: analyse.drapeaux, total: analyse.total, totalConfirme: analyse.totalConfirme, statut: 'nouvelle', vuLe: maintenant, revuLe: maintenant })),
           exemples: jug.exemples,
         });
       }
@@ -275,7 +277,7 @@ export async function actionVeille(action, b, owner, opts = {}) {
         });
         if (w2 !== true) pause = false;
       }
-      return R(200, { ok: true, annonce: { ...out.annonce, id: itemId }, bilan: bilanRecherche(out.data.parRecherche[rid]), recherchePausee: pause });
+      return R(200, { ok: true, annonce: { ...out.annonce, id: itemId }, bilan: bilanRecherche(out.data.parRecherche[rid]), achatsMois: achatsVeilleDuMois(out.data, maintenant), recherchePausee: pause });
     }
     default:
       return R(400, { ok: false, error: 'action inconnue' });
@@ -328,7 +330,7 @@ export async function veilleDuMatin({ owner, maintenant = Date.now(), envoyer, c
     if (w !== true) continue;
     const neuves = alertees.filter((k) => !vues.has(k));
     neuves.forEach((k) => vues.add(k));
-    if (neuves.length) parRecherche.push({ nom: r.nom, n: neuves.length });
+    if (neuves.length) parRecherche.push({ nom: nomRecherche(r), n: neuves.length });
   }
   const total = vues.size;
   if (!total) { await finir('rien', { appels }); return { appels, nouvelles: 0 }; }

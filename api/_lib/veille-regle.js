@@ -25,6 +25,7 @@ export const VEILLE_MAX_EXCLUS = 10;
 export const VEILLE_ANNONCES_MAX = 40;     // annonces gardées par recherche (décidées comprises)
 export const VEILLE_REFUSEES_MAX = 150;    // mémoire compacte des refus (pour ne pas les reproposer)
 export const VEILLE_HISTO_MAX = 200;
+export const VEILLE_CONNUES_MAX = 300;     // annonces déjà montrées (numéro → première vue) : une annonce revenue n'est pas « nouvelle »
 export const VEILLE_QUOTA_JOUR = 30;       // vérifications à la demande, par vendeur et par jour (heure de Paris)
 export const VEILLE_DELAI_MS = 2 * 60 * 1000;   // pas deux vérifications de la même recherche en 2 min
 export const VEILLE_LIMITE_EBAY = 100;     // annonces lues par appel (les plus récentes)
@@ -85,6 +86,11 @@ export function titrePorte(titre, mot) {
   }
   return false;
 }
+// La photo d'une annonce eBay : l'hôte d'images d'eBay et lui seul
+// (`i.ebayimg.com`, ou `ebayimg.com`) — un nom qui FINIT par « ebayimg.com »
+// sans le point (« pixel-espion-ebayimg.com ») n'en est pas un. La même règle
+// au serveur (`lireItemEbay`) et à l'écran (§11).
+export const PHOTO_EBAY = /^https:\/\/(?:[a-z0-9-]+\.)*ebayimg\.com\//i;
 const propre = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
 // ── POINTURES ÉCRITES DANS UN TITRE (fractions comprises) ────────────────────
@@ -100,6 +106,12 @@ export function normPointure(s) {
   if (!m) return '';
   return m[1] + (m[2] ? '.5' : (m[3] ? FRACTION[m[3]] : ''));
 }
+// Une pointure à l'écran s'écrit à la française (« 42,5 »).
+export const pointureTexte = (p) => String(p == null ? '' : p).replace('.', ',');
+// Le champ « Pointures » se découpe sur les virgules et points-virgules —
+// SAUF la virgule décimale (« 42,5 » est UNE pointure, « 42, 43 » en sont deux).
+export const decouperPointures = (v) => (Array.isArray(v) ? v : String(v == null ? '' : v).split(/;|\n|,(?!5(?![0-9]))/))
+  .map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
 export function taillesDuTitre(titre) {
   const t = ' ' + sansAccents(titre).toLowerCase()
     .replace(/½/g, ' 1/2').replace(/⅓/g, ' 1/3').replace(/⅔/g, ' 2/3')
@@ -121,13 +133,20 @@ export function taillesDuTitre(titre) {
 }
 
 // ── LOTS ─────────────────────────────────────────────────────────────────────
-const RE_LOT = /(^|[^a-z])(lot|lots|pack|bundle)([^a-z]|$)|(^|[^0-9])[2-9]\s*(paires|pairs|pares)([^a-z]|$)|(^|[^a-z0-9])x\s?[2-9]([^0-9]|$)|(^|[^0-9])[2-9]\s?x([^a-z0-9]|$)/;
+// ⚠️ « pack » SEUL n'est PAS un lot : c'est un nom de coloris ou de modèle
+//    (« 2002R Protection Pack », « Rain Cloud pack ») — mesuré : 52 de ses titres
+//    le portent, dont 15 ventes de 2002R/1906D « protection pack ». Un pack n'est
+//    un lot que s'il est COMPTÉ (« pack de 2 », « 2-pack », « 3 pack »).
+const RE_LOT = /(^|[^a-z])(lot|lots|bundle)([^a-z]|$)|(^|[^0-9])[2-9]\s*(paires|pairs|pares)([^a-z]|$)|(^|[^a-z0-9])x\s?[2-9]([^0-9]|$)|(^|[^0-9])[2-9]\s?x([^a-z0-9]|$)|(^|[^a-z])pack\s*(de\s*)?[2-9]([^0-9]|$)|(^|[^a-z0-9])[2-9]\s*-?\s*packs?([^a-z]|$)/;
 export const estUnLot = (titre) => RE_LOT.test(' ' + sansAccents(titre).toLowerCase() + ' ');
 
 // ── MONTANTS (centimes entiers ; `null` = inconnu, jamais 0) ─────────────────
+// Ce qu'on tape se lit comme on l'écrit : « 60 », « 60,50 », « 60 € »,
+// « 60 euros », « 1 234,50 » (espaces, y compris insécables, retirés).
 export function centimesDe(v) {
   if (v == null || (typeof v === 'string' && !v.trim())) return null;
-  const s = String(typeof v === 'object' ? (v.value ?? v.amount ?? '') : v).trim().replace(',', '.');
+  const s = String(typeof v === 'object' ? (v.value ?? v.amount ?? '') : v).trim()
+    .replace(/[\s\u00a0\u202f]+/g, '').replace(/^€|€$/g, '').replace(/(?:eur|euros?)$/i, '').replace(',', '.');
   if (!/^\d{1,7}(?:\.\d{1,2})?$/.test(s)) return null;
   const [a, b = ''] = s.split('.');
   return Number(a) * 100 + Number(b.padEnd(2, '0'));
@@ -147,7 +166,7 @@ export function normaliserRecherche(b, opts = {}) {
   const noms = liste(r.noms != null ? r.noms : r.modele, VEILLE_MAX_NOMS, 40);
   if (!noms.length || !noms.some((x) => normTexte(x).length >= 2)) return { ok: false, champ: 'noms', erreur: 'Indique au moins le modèle cherché.' };
   const tailles = [];
-  for (const x of liste(r.tailles, VEILLE_MAX_TAILLES + 4, 12)) {
+  for (const x of decouperPointures(r.tailles).map((x) => propre(x, 12)).filter(Boolean).slice(0, VEILLE_MAX_TAILLES + 4)) {
     const p = normPointure(x);
     if (!p) return { ok: false, champ: 'tailles', erreur: `« ${x} » n'est pas une pointure (34 à 52, ex. 42, 42,5 ou 42 2/3).` };
     if (!tailles.includes(p)) tailles.push(p);
@@ -164,7 +183,10 @@ export function normaliserRecherche(b, opts = {}) {
   const marque = propre(r.marque, 40);
   const id = ID_RECHERCHE.test(String(r.id || '')) ? String(r.id) : (opts.nouvelId || '');
   const maintenant = opts.maintenant || Date.now();
-  const nom = propre(r.nom, 60) || [marque, noms[0], tailles.length ? tailles.join('/') : ''].filter(Boolean).join(' ');
+  // Le NOM se refait TOUJOURS depuis les critères (l'écran n'a pas de champ
+  // Nom) : une recherche modifiée en Samba 44 ne garde jamais « Spezial 42 »,
+  // ni sur sa carte ni dans l'alerte du matin.
+  const nom = nomRecherche({ marque, noms, tailles });
   return {
     ok: true,
     recherche: {
@@ -181,6 +203,10 @@ export function normaliserRecherche(b, opts = {}) {
     },
   };
 }
+
+// Le nom d'une recherche : marque, modèle, pointures. Lu par la carte et par
+// l'alerte du matin — jamais un nom rangé qui aurait pu rester en arrière.
+export const nomRecherche = (r) => propre([r && r.marque, ((r && r.noms) || [])[0], ((r && r.tailles) || []).map(pointureTexte).join('/')].filter(Boolean).join(' '), 60);
 
 // ── LA REQUÊTE eBAY (Browse, item_summary/search) ────────────────────────────
 // Une requête PAR NOM (le modèle et ses autres noms) : la syntaxe « OU » de
@@ -226,7 +252,7 @@ export function lireItemEbay(it) {
     if (livraison == null || c < livraison) { livraison = c; livraisonDevise = d || 'EUR'; }
   }
   const img = String((it.image && it.image.imageUrl) || '');
-  const image = /^https:\/\/[a-z0-9.-]*ebayimg\.com\//i.test(img) ? img.slice(0, 300) : '';
+  const image = PHOTO_EBAY.test(img) ? img.slice(0, 300) : '';
   const pct = Number(it.seller && it.seller.feedbackPercentage), score = Number(it.seller && it.seller.feedbackScore);
   const cree = Date.parse(it.itemCreationDate || '');
   return {
@@ -251,6 +277,10 @@ export function lireItemEbay(it) {
 // l'annonce ; ce qui ne peut pas être lu est « non vérifiable », jamais « ok ».
 export function analyserAnnonce(a, r) {
   const raisons = [], inverifiables = [], drapeaux = [];
+  // `faits` : les mêmes raisons, rangées par sorte (le nom trouvé, la pointure
+  // lue…). L'écran ne montre sur une annonce que ce qui la DISTINGUE de ses
+  // voisines — le reste est la recherche elle-même, déjà écrite au-dessus (§7).
+  const faits = {};
   let exclusion = null;
   const exclure = (code, texte) => { if (!exclusion) exclusion = { code, texte }; };
   const titre = a.titre || '';
@@ -258,8 +288,8 @@ export function analyserAnnonce(a, r) {
   const nom = (r.noms || []).find((n) => titrePorte(titre, n));
   // Les raisons sont des faits COURTS, lus dans l'annonce : « Spezial » ·
   // Adidas · pointure 42 · Occasion · ≤ 60 € livraison comprise.
-  if (nom) raisons.push(`« ${nom} »`); else exclure('nom', 'modèle absent du titre');
-  if (r.marque) { if (titrePorte(titre, r.marque)) raisons.push(r.marque); else inverifiables.push('marque absente du titre'); }
+  if (nom) { raisons.push(`« ${nom} »`); faits.nom = nom; } else exclure('nom', 'modèle absent du titre');
+  if (r.marque) { if (titrePorte(titre, r.marque)) { raisons.push(r.marque); faits.marque = r.marque; } else inverifiables.push('marque absente du titre'); }
   const mot = (r.motsExclus || []).find((m) => titrePorte(titre, m));
   if (mot) exclure('mot', `mot exclu « ${mot} »`);
   const lot = estUnLot(titre);
@@ -271,32 +301,33 @@ export function analyserAnnonce(a, r) {
     const voulue = eu.find((p) => r.tailles.includes(p));
     if (!eu.length) inverifiables.push(autres.length ? `pointure en ${autres.join(', ')} : non comparée` : 'pointure absente du titre');
     else if (!voulue) exclure('taille', `pointure ${eu.join(', ')} dans le titre`);
-    else raisons.push(`pointure ${voulue}`);
+    else { raisons.push(`pointure ${pointureTexte(voulue)}`); faits.pointure = voulue; }
     if (eu.length > 1 && voulue) drapeaux.push('plusieurs-pointures');
   }
   if ((r.etats || []).length) {
     const permis = r.etats.flatMap((e) => (ETATS_VEILLE[e] ? ETATS_VEILLE[e].ids : []));
     if (!a.etatId) inverifiables.push('état non indiqué');
-    else if (permis.includes(a.etatId)) raisons.push(a.etat || `état ${a.etatId}`);
+    else if (permis.includes(a.etatId)) { raisons.push(a.etat || `état ${a.etatId}`); faits.etat = a.etat || a.etatId; }
     else exclure('etat', `état « ${a.etat || a.etatId} »`);
   }
   if (a.achat === 'encheres') { if (r.encheres === 'aussi') drapeaux.push('encheres'); else exclure('encheres', 'une enchère'); }
   if (r.pays) { if (!a.pays) inverifiables.push('pays du vendeur non indiqué'); else if (a.pays !== r.pays) exclure('pays', `vendeur en ${a.pays}`); }
-  // Le prix : l'article, puis le total quand la livraison est CONNUE.
+  // Le prix : l'article, puis le total quand la livraison est CONNUE. Le total
+  // est calculé même quand l'annonce est écartée pour son prix : une annonce
+  // gardée (« à examiner ») dont le prix a monté montre son coût d'AUJOURD'HUI.
   let total = null, totalConfirme = false;
   if (a.prix == null) exclure('prix', 'prix illisible');
   else if (a.devise && a.devise !== 'EUR') exclure('devise', `prix en ${a.devise}`);
-  else if (a.prix > r.prixMax) exclure('prix', `article à ${eurosTexte(a.prix)}`);
-  else if (a.livraison == null) {
-    total = a.prix;
-    inverifiables.push('livraison inconnue : total non confirmé');
-  } else {
-    total = a.prix + a.livraison; totalConfirme = true;
-    if (total > r.prixMax) exclure('prix', `${eurosTexte(total)} livraison comprise`);
-    else raisons.push(`≤ ${eurosTexte(r.prixMax)} livraison comprise`);
+  else {
+    total = a.livraison == null ? a.prix : a.prix + a.livraison;
+    totalConfirme = a.livraison != null;
+    if (a.prix > r.prixMax) exclure('prix', `article à ${eurosTexte(a.prix)}`);
+    else if (a.livraison == null) inverifiables.push('livraison inconnue : total non confirmé');
+    else if (total > r.prixMax) exclure('prix', `${eurosTexte(total)} livraison comprise`);
+    else { raisons.push(`≤ ${eurosTexte(r.prixMax)} livraison comprise`); faits.prix = r.prixMax; }
   }
   if (!a.image) drapeaux.push('sans-photo');
-  return { garde: !exclusion, exclusion, raisons, inverifiables, drapeaux, total, totalConfirme };
+  return { garde: !exclusion, exclusion, raisons, faits, inverifiables, drapeaux, total, totalConfirme };
 }
 
 // Les écartées, comptées par cause : « 62 autre pointure, 20 lots » dit comment
@@ -331,6 +362,9 @@ export function jugerLectures(lectures, r) {
     partiel: echecs > 0,
     lus, totalEbay, complet,
     retenues, ecartees, exemples,
+    // Les annonces LUES mais écartées : une annonce déjà gardée (« à examiner »)
+    // dont le prix a monté est relue — sa fiche se met à jour, jamais figée.
+    horsCriteres: [...vues.values()].filter((x) => !x.analyse.garde),
     nbEcartees: Object.values(ecartees).reduce((s, n) => s + n, 0),
   };
 }
@@ -349,6 +383,12 @@ export function reserverQuota(d, maintenant, n = 1) {
   return { ok: true, quota: { jour, n: q.n + n }, data: { ...base, quota: { jour, n: q.n + n } } };
 }
 
+// Ce qu'une lecture apprend d'une annonce (le prix et la livraison bougent).
+const ficheDe = (a, maintenant) => {
+  const { analyse, ...donnees } = a;
+  return { ...donnees, raisons: analyse.raisons, faits: analyse.faits, inverifiables: analyse.inverifiables, drapeaux: analyse.drapeaux, total: analyse.total, totalConfirme: analyse.totalConfirme, revuLe: maintenant };
+};
+
 // Rejuge les annonces encore « nouvelles » avec les critères d'AUJOURD'HUI :
 // une recherche resserrée (prix plus bas, pointure retirée) ne garde pas ce
 // qu'elle n'aurait pas retenu. Ses décisions (à examiner, achetée, refusée)
@@ -363,7 +403,7 @@ export function rejuger(d, rid, r) {
     if (a.statut !== 'nouvelle') continue;
     const an = analyserAnnonce(a, r);
     if (!an.garde) { delete annonces[k]; retirees++; }
-    else annonces[k] = { ...a, raisons: an.raisons, inverifiables: an.inverifiables, drapeaux: an.drapeaux, total: an.total, totalConfirme: an.totalConfirme };
+    else annonces[k] = { ...a, raisons: an.raisons, faits: an.faits, inverifiables: an.inverifiables, drapeaux: an.drapeaux, total: an.total, totalConfirme: an.totalConfirme };
   }
   if (!retirees && !Object.keys(annonces).length) return d;
   pr[rid] = { ...rr, annonces };
@@ -378,7 +418,14 @@ export function rejuger(d, rid, r) {
 //     dernière date de lecture (« pas revue à la dernière vérification ») ;
 //   · au-delà de la borne, on retire d'abord les nouvelles les plus anciennes
 //     jamais revues, puis le détail des refus les plus anciens (leur numéro
-//     reste dans `refusees`) — jamais une « à examiner » ni une « achetée ».
+//     reste dans `refusees`) — jamais une « à examiner » ni une « achetée » ;
+//   · une annonce LUE mais qui ne correspond plus (son prix a monté, la
+//     recherche a changé) : encore « nouvelle » ⇒ elle part ; « à examiner » ⇒
+//     elle reste (c'est sa décision) avec son prix d'AUJOURD'HUI et la raison
+//     (`horsCriteres`) — jamais une fiche figée sur un prix qui n'existe plus ;
+//   · `connues` (numéro → première vue, bornée) : une annonce déjà montrée qui
+//     revient (après la borne, ou repassée sous le prix maximum) n'est pas
+//     « nouvelle » — ni à l'écran, ni dans l'alerte du matin.
 export function fusionnerVerification(d, rid, jugement, maintenant, source, r) {
   const base0 = d && typeof d === 'object' ? { ...resultatsVides(), ...d } : resultatsVides();
   const base = r ? rejuger(base0, rid, r) : base0;
@@ -386,15 +433,28 @@ export function fusionnerVerification(d, rid, jugement, maintenant, source, r) {
   const avant = pr[rid] || { annonces: {}, refusees: {} };
   const annonces = { ...(avant.annonces || {}) };
   const refusees = { ...(avant.refusees || {}) };
+  const connues = { ...(avant.connues || {}) };
+  for (const [k, a] of Object.entries(annonces)) if (!connues[k] && Number.isFinite(a && a.vuLe)) connues[k] = a.vuLe;
   const nouvelles = [];
   for (const a of (jugement.retenues || [])) {
     if (refusees[a.id]) continue;
     const ex = annonces[a.id];
-    const { analyse, ...donnees } = a;
-    const fiche = { ...donnees, raisons: analyse.raisons, inverifiables: analyse.inverifiables, drapeaux: analyse.drapeaux, total: analyse.total, totalConfirme: analyse.totalConfirme, revuLe: maintenant };
-    if (ex) annonces[a.id] = { ...ex, ...fiche, vuLe: ex.vuLe, statut: ex.statut, note: ex.note, motif: ex.motif, decideLe: ex.decideLe, alerteLe: ex.alerteLe };
-    else { annonces[a.id] = { ...fiche, vuLe: maintenant, statut: 'nouvelle' }; nouvelles.push(a.id); }
+    const fiche = ficheDe(a, maintenant);
+    if (ex) {
+      const garde = { ...ex, ...fiche, vuLe: ex.vuLe, statut: ex.statut, note: ex.note, motif: ex.motif, decideLe: ex.decideLe, alerteLe: ex.alerteLe };
+      delete garde.horsCriteres;
+      annonces[a.id] = garde;
+    } else if (connues[a.id]) annonces[a.id] = { ...fiche, vuLe: connues[a.id], statut: 'nouvelle' };
+    else { annonces[a.id] = { ...fiche, vuLe: maintenant, statut: 'nouvelle' }; nouvelles.push(a.id); connues[a.id] = maintenant; }
   }
+  for (const a of (jugement.horsCriteres || [])) {
+    const ex = annonces[a.id];
+    if (!ex) continue;
+    if (ex.statut === 'nouvelle') { delete annonces[a.id]; continue; }
+    if (ex.statut !== 'a-examiner') continue;
+    annonces[a.id] = { ...ex, ...ficheDe(a, maintenant), vuLe: ex.vuLe, statut: ex.statut, note: ex.note, motif: ex.motif, decideLe: ex.decideLe, alerteLe: ex.alerteLe, horsCriteres: a.analyse.exclusion ? a.analyse.exclusion.texte : 'ne correspond plus' };
+  }
+  const vuesCeTour = [...nouvelles];
   const ids = Object.keys(annonces);
   if (ids.length > VEILLE_ANNONCES_MAX) {
     // Dans l'ordre : les nouvelles que cette lecture n'a pas revues, le détail
@@ -411,8 +471,14 @@ export function fusionnerVerification(d, rid, jugement, maintenant, source, r) {
     for (const k of jetables.slice(0, ids.length - VEILLE_ANNONCES_MAX)) delete annonces[k];
   }
   for (let i = nouvelles.length - 1; i >= 0; i--) if (!annonces[nouvelles[i]]) nouvelles.splice(i, 1);
+  // Une annonce trouvée ET retirée par la borne dans la même lecture n'a jamais
+  // été montrée : elle n'entre pas dans la mémoire des annonces montrées.
+  for (const k of vuesCeTour) if (!annonces[k]) delete connues[k];
+  // La mémoire des annonces montrées reste bornée : les plus anciennes partent.
+  const ck = Object.keys(connues);
+  if (ck.length > VEILLE_CONNUES_MAX) for (const k of ck.filter((x) => !annonces[x]).sort((x, y) => connues[x] - connues[y]).slice(0, ck.length - VEILLE_CONNUES_MAX)) delete connues[k];
   pr[rid] = {
-    annonces, refusees,
+    annonces, refusees, connues,
     verif: { at: maintenant, ok: true, partiel: !!jugement.partiel, lus: jugement.lus, totalEbay: jugement.totalEbay, complet: !!jugement.complet, retenues: (jugement.retenues || []).length, ecartees: jugement.ecartees || {}, source: source || 'clic' },
   };
   return { data: { ...base, parRecherche: pr }, nouvelles };
@@ -425,8 +491,11 @@ export function noterEchec(d, rid, erreur, maintenant, source) {
   return { ...base, parRecherche: pr };
 }
 
-// Ce qui mérite une alerte : une annonce retenue, jamais signalée, ni décidée
-// (« à examiner », « achetée », « refusée » : il l'a déjà vue). Marquée AVANT
+// Ce qui mérite une alerte : une annonce VUE POUR LA PREMIÈRE FOIS PAR CE
+// PASSAGE (`vuLe` = maintenant : la lecture de ce matin l'a trouvée, et elle
+// n'avait jamais été montrée — ni à l'écran après un « Vérifier », ni par une
+// alerte), encore « nouvelle ». Une annonce déjà vue dans l'app, ou absente de
+// la lecture de ce matin, n'est jamais annoncée « nouvelle ». Marquée AVANT
 // l'envoi, dans la même écriture : une annonce n'est jamais signalée deux fois.
 export function marquerAlertes(d, rid, maintenant) {
   const pr = { ...((d && d.parRecherche) || {}) };
@@ -435,7 +504,7 @@ export function marquerAlertes(d, rid, maintenant) {
   const annonces = { ...(rr.annonces || {}) };
   const alertees = [];
   for (const [k, a] of Object.entries(annonces)) {
-    if (a.statut !== 'nouvelle' || a.alerteLe) continue;
+    if (a.statut !== 'nouvelle' || a.alerteLe || a.vuLe !== maintenant || a.revuLe !== maintenant) continue;
     annonces[k] = { ...a, alerteLe: maintenant };
     alertees.push(k);
   }
@@ -464,7 +533,11 @@ export function appliquerDecision(d, rid, itemId, dec, maintenant) {
   const rk = Object.keys(refusees);
   if (rk.length > VEILLE_REFUSEES_MAX) for (const k of rk.sort((x, y) => refusees[x].at - refusees[y].at).slice(0, rk.length - VEILLE_REFUSEES_MAX)) delete refusees[k];
   pr[rid] = { ...rr, annonces, refusees };
-  const historique = [{ at: maintenant, rid, itemId, titre: propre(avant.titre, 80), de: avant.statut || null, a: statut || avant.statut || null, motif, ...(note !== undefined ? { note: true } : {}) }, ...(base.historique || [])].slice(0, VEILLE_HISTO_MAX);
+  // `type` : un changement de décision, ou une note seule (jamais affichée
+  // comme une décision). Un achat garde son COÛT (le budget du mois le lit,
+  // même si la recherche est supprimée ensuite).
+  const achat = statut === 'achetee' ? { total: Number.isSafeInteger(avant.total) ? avant.total : null, totalConfirme: !!avant.totalConfirme } : {};
+  const historique = [{ at: maintenant, rid, itemId, titre: propre(avant.titre, 80), type: statut ? 'statut' : 'note', de: avant.statut || null, a: statut || avant.statut || null, motif, ...achat, ...(note !== undefined ? { note: true } : {}) }, ...(base.historique || [])].slice(0, VEILLE_HISTO_MAX);
   return { ok: true, data: { ...base, parRecherche: pr, historique }, annonce: apres };
 }
 
@@ -511,15 +584,58 @@ export function rentabilite({ achat, livraison, remise, frais, revente, marge } 
 }
 
 // Les ventes comparables : MÊME modèle, MÊME pointure (exacte, tiers compris),
-// tirées de SES ventes finalisées. Le modèle est lu par la règle de l'app
-// (`extractModel`, passée en paramètre : une seule liste de modèles connus).
+// tirées de SES ventes finalisées. Deux façons de dire « même modèle », et
+// jamais une troisième :
+//   · un modèle que l'app connaît (`extractModel`, passée en paramètre : une
+//     seule liste de modèles connus) ⇒ ses ventes de ce modèle ;
+//   · sinon le NOM qu'il a tapé (« 2002R », « Shox TL ») ⇒ ses ventes dont le
+//     titre porte ce nom, avec la règle qui juge les annonces (`titrePorte`).
+//     Mesuré le 15 octobre : un tiers de ses ventes finalisées (419 sur 1 299)
+//     ont un modèle hors de la liste connue — 2002R, 530, Shox TL, 1906D… —
+//     et n'avaient JAMAIS de fourchette, même quand c'était le modèle cherché.
+//     Un nom tout en chiffres (« 530 ») ne suffit pas seul : la marque de la
+//     recherche est alors exigée dans le titre.
+// Un LOT n'est jamais comparable (son prix n'est pas celui d'une paire).
 // Rend la liste ET ce qui la date : une fourchette sans sa source ne vaut rien.
+const nomUtile = (n) => normTexte(n).replace(/ /g, '').length >= 3;
+export function cleComparables(titre, recherche, modeleDe) {
+  const { eu } = taillesDuTitre(titre);
+  if (eu.length !== 1) return null;
+  const noms = ((recherche && recherche.noms) || []).filter((n) => nomUtile(n));
+  const trouve = noms.find((n) => titrePorte(titre, n));
+  if (trouve) {
+    const connu = typeof modeleDe === 'function' ? modeleDe(trouve) : null;
+    if (connu) return { modele: connu, taille: eu[0] };
+    return { modele: trouve, taille: eu[0], noms, marque: (recherche && recherche.marque) || '' };
+  }
+  const m = typeof modeleDe === 'function' ? modeleDe(titre) : null;
+  return m ? { modele: m, taille: eu[0] } : null;
+}
+// « Rentabilité avant achat » libre : ce qu'il tape (« New Balance 2002R 42 »).
+// Une seule pointure lue ; le modèle connu de l'app, sinon le texte tapé sans
+// sa pointure (« New Balance 2002R »), cherché tel quel dans ses ventes.
+export function cleLibre(texte, modeleDe) {
+  const { eu } = taillesDuTitre(texte);
+  if (eu.length !== 1) return null;
+  const connu = typeof modeleDe === 'function' ? modeleDe(texte) : null;
+  if (connu) return { modele: connu, taille: eu[0] };
+  const nom = propre(sansAccents(texte)
+    .replace(/(^|\s)(taille|pointure|size|eu|eur|fr|t)\s*[:.]?\s*(?=\d)/gi, '$1')
+    .replace(/(^|[^0-9a-z])(3[4-9]|4[0-9]|5[0-2])(?:[.,]5|\s(?:1\/2|1\/3|2\/3))?(?![0-9])/gi, '$1'), 40);
+  return nomUtile(nom) ? { modele: nom, taille: eu[0], noms: [nom], marque: '' } : null;
+}
+const chiffresSeuls = (n) => /^[0-9 ]+$/.test(normTexte(n));
 export function ventesComparables(ventes, cle, modeleDe) {
-  if (!cle || !cle.modele || !cle.taille || typeof modeleDe !== 'function') return [];
+  if (!cle || !cle.taille) return [];
+  const parNom = Array.isArray(cle.noms) && cle.noms.length > 0;
+  if (!parNom && (!cle.modele || typeof modeleDe !== 'function')) return [];
   const out = [];
   for (const v of (ventes || [])) {
     if (!v || v.prix == null || !(v.prix > 0)) continue;
-    if (modeleDe(v.titre) !== cle.modele) continue;
+    if (estUnLot(v.titre)) continue;
+    if (parNom) {
+      if (!cle.noms.some((n) => titrePorte(v.titre, n) && (!(cle.marque && chiffresSeuls(n)) || titrePorte(v.titre, cle.marque)))) continue;
+    } else if (modeleDe(v.titre) !== cle.modele) continue;
     const { eu } = taillesDuTitre(v.titre);
     if (eu.length !== 1 || eu[0] !== cle.taille) continue;
     out.push(v);
@@ -542,13 +658,45 @@ export function fourchetteRevente(comparables, maintenant) {
 }
 
 // ── BUDGET D'ACHAT DU MOIS ───────────────────────────────────────────────────
+// Ce qu'il a MARQUÉ « achetée » dans la veille ce mois-ci (heure de Paris), lu
+// dans l'historique de ses décisions — qui survit à la suppression d'une
+// recherche. La DERNIÈRE décision de chaque annonce compte (« Remettre » après
+// « Je l'ai achetée » la retire) ; une note n'est pas une décision. Une annonce
+// achetée sans livraison connue compte pour son prix : « au moins ». Ces achats
+// eBay ne sont comptés NULLE PART ailleurs (`vrm_achats_mois` = Vinted et hors
+// plateforme) : sans eux, le reste ignorait justement ce qu'il vient d'acheter.
+export function achatsVeilleDuMois(res, maintenant) {
+  const mois = parisJour(maintenant).slice(0, 7);
+  const h = (res && Array.isArray(res.historique)) ? res.historique : [];
+  const vus = new Set();
+  let n = 0, total = 0, sansLivraison = 0, sansPrix = 0;
+  for (const x of h) {
+    if (!x || !x.itemId) continue;
+    const note = x.type === 'note' || (x.type == null && x.note && x.de === x.a);
+    if (note || vus.has(x.itemId)) continue;
+    vus.add(x.itemId);
+    if (x.a !== 'achetee' || !Number.isFinite(x.at) || parisJour(x.at).slice(0, 7) !== mois) continue;
+    n++;
+    if (Number.isSafeInteger(x.total)) { total += x.total; if (!x.totalConfirme) sansLivraison++; } else sansPrix++;
+  }
+  // L'historique est borné : plein ET encore dans ce mois ⇒ un achat plus ancien
+  // du mois a pu en sortir (« au moins », jamais un total présenté complet).
+  const dernier = h[h.length - 1];
+  const tronque = h.length >= VEILLE_HISTO_MAX && !!dernier && Number.isFinite(dernier.at) && parisJour(dernier.at).slice(0, 7) === mois;
+  return { mois, n, total, sansLivraison, sansPrix, complet: !sansLivraison && !sansPrix && !tronque };
+}
 // `publication` : ce que l'écran Achats a PUBLIÉ (`vrm_achats_mois`, §11 —
 // l'écran qui lit les achats est le seul à les compter). Absente, d'un autre
-// mois ou partielle ⇒ on le dit, jamais un « reste » inventé.
-export function budgetDuMois(budget, publication, maintenant) {
-  if (budget == null) return { etat: 'sans-budget' };
+// mois ou partielle ⇒ on le dit, jamais un « reste » inventé. `veille` : ses
+// achats marqués dans la veille (`achatsVeilleDuMois`), ajoutés à côté.
+export function budgetDuMois(budget, publication, maintenant, veille) {
   const mois = parisJour(maintenant).slice(0, 7);
-  if (!publication || publication.mois !== mois || !Number.isFinite(publication.depense)) return { etat: 'pas-su', budget, mois };
-  const reste = budget - publication.depense;
-  return { etat: publication.complet ? 'lu' : 'partiel', budget, mois, depense: publication.depense, n: publication.n, reste, depasse: reste < 0, manque: publication.manque || [] };
+  const v = veille && veille.mois === mois && veille.n > 0 ? veille : null;
+  const ve = v ? { n: v.n, total: v.total, complet: !!v.complet } : null;
+  if (budget == null) return { etat: 'sans-budget', veille: ve };
+  if (!publication || publication.mois !== mois || !Number.isFinite(publication.depense)) return { etat: 'pas-su', budget, mois, veille: ve };
+  const depense = publication.depense + (ve ? ve.total : 0);
+  const reste = budget - depense;
+  const complet = !!publication.complet && (!ve || ve.complet);
+  return { etat: complet ? 'lu' : 'partiel', budget, mois, depense, depenseAchats: publication.depense, n: publication.n, veille: ve, reste, depasse: reste < 0, manque: publication.manque || [] };
 }

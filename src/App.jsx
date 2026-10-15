@@ -10715,8 +10715,21 @@ function EntetePlateforme({nom,plateforme}) {
 function PlatSubNav({ sub, setSub, sections, dark }) {
   const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear',veille:'search'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
+  // Sur téléphone la rangée défile quand les onglets ne tiennent pas (eBay en a
+  // 7) : l'onglet ouvert reste VISIBLE — arrivé par une notification sur
+  // « Veille », on ne le cherche pas hors de l'écran. Seul le défilement de la
+  // rangée bouge (jamais la page).
+  const navRef = React.useRef(null);
+  React.useEffect(() => {
+    const nav = navRef.current; if (!nav || nav.scrollWidth <= nav.clientWidth + 1) return;
+    const b = nav.querySelector('[aria-current="page"]'); if (!b) return;
+    const rn = nav.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const g = rb.left - rn.left + nav.scrollLeft, d = g + rb.width;
+    if (g < nav.scrollLeft) nav.scrollLeft = Math.max(0, g - 12);
+    else if (d > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = d - nav.clientWidth + 12;
+  }, [sub]);
   return (
-    <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
+    <nav ref={navRef} aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
       {sections.map(([id,label,point])=>{ const on = sub===id; return (
         <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id}
           style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
