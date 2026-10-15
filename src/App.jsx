@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
+import * as photosLbc from "./photosLeboncoin.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
@@ -5301,6 +5302,25 @@ if (typeof window !== 'undefined') {
     setTimeout(() => photosVinted.secoursChange(), PHOTOS_GRACE_EXT_MS + 200);
   } catch (_) {}
 }
+// Les photos du CDN de LEBONCOIN (15 octobre, `src/photosLeboncoin.js`) : le
+// même secours que Vinted — la route serveur des photos d'abord (elle admet
+// `img.leboncoin.fr`), puis l'extension (son pont « photo » admet cet hôte, et
+// lui seul, depuis le 15 octobre). Une extension plus ancienne refuse : la
+// photo garde le pictogramme et retente au retour de l'extension, sans phrase
+// (aucune promesse n'est faite à une version qui ne sait pas).
+photosLbc.configurer({
+  demander: async (u) => {
+    const debut = Date.now();
+    const parServeur = await photoViaServeur(u);
+    if (parServeur) return parServeur;
+    if (!__vmrExtReady) return null;
+    const r = await vmrPhotoIssue(u, Math.max(1000, photosVinted.DELAI_SECOURS_MS - (Date.now() - debut)));
+    return (r && r.dataUrl) || null;
+  },
+});
+if (typeof window !== 'undefined') {
+  try { onVmrExt(() => photosLbc.reprendre()); } catch (_) {}
+}
 // Le cadre du pictogramme reprend la PLACE de l'image (jamais un trou, jamais
 // l'icône « image cassée » du navigateur) : mêmes dimensions, mêmes arrondis.
 const CLES_CADRE_PHOTO = ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'borderRadius', 'flexShrink', 'flex', 'margin', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom', 'border', 'boxShadow', 'position', 'top', 'left', 'right', 'bottom', 'aspectRatio', 'background'];
@@ -5331,7 +5351,54 @@ const taillePicto = (style) => {
 //     de quelques secondes et ne les remontrait jamais. Ce composant dessine
 //     lui-même le pictogramme à leur place. Pour une autre adresse (un <img>
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
-function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+// ⚠️ Un AIGUILLAGE, sans hook : une adresse du CDN de Leboncoin passe par SA
+//    règle (`PhotoLeboncoin`), toute autre par celle de Vinted (qui laisse les
+//    autres adresses en `<img>` ordinaire, comme avant). Deux composants
+//    distincts : une vignette qui changerait d'hôte se remonte, l'ordre des
+//    hooks ne bouge jamais.
+function PhotoVinted(props) {
+  return photosLbc.estPhotoLbc(props && props.src) ? <PhotoLeboncoin {...props}/> : <PhotoVintedCdn {...props}/>;
+}
+// ── LES PHOTOS DU CDN DE LEBONCOIN (15 octobre) ──────────────────────────────
+// Julien : « j'ai beau actualiser la page, les photos des annonces
+// n'apparaissent pas ». Elles étaient rendues par un `<img>` ordinaire : le
+// référent de VRM partait avec, et un refus du CDN laissait une case vide, sans
+// secours. Ici : sans référent ; refusée ⇒ le secours (serveur, puis extension)
+// ⇒ sinon le pictogramme, et rien n'est figé (`src/photosLeboncoin.js`).
+// `onError` n'est JAMAIS appelé : ce composant dessine lui-même le pictogramme
+// (comme pour une photo Vinted), et un appelant qui relancerait son propre
+// secours referait la même demande.
+function PhotoLeboncoin({ src, repli, onError, onLoad, style, loading, ...reste }) {
+  void onError;
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  const vu = React.useRef('');
+  const etat = photosLbc.etat(src);
+  vu.current = etat;
+  React.useEffect(() => {
+    const off = photosLbc.monter(src, maj);
+    if (photosLbc.etat(src) !== vu.current) maj();
+    return off;
+  }, [src]);
+  if (etat === 'ok') {
+    return <img src={photosLbc.donnees(src)} style={style} {...reste} data-photo-lbc="secours" onLoad={onLoad}
+      onError={() => photosLbc.echecDonnees(src)}/>;
+  }
+  if (etat === 'natif') {
+    // ⚠️ `referrerPolicy` et `loading` AVANT `src` (React 18 pose les attributs
+    //    dans l'ordre) : mesuré au banc, une photo déjà dans le cache mémoire du
+    //    navigateur (vue sur un autre écran) se charge DÈS que `src` est posé —
+    //    avec le référent par défaut, l'interdiction n'étant pas encore là.
+    return <img referrerPolicy="no-referrer" loading={loading || 'lazy'} src={src} style={style} {...reste} data-photo-lbc="natif"
+      onLoad={onLoad} onError={() => photosLbc.echecNatif(src)}/>;
+  }
+  if (repli === null) return null;
+  return (
+    <span aria-hidden="true" data-photo-lbc={etat === 'vol' ? 'attente' : 'perdue'} style={cadrePhoto(style)}>
+      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
+    </span>
+  );
+}
+function PhotoVintedCdn({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const qui = React.useRef(null); if (!qui.current) qui.current = {};
@@ -5372,7 +5439,8 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} {...reste} data-photo-vinted="natif"
+    // `referrerPolicy` AVANT `src` : voir `PhotoLeboncoin` (mesuré le 15 octobre).
+    return <img referrerPolicy="no-referrer" loading={loading || 'lazy'} src={src} style={style} {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -10825,6 +10893,10 @@ function LigneVente({ photo, titre, meta, montant, actions }) {
     </div>
   </article>;
 }
+// La photo d'une transaction Leboncoin : celle que la coque a résolue par la
+// règle (`photosLbc.photoTransactionLbc` : la sienne, sinon celle de SON annonce
+// par l'identifiant), sinon sa propre image (§11 : une règle, la coque la porte).
+const photoLbcDe = (o) => (o && o.photoLbc) || photosLbc.photoTransactionLbc(o, null) || photoArticle(o);
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
 // peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
 // sinon la porte vers elle. Même principe que PhotoVente.
@@ -10920,7 +10992,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     return (
       <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <PhotoVente src={photoArticle(o)} size={58} />
+          <PhotoVente src={photoLbcDe(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {badgeNum(n)}
@@ -10978,7 +11050,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
           <Card>
             {postes.map((o, i) => { const n = numDe(o); const lbl = o.label || {}; return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <PhotoVente src={photoArticle(o)} size={40} />
+                <PhotoVente src={photoLbcDe(o)} size={40} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{estFait(o) ? 'Posté' : (o.stepLabel || 'Posté')}{lbl.reference ? ` · ${lbl.reference}` : ''}</div>
@@ -11045,7 +11117,7 @@ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.'
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o }) {
-  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
+  return <LigneVente photo={photoLbcDe(o)} titre={o.title} montant={lbcEuro(o.price)}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
 function lbcArgent(lbcVentes) {
@@ -38749,9 +38821,25 @@ function AppCoeur() {
       // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
       // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
       const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
-      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
+      const ranger = (liste) => setLbcVentes({ ventes: liste.filter(o => o && o.isSeller === true), achats: liste.filter(o => o && o.isSeller === false), inconnues: inc.length,
         maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
+      // ⚠️ LA PHOTO D'UNE TRANSACTION (15 octobre). Mesuré : 1 transaction sur
+      //    16 porte son `image`, et les 3 ventes prouvées AUCUNE — alors que LEUR
+      //    annonce (même identifiant) est dans `lbc_listings`, avec ses photos.
+      //    Les cartes n'affichaient donc qu'un pictogramme, quoi qu'il actualise.
+      //    Une règle (`photoTransactionLbc`) : sa propre image, sinon celle de
+      //    SON annonce — par l'identifiant, jamais par le titre (§5). Les annonces
+      //    (226 Ko) ne sont lues que s'il en manque une, une fois par session
+      //    (`lbcAnnoncesSession`, le lecteur déjà partagé) ; illisibles ⇒ on
+      //    garde ce qu'on a (la carte garde son pictogramme, rien n'est inventé).
+      const avecPhoto = (items) => arr.map((o) => (o && typeof o === 'object' ? { ...o, photoLbc: photosLbc.photoTransactionLbc(o, items) } : o));
+      const ventesAvecPhoto = avecPhoto(null);
+      ranger(ventesAvecPhoto);
       setLbcCoqueLu(true);
+      if (ventesAvecPhoto.some((o) => o && !o.photoLbc && o.itemId != null && String(o.itemId).trim() !== '')) {
+        const items = await lbcAnnoncesSession();
+        if (items) ranger(avecPhoto(items));
+      }
     } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
