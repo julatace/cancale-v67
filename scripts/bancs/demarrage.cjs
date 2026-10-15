@@ -20,7 +20,7 @@ const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4502;
+const PORT = Number(process.env.BANC_PORT) || 4502;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 
 const JETON = 'jeton-de-banc';
@@ -73,7 +73,14 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
   await pg.waitForTimeout(sondeKO ? 9000 : 6000);
   const txt = await pg.evaluate(() => document.body.innerText);
   const etape = await pg.evaluate(() => { const e = document.querySelector('[data-etape]'); return e ? e.getAttribute('data-etape') : null; });
-  const nouv = (/(\d+) nouvelles? ventes?/.exec(txt) || [])[1];
+  // (15 octobre) Le bandeau d'ouverture est retiré (demande de Julien) : une
+  // vente arrivée depuis la dernière ouverture se lit sur Ma journée, dans
+  // l'en-tête des dernières ventes (`data-nouvelles-ventes`). Le contrôle juge
+  // le NOMBRE porté par l'attribut, pas une phrase (§6.5).
+  // (revue du 15 octobre) L'en-tête ne compte que les cartes marquées ; une
+  // nouvelle vente plus ancienne que les six cartes est annoncée sur le lien
+  // « tout voir » (`data-nouvelles-ailleurs`). Annoncée = l'une OU l'autre.
+  const nouv = await pg.evaluate(() => { const n = (s, a) => { const e = document.querySelector(s); return e ? Number(e.getAttribute(a)) || 0 : 0; }; const t = n('[data-nouvelles-ventes]', 'data-nouvelles-ventes') + n('[data-nouvelles-ailleurs]', 'data-nouvelles-ailleurs'); return t ? String(t) : null; });
   const seen = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vinted_notif_seen_ventes')||'null')||[]).length; } catch(_) { return -1; } }).catch(()=>-2);
   if (process.env.DEBUG) console.log('   [debug]', JSON.stringify(lus.urls||[]), 'seen', seen, (txt.match(/.*nouvelle.*/g)||[]).slice(0,3));
   await pg.close();

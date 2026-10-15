@@ -88,7 +88,7 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-const PORT_BANC=Number(process.env.BANC_PORT)||4322;
+const PORT_BANC = Number(process.env.BANC_PORT) || 4322;
 srv.listen(PORT_BANC);
 // ⚠️ TOUS LES ÉCRANS, PAS DIX SUR TREIZE. `vintedaccounts` (« Comptes liés »)
 // n'etait rendu par AUCUN banc — et c'est la qu'un bouton « ↻ Actualiser »
