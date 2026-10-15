@@ -178,8 +178,10 @@ const ouvrirVeille = async (pg) => {
   try {
     try { V = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'veille.js')).href); } catch (e) { dit(false, 'la route de la veille existe (api/_lib/veille.js)', String(e.message).slice(0, 100)); }
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const sombre of [false, true]) {
-      for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    // `BANC_RAPIDE=1` : une seule vue (390 px, clair) — pour les mutations.
+    const RAPIDE = process.env.BANC_RAPIDE === '1';
+    for (const sombre of (RAPIDE ? [false] : [false, true])) {
+      for (const vp of (RAPIDE ? [{ width: 390, height: 844 }] : [{ width: 390, height: 844 }, { width: 1512, height: 950 }])) {
         const nom = `${vp.width} px${sombre ? ' · sombre' : ''}`;
         console.log(`── ${nom}`);
         const rid = await preparer();
@@ -204,7 +206,8 @@ const ouvrirVeille = async (pg) => {
           const dits = (t5.t.match(/livraison inconnue/g) || []).length;
           dit(dits === 1, '« livraison inconnue » n\'est dit qu\'UNE fois sur l\'annonce (§7)', String(dits));
           const sansPhoto = await pg.$eval('[data-annonce="110011"]', (e) => (e.textContent.match(/sans photo/g) || []).length);
-          const avecPhoto = await pg.$eval('[data-annonce="110001"] img', (e) => e.naturalWidth > 0).catch(() => false);
+          await pg.locator('[data-annonce="110001"] img').scrollIntoViewIfNeeded().catch(() => {});
+          const avecPhoto = await pg.waitForFunction(() => { const i = document.querySelector('[data-annonce="110001"] img'); return !!(i && i.complete && i.naturalWidth > 0); }, null, { timeout: 8000 }).then(() => true).catch(() => false);
           dit(sansPhoto === 1 && avecPhoto, 'la photo s\'affiche ; une annonce sans photo le dit UNE fois', `${sansPhoto} · ${avecPhoto}`);
           const t8 = await pg.$eval('[data-annonce="110008"]', (e) => e.textContent);
           dit(/Non vérifié : pointure en UK 8 : non comparée/.test(t8), 'ce qui n\'est pas vérifiable est dit (pointure UK)');

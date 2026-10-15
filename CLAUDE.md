@@ -6776,6 +6776,75 @@ racine, rouge sur c4fa405 (copie `git archive`, contrôle lancé DEPUIS elle,
   relit) ; ce qu'il rend quand une programmée part sans que la liste la porte
   encore (servi par le faux de l'audit et du banc).
 
+### Veille d'achat (prototype eBay) et rentabilité avant achat (15 octobre)
+Demande du 15 octobre (VEILLE-CONCEPT-01, VEILLE-50, COMPLEMENT-01…10, « achat et
+rentabilité »). eBay → **Veille**. Aucun achat, aucun paiement, aucune offre :
+le seul geste vers eBay est un lien vers l'annonce.
+- **Ce qui est interrogé** : eBay seulement, API Browse
+  (`/buy/browse/v1/item_summary/search`, eBay.fr), avec le jeton de
+  l'APPLICATION (`client_credentials` — jamais le compte eBay du vendeur), gardé
+  en mémoire de l'instance. Clés présentes en production (vérifié le 15 octobre,
+  noms seuls). **Vinted et Leboncoin : aucune requête** (§3) — l'écran le dit une
+  fois. Détail et non-mesuré : `docs/ebay-api.md` § « Veille d'achat ».
+- **Une règle, un propriétaire** : `api/_lib/veille-regle.js` (pur) — le serveur
+  juge, l'app montre, l'audit l'exécute. Une requête eBay par nom du modèle (la
+  syntaxe « OU » de `q` n'est pas mesurée), la pointure n'est jamais dans `q` :
+  chaque titre est rejugé. « 42 2/3 » n'est PAS du 42 ; une pointure UK/US est
+  nommée, jamais convertie (une table fausse ferait acheter la mauvaise taille) ;
+  livraison inconnue ⇒ « total non confirmé », jamais 0 ; neuf avec défauts,
+  reconditionné, pour pièces ⇒ écartés et dits ; le pseudo du vendeur n'est
+  jamais gardé (son pays et son % d'avis, source eBay).
+- **Ses lignes** : `veille_recherches` (≤ 8 recherches, budget, horaires
+  silencieux) et `veille_resultats` (≤ 40 annonces par recherche, mémoire des
+  refus ≤ 150 — une refusée ne revient jamais —, historique ≤ 200, quota, passage
+  du matin). Au nom du vendeur (`owner=eq.`), compare-et-échange
+  (`modifierDonnee`) ; lecture ratée ⇒ 503 et RIEN d'écrit.
+- **La route** : actions `veille*` de `api/ebay.js` (pas de 13ᵉ fonction),
+  après la session et l'abonnement, avant le test des clés. 30 vérifications par
+  vendeur et par jour, pas deux de la même recherche en 2 min — réservées AVANT
+  eBay. « Tester sans enregistrer » est la simulation : rien n'est rangé (hors le
+  compteur du jour).
+- **Les alertes** : FACULTATIVES (« Alerte du matin » par recherche), par le
+  passage quotidien DÉJÀ en place (`ship-reminders`, ~10 h) — **aucun nouveau
+  cron**. ≤ 6 appels eBay par vendeur, mémo du passage écrit AVANT, annonces
+  marquées AVANT l'envoi dans la même écriture (jamais deux fois), écriture ratée
+  ⇒ aucune notification, horaires silencieux (Paris), catégorie `veille` dans
+  Réglages → Notifications (même défaut dans l'app et `PUSH_DEFAUT`).
+  ⚠️ « Immédiat » n'existe pas : il faudrait une tâche plus fréquente.
+- **Rentabilité avant achat** (sur chaque annonce, et « Rentabilité avant
+  achat » libre) : coûts en centimes, ce qui n'est pas saisi est NOMMÉ à côté du
+  bénéfice ; prix d'achat maximum pour un bénéfice voulu (sur le coût TOTAL quand
+  la livraison est inconnue). La fourchette prudente/moyenne/ambitieuse (Q1,
+  médiane, Q3) vient de SES ventes finalisées (même lecture que « Le prix qui
+  marche », `ventesFinaliseesDe`), même modèle (celui de la recherche s'il est
+  dans le titre — `extractModel` rend « handball » pour « Spezial Handball » —,
+  sinon `extractModel`) ET même pointure exacte ; < 3 ventes ⇒ « pas assez de
+  ventes comparables » ; nombre et ancienneté affichés, liste dépliable.
+- **Budget du mois** : l'écran Achats PUBLIE `vrm_achats_mois` (synchronisée,
+  centimes, compte illisible ⇒ partiel et nommé) ; la veille le CONSOMME (§11).
+  Pas publié ce mois-ci ⇒ « ouvre une fois Vinted → Achats », jamais un reste
+  inventé. Les « à examiner » sont dites à côté (dont celles sans livraison).
+- **Preuves** : `audit-veille.cjs` **80 contrôles** — sur w15 **2 OK / 32 KO**
+  (sans mourir) ; **12 mutations, chacune rouge** (livraison comptée 0, tiers
+  ignorés, alerte en double, refus qui revient, borne retirée, quota ignoré,
+  lecture ratée prise pour vide, simulation qui range, prix sans livraison,
+  silence ignoré, session retirée, écriture ratée qui notifie). Banc
+  `bancs/veille.cjs` (port 6001, données inventées, la VRAIE route exécutée)
+  **109 OK** à 390/1512 px en clair et en sombre.
+- **Livré** : VEILLE-CONCEPT-01 (eBay) · VEILLE-50 : 03, 04, 05, 07, 08,
+  09, 10, 11, 12, 13, 15 (eBay seul, les autres dites indisponibles), 16, 17, 18,
+  19, 21 et 22 (récapitulatif du matin), 24, 25, 26, 27, 29, 30, 31, 32, 34, 35,
+  36, 38 (avis du vendeur, source eBay), 39, 40, 43, 44 (frais saisis), 45, 46,
+  47 (dans l'écran), 48, 49, 50 · COMPLEMENT : 01, 02, 04, 07, 08, 09, 10.
+  **Pas fait** : 01 (depuis un lien), 02 (plusieurs modèles dans UNE recherche :
+  une recherche par modèle), 06 couleur, 14 distance, 20, 23 immédiat,
+  28 « plus disponible » (on dit « pas revue », jamais « vendue »), 33 côte à
+  côte, 37 collaborateur, 41/42 question et offre au vendeur (Buy Offer API
+  réservée, et §3) · COMPLEMENT 03 (équivalences de tailles), 05, 06.
+- ⚠️ **Le geste de Julien** : eBay → Veille → « + Recherche » → « Tester sans
+  enregistrer ». Si eBay répond « refuse la recherche à l'application VRM »,
+  activer l'accès Browse du jeu de clés Production dans le portail développeur.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

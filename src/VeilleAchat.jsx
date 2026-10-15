@@ -23,6 +23,7 @@ const ilYa = (t, maintenant) => {
   return `il y a ${Math.round(h / 24)} j`;
 };
 const enEuros = (c) => (c == null ? '' : (c / 100).toFixed(2).replace('.', ',').replace(/,00$/, ''));
+const PHOTO_EBAY = /^https:\/\/[a-z0-9.-]*ebayimg\.com\//i;
 const DRAPEAUX = { lot: 'lot', 'plusieurs-pointures': 'plusieurs pointures dans le titre', encheres: 'enchère : le prix peut monter', 'sans-photo': 'sans photo' };
 const ORDRES = { cout: 'Coût total', date: 'Plus récentes' };
 
@@ -208,7 +209,7 @@ export function cleComparables(titre, recherche, modeleDe) {
   const { eu } = taillesDuTitre(titre);
   return modele && eu.length === 1 ? { modele, taille: eu[0] } : null;
 }
-function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, modeleDe, occupe, recherche }) {
+function AnnonceVeille({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, modeleDe, occupe, recherche }) {
   const S = styles(C);
   const [refus, setRefus] = useState(false);
   const [note, setNote] = useState(null);
@@ -222,7 +223,9 @@ function Annonce({ C, a, verifAt, maintenant, lectureSeule, onDecision, ventes, 
   const dec = (statut, extra) => onDecision(a.id, { statut, ...(extra || {}) });
   return (
     <div data-annonce={a.id} data-statut={a.statut} data-total-confirme={a.totalConfirme ? '1' : '0'} style={{ display: 'grid', gridTemplateColumns: '56px minmax(0,1fr)', gap: 10, padding: '10px 0', borderTop: `1px solid ${C.border}` }}>
-      {a.image
+      {/* Photo d'une annonce eBay : seulement l'hôte d'images d'eBay (déjà
+          vérifié par le serveur, `lireItemEbay`) — jamais une photo Vinted. */}
+      {PHOTO_EBAY.test(a.image || '')
         ? <img src={a.image} alt="" loading="lazy" width="56" height="56" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, background: C.card2 }}/>
         : <div style={{ width: 56, height: 56, borderRadius: 8, background: C.card2, fontSize: 10, color: C.muted, display: 'grid', placeItems: 'center', textAlign: 'center' }}>sans photo</div>}
       <div style={{ minWidth: 0, display: 'grid', gap: 3 }}>
@@ -297,7 +300,7 @@ function Annonces({ C, res, maintenant, onDecision, ventes, modeleDe, occupe, le
           </select>
         </label>}
       </div>
-      {liste.map((a) => <Annonce key={a.id} C={C} a={a} verifAt={res.verif && res.verif.at} maintenant={maintenant} onDecision={onDecision} ventes={ventes} modeleDe={modeleDe} occupe={occupe} lectureSeule={lectureSeule} recherche={recherche}/>)}
+      {liste.map((a) => <AnnonceVeille key={a.id} C={C} a={a} verifAt={res.verif && res.verif.at} maintenant={maintenant} onDecision={onDecision} ventes={ventes} modeleDe={modeleDe} occupe={occupe} lectureSeule={lectureSeule} recherche={recherche}/>)}
     </div>
   );
 }
@@ -445,7 +448,7 @@ export default function VeilleAchat({ C, headers, confirm, chargerVentes, modele
       )}
       {etat === 'lu' && message && <p role="status" style={{ ...S.muet, margin: 0, color: C.text }} data-veille-message="">{message}</p>}
 
-      {form && <Formulaire C={C} initial={form} occupe={occupe === 'form'} erreur={erreurForm} onAnnuler={() => { setForm(null); setSimulation(null); }} onEnregistrer={enregistrer} onTester={tester}/>}
+      {form && <Formulaire key={form.id || 'nouvelle'} C={C} initial={form} occupe={occupe === 'form'} erreur={erreurForm} onAnnuler={() => { setForm(null); setSimulation(null); }} onEnregistrer={enregistrer} onTester={tester}/>}
       {simulation && (
         <div style={S.carte} data-veille-simulation="">
           <h3 style={S.titre}>Simulation — rien n'est enregistré, aucune alerte</h3>
@@ -485,7 +488,7 @@ export default function VeilleAchat({ C, headers, confirm, chargerVentes, modele
                 <label style={{ ...S.muet, display: 'flex', gap: 6, alignItems: 'center', color: C.text }} title="Une fois par jour, vers 10 h">
                   <input type="checkbox" checked={!!r.alerte} disabled={!!occupe} onChange={() => basculer(r, 'alerte')} data-alerte=""/> Alerte du matin
                 </label>
-                <details style={{ position: 'relative' }}>
+                <details style={{ position: 'relative' }} onClick={(e) => { if (e.target.closest && e.target.closest('button')) e.currentTarget.open = false; }}>
                   <summary style={{ ...S.bouton, listStyle: 'none', display: 'inline-flex', alignItems: 'center' }} aria-label="Autres actions">⋯</summary>
                   <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 5, display: 'grid', gap: 4, padding: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: C.shadow || 'none', minWidth: 150 }}>
                     <button type="button" style={S.bouton} onClick={() => { setForm(versFormulaire(r)); setErreurForm(''); setSimulation(null); }} data-modifier="">Modifier</button>
