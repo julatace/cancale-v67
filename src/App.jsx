@@ -3953,7 +3953,11 @@ const lectureIncomplete = ({ registre, ventes, ventesErreur, comptesEchec, verse
 //    serait une date fausse), elle est comptée dans `sansDate`. eBay : commande
 //    payée, en euros, datée de sa création (même lecture que le CA déclaré).
 //    Identité `plateforme:id`, jamais un titre (§5).
-const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
+// Chaque ligne porte son `id` (le MÊME que `ventesDeclarables`) et `fin` (la
+// vente est finalisée, au même test que le CA déclaré) : c'est ce qui permet au
+// bilan d'une période (`bilanPeriode`) d'expliquer l'écart entre « finalisé » et
+// « versé » vente par vente, sans second calcul (15 octobre).
+const ventesFaites =({ vinted, lbc, ebay, cachee } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0;
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
@@ -3963,7 +3967,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), id: tx != null ? 'vinted:' + tx : null, fin: classifyOrderStatus(o.status) === 'completed' });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -3971,7 +3975,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, id: 'lbc:' + v.txId, fin: lbcFinalisee(v) });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -3979,7 +3983,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (tot.currency && tot.currency !== 'EUR') continue;
     const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
     if (!isFinite(eur) || !t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, id: 'ebay:' + e.orderId, fin: true });
   }
   return { lignes, sansDate };
 };
@@ -7472,103 +7476,154 @@ function CarteSeuilsVinted({ annee, echoues, comptes, ecarte, nomDe, datees, aDa
   );
 }
 
-// ── VENDU / REÇU, JOUR PAR JOUR (4 octobre) ──────────────────────────────────
-// Julien : « distingue les ventes que l'on fait en une journée et l'argent que
-// l'on reçoit — je veux un graphique avec les ventes de la journée ».
-// Deux séries, deux règles (`ventesFaites` · `ventesDeclarables`), même échelle.
-// VENDU porte l'accent — la seule couleur (§7) ; REÇU reste à l'encre neutre.
-// Un jour sans rien garde une trace grise : un trou se lirait comme une donnée
-// manquante, pas comme un zéro. Quand le reçu n'a pas pu être lu (`recu:null`),
-// sa barre n'est PAS dessinée — des zéros seraient un faux (§5).
-// (Remplace `MiniBarres`, définie et jamais rendue — §4.11.)
-function BarresVenduRecu({ jours, hauteur = 96 }) {
-  const max = Math.max(1, ...jours.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
+// ── VENDU / REÇU, JOUR PAR JOUR — EN POINTS RELIÉS (15 octobre) ──────────────
+// Julien : « pour les statistiques des 14 derniers jours, je voyais plutôt un
+// graphique à points reliés, avec les chiffres par jour, pour une semaine ou
+// 14 jours ». (Les barres du 4 octobre, `BarresVenduRecu`, sont remplacées.)
+// Deux séries, deux règles (`ventesFaites` · `ventesDeclarables`), UNE échelle
+// (jamais deux axes). VENDU porte l'accent — la seule couleur (§7) — et un point
+// PLEIN ; REÇU reste à l'encre neutre, point CREUX : l'identité ne tient jamais
+// à la couleur seule. Les chiffres du jour sont écrits SOUS l'axe, alignés sur
+// leur jour (un tableau, pas un nombre sur chaque point) ; toucher ou survoler
+// un jour ouvre son détail (date, ventes, montants).
+// ⚠️ « PAS SU » N'EST PAS ZÉRO : une valeur `null` n'est ni tracée ni reliée —
+//    la ligne s'interrompt, jamais un point posé à 0 (§5). Reçu illisible ⇒ la
+//    série entière est absente, et l'appelant le dit.
+const chiffreCourt = (v, mesure) => {
+  if (v == null) return '';
+  if (mesure === 'n') return String(v);
+  const r = Math.round(v);
+  if (Math.abs(r) < 1000) return String(r);
+  return (r / 1000).toFixed(1).replace('.0', '').replace('.', ',') + 'k';
+};
+function CourbePoints({ points, series, mesure = 'eur', hauteur = 132, attr = {} }) {
+  const [sel, setSel] = useState(null);
+  // Un clic juste après le survol du même jour ne referme pas le détail (sur
+  // ordinateur, survoler PUIS cliquer l'aurait fait clignoter) ; au doigt,
+  // retoucher le même jour le referme.
+  const survol = React.useRef(null);
+  const N = points.length;
+  const val = (p, s) => { const x = p.v[s.k]; return x == null ? null : (mesure === 'n' ? x.n : x.eur); };
+  const vrai = Math.max(0, ...points.flatMap(p => series.map(s => val(p, s) || 0)));
+  const max = Math.max(1, vrai);
+  const haut = 16, bas = 8, H = hauteur;
+  const y = (v) => haut + (1 - v / max) * (H - haut - bas);
+  const xPct = (i) => ((i + 0.5) / N) * 100;
   const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
-  const h = (v) => v > 0 ? Math.max(4, Math.round((v / max) * (hauteur - 4))) : 2;
-  const totV = jours.reduce((a, j) => a + j.vendu.eur, 0);
-  const totR = jours.every(j => j.recu) ? jours.reduce((a, j) => a + j.recu.eur, 0) : null;
+  const dit = (s, x) => x == null ? `${s.nom} : pas su` : `${s.nom} : ${x.n} vente${x.n > 1 ? 's' : ''}, ${eur(x.eur)}`;
+  // Segments de valeurs connues consécutives (une valeur inconnue coupe la ligne).
+  const segments = (s) => {
+    const out = []; let cur = [];
+    points.forEach((p, i) => { const v = val(p, s); if (v == null) { if (cur.length) out.push(cur); cur = []; } else cur.push([xPct(i) * 10, y(v)]); });
+    if (cur.length) out.push(cur);
+    return out;
+  };
+  const P = sel != null ? points[sel] : null;
   return (
-    <div data-vendu-recu="">
-      <div role="img" aria-label={`${jours.length} derniers jours : vendu ${eur(totV)}${totR != null ? ` · reçu ${eur(totR)}` : ''}`}
-        style={{display:'flex',alignItems:'flex-end',gap:4,height:hauteur}}>
-        {jours.map((j) => (
-          <div key={j.cle} data-jour={j.cle} data-vendu={Math.round(j.vendu.eur * 100)} data-recu={j.recu ? Math.round(j.recu.eur * 100) : ''}
-            title={`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}
-            style={{flex:1,minWidth:0,height:'100%',display:'flex',alignItems:'flex-end',justifyContent:'center',gap:2}}>
-            <div style={{width:'44%',maxWidth:14,height:h(j.vendu.eur),background:j.vendu.eur > 0 ? C.accent : C.border,borderRadius:'3px 3px 0 0'}}/>
-            {j.recu && <div style={{width:'44%',maxWidth:14,height:h(j.recu.eur),background:j.recu.eur > 0 ? C.muted : C.border,borderRadius:'3px 3px 0 0'}}/>}
+    <div data-courbe-points={N} {...attr} style={{ position: 'relative', paddingLeft: 16 }}>
+      <div style={{ position: 'relative', height: H }}
+        onMouseLeave={() => { survol.current = null; setSel(null); }}>
+        <svg viewBox={`0 0 1000 ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true" style={{ display: 'block', overflow: 'visible' }}>
+          {[0, 0.5, 1].map(f => <line key={f} x1="0" x2="1000" y1={haut + f * (H - haut - bas)} y2={haut + f * (H - haut - bas)} stroke={C.border} strokeWidth="1" vectorEffect="non-scaling-stroke"/>)}
+          {P && <line x1={xPct(sel) * 10} x2={xPct(sel) * 10} y1={haut - 6} y2={H - bas} stroke={C.muted} strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
+          {series.map(s => segments(s).map((seg, j) => seg.length > 1 && (
+            <polyline key={s.k + j} data-serie={s.k} points={seg.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(' ')} fill="none" stroke={s.couleur} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
+          )))}
+        </svg>
+        {vrai > 0 && <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: haut - 15, fontSize: 9.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{mesure === 'n' ? Math.round(max) : eur(max)}</span>}
+        {/* Les points : décor (la ligne de chiffres sous l'axe porte la valeur). */}
+        {series.map(s => points.map((p, i) => { const v = val(p, s); if (v == null) return null; return (
+          <span key={s.k + i} aria-hidden="true" data-point={s.k} style={{ position: 'absolute', left: `${xPct(i)}%`, top: y(v), width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5, borderRadius: 999, boxSizing: 'border-box',
+            background: s.creux ? C.card : s.couleur, border: `2px solid ${s.couleur}`, boxShadow: `0 0 0 2px ${C.card}` }}/>
+        ); }))}
+        {/* Les zones de jour : tout le jour se touche, pas seulement le point. */}
+        {points.map((p, i) => (
+          <button key={p.cle} type="button" data-jour={p.cle}
+            data-vendu={p.v.vendu == null ? '' : Math.round(p.v.vendu.eur * 100)} data-recu={p.v.recu == null ? '' : Math.round(p.v.recu.eur * 100)}
+            aria-label={`${p.long}${p.enCours ? ' (en cours)' : ''} — ${series.map(s => dit(s, p.v[s.k])).join(' ; ')}`}
+            aria-pressed={sel === i}
+            onMouseEnter={() => { survol.current = i; setSel(i); }} onFocus={() => setSel(i)}
+            onClick={() => { if (survol.current === i) { survol.current = null; setSel(i); } else setSel(v => v === i ? null : i); }}
+            style={{ position: 'absolute', top: 0, bottom: 0, left: `${(i / N) * 100}%`, width: `${100 / N}%`, border: 0, padding: 0, margin: 0, background: 'transparent', cursor: 'pointer', minHeight: 0 }}/>
+        ))}
+        {P && (
+          <div role="status" data-infobulle={P.cle} style={{ position: 'absolute', zIndex: 2, top: 0, width: 164, boxSizing: 'border-box',
+            // Du côté opposé au jour choisi : la bulle ne cache ni son point, ni le titre au-dessus.
+            ...(xPct(sel) < 50 ? { left: `min(calc(${xPct(sel)}% + 10px), calc(100% - 164px))` } : { right: `min(calc(${100 - xPct(sel)}% + 10px), calc(100% - 164px))` }),
+            background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 9px', boxShadow: C.shadowLg || '0 6px 18px rgba(0,0,0,.18)', fontSize: 11.5, color: C.text, lineHeight: 1.45, pointerEvents: 'none' }}>
+            <div style={{ fontWeight: 700 }}>{P.long}{P.enCours ? ' · en cours' : ''}</div>
+            {series.map(s => { const x = P.v[s.k]; return (
+              <div key={s.k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, boxSizing: 'border-box', flexShrink: 0, background: s.creux ? 'transparent' : s.couleur, border: `2px solid ${s.couleur}` }}/>
+                <span style={{ flex: 1, color: C.muted }}>{s.nom}</span>
+                <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{x == null ? '—' : `${eur(x.eur)} · ${x.n}`}</span>
+              </div>
+            ); })}
+          </div>
+        )}
+      </div>
+      {/* Sous l'axe : la date, puis le chiffre de chaque série, jour par jour. */}
+      <div aria-hidden="true" style={{ borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 5 }}>
+        {[{ k: '_axe' }, ...series].map((s, r) => (
+          <div key={s.k} style={{ display: 'flex', marginTop: r ? 2 : 0, position: 'relative' }}>
+            {/* La rangée de chiffres porte le marqueur de SA série (plein / creux) dans la marge. */}
+            {s.k !== '_axe' && <span style={{ position: 'absolute', left: -14, top: 3, width: 8, height: 8, borderRadius: 999, boxSizing: 'border-box', background: s.creux ? 'transparent' : s.couleur, border: `2px solid ${s.couleur}` }}/>}
+            {points.map((p, i) => {
+              const actif = sel === i || (sel == null && i === N - 1 && !p.enCours && s.k === '_axe');
+              if (s.k === '_axe') {
+                const [a, b] = Array.isArray(p.axe) ? p.axe : [p.axe, null];
+                return <div key={p.cle} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 9.5, lineHeight: 1.25, color: actif ? C.text : C.muted, fontWeight: actif ? 700 : 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' }}>{a}{b != null && <><br/>{b}</>}</div>;
+              }
+              const v = val(p, s);
+              return <div key={p.cle} data-chiffre={s.k} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 9.5, lineHeight: 1.3, color: v ? (s.creux ? C.muted : C.text) : C.border, fontWeight: v && !s.creux ? 700 : 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', background: sel === i ? `${C.border}66` : 'transparent', borderRadius: 4 }}>{v == null ? '—' : v ? chiffreCourt(v, mesure) : '·'}</div>;
+            })}
           </div>
         ))}
-      </div>
-      <div style={{display:'flex',gap:4,marginTop:6,borderTop:`1px solid ${C.border}`,paddingTop:5}}>
-        {jours.map((j, i) => {
-          const auj = i === jours.length - 1;
-          return <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9.5,color:auj ? C.text : C.muted,fontWeight:auj ? 700 : 500,fontVariantNumeric:'tabular-nums'}}>{j.num}</div>;
-        })}
       </div>
     </div>
   );
 }
-
-// ── COURBE DES VENTES (30 sept.) ──────────────────────────────────────────────
-// Julien : « je veux des graphiques de qualité, là c'est enfantin » (les grosses
-// barres blanches). Une courbe LISSÉE (cubique monotone : elle ne dépasse jamais
-// les vraies valeurs, donc elle ne ment pas sur un jour sans vente), un trait fin
-// à l'accent, un dégradé qui s'efface vers le bas, un point sur le dernier jour,
-// et seulement deux repères de date. Chaque point garde son infobulle (jour,
-// ventes, montant). Aucune bibliothèque : du SVG pur, qui suit la palette.
-function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null, libFin = null }) {
-  const W = 320, H = hauteur, pad = 4;
-  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cv';
-  const max = Math.max(1, ...jours.map(j => j.eur));
-  const n = jours.length;
-  const pts = jours.map((j, i) => [pad + (i * (W - 2 * pad)) / Math.max(1, n - 1), H - pad - (j.eur / max) * (H - 2 * pad - 6)]);
-  // Cubique monotone (Fritsch–Carlson) : pas de bosse sous zéro, pas de dépassement.
-  const d = (() => {
-    if (pts.length < 2) return '';
-    const dx = [], dy = [], m = [];
-    for (let i = 0; i < pts.length - 1; i++) { dx.push(pts[i + 1][0] - pts[i][0]); dy.push((pts[i + 1][1] - pts[i][1]) / dx[i]); }
-    m.push(dy[0]);
-    for (let i = 1; i < pts.length - 1; i++) m.push(dy[i - 1] * dy[i] <= 0 ? 0 : (dy[i - 1] + dy[i]) / 2);
-    m.push(dy[dy.length - 1]);
-    for (let i = 0; i < dy.length; i++) {
-      if (dy[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
-      const a = m[i] / dy[i], b = m[i + 1] / dy[i], h = a * a + b * b;
-      if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * dy[i]; m[i + 1] = t * b * dy[i]; }
-    }
-    let p = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-    for (let i = 0; i < dy.length; i++) {
-      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], h = dx[i] / 3;
-      p += ` C${(x0 + h).toFixed(1)},${(y0 + m[i] * h).toFixed(1)} ${(x1 - h).toFixed(1)},${(y1 - m[i + 1] * h).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
-    }
-    return p;
-  })();
-  const trait = surSombre ? '#8FB2FF' : C.accent;
-  const grille = surSombre ? 'rgba(255,255,255,.08)' : C.border;
-  const texte = surSombre ? 'rgba(255,255,255,.5)' : C.muted;
-  const last = pts[pts.length - 1];
-  const court = (j) => j.long.split(' ').slice(1).join(' ');
+// La légende : marqueur (plein / creux) + nom + total sur la période affichée.
+function LegendeSeries({ series, totaux }) {
   return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img"
-        aria-label={`Ventes des ${n} derniers jours : ${jours.reduce((a, j) => a + j.eur, 0).toFixed(0)} €`} style={{display:'block',overflow:'visible'}}>
-        <defs>
-          <linearGradient id={`cvg${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={trait} stopOpacity={surSombre ? 0.42 : 0.28}/>
-            <stop offset="100%" stopColor={trait} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        {[0.5, 1].map(f => <line key={f} x1="0" x2={W} y1={(H - pad) * f} y2={(H - pad) * f} stroke={grille} strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray={f < 1 ? '2 4' : undefined}/>)}
-        {d && <path d={`${d} L${last[0].toFixed(1)},${H - pad} L${pts[0][0].toFixed(1)},${H - pad} Z`} fill={`url(#cvg${uid})`}/>}
-        {d && <path d={d} fill="none" stroke={trait} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>}
-        {pts.map((p, i) => <rect key={i} x={p[0] - (W / n) / 2} y="0" width={W / n} height={H} fill="transparent"><title>{`${jours[i].long} · ${jours[i].n} vente${jours[i].n > 1 ? 's' : ''} · ${jours[i].eur.toFixed(0)} €`}</title></rect>)}
-      </svg>
-      <div style={{position:'relative',height:0}}>
-        <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(143,178,255,.22)' : C.accent + '33'}`}}/>
+    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11.5, color: C.muted, fontWeight: 500 }}>
+      {series.map(s => (
+        <span key={s.k} data-legende={s.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, boxSizing: 'border-box', background: s.creux ? 'transparent' : s.couleur, border: `2px solid ${s.couleur}` }}/>
+          {s.nom}{totaux && totaux[s.k] != null && <b style={{ color: C.text, fontWeight: 700 }}>{totaux[s.k]}</b>}
+        </span>
+      ))}
+    </div>
+  );
+}
+// Les 7 ou 14 derniers jours (choix gardé sur CET appareil : une commodité,
+// jamais une donnée). `jours` = `joursVenduRecu(…, 14)`.
+const SERIES_VENDU_RECU = () => [
+  { k: 'vendu', nom: 'Vendu', couleur: C.accent, creux: false },
+  { k: 'recu', nom: 'Reçu', couleur: C.muted, creux: true },
+];
+function CourbeVenduRecu({ jours, titre = true }) {
+  const [n, setN] = useState(() => { try { return localStorage.getItem('vrm_courbe_jours') === '7' ? 7 : 14; } catch (_) { return 14; } });
+  const choisir = (k) => { setN(k); try { localStorage.setItem('vrm_courbe_jours', String(k)); } catch (_) {} };
+  const J = (jours || []).slice(-n);
+  const recuLu = J.every(j => j.recu);
+  const series = SERIES_VENDU_RECU().filter(s => s.k === 'vendu' || recuLu);
+  const initiale = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+  const pts = J.map(j => { const d = new Date(j.cle + 'T12:00:00');
+    return { cle: j.cle, long: j.long, axe: n === 7 ? [d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''), j.num] : [initiale[d.getDay()], j.num], v: { vendu: j.vendu, recu: j.recu } }; });
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const tot = { vendu: eur(J.reduce((a, j) => a + j.vendu.eur, 0)), recu: recuLu ? eur(J.reduce((a, j) => a + j.recu.eur, 0)) : null };
+  return (
+    <div data-vendu-recu="" data-jours={n}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        {titre && <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Tes {n} derniers jours</div>}
+        <div role="group" aria-label="Nombre de jours" style={{ display: 'flex', gap: 2, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 2 }}>
+          {[7, 14].map(k => <button key={k} type="button" aria-pressed={n === k} onClick={() => choisir(k)}
+            style={{ border: 0, borderRadius: 6, padding: '4px 10px', minHeight: 0, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: n === k ? C.card : 'transparent', color: n === k ? C.text : C.muted, boxShadow: n === k ? (C.shadow || 'none') : 'none' }}>{k} jours</button>)}
+        </div>
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:10.5,color:texte,fontWeight:500}}>
-        <span>{libDebut || court(jours[0])}</span><span>{libFin || "aujourd'hui"}</span>
-      </div>
+      <div style={{ marginBottom: 12 }}><LegendeSeries series={series} totaux={tot}/></div>
+      <CourbePoints points={pts} series={series}/>
     </div>
   );
 }
@@ -8062,7 +8117,7 @@ const PLUS_TABS=[
      tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Dépenses, coûts fixes, packs photos, factures'},
-  {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
+  {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix de revente',desc:'Tes ventes par modèle et taille, ventes à l’appui'},
   /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
      avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
      visent encore `leboncoin` (cloche, notifications) y mènent tout seuls. */
@@ -8113,6 +8168,87 @@ const dansPeriodeDate = (t, p) => {
   return true;
 };
 const dansPeriode = (o, p) => dansPeriodeDate(o && o.date ? Date.parse(o.date) : NaN, p);
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE PÉRIODE CHOISIE : VENDU · FINALISÉ · VERSÉ (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « quand je sélectionne une date, il y ait le CA finalisé et l'argent
+// des ventes faites sur cette période ». Trois chiffres, trois notions, chacune
+// par SA règle (§11 — aucun troisième calcul) :
+//   · VENDU    = `ventesFaites` vendues dans la période (date de VENTE), en
+//                cours comprises — exactement « Vendu » de Ma journée ;
+//   · FINALISÉ = la part de VENDU dont la vente est finalisée (`fin`) : la
+//                différence est l'argent ENCORE EN COURS, et elle est dite ;
+//   · VERSÉ    = `ventesDeclarables` versées dans la période (date de VERSEMENT,
+//                `l.ts`, comme « Reçu » de Ma journée — jamais le mois de la
+//                déclaration, `l.ym`).
+// ⚠️ L'ÉCART FINALISÉ → VERSÉ S'EXPLIQUE VENTE PAR VENTE, PAR IDENTITÉ
+//    (`plateforme:id`, §5), jamais par une soustraction de totaux : vendues
+//    avant la période et versées dedans (+), versées après (−), finalisées sans
+//    date de versement (−), masquées d'un ✕ (comptées dans le versé, pas dans le
+//    vendu, +), comptes dont les ventes n'ont pas été lues (−), le reste (±).
+//    Tout est sommé en CENTIMES : Σ écarts = versé − finalisé, exactement.
+// ⚠️ « PAS SU » NE VAUT PAS 0 : `declarables` vaut `undefined` (on lit encore)
+//    ou `null` (dates de versement illisibles) ⇒ `verse` vaut la même chose, et
+//    l'écran écrit « — » avec la raison. Des ventes finalisées SANS date de
+//    versement qui pourraient tomber dans la période (vendues au plus
+//    `VERSEMENT_MAX_J` jours avant sa fin, ou sans date du tout) font du versé
+//    un MINORANT : `possibles` les compte, l'écran dit « au moins » (§5).
+const bilanPeriode = ({ vendus, declarables, periode } = {}) => {
+  const dans = (t) => dansPeriodeDate(t, periode);
+  const cts = (eur) => Math.round(Number(eur) * 100) || 0;
+  const vide = () => ({ n: 0, cts: 0 });
+  const ajoute = (s, c, n = 1) => { s.n += n; s.cts += c; };
+  const vendu = vide(), fin = vide(), enCours = vide(), par = {};
+  const fins = new Map(), dateVente = new Map(), finSansId = vide();
+  for (const l of ((vendus && vendus.lignes) || [])) {
+    if (!l) continue;
+    if (l.id) dateVente.set(l.id, l.ts);
+    if (!dans(l.ts)) continue;
+    const c = cts(l.eur);
+    ajoute(vendu, c); ajoute(par[l.plateforme] || (par[l.plateforme] = vide()), c);
+    if (l.fin) { ajoute(fin, c); if (l.id) fins.set(l.id, c); else ajoute(finSansId, c); } else ajoute(enCours, c);
+  }
+  const eur = (s) => s && ({ ...s, eur: s.cts / 100 });
+  const base = { vendu: eur(vendu), fin: eur(fin), enCours: eur(enCours), par: Object.fromEntries(Object.entries(par).map(([k, v]) => [k, eur(v)])) };
+  if (declarables === undefined || declarables === null) return { ...base, verse: declarables, ecart: null, possibles: null };
+  const debut = periode && periode.from ? debutJour(periode.from).getTime() : -Infinity;
+  const fin_ = periode && periode.to ? finJour(periode.to).getTime() : Infinity;
+  const verse = vide(), verses = new Map(), lignesDecl = new Map();
+  for (const l of (declarables.lignes || [])) {
+    if (!l) continue;
+    lignesDecl.set(l.id, l);
+    if (l.ts && dans(l.ts)) { const c = cts(l.eur); ajoute(verse, c); verses.set(l.id, { c, l }); }
+  }
+  const aDater = new Set((declarables.aDater || []).map(l => l && l.id));
+  const ecart = { avant: vide(), masquees: vide(), apres: vide(), sansDate: vide(), nonLus: vide(), autres: vide() };
+  for (const [id, { c, l }] of verses) {
+    if (fins.has(id)) { const d = c - fins.get(id); if (d) ajoute(ecart.autres, d, 0); continue; }
+    const tv = dateVente.get(id);
+    if (l.masquee) ajoute(ecart.masquees, c);
+    else if (tv != null && tv < debut) ajoute(ecart.avant, c);
+    else ajoute(ecart.autres, c);
+  }
+  if (finSansId.n) ajoute(ecart.autres, -finSansId.cts, finSansId.n);   // une vente sans identité ne se suit pas
+  for (const [id, c] of fins) {
+    if (verses.has(id)) continue;
+    const d = lignesDecl.get(id);
+    if (d && d.ts && d.ts > fin_) ajoute(ecart.apres, -c);
+    else if ((d && !d.ts) || aDater.has(id)) ajoute(ecart.sansDate, -c);
+    else if (!d) ajoute(ecart.nonLus, -c);
+    else ajoute(ecart.autres, -c);
+  }
+  // Ce qui pourrait encore tomber dans la période : finalisé, sans date de versement.
+  const possibles = vide();
+  const plancher = debut - VERSEMENT_MAX_J * 86400e3;
+  for (const l of [...(declarables.aDater || []), ...(declarables.lignes || []).filter(x => x && !x.ts)]) {
+    if (!l) continue;
+    const tv = l.o ? tsCommande(l.o) : (Date.parse(l.dateVente || '') || 0);
+    if (tv && (tv > fin_ || tv < plancher)) continue;
+    ajoute(possibles, cts(l.eur));
+  }
+  return { ...base, verse: eur(verse), possibles: eur(possibles),
+    ecart: Object.fromEntries(Object.entries(ecart).map(([k, v]) => [k, eur(v)])) };
+};
 const libellePeriode = (p) => {
   if (!p || (!p.from && !p.to)) return 'Toute la période';
   if (p.label) return p.label;
@@ -8452,6 +8588,58 @@ function PeriodePicker({ value, onChange, compact = false }) {
       <button type="button" className="vrm-button" onClick={appliquer} style={{marginTop:10,background:C.accent,color:C.onAccent,border:0}}>Appliquer</button>
     </div>}
   </div>;
+}
+
+// ── LE BILAN DE LA PÉRIODE CHOISIE, sous le sélecteur de l'écran Ventes ──────
+// Trois chiffres (`bilanPeriode`) puis UNE ligne qui explique les écarts — le
+// chiffre, jamais la promesse (§5). Les montants sont en centimes dans les
+// `data-*` : le banc vérifie que les écarts somment exactement à la différence.
+// `sans` = ce qui n'a pas pu être lu (comptes, Leboncoin, eBay) : les totaux
+// sont alors partiels, et c'est dit UNE fois (§7).
+const centimesLisibles = (cts) => {
+  const v = Math.abs(cts) / 100;
+  return (cts < 0 ? '−' : '') + v.toLocaleString('fr-FR', { minimumFractionDigits: cts % 100 ? 2 : 0, maximumFractionDigits: 2 }) + ' €';
+};
+function BilanPeriode({ bilan, sans = [] }) {
+  if (!bilan) return null;
+  const e0 = (s) => Math.round(s.cts / 100).toLocaleString('fr-FR') + ' €';
+  const nb = (s) => `${s.n} vente${s.n > 1 ? 's' : ''}`;
+  const v = bilan.verse, ec = bilan.ecart;
+  const auMoins = !!(v && bilan.possibles && bilan.possibles.n > 0);
+  const dejaDit = (ec && ec.sansDate) || { n: 0, cts: 0 };
+  const autresPossibles = auMoins ? { n: bilan.possibles.n - dejaDit.n, cts: bilan.possibles.cts + dejaDit.cts } : { n: 0, cts: 0 };
+  const autres = Object.entries(bilan.par || {}).filter(([k]) => k !== 'Vinted').map(([k, s]) => `${s.n} ${k}`);
+  const LIB = { avant: 'vendues avant, versées dans la période', apres: 'versées après', sansDate: 'sans date de versement', masquees: 'masquées d’un ✕', nonLus: 'comptes non lus', autres: 'autres' };
+  const morceaux = ec ? Object.entries(LIB).filter(([k]) => ec[k] && ec[k].cts).map(([k, lib]) => (
+    <span key={k} data-ecart={k} data-ecart-cts={ec[k].cts}>{ec[k].cts > 0 ? '+' : ''}{centimesLisibles(ec[k].cts)} {lib}</span>
+  )) : [];
+  const sep = (arr) => arr.flatMap((x, i) => i ? [<span key={'s' + i} aria-hidden="true"> · </span>, x] : [x]);
+  return (
+    <div data-bilan-periode="" data-vendu={bilan.vendu.cts} data-finalise={bilan.fin.cts} data-en-cours={bilan.enCours.cts}
+      data-verse={v ? v.cts : ''} data-verse-etat={v === undefined ? 'encours' : v === null ? 'passu' : 'lu'} data-au-moins={auMoins ? '1' : ''}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 0 10px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        <StatBox compact label="Vendu" value={e0(bilan.vendu)} sub={nb(bilan.vendu) + (autres.length ? ` · dont ${autres.join(', ')}` : '')}/>
+        <StatBox compact label="Finalisé" value={e0(bilan.fin)} sub={nb(bilan.fin)}/>
+        <StatBox compact label="Versé" value={v === undefined ? '…' : v === null ? '—' : e0(v)}
+          sub={v === undefined ? 'lecture…' : v === null ? 'dates illisibles' : (auMoins ? 'au moins · ' : '') + nb(v)}/>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, padding: '8px 14px 0', borderTop: `1px solid ${C.border}`, marginTop: 10 }}>
+        <div>Vendu et finalisé : à la date de vente. Versé : à la date du versement.</div>
+        {(bilan.enCours.n > 0 || morceaux.length > 0) && (
+          <div data-bilan-ecart="">
+            {bilan.enCours.n > 0 && <span data-ecart="enCours">{centimesLisibles(bilan.enCours.cts)} encore en cours ({bilan.enCours.n}).</span>}
+            {morceaux.length > 0 && <>{bilan.enCours.n > 0 ? ' ' : ''}Versé − finalisé : {sep(morceaux)}.</>}
+          </div>
+        )}
+        {v === null && <div>Les dates de versement n’ont pas pu être lues : le versé n’est pas calculé — ce n’est pas zéro.</div>}
+        {/* « Au moins » : la cause est déjà dite si ce sont les « sans date de
+            versement » de l'écart ; sinon (vendues avant la période) on la dit. */}
+        {auMoins && autresPossibles.n > 0 && <div data-possibles={bilan.possibles.cts}>{autresPossibles.n} autre{autresPossibles.n > 1 ? 's' : ''} vente{autresPossibles.n > 1 ? 's' : ''} finalisée{autresPossibles.n > 1 ? 's' : ''} sans date de versement ({centimesLisibles(autresPossibles.cts)}) pourrai{autresPossibles.n > 1 ? 'ent' : 't'} aussi tomber dans la période.</div>}
+        {sans.length > 0 && <div data-bilan-sans={sans.join(',')} style={{ color: C.text }}>Sans {sans.join(', ')} : pas lu{sans.length > 1 ? 's' : ''} pour l’instant, ces totaux sont partiels.</div>}
+      </div>
+    </div>
+  );
 }
 
 function EmptyState({ icon, title, desc, action }) {
@@ -10559,13 +10747,27 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa) {
 const medianeNb = (arr) => { const a = arr.filter(x => x > 0).sort((x, y) => x - y);
   if (!a.length) return 0; const m = Math.floor(a.length / 2);
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
-function grouperPrixMarche(sold, online) {
+// ⚠️⚠️ VÉRIFIABLE (15 octobre — Julien : « je ne sais pas si un onglet Prix qui
+//    marche est vraiment pertinent »). Tranché : on le GARDE, renommé « Prix de
+//    revente », parce qu'il répond à une question concrète (à combien remettre
+//    en ligne CETTE paire) — mais une médiane qu'on ne peut pas vérifier ne vaut
+//    rien (§2.7). Chaque groupe porte donc ses VENTES (date, compte, prix,
+//    titre) : la médiane se recompte à la main ; les dates de la plus ancienne
+//    et de la plus récente disent si le prix est encore actuel ; et `depuis`
+//    borne la fenêtre (12 mois par défaut — une vente de 2023 ne dit plus le
+//    prix d'aujourd'hui). Une vente sans date n'entre que dans « tout ».
+function grouperPrixMarche(sold, online, { depuis = null, compteDe = null } = {}) {
   const g = {};
   for (const o of (sold || [])) {
+    const t = tsCommande(o);
+    if (depuis != null && !(t >= depuis)) continue;
     const mo = extractModel(o && o.title), ta = extractSize(o && o.title);
     if (!mo || !ta) continue;
     const k = mo + '|' + ta;
-    (g[k] = g[k] || { modele: mo, taille: ta, prix: [], stock: 0 }).prix.push(montantCommande(o));
+    const x = (g[k] = g[k] || { modele: mo, taille: ta, prix: [], ventes: [], stock: 0 });
+    const p = montantCommande(o);
+    x.prix.push(p);
+    if (p > 0) x.ventes.push({ ts: t || null, prix: p, titre: (o && o.title) || '', compte: compteDe ? compteDe(o) : '', tx: o && o.transaction_id != null ? String(o.transaction_id) : '' });
   }
   for (const it of (online || [])) {
     const mo = extractModel(it && it.title);
@@ -10576,8 +10778,13 @@ function grouperPrixMarche(sold, online) {
   return Object.values(g)
     .map(x => { const pr = x.prix.filter(p => p > 0).sort((a, b) => a - b); return { ...x, pr }; })
     .filter(x => x.pr.length >= 2)
-    .map(x => ({ modele: x.modele, taille: x.taille, n: x.pr.length,
-      med: medianeNb(x.pr), min: x.pr[0], max: x.pr[x.pr.length - 1], stock: x.stock }))
+    .map(x => {
+      const ventes = x.ventes.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      const dates = ventes.map(v => v.ts).filter(Boolean);
+      return { modele: x.modele, taille: x.taille, n: x.pr.length,
+        med: medianeNb(x.pr), min: x.pr[0], max: x.pr[x.pr.length - 1], stock: x.stock,
+        ventes, recente: dates.length ? Math.max(...dates) : null, ancienne: dates.length ? Math.min(...dates) : null };
+    })
     .sort((a, b) => b.n - a.n || b.med - a.med);
 }
 // ── VALEUR DE TON STOCK EN LIGNE, AU PRIX OÙ ÇA PART VRAIMENT ─────────────────
@@ -10598,60 +10805,88 @@ function valoriserStock(groups, online) {
   }
   return { total: (online || []).length, reconnu, marche, affiche };
 }
-function PrixMarche({ data, baseKO }) {
+// `data` : `null` lecture en cours · `{ pasSu }` ventes illisibles · sinon
+// `{ groups, valo, sans, nVentes }`. `fenetre` (mois, 0 = tout) est choisie ici
+// et remontée à la coque, qui regroupe (une lecture, une règle).
+const PQM_FENETRES = [[6, '6 mois'], [12, '12 mois'], [0, 'Tout']];
+function PrixMarche({ data, baseKO, fenetre = 12, setFenetre }) {
   const eur2 = (n) => n.toFixed(n % 1 ? 2 : 0).replace('.', ',');
   const groups = data && data.groups;
   const valo = data && data.valo;
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
+  const jours = (t) => { const j = Math.floor((Date.now() - t) / 86400e3); return j <= 0 ? "aujourd'hui" : j === 1 ? 'hier' : j < 60 ? `il y a ${j} j` : `il y a ${Math.round(j / 30.4)} mois`; };
+  const date = (t) => t ? new Date(t).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : 'sans date';
+  const libFen = fenetre ? `des ${fenetre} derniers mois` : 'de toute la période';
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="chart" title="Le prix qui marche"
-        desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
+      <ScreenHead icon="chart" title="Prix de revente"
+        desc="À combien tes paires se sont vraiment revendues, par modèle et taille — ventes à l'appui." />
+      <div role="group" aria-label="Période des ventes comparées" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {PQM_FENETRES.map(([k, l]) => (
+          <button key={k} type="button" aria-pressed={fenetre === k} onClick={() => setFenetre && setFenetre(k)}
+            style={{ border: `1px solid ${fenetre === k ? C.accent : C.border}`, background: fenetre === k ? C.accent : 'transparent', color: fenetre === k ? C.onAccent || '#fff' : C.text, borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
+        ))}
+      </div>
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes ventes — un prix médian faux serait pire que pas de prix. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
+      ) : data && data.pasSu ? (
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes ventes n'ont pas pu être lues : aucun prix n'est calculé pour l'instant. Rouvre cet écran dans un moment.</div>
       ) : groups == null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Lecture de tes ventes…</div>
       ) : (<>
+        {(data.sans || []).length > 0 && <div data-pqm-sans={data.sans.join(',')} style={{ fontSize: 12, color: C.text, lineHeight: 1.45 }}>Sans {data.sans.join(', ')} : ventes pas lues pour l'instant.</div>}
         {valo && valo.reconnu > 0 && (
           <Card style={{ padding: 18 }}>
-            <div style={{ ...eti, marginBottom: 4 }}>Valeur de ton stock en ligne · au prix du marché</div>
+            <div style={{ ...eti, marginBottom: 4 }}>Ton stock en ligne · au prix de revente</div>
             <div className="vrm-display" style={{ fontSize: 30, fontWeight: 700, color: C.text }}>≈ {eur2(valo.marche)} €</div>
             <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
-              Sur <b>{valo.reconnu}</b> annonce{valo.reconnu > 1 ? 's' : ''} en ligne dont on connaît le prix du marché{valo.total > valo.reconnu ? <> (sur {valo.total} — les autres n'ont pas encore 2 ventes du même modèle+taille)</> : null}.
+              Sur <b>{valo.reconnu}</b> annonce{valo.reconnu > 1 ? 's' : ''} en ligne dont le modèle et la taille ont au moins 2 ventes {libFen}{valo.total > valo.reconnu ? <> (sur {valo.total})</> : null}.
               {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / valo.marche - 1) * 100);
-                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <> — soit <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'} du marché</> : ' — en ligne avec le marché'}.</>; })()}
+                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <> — <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'}</> : ' — au même niveau'}.</>; })()}
             </div>
           </Card>
         )}
         {groups.length === 0 ? (
-        <Card style={{ padding: 16 }}>
-          <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
-            Pas encore assez de ventes pour dégager un prix fiable — il faut <b>au moins deux ventes</b> d'un même modèle dans une même taille. Ça se remplira tout seul au fil de tes ventes.
-          </div>
-        </Card>
-      ) : (<>
-        <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
-          Calculé sur tes <b>ventes finalisées</b>, regroupées par <b>modèle + taille</b> (au moins 2 ventes). Un modèle hors des grands connus n'apparaît pas — mieux vaut un blanc qu'un faux. Trié par ce qui se vend le plus.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {groups.map((gr, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 14px', boxShadow: C.shadow || 'none' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>
-                  {gr.modele} <span style={{ color: C.accent, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
-                </div>
-                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
-                  {gr.n} vente{gr.n > 1 ? 's' : ''} · de {eur2(gr.min)} à {eur2(gr.max)} €{gr.stock > 0 ? ` · ${gr.stock} en stock` : ''}
-                </div>
-              </div>
-              <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>Prix médian</div>
-                <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)} €</div>
-              </div>
+          <Card style={{ padding: 16 }}>
+            <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
+              Aucun modèle n'a encore <b>deux ventes dans la même taille</b> {libFen}.{fenetre ? ' Essaie « Tout ».' : ' Ça se remplira au fil de tes ventes.'}
             </div>
-          ))}
-        </div>
-      </>)}
+          </Card>
+        ) : (<>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+            Tes ventes finalisées {libFen}, par modèle et taille (au moins 2). Touche un modèle pour voir les ventes derrière son prix. Comptes exclus et ventes masquées : non comptés.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {groups.map((gr) => (
+              <details key={gr.modele + '|' + gr.taille} data-pqm-groupe={gr.modele + '|' + gr.taille} data-pqm-n={gr.n} data-pqm-med={Math.round(gr.med * 100)}
+                style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, boxShadow: C.shadow || 'none' }}>
+                <summary style={{ listStyle: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>
+                      {gr.modele} <span style={{ color: C.text, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>
+                      {gr.n} vente{gr.n > 1 ? 's' : ''} · {eur2(gr.min)} à {eur2(gr.max)} €{gr.recente ? ` · dernière ${jours(gr.recente)}` : ''}{gr.stock > 0 ? ` · ${gr.stock} en ligne` : ''}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>Médiane</div>
+                    <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)} €</div>
+                  </div>
+                </summary>
+                <div style={{ borderTop: `1px solid ${C.border}`, padding: '6px 14px 10px' }}>
+                  {gr.ventes.map((v, i) => (
+                    <div key={(v.tx || '') + i} data-pqm-vente={Math.round(v.prix * 100)} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12, padding: '4px 0', borderTop: i ? `1px solid ${C.border}66` : 'none' }}>
+                      <span style={{ flexShrink: 0, width: 62, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{date(v.ts)}</span>
+                      <span style={{ flex: 1, minWidth: 0, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.titre}{v.compte ? <span style={{ color: C.muted }}> · {v.compte}</span> : null}</span>
+                      <span style={{ flexShrink: 0, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{eur2(v.prix)} €</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        </>)}
       </>)}
     </div>
   );
@@ -16031,9 +16266,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
   const [caMode,setCaMode]=useState('ca');             // graphique d'évolution : « ca » (€) ou « ventes » (nb)
-  const [selMois,setSelMois]=useState(null);           // mois sélectionné dans le graphique d'évolution moisson
-  const [caDu,setCaDu]=useState('');                   // CA sur mesure : borne de début (YYYY-MM-DD)
-  const [caAu,setCaAu]=useState('');                   // CA sur mesure : borne de fin
   const [topMode,setTopMode]=useState('marques');      // « ce qui rapporte » : marques | tailles
   const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
   const [objEdit,setObjEdit]=useState(false);
@@ -16278,28 +16510,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     return Object.keys(map).sort().slice(-12).map(k=>({key:k,label:map[k].label,nomComplet:map[k].nomComplet,ca:map[k].ca,ventes:map[k].ventes}));
   },[sales]);
 
-  // CA SUR MESURE — « d'une date à une autre » (Julien, 28 sept.). MÊME source
-  // que le graphique par date de vente ci-dessus (§11) : les ventes finalisées,
-  // à leur date de VENTE (§5 — jamais la date d'encaissement). Bornes incluses ;
-  // une borne vide = ouverte de ce côté. On n'affiche que ce qu'on sait (le
-  // nombre de ventes de la période à côté du total, jamais un total « complet »).
-  const caRange=useMemo(()=>{
-    if(!caDu && !caAu) return null;
-    const toNum=(iso)=> iso ? parseInt(iso.replace(/-/g,''),10) : null;   // YYYY-MM-DD → YYYYMMDD
-    const from=toNum(caDu), to=toNum(caAu);
-    let ca=0, count=0;
-    sales.forEach(v=>{
-      const p=(v.saleDate||'').trim().split('/');
-      if(p.length!==3) return;
-      const n=parseInt(p[2]+p[1].padStart(2,'0')+p[0].padStart(2,'0'),10);  // AAAAMMJJ
-      if(!Number.isFinite(n)) return;
-      if(from!=null && n<from) return;
-      if(to!=null && n>to) return;
-      ca+=+v.sellPrice||0; count++;
-    });
-    return {ca,count};
-  },[sales,caDu,caAu]);
-
   // ── GRAPHIQUES « épuré / haut de gamme » (Julien, 28 sept.) : une seule teinte
   //    d'accent, variée par OPACITÉ fixée par plateforme (jamais par rang, §7 +
   //    dataviz), et l'identité portée par les libellés — pas par la couleur seule.
@@ -16382,27 +16592,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                urssaf:aPayerUrssaf(m.ca, TAUX_URSSAF*100), net:netApresUrssafDe(m.ca, TAUX_URSSAF*100) };
     });
   },[encaissees,urssafMois,TAUX_URSSAF]);
-
-  // ── ÉVOLUTION MENSUELLE, DÉRIVÉE DU RÉCAP COMPTABLE (§11) ─────────────────
-  // On CONSOMME `moisRecap` — le même tableau que le Récap comptable mensuel
-  // (source : la ligne publiée `vinted_urssaf_mois`, sinon l'archive) : le
-  // graphique et le tableau ne peuvent donc PAS diverger, et la courbe apparaît
-  // partout où le tableau a des lignes. Les deux anciens graphiques lisaient le
-  // vieux catalogue local par `receiveDate`/`saleDate` (vide depuis la moisson) :
-  // Julien ne voyait plus aucune courbe alors qu'il a ~190 ventes en août.
-  // `moisRecap` est du plus récent au plus ancien → on remet dans l'ordre du
-  // temps et on garde 12 mois ; le dernier est le mois EN COURS (encore en
-  // train de se finaliser — on le DIT, jamais un total partiel présenté comme
-  // complet, §5).
-  const moisMoisson=useMemo(()=>{
-    if(!moisRecap||!moisRecap.length) return null;
-    const mc=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
-    const now=new Date(); const curKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-    return [...moisRecap].reverse().slice(-12).map(m=>{
-      const mo=parseInt(String(m.ym||'').split('-')[1],10); const mi=mo-1;
-      return {key:m.ym||m.label,label:mc[mi]||String(mo||''),nomComplet:m.label,ca:Number(m.ca)||0,ventes:Number(m.count)||0,enCours:m.ym===curKey};
-    });
-  },[moisRecap]);
 
   // Téléchargement du récap comptable MENSUEL en CSV
   const exportCompta=()=>{
@@ -16507,7 +16696,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
             </div>
             <div role="progressbar" aria-label="Progression vers l’objectif du mois" aria-valuemin={0} aria-valuemax={objectif} aria-valuenow={Math.min(caMoisCourant,objectif)} aria-valuetext={`${fmt(caMoisCourant)} sur ${fmt(objectif)}`} style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · Vinted, ventes finalisées et en cours du mois</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, en cours compris</div>
           </>
         ); })() : (
           <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
@@ -16544,28 +16733,56 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       </div></details>
       {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
 
-      {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
-          « Des graphiques de qualité » : la même courbe que l'accueil, sur
-          douze mois. Source = `caParMois`, calculé dans la même boucle que « CA
-          du mois » (§11) — le dernier point est donc exactement ce chiffre-là. */}
-      {liveStats && liveStats.caParMois && (()=>{
-        const now = new Date(); const mois = [];
+      {/* ── VENDU ET REÇU, 12 DERNIERS MOIS (15 octobre) ─────────────────────
+          Remplace deux cartes dont le nom trompait : « Chiffre d'affaires · 12
+          derniers mois » (c'était le VENDU, en cours compris — le mot du CA
+          finalisé) et « Évolution — ventes finalisées » (c'était le CA DÉCLARÉ,
+          au mois du versement ou de la déclaration, et son détail disait « se
+          finalise ~2 semaines après la vente »). Julien : « pas clair ». Une
+          carte, deux séries NOMMÉES, une seule échelle, les chiffres sous l'axe
+          (`CourbePoints`) :
+            · Vendu = `liveStats.caParMois` (la règle de Ma journée, §11) ;
+            · Reçu  = `recu` de la ligne publiée par l'écran Ventes, au mois du
+              VERSEMENT (comme « Reçu en {mois} »). Pas encore publiée sur cet
+              appareil ⇒ la série est absente et la carte dit où elle se
+              calcule : jamais une disparition silencieuse, jamais des zéros. */}
+      {liveStats && (()=>{
+        const now = new Date(); const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const pub = (urssafMois && urssafMois.some(m => m && m.recu != null)) ? Object.fromEntries(urssafMois.map(m => [m.ym, m])) : null;
+        const venduLu = !!liveStats.caParMois;
+        const mesure = caMode === 'ventes' ? 'n' : 'eur';
+        const pts = [];
         for (let i = 11; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-          mois.push({ cle:k, eur: liveStats.caParMois[k] || 0, n: (liveStats.ventesParMois||{})[k] || 0,
-            long: d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}) });
+          pts.push({ cle: k, enCours: k === curKey, long: d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+            axe: [d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''), String(d.getFullYear()).slice(2)],
+            v: { vendu: venduLu ? { n: (liveStats.ventesParMois || {})[k] || 0, eur: liveStats.caParMois[k] || 0 } : null,
+                 recu: pub ? { n: (pub[k] && pub[k].nRecu) || 0, eur: (pub[k] && pub[k].recu) || 0 } : null } });
         }
-        const tot = mois.reduce((a,m)=>a+m.eur,0);
-        if (!tot) return null;
-        const meilleur = mois.reduce((a,m)=>m.eur>a.eur?m:a, mois[0]);
-        const court = (m) => new Date(m.cle+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+        const series = SERIES_VENDU_RECU().filter(s => s.k === 'vendu' ? venduLu : !!pub);
+        const somme = (k) => pts.reduce((a, p) => a + (p.v[k] ? (mesure === 'n' ? p.v[k].n : p.v[k].eur) : 0), 0);
+        if (!series.length || !series.some(s => somme(s.k) > 0)) return null;
+        const tot = Object.fromEntries(series.map(s => [s.k, mesure === 'n' ? `${somme(s.k)}` : fmt(somme(s.k))]));
+        const ad = urssafInfo && urssafInfo.aDater && urssafInfo.aDater.n > 0 ? urssafInfo.aDater : null;
         return (
           <Card style={{padding:'16px 16px 14px',background:C.card,border:`1px solid ${C.border}`,marginTop:12}}>
-            <div style={{fontSize:12,color:C.muted,fontWeight:500}}>Chiffre d'affaires · 12 derniers mois</div>
-            <div className="vrm-display" style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.6,marginTop:3}}>{fmt(tot)}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:3}}>Meilleur mois : <b style={{color:C.text,fontWeight:600}}>{meilleur.long} · {fmt(meilleur.eur)}</b></div>
-            <div style={{marginTop:14}}><CourbeVentes jours={mois} hauteur={110} libDebut={court(mois[0])} libFin="ce mois-ci"/></div>
+            <div data-courbe-mois="" style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
+              <span style={{fontSize:14,fontWeight:700,color:C.text,flex:1,minWidth:150}}>Vendu et reçu · 12 derniers mois</span>
+              <div role="group" aria-label="Unité" style={{display:'flex',gap:2,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:2}}>
+                {[['ca','€'],['ventes','Ventes']].map(([v,l])=>(
+                  <button type="button" key={v} aria-pressed={caMode===v} onClick={()=>setCaMode(v)} style={{border:0,borderRadius:6,padding:'4px 10px',minHeight:0,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.card:'transparent',color:caMode===v?C.text:C.muted,boxShadow:caMode===v?(C.shadow||'none'):'none'}}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{marginBottom:12}}><LegendeSeries series={series} totaux={tot}/></div>
+            <CourbePoints points={pts} series={series} mesure={mesure} hauteur={140} attr={{'data-mois':''}}/>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+              <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au mois de la vente, toutes plateformes, en cours compris. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au mois du versement. Le mois en cours n'est pas fini.
+              {!pub && <span data-recu-absent=""> Le reçu se calcule sur l'écran <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{display:'inline',border:0,background:'transparent',padding:0,margin:0,minHeight:0,height:'auto',lineHeight:'inherit',verticalAlign:'baseline',color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit'}}>Ventes</button> : ouvre-le une fois sur cet appareil.</span>}
+              {pub && ad && <span data-a-dater-mois={ad.n}> {ad.n} vente{ad.n>1?'s':''} finalisée{ad.n>1?'s':''} ({fmt(ad.ca)}) attend{ad.n>1?'ent':''} encore {ad.n>1?'leur':'sa'} date de versement : dans aucun mois.</span>}
+              {!venduLu && liveStats.venduPasSu && <span> Les ventes n'ont pas pu être lues : la courbe « vendu » n'est pas tracée.</span>}
+            </div>
           </Card>
         );
       })()}
@@ -16849,59 +17066,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
       </div>
 
-      {/* ── ÉVOLUTION MENSUELLE, SUR LES VRAIES DONNÉES (moisson) ──────────
-          §11 : même source que le CA total. Une seule teinte d'accent (§7),
-          barres fines à sommet arrondi, la valeur écrite sur chaque barre. Le
-          mois EN COURS est hachuré et dit « en cours » : un total partiel ne se
-          présente jamais comme complet (§5). Bascule CA €/Ventes plutôt qu'un
-          double axe (jamais deux échelles sur un même graphique — dataviz). */}
-      {moisMoisson && moisMoisson.length>0 && (()=>{
-        const val=(h)=> caMode==='ca' ? h.ca : h.ventes;
-        const maxV=Math.max(...moisMoisson.map(val),1);
-        const sel=moisMoisson.find(h=>h.key===selMois);
-        return (
-          <Card>
-            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
-              <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
-              <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
-                {[['ca','CA €'],['ventes','Ventes']].map(([v,l])=>(
-                  <button type="button" key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {moisMoisson.length} mois · même source que le récap comptable ci-dessous — touche une barre pour le détail.
-            </div>
-            <div style={{display:'flex',alignItems:'flex-end',gap:6,height:160,paddingTop:12}} role="img" aria-label={`Évolution ${caMode==='ca'?'du chiffre d’affaires':'du nombre de ventes'} par mois, ventes finalisées`}>
-              {moisMoisson.map((h,i)=>{
-                const pct=Math.round(val(h)/maxV*100);
-                const actif=h.key===selMois;
-                const col=actif?C.text:C.accent;
-                return (
-                  <div key={i} onClick={()=>setSelMois(actif?null:h.key)}
-                       title={`${h.nomComplet} · ${fmt(h.ca)} · ${h.ventes} vente${h.ventes>1?'s':''}${h.enCours?' (en cours)':''}`}
-                       style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer',minWidth:0}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{caMode==='ca'?Math.round(h.ca):h.ventes}</div>
-                    <div style={{width:'100%',maxWidth:32,height:`${pct}%`,minHeight:3,borderRadius:'8px 8px 0 0',transition:'height .4s',
-                         background:h.enCours?`repeating-linear-gradient(135deg, ${col}, ${col} 3px, ${col}66 3px, ${col}66 6px)`:col,
-                         outline:actif?`2px solid ${C.accent}`:'none',outlineOffset:1}}/>
-                    <div style={{fontSize:10,color:actif?C.accent:C.muted,fontWeight:actif?700:500,whiteSpace:'nowrap'}}>{h.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            {sel&&(
-              <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:13,color:C.text}}>
-                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> · en cours (se finalise ~2 semaines après la vente)</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} vente{sel.ventes>1?'s':''}
-              </div>
-            )}
-          </Card>
-        );
-      })()}
-
       {/* Graphique du CA encaissé par mois (repli : ancien catalogue local, si
           la moisson n'a encore rien publié) */}
-      {!moisMoisson && caHistory.length>0&&(()=>{
+      {!(urssafMois && urssafMois.length) && caHistory.length>0&&(()=>{
         const maxCA=Math.max(...caHistory.map(h=>h.ca),1);
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
@@ -16927,35 +17094,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         );
       })()}
 
-      {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
-      <Card>
-        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Du</label>
-            <input type="date" value={caDu} onChange={e=>setCaDu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Au</label>
-            <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
-          </div>
-          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
-        </div>
-        {caRange ? (
-          <div style={{marginTop:14}}>
-            <div className="vrm-display" style={{fontSize:30,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-              {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}
-              {caDu&&caAu?` du ${caDu.split('-').reverse().join('/')} au ${caAu.split('-').reverse().join('/')}`
-                : caDu?` depuis le ${caDu.split('-').reverse().join('/')}`
-                : ` jusqu'au ${caAu.split('-').reverse().join('/')}`}
-            </div>
-          </div>
-        ) : (
-          <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
-        )}
-      </Card>
+      {/* UNE PÉRIODE PRÉCISE (15 octobre). « Chiffre d'affaires entre deux dates »
+          sommait l'ARCHIVE `vinted_sales`, vide depuis juillet (mesuré : [] pour
+          les 3 propriétaires) : toute période affichait « 0,00 € · 0 vente »,
+          présenté comme un fait (D-ventes-2). La période vit sur l'écran Ventes,
+          avec vendu · finalisé · versé et leurs écarts (`bilanPeriode`, §11) :
+          ici, une porte, pas un second calcul. */}
+      <button type="button" data-porte-periode="" onClick={()=>onGo&&onGo('cat_ventes')}
+        style={{display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+        <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="calendar" size={18}/></span>
+        <span style={{flex:1,minWidth:0}}>
+          <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Une période précise</span>
+          <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>Dans Ventes, choisis tes dates : vendu, finalisé et versé.</span>
+        </span>
+        <span aria-hidden="true" style={{color:C.muted,fontSize:15}}>›</span>
+      </button>
 
       {/* 🍩 ANNEAU PAR PLATEFORME — une seule teinte (accent), variée par opacité
           FIXE par plateforme (§7) ; identité portée par la légende, pas la couleur. */}
@@ -24337,6 +24490,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [vendus]);
   // Les 14 derniers jours, VENDU et REÇU côte à côte (`joursVenduRecu`).
   const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
+  // La période choisie sur l'écran Ventes : VENDU · FINALISÉ · VERSÉ, chacun par
+  // sa règle (`bilanPeriode`, 15 octobre). Rien sans période choisie.
+  const bilanVentesPeriode = useMemo(() => (periode && (periode.from || periode.to)) ? bilanPeriode({ vendus, declarables, periode }) : null, [vendus, declarables, periode]);
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
@@ -24349,10 +24505,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const { lignes, aDater, ecartees } = declarables;
       const r2 = (x) => Math.round(x * 100) / 100;
+      // REÇU par mois = au mois du VERSEMENT (`l.ts`, la règle de « Reçu » de Ma
+      // journée), à côté du CA déclaré (`l.ym`, mois de la déclaration s'il y en
+      // a une). Pour le graphique « Vendu et reçu » des Statistiques (15 octobre) :
+      // il CONSOMME ce chiffre, il ne le recalcule pas (§11).
+      const recuPar = {};
+      for (const l of lignes) { if (!l.ts) continue; const k = ymDeTs(l.ts); const q = recuPar[k] || (recuPar[k] = { n: 0, ca: 0 }); q.n += 1; q.ca += l.eur; }
       const liste = Object.values(caDeclarableParMois(lignes))
         .map(m => {
           const d = moisDeclare(declUrssaf, m.ym) ? declUrssaf[m.ym] : null;
           return { ym: m.ym, n: m.n, ca: r2(m.ca), nMasq: m.nMasq, caMasq: r2(m.caMasq),
+            recu: r2((recuPar[m.ym] || {}).ca || 0), nRecu: (recuPar[m.ym] || {}).n || 0,
             par: Object.fromEntries(Object.entries(m.par).map(([k, v]) => [k, { n: v.n, ca: r2(v.ca) }])),
             // Le registre de ses déclarations (« J'ai déclaré ce mois ») : ce qui
             // a changé depuis, sur les MÊMES lignes que le total (§5).
@@ -28860,21 +29023,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             )}
 
-            {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
+            {/* VENDU / REÇU, 7 ou 14 derniers jours, en points reliés (CourbeVenduRecu). */}
             {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
-              <ResumePlateforme title="Évolution · 14 derniers jours" className="vrm-day-history">
+              <ResumePlateforme title="Évolution · tes derniers jours" className="vrm-day-history">
               <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
-                  <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
-                  </div>
-                </div>
-                <BarresVenduRecu jours={jours14}/>
+                <CourbeVenduRecu jours={jours14}/>
                 <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
                   <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
-                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
+                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la courbe « reçu » n'est pas tracée — ce n'est pas zéro.</>}
                   {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
                 </div>
               </div>
@@ -29138,6 +29294,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             on choisit « Finalisées », puis le mois. */}
         {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} compact/>}
         </div>
+        {/* LA PÉRIODE CHOISIE : vendu · finalisé · versé, et les écarts dits
+            en une ligne (Julien, 15 octobre). Toutes plateformes, comme Ma
+            journée ; la liste dessous reste celle de Vinted. */}
+        {sales.items && sales.items.length>0 && bilanVentesPeriode && (
+          <BilanPeriode bilan={bilanVentesPeriode}
+            sans={[...nomsVentesKO, ...(lbcLu === null ? ['Leboncoin'] : []), ...(ebayCmd === null ? ['eBay'] : [])]}/>
+        )}
         <NoAcc/>
         {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
             LEBONCOIN (onglet Leboncoin → aperçu), pas dans les ventes VINTED
@@ -29388,7 +29551,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
              quatre gros blocs empilés prenaient un écran entier sur téléphone. */
           <div className="vrm-summary-strip" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            {/* « Vinted » : la liste et l'analyse de cet écran sont Vinted ; le
+                bilan de la période (au-dessus) compte toutes les plateformes. */}
+            <StatBox compact label="CA finalisé Vinted" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
@@ -38703,25 +38868,24 @@ function AppCoeur() {
   useEffect(()=>()=>publierVentesCoque(undefined, []),[]);
   // Ce que le widget publie hors « vendu » (attente, encaissé, stock, messages).
   const [widgetBase,setWidgetBase]=useState(null);
-  // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
-  // Lit les ventes FINALISÉES et les annonces en ligne, regroupe par
-  // modèle+taille (grouperPrixMarche). `null` = pas encore lu · [] = lu, rien
-  // d'assez dense · échec ⇒ baseKO parle déjà. select=data sur orders_sold /
-  // listings : lignes légères (pas de PDF), §4.4 respecté.
-  const [pqmData,setPqmData]=useState(null);
-  useEffect(()=>{ if(tab!=='prixmarche' || pqmData!==null) return; (async()=>{
-    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
-    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data');
-    if(so===null) return; // pas su ⇒ on laisse `null`, baseKO affiche la panne
-    const sold=[]; const seen=new Set();
-    for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
-      const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
-      if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
-    const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
-      for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
-    const g = grouperPrixMarche(sold, online);
-    setPqmData({ groups: g, valo: valoriserStock(g, online) });
+  // ── « Prix de revente » (ex-« Le prix qui marche ») ──────────────────────
+  // ⚠️ 15 octobre : les VENTES ne sont plus relues ici. L'écran lisait TOUTES les
+  // lignes `orders_sold` du propriétaire (mesuré : 13 lignes, dont 6 identifiants
+  // sans compte lié portant 1 013 des 1 309 ventes finalisées, et 3 comptes
+  // masqués) — alors que Julien a tranché le 3 octobre : « les comptes
+  // sélectionnés ». Il consomme désormais `ventesCoque` (les comptes liés, déjà
+  // lus pour « vendu », §11), sans les comptes exclus ni les ventes masquées.
+  // Seules les annonces en ligne (pour « en ligne » et la valeur du stock) sont
+  // lues à la demande. `null` = pas lu · `false` = illisible · tableau = lu.
+  const [pqmEnLigne,setPqmEnLigne]=useState(null);
+  const [pqmFenetre,setPqmFenetre]=useState(12);
+  useEffect(()=>{ if(tab!=='prixmarche' || pqmEnLigne!==null) return; (async()=>{
+    try {
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_listings&select=data`,{headers:sbAuth()});
+      const rows=r.ok?await r.json():null;
+      if(!Array.isArray(rows)){ setPqmEnLigne(false); return; }
+      setPqmEnLigne((await lireLignesEnLigne(rows)).lignes || []);   // 5.167 : la règle « en ligne » (§11)
+    } catch(_) { setPqmEnLigne(false); }
   })(); /* eslint-disable-next-line */ },[tab]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
@@ -39411,6 +39575,32 @@ function AppCoeur() {
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts]);
+  // « Prix de revente » : regroupé sur les MÊMES ventes que « vendu » (comptes
+  // liés, comptes exclus et ventes masquées écartés — la règle de `liveStatsVus`
+  // juste au-dessus), dans la fenêtre choisie. Trois états : `null` lecture en
+  // cours · `{ pasSu }` aucune lecture de ventes n'a abouti · le résultat.
+  const pqmData = useMemo(() => {
+    if (tab !== 'prixmarche') return null;
+    if (ventesCoque === undefined) return null;
+    if (ventesCoque === null) return { pasSu: true };
+    try {
+      const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
+      const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) ?? '');
+      const labels = load('vinted_account_labels', {}) || {};
+      const nom = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === uid); return labels[uid] || (a && a.login) || uid; };
+      const sold = ventesCoque.filter(o => o && !hTx.has(String(o.transaction_id)) && !ecarte(uidDe(o)) && classifyOrderStatus(o.status) === 'completed');
+      const lies = new Set((vintedAccounts || []).map(a => String(a.vinted_user_id)).filter(u => !ecarte(u)));
+      const online = Array.isArray(pqmEnLigne) ? pqmEnLigne.filter(r => { const m = /^harvest_(.+)_listings$/.exec((r && r.id) || ''); return !m || lies.has(m[1]); })
+        .flatMap(r => ((r.data && r.data.payload && r.data.payload.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)) : null;
+      const depuis = pqmFenetre ? Date.now() - pqmFenetre * 30.44 * 86400e3 : null;
+      const groups = grouperPrixMarche(sold, online || [], { depuis, compteDe: (o) => nom(uidDe(o)) });
+      return { groups, valo: online ? valoriserStock(groups, online) : null, nVentes: sold.length,
+        sans: ventesKO.filter(u => !ecarte(String(u))).map(u => nom(String(u))) };
+    } catch (_) { return { pasSu: true }; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, ventesCoque, ventesKO, pqmEnLigne, pqmFenetre, panelOffCoque, nuagePret, masquesTick, vintedAccounts]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
@@ -40452,7 +40642,7 @@ function AppCoeur() {
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
-        {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
+        {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO} fenetre={pqmFenetre} setFenetre={setPqmFenetre}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();

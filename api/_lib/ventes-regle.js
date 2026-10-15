@@ -145,7 +145,7 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
-export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
+export const ventesFaites =({ vinted, lbc, ebay, cachee } = {}) => {
   const lignes = [], vus = new Set();
   let sansDate = 0;
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
@@ -155,7 +155,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     if (tx != null && !garde('vinted:' + tx)) continue;
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o), id: tx != null ? 'vinted:' + tx : null, fin: classifyOrderStatus(o.status) === 'completed' });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -163,7 +163,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (!isFinite(eur)) continue;
     const t = Date.parse(v.dateVente || '');
     if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
-    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur, id: 'lbc:' + v.txId, fin: lbcFinalisee(v) });
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -171,7 +171,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (tot.currency && tot.currency !== 'EUR') continue;
     const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
     if (!isFinite(eur) || !t) continue;
-    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur, id: 'ebay:' + e.orderId, fin: true });
   }
   return { lignes, sansDate };
 };

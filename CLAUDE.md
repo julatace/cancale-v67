@@ -8984,6 +8984,54 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Ventes et statistiques : trois chiffres par période, points reliés, « Prix de revente » (15 octobre)
+Demande de Julien du 15 octobre (lot P2 « Ventes »). Tranché sans lui demander :
+- **Écran Ventes, période choisie** ⇒ `BilanPeriode` sous le sélecteur :
+  **Vendu** (`ventesFaites`, date de vente, en cours comprises) · **Finalisé** (leur
+  part finalisée, `fin` porté par chaque ligne) · **Versé** (`ventesDeclarables`,
+  date du VERSEMENT `l.ts`, jamais le mois de déclaration). Toutes plateformes,
+  comme Ma journée (la liste dessous reste Vinted). Une règle, `bilanPeriode`
+  (module) : l'écart finalisé → versé s'explique **vente par vente, par identité**
+  (vendues avant · versées après · sans date de versement · masquées · comptes non
+  lus · autres), en centimes : Σ écarts = versé − finalisé, exactement. Versements
+  en cours ⇒ « … », illisibles ⇒ « — » (jamais 0) ; une finalisée sans date qui
+  pourrait tomber dans la période ⇒ « au moins ».
+  ⚠️ `ventesFaites` porte désormais `id` et `fin` : le miroir serveur
+  `api/_lib/ventes-regle.js` a été refabriqué (`--recopie`), aucun total ne change.
+- **14 derniers jours ⇒ points reliés** (`CourbePoints`, `CourbeVenduRecu`, Ma
+  journée) : bascule 7 / 14 jours (choix gardé sur l'appareil), un point par jour
+  et par série (vendu plein, reçu creux : jamais la couleur seule), les chiffres du
+  jour SOUS l'axe (un tableau aligné, pas un nombre sur chaque point), un détail au
+  toucher/survol. Une valeur inconnue coupe la ligne — reçu illisible ⇒ aucune
+  ligne « reçu », jamais une ligne à 0. `BarresVenduRecu` est retiré.
+- **Statistiques : UNE carte « Vendu et reçu · 12 derniers mois »** remplace
+  « Chiffre d'affaires · 12 derniers mois » (c'était le VENDU) et « Évolution —
+  ventes finalisées » (c'était le CA DÉCLARÉ, avec un détail faux « se finalise ~2
+  semaines après la vente »). Vendu = `liveStats.caParMois` ; Reçu = `recu`/`nRecu`
+  ajoutés à chaque mois de `vinted_urssaf_mois` par l'écran Ventes (au mois du
+  versement, comme « Reçu en {mois} », §11). Pas encore publié sur l'appareil ⇒ la
+  série est absente et la carte dit d'ouvrir Ventes. `CourbeVentes` (lissée) et
+  `moisMoisson` sont retirés (plus d'appelant).
+- **« Prix qui marche » ⇒ gardé, renommé « Prix de revente »**, rendu vérifiable :
+  chaque modèle+taille ouvre la liste de SES ventes (date, compte, prix, titre —
+  la médiane se recompte), dit la date de la dernière, et la fenêtre se choisit
+  (6 mois · **12 mois** par défaut · tout). Les ventes viennent de `ventesCoque`
+  (les comptes LIÉS, comptes exclus et ventes masquées écartés — décisions du
+  3 octobre), plus d'une relecture de toutes les lignes `orders_sold` du
+  propriétaire. Mesuré sur la copie du 5 octobre : 115 groupes (dont 1 013 ventes
+  de comptes supprimés) → **32 groupes** sur ses 7 comptes liés.
+- Preuves : `audit-bilan-periode.cjs` (la vraie règle exécutée, cas à la main +
+  400 jeux au hasard ; `--prouve` : 4 mutations, toutes rouges) ; banc
+  `bancs/ventes-periode.cjs` (port 5951, données inventées, 390/1512, clair/sombre)
+  — **115 verts**, **39 rouges** sur le build de w15, **4 rouges** sur un build
+  muté (reçu illisible dessiné à 0, fenêtre ignorée).
+- ⚠️ **Non fait** : la courbe vit dans Ma journée (bloc replié sous 768 px) — si la
+  refonte de Ma journée la retire, la remettre ailleurs, ne pas la perdre ; « Ventes
+  par jour » (calendrier de la période, Analyse) reste en liste ; l'écart eBay
+  « total acheteur ≠ net versé » attend la session eBay ; les deux « Objectif du
+  mois » (D-ventes-12) et les blocs morts de l'archive (D-ventes-11) ne sont pas
+  touchés.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
