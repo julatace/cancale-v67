@@ -44,7 +44,7 @@ const SRC = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(R, 'src'
       ['€ 12', '12'], ['total 45 €', '45'], ['3 456 € encaissés', '3 456'], ['12.50 EUR', '12.50'], ['45 euros', '45 euros'],
       ['Contact : zorglub.secret@exemple.test', 'zorglub.secret@'], ['tél 06 12 34 56 78', '06 12 34 56 78'], ['+33 6 12 34 56 78', '12 34 56 78'],
       ['IBAN FR76 3000 6000 0112 3456 7890 189', '3000 6000'], ['SIRET 123 456 789 00012', '123 456 789'],
-      ['compte #24602614 · tx 22155558568', '22155558568'], ['suivi XW476115185SP', 'XW476115185SP'],
+      ['compte #24602614 · tx 22155558568', '22155558568'], ['n° Vinted 730000123', '730000123'], ['suivi XW476115185SP', 'XW476115185SP'],
       ['17 rue des Glycines 29280 Plouzané', 'Glycines'], ['Relais, 29200 Brest', '29200'],
       ['@zorglub_vend42', 'zorglub_vend42'], ['Boutique Zorglub · 3 ventes', 'Boutique Zorglub'], ['Bonjour Bérénice', 'Bérénice'],
       ['ZORGLUB_VEND42 a vendu', 'ZORGLUB_VEND42'],
