@@ -379,7 +379,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(2500);
     const ajoute = async (lib, mnt) => {
-      await pg.fill('input[placeholder="Ex. rouleau de scotch"]', lib);
+      await pg.fill('input[aria-label="Libellé de la dépense"]', lib);   // le libellé du champ, pas son exemple (qui change)
       await pg.locator('input[placeholder="€"]').first().fill(String(mnt));
       await pg.getByRole('button', { name: 'Ajouter' }).first().click();
       await pg.waitForTimeout(300);
