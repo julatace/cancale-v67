@@ -6830,7 +6830,15 @@ le seul geste vers eBay est un lien vers l'annonce.
   lecture ratée prise pour vide, simulation qui range, prix sans livraison,
   silence ignoré, session retirée, écriture ratée qui notifie). Banc
   `bancs/veille.cjs` (port 6001, données inventées, la VRAIE route exécutée)
-  **109 OK** à 390/1512 px en clair et en sombre.
+  **109 OK** à 390/1512 px en clair et en sombre — **35 rouges** sur le build
+  de w15 ; quatre mutations de l'écran, chacune rouge (livraison inconnue
+  affichée 0, coûts manquants tus, annonce montrée deux fois, Vinted/Leboncoin
+  présentés comme surveillés). `verif_visuel` (vraies fixtures, onglet
+  `ebay_veille` ajouté dans une copie non commitée) : rendu conforme aux deux
+  tailles. ⚠️ `ebay-comptes.cjs` sort 0 à 4 rouges selon la charge, **sur w15
+  comme ici** (un clic « Oui, publier » qui expire laisse la feuille ouverte,
+  la suite cascade) ; `ebay-form.cjs` a 2 rouges **déjà sur w15** (« Compte
+  eBay » compté 1) — ni l'un ni l'autre ne vient de ce lot.
 - **Livré** : VEILLE-CONCEPT-01 (eBay) · VEILLE-50 : 03, 04, 05, 07, 08,
   09, 10, 11, 12, 13, 15 (eBay seul, les autres dites indisponibles), 16, 17, 18,
   19, 21 et 22 (récapitulatif du matin), 24, 25, 26, 27, 29, 30, 31, 32, 34, 35,
