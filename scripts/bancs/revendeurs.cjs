@@ -102,6 +102,19 @@ async function brancher(p){
    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
    for(const width of [320,390,1512]){
     await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
+    if(width===1512 && nom==='Vinted'){
+      const rail=p.locator('.vrm-atelier-rail');
+      check((await rail.boundingBox()).width<100,'navigation bureau réduite à un rail de logos');
+      check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
+      const gestion=rail.getByRole('button',{name:'Gestion',exact:true});
+      await gestion.click();
+      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion accessible dans le panneau de gauche');
+      if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'gestion-desktop.png')});}
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures conservés dans Gestion');
+      await p.keyboard.press('Escape');
+      check(await gestion.evaluate(e=>e===document.activeElement) && await gestion.getAttribute('aria-expanded')==='false','Échap ferme Gestion et restitue le focus');
+      check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
+    }
     if(width===1512){
       const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
       check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);

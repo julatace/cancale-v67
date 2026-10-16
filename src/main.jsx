@@ -28,6 +28,7 @@ import '@fontsource/space-grotesk/700.css';
 import './styles-mineral.css';
 import './styles-reglages.css';
 import './styles-coque.css';
+import './styles-atelier.css';
 
 // ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
 // garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page

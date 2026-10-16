@@ -9330,47 +9330,41 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 236;
+const NAV_LARGEUR = 88;
 
-// Barre latérale : TOUS les écrans visibles d'un coup, pas quatre plus un
-// « Plus ». Sur un grand écran, cacher la moitié de la navigation derrière un
-// bouton n'a aucune raison d'être — c'est une contrainte de téléphone.
-// Les commandes du quotidien sont visibles ; les outils occasionnels restent
-// accessibles dans des groupes repliables, sans remplir le rail de 16 entrées.
+// Navigation compacte par plateforme. Les outils partagés restent dans le
+// panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab }) {
-  const bouton = (t) => (
-    <button key={t.id} type="button" className="vrm-sidebar-link" onClick={() => setTab(t.id)} aria-current={tab===t.id?'page':undefined}
-      style={{color:tab===t.id?C.onChrome:C.chromeMuted}}>
-      <NavigationIcon item={t} size={19}/><span>{t.label}</span>
-      {t.bientot && <span data-bientot="" style={{marginLeft:'auto',fontSize:10,fontWeight:600,letterSpacing:.2,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted,whiteSpace:'nowrap'}}>Bientôt</span>}
-    </button>
-  );
-  return (
-    <nav className="vrm-sidebar" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-      <div className="vrm-sidebar-brand"><VrmWord height={26} color={C.onChrome} accent={C.onChrome}/></div>
-      <div className="vrm-sidebar-group">
-        <div className="vrm-sidebar-label">Plateformes</div>
-        {BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(bouton)}
-      </div>
-      <details className="vrm-sidebar-group" open={tab==='plat_vestiaire'||undefined}>
-        <summary className="vrm-sidebar-label">Autres plateformes</summary>
-        {BOTTOM_TABS.filter(t=>t.id==='plat_vestiaire').map(bouton)}
-      </details>
-      <div className="vrm-sidebar-group">
-        <div className="vrm-sidebar-label">Gestion</div>
-        {NAV_GESTION.map(bouton)}
-      </div>
-      {[{titre:'Détails Vinted',items:VINTED_TABS},{titre:'Autres outils',items:NAV_OUTILS}].map(g => (
-        <details className="vrm-sidebar-group" key={g.titre} open={g.items.some(t=>t.id===tab)}>
-          <summary className="vrm-sidebar-label">{g.titre}</summary>
-          {g.items.map(bouton)}
-        </details>
-      ))}
-      <button type="button" className="vrm-sidebar-link vrm-sidebar-settings" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}>
-        <Icon name="gear" size={19}/><span>Réglages</span>
-      </button>
-    </nav>
-  );
+  const [gestion, setGestion] = useState(false);
+  const rail = useRef(null), declencheur = useRef(null), panneau = useRef(null);
+  const actif = BAR_GROUPE[tab] || tab;
+  const outils = [...NAV_GESTION, ...NAV_OUTILS];
+  const ouvrir = id => {setGestion(false);setTab(id);};
+  useEffect(()=>{setGestion(false);},[tab]);
+  useEffect(()=>{
+    if(!gestion)return;
+    panneau.current?.querySelector('button')?.focus();
+    const dehors=e=>{if(!rail.current?.contains(e.target))setGestion(false);};
+    const clavier=e=>{if(e.key==='Escape'){e.preventDefault();setGestion(false);declencheur.current?.focus();}};
+    document.addEventListener('pointerdown',dehors);document.addEventListener('keydown',clavier);
+    return()=>{document.removeEventListener('pointerdown',dehors);document.removeEventListener('keydown',clavier);};
+  },[gestion]);
+  return <nav ref={rail} className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+    <div className="vrm-sidebar-brand"><VrmWord height={19} color={C.onChrome} accent={C.onChrome}/></div>
+    <div className="vrm-rail-platforms">
+      {BOTTOM_TABS.map(t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>ouvrir(t.id)} aria-current={actif===t.id?'page':undefined}>
+        <NavigationIcon item={t} size={25}/>
+      </button>)}
+    </div>
+    <div className="vrm-rail-bottom">
+      <button ref={declencheur} type="button" className="vrm-rail-button" aria-label="Gestion" title="Gestion" aria-expanded={gestion} aria-controls="vrm-gestion-laterale" onClick={()=>setGestion(v=>!v)} data-active={outils.some(t=>t.id===actif)||undefined}><Icon name="grid" size={23}/></button>
+      <button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>ouvrir('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button>
+    </div>
+    {gestion && <section ref={panneau} id="vrm-gestion-laterale" className="vrm-rail-panel" aria-label="Gestion">
+      <div className="vrm-rail-panel-title"><span>Gestion</span><button type="button" aria-label="Fermer la gestion" onClick={()=>{setGestion(false);declencheur.current?.focus();}}><Icon name="close" size={18}/></button></div>
+      {outils.map(t=><button key={t.id} type="button" className="vrm-sidebar-link" aria-current={tab===t.id?'page':undefined} onClick={()=>ouvrir(t.id)}><NavigationIcon item={t} size={19}/><span>{t.label}</span>{t.bientot && <span className="vrm-rail-soon">Bientôt</span>}</button>)}
+    </section>}
+  </nav>;
 }
 
 // ── MENU DES ÉCRANS, EN HAUT À GAUCHE (téléphone) ──────────────────────────
