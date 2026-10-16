@@ -162,7 +162,11 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   // contrôle porte donc sur la règle : la valeur est gardée par un dénominateur
   // STRICTEMENT POSITIF, et retombe sur « — ».
   {
-    const carte = /label="CA \/ jour[^"]*"[\s\S]{0,300}?value=\{([\s\S]*?)\}\s/.exec(app);
+    // (16 oct.) La carte peut aussi être une entrée de tableau
+    // `['CA / jour de vente', <valeur>, <légende>]` (grille « Détails ») : la
+    // règle est la même, on suit l'expression de la VALEUR.
+    const carte = /label="CA \/ jour[^"]*"[\s\S]{0,300}?value=\{([\s\S]*?)\}\s/.exec(app)
+      || /\['CA \/ jour[^']*',\s*([^\n]*?:\s*'—')\s*,/.exec(app);
     const v = carte ? carte[1] : '';
     (v && /\w+>0\s*\?/.test(v) && /:\s*'—'/.test(v))
       ? ok('le CA par jour écrit « — » tant qu\'il n\'a aucun jour à diviser')

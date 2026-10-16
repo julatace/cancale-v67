@@ -88,7 +88,7 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4322);
+const PORT_VV=Number(process.env.BANC_PORT)||4322; srv.listen(PORT_VV);
 // ⚠️ TOUS LES ÉCRANS, PAS DIX SUR TREIZE. `vintedaccounts` (« Comptes liés »)
 // n'etait rendu par AUCUN banc — et c'est la qu'un bouton « ↻ Actualiser »
 // posait sa propre ligne de titre au lieu de passer par le slot `right` de
@@ -137,7 +137,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
     const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='';
     for(const t of TABS){
-      await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
+      await pg.goto('http://localhost:'+PORT_VV+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
       // `SHOTS=dossier` : une capture par écran et par taille (pour REGARDER, §6.2).
       if(process.env.SHOTS){ try{ fs.mkdirSync(process.env.SHOTS,{recursive:true}); await pg.screenshot({path:require('path').join(process.env.SHOTS,`${t}-${W}.png`),fullPage:true}); }catch(_){} }

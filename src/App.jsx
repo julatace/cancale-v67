@@ -7700,6 +7700,49 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
   );
 }
 
+// ── LE CA DES 12 DERNIERS MOIS EN BARRES (Statistiques, 16 oct.) ─────────────
+// Une barre par mois, une seule teinte (§7) : le meilleur mois en plein, le mois
+// en cours hachuré (il n'est pas fini — un total partiel ne se présente pas
+// comme complet, §5), les autres en teinte claire. Un mois sans vente garde un
+// trait au ras de l'axe : l'axe se lit, rien n'est inventé. Les valeurs exactes
+// vivent dans la légende de la carte et dans l'infobulle de chaque barre.
+function BarresCA12({ mois, meilleur }) {
+  const max = Math.max(1, ...mois.map(m => m.eur));
+  const H = 120;
+  const dernier = mois.length - 1;
+  return (
+    <div role="img" aria-label={`Chiffre d'affaires des 12 derniers mois, par mois`} style={{marginTop:16}}>
+      <div style={{position:'relative',height:H,display:'flex',alignItems:'flex-end',gap:'clamp(4px,1.2vw,10px)'}}>
+        {/* Deux repères discrets : la moitié et le sommet du meilleur mois. */}
+        {[0.5, 1].map(f => <div key={f} aria-hidden="true" style={{position:'absolute',left:0,right:0,bottom:Math.round(H*f)-1,borderTop:`1px dashed ${C.border}`,opacity:f<1?0.9:0.6}}/>)}
+        {mois.map((m, i) => {
+          const fort = m.cle === meilleur, enCours = i === dernier;
+          const h = m.eur > 0 ? Math.max(4, Math.round(m.eur / max * H)) : 2;
+          const fond = m.eur <= 0 ? C.border
+            : enCours ? `repeating-linear-gradient(135deg, ${C.accent}, ${C.accent} 3px, ${C.accent}55 3px, ${C.accent}55 6px)`
+            : fort ? C.accent : `${C.accent}38`;
+          return (
+            <div key={m.cle} data-mois={m.cle} title={`${m.long} · ${m.n} vente${m.n > 1 ? 's' : ''} · ${fmt(m.eur)}${enCours ? ' (en cours)' : ''}`}
+              style={{position:'relative',flex:1,minWidth:0,height:h,background:fond,borderRadius:'5px 5px 0 0'}}/>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',gap:'clamp(4px,1.2vw,10px)',marginTop:7,borderTop:`1px solid ${C.border}`,paddingTop:6}}>
+        {mois.map((m, i) => {
+          const d = new Date(m.cle + '-01T12:00:00');
+          const court = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+          const fort = m.cle === meilleur || i === dernier;
+          return (
+            <div key={m.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:10.5,lineHeight:1.2,color:fort?C.text:C.muted,fontWeight:fort?600:500}}>
+              <span className="vrm-mois-long">{court}</span><span className="vrm-mois-court" aria-hidden="true">{court.slice(0, 1).toUpperCase()}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CountUp({ value, format, duration = 950, style }) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -16616,14 +16659,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const quoiDepuisDebut = stockInconnu
     ? 'La valeur du stock, le bénéfice et la marge'
     : 'Le bénéfice et la marge';
-  const LignePrixAchat = ({ quoi }) => (
+  // (16 oct., passe « premium ») : un LIEN discret, pas une ligne orange — la
+  // cause est dite une fois par groupe, et le geste est le lien lui-même.
+  const LignePrixAchat = ({ quoi, dans = false }) => (
     <button type="button" onClick={versSaisiePrix}
       title="Ouvrir la saisie en série des prix d'achat"
-      style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:'-6px 0 0',cursor:'pointer',
-        fontFamily:'inherit',fontSize:12,fontWeight:600,color:C.warn,textAlign:'left',minHeight:0}}>
-      {quoi} attendent tes prix d'achat — les saisir →
+      style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
+        fontFamily:'inherit',fontSize:12.5,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
+      {quoi} attendent tes prix d'achat — <span style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
     </button>
   );
+  // ── Typographie de l'écran (16 oct.) ─────────────────────────────────────
+  // Un montant ne se coupe JAMAIS en deux (« 2066,80 » puis « € » seul sur la
+  // ligne suivante) : `Mt` le garde d'un bloc, en chiffres tabulaires.
+  const Mt = ({ v }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(v)}</span>;
+  // Libellés en casse normale (plus de capitales espacées partout) : un titre
+  // de carte, un libellé de chiffre, une note.
+  const sTitre = {fontSize:14,fontWeight:600,color:C.text,letterSpacing:-0.15};
+  const sLib = {fontSize:12.5,color:C.muted,fontWeight:500};
+  const sNote = {fontSize:12,color:C.muted,lineHeight:1.5};
+  const sHero = {fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1.05,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'};
+  const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
 
   return (
     <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
@@ -16636,8 +16692,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
-      <div className="vrm-finance-period-label" style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
-      <div className="vrm-finance-overview">
+      <div data-stats-carte="hero" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
+        <div style={sLib}>CA finalisé · depuis le début</div>
         {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
             cette date). Le rapport comptable a été corrigé, ce titre-là était
@@ -16648,14 +16704,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             global alors que le « Total toutes plateformes » (Collectif) est plus
             grand dès qu'une autre plateforme a des ventes : un total partiel qui
             se présente comme complet (§5). On ne touche PAS la valeur (URSSAF). */}
-        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
-        {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
-            afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice estimé" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
-        {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
-            voisines, avec d'autres mots : trois formulations pour une seule
-            cause font croire à trois problèmes. */}
-        <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
+        {/* (16 oct.) Le chiffre héros, seul, en très gros — plus de cellule
+            noire, plus de filet vertical parasite à gauche de chaque texte
+            (l'ombre « -1px » de StatBox compact). */}
+        <div className="vrm-display" style={{...sHero,fontSize:'clamp(34px,10.5vw,46px)',marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
+        <div style={{...sNote,marginTop:6}}>Vinted, tous comptes · daté au jour de la vente</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
+          {/* Bénéfice/marge : un tiret tant qu'aucun prix d'achat n'est saisi
+              (sinon on afficherait le CA comme « bénéfice », ce qui est faux —
+              cf. écran Ventes). ⚠️ « prix d'achat manquants » disait la MÊME
+              chose que ses deux voisines : une cause, une phrase (le lien
+              dessous). */}
+          {[['Bénéfice estimé', liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit), liveStats&&liveStats.caEncaisse!=null?null:'argent reçu uniquement'],
+            ['Taux marge', (liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`, liveStats&&liveStats.caEncaisse!=null?null:(avgMargin===null?'dès ta première vente':'bénéf / CA')]].map(([l,v,sub],i)=>(
+            <div key={l} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
+              <div style={sLib}>{l}</div>
+              <div className="vrm-display" style={{...sHero,fontSize:22,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
+              {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+        {manquePrix && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
       {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
       <div className="vrm-finance-goal"><Card>
@@ -16684,8 +16753,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         )}
       </Card></div>
 
-      {liveStats && <details className="vrm-finance-activity" style={{marginBottom:10,fontSize:12,color:C.muted}}>
-        <summary style={{cursor:'pointer',padding:'8px 0'}}>Ventes enregistrées · <span data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui {liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</span> · <span data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois {liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</span></summary>
+      {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
+          l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
+      <div data-stats-carte="activite" className="vrm-stats-volets" style={{...sCarte,padding:'4px 18px'}}>
+      {liveStats && <details className="vrm-finance-activity" style={{fontSize:12.5,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
+        {/* (16 oct.) Chaque montant reste d'un bloc avec son libellé : « 2066,80 »
+            ne se sépare plus de son « € » au retour à la ligne. */}
+        <summary style={{cursor:'pointer',padding:'10px 0',lineHeight:1.65}}>Ventes enregistrées · <span style={{whiteSpace:'nowrap'}} data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</b></span> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</b></span></summary>
         <p>Ventes faites, toutes plateformes, avant encaissement. Le CA finalisé et l’argent reçu restent distincts.</p>
         {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">Les ventes n’ont pas pu être lues. Les montants restent inconnus.</p>}
         {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>Total partiel, sans {liveStats.venduManque.join(', ')} : ventes non lues.</p>}
@@ -16712,7 +16786,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
       </div></details>
-      {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
+      </div>
 
       {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
           « Des graphiques de qualité » : la même courbe que l'accueil, sur
@@ -16729,14 +16803,29 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const tot = mois.reduce((a,m)=>a+m.eur,0);
         if (!tot) return null;
         const meilleur = mois.reduce((a,m)=>m.eur>a.eur?m:a, mois[0]);
-        const court = (m) => new Date(m.cle+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+        const encours = mois[mois.length-1];
+        // (16 oct.) Douze BARRES plutôt qu'une ligne écrasée : un mois est un
+        // total, il se lit en hauteur. Le meilleur mois et le mois en cours sont
+        // MARQUÉS sur le graphique et leur valeur exacte écrite dessous — jamais
+        // une valeur arrondie différemment (« 2 k ») à côté du vrai montant (§7).
         return (
-          <Card style={{padding:'16px 16px 14px',background:C.card,border:`1px solid ${C.border}`,marginTop:12}}>
-            <div style={{fontSize:12,color:C.muted,fontWeight:500}}>Chiffre d'affaires · 12 derniers mois</div>
-            <div className="vrm-display" style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.6,marginTop:3}}>{fmt(tot)}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:3}}>Meilleur mois : <b style={{color:C.text,fontWeight:600}}>{meilleur.long} · {fmt(meilleur.eur)}</b></div>
-            <div style={{marginTop:14}}><CourbeVentes jours={mois} hauteur={110} libDebut={court(mois[0])} libFin="ce mois-ci"/></div>
-          </Card>
+          <div data-stats-carte="courbe" data-stats-courbe style={{...sCarte,marginTop:4}}>
+            <div style={sLib}>Chiffre d'affaires · 12 derniers mois</div>
+            <div className="vrm-display" style={{...sHero,fontSize:'clamp(28px,8vw,34px)',letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
+            <BarresCA12 mois={mois} meilleur={meilleur.cle}/>
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+                <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
+                <span style={{flex:1,minWidth:0}}>Meilleur mois · <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
+                <b style={{color:C.text,fontWeight:600}}><Mt v={meilleur.eur}/></b>
+              </div>
+              {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+                <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,flexShrink:0,background:`repeating-linear-gradient(135deg, ${C.accent}, ${C.accent} 2px, ${C.accent}55 2px, ${C.accent}55 4px)`}}/>
+                <span style={{flex:1,minWidth:0}}>En cours · <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
+                <b style={{color:C.text,fontWeight:600}}><Mt v={encours.eur}/></b>
+              </div>}
+            </div>
+          </div>
         );
       })()}
 
@@ -16761,42 +16850,45 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
         if (caVinted == null && caLbc == null) return null;
         const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
+        // (16 oct.) Une ligne = le nom, sa note, le montant à droite (d'un
+        // bloc, chiffres tabulaires) ; dessous, la part du total en barre
+        // pleine sur un rail, une seule teinte (§7). Une plateforme sans vente
+        // captée reste nommée, en sourdine, avec son tiret.
         const Ligne = ({label, val, note, fort, part}) => (
-          <div style={{padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+          <div style={{padding:fort?'12px 0 2px':'11px 0',borderTop:`1px solid ${C.border}`}}>
             <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
               <div style={{minWidth:0}}>
-                <div style={{fontSize:13.5,fontWeight:fort?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
-                {note && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{note}</div>}
+                <div style={{fontSize:fort?13.5:14,fontWeight:fort?600:500,color:val==null?C.muted:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
+                {note && <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.35}}>{note}</div>}
               </div>
-              <div style={{display:'flex',alignItems:'baseline',gap:8,flexShrink:0}}>
-                {part!=null && <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums'}}>{Math.round(part*100)} %</span>}
-                <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:val==null?C.muted:C.text}}>{val==null?'—':fmt(val)}</span>
-              </div>
+              <span className="vrm-display" style={{fontSize:fort?17:15,fontWeight:fort?700:600,color:val==null?C.muted:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',flexShrink:0,letterSpacing:-0.2}}>{val==null?'—':fmt(val)}</span>
             </div>
-            {/* Part du total : une barre fine, une seule teinte (§7). */}
-            {part!=null && <div style={{height:4,borderRadius:999,background:C.card2||C.border,marginTop:7,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>}
+            {part!=null && <div style={{display:'flex',alignItems:'center',gap:10,marginTop:8}}>
+              <div style={{flex:1,height:6,borderRadius:999,background:C.card2||C.border,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>
+              <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)} %</span>
+            </div>}
           </div>
         );
         const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
         const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(300px,100%), 1fr))',gap:12,marginTop:12}}>
-            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA finalisé par plateforme</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
+            <div data-stats-carte="plateformes" data-stats-plateformes style={{...sCarte,paddingBottom:12}}>
+              <div style={{...sTitre,marginBottom:8}}>CA finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
               {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total toutes plateformes" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
-            </Card>
-            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA Vinted par compte</div>
+            </div>
+            <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
+              <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
               {comptes.length
                 ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
-                : <div style={{fontSize:12,color:C.muted,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
+                : <div style={{fontSize:12,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
-            </Card>
+            </div>
           </div>
         );
       })()}
@@ -16808,216 +16900,218 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           haut — arrondi différemment (296 € contre 296,40 €). Le même nombre,
           deux fois, deux valeurs : c'est ce qui fait douter de tous les autres
           (§11). Une carte, un mois, et chaque chiffre une seule fois. */}
-      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          {moisCourant.nom}
+      {/* (16 oct., passe « premium ») Une carte, quatre chiffres, une ligne de
+          calcul et la couverture en lignes courtes : tout ce qui empêche un total
+          partiel de se faire passer pour complet reste VISIBLE (§5). Ce qui
+          s'explique (le détail du calcul, les gestes pour dater les ventes, la
+          réserve « je ne suis pas comptable ») se replie dans « Comment c'est
+          calculé » au lieu de quatre pavés colorés de même poids. L'ambre ne
+          reste que là où il y a vraiment quelque chose à faire (§7). */}
+      {(() => {
+        const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
+        const nA = Number(e.nAilleurs)||0, caA = Number(e.caAilleurs)||0;
+        const ou = Object.keys(e.ailleurs||{}).sort().map(k=>{ const [y,m]=k.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }).join(', ');
+        const decl = (urssafInfo && urssafInfo.declare) || '';
+        // La couverture : de la MÊME ligne publiée que le total (§5) — les
+        // « dont » somment au total, et ce qui MANQUE est dit à côté.
+        const par = Object.entries(e.par||{}).filter(([,v])=>v && v.n>0);
+        const src = (urssafInfo && urssafInfo.sources) || {};
+        const pasSu = Object.entries(src).filter(([,v])=>v==='pasSu').map(([k])=>k);
+        const ad = urssafInfo && urssafInfo.aDater;
+        const adV = ad && ad.par && ad.par.Vinted;
+        const adL = ad && (ad.par ? ad.par.Leboncoin : (ad.n > 0 ? ad : null));
+        const morceaux = [];
+        const Puce = ({ children, warn }) => (
+          <div style={{display:'flex',gap:8,alignItems:'baseline',color:warn?C.warn:C.muted}}>
+            <span aria-hidden="true" style={{width:4,height:4,borderRadius:999,background:'currentColor',opacity:.55,flexShrink:0,transform:'translateY(-2px)'}}/>
+            <span style={{minWidth:0}}>{children}</span>
+          </div>
+        );
+        if (moisCourantCA!=null) {
+          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">dont {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
+          if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
+          if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Collective : pas encore relié</Puce>);
+        }
+        const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
+          <div style={{minWidth:0}}>
+            <div style={sLib}>{lib}</div>
+            <div className="vrm-display" style={{...sHero,fontSize:fort?'clamp(26px,7.6vw,32px)':'clamp(22px,6.2vw,26px)',letterSpacing:fort?-0.8:-0.5,marginTop:5,color:couleur||C.text}}>{val}</div>
+            {sous && <div style={{...sNote,fontSize:11.5,marginTop:3,...(sousStyle||{})}}>{sous}</div>}
+          </div>
+        );
+        return (
+      <div data-stats-carte="mois" style={{...sCarte,padding:'20px 20px 16px'}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'4px 12px',flexWrap:'wrap'}}>
+          <div style={{...sTitre,fontSize:17,textTransform:'capitalize'}}>{moisCourant.nom}</div>
+          <div style={{...sNote,fontSize:12}}>Ce que tu déclares à l'URSSAF</div>
         </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:22}}>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes finalisées</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:moisCourantN!=null?C.text:C.muted}}>{moisCourantN!=null?moisCourantN:'—'}</div>
-            {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
-                n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
-                doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
-            {moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN && (
-              <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>sur {liveStats.ventesMois} vendue{liveStats.ventesMois>1?'s':''} ce mois-ci</div>
-            )}
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
-            {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
-                raison en clair — il n'est pas développeur. */}
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)}</div>
-            {liveStats&&liveStats.caMois!=null&&<div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>saisis tes prix d'achat</div>}
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
-          </div>
+        <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'18px 16px',marginTop:16}}>
+          <Chiffre fort lib={`À payer (${String(tauxUrssaf()).replace('.',',')} %)`} val={urssafEstime==null?'—':fmt(urssafEstime)} couleur={urssafEstime==null?C.muted:C.text}/>
+          <Chiffre fort lib="Net après paiement" val={netApresUrssaf==null?'—':fmt(netApresUrssaf)} couleur={netApresUrssaf==null?C.muted:C.text}/>
+          {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
+              n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
+              doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
+          <Chiffre lib="Ventes finalisées" val={moisCourantN!=null?moisCourantN:'—'} couleur={moisCourantN!=null?C.text:C.muted}
+            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN ? `sur ${liveStats.ventesMois} vendue${liveStats.ventesMois>1?'s':''} ce mois-ci` : null}/>
+          {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
+              raison en clair — il n'est pas développeur. */}
+          <Chiffre lib="Bénéfice" val={liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)} couleur={C.muted}
+            sous={liveStats&&liveStats.caMois!=null ? <button type="button" onClick={versSaisiePrix} title="Ouvrir la saisie en série des prix d'achat" style={{border:'none',background:'transparent',padding:0,margin:0,font:'inherit',color:C.accent,fontWeight:600,cursor:'pointer',minHeight:0,textAlign:'left',display:'inline-flex',alignItems:'flex-start',justifyContent:'flex-start'}}>saisis tes prix d'achat →</button> : null}/>
         </div>
-        <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
-              DEPUIS JUILLET 2026, donc « (0,00 €) ». Le commentaire juste
-              au-dessus dit pourtant que le récap ne vient plus de là. Les
-              CHIFFRES avaient été rebranchés sur la ligne publiée, la phrase
-              qui les explique était restée en arrière : l'écran affichait
-              « 19,32 € à payer » et, dessous, « calculé sur 0,00 € ». Sur
-              l'écran où il décide ce qu'il verse à l'URSSAF, c'est le pire
-              endroit possible pour un chiffre invérifiable (§2.7). */}
-          {/* ⚠️ (revue du 6 octobre) « argent versé en octobre » sur un chiffre qui
-              EXCLUT une vente versée en octobre mais déjà déclarée en septembre
-              (registre « J'ai déclaré ce mois ») : la phrase le dit, des MÊMES
-              champs de la MÊME ligne publiée (`nAilleurs`, `caAilleurs`,
-              `ailleurs`) — et dit aussi quand le registre n'était pas encore lu
-              au moment du calcul (`declare: 'pasSu'`). */}
+        {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
+            DEPUIS JUILLET 2026, donc « (0,00 €) ». Les CHIFFRES avaient été
+            rebranchés sur la ligne publiée, la phrase qui les explique était
+            restée en arrière (§5). Elle cite le MÊME montant que celui qui
+            produit « à payer », et reste visible (le banc urssaf.cjs la lit).
+            ⚠️ (revue du 6 octobre) une vente versée ce mois-ci mais déjà
+            déclarée ailleurs est EXCLUE : la phrase le dit, des MÊMES champs de
+            la MÊME ligne publiée (`nAilleurs`, `caAilleurs`, `ailleurs`) — et
+            dit aussi quand le registre n'était pas encore lu (`declare`). */}
+        <div style={{...sNote,fontSize:12.5,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
           {moisCourantCA==null
             ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
-            : (() => {
-              const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-              const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
-              const nA = Number(e.nAilleurs)||0, caA = Number(e.caAilleurs)||0;
-              const ou = Object.keys(e.ailleurs||{}).sort().map(k=>{ const [y,m]=k.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }).join(', ');
-              const decl = (urssafInfo && urssafInfo.declare) || '';
-              return <span data-urssaf-declare={decl}>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises
-                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, <b>hors {nA} vente{nA>1?'s':''} ({fmt(caA)})</b> versée{nA>1?'s':''} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} — {nA>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici</span>}
-                . C'est la somme à verser à la fin du mois (versement libératoire).
+            : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
+                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
+                .
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
-              </span>;
-            })()}
+              </span>}
         </div>
-        {/* TOUTES PLATEFORMES (3 octobre) — les « dont » viennent de la MÊME
-            ligne publiée que le total : ils somment au total, ils ne peuvent
-            pas le contredire (§5). Et ce qui MANQUE est dit à côté : une source
-            pas lue, des ventes sans date, Vestiaire pas relié. */}
-        {moisCourantCA!=null && (() => {
-          const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-          const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
-          const par = Object.entries(e.par||{}).filter(([,v])=>v && v.n>0);
-          const src = (urssafInfo && urssafInfo.sources) || {};
-          const pasSu = Object.entries(src).filter(([,v])=>v==='pasSu').map(([k])=>k);
-          const ad = urssafInfo && urssafInfo.aDater;
-          const morceaux = [];
-          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<span key="d">dont {par.map(([k,v])=>`${k} ${fmt(v.ca)}`).join(' · ')}</span>);
-          if (pasSu.length) morceaux.push(<span key="p" style={{color:C.warn}}>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</span>);
-          const adV = ad && ad.par && ad.par.Vinted;
-          if (adV && adV.n > 0) morceaux.push(<span key="av" style={{color:C.warn}}>{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement ({fmt(adV.ca)}) : dans aucun mois pour l'instant — {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}</span>);
-          const adL = ad && (ad.par ? ad.par.Leboncoin : (ad.n > 0 ? ad : null));
-          if (adL && adL.n > 0) morceaux.push(<span key="a" style={{color:C.warn}}>{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date ({fmt(adL.ca)}) : dans aucun mois tant que leur date n'est pas captée — {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate}), puis ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}</span>);
-          if ((e.par||{}).Leboncoin) morceaux.push(<span key="lv">Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée)</span>);
-          if (src.Vestiaire === 'nonRelie') morceaux.push(<span key="v">Vestiaire Collective : pas encore relié</span>);
-          if (!morceaux.length) return null;
-          return <div data-urssaf-couverture style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.6,display:'flex',flexDirection:'column',gap:2}}>{morceaux}</div>;
-        })()}
-        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
-            L'app date chaque vente au jour où elle a été VENDUE — la date à
-            laquelle Vinted libère l'argent n'est pas connue pour toutes les
-            ventes, donc on ne peut pas l'utiliser sans exclure des lignes en
-            silence. L'écart est de quelques jours à quelques semaines : on le
-            DIT au lieu de laisser croire à un chiffre officiel. */}
-        <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
-        </div>
-        {/* Prochaine échéance de DÉCLARATION (rappel) */}
-        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
-            <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
+        {morceaux.length > 0 && <div data-urssaf-couverture style={{...sNote,marginTop:8,display:'flex',flexDirection:'column',gap:4}}>{morceaux}</div>}
+        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
+            comment elle date chaque vente — replié, pas retiré. */}
+        <details className="vrm-stats-calcul" style={{marginTop:10}}>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:500,color:C.muted,padding:'6px 0',listStyle:'revert'}}>Comment c'est calculé</summary>
+          <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
+            {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
+            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
+            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
+            <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</div>
+          </div>
+        </details>
+        {/* Prochaine échéance de DÉCLARATION (rappel) — un encart neutre ; la
+            couleur ne vient QUE si l'échéance presse (≤ 14 j) ou est passée. */}
+        <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+            <span style={{...sTitre,fontSize:13.5,flex:1}}>Prochaine déclaration</span>
+            <div style={{display:'flex',gap:2,background:C.card2||C.surface,borderRadius:10,padding:2}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
+                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
               ))}
             </div>
           </div>
           {urssafDue ? (()=>{
             const late=urssafDue.daysLeft<0, soon=urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
-            const col=late?C.danger:soon?C.warn:C.accent;
+            const col=late?C.danger:soon?C.warn:C.text;
             return (
-              <div style={{border:`1px solid ${col}55`,background:`${col}0e`,borderRadius:10,padding:'11px 13px'}}>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-                  <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
-                  <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
+              <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
+                <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:16,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
+                  <span style={{fontSize:12.5,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))}</b></div>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:7}}>
-                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:700,color:'#fff',background:C.accent,borderRadius:8,padding:'6px 12px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
-                  <span style={{fontSize:9,color:C.muted}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là-bas.</span>
+                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:12.5,color:C.muted}}>
+                  <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
+                  <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
+                  <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
+                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
+                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.</span>
                 </div>
               </div>
             );
-          })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
+          })() : <div style={{fontSize:12,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
-      </Card>
+      </div>
+        );
+      })()}
 
       {/* Barre de progression du garage */}
-      <Card style={{padding:18}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><Icon name="home" size={12}/>Remplissage du stock</span>
-          <span style={{fontSize:13,fontWeight:600,color:C.accent}}>{fillRate}%</span>
+      <div data-stats-carte="garage" style={sCarte}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
+          <span style={{...sTitre,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="home" size={14}/>Remplissage du stock</span>
+          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{fillRate}%</span>
         </div>
-        <div style={{height:10,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        <div style={{height:6,background:C.card2||C.surface,borderRadius:999,overflow:'hidden'}}>
           <div style={{
             height:'100%',
             width:`${fillRate}%`,
             background:C.accent,
-            borderRadius:8,
+            borderRadius:999,
             transition:'width 0.4s ease',
           }}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:11,color:C.muted}}>
-          <span><b style={{color:C.accent}}>{stockCount}</b> boîtes occupées</span>
-          <span><b style={{color:C.warn}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:12,color:C.muted}}>
+          <span><b style={{color:C.text,fontWeight:600}}>{stockCount}</b> boîtes occupées</span>
+          <span><b style={{color:C.text,fontWeight:600}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
         </div>
-      </Card>
+      </div>
 
       {/* Stats secondaires */}
-      <div>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Détails</div>
-        {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
-            Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
-            nb ventes finalisées). Le « × moyen » et le « bénéf. moyen »
-            dépendent des prix d'achat (non saisis) → n/d honnête plutôt qu'un 0
-            trompeur. */}
-        {(()=>{
-          const hv = liveStats && liveStats.soldTotal!=null;
-          // Ventes illisibles : un tiret, jamais la moyenne de l'archive vide (0 €).
-          const venteMoy = liveStats && liveStats.venduPasSu ? null : (hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale);
-          return (
-        <>
-        <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-          {/* ⚠️ PAS DE « n/d » : c'est du vocabulaire d'informaticien, et la
-              règle est écrite noir sur blanc dans le dossier de passation. Un
-              tiret dit « on ne sait pas » ; la raison juste dessous dit quoi
-              faire. Les cartes voisines le faisaient déjà — ces trois-là
-              étaient restées en arrière (vues en capture le 7 septembre). */}
-          <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted}/>
-          <StatCard icon="💵" label="Vente moyenne" value={venteMoy==null?'—':fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
-          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted}/>
-          {/* ⚠️ TRANCHÉ. Cette carte s'appelait « CA / jour actif » et comptait
-              les jours d'après `receiveDate`, la date d'ENCAISSEMENT — retirée
-              exprès de l'app (elle n'existait que pour une partie des ventes).
-              Elle affichait donc un tiret que RIEN ne pouvait jamais remplir :
-              ni une saisie, ni une synchro. Une carte qui ne peut pas exister
-              n'apprend rien.
-              La date de VENTE, elle, est connue pour toutes les ventes. On
-              affiche donc le CA moyen par JOUR OÙ IL A VENDU — `joursVente` est
-              publié par le même calcul que `caEncaisse` (§11), sur exactement
-              les mêmes ventes finalisées : numérateur et dénominateur parlent
-              des mêmes lignes. Tant que la moisson n'a rien publié, tiret. */}
-          <StatCard icon="📅" label="CA / jour de vente"
-            value={hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—'} color={C.muted}
-            sub={hv && liveStats.joursVente>0
-              ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu`
-              : 'en attente de la synchro Vinted'}/>
-        </div>
-        {hv && <LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen"/>}
-        </>
-          );
-        })()}
-      </div>
+      {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
+          Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
+          nb ventes finalisées). Le « × moyen » et le « bénéf. moyen »
+          dépendent des prix d'achat (non saisis) → un tiret honnête plutôt
+          qu'un 0 trompeur. (16 oct.) Une carte, une grille 2 × 2 régulière, au
+          lieu de quatre boîtes de largeurs différentes. */}
+      {(()=>{
+        const hv = liveStats && liveStats.soldTotal!=null;
+        // Ventes illisibles : un tiret, jamais la moyenne de l'archive vide (0 €).
+        const venteMoy = liveStats && liveStats.venduPasSu ? null : (hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale);
+        // ⚠️ PAS DE « n/d » : un tiret dit « on ne sait pas » ; la raison juste
+        // dessous dit quoi faire.
+        // ⚠️ TRANCHÉ. « CA / jour actif » comptait les jours d'après
+        // `receiveDate` (retirée de l'app) : un tiret que RIEN ne pouvait
+        // remplir. On affiche le CA moyen par JOUR OÙ IL A VENDU — `joursVente`
+        // est publié par le même calcul que `caEncaisse` (§11), sur exactement
+        // les mêmes ventes finalisées. Tant que la moisson n'a rien publié, tiret.
+        const cases = [
+          ['× moyen', hv?'—':`×${avgX}`, null, true],
+          ['Vente moyenne', venteMoy==null?'—':fmt(venteMoy), hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:null, false],
+          ['Bénéf. moyen / vente', hv?'—':fmt(avgProfit), null, true],
+          ['CA / jour de vente', hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—',
+            hv && liveStats.joursVente>0 ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu` : 'en attente de la synchro Vinted', false],
+        ];
+        return (
+          <div data-stats-carte="details" style={sCarte}>
+            <div style={{...sTitre,marginBottom:4}}>Détails</div>
+            <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
+              {cases.map(([l,v,sub,sourd])=>(
+                <div key={l} style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+                  <div style={sLib}>{l}</div>
+                  <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:(sourd||v==='—')?C.muted:C.text}}>{v}</div>
+                  {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+                </div>
+              ))}
+            </div>
+            {hv && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+          </div>
+        );
+      })()}
 
-      {/* Records */}
-      <div>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Records</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+      {/* Records — seulement s'il y en a (un titre sans rien dessous n'apprend rien). */}
+      {(bestDayCA||bestDayProfit) && <div data-stats-carte="records" style={sCarte}>
+        <div style={{...sTitre,marginBottom:4}}>Records</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
           {bestDayCA&&(
-            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🏆 Meilleur jour</div>
-              <div style={{fontSize:20,fontWeight:600,color:C.warn}}>{fmt(bestDayCA[1].ca)}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
-            </Card>
+            <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={sLib}>Meilleur jour</div>
+              <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayCA[1].ca)}</div>
+              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
+            </div>
           )}
           {bestDayProfit&&(
-            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🚀 Meilleur jour bénéfice</div>
-              <div style={{fontSize:20,fontWeight:600,color:C.accent}}>{fmt(bestDayProfit[1].profit)}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayProfit[0]}</div>
-            </Card>
+            <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={sLib}>Meilleur jour bénéfice</div>
+              <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
+              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayProfit[0]}</div>
+            </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── ÉVOLUTION MENSUELLE, SUR LES VRAIES DONNÉES (moisson) ──────────
           §11 : même source que le CA total. Une seule teinte d'accent (§7),

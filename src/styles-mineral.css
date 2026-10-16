@@ -588,3 +588,17 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 :root[data-theme="light"] .vrm-sidebar-link[aria-current="page"] {
   background:rgba(255,255,255,.10); color:#FFFFFF;
 }
+
+/* ── Statistiques « premium » (16 oct.) ──────────────────────────────────────
+   Le filet vertical parasite venait de l'ombre « -1px » de StatBox compact,
+   que `border:0` ne retirait pas : on l'éteint dans les cellules de chiffres.
+   Les mois du graphique : abrégés en entier, une seule lettre sur téléphone.
+   La carte du mois : 2 colonnes au doigt, 4 sur grand écran. */
+.vrm-finance-metric > * { box-shadow:none !important; }
+.vrm-mois-court { display:none; }
+@media(max-width:560px) { .vrm-mois-long { display:none; } .vrm-mois-court { display:inline; } }
+@media(min-width:900px) { .vrm-mois-grille { grid-template-columns:repeat(4,minmax(0,1fr)) !important; } }
+.vrm-stats-calcul > summary::marker { color:var(--vrm-muted); }
+.vrm-stats-volets > details > summary { padding:12px 0 !important; font-size:12.5px; color:var(--vrm-muted); cursor:pointer; }
+.vrm-stats-volets > details > p { margin:0 0 10px; font-size:12px; line-height:1.5; }
+.vrm-stats-volets .vrm-finance-stock-grid { margin:0 0 14px; }
