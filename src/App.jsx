@@ -1,3 +1,4 @@
+import {resumerStockJournee} from './stockJournee.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -19,6 +20,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
+import { installerLecturesPartagees } from "./lecturesPartagees.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -54,7 +56,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.182.0';
+const EXT_ATTENDUE = '5.183.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -314,7 +316,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -443,7 +445,7 @@ const THEMES = {
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
 // La palette de src/themeMineral.js est appliquée VERBATIM au thème clair :
-// fond clair FROID, encre, un bleu de marque, barre latérale bleu nuit (via le
+// fond clair légèrement crème, encre, un bleu de marque, barre latérale bleu nuit (via le
 // jeton `chrome`). Elle REMPLACE la direction « Minéral » pierre du 13 octobre,
 // que Julien a refusée. Mêmes hex que la page d'accueil (identité commune).
 // Toute clé non couverte garde sa valeur d'avant ; le thème SOMBRE n'est pas
@@ -462,6 +464,10 @@ const INIT_SAL = [];
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
+// Une lecture identique de notre base ne part qu'une fois (16 oct., mesuré :
+// 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans
+// `src/lecturesPartagees.js` (un échec n'est jamais gardé, une écriture vide tout).
+installerLecturesPartagees(SUPABASE_URL);
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -1963,15 +1969,15 @@ function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
-const lireSupprimees = (uid) => cachedRow(`s:${uid}`, async () => {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return null;
-    const ids = rows[0] && rows[0].ids;
-    return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
-  } catch (_) { return null; }
+// (16 oct., « app plus rapide ») Lue dans la lecture de TOUS les comptes
+// (`lireSupprimeesTous`, une ligne par compte, famille bornée) : chaque écran qui
+// lit les dressings faisait UNE lecture par compte, à la suite de celle des
+// lectures publiques (7 allers-retours pour 7 comptes, mesuré au banc
+// `vitesse.cjs`). Mêmes trois états, même forme : `ids` · `{}` · `null`.
+const lireSupprimees = (uid) => lireSupprimeesTous().then((m) => {
+  if (m === null) return null;
+  const ids = m.get(String(uid));
+  return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
 });
 // Toutes les lignes (une par compte : famille bornée) → Map uid → ids, ou `null`.
 const lireSupprimeesTous = () => cachedRow('s:*', async () => {
@@ -3599,12 +3605,20 @@ const fetchCapturedLabelMetas = async (uid) => {
 // ⚠️ On lit ici DEUX SCALAIRES par transaction, jamais le payload (§34) :
 // la transaction et l'identifiant d'annonce que Vinted lui rattache — l'identité
 // certaine sur laquelle repose tout le reste (§5.34).
+// ⚠️ UNE SEULE LECTURE POUR LES DEUX (16 oct., mesuré au banc `vitesse.cjs`) :
+// le pont transaction → annonce et les dates de versement balayaient CHACUN
+// toute la famille `harvest_*_txn_*` (~1 200 lignes, deux pages), avec deux
+// projections différentes — trois à quatre balayages par écran ouvert, la
+// requête la plus coûteuse de la base (`pg_stat_statements`). Même adresse ⇒
+// `lecturesPartagees` n'en fait partir qu'un. Chaque fonction garde SA règle
+// (« pas su » : `{}` pour l'un, `null` pour l'autre), rien d'autre ne change.
+const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at';
 const fetchTxnItemIds = async () => {
   try {
     // `meta` : la base y range les petits champs à chaque écriture — lire la
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id');
+    const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return {};
     const map = {};
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
@@ -3623,7 +3637,7 @@ const fetchTxnItemIds = async () => {
 // lignes et Supabase coupe à 1 000 sans le dire (§4.5).
 const fetchVersementsVinted = async () => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at');
+    const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return null;
     const map = {};
     for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
@@ -4969,7 +4983,11 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   });
 }
 
-function vmrExec(q, timeoutMs = 15000) { return sondageConnu().then(() => vmrExecUn(q, timeoutMs)); }
+// 5.183 : un GESTE (jamais une lecture) part par le relais sur le téléphone.
+function vmrExec(q, timeoutMs = 15000) {
+  if (q && String(q.method || 'POST').toUpperCase() !== 'GET' && relaisVivant()) return relaisExec(q);
+  return sondageConnu().then(() => vmrExecUn(q, timeoutMs));
+}
 function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -5110,7 +5128,245 @@ function vmrDemandeUn(type, payload, timeoutMs) {
 //    muette. L'extension 5.160 répond sans réseau ; on laisse quand même le
 //    temps aux versions déjà installées.
 const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
-const vmrCmd = (p, timeoutMs = 9000) => vmrDemande('cmd', p, timeoutMs);
+// 5.183 : sur le téléphone, une commande permise part par le RELAIS (l'extension
+// de l'ordinateur l'exécute) ; ailleurs, par le pont, comme avant.
+const vmrCmd = (p, timeoutMs = 9000) => (p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RELAIS DU TÉLÉPHONE (extension 5.183) — « quand je suis sur mon téléphone
+// et que l'extension est allumée sur mon ordinateur, je veux pouvoir faire des
+// actions » (Julien, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Sur le téléphone il n'y a pas d'extension. Le téléphone DÉPOSE la commande
+// dans sa base (une ligne `cmd_relais_{id}` à lui, RLS) ; l'extension du Chrome
+// de l'ordinateur la prend, l'exécute avec EXACTEMENT les gardes d'un clic sur
+// l'ordinateur (compte du cookie = compte visé, 20 actions/heure, une requête
+// Vinted à la fois, pause quand Vinted freine) et écrit le résultat dans la
+// même ligne. Le téléphone suit la ligne : « envoyé à ton ordinateur… »,
+// « en cours… », puis le résultat — JAMAIS « fait » avant que l'extension
+// l'ait écrit.
+// Le relais existe si l'extension a déposé un signe de vie (`relais_ext`) il y a
+// moins de 3 min, dans une version qui sait relayer. Trois états, jamais deux :
+// vivant · éteint (« pas de signe de vie depuis X ») · pas su (lecture ratée).
+// Uniquement sans souris (téléphone, tablette) et sans extension ici : sur un
+// ordinateur, c'est le pont qui parle, rien ne change.
+const RELAIS_VIVANT_MS = 3 * 60000;
+const RELAIS_EXPIRE_MS = 10 * 60000;
+const RELAIS_CMDS = ['bordereau', 'lbcPublier'];
+// Les durées, réglables par un banc seulement (il ne peut pas attendre 2 min).
+const tempsRelais = () => Object.assign({ prise: 120000, pas: 2500, suivi: 3000, lecture: 30000, pris: 6 * 60000 },
+  (typeof window !== 'undefined' && window.__VRM_RELAIS_TEMPS) || {});
+const lireSansSouris = () => {
+  try { return window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(hover: none)').matches; } catch (_) { return false; }
+};
+// `undefined` pas encore lu · `null` lecture ratée (pas su) · `{absent:true}`
+// aucun signe de vie jamais · objet = le dernier signe de vie.
+let __relais = undefined, __relaisEnVol = null, __relaisMinuteur = null;
+const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user);
+async function lireRelais() {
+  if (__relaisEnVol) return __relaisEnVol;
+  __relaisEnVol = (async () => {
+    let v = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua`, { headers: sbAuth(), cache: 'no-store' });
+      if (r.ok) {
+        const rows = await r.json();
+        if (Array.isArray(rows)) v = rows[0] ? { atMs: Number(rows[0].atMs) || 0, ver: String(rows[0].ver || ''), code: String(rows[0].code || ''),
+          vUid: String(rows[0].vUid || ''), vLogin: String(rows[0].vLogin || ''), pauseJusqua: Number(rows[0].pauseJusqua) || 0 } : { absent: true };
+      }
+    } catch (_) { v = null; }
+    __relais = v;
+    __vmrNotifier();
+    return v;
+  })().finally(() => { __relaisEnVol = null; });
+  return __relaisEnVol;
+}
+function demarrerRelais() {
+  if (typeof window === 'undefined' || __relaisMinuteur || !lireSansSouris()) return;
+  const tour = () => { if (typeof document !== 'undefined' && document.hidden) return; if (relaisUtile()) lireRelais(); };
+  __relaisMinuteur = setInterval(tour, tempsRelais().lecture);
+  try { document.addEventListener('visibilitychange', tour); } catch (_) {}
+  tour();
+  // La session peut arriver après le premier rendu : on relit dès qu'elle est là.
+  setTimeout(tour, 1500);
+}
+const dureeRelais = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${Math.max(1, m)} min` : m < 48 * 60 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} j`; };
+function etatRelais() {
+  if (!relaisUtile()) return { niveau: 'hors' };
+  const r = __relais;
+  if (r === undefined) return { niveau: 'verif' };
+  if (r === null) return { niveau: 'passu' };
+  if (r.absent) return { niveau: 'absent' };
+  if (!r.atMs) return { niveau: 'passu' };
+  const age = Date.now() - r.atMs;
+  if (!(age < RELAIS_VIVANT_MS)) return { niveau: 'perime', age };
+  if (!/^\d+\.\d+\.\d+$/.test(r.ver) || cmpVersion(r.ver, EXT_CAPACITES.relais) < 0) return { niveau: 'retard', ver: r.ver };
+  return { niveau: 'vivant', age, at: r.atMs, ver: r.ver, vinted: r.vUid ? { uid: r.vUid, login: r.vLogin } : null, pauseMs: Math.max(0, r.pauseJusqua - Date.now()) };
+}
+const relaisVivant = () => etatRelais().niveau === 'vivant';
+// Le compte Vinted au nom duquel une action PARTIRAIT d'ici : celui du cookie
+// de ce Chrome (le pont), ou — par le relais — celui du Chrome de l'ordinateur.
+function vintedAgissant() {
+  const rl = etatRelais();
+  if (rl.niveau === 'vivant') return rl.vinted;
+  return vintedDeChrome();
+}
+// L'état « comme si l'extension était ici » pour les boutons qui lisent le
+// compte ouvert (`etat.vinted`) : sur le relais, celui de l'ordinateur.
+function etatAgissant() {
+  const rl = etatRelais();
+  if (rl.niveau === 'vivant') return { ok: true, relais: true, vinted: rl.vinted, cmds: {} };
+  return __vmrEtat;
+}
+const viaOrdinateur = (v) => `via ton ordinateur (compte Vinted ouvert : ${(v && (v.login || ('compte ' + v.uid))) || 'aucun'})`;
+const nouvelIdRelais = () => 'cmd_relais_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+const dormirRelais = (ms) => new Promise((r) => setTimeout(r, ms));
+// Dépose la commande. `null` ⇒ la base n'a pas pris la ligne : rien n'est parti.
+async function relaisEnvoyer(cmd, args, extra) {
+  if (!(AUTH.user && AUTH.user.id)) return null;
+  const id = nouvelIdRelais(), t = Date.now();
+  const data = Object.assign({ cmd, args, pour: String(AUTH.user.id), demandeLe: t, expire: t + RELAIS_EXPIRE_MS, etat: 'attente', par: 'telephone' }, extra || {});
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id, data })]) });
+    if (!r.ok) return null;
+  } catch (_) { return null; }
+  return { id, data };
+}
+// La ligne de la commande, en deux scalaires (§4.4). `null` = pas su.
+async function relaisLire(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=etat:meta->>etat,resultat:data->resultat`, { headers: sbAuth(), cache: 'no-store' }); // suivi d'une commande : jamais la lecture partagée (2 s de retard)
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    return rows[0] ? { etat: String(rows[0].etat || ''), resultat: rows[0].resultat && typeof rows[0].resultat === 'object' ? rows[0].resultat : {} } : { absente: true };
+  } catch (_) { return null; }
+}
+// Annule une commande pas encore prise — sous condition : si l'extension l'a
+// prise entre-temps, rien n'est touché (`false`). `null` = pas su.
+async function relaisAnnuler(id, data) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&meta->>etat=eq.attente&select=id`, {
+      method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data: Object.assign({}, data, { etat: 'annulee', annuleLe: Date.now() }), updated_at: new Date().toISOString() }) });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows.length > 0 : null;
+  } catch (_) { return null; }
+}
+// Attend la prise puis le résultat. `suivi(etat)` à chaque lecture.
+async function relaisAttendre(id, data, suivi) {
+  const T = tempsRelais(), t0 = Date.now();
+  let prisA = 0;
+  for (;;) {
+    await dormirRelais(T.pas);
+    const r = await relaisLire(id);
+    if (r === null || r.absente) {
+      if (Date.now() - t0 > T.prise + T.pris) return { inconnu: true, pris: !!prisA };
+      continue;
+    }
+    if (suivi) { try { suivi(r.etat, r.resultat); } catch (_) {} }
+    if (r.etat === 'attente') {
+      if (Date.now() - t0 > T.prise) {
+        const a = await relaisAnnuler(id, data);
+        if (a === true) return { pasPris: true };
+      }
+      continue;
+    }
+    if (r.etat === 'pris') { if (!prisA) prisA = Date.now(); if (Date.now() - prisA > T.pris) return { inconnu: true, pris: true }; continue; }
+    return { etat: r.etat, resultat: r.resultat || {} };
+  }
+}
+const RAISON_PAS_PRIS = "Ton ordinateur n'a pas pris la commande en 2 min — je l'ai annulée, rien n'est parti. Vérifie que Chrome y est ouvert, puis réessaie.";
+const RAISON_INCERTAIN = "Ton ordinateur a pris la commande mais n'a pas encore répondu — je ne sais pas si elle est partie : regarde avant de relancer.";
+// Un bordereau accepté avance sur l'ordinateur : la ligne de la commande le
+// dit, le téléphone la relit jusqu'au bout.
+async function relaisSuivreJobTel(id, jobId) {
+  const T = tempsRelais(), t0 = Date.now();
+  while (Date.now() - t0 < 10 * 60000) {
+    await dormirRelais(T.suivi);
+    const r = await relaisLire(id);
+    if (!r || r.absente) continue;
+    const res = r.resultat || {};
+    const fini = r.etat !== 'en-cours' && r.etat !== 'pris';
+    if (res.etape) { __vmrJobs[jobId] = Object.assign({ etape: res.etape, at: Date.now(), vivant: !fini, raison: res.raison || null, relais: id }, res.progres ? { progres: res.progres } : {}); __vmrNotifier(); }
+    if (fini) return;
+  }
+}
+async function relaisCmd(p) {
+  const cmd = String(p.cmd);
+  const args = cmd === 'bordereau' ? { uid: String(p.uid || ''), tx: String(p.tx || '') }
+    : Object.assign({ id: String(p.id || '') }, p.confirme === true ? { confirme: true } : {}, p.annonce !== undefined ? { annonce: p.annonce } : {});
+  const jobId = cmd === 'bordereau' ? `bord:${args.uid}:${args.tx}` : `lbc:${args.id}`;
+  const env = await relaisEnvoyer(cmd, args);
+  if (!env) return { accepte: false, code: 'relais-base', relais: true, raison: "La base n'a pas répondu — rien n'est parti vers ton ordinateur. Réessaie dans un instant." };
+  const avant = __vmrJobs[jobId];
+  __vmrJobs[jobId] = { etape: 'relais-attente', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier();
+  const fin = await relaisAttendre(env.id, env.data, (e) => {
+    if (e === 'pris' && __vmrJobs[jobId] && __vmrJobs[jobId].etape === 'relais-attente') { __vmrJobs[jobId] = { etape: 'relais-pris', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier(); }
+  });
+  const rendre = () => { if (avant) __vmrJobs[jobId] = avant; else delete __vmrJobs[jobId]; __vmrNotifier(); };
+  if (fin.pasPris) { rendre(); return { accepte: false, code: 'relais-pas-pris', relais: true, raison: RAISON_PAS_PRIS }; }
+  if (fin.inconnu) { __vmrJobs[jobId] = { etape: 'relais-inconnu', at: Date.now(), raison: RAISON_INCERTAIN }; __vmrNotifier(); return { accepte: false, code: 'relais-incertain', relais: true, raison: RAISON_INCERTAIN }; }
+  const res = fin.resultat || {};
+  if (fin.etat !== 'en-cours' && fin.etat !== 'fait') {
+    rendre();
+    return { accepte: false, code: res.code || fin.etat, relais: true, actifLogin: res.actifLogin || '',
+      raison: res.raison || (fin.etat === 'expiree' ? 'Commande trop ancienne — rien n\'est parti.' : 'Refusé par ton ordinateur.') };
+  }
+  const jid = res.jobId || jobId;
+  const etape = res.etape || (fin.etat === 'fait' ? 'fait' : 'file');
+  if (jid !== jobId) rendre();
+  __vmrJobs[jid] = { etape, at: Date.now(), vivant: fin.etat === 'en-cours', relais: env.id }; __vmrNotifier();
+  if (fin.etat === 'en-cours') relaisSuivreJobTel(env.id, jid);
+  return { accepte: true, jobId: jid, etape, vivant: fin.etat === 'en-cours', relais: true };
+}
+async function relaisExec(q) {
+  const cle = 'exec:' + String(q.endpoint || '');
+  const env = await relaisEnvoyer('exec', { uid: String(q.uid || ''), method: String(q.method || 'POST').toUpperCase(), endpoint: String(q.endpoint || ''), body: q.body == null ? null : q.body },
+    q.confirme === true ? { confirme: true } : null);
+  if (!env) return { ok: false, code: 'relais-base', relais: true, error: "La base n'a pas répondu — rien n'est parti vers ton ordinateur. Réessaie dans un instant." };
+  __vmrJobs[cle] = { etape: 'relais-attente', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier();
+  const fin = await relaisAttendre(env.id, env.data, (e) => {
+    if (e === 'pris' && __vmrJobs[cle]) { __vmrJobs[cle] = { etape: 'relais-pris', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier(); }
+  });
+  delete __vmrJobs[cle]; __vmrNotifier();
+  if (fin.pasPris) return { ok: false, code: 'relais-pas-pris', relais: true, error: RAISON_PAS_PRIS };
+  if (fin.inconnu) return { ok: false, code: 'relais-incertain', relais: true, incertain: true, error: RAISON_INCERTAIN };
+  const res = fin.resultat || {};
+  if (fin.etat === 'fait' && res.ok) return { ok: true, status: res.status || 200, relais: true };
+  return { ok: false, code: res.code || fin.etat, relais: true, status: res.status || 0, error: res.raison || 'Refusé par ton ordinateur.' };
+}
+// La ligne d'avancement d'un geste relayé (messagerie : une conversation à la
+// fois, donc une seule demande en vol).
+function etapeRelaisExec() {
+  for (const k of Object.keys(__vmrJobs)) if (/^exec:/.test(k) && __vmrJobs[k] && /^relais-/.test(__vmrJobs[k].etape)) return __vmrJobs[k].etape;
+  return null;
+}
+const libelleRelais = (etape) => etape === 'relais-attente' ? 'Envoyé à ton ordinateur…' : etape === 'relais-pris' ? 'En cours sur ton ordinateur…' : '';
+// L'avancement d'un geste de la messagerie passé par le relais (abonné aux
+// évènements : la ligne change sans attendre un autre rendu de l'écran).
+function EtatRelaisConv({ vinted }) {
+  useExtVivante();
+  const et = etapeRelaisExec();
+  return <div data-conv-relais={et || 'pret'} role="status" style={{ fontSize: 11.5, color: et ? C.text : C.muted, marginBottom: 6, lineHeight: 1.35 }}>{et ? libelleRelais(et) : `Répondre et les offres partent ${viaOrdinateur(vinted)}.`}</div>;
+}
+// UNE phrase, au-dessus d'une liste de boutons qui passent par l'ordinateur
+// (§7 : elle n'est pas redite sous chaque bouton ; le bouton la porte en titre).
+function LigneRelais({ quoi }) {
+  useExtVivante();
+  const rl = etatRelais();
+  if (rl.niveau !== 'vivant') return null;
+  return (
+    <div data-relais-info={rl.vinted ? rl.vinted.uid : ''} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+      border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: C.accent, flexShrink: 0, marginTop: 5 }}/>
+      <span style={{ minWidth: 0 }}><b>{quoi} {viaOrdinateur(rl.vinted)}</b>{rl.vinted ? '' : ' — ouvre vinted.fr dans le Chrome de ton ordinateur pour agir.'}</span>
+    </div>
+  );
+}
 let __vmrBattementEnVol = false, __vmrRelance = null;
 // ⚠️ Un pont plus ancien que la 5.129 ne sait pas répondre à « état » : le
 //    questionner le faisait passer pour MUET au bout de 15 s, et l'app disait
@@ -5770,7 +6026,21 @@ const compteEffectif = (sel, connecte, estChoisissable) => {
 function raisonExtGlobale(sansSouris, opt) {
   const cap = (opt && opt.cap) || 'commande';
   const role = (opt && opt.role) || 'génère les bordereaux';
-  if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+  if (sansSouris) {
+    // 5.183 : le RELAIS — l'extension de l'ordinateur agit pour le téléphone.
+    // Trois états, jamais deux : vivant · éteint · pas su.
+    const rl = etatRelais();
+    if (rl.niveau === 'vivant') {
+      if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
+      if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
+      return null;
+    }
+    if (rl.niveau === 'verif') return { code: 'verif', relais: 'verif', texte: "Je regarde si ton ordinateur peut agir pour toi…" };
+    if (rl.niveau === 'perime') return { code: 'telephone', relais: 'perime', texte: `Ton ordinateur n'a pas donné signe de vie depuis ${dureeRelais(rl.age)} — ouvre Chrome sur l'ordinateur où l'extension VRM est installée : c'est elle qui ${role}, et tu pourras le faire d'ici.` };
+    if (rl.niveau === 'retard') return { code: 'telephone', relais: 'retard', texte: `L'extension de ton ordinateur (${rl.ver || 'version ?'}) ne sait pas encore agir pour ton téléphone : mets-la à jour (${EXT_ATTENDUE}) sur l'ordinateur.` };
+    if (rl.niveau === 'passu') return { code: 'telephone', relais: 'passu', texte: `Je n'ai pas pu savoir si ton ordinateur est allumé (la base n'a pas répondu) — c'est l'extension de ton ordinateur qui ${role}.` };
+    return { code: 'telephone', relais: rl.niveau, texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+  }
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
@@ -9330,47 +9600,22 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 236;
+const NAV_LARGEUR = 160;
 
-// Barre latérale : TOUS les écrans visibles d'un coup, pas quatre plus un
-// « Plus ». Sur un grand écran, cacher la moitié de la navigation derrière un
-// bouton n'a aucune raison d'être — c'est une contrainte de téléphone.
-// Les commandes du quotidien sont visibles ; les outils occasionnels restent
-// accessibles dans des groupes repliables, sans remplir le rail de 16 entrées.
+// Navigation compacte par plateforme. Les outils partagés restent dans le
+// panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab }) {
-  const bouton = (t) => (
-    <button key={t.id} type="button" className="vrm-sidebar-link" onClick={() => setTab(t.id)} aria-current={tab===t.id?'page':undefined}
-      style={{color:tab===t.id?C.onChrome:C.chromeMuted}}>
-      <NavigationIcon item={t} size={19}/><span>{t.label}</span>
-      {t.bientot && <span data-bientot="" style={{marginLeft:'auto',fontSize:10,fontWeight:600,letterSpacing:.2,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted,whiteSpace:'nowrap'}}>Bientôt</span>}
-    </button>
-  );
-  return (
-    <nav className="vrm-sidebar" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-      <div className="vrm-sidebar-brand"><VrmWord height={26} color={C.onChrome} accent={C.onChrome}/></div>
-      <div className="vrm-sidebar-group">
-        <div className="vrm-sidebar-label">Plateformes</div>
-        {BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(bouton)}
-      </div>
-      <details className="vrm-sidebar-group" open={tab==='plat_vestiaire'||undefined}>
-        <summary className="vrm-sidebar-label">Autres plateformes</summary>
-        {BOTTOM_TABS.filter(t=>t.id==='plat_vestiaire').map(bouton)}
-      </details>
-      <div className="vrm-sidebar-group">
-        <div className="vrm-sidebar-label">Gestion</div>
-        {NAV_GESTION.map(bouton)}
-      </div>
-      {[{titre:'Détails Vinted',items:VINTED_TABS},{titre:'Autres outils',items:NAV_OUTILS}].map(g => (
-        <details className="vrm-sidebar-group" key={g.titre} open={g.items.some(t=>t.id===tab)}>
-          <summary className="vrm-sidebar-label">{g.titre}</summary>
-          {g.items.map(bouton)}
-        </details>
-      ))}
-      <button type="button" className="vrm-sidebar-link vrm-sidebar-settings" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}>
-        <Icon name="gear" size={19}/><span>Réglages</span>
-      </button>
-    </nav>
-  );
+  const outils = [...NAV_GESTION, ...NAV_OUTILS];
+  const actif = BAR_GROUPE[tab] || tab;
+  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/></div>
+    <div className="vrm-rail-scroll">
+      <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
+      <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
+    </div>
+    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button></div>
+  </nav>;
 }
 
 // ── MENU DES ÉCRANS, EN HAUT À GAUCHE (téléphone) ──────────────────────────
@@ -10313,9 +10558,10 @@ function useEtapePont() {
 function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => onVmrExt(force), []);
-  return { present: vmrExtPresent(), etat: __vmrEtat, jobs: __vmrJobs };
+  React.useEffect(() => { demarrerRelais(); }, []);
+  return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
 }
-const CMD_ACTIVE = ['file', 'generation', 'pdf'];
+const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
 // (`vivant`, depuis la version qui le dit) ; sinon, comme avant, 3 minutes après
 // son dernier évènement. ⚠️ L'âge seul ne suffisait pas (revue du 9 octobre) :
@@ -10336,6 +10582,7 @@ function RaisonBordereauxGrises({ ventes }) {
   // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
   // ne la répète pas (§7, `useVoixExt`).
   useVoixExt(montre && aideOuverte ? r.code : null);
+  if (n && !r && relaisVivant()) return <LigneRelais quoi={`${n} bordereau${n > 1 ? 'x' : ''} à générer :`}/>;
   if (!montre) return null;
   return (
     <details className="vrm-label-help" onToggle={ev=>setAideOuverte(ev.currentTarget.open)}><summary>Bordereaux et impression</summary><div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
@@ -10383,11 +10630,12 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const glob = raisonExtGlobale(sansSouris);
   let raison = glob ? glob.texte : null, distingue = null;
   if (!raison && etat) {
-    if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`; distingue = raison; }
-    else if (String(etat.vinted.uid) !== String(uid)) { raison = `Chrome est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`; distingue = raison; }
+    const ou = etat.relais ? 'dans le Chrome de ton ordinateur' : 'dans ce Chrome';
+    if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} ${ou}.`; distingue = raison; }
+    else if (String(etat.vinted.uid) !== String(uid)) { raison = `${etat.relais ? 'Le Chrome de ton ordinateur' : 'Chrome'} est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr${etat.relais ? ', sur l’ordinateur' : ''}.`; distingue = raison; }
   }
   const enCours = jobEnCours(job);
-  const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf');
+  const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf' || job.etape === 'relais-inconnu');
   const lancer = async () => {
     if (raison || enCours || envoi) return;
     setRefus(null); setEnvoi(true);
@@ -10410,7 +10658,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   // Un évènement de ce colis arrivé APRÈS le refus affiché le rend caduc : la
   // ligne dit ce que l'extension fait vraiment.
   const refusVu = refus && !(job && Number(job.at || 0) >= refusAt - 1000) ? refus : null;
-  const libelle = envoi ? 'Envoi…'
+  const relaisLib = job ? libelleRelais(job.etape) : '';
+  const libelle = relaisLib ? relaisLib
+    : envoi ? 'Envoi…'
     : enCours ? (job.etape === 'pdf' ? 'Récupération du PDF…' : job.etape === 'generation' ? 'Génération chez Vinted…' : 'En file…')
     : ko ? 'Réessayer'
     // Sur téléphone le bouton est forcément grisé (l'extension tourne sur
@@ -10423,9 +10673,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
   const repliVinted = !sansRepli && ((grise && glob && glob.code !== 'verif') || !!refusVu);
   return (
-    <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+    <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-relais={etat && etat.relais ? (job && /^relais-/.test(job.etape) ? job.etape : 'oui') : undefined} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
-        title={raison || (enCours ? "L'extension travaille sur Vinted" : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
+        title={raison || (enCours ? "L'extension travaille sur Vinted" : etat && etat.relais ? `Générer le bordereau ${viaOrdinateur(etat.vinted)}` : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
         style={{ ...base, border: `1px solid ${grise ? C.border : C.accent}`, background: grise ? 'transparent' : `${C.accent}14`,
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
         <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
@@ -10611,7 +10861,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
   const lbc = place === 'lbc';
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   const job = jobs[jobId] || null;
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+  const glob = raisonExtGlobale(sansSouris, { cap: lbc ? 'publication' : 'publication-ebay', role: 'publie tes annonces' })
     || (croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
@@ -10651,7 +10901,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
     __vmrNotifier();
   };
-  const libelle = envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
+  const libelle = job && libelleRelais(job.etape) ? libelleRelais(job.etape) : envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
     : abandonne ? 'Réessayer'
     : (lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay');
@@ -10734,7 +10984,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
   const errDe = (champ) => (!v.ok && v.erreurs.find((e) => e.champ === champ)) || null;
   const corrigee = titre !== defauts.title || desc !== defauts.description || prix !== defauts.price || etat !== defauts.etat
     || photos.length !== defauts.photos.length || photos.some((u, i) => u !== defauts.photos[i]);
-  const saitFiche = extSait('lbcfiche');
+  // 5.183 : par le relais, c'est l'extension de l'ORDINATEUR qui reçoit la fiche (≥ 5.183 ⇒ elle la sait).
+  const saitFiche = relaisVivant() ? 'ok' : extSait('lbcfiche');
   const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
     || (q.croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
   const fait = !!(job && job.etape === 'fait');
@@ -10943,8 +11194,9 @@ function LbcCroitVendue({ n }) {
 function RaisonPublication({ n, place }) {
   const sansSouris = useSansSouris();
   useExtVivante();
-  const r = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  const r = raisonExtGlobale(sansSouris, { cap: place === 'lbc' ? 'publication' : 'publication-ebay', role: 'publie tes annonces' });
   useVoixExt(r && n ? r.code : null);
+  if (!r && n && place === 'lbc' && relaisVivant()) return <LigneRelais quoi="Publier sur Leboncoin :"/>;
   if (!r || !n) return null;
   return (
     <div data-raison-publier={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
@@ -10983,7 +11235,9 @@ function etatActionsExt(sansSouris) {
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
   if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
-  const vinted = vintedDeChrome() || null;
+  const relais = etatRelais().niveau === 'vivant';
+  const vinted = vintedAgissant() || null;
+  if (relais && !vinted) return { niveau: 'lecture', relais, glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans le Chrome de ton ordinateur — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
   // ⚠️ « Publier sur Leboncoin reste possible » ne se dit que si l'extension
   //    installée sait publier depuis l'app (revue du 9 octobre) : avec une 5.143,
   //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
@@ -10995,7 +11249,7 @@ function etatActionsExt(sansSouris) {
   //    reste marche, la pastille DIT l'exception, avec la même raison que le
   //    bouton (une seule règle, `raisonExtGlobale`, §11).
   const pub = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
-  return { niveau: 'ok', glob: null, vinted, exception: pub && pub.code !== 'verif' ? pub : null };
+  return { niveau: 'ok', glob: null, vinted, relais, exception: pub && pub.code !== 'verif' ? pub : null };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
 // inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
@@ -11052,7 +11306,8 @@ function EtatActions({ onNav, ordi, sombre }) {
   // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
-  const libelle = st.niveau === 'ok' ? (st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const rl = etatRelais();
+  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
@@ -11060,7 +11315,11 @@ function EtatActions({ onNav, ordi, sombre }) {
   const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs', 'perime'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
-  const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+  const ligneExt = st.relais ? { s: 'oui', t: `sur ton ordinateur${rl.ver ? ' · ' + rl.ver : ''} · signe de vie ${ilYaCourt(rl.at || Date.now())}` }
+    : code === 'telephone' && rl.niveau === 'perime' ? { s: 'non', t: `sur ton ordinateur — pas de signe de vie depuis ${dureeRelais(rl.age)}` }
+    : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
+    : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
+    : code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
@@ -11071,7 +11330,8 @@ function EtatActions({ onNav, ordi, sombre }) {
     : code === 'perime' ? { s: 'non', t: `elle annonce la ${version || '?'} mais tourne encore sur son ancien code${(codePerime() || {}).code ? ' (' + codePerime().code + ')' : ''}` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
-  const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
+  const ligneVrm = st.relais ? { s: 'oui', t: 'ton compte (c’est sous lui qu’elle donne signe de vie)' }
+    : ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
     : extKo || st.niveau === 'verif' ? { s: '—', t: '' }
     : code === 'vrm' ? { s: 'non', t: __sessExtEnVol ? 'je lui transmets ta connexion…' : 'pas connectée' }
     : code === 'autre-vrm' ? { s: 'non', t: `connectée à ${sonMail || 'un autre compte'}, pas à ${monMail}` }
@@ -11079,14 +11339,17 @@ function EtatActions({ onNav, ordi, sombre }) {
     // Le ✓ n'est mis que sur ce que l'EXTENSION a dit (son adresse), jamais
     // sur la nôtre par défaut (revue du 5 octobre).
     : sonMail ? { s: 'oui', t: sonMail } : { s: 'oui', t: 'connectée' };
-  const ligneVinted = extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' || code === 'vrm-passu' ? { s: '—', t: '' }
+  const ligneVinted = st.relais ? (st.vinted ? { s: 'oui', t: `${loginVinted} (ouvert sur ton ordinateur)` } : { s: 'non', t: 'aucun compte ouvert sur ton ordinateur' })
+    : extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' || code === 'vrm-passu' ? { s: '—', t: '' }
     : st.vinted ? { s: 'oui', t: loginVinted }
     : { s: 'non', t: 'aucun compte ouvert' };
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
   const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
   let geste = null;
-  if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
+  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
+  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
+  else if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier{rl.niveau === 'absent' ? ' — avec l’extension à jour, tu pourras aussi le faire d’ici' : ''}.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
@@ -11131,6 +11394,7 @@ function EtatActions({ onNav, ordi, sombre }) {
         : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
   else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'vinted' && st.relais) geste = <span data-etat-geste="vinted-ordinateur">Sur ton ordinateur, ouvre vinted.fr connecté sur le compte des colis.</span>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
@@ -11143,13 +11407,13 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" aria-label={libelle} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" aria-label={st.relais && loginVinted ? `${libelle} · ${loginVinted}` : libelle} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
-        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
+        title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
           padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
-        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? 'Actions' : libelle}</span>
+        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
         {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
       </button>
       {ouvert && (
@@ -11159,9 +11423,13 @@ function EtatActions({ onNav, ordi, sombre }) {
             borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
           <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
-            {st.niveau === 'ok' ? 'Tu peux agir sur Vinted depuis VRM' : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
           </div>
-          {st.niveau === 'ok' ? (
+          {st.niveau === 'ok' && st.relais ? (
+            <div data-etat-relais-texte="" style={{ color: C.muted, marginBottom: 8 }}>
+              Générer un bordereau, répondre, faire une offre, publier sur Leboncoin : ta demande part dans ta base, l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute au nom de <b style={{ color: C.text }}>{loginVinted}</b>, avec les mêmes garde-fous que là-bas. Rien n'est dit « fait » avant qu'elle l'ait écrit.
+            </div>
+          ) : st.niveau === 'ok' ? (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
@@ -24478,7 +24746,18 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
-const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+// ⚠️ (16 oct., « app plus rapide ») Chaque rangement (ventes, achats, annonces,
+// conversations) réécrivait TOUT le cache dans `sessionStorage` — quatre
+// `JSON.stringify` de plus en plus gros à l'ouverture (mesuré au profileur,
+// téléphone émulé : ~150 ms de processeur). Un rangement programme UNE écriture
+// (`_persistAcctCacheBientot`, 400 ms plus tard) ; un EFFACEMENT reste écrit
+// tout de suite (`_persistAcctCache`) et annule l'écriture en attente — sinon un
+// rechargement juste après « Synchroniser » relirait l'ancien cache. Le cache
+// n'est qu'un raccourci : une écriture perdue relit simplement la base.
+let _persistAcctTimer = null;
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ clearTimeout(_persistAcctTimer); _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return; _persistAcctTimer = setTimeout(_persistAcctCache, 400); };
+try { window.addEventListener('pagehide', ()=>{ if(_persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
 // ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
 // Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
 // annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
@@ -27805,7 +28084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'aujourd'hui (`comptes`) : un compte ajouté depuis serait « lu · 0 », un
   // compte retiré resterait compté.
   const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL && c.comptes===cleComptes) ? c : null; };
-  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
+  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCacheBientot(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -28840,7 +29119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const sendReply = async () => {
     const oc = openConv; const text = replyText.trim();
     if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
-    if (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
+    if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
     setReplyBusy(true); setReplyErr(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
     if(conversationRequest.current!==oc.request)return;
@@ -28875,7 +29154,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(true); setOffreMsg(null);
-    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body });
+    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body, confirme: quoi === 'accept' });
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
     if (r && r.ok) {
@@ -29193,6 +29472,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // deps avant sa déclaration plante au rendu — « Cannot access before init »).
   useEffect(()=>{ if(showWrapped) setWrapStep(0); }, [showWrapped, wrappedYear, wrappedMode, wrappedMonth]);
   const wrapped = useMemo(() => {
+    // (16 oct.) Calculé seulement quand le récap plein écran est ouvert — il
+    // l'était à chaque arrivée de données, sur tous les écrans (~100 ms de
+    // processeur au démarrage sur téléphone émulé, mesuré au profileur).
+    if (!showWrapped) return null;
     const yr = wrappedYear; const mode = wrappedMode; const mo = wrappedMonth;
     const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const inPeriod = (d) => d.getFullYear()===yr && (mode==='year' || d.getMonth()===mo);
@@ -29219,7 +29502,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const periodLabel = mode==='month' ? `${moisNoms[mo]} ${yr}` : String(yr);
     return { yr, mode, mo, moisNoms, periodLabel, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, wrappedYear, wrappedMode, wrappedMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showWrapped, sales.items, wrappedYear, wrappedMode, wrappedMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
@@ -29811,6 +30094,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [releveMois, reportMonth, accounts]);
   const report = useMemo(() => {
+    // ⚠️ (16 oct., « app plus rapide ») Calculé SEULEMENT quand le rapport comptable est ouvert :
+    // il était recalculé à chaque arrivée de données sur TOUS les écrans du
+    // composant (Ma journée comprise), où il n'est jamais affiché — mesuré au
+    // profileur, téléphone émulé : ~170 ms de processeur au démarrage. Seul ce
+    // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
+    if (!showReport) return null;
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
@@ -29913,7 +30202,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
+  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -30077,6 +30366,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return [...s].sort((a,b)=>b-a);
   }, [sales.items, buysBase]);
   const annual = useMemo(() => {
+    // ⚠️ (16 oct., « app plus rapide ») Calculé SEULEMENT quand le registre annuel est ouvert :
+    // il était recalculé à chaque arrivée de données sur TOUS les écrans du
+    // composant (Ma journée comprise), où il n'est jamais affiché — mesuré au
+    // profileur, téléphone émulé : ~125 ms de processeur au démarrage. Seul ce
+    // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
+    if (!showAnnual) return null;
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
@@ -30157,7 +30452,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       vintedParUid: declRapport.vinted === 'lu' ? vintedParUid : declRapport.vinted === 'passu' ? null : undefined,
       vintedADater: declRapport.vinted === 'lu' ? (declRapport.aDater || []).filter(l => l.plateforme === 'Vinted') : [] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
+  }, [showAnnual, sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
@@ -30657,9 +30952,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ « Pas su » (état de l'extension inconnu, cookie pas lu, deux copies,
   //    extension en retard) ⇒ `msgCompteActif` vide : rien n'est affirmé, le
   //    comportement d'avant reste (« pas su » ne vaut pas oui).
-  const msgCompteActif = (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
-  const msgLectureSeule = (acc) => !!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif;
-  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : ''; };
+  // 5.183 : sur le téléphone, le RELAIS — le compte qui agit est celui ouvert
+  // dans le Chrome de l'ordinateur (aucun ⇒ tout reste en lecture seule).
+  const msgRelais = etatRelais().niveau === 'vivant';
+  const msgRelaisVinted = msgRelais ? vintedAgissant() : null;
+  const msgCompteActif = msgRelais ? String((msgRelaisVinted && msgRelaisVinted.uid) || '') : (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
+  const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
+  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -30715,7 +31015,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const sansExt = !vmrExtPresent(); const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const sansExt = !vmrExtPresent() && !msgRelais; const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
               <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
@@ -30723,7 +31023,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {ro && (
                   <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
-                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
+                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le Chrome de ton ordinateur' : 'dans Chrome'} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
                   </div>
                 )}
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
@@ -30732,8 +31032,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const off = offreEnAttenteDe(openConv.conversation);
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
-                  const etat = extSait('messagerie');
-                  if (etat !== 'ok' || __vmrPlusieurs) return (
+                  const etat = msgRelais ? 'ok' : extSait('messagerie');
+                  if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
@@ -30764,6 +31064,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })()}
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyErr && <div style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
                 {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
                     envoyer : un champ de saisie inutilisable n'y a pas sa place.
@@ -30783,7 +31084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-chat-compose">
                   <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
-                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'…':'Envoyer'}</button>
+                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
                 </>)}
               </div>
@@ -31030,6 +31331,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
+            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
+                Empilées, chacune traversait 900 px pour porter trois mots et
+                laissait 400 px de vide sous l'écran (mesuré en capture à
+                1440×900). Une grille qui se remplit toute seule
+                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
+                grand écran et UNE sur téléphone — la même règle, sans test de
+                largeur dans le JavaScript. */}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
+            )}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
+                {jobs.map((j,i)=>(
+                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
+                     différentes, empilées : c'est exactement ce qui faisait
+                     « brouillon ». La couleur reste sur l'icône et le chevron —
+                     elle sert à reconnaître la nature de l'action, pas à
+                     repeindre un quart de l'écran. */
+                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
+                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
+                        empilés, c'est ce qui faisait « application générée ».
+                        Maintenant : une pastille neutre et l'icône au trait, du
+                        même dessin que la barre du bas. La couleur ne sert plus
+                        qu'à l'icône et au chevron — le fond reste calme. */}
+                    {/* 30 sept. — « pas assez de photos » : une action qui porte
+                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
+                        les autres gardent leur icône. */}
+                    {j.photos && j.photos.length
+                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
+                          {j.photos.map((ph,k)=>(
+                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
+                          ))}
+                        </div>
+                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
+                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
+                          « 3 en retard — à poster en priorité » et « 3 hors
+                          délai — va vite les chercher » se lisaient de la même
+                          couleur que « Bordereau + paire au stock ». La
+                          consigne porte la couleur seulement quand il y a
+                          vraiment quelque chose à rattraper (§5.65 : c'est le
+                          chiffre qui se colore, pas le fond). */}
+                      <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+                    </div>
+                    <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* LE HAUT DE LA JOURNÉE : héros + semaine (+ argent). Sur
                 téléphone : empilés dans cet ordre. Sur ordinateur : le héros et
                 l'argent à gauche, la semaine à droite (`.vrm-day-top`). */}
@@ -31162,59 +31516,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : null)
             )}
 
-            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
-                Empilées, chacune traversait 900 px pour porter trois mots et
-                laissait 400 px de vide sous l'écran (mesuré en capture à
-                1440×900). Une grille qui se remplit toute seule
-                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
-                grand écran et UNE sur téléphone — la même règle, sans test de
-                largeur dans le JavaScript. */}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
-            )}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
-                {jobs.map((j,i)=>(
-                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
-                     différentes, empilées : c'est exactement ce qui faisait
-                     « brouillon ». La couleur reste sur l'icône et le chevron —
-                     elle sert à reconnaître la nature de l'action, pas à
-                     repeindre un quart de l'écran. */
-                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
-                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
-                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
-                        empilés, c'est ce qui faisait « application générée ».
-                        Maintenant : une pastille neutre et l'icône au trait, du
-                        même dessin que la barre du bas. La couleur ne sert plus
-                        qu'à l'icône et au chevron — le fond reste calme. */}
-                    {/* 30 sept. — « pas assez de photos » : une action qui porte
-                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
-                        les autres gardent leur icône. */}
-                    {j.photos && j.photos.length
-                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
-                          {j.photos.map((ph,k)=>(
-                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
-                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
-                          ))}
-                        </div>
-                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
-                          « 3 en retard — à poster en priorité » et « 3 hors
-                          délai — va vite les chercher » se lisaient de la même
-                          couleur que « Bordereau + paire au stock ». La
-                          consigne porte la couleur seulement quand il y a
-                          vraiment quelque chose à rattraper (§5.65 : c'est le
-                          chiffre qui se colore, pas le fond). */}
-                      <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
-                    </div>
-                    <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* 🏷️ OFFRES REÇUES — RETIRÉ DE L'ACCUEIL (demande de Julien,
                 28 sept. : « enlève le nombre d'offres reçues, laisse simplement
                 les notifications »). Les offres restent dans le centre de
@@ -31237,6 +31538,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 règle CSS, aucun test de largeur en JavaScript (§7). Chaque carte
                 porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
                 serait un faux, §5) — le prix de vente, qui est un fait. */}
+            <div className="vrm-day-lower">
             {!loading && dernieresVentes.length>0 && (
               <div className="vrm-day-recent" style={{marginTop:24}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
@@ -31276,6 +31578,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
             )}
+
+            {!premierJour && (()=>{
+              const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
+              const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
+              return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+                <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
+                <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>annonce{stock?.total===1?'':'s'} en ligne</span></div>
+                {stock ? <>
+                  <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
+                  <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
+                  <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
+                </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
+                {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
+                <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
+              </section>;
+            })()}
+            </div>
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
@@ -42512,15 +42831,8 @@ function AppCoeur() {
       )}
       {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
           la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
-      {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
-          Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
-          mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
-          On plafonne à 1180 px, collé à gauche sous la barre latérale — la
-          respiration passe à droite, pas dans la carte. ⚠️ 980 px laissait
-          230 px de vide sur un écran de 1512 : ni rempli ni centré, ça se
-          voyait comme un décalage. 1180 occupe l'espace disponible sans que la
-          ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
-          `ordi` est faux et RIEN ne change. */}
+      {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
+          L'ordre des blocs et la disposition de chaque page restent conservés. */}
       <main className="vrm-main" data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
@@ -42530,7 +42842,7 @@ function AppCoeur() {
         flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
         WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
         width: ordi ? undefined : '100%',
-        maxWidth: ordi ? 1180 : 1200,
+        maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
         marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
         paddingRight: ordi ? 28 : undefined,
