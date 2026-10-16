@@ -9215,6 +9215,56 @@ vendeur reste chez le bon.
   repli (le corps d'un « colis disponible » contient les consignes de retrait).
 - **Un colis caché est un colis perdu** : on n'écarte jamais un colis en silence.
 
+### « App plus rapide » — mesuré d'abord, au volume de sa base (16 octobre)
+Retenue par Julien le 11 octobre. **Mesuré avant de coder** : banc
+`scripts/bancs/vitesse.cjs` sur une base INVENTÉE au volume de la sienne
+(`_base-volume.cjs`, tailles par famille lues en production le 16 octobre en
+lecture seule : ~1 200 transactions, ~1 300 conversations, PDF de 100 Ko), un
+aller-retour simulé (150 ms, 2 Mo/s, téléphone à processeur ×4), et le
+profileur de Chrome sur un build non minifié.
+- **Le code JS** : `App` = 1,73 Mo (518 Ko compressés), chargé à part de la
+  page d'accueil ; `pdf-lib` et la 3D sont déjà paresseux. Le découper est un
+  chantier à lui seul (un fichier de 42 000 lignes que cinq sessions modifient) :
+  **pas fait**.
+- ⚠️⚠️ **LE RÉSEAU : 16 à 45 LECTURES IDENTIQUES PAR ÉCRAN.** Ma journée faisait
+  72–77 lectures de notre base, dont 16–21 strictement identiques
+  (`lbc_ventes` ×5, `ebay_orders` ×5, `vinted_lbc_posted` ×4…) ; Messages 95–100
+  dont 40–45. Chaque écran et chaque passage du centre de notifications relit à
+  sa façon. ⇒ `src/lecturesPartagees.js` : une lecture GET de NOTRE base
+  identique à une lecture en cours ou finie depuis moins de 2 s reçoit la même
+  réponse (une copie). **Un échec n'est jamais gardé** (« pas su » reste « pas
+  su »), **toute écriture vide tout** (à son départ et à son retour), le signal
+  de l'extension (`vrm:ext`) vide tout, la session et `Range` font partie de la
+  clé (deux vendeurs ne partagent rien). Vinted n'y passe jamais (§3).
+  `audit-lectures-partagees.cjs` exécute la règle (`--prouve` : 3 mutations
+  rouges).
+- **La famille des transactions balayée 2 à 7 fois par écran** — la requête la
+  plus coûteuse de la base (`pg_stat_statements`). Le pont transaction → annonce
+  et les dates de versement lisent maintenant LA MÊME projection
+  (`TXN_META_SELECT`) : un balayage, chacun garde sa règle de « pas su ».
+- **Les suppressions lues une par compte** (7 allers-retours, à la suite des
+  lectures publiques) : `lireSupprimees(uid)` lit dans `lireSupprimeesTous()`.
+- **Le processeur au démarrage** (profileur, téléphone ×4) : le rapport
+  comptable (~170 ms), le registre annuel (~125 ms) et le récap « Wrapped »
+  (~100 ms) étaient recalculés à chaque arrivée de données sur TOUS les écrans
+  du composant, Ma journée comprise : calculés seulement panneau ouvert. Le
+  cache de session (`_persistAcctCache`, ~150 ms de `JSON.stringify` répétés)
+  ne s'écrit plus qu'une fois par rafale (un effacement reste immédiat).
+- **Résultat** (même base, même banc) : Ma journée **72–77 → 48–54 lectures**,
+  doublons **16–21 → 0–4** ; Ventes 98–105 → 65–66 ; Colis 102–107 → 63–69 ;
+  Annonces 87–92 → 47–50 ; Achats 97–102 → 58–63 ; Messages 95–100 → 50–51 ;
+  tableau de bord 63–68 → 50. **Texte rendu identique** sur les 14 rendus
+  (sauf la phrase des photos de Ventes, qui dépend du moment où le banc coupe
+  les images — elle apparaît dans les deux sens). `vitesse.cjs` : **56 rouges**
+  sur le build d'avant, 0 après.
+- **Pas fait, mesuré** : (1) une frappe dans la recherche de Ventes recrée les
+  60 lignes DEUX fois (rendu urgent + rendu différé : la liste n'est pas
+  mémoïsée) — 200 à 300 ms par lettre en émulation téléphone ; (2) le composant
+  qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
+  par arrivée de données) ; (3) le premier écran attend la sonde de schéma, puis
+  les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
+  de l'app (518 Ko compressés).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
