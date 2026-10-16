@@ -22,7 +22,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4343;
+const PORT = Number(process.env.BANC_PORT) || 4343;
 
 const PLAN = { rooms: [{ id: 'r1', name: 'Garage test', room: { w: 8, h: 6, wallH: 3 }, items: [
   { id: 'p1', type: 'pile', name: 'Pile test', x: 1, y: 2, w: 0.5, h: 0.5, rows: 4, cell: 0.5, nums: ['201', '202', '203', '204', '205'] },
@@ -69,7 +69,22 @@ srv.listen(PORT);
     const etat = () => pg.evaluate(() => { const e = document.querySelector('[data-stock3d]'); const c = e && e.querySelector('canvas'); const bu = e && e.querySelector('[data-bulle-3d]');
       return { dist: e ? Number(e.dataset.camDist) : NaN, az: e ? Number(e.dataset.camAz) : NaN, hover: e ? e.dataset.hover || '' : '', cur: c ? getComputedStyle(c).cursor : '', bulle: bu && bu.style.display !== 'none' ? bu.textContent : '' }; });
     const dialogue = (re) => pg.evaluate((src) => new RegExp(src).test(document.body.innerText), re.source);
-    const fermer = async () => { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); for (const t of ['Annuler', 'Fermer']) { const bt = await pg.$(`button:has-text("${t}")`); if (bt) { try { await bt.click({ timeout: 1000 }); } catch (_) {} } } await pg.waitForTimeout(300); };
+    // ⚠️ La feuille de saisie floute ce qu'il y a dessous (`backdrop-filter`) :
+    //    par-dessus une scène WebGL en rendu LOGICIEL (swiftshader), la page
+    //    tombe à ~1,5 image/s (mesuré : 3 images en 2 s, contre 10 sans la
+    //    feuille). Le clic de Playwright attend un bouton « stable » sur deux
+    //    images de suite : 1 s ne suffisait plus, le clic expirait EN SILENCE,
+    //    la feuille restait ouverte… et couvrait la vue pour tous les contrôles
+    //    suivants (« Voir toute la pièce » introuvable, ← qui ne tourne plus).
+    //    On laisse le temps au clic, et une feuille qui ne se ferme pas est
+    //    DITE — jamais avalée.
+    const fermer = async () => {
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+      for (const t of ['Annuler', 'Fermer']) { const bt = await pg.$(`button:has-text("${t}")`); if (bt) { try { await bt.click({ timeout: 10000 }); } catch (_) {} } }
+      const ferme = await pg.waitForFunction(() => !/Numéro de cette boîte/.test(document.body.innerText), null, { timeout: 10000 }).then(() => true).catch(() => false);
+      if (!ferme) dit(false, 'la feuille de saisie se ferme sur « Annuler »', 'elle couvre encore la vue');
+      await pg.waitForTimeout(300);
+    };
 
     // ── 1. LE SURVOL ─────────────────────────────────────────────────────────
     await essaie('survol', async () => {

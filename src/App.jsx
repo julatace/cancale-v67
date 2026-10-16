@@ -2019,6 +2019,16 @@ function connexionExtensionVrm() {
   const autre = (monId && sonId) ? monId !== sonId : !!(monMail && sonMail && monMail !== sonMail);
   return autre ? 'autre' : 'ok';
 }
+// « Annonces en ligne » : UNE règle d'écriture pour chaque écran qui la montre
+// (§11). Des annonces « à confirmer » (compte dont le dressing date de plus de
+// 24 h) ne sont pas comptées : le nombre est alors un MINORANT, écrit « ≥ N »,
+// et un zéro qui veut dire « je ne sais pas » s'écrit « — » (§5, §7). Jamais
+// un minorant présenté comme un total.
+const texteEnLigne = (liveStats) => {
+  if (!liveStats || liveStats.online == null) return '—';
+  if ((liveStats.annAConfirmer || []).length) return liveStats.online > 0 ? `≥ ${liveStats.online}` : '—';
+  return String(liveStats.online);
+};
 function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numeros, activite, attr = 'data-ann-fraicheur', style }) {
   const sansSouris = useSansSouris();
   const [, majExt] = React.useReducer((x) => x + 1, 0);
@@ -16308,7 +16318,6 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   const aller = (section, tabId) => (onSub ? onSub(section) : (onGo && onGo(tabId)));
   const estVinted = plat === 'Vinted';
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
-  const online = liveStats && liveStats.online != null ? liveStats.online : null;
   const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
   // Argent Vinted : « disponible » et « en attente » sont DEUX montants qui ne
   // se confondent jamais (§5.14). Consommés de liveStats (même source que Ma
@@ -16363,7 +16372,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
           <button type="button" onClick={()=>aller('annonces','cat_annonces')} style={carte}>
             <div style={eti}>Annonces en ligne</div>
-            <div className="vrm-display" style={gros}>{online==null?'—':online}</div>
+            <div className="vrm-display" style={gros}>{texteEnLigne(liveStats)}</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>Voir toutes les annonces ›</div>
           </button>
           <button type="button" onClick={()=>aller('ventes','cat_ventes')} style={carte}>
@@ -16422,7 +16431,6 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
   const caGlobal = connues.reduce((s,p)=> s + p.ca, 0);
   const maxCA = Math.max(...connues.map(p=>p.ca), 1);
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
-  const online = liveStats && liveStats.online != null ? liveStats.online : null;
   const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
   // Argent à VIRER (Vinted) — publié par liveStats (§11, jamais recalculé).
   // « disponible » et « en attente » ne se confondent jamais (§5.14).
@@ -16520,7 +16528,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
           </button>
           <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
-            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{online==null?'—':online}</div>
+            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{texteEnLigne(liveStats)}</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>Vinted (capté)</div>
           </button>
           <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
@@ -16582,7 +16590,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
             </button>
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
               <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
-              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{online==null?'—':online}</div>
+              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{texteEnLigne(liveStats)}</div>
             </button>
           </div>
           <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
@@ -17145,7 +17153,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">Les ventes n’ont pas pu être lues. Les montants restent inconnus.</p>}
         {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>Total partiel, sans {liveStats.venduManque.join(', ')} : ventes non lues.</p>}
       </details>}
-      <details className="vrm-finance-stock"><summary>Stock et volume de ventes</summary><div className="vrm-finance-stock-grid">
+      {/* (16 oct.) « Annonces en ligne » avait disparu du tableau de bord avec
+          la simplification du 13 octobre — et avec elle la ligne qui dit de
+          quand date sa lecture. Le chiffre revient ICI, dans le titre du volet
+          (visible replié), écrit par `texteEnLigne` (« ≥ N » quand des annonces
+          sont à confirmer) ; la ligne de fraîcheur est la MÊME que celle de
+          l'écran Annonces (`FraicheurAnnonces`, §11), et se tait quand tout
+          est frais. */}
+      <details className="vrm-finance-stock"><summary>Stock et volume de ventes{liveStats && <> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="online">annonces en ligne <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{texteEnLigne(liveStats)}</b></span></>}</summary><div className="vrm-finance-stock-grid">
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
@@ -17167,6 +17182,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
       </div></details>
+      {liveStats && <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} aConfirmer={liveStats.annAConfirmer} numeros={numerosDash} activite={liveStats.annActivite} style={{marginTop:4,marginBottom:10}}/>}
       </div>
 
       {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
@@ -33138,7 +33154,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
-          const nonLusAilleurs = filtreMsg ? liste.filter(c=>c.unread && uidC(c)!==filtreMsg).length : 0;
+          // ⚠️ (16 octobre) Depuis qu'un choix EXPLICITE filtre la liste
+          //    (13 octobre), `liste` ne porte plus les autres comptes : compté
+          //    dessus, ce nombre valait toujours 0, et l'en-tête passait à « tout
+          //    lu » au-dessus de non-lus cachés — le défaut du 8 octobre, revenu
+          //    par le filtre. On compte donc sur les conversations AVANT le
+          //    filtre de compte (comptes écartés exclus) : cachés, ils sont dits.
+          const nonLusAilleurs = filtreMsg ? (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && uidC(c)!==filtreMsg).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
@@ -33181,7 +33203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
@@ -33193,7 +33215,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
-                  Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
+                  <b>{nonLusAilleurs}</b> non lu{nonLusAilleurs>1?'s':''} sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'}, pas affiché{nonLusAilleurs>1?'s':''} ici — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'les':'le'} voir.
                 </div>
               )}
               {boitesKO.length>0 && (
