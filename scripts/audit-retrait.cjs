@@ -124,7 +124,10 @@ dit(/l'extension va chercher/i.test(APP) || /va chercher les codes toute seule/i
 // La porte vers la mise à jour de l'extension vit sur l'écran où il constate
 // que les codes manquent — pas seulement sur Ma journée.
 {
-  const i = APP.indexOf("curSub==='achats' && (<>");
+  // L'écran s'ouvre sur un fragment ou sur son conteneur (`<div className=…>`,
+  // 16 oct.) : on suit le début de l'écran, pas son orthographe.
+  const m = /curSub==='achats' && \((?:<>|<div[^>]*>)/.exec(APP);
+  const i = m ? m.index : -1;
   const B = i < 0 ? '' : APP.slice(i, i + 1800);
   dit(/<ExtEnRetard/.test(B), 'l\'écran Achats dit pourquoi les codes manquent',
     'c\'est l\'extension qui les lit dans les conversations');

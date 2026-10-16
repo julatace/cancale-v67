@@ -31,6 +31,10 @@
       "destination": "/api/compte?mode=webhook"
     },
     {
+      "source": "/api/superpdp",
+      "destination": "/api/compte?mode=superpdp"
+    },
+    {
       "source": "/api/detourage",
       "destination": "/api/ai?mode=detourage"
     }

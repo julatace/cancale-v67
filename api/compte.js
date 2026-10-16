@@ -12,6 +12,10 @@
 //   /api/compte?mode=reprendre    (POST, session) annuler la résiliation
 //   /api/compte?mode=session-extension (POST, session) une session À ELLE pour
 //                                 l'extension Chrome (même vendeur, autre famille)
+//   /api/compte?mode=superpdp     (GET/POST, session) SA connexion Super PDP
+//                                 (plateforme agréée de facturation électronique) :
+//                                 statut · connecter · deconnecter · envoyer ·
+//                                 relire — voir api/_lib/superpdp.js
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
@@ -30,6 +34,8 @@ import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
+import { routeSuperPdp } from './_lib/superpdp.js';
+import { accesVendeur } from './_lib/abonnement.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -855,6 +861,14 @@ async function photo(req, res) {
   return res.status(200).send(r.octets);
 }
 
+// ── Super PDP : la session d'abord, puis SA connexion (api/_lib/superpdp.js) ─
+async function superpdp(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeSuperPdp(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id) });
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -883,6 +897,7 @@ export default async function handler(req, res) {
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }
