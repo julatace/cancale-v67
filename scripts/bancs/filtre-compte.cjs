@@ -152,7 +152,12 @@ const messagerie = (pg) => pg.evaluate(() => {
   const tete = document.querySelector('[data-messagerie]');
   return {
     etat: t ? t.getAttribute('data-messagerie-tete') : null, nonlus: t ? t.getAttribute('data-nonlus') : null,
-    ailleurs: a ? a.getAttribute('data-nonlus-ailleurs') : null, ko: k ? k.getAttribute('data-boites-ko') : null, koTxt: k ? k.innerText : '',
+    ailleurs: a ? a.getAttribute('data-nonlus-ailleurs') : null,
+    // (16 octobre) Le compte de l'extension ne filtre plus Messages : les autres
+    // comptes restent listés, en lecture seule, et leurs non-lus sont dits dans
+    // l'en-tête de leur groupe (`messages-priorite.cjs`).
+    autres: (() => { const g = document.querySelector('[data-msg-lecture-seule]'); return g ? { n: g.getAttribute('data-nonlus-autres'), txt: g.innerText } : null; })(),
+    ko: k ? k.getAttribute('data-boites-ko') : null, koTxt: k ? k.innerText : '',
     texte: tete ? tete.innerText.split('\n').slice(0, 3).join(' | ') : '',
     convs: [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => x.getAttribute('data-conv')),
     toutLu: /Tout est lu/.test(tete ? tete.innerText : ''),
@@ -185,7 +190,7 @@ const messagerie = (pg) => pg.evaluate(() => {
       const r = await rendre(b, { chrome: '111', onglet: 'cat_msg' });
       const m = await messagerie(r.pg);
       dit(m.etat === 'nonlus' && m.nonlus === '2' && !m.toutLu, 'l’en-tête compte les non-lus de TOUTE la liste affichée — jamais « Tout est lu » au-dessus d’eux', JSON.stringify(m));
-      dit(m.ailleurs === '2', 'ceux d’un compte estompé sont dits À CÔTÉ, avec le geste', JSON.stringify(m.ailleurs));
+      dit(m.autres && m.autres.n === '2' && /bascule Chrome/i.test(m.autres.txt) && m.convs.includes('401') && m.convs.includes('402'), 'ceux de l’autre compte restent listés, leurs non-lus dits À CÔTÉ, avec le geste', JSON.stringify({ ailleurs: m.ailleurs, autres: m.autres, convs: m.convs }));
       dit(!m.convs.includes('501'), 'la conversation du compte EXCLU n’est ni listée ni comptée', JSON.stringify(m.convs));
       // Les offres : celle d'un compte exclu (333) et d'un compte retiré (444)
       // n'ont rien à faire là ; celle sans compte connu reste (pas su ≠ autre).
