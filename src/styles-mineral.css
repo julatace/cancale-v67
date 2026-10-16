@@ -790,6 +790,223 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
  .vrm-ann-grid .vrm-ann-actions > summary:hover { background:var(--vrm-bg); color:var(--vrm-ink) !important; }
  .vrm-ann-grid .vrm-ann-actions[open] > summary { margin-left:auto; background:var(--vrm-bg); color:var(--vrm-ink) !important; }
 }
+/* ── Achats et Messages, 16 octobre (« trop vibe-codé », Julien) ──────────
+   Une disposition d'app native : une liste dense et alignée, un contrôle
+   segmenté, des sections nommées une fois, une seule forme de bouton
+   (44 px au doigt, rayon 10), l'accent réservé à ce qu'on doit toucher. Les
+   COULEURS restent en ligne (thème `C` ; et le fil est rendu hors de la coque
+   sur téléphone, aucune variable CSS n'y arrive) ; ici, la mise en page. */
+.vrm-sr { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+
+/* Contrôle segmenté (Achats : les étapes du colis). */
+.vrm-seg { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:2px; padding:3px; border-radius:12px; margin:0 0 16px; }
+.vrm-seg > button { min-height:38px; border:0 !important; border-radius:9px !important; padding:0 6px !important; font:600 13px/1.2 Inter,system-ui,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; box-shadow:none; }
+.vrm-seg > button[aria-pressed="true"] { box-shadow:0 1px 2px rgba(15,20,30,.10), 0 0 0 .5px rgba(15,20,30,.06); }
+.vrm-seg-n { font-weight:500; opacity:.6; font-variant-numeric:tabular-nums; }
+@media(max-width:767px){ .vrm-main .vrm-seg > button { min-height:44px !important; } }
+
+/* Recherche : un champ, une loupe. */
+.vrm-msg-search { display:flex; align-items:center; gap:8px; padding:0 12px; margin:0 0 12px; border-radius:12px; background:var(--vrm-surface,#fff); border:1px solid var(--vrm-line,#e3e6ec); box-sizing:border-box; cursor:text; }
+.vrm-msg-search > svg { flex-shrink:0; }
+.vrm-msg-search input, .vrm-inbox-column .vrm-msg-search input[type="search"] { flex:1; min-width:0; height:44px; min-height:44px !important; border:0 !important; border-radius:0 !important; background:transparent !important; padding:0 !important; outline:none; font:400 15px Inter,system-ui,sans-serif; box-shadow:none !important; }
+.vrm-msg-search:focus-within { border-color:var(--vrm-focus,#2458E6); }
+.vrm-achats .vrm-reception-sum { min-height:44px; box-sizing:border-box; padding:0 !important; font-size:12px !important; }
+
+/* ── ACHATS ──────────────────────────────────────────────────────────── */
+.vrm-achats-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-radius:14px; overflow:hidden; margin:0 0 16px; }
+.vrm-achats-kpi { padding:14px 16px; min-width:0; border:0 solid; border-left-width:1px; }
+.vrm-achats-kpi:first-child { border-left-width:0; }
+.vrm-achats-kpi-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:1.3; }
+.vrm-achats-kpi-v { font-size:22px; font-weight:700; letter-spacing:-.02em; line-height:1.15; margin-top:6px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.vrm-achats-kpi-s { font-size:12px; line-height:1.35; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:767px){
+  .vrm-achats-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .vrm-achats-kpi { padding:12px 14px; border-left-width:0; border-top-width:1px; }
+  .vrm-achats-kpi:nth-child(-n+2) { border-top-width:0; }
+  .vrm-achats-kpi:nth-child(2n) { border-left-width:1px; }
+  .vrm-achats-kpi-v { font-size:20px; }
+}
+
+/* Blocs d'exception (litige, colis repartis) : sobres, l'icône seule colorée. */
+.vrm-achats-bloc { border-radius:14px; padding:14px 16px; margin:0 0 16px; }
+.vrm-achats-bloc-t { font-size:14px; font-weight:600; line-height:1.4; }
+.vrm-achats-bloc-p { font-size:12.5px; line-height:1.45; margin-top:4px; }
+.vrm-achats-bloc-liste { margin-top:8px; }
+.vrm-achats-bloc-ligne { display:flex; align-items:center; flex-wrap:wrap; gap:0 12px; padding:10px 0 0; margin-top:10px; border-top:1px solid; }
+.vrm-achats a[data-retour-tx], .vrm-buy-retour > a, .vrm-pickup-cta { min-height:44px; box-sizing:border-box; }
+.vrm-achats [data-a-renvoyer] > div[style*="margin-top"] { margin-top:12px !important; }
+
+/* La liste des achats : vignette · titre / statut · montant · ⋯ */
+.vrm-buy-compte { display:flex; align-items:center; gap:8px; font-size:12.5px; margin:0 2px 8px; }
+.vrm-buy-list { border-radius:14px; overflow:hidden; }
+.vrm-buy-row { position:relative; display:grid; grid-template-columns:52px minmax(0,1fr) auto auto; align-items:center; gap:0 12px; padding:12px 8px 12px 16px; min-height:76px; box-sizing:border-box; }
+.vrm-buy-row + .vrm-buy-row::before { content:''; position:absolute; left:80px; right:0; top:0; height:1px; background:var(--vrm-line,#e3e6ec); }
+.vrm-buy-ph { width:52px; height:52px; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; align-self:start; }
+.vrm-buy-main { min-width:0; }
+.vrm-buy-title { font-size:15px; font-weight:600; letter-spacing:-.01em; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vrm-buy-meta { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; font-size:12.5px; line-height:1.35; margin-top:4px; }
+.vrm-buy-statut { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+.vrm-buy-statut > i { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.vrm-buy-price { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+.vrm-buy-act { position:relative; display:flex; align-items:center; gap:0; }
+.vrm-buy-act > .vrm-buy-quick, .vrm-buy-act > .vrm-buy-more { display:flex; align-items:center; justify-content:center; width:36px; height:36px; min-height:36px; min-width:36px; padding:0; border:0; border-radius:10px; background:transparent; cursor:pointer; font:800 18px/1 Inter,system-ui,sans-serif; text-decoration:none; }
+.vrm-buy-retour { margin-top:8px; }
+.vrm-buy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:41; min-width:240px; border-radius:12px; overflow:hidden; padding:4px 0; }
+.vrm-buy-menu-tel { display:none !important; }
+@media(hover:hover) and (pointer:fine){ .vrm-buy-act > .vrm-buy-quick:hover, .vrm-buy-act > .vrm-buy-more:hover { background:var(--vrm-bg,#f4f6fa); } }
+@media(max-width:767px){
+  .vrm-buy-row { grid-template-columns:48px minmax(0,1fr) auto 44px; gap:0 10px; padding:10px 0 10px 14px; min-height:72px; }
+  .vrm-buy-row + .vrm-buy-row::before { left:72px; }
+  .vrm-buy-ph { width:48px; height:48px; }
+  .vrm-buy-title { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; font-size:14.5px; }
+  .vrm-buy-meta { font-size:12px; }
+  .vrm-buy-price { font-size:14.5px; align-self:start; padding-top:1px; }
+  .vrm-buy-act { align-self:start; margin-top:-6px; }
+  .vrm-buy-act > .vrm-buy-quick { display:none; }
+  .vrm-main .vrm-buy-act > .vrm-buy-more { width:44px; height:44px; min-height:44px !important; min-width:44px; }
+  .vrm-buy-menu-tel { display:flex !important; }
+  .vrm-buy-menu { min-width:min(280px, calc(100vw - 32px)); }
+  .vrm-buy-retour > a { width:100%; justify-content:center; }
+}
+
+/* À retirer : un en-tête, des destinations, et le code mis en avant. */
+.vrm-achats .vrm-pickup-board { margin-bottom:8px !important; }
+.vrm-pickup-head { margin:0 2px 12px; }
+.vrm-pickup-title { font-size:20px; font-weight:700; letter-spacing:-.02em; line-height:1.3; }
+.vrm-pickup-title > span { font-size:13px; letter-spacing:0; }
+.vrm-achats .vrm-pickup-help { margin-top:0; }
+.vrm-achats .vrm-pickup-help > summary { display:inline-flex; align-items:center; min-height:44px; margin:-6px 0 -10px; padding:0; font-size:12.5px; }
+.vrm-achats .vrm-pickup-point { border-radius:14px !important; margin-bottom:16px !important; box-shadow:none; }
+.vrm-pickup-dest { display:flex; align-items:center; gap:12px; padding:14px 60px 12px 16px; }
+.vrm-pickup-dest > div { flex:1 1 auto !important; }
+.vrm-pickup-dest > div > div:nth-child(2) { font-size:16px !important; letter-spacing:-.01em; }
+.vrm-achats .vrm-pickup-point > div:first-child { padding-right:60px !important; }
+.vrm-achats .vrm-pickup-method { top:8px; right:8px; }
+.vrm-achats .vrm-pickup-method > summary { width:44px; min-height:44px; border-radius:10px; font-weight:600; font-size:15px; }
+.vrm-achats .vrm-pickup-method > div { top:48px; }
+.vrm-achats .vrm-pickup-point > div:last-child { padding:0 !important; gap:0 !important; }
+.vrm-achats .vrm-pickup-card { display:flex !important; flex-wrap:wrap; align-items:flex-start !important; gap:12px !important; padding:14px 16px !important; background:transparent !important; }
+.vrm-achats .vrm-pickup-card > .vrm-pickup-thumb, .vrm-achats .vrm-pickup-card > img { width:48px !important; height:48px !important; border-radius:10px !important; border:0 !important; }
+.vrm-achats .vrm-pickup-card > div:first-of-type { flex:1 1 calc(100% - 60px) !important; min-width:0; }
+.vrm-achats .vrm-pickup-card > div:first-of-type > div:first-child { font-size:15px !important; font-weight:600 !important; line-height:1.3; }
+.vrm-achats .vrm-pickup-card .vrm-pickup-details > summary { display:inline-flex; align-items:center; min-height:44px; margin:-10px 0 -12px; padding:0; font-size:12px; }
+.vrm-achats .vrm-pickup-card .vrm-pickup-details[open] > summary { margin-bottom:0; }
+.vrm-pickup-lien { display:inline-flex; align-items:center; min-height:44px; margin:-8px 0 -12px; }
+.vrm-achats-bloc-ligne .vrm-pickup-lien { margin:0; }
+/* La ligne d'action : le code prend la place, « J'ai retiré » à côté. */
+.vrm-achats .vrm-pickup-card > .vrm-pickup-code, .vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) { flex:1 1 0 !important; min-width:0; margin-left:60px; }
+.vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) { display:flex; gap:8px; }
+.vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) > .vrm-pickup-code { flex:1; min-width:0; }
+/* Le ticket du code : le libellé et « Copier » sur une ligne, le code dessous,
+   en grand, jamais coupé. */
+.vrm-achats .vrm-pickup-code { display:grid !important; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"lab copie" "code code"; align-items:center !important; justify-items:start; gap:2px 12px !important; min-height:56px !important; padding:8px 14px !important; border-radius:12px !important; box-sizing:border-box; text-align:left; }
+.vrm-achats .vrm-pickup-code > span { grid-area:lab; font-size:11px !important; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--vrm-muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vrm-achats .vrm-pickup-code > strong { grid-area:code; font-size:22px; letter-spacing:.08em !important; white-space:nowrap; }
+.vrm-achats .vrm-pickup-code > small { grid-area:copie; font-size:11px !important; white-space:nowrap; }
+.vrm-achats .vrm-pickup-collect { flex:0 0 auto; align-self:stretch; min-height:44px !important; padding:0 14px !important; font-size:13px !important; border-radius:10px !important; }
+.vrm-achats .vrm-pickup-card > button.vrm-icon-control { width:56px !important; height:56px !important; margin-left:60px; }
+.vrm-achats .vrm-pickup-card > button.vrm-icon-control ~ div:has(> .vrm-pickup-code), .vrm-achats .vrm-pickup-card > button.vrm-icon-control ~ .vrm-pickup-code { margin-left:0; }
+.vrm-pickup-foot { font-size:12px; line-height:1.45; margin:0 2px 16px; }
+@media(max-width:767px){
+  .vrm-achats .vrm-pickup-card { padding:12px 14px !important; }
+  .vrm-achats .vrm-pickup-card > .vrm-pickup-code, .vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) { margin-left:0; }
+  .vrm-achats .vrm-pickup-card > button.vrm-icon-control { margin-left:0; }
+  .vrm-achats-bloc-ligne > a { flex-basis:100%; }
+  .vrm-main .vrm-achats .vrm-pickup-collect { min-height:56px !important; }
+  .vrm-pickup-dest { padding:12px 60px 12px 14px; }
+}
+@media(min-width:768px){
+  .vrm-seg { max-width:520px; }
+  .vrm-achats .vrm-pickup-card > .vrm-pickup-code { flex:0 1 240px !important; }
+  .vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) { flex:0 1 auto !important; }
+  .vrm-achats .vrm-pickup-card > div:has(> .vrm-pickup-code) > .vrm-pickup-code { flex:0 1 200px; }
+}
+@media(min-width:1024px){
+  .vrm-achats .vrm-pickup-point > div:last-child { display:grid !important; grid-template-columns:repeat(auto-fill, minmax(min(460px,100%),1fr)); }
+  .vrm-achats .vrm-pickup-point > div:last-child > .vrm-pickup-card { border-top:0 !important; }
+}
+
+/* ── MESSAGES ────────────────────────────────────────────────────────── */
+.vrm-msg-bar { display:flex; align-items:center; gap:8px; margin:0 0 12px; }
+.vrm-msg-bar > .vrm-inbox-filters { padding:3px !important; margin:0; flex:0 1 auto; gap:2px !important; border-radius:12px; background:var(--vrm-bg,#f4f6fa); border:1px solid var(--vrm-line,#e3e6ec); }
+.vrm-msg-bar > .vrm-inbox-filters button { border:0 !important; border-radius:9px !important; min-height:36px; padding:0 14px !important; font:600 13px Inter,system-ui,sans-serif !important; background:transparent !important; color:var(--vrm-muted) !important; }
+.vrm-msg-bar > .vrm-inbox-filters button[aria-pressed="true"] { background:var(--vrm-surface,#fff) !important; color:var(--vrm-ink) !important; box-shadow:0 1px 2px rgba(15,20,30,.10), 0 0 0 .5px rgba(15,20,30,.06); }
+.vrm-msg-bar > .vrm-inbox-filters button span { font-size:12px !important; font-weight:500; opacity:.6; }
+.vrm-msg-refresh { margin-left:auto; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:0; border-radius:10px; background:transparent; color:var(--vrm-muted); cursor:pointer; flex-shrink:0; }
+.vrm-msg-list { border-radius:14px; overflow:hidden; }
+.vrm-msg-section { display:flex; align-items:center; gap:8px; padding:10px 16px 8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+.vrm-msg-section-ro { display:block; padding:12px 16px 10px; }
+.vrm-msg-section-t { display:flex; align-items:center; gap:7px; }
+.vrm-msg-section-p { font-size:12.5px; font-weight:400; letter-spacing:0; text-transform:none; line-height:1.45; margin-top:4px; }
+.vrm-main .vrm-inbox-row, .vrm-inbox-row { position:relative; display:flex !important; align-items:center; gap:12px; width:100%; min-height:72px; padding:10px 16px !important; border:0 !important; border-radius:0 !important; background:transparent; text-align:left; cursor:pointer; font-family:inherit; box-sizing:border-box; }
+.vrm-inbox-row + .vrm-inbox-row::before { content:''; position:absolute; left:76px; right:0; top:0; height:1px; background:var(--vrm-line,#e3e6ec); }
+.vrm-msg-av { width:48px; height:48px; border-radius:12px; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.vrm-msg-ini { font-size:19px; font-weight:600; }
+.vrm-msg-body { flex:1; min-width:0; display:block; }
+.vrm-msg-l1, .vrm-msg-l2 { display:flex; align-items:center; gap:6px; min-width:0; }
+.vrm-msg-l2 { margin-top:3px; }
+.vrm-msg-name { font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; letter-spacing:-.01em; }
+.vrm-inbox-row[data-nonlu] .vrm-msg-name { font-weight:700; }
+.vrm-msg-acc { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; }
+.vrm-msg-time { margin-left:auto; font-size:12px; white-space:nowrap; flex-shrink:0; padding-left:6px; font-variant-numeric:tabular-nums; }
+.vrm-msg-extrait { flex:1; min-width:0; font-size:14px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vrm-inbox-row[data-nonlu] .vrm-msg-extrait { font-weight:500; }
+.vrm-msg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.vrm-msg-more { display:block; width:100%; min-height:44px; margin:8px 0 0; border:0; border-radius:12px; background:transparent; font:600 13px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-inbox-row.is-current { box-shadow:inset 3px 0 var(--vrm-focus,#2458E6) !important; }
+@media(max-width:767px){
+  .vrm-msg-list { border-radius:0 !important; border-left:0 !important; border-right:0 !important; margin:0 -14px; }
+  .vrm-main .vrm-msg-bar > .vrm-inbox-filters button { min-height:44px !important; }
+}
+
+/* Le fil : en-tête de messagerie, bulles, offre épinglée, saisie en pilule. */
+.vrm-chat-head { display:flex; align-items:center; gap:10px; padding:6px 8px; min-height:56px; flex-shrink:0; box-sizing:border-box; }
+.vrm-chat-back, .vrm-chat-sync { display:flex !important; align-items:center; justify-content:center; width:44px; height:44px; min-height:44px !important; padding:0 !important; border:0 !important; border-radius:10px; background:transparent !important; cursor:pointer; flex-shrink:0; }
+.vrm-chat-head-ph { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.vrm-chat-head-t { flex:1; min-width:0; }
+.vrm-chat-head-n { font-size:16px; font-weight:600; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.01em; }
+.vrm-chat-head-s { font-size:12px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+.vrm-chat-history { padding:16px 14px !important; gap:4px !important; }
+.vrm-bulle-l { display:flex; flex-direction:column; align-items:flex-start; max-width:80%; align-self:flex-start; margin-top:6px; }
+.vrm-bulle-l.vrm-bulle-moi { align-items:flex-end; align-self:flex-end; }
+.vrm-bulle { padding:9px 14px; border-radius:18px 18px 18px 6px; font-size:15px; line-height:1.4; white-space:pre-wrap; word-break:break-word; box-sizing:border-box; }
+.vrm-bulle-moi > .vrm-bulle { border-radius:18px 18px 6px 18px; border:0 !important; }
+.vrm-bulle-pied { display:flex; align-items:center; gap:12px; margin:3px 6px 0; min-height:20px; font-size:11px; }
+.vrm-bulle-pied > button[data-traduire] { margin:-13px -8px !important; padding:13px 8px !important; font-size:11.5px !important; min-height:44px !important; box-sizing:border-box; }
+.vrm-chat-link { display:inline-flex; align-items:center; min-height:44px; margin:-8px 4px -10px; font-size:13px; font-weight:600; text-decoration:none; }
+.vrm-chat-event { align-self:center; max-width:88%; text-align:center; font-size:12px; line-height:1.4; margin:10px 0 4px; }
+.vrm-chat-event-colis { border-radius:14px; padding:10px 14px; }
+.vrm-chat-event-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin-bottom:4px; }
+.vrm-chat-foot { flex-shrink:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); box-sizing:border-box; }
+.vrm-chat-note { display:flex; gap:8px; align-items:flex-start; font-size:12.5px; line-height:1.45; margin:0 0 10px; }
+.vrm-chat-offre { border-radius:14px; padding:12px; margin:0 0 10px; }
+.vrm-chat-offre-l { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.vrm-chat-offre-l + .vrm-chat-offre-l { margin-top:10px; }
+.vrm-chat-offre-t { flex:1 1 140px; font-size:15px; line-height:1.3; }
+.vrm-chat-offre-t b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.vrm-chat-offre-k { font-size:13px; flex-shrink:0; }
+.vrm-chat-offre-p { font-size:12.5px; line-height:1.45; margin-top:4px; }
+.vrm-chat-offre-info .vrm-chat-offre-t { flex:none; }
+.vrm-chat-btn { min-height:40px; padding:0 16px; border-radius:10px; font:600 14px Inter,system-ui,sans-serif; cursor:pointer; border:0; white-space:nowrap; }
+.vrm-chat-btn:disabled { cursor:default; }
+.vrm-chat-prix { width:96px; min-height:40px; border-radius:10px; padding:0 10px; font:400 15px Inter,system-ui,sans-serif; box-sizing:border-box; }
+.vrm-chat-rapides { display:flex; gap:8px; overflow-x:auto; margin:0 -12px; padding:0 12px 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; scroll-padding-inline:12px; }
+.vrm-chat-rapides::-webkit-scrollbar { display:none; }
+.vrm-chat-rapides > button { flex-shrink:0; min-height:36px; padding:0 14px; border-radius:999px; font:500 13px Inter,system-ui,sans-serif; white-space:nowrap; cursor:pointer; }
+.vrm-chat-compose { display:flex; align-items:flex-end; gap:8px; }
+.vrm-chat-compose > textarea { flex:1; resize:none; max-height:120px; min-height:40px; border-radius:20px; padding:9px 16px; font:400 15px/1.4 Inter,system-ui,sans-serif; outline:none; box-sizing:border-box; }
+.vrm-chat-send { flex-shrink:0; min-height:40px; padding:0 18px; border:0; border-radius:20px; font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
+.vrm-chat-vinted { display:flex; align-items:center; justify-content:center; min-height:48px; border-radius:12px; font:600 15px Inter,system-ui,sans-serif; text-decoration:none; }
+@media(max-width:767px){
+  .vrm-chat-panel .vrm-chat-btn, .vrm-chat-panel .vrm-chat-send, .vrm-chat-panel .vrm-chat-rapides > button, .vrm-chat-panel .vrm-chat-prix { min-height:44px !important; }
+  .vrm-chat-panel .vrm-chat-compose > textarea { min-height:44px; border-radius:22px; padding:11px 16px; }
+  .vrm-chat-panel .vrm-chat-send { border-radius:22px; }
+  .vrm-chat-offre-l > .vrm-chat-btn { flex:1 1 0; }
+  .vrm-chat-offre-l > .vrm-chat-offre-t { flex-basis:100%; }
+  .vrm-chat-offre-l > .vrm-chat-prix { flex:1 1 auto; width:auto; min-width:80px; }
+}
+.vrm-quick-settings > summary { display:flex; align-items:center; min-height:44px; padding:0; box-sizing:border-box; }
+
 /* ── Ventes et Colis (16 octobre) : des listes, pas des cartes ──────────────────
    Julien : « ça fait encore trop vibe-codé ». Sur téléphone, une vente et un
    colis se lisent comme une ligne d'app native : vignette · titre · méta ·
