@@ -27,6 +27,7 @@ import '@fontsource/space-grotesk/700.css';
 // le fond clair, le focus, la sélection et une classe de bouton opt-in.
 import './styles-mineral.css';
 import './styles-reglages.css';
+import './styles-coque.css';
 
 // ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
 // garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page

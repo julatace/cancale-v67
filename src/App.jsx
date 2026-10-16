@@ -310,6 +310,10 @@ const THEMES = {
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#0A0D12", onChrome:"#F2F5FA", chromeMuted:"#7D8798", chromeLine:"#1C222C",
     s1:"#2458E6", s2:"#7C9CFF",
+    // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
+    // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
+    // filet fin (`hair`) et le verre des barres de la coque (`bar`).
+    faint:"#8A93A6", hair:"rgba(18,27,44,.09)", bar:"rgba(255,255,255,.84)",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
@@ -339,6 +343,7 @@ const THEMES = {
     glass:"rgba(16,20,27,.90)",
     chrome:"#030406", onChrome:"#F2F5FA", chromeMuted:"#6D7788", chromeLine:"#161B24",
     s1:"#3D7BFF", s2:"#8AB4FF",
+    faint:"#5F6878", hair:"rgba(255,255,255,.08)", bar:"rgba(3,4,6,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
   },
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
@@ -8460,6 +8465,7 @@ const ICON_PATHS = {
   // ce genre de détail qui fait « page web bricolée » plutôt qu'application.
   trash:  <><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"/><path d="M6.5 6.5 7.4 19a1.6 1.6 0 0 0 1.6 1.5h6a1.6 1.6 0 0 0 1.6-1.5l.9-12.5"/><path d="M10.5 10v6.5M13.5 10v6.5"/></>,
   close:  <><path d="m6 6 12 12M18 6 6 18"/></>,
+  chevron: <><path d="m9.5 6 6 6-6 6"/></>,
   pencil: <><path d="M4 20.2h4l10-10a2.8 2.8 0 0 0-4-4l-10 10v4Z"/><path d="m14.5 5.5 4 4"/></>,
   // Atelier de republication (« ✨ ») : une étincelle + une petite touche.
   spark:  <><path d="M12 3.2 13.7 9l5.8 1.7L13.7 12.4 12 18.2l-1.7-5.8L4.5 10.7 10.3 9 12 3.2Z"/><path d="M18.5 4v3M20 5.5h-3"/></>,
@@ -8614,6 +8620,15 @@ const BAR_GROUPE={
   cat_msg:'plat_vinted', cat_expedition:'cat_bord',
   leboncoin:'plat_leboncoin',
 };
+// Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
+// défilement). Une source : les listes de navigation elles-mêmes (§11).
+function titreEcran(tab) {
+  if (tab === 'journee') return 'Ma journée';
+  if (tab === 'settings') return 'Paramètres';   // le grand titre de l'écran (le menu, lui, dit « Réglages »)
+  const t = [...BOTTOM_TABS, ...PLUS_TABS, ...VINTED_TABS].find(x => x.id === tab);
+  if (t) return t.label;
+  return { cat_msg: 'Messages', cat_expedition: 'Colis', leboncoin: 'Leboncoin', masques: 'Masqués', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+}
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
   /* ⚠️ Colis descend ici (barre du bas = les plateformes, demande du 27 sept.).
@@ -9045,18 +9060,21 @@ function ScreenHead({ icon, title, desc, right }) {
        tous les jours. L'icône rejoint le titre sur sa ligne (elle nomme déjà
        l'écran dans la barre de navigation) et le filet redevient une simple
        séparation. Mesuré : 40 px rendus au contenu, en haut de chaque page. */
-    <div className="vrm-screen-head" style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
+    /* (16 oct.) GRAND TITRE : l'échelle typographique de l'app est posée une
+       fois (index.html, `--vrm-t-*`) ; taille, graisse et marges vivent dans
+       `.vrm-screen-head` (styles-coque.css). Plus de filet sous le titre. */
+    <div className="vrm-screen-head">
       {/* ⚠️ LA RANGÉE DU TITRE RÉSERVE LA PLACE DE L'ÎLE D'ACTIONS. Depuis
           qu'elle flotte en haut à droite (fixe), les boutons qu'un écran pose
           sur sa propre ligne de titre passaient DESSOUS : sur Factures,
           « ⚙ Réglages » disparaissait derrière (vu en capture). Le filet de
           séparation, lui, garde toute la largeur. */}
-      <div className="vrm-tete-row" style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:10}}>
+      <div className="vrm-tete-row">
+        <div className="vrm-screen-head-titre">
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
-          <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(21px, 3vw, 27px)',fontWeight:700,color:C.text,lineHeight:1.05,letterSpacing:'-0.02em'}}>{title}</h2>
+          <h2 className="vrm-display" style={{color:C.text}}>{title}</h2>
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -9307,54 +9325,46 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
     ...(!bottom?[{ titre: 'Dans Vinted', items: VINTED_TABS }]:[]),
     { titre: 'Autres outils', items: NAV_OUTILS },
   ];
+  // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
+  // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
+  // L'écran courant porte la teinte d'accent et une coche — plus d'aplat bleu.
+  // Le dessin vit dans `.vrm-sheet` (styles-coque.css).
+  const rangee = (t, on, onClick) => (
+    <button key={t.id} type="button" role="menuitem" className="vrm-sheet-row" onClick={onClick} aria-current={on?'page':undefined}>
+      <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
+      <span className="vrm-sheet-lib">{t.label}</span>
+      {t.bientot && <span data-bientot="" className="vrm-sheet-badge">Bientôt</span>}
+      <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
+    </button>
+  );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-nav-more":undefined} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}
-        style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
-          borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
-          color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
-        {bottom?<span aria-hidden="true"><Icon name={open?'close':'menu'} size={19}/></span>:<Icon name={open?'close':'menu'} size={19}/>} {bottom && <span className="vrm-nav-label">Gestion</span>}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}>
+        <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex'}}><Icon name={open&&!bottom?'close':'menu'} size={bottom?24:22} style={{strokeWidth:1.6}}/></span>{bottom && <span className="vrm-nav-label">Gestion</span>}
       </button>
       {open && (
-        <div data-noswipe onClick={()=>setOpen(false)}
-          style={{position:'fixed',inset:0,zIndex:80,background:'rgba(21,17,16,.42)',
-            backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)'}}>
-          {/* Le panneau descend DU HAUT, sous le bouton qui l'a ouvert : une
-              feuille qui monte du bas pour un bouton du haut, le geste et le
-              mouvement se contredisent. */}
-          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-menu-bottom":"vrm-mobile-menu"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
-            style={{position:'absolute',left:0,right:0,top:0,background:C.chrome,color:C.onChrome,
-              borderBottom:`1px solid ${C.chromeLine}`,boxShadow:'0 14px 40px rgba(21,17,16,.28)',
-              padding:'calc(8px + env(safe-area-inset-top)) 10px 12px',
-              animation:'cancaleSheet .2s cubic-bezier(.32,.72,0,1)',maxHeight:'86vh',overflowY:'auto'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 8px'}}>
-              <span style={{fontSize:19,fontWeight:600}}>Ton espace</span>
-              <button className="vrm-icon-control" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)} style={{border:0,background:'transparent',color:C.onChrome,cursor:'pointer',padding:8}}><Icon name="close" size={20}/></button>
+        <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
+          {/* Depuis la barre du bas, la feuille MONTE du bas ; depuis l'en-tête,
+              elle descend du haut : le geste et le mouvement vont dans le même sens. */}
+          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom":"vrm-mobile-menu vrm-sheet vrm-sheet-haut"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+            {bottom && <div aria-hidden="true" className="vrm-sheet-poignee"/>}
+            <div className="vrm-sheet-tete">
+              <span className="vrm-sheet-titre">Ton espace</span>
+              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
             {groupes.map(g => (
-              <div className="vrm-menu-group" key={g.titre} style={{marginBottom:4}}>
-                <div className="vrm-label" style={{color:C.chromeMuted,padding:'9px 8px 5px'}}>{g.titre}</div>
-                {g.items.map(t => { const on = tab === t.id; return (
-                  <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setOpen(false); }}
-                    aria-current={on?'page':undefined}
-                    style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                      padding:'11px 10px',marginBottom:2,borderRadius:8,border:'none',cursor:'pointer',fontFamily:'inherit',
-                      background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
-                      fontSize:15,fontWeight:on?600:500}}>
-                    <NavigationIcon item={t} size={20} style={{opacity:on?1:.7,flexShrink:0}}/>
-                    <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
-                    {t.bientot && <span data-bientot="" style={{marginLeft:'auto',flexShrink:0,fontSize:10,fontWeight:600,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted}}>Bientôt</span>}
-                  </button>
-                );})}
+              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre}>
+                <div className="vrm-sheet-label">{g.titre}</div>
+                <div className="vrm-sheet-carte">
+                  {g.items.map(t => rangee(t, tab === t.id, ()=>{ setTab(t.id); setOpen(false); }))}
+                </div>
               </div>
             ))}
-            <button type="button" role="menuitem" onClick={()=>{ setTab('settings'); setOpen(false); }}
-              aria-current={tab==='settings'?'page':undefined}
-              style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',marginTop:6,
-                padding:'11px 10px',borderRadius:8,border:`1px solid ${C.chromeLine}`,cursor:'pointer',fontFamily:'inherit',
-                background:tab==='settings'?C.chromeLine:'transparent',color:C.chromeMuted,fontSize:14,fontWeight:500}}>
-              <Icon name="gear" size={19}/><span>Réglages</span>
-            </button>
+            <div className="vrm-sheet-groupe">
+              <div className="vrm-sheet-carte">
+                {rangee({id:'settings',icon:'gear',label:'Réglages'}, tab==='settings', ()=>{ setTab('settings'); setOpen(false); })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -9403,36 +9413,22 @@ function BottomBar({tab,setTab}) {
     return ()=>{ window.removeEventListener('focusin',onIn); window.removeEventListener('focusout',onOut); };
   },[]);
   return (
-    // Barre en VERRE DÉPOLI (comme iOS) : le contenu défile derrière au lieu
-    // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
-    // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <>
-    <nav className="vrm-mobile-nav" aria-label="Navigation principale" style={{flexShrink:0,zIndex:60,display:kbOpen?'none':'flex',overflowX:'hidden',
-      /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
-         signature, comme la barre latérale sur ordinateur. */
-      background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
-      paddingBottom:'env(safe-area-inset-bottom)',
-      // ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PLUS `position:fixed`.
-      // Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
-      // c'est `<main>` qui défile. Une barre qui ne participe pas au défilement
-      // ne peut pas « flotter au milieu de l'écran » pendant l'inertie iOS, ni
-      // être décalée par le `zoom` de densité. On la masque au clavier avec
-      // `display:none` (elle est dans le flux, un translate laisserait un vide).
-      }}>
+    {/* ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PAS `position:fixed`.
+       Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
+       c'est `<main>` qui défile — elle ne peut donc pas « flotter au milieu de
+       l'écran » pendant l'inertie iOS. Masquée au clavier par `display:none`.
+       (16 oct.) BARRE D'ONGLETS NATIVE : icônes fines, libellé 11 px, l'onglet
+       actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
+       seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
+       `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
+    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex'}}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab;
         const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
-        <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
-          flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
-          background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-          color:on?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
-          <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
-            width:38,height:26,transition:'transform .2s cubic-bezier(.32,.72,0,1), opacity .2s ease',
-            transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
-            <Icon name={t.icon} size={23} style={{strokeWidth:on?2:1.7}}/>
-          </span>
-          <span className="vrm-nav-label" style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
-            overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
+        <button key={t.id} type="button" className="vrm-tab" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined}>
+          <span aria-hidden="true" className="vrm-tab-ic"><Icon name={t.icon} size={24} style={{strokeWidth:on?2:1.6}}/></span>
+          <span className="vrm-nav-label">{t.label}</span>
         </button>
       );}); })()}
       <MenuEcrans tab={tab} setTab={setTab} bottom/>
@@ -11251,23 +11247,32 @@ function EntetePlateforme({nom,plateforme}) {
   return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
 }
 function PlatSubNav({ sub, setSub, sections, dark }) {
-  const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
+  // (16 oct.) CONTRÔLE SEGMENTÉ : une piste neutre, le segment actif posé dessus
+  // (fond carte + ombre fine), le texte des autres en secondaire. Plus de rangée
+  // de boutons encadrés ni d'aplat bleu (§7). Défile au doigt quand les sections
+  // ne tiennent pas (eBay en a six). Les couleurs viennent du thème (`T`) par des
+  // variables : le dessin vit dans `.vrm-seg` (styles-coque.css).
+  const refPiste = React.useRef(null);
+  React.useEffect(() => {
+    const el = refPiste.current && refPiste.current.querySelector('[aria-current="page"]');
+    if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {} }
+  }, [sub]);
   return (
-    <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
-      {sections.map(([id,label,point])=>{ const on = sub===id; return (
-        <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id}
-          style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
-            color:on?(T.onAccent||'#fff'):T.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
-            fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6}}>
-          <span className="vrm-section-icon"><Icon name={icones[id] || 'more'} size={17}/></span><span>{label}</span>
-          {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
-              comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
-              ici pourrait contredire celui de l'écran juste en dessous (§11). */}
-          {point && !on ? <span data-point="" aria-label="nouveau" style={{width:7,height:7,borderRadius:999,background:T.accent,flexShrink:0}}/> : null}
-        </button>
-      );})}
-    </nav>
+    <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
+      <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
+        style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent }}>
+        {sections.map(([id,label,point])=>{ const on = sub===id; return (
+          <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
+            <span>{label}</span>
+            {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
+                comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
+                ici pourrait contredire celui de l'écran juste en dessous (§11). */}
+            {point && !on ? <span data-point="" aria-label="nouveau" className="vrm-seg-point"/> : null}
+          </button>
+        );})}
+      </nav>
+    </div>
   );
 }
 // Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
@@ -24173,16 +24178,20 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) 
 // un élément déjà formé (la note du sélecteur Vinted porte son attribut).
 function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   const K = skin || C;
+  // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
+  // en liste native à droite (sans cadre lourd), chevron discret. La note, s'il y
+  // en a une, passe dessous en légende.
   return (
-    <div {...(attrs || {})} style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap', background: skin ? K.bg : 'transparent' }}>
-      <label htmlFor={id} style={{ fontSize: 12, color: K.muted, fontWeight: 600 }}>Compte</label>
-      <select id={id} value={valeur} onChange={(e) => onChange(e.target.value)}
-        style={{ flex: '0 1 280px', maxWidth: '100%', padding: '8px 11px', borderRadius: 8, border: `1px solid ${K.border}`,
-          background: K.card, color: K.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
-        <option value="*">Tous les comptes</option>
-        {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
-      </select>
-      {note ? (typeof note === 'string' ? <span style={{ fontSize: 11.5, color: K.muted }}>{note}</span> : note) : null}
+    <div {...(attrs || {})} className="vrm-compte-choix" style={{ background: skin ? K.bg : 'transparent' }}>
+      <div className="vrm-compte-ligne" style={{ background: skin ? 'rgba(255,255,255,.06)' : K.card2, color: K.text }}>
+        <label htmlFor={id} style={{ color: K.muted }}>Compte</label>
+        <select id={id} value={valeur} onChange={(e) => onChange(e.target.value)} style={{ color: K.text }}>
+          <option value="*">Tous les comptes</option>
+          {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
+        </select>
+        <span aria-hidden="true" className="vrm-compte-chevron" style={{ color: K.muted }}><Icon name="chevron" size={15}/></span>
+      </div>
+      {note ? (typeof note === 'string' ? <span className="vrm-compte-note" style={{ color: K.muted }}>{note}</span> : <span className="vrm-compte-note">{note}</span>) : null}
     </div>
   );
 }
@@ -40636,6 +40645,24 @@ function AppCoeur() {
     const ro = new ResizeObserver(poser); ro.observe(el);
     return () => ro.disconnect();
   }, [ordi]);
+  // (16 oct.) GRAND TITRE FAÇON iOS. Le titre large vit dans l'écran (son
+  // `ScreenHead`, l'en-tête de plateforme) ; dès qu'on a défilé au-delà, l'en-tête
+  // de la coque prend son matériau (verre + filet) et affiche le titre COURT de
+  // l'écran, centré. En haut de page il reste transparent, sans filet : le titre
+  // n'est jamais écrit deux fois à l'écran. On lit `.vrm-main` (c'est lui qui
+  // défile, pas le document) ; un seuil, pas une animation pilotée au pixel.
+  const [defile, setDefile] = useState(false);
+  React.useEffect(() => {
+    const main = document.querySelector('.vrm-main');
+    if (!main) return undefined;
+    let raf = 0;
+    const lire = () => { raf = 0; setDefile(main.scrollTop > 44); };
+    const surDefilement = () => { if (!raf) raf = requestAnimationFrame(lire); };
+    lire();
+    main.addEventListener('scroll', surDefilement, { passive: true });
+    return () => { main.removeEventListener('scroll', surDefilement); if (raf) cancelAnimationFrame(raf); };
+  }, [tab]);
+  const titreCourant = titreEcran(tab);
   const handleLogoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if(!file) return;
@@ -41842,7 +41869,7 @@ function AppCoeur() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-faint':C.faint,'--vrm-hair':C.hair,'--vrm-bar':C.bar,'--vrm-accent':C.accent,'--vrm-card2':C.card2,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -41919,92 +41946,48 @@ function AppCoeur() {
           en `fixed`, le titre de l'écran remonte et partage la ligne avec les
           actions, comme dans une vraie application. Sur téléphone il porte le
           menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      <header className="vrm-app-header" ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
-        padding: ordi ? '7px 10px' : '11px 16px',
-        // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
-        // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
-        // illisible dès qu'il passait dessous (vu en capture). Réduit à la
-        // largeur de ses quatre icônes et posé en haut à droite, il ne recouvre
-        // plus rien et le titre remonte de 56 px.
-        right: ordi ? 24 : undefined,
-        borderRadius: ordi ? 12 : undefined,
-        border: ordi ? `1px solid ${C.border}` : undefined,
-        boxShadow: ordi ? (C.shadowMd||'none') : undefined,
-        /* ⚠️ SUR ORDINATEUR C'ÉTAIT UNE BANDE BLANCHE VIDE de 62 px : la moitié
-           gauche est masquée (la barre latérale porte déjà la marque et la
-           navigation), donc il ne restait qu'un bandeau plein largeur avec
-           quatre icônes collées à droite. Il prend maintenant la couleur du
-           FOND et perd sa bordure : les icônes flottent au-dessus de la page,
-           il n'y a plus de barre à regarder. Sur téléphone, rien ne change —
-           le bandeau y porte le menu, le logo et la synchro. */
-        // ⚠️ Sur l'onglet eBay (téléphone), la barre du haut passe au NOIR eBay
-        // pour que l'écran soit d'un seul tenant (Julien : « améliore tout » —
-        // plus de barre claire au-dessus d'un contenu noir). Fond + bordure
-        // seulement : les puces/icônes restent lisibles sur noir.
-        background: C.glass||C.surface,
-        backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom: ordi ? undefined : `1px solid ${C.border}`}}>
+      {/* (16 oct.) Le dessin de l'en-tête vit dans `.vrm-app-header`
+          (styles-coque.css) : téléphone = barre transparente qui prend son verre
+          et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
+          haut à droite. Ici seulement la structure et la position. */}
+      <header className={`vrm-app-header${defile ? ' is-defile' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,right: ordi ? 24 : undefined,zIndex:50}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div className="vrm-header-brand" style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
+        <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
           {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark}/>}
-          {/* Logo Cancale Shoes Store - cliquable pour le changer */}
+          {/* Logo : cliquable pour le changer (appui long = remettre celui de VRM). */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div className="vrm-header-logo"
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
-            title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
-            style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:10,cursor:'pointer'}}>
-            {/* Logo VRM par défaut ; remplacé par ton image si tu en as chargé une.
-                `key={tab}` remonte le logo à chaque changement d'écran → la petite
-                rotation 3D se rejoue « quand VRM charge une page » (demande de
-                Julien). `prefers-reduced-motion` la neutralise. */}
+            title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)">
+            {/* `key={tab}` rejoue la petite rotation 3D au changement d'écran
+                (demande de Julien) ; `prefers-reduced-motion` la neutralise. */}
             {customLogo
-              ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim" style={{width:40,height:40,objectFit:'cover',borderRadius:10}}/>
-              : <VrmLogo key={tab} size={40}/>}
-            {/* Repère « modifiable » : une pastille discrète en coin, et non plus
-                un bandeau noir en travers du logo — il masquait le bas du V. */}
-            {/* ⚠️ La pastille « modifiable » ne colle plus en permanence sur la
-                marque : un produit fini ne porte pas un crayon sur son logo.
-                Elle apparaît au SURVOL (ordinateur) ; le changement d'icône
-                reste accessible dans Réglages sur téléphone. */}
-            <div className="vrm-logo-edit" style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1,opacity:0,transition:'opacity .15s ease'}}>✎</div>
-          </div>
-          {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
-              passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
-          {/* ⚠️ LE LOGO ÉTAIT ÉCRIT DEUX FOIS : l'icône carrée porte déjà les
-              lettres « VRM », et le mot était posé juste à côté. Sur téléphone
-              ça mangeait un tiers de la barre pour ne rien dire de plus. Le mot
-              seul reste dans la barre latérale, sur ordinateur. */}
-          <div style={{minWidth:0,display:'none'}}>
-            <VrmWord height={19} color={C.text} accent={C.accent} style={{display:'block'}}/>
-            {/* ⚠️ Le numéro de version ne s'affiche PLUS dans l'en-tête. Il y
-                apparaissait tronqué (« v83/00 · Rafraîchisse… ») sur TOUS les
-                écrans : c'est de la information de développeur, et c'est
-                exactement ce qui fait « outil bricolé » plutôt que produit.
-                Il reste consultable dans Réglages, à côté de la version de
-                l'extension — c'est là qu'on le cherche quand on en a besoin. */}
+              ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim"/>
+              : <VrmLogo key={tab} size={30}/>}
           </div>
         </div>
-        <div className="vrm-header-actions" style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
-          <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
+        {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
+        <div className="vrm-header-actions">
+          <div style={{display:'flex',alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
             <span style={{position:'relative',display:'inline-flex'}}>
-            <button type="button" className="vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
+            <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
               syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
               syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
-            } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
-              {/* Icône au trait plutôt qu'emoji : elle prend la couleur de l'état
-                  (vert synchronisé, orange en cours, rouge hors ligne), ce qu'un
-                  emoji ne sait pas faire. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
-                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
+            }>
+              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
+                  rouge seulement si la base refuse ou ne répond pas. */}
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
@@ -42015,7 +41998,7 @@ function AppCoeur() {
             </span>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
-          <div style={{display:'flex',gap:6}}>
+          <div style={{display:'flex',alignItems:'center'}}>
             {false&&<button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
@@ -42038,14 +42021,13 @@ function AppCoeur() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
-            {(() => { const eD = dark; const ink = C.text; const bd = C.border; return (<>
+            {(() => { const eD = dark; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
-            <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
-              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              <Icon name="search" size={17}/>
+            <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
+              <Icon name="search" size={21}/>
             </button>
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
