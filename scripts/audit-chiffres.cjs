@@ -130,12 +130,15 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
 // côté de 2 235,80 € retenus. Le disponible n'apparaissait que dans une phrase
 // d'explication de l'écran Statistiques — jamais sur l'accueil.
 {
+  // (16 oct.) La carte de Ma journée est en deux colonnes « En attente » /
+  // « À virer » : le bloc est plus long, la fenêtre suit (la RÈGLE reste : deux
+  // montants, deux mots, et l'âge d'un vieux solde).
   const i = app.indexOf('escrow && escrow.dispo > 0');
-  const F = i < 0 ? '' : app.slice(i, i + 900);
+  const F = i < 0 ? '' : app.slice(i, i + 1600);
   F ? ok('l\'accueil dit l\'argent déjà disponible à virer')
     : nok('l\'argent virable doit apparaître à côté de l\'argent en attente');
   // ⚠️ « en attente » et « disponible » ne se confondent JAMAIS (§5.14).
-  /déjà disponibles à virer/.test(F)
+  (/déjà disponibles à virer/.test(F) || (/À virer/.test(F) && /En attente/.test(app.slice(Math.max(0, i - 1600), i + 1600)) && /déjà disponibles/.test(F)))
     ? ok('et ne le confond pas avec l\'argent en attente')
     : nok('les deux montants doivent porter des mots différents');
   /plusVieuxJours>7/.test(F)
