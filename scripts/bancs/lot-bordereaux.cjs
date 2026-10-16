@@ -22,7 +22,12 @@ const PORT = 4341 + 7;   // 4348
 
 const auj = new Date();
 const vente = (id, titre) => ({ transaction_id: id, title: titre, price: { amount: '50', currency_code: 'EUR' }, status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: new Date(auj.getTime() - 86400000).toISOString() });
-const VENTES = [vente(9001, 'Paire A taille 42'), vente(9002, 'Paire B taille 40'), vente(9003, 'Paire C taille 38')];
+// (16 oct.) 9004 : une vente d'il y a UN MOIS que Vinted dit encore « à
+// expédier » (le compte n'a pas été relu) — la plainte de Julien : « Tout
+// imprimer m'a donné des bordereaux d'il y a un mois ». Elle doit être dans
+// l'aperçu, DÉCOCHÉE avec la raison, et ne pas partir à l'impression.
+const VENTES = [vente(9001, 'Paire A taille 42'), vente(9002, 'Paire B taille 40'), vente(9003, 'Paire C taille 38'),
+  { ...vente(9004, 'Paire ancienne taille 41'), date: new Date(auj.getTime() - 31 * 86400000).toISOString() }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
 const ABIME_B64 = Buffer.from('%PDF-1.4\n' + 'ceci n’est pas un PDF lisible '.repeat(20)).toString('base64');
@@ -31,6 +36,7 @@ const rows = [
   bord(9001, 'Paire A taille 42', PDF_B64),
   bord(9002, 'Paire B taille 40', ABIME_B64),
   bord(9003, 'Paire C taille 38', null),
+  bord(9004, 'Paire ancienne taille 41', PDF_B64),
   { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: VENTES } } },
 ];
 
@@ -89,10 +95,21 @@ const projette = (row, sel) => {
     await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
     ctx.on('page', (p) => p.close().catch(() => {}));      // l'onglet d'impression réservé au clic
     await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-    await pg.waitForSelector('button[data-imprime="1"]', { timeout: 20000 }).catch(() => {});
+    await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(1200);
+    const ouvrir = await pg.$('button[data-lot-ouvrir="1"]');
+    dit(!!ouvrir, 'le bouton « Tout imprimer » est là', errs.join(' | ').slice(0, 120));
+    if (ouvrir) await ouvrir.click();
+    await pg.waitForTimeout(500);
+    // L'APERÇU : le plus récent en haut, l'ancienne décochée avec sa raison.
+    const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), coche: e.getAttribute('data-coche') === '1', ancienne: !!e.querySelector('[data-lot-ancienne]') })));
+    dit(ap.length === 4, 'l’aperçu liste les 4 bordereaux prêts, aucun caché', JSON.stringify(ap.map((x) => x.cle)));
+    dit(ap.length && ap[ap.length - 1].cle === '9004', 'trié par date de vente : la plus ancienne en bas', JSON.stringify(ap.map((x) => x.cle)));
+    const v4 = ap.find((x) => x.cle === '9004');
+    dit(v4 && !v4.coche && v4.ancienne, 'la vente d’il y a un mois est DÉCOCHÉE et dit pourquoi (pas d’impression silencieuse d’archives)', JSON.stringify(v4));
+    dit(ap.filter((x) => x.coche).length === 3, 'les trois ventes récentes sont cochées', JSON.stringify(ap));
     const bouton = await pg.$('button[data-imprime="1"]');
-    dit(!!bouton, 'le bouton « Tout imprimer » est là', errs.join(' | ').slice(0, 120));
+    dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
       await bouton.click();
       // Le message du lot : celui qui dit « N sur M ».
@@ -105,6 +122,9 @@ const projette = (row, sel) => {
       dit(/1 sans PDF/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
       const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans PDF/, '');
       dit(/\b1\b/.test(illisible), 'et celui que la fusion a écarté — compté, jamais passé sous silence', msg || '');
+      await pg.waitForTimeout(600);
+      const reprise = await pg.evaluate(() => { const b = document.querySelector('button[data-lot-imprimer]'); return b ? { n: b.getAttribute('data-lot-imprimer'), t: b.innerText } : null; });
+      dit(reprise && /Réessayer/.test(reprise.t) && reprise.n === '1', 'il propose de relancer SEULEMENT l’échec (le bordereau sans PDF)', JSON.stringify(reprise));
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
     await ctx.close();

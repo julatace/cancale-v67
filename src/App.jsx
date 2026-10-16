@@ -1226,7 +1226,51 @@ function ConfirmHost() {
 // Indicateur de synchro (mis a jour par l'app)
 let _syncListeners = [];
 const onSyncChange = (fn) => { _syncListeners.push(fn); return () => { _syncListeners = _syncListeners.filter(f=>f!==fn); }; };
-const _emitSync = (status) => { _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}}); };
+// (16 oct., Julien : « pourquoi le nuage en haut est barré ? ») L'état de la
+// synchro porte maintenant SA RAISON et l'heure : le panneau du nuage les dit
+// en clair (« la base a répondu 503 », « pas de réseau ») au lieu d'une icône.
+let _syncInfo = { etat: 'attente', raison: '', at: null, okAt: null, reprise: null };
+const _emitSync = (status, raison) => {
+  const now = Date.now();
+  _syncInfo = { ..._syncInfo, etat: status, raison: status === 'error' || status === 'refus' ? (raison || _syncInfo.raison || '') : '', at: now, okAt: status === 'synced' ? now : _syncInfo.okAt };
+  _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}});
+};
+// Une sauvegarde ratée se RELANCE toute seule (5 s, 15 s, 1 min, puis toutes
+// les 2 min) : avant, le nuage restait barré jusqu'à la prochaine saisie, et
+// ce qu'il venait de taper n'arrivait jamais dans la base s'il ne touchait à
+// rien d'autre. Rien n'est perdu entre-temps : tout reste sur cet appareil.
+let _repriseN = 0, _repriseT = null;
+const planifierReprise = () => {
+  if (_repriseT) return;
+  const d = [5000, 15000, 60000][_repriseN] || 120000; _repriseN++;
+  _syncInfo = { ..._syncInfo, reprise: Date.now() + d };
+  _repriseT = setTimeout(() => { _repriseT = null; cloudPush(); }, d);
+};
+function PanneauSync({ onFermer, onReglages }) {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const off = onSyncChange(() => maj()); const t = setInterval(maj, 5000); const f = (e) => { if (!e.target.closest || !e.target.closest('[data-sync-panneau],.vrm-sync-status')) onFermer(); }; document.addEventListener('pointerdown', f); return () => { off(); clearInterval(t); document.removeEventListener('pointerdown', f); }; }, []);
+  const i = _syncInfo;
+  const h = (t) => t ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null;
+  const titre = i.etat === 'synced' ? 'Tout est sauvegardé' : i.etat === 'saving' ? 'Sauvegarde en cours…' : i.etat === 'loading' ? 'Chargement de tes réglages…' : i.etat === 'refus' ? 'Sauvegarde bloquée' : i.etat === 'error' ? 'Dernière sauvegarde pas partie' : 'En attente';
+  const sec = i.reprise ? Math.max(0, Math.round((i.reprise - Date.now()) / 1000)) : null;
+  return (
+    <div data-sync-panneau={i.etat} role="dialog" aria-label="Synchronisation" data-noswipe="1"
+      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(300px, calc(100vw - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '12px 14px', fontSize: 12.5, lineHeight: 1.5, textAlign: 'left' }}>
+      <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>{titre}</div>
+      {i.okAt && <div style={{ color: C.muted }}>Dernière sauvegarde réussie à {h(i.okAt)}.</div>}
+      {!i.okAt && i.etat !== 'synced' && <div style={{ color: C.muted }}>Aucune sauvegarde réussie depuis l’ouverture de l’app.</div>}
+      {(i.etat === 'error' || i.etat === 'refus') && <div data-sync-raison style={{ marginTop: 6 }}>Pourquoi : {i.raison || 'la base n’a pas répondu'}.</div>}
+      {i.etat === 'error' && <div style={{ color: C.muted, marginTop: 6 }}>Rien n’est perdu : tes changements restent sur cet appareil{sec != null ? ` — nouvel essai dans ${sec} s` : ''}.</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
+        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
+        <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réglages</button>
+      </div>
+    </div>
+  );
+}
+if (typeof window !== 'undefined') window.addEventListener('online', () => { if (_syncInfo.etat === 'error') { _repriseN = 0; setTimeout(() => reprendreSyncMaintenant(), 500); } });
+const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT); _repriseT = null; } cloudPush(); };
 
 // Signal « chargement initial du cloud terminé ». CRUCIAL pour la numérotation :
 // tant que le cloud n'est pas chargé, un composant ne doit PAS numéroter (sinon
@@ -1328,7 +1372,7 @@ const cloudPush = () => {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
       // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
-      if (Object.keys(payload).length === 0) { _emitSync('error'); _cloudTimer = null; return; }
+      if (Object.keys(payload).length === 0) { _emitSync('error', 'rien à sauvegarder sur cet appareil (réglages pas encore chargés)'); _cloudTimer = null; return; }
       // UPSERT et non PATCH : un PATCH ne modifie qu'une ligne existante, donc
       // un vendeur qui vient de créer son compte (pas encore de ligne) n'aurait
       // jamais rien de sauvegardé. L'upsert crée la ligne au premier envoi.
@@ -1345,16 +1389,17 @@ const cloudPush = () => {
           try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
           try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
           toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
-          _emitSync('error'); _cloudTimer = null;
+          _emitSync('error', 'lettre de numérotation refusée'); _cloudTimer = null;
           // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
           // sans la lettre (jamais en boucle).
           if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
           return;
         }
-        if (code) { _pushBloque = true; _emitSync('refus'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
-      }
-      _emitSync(res.ok ? 'synced' : 'error');
-    } catch (_) { _emitSync('error'); }
+        if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
+        _emitSync('error', res.status === 401 || res.status === 403 ? `la base a refusé l'envoi (${res.status}) — ta session a peut-être expiré` : res.status >= 500 ? `la base ne répond pas (${res.status})` : `la base a répondu ${res.status}`);
+        planifierReprise();
+      } else { _repriseN = 0; _emitSync('synced'); }
+    } catch (_) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : 'la base n’a pas répondu'); planifierReprise(); }
     _cloudTimer = null;
   }, 800);
 };
@@ -4144,6 +4189,26 @@ const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
     const d = new Date(d0); d.setDate(d0.getDate() - i);
     const j = { cle: cleJourLocal(d.getTime()), jour: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d.getDay()], num: d.getDate(),
       long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
+      vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
+    J.push(j); par[j.cle] = j;
+  }
+  for (const l of (vendues || [])) { const j = par[cleJourLocal(l.ts)]; if (j) { j.vendu.n += 1; j.vendu.eur += l.eur; } }
+  for (const l of (recues || [])) { const j = par[cleJourLocal(l.ts)]; if (j && j.recu) { j.recu.n += 1; j.recu.eur += l.eur; } }
+  return J;
+};
+// La SEMAINE EN COURS, du lundi au dimanche (16 oct., Julien : « un graphique
+// avec les jours en abscisse et le chiffre d'affaires en ordonnée, pour la
+// semaine en cours »). Mêmes règles que `joursVenduRecu` (vendu au jour de la
+// vente, reçu au jour du versement) ; un jour pas encore arrivé est `futur` :
+// il n'a pas de point (zéro serait un faux).
+const joursSemaine = (vendues, recues, maintenant = Date.now()) => {
+  const d0 = new Date(maintenant); d0.setHours(0, 0, 0, 0);
+  const lundi = new Date(d0); lundi.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));
+  const J = [], par = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(lundi); d.setDate(lundi.getDate() + i);
+    const j = { cle: cleJourLocal(d.getTime()), jour: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][d.getDay()], num: d.getDate(),
+      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), futur: d.getTime() > d0.getTime(), auj: d.getTime() === d0.getTime(),
       vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
     J.push(j); par[j.cle] = j;
   }
@@ -7528,6 +7593,47 @@ function BarresVenduRecu({ jours, hauteur = 96 }) {
         })}
       </div>
     </div>
+  );
+}
+
+// Courbe à POINTS RELIÉS de la semaine : en abscisse les jours (lun → dim), en
+// ordonnée le chiffre d'affaires, la valeur écrite au-dessus de chaque point.
+// Vendu (trait plein, accent) et reçu (pointillé, gris) quand il est connu.
+function CourbeSemaine({ jours }) {
+  const W = 340, H = 168, gx = 34, gy = 22, bas = 26;
+  const vus = jours.filter(j => !j.futur);
+  const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
+  const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
+  const haut = Math.ceil(max / pas) * pas;
+  const X = (i) => gx + (i * (W - gx - 10)) / 6;
+  const Y = (v) => gy + (1 - v / haut) * (H - gy - bas);
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const chemin = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean).map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
+  const avecRecu = jours.every(j => j.recu);
+  const graduations = []; for (let v = 0; v <= haut; v += pas) graduations.push(v);
+  return (
+    <svg data-courbe-semaine="" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
+      {graduations.map(v => (
+        <g key={v}>
+          <line x1={gx} x2={W - 6} y1={Y(v)} y2={Y(v)} stroke={C.border} strokeWidth="1"/>
+          <text x={gx - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="9.5" fill={C.muted}>{v}</text>
+        </g>
+      ))}
+      {avecRecu && <path d={chemin('recu')} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 3"/>}
+      <path d={chemin('vendu')} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+      {jours.map((j, i) => (
+        <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
+          {!j.futur && <>
+            <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
+            {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.6" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
+            <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.2 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
+            {j.vendu.eur > 0 && <text x={X(i)} y={Y(j.vendu.eur) - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.text}>{Math.round(j.vendu.eur)}</text>}
+          </>}
+          <text x={X(i)} y={H - 10} textAnchor="middle" fontSize="10" fontWeight={j.auj ? 700 : 500} fill={j.auj ? C.text : C.muted}>{j.jour} {j.num}</text>
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -24394,6 +24500,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [vendus]);
   // Les 14 derniers jours, VENDU et REÇU côte à côte (`joursVenduRecu`).
   const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
+  const semaine = useMemo(() => joursSemaine(vendus.lignes, declarables ? declarables.lignes : null), [vendus, declarables]);
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
@@ -28423,7 +28530,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
   // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
   const [batchBusy, setBatchBusy] = useState(false);
-  const batchBordereaux = async () => {
+  // ── « TOUT IMPRIMER » PASSE PAR UN APERÇU (16 octobre) ─────────────────────
+  // Julien : « j'ai appuyé sur Tout imprimer, ça m'a donné des bordereaux
+  // d'anciennes ventes d'il y a un mois ». Le lot ne prend que les ventes que
+  // Vinted dit encore « à expédier » — mais cet état n'est relu que quand
+  // l'extension repasse sur le compte : une vente d'un compte pas relu depuis
+  // des semaines garde « à expédier » pour toujours. Or Vinted annule une vente
+  // non postée dans les jours qui suivent : une vente de plus de
+  // `VENTE_LOT_MAX_J` jours encore « à expédier », c'est presque toujours un
+  // état périmé. ⇒ Le bouton ouvre un APERÇU trié par date de vente (la plus
+  // récente en haut, tous comptes mêlés) : on voit date, compte, N°, titre.
+  // Les ventes anciennes et les bordereaux déjà imprimés sont DÉCOCHÉS avec la
+  // raison (jamais cachés) ; on imprime exactement ce qui est coché, et un
+  // échec se relance seul (« Réessayer les échecs »).
+  const VENTE_LOT_MAX_J = 14;
+  const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
+  const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
+  const lignesLot = () => expeditions()
+    .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
+    .map(e => { const cle = e.txn || e.key; const age = ageVenteJ(e.o); const imprime = (e.txn && bordsPrinted[e.txn]) || (e.b && isBordPrinted(e.b) ? bordsPrinted[bordKey(e.b)] : null) || null;
+      return { cle, e, age, imprime, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
+    .sort((a, b) => (Date.parse(b.e.o && b.e.o.date) || 0) - (Date.parse(a.e.o && a.e.o.date) || 0));
+  const ouvrirLot = () => {
+    const L = lignesLot();
+    if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    setLot({ coches: new Set(L.filter(l => !l.ancienne && !l.imprime).map(l => l.cle)), echecs: [] });
+  };
+  const batchBordereaux = async (cles) => {
     if (batchBusy) return;
     // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
     // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
@@ -28441,8 +28574,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
     //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
     const ex = expeditions();
-    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
-    if (!aImprimer.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    const choisis = cles instanceof Set ? cles : null;
+    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
+      .filter(e => !choisis || choisis.has(e.txn || e.key));
+    if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    const echecs = [], faits = [];
     setBatchBusy(true);
     try {
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
@@ -28458,7 +28594,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
         if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
         const buf = lu && lu.octets ? lu.octets : null;
-        if (!buf) continue;   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+        if (!buf) { echecs.push(e.txn || e.key); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+        faits.push(e.txn || e.key);
         // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
         // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
         const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
@@ -28479,6 +28616,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // est écarté par la fusion, et il doit être compté ici aussi.
       const imprimes = Number(r && r.count) || 0;
       const illisibles = Math.max(0, items.length - imprimes);
+      // Les imprimés sont notés « ✓ Imprimé » (le prochain lot les décoche) ;
+      // quand la fusion a écarté un PDF illisible on ne sait pas lequel : rien
+      // n'est noté plutôt qu'un faux « imprimé ».
+      if (!illisibles && faits.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); faits.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      if (choisis) setLot(echecs.length || illisibles ? { coches: new Set(echecs), echecs } : null);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -28488,7 +28630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     if(only!=='bordereaux' || !_pendingBordPrint || !Array.isArray(emailBords)) return;
     _pendingBordPrint=false;
-    const t=setTimeout(()=>{ try{ batchBordereaux(); }catch(_){} }, 400);
+    const t=setTimeout(()=>{ try{ ouvrirLot(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only]);
@@ -28718,7 +28860,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const h = new Date().getHours();
         const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
         const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
+        // ⚠️ (16 oct., Julien : « enlève répondre à 112 messages, c'est
+        //    incohérent »). Mesuré sur sa base : 159 conversations marquées non
+        //    lues, dont 21 seulement ont bougé ces 7 derniers jours — le reste
+        //    est de vieux échanges jamais rouverts. On ne compte que ce qui
+        //    attend VRAIMENT une réponse : non lu, de moins de 7 jours, compte
+        //    pas écarté.
+        const MSG_RECENT_MS = 7 * 864e5;
+        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS).length;
         const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
@@ -28732,6 +28881,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // dérivation pour les rendus qui ne passent pas la prop.
         const premierJour = premierJourProp !== undefined ? !!premierJourProp : (!!accountsReady && !baseKO && accounts.length===0);
         const jobs=[];
+        // (16 oct.) Les quatre gestes du quotidien sont une BARRE compacte —
+        // icône, nombre, deux mots — et plus quatre cartes de texte. La liste en
+        // dessous ne garde que les vraies alertes (double vente, colis cochés
+        // non partis, litige, emails mis de côté).
+        const tuiles = { envoyer: { n: 0, sub: 'Aucun colis à envoyer' }, retirer: { n: 0, sub: 'Aucun colis à retirer' }, messages: null, prix: null };
         // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
         // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
         // le bordereau est déjà en base** — et la carte disait seulement
@@ -28758,8 +28912,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + paire au stock, coche par colis';
-          jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`${toShip.length} colis`,action:'Expédier',sub,tab:'cat_bord',prio:late>0?0:1,
-            photos:toShip.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
+          tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
         }
         // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
         // même liste que l'alerte de Colis (`cochesNonPartis`, §11). Coché, le
@@ -28805,7 +28958,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      // dans Achats) ; l'auto-capture ne couvre les casiers Vinted Go
                      // qu'avec une version récente — ne pas la promettre seule.
                      return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
-          jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
+          tuiles.retirer = { n: pickupCount, sub, alerte: hd>0 };
         }
         // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
         //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
@@ -28815,8 +28968,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
-        if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
-        if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
+        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -28879,7 +29032,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 logique §5/§11 (chiffres sûrs, « vendu » ≠ « reçu », escrow ≠
                 dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
                 plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
-            {!baseKO && !premierJour && (
+            {!baseKO && (
               <div className="vrm-day-greeting" style={{marginBottom:14}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
                 <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
@@ -28893,6 +29046,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 serait le pire des deux mondes. Le bandeau s'auto-masque dès que
                 tout va bien. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
+
+            {/* LA BARRE DU QUOTIDIEN (16 oct., Julien : « juste les logos —
+                colis à envoyer, à retirer, messages, baisser les prix — sans les
+                textes, une barre en largeur »). Le nombre est un fait ; « — »
+                quand il n'a pas pu être lu (jamais un zéro inventé, §5). */}
+            {!baseKO && !premierJour && (()=>{
+              const ko = nomsVentesKO.length > 0;
+              const T = [
+                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || (ko && !(tuiles.envoyer && tuiles.envoyer.n)) },
+                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
+                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:'cat_msg', pasSu: loading || convs.items == null },
+                { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
+              ];
+              return (
+                <div data-barre-jour="" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:8,marginBottom:14}}>
+                  {T.map(x => {
+                    const n = x.t ? x.t.n : 0;
+                    const vif = !x.pasSu && n > 0;
+                    return (
+                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                        style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'12px 6px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',minWidth:0}}>
+                        <span style={{display:'flex',color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
+                        <span className="vrm-display" style={{fontSize:20,fontWeight:700,lineHeight:1.1,color:vif ? C.text : C.muted,fontVariantNumeric:'tabular-nums'}}>{x.pasSu ? '—' : n}</span>
+                        <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{x.l}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
                 claire : le gros chiffre en encre, l'accent réservé au lien. */}
@@ -28927,17 +29110,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
 
             {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
-            {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
-              <ResumePlateforme title="Évolution · 14 derniers jours" className="vrm-day-history">
+            {!baseKO && !premierJour && !loading && sales.items && (
+              <ResumePlateforme title="Ta semaine" className="vrm-day-history">
               <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Cette semaine · <span className="vrm-display" data-total-semaine={Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)*100)}>{Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)).toLocaleString('fr-FR')} €</span> vendus</div>
                   <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
                     <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
                   </div>
                 </div>
-                <BarresVenduRecu jours={jours14}/>
+                <CourbeSemaine jours={semaine}/>
                 <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
                   <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
                   {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
@@ -28996,9 +29179,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
-              : <div style={{padding:'12px 14px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12,color:C.muted}}>
-                  <span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.
-                </div>
+              : (tuiles.envoyer && tuiles.envoyer.n === 0 && tuiles.retirer && tuiles.retirer.n === 0 && !(tuiles.messages && tuiles.messages.n > 0)
+                  ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
+                  : null)
             )}
 
             {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
@@ -31959,13 +32142,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
-                  <button type="button" data-imprime="1" onClick={batchBordereaux} disabled={batchBusy}
+                  <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
                     style={{flexShrink:0,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
+                {lot && (()=>{
+                  const L = lignesLot();
+                  const nb = L.filter(l=>lot.coches.has(l.cle)).length;
+                  const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
+                  const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
+                  return (
+                    <div data-noswipe="1" data-lot={L.length} role="dialog" aria-modal="true" aria-label="Bordereaux à imprimer"
+                      onClick={e=>{ if(e.target===e.currentTarget) setLot(null); }}
+                      style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(10,15,25,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                      <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
+                        <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
+                          <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
+                          <div style={{fontSize:12,color:C.muted,marginTop:3}}>Le plus récent en haut. Seuls les cochés partent à l'impression, chacun sur sa feuille.</div>
+                        </div>
+                        <div style={{overflowY:'auto',padding:'4px 18px'}}>
+                          {L.map(l => {
+                            const o = l.e.o, coche = lot.coches.has(l.cle);
+                            const num = (l.e.b ? numForBord(l.e.b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+                            return (
+                              <label key={l.cle} data-lot-ligne={l.cle} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
+                                <input type="checkbox" checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/>
+                                <span style={{flex:1,minWidth:0}}>
+                                  <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{(o && o.title) || (l.e.b && (l.e.b.modele || l.e.b.article)) || 'Bordereau'}</span>
+                                  <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>
+                                    Vinted · {o && o._acc ? accNameOf(o._acc) : 'compte inconnu'} · vendue le {fmtD(o)}
+                                    {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
+                                    {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
+                                    {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
+                          <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
+                          <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
+                            style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
+                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
                   clique sur fait, ça sert à rien, tu peux enlever ». */}
@@ -38732,7 +38960,8 @@ function AppCoeur() {
   const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
-  const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
+  const [syncStatus,setSyncStatus]=useState('idle');
+  const [syncOuvert, setSyncOuvert] = useState(false); // idle | saving | synced | error | loading
   const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
@@ -39004,7 +39233,7 @@ function AppCoeur() {
       // au lieu de conclure « nuage vide ». Rien n'est poussé entre-temps.
       let cloud = await cloudLoad();
       for (let attente = 2000; cloud === undefined && !stop; attente = Math.min(attente * 2, 30000)) {
-        setSyncStatus('error');
+        _emitSync('error', 'tes réglages n’ont pas pu être lus dans la base — je réessaie');
         await new Promise(r => setTimeout(r, attente));
         if (!stop) cloud = await cloudLoad();
       }
@@ -40108,7 +40337,8 @@ function AppCoeur() {
           <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
-            <button type="button" className="vrm-sync-status" aria-label="Voir la synchronisation" onClick={()=>setTab('settings')} title={
+            <span style={{position:'relative',display:'inline-flex'}}>
+            <button type="button" className="vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
@@ -40126,6 +40356,8 @@ function AppCoeur() {
                   cloche, rouage — huit éléments. L'icône de nuage dit déjà si
                   c'est synchronisé ; l'heure exacte est dans Réglages. */}
             </button>
+            {syncOuvert && <PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/>}
+            </span>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
           <div style={{display:'flex',gap:6}}>
@@ -40159,11 +40391,8 @@ function AppCoeur() {
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
-            <button className="vrm-icon-control" type="button" onClick={()=>{setPlatSub('messages');setTab('plat_vinted');}} title="Messages Vinted" aria-label="Ouvrir les messages Vinted" style={{background:'transparent',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 11px',color:ink,cursor:'pointer'}}><Icon name="chat" size={17}/></button>
-            <button className="vrm-header-settings" type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
-              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              <Icon name="gear" size={17}/>
-            </button>
+            {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
+                dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
           </div>
         </div>
@@ -40272,29 +40501,8 @@ function AppCoeur() {
           </div>
         </div>
       )}
-      {/* Bandeau de notification in-app */}
-      {notifBanner&&(notifBanner.ventes>0||notifBanner.factures>0)&&(
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.accent,color:C.onAccent,fontSize:13,fontWeight:500}}>
-          <span>
-            🔔 {notifBanner.ventes>0&&`${notifBanner.ventes} vente${notifBanner.ventes>1?'s':''} comptabilisée${notifBanner.ventes>1?'s':''}`}
-            {notifBanner.ventes>0&&notifBanner.factures>0&&' · '}
-            {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
-          </span>
-          <button type="button" onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:5,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
-        </div>
-      )}
-      {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
-      {vintedNotif&&(vintedNotif.messages>0||vintedNotif.ventes>0)&&(
-        <div onClick={()=>{setTab('cat_msg');setVintedNotif(null);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.blue||C.accent,color:'#fff',fontSize:13,fontWeight:500,cursor:'pointer'}}>
-          <span>
-            🔔 {vintedNotif.ventes>0&&`${vintedNotif.ventes} nouvelle${vintedNotif.ventes>1?'s':''} vente${vintedNotif.ventes>1?'s':''}`}
-            {vintedNotif.ventes>0&&vintedNotif.messages>0&&' · '}
-            {vintedNotif.messages>0&&`${vintedNotif.messages} nouveau${vintedNotif.messages>1?'x':''} message${vintedNotif.messages>1?'s':''}`}
-            {' '}sur Vinted
-          </span>
-          <button type="button" onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:5,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
-        </div>
-      )}
+      {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
+          la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
       {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
           Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
           mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
