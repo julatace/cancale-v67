@@ -53,7 +53,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.180.0';
+const EXT_ATTENDUE = '5.181.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -219,7 +219,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21537,8 +21537,33 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       setLastCap(by);
     } catch (_) {}
   })(); }, []);
+  // ÉTAT ÉVALUÉ PAR L'EXTENSION (5.181, `noterEtatCompte`) : actif / banni, lu
+  // dans le champ `is_account_banned` du profil Vinted qu'elle reçoit déjà.
+  // Trois états : `undefined` en cours · `null` pas su (lecture ratée) · objet lu.
+  // « Pas su » ne fait jamais « banni » : on retombe sur ce qu'on savait déjà.
+  const [etatExt, setEtatExt] = useState(undefined);
+  useEffect(() => {
+    let mort = false, t = null;
+    const lire = async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_comptes_etat&select=data`, { headers: sbAuth() });
+        if (!r.ok) { if (!mort) setEtatExt(null); return; }
+        const rows = await r.json();
+        if (!Array.isArray(rows)) { if (!mort) setEtatExt(null); return; }
+        const d = (rows[0] && rows[0].data) || {};
+        if (!mort) setEtatExt((d.comptes && typeof d.comptes === 'object') ? d.comptes : {});
+      } catch (_) { if (!mort) setEtatExt(null); }
+    };
+    lire();
+    const f = (e) => { const d = e && e.detail; if (!d || d.type !== 'maj' || d.quoi !== 'etatcompte') return; clearTimeout(t); t = setTimeout(lire, 800); };
+    window.addEventListener('vrm:ext', f);
+    return () => { mort = true; clearTimeout(t); window.removeEventListener('vrm:ext', f); };
+  }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
+    const ev = etatExt && etatExt[uid];
+    const evLu = ev && (ev.etat === 'banni' || ev.etat === 'actif') ? ev : null;
+    const evQuand = evLu && evLu.at ? (() => { try { return new Date(evLu.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); } catch (_) { return ''; } })() : '';
     // ⚠️⚠️ UN CHOIX N'EST PAS UNE PANNE. Vu en capture le 9 septembre :
     // l'en-tête annonçait « 2 en panne » en ROUGE, et l'un des deux était
     // `liliand653` — le compte que Julien a lui-même EXCLU de l'application
@@ -21555,14 +21580,18 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // l'app n'a plus à le réclamer. La raison reste écrite dans l'infobulle.
     if (hiddenAccts.has(uid)) return { etat: 'exclu', ic: 'eyeOff', label: 'Exclu de l\'app', color: C.muted,
       hint: `Tu as masqué ce compte : ses annonces, ses ventes et ses achats n'apparaissent nulle part.${blockedAccts.has(uid) ? ' (Vinted l\'avait aussi refusé.)' : ''} Sa date de capture ne veut donc plus rien dire ici — rien à rattraper.` };
-    if (blockedAccts.has(uid)) return { etat: 'bad', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    // L'extension l'a LU dans le profil Vinted : c'est la preuve la plus forte,
+    // elle passe avant la liste locale (un refus 403 vu par cet appareil).
+    if (evLu && evLu.etat === 'banni') return { etat: 'bad', source: 'extension', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: `Vinted le dit lui-même dans le profil du compte (lu par l'extension${evQuand ? ` le ${evQuand}` : ''}). Rien n'est masqué tout seul : masque-le si tu ne veux plus voir ses annonces.` };
+    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
     // (16 oct.) Julien : « juste s'il est actif ou banni, l'extension doit
     // évaluer l'état du compte ». Deux états sur la pastille ; la fraîcheur de
     // la capture n'est plus une alerte, seulement une ligne grise (`ago`).
     const cap = lastCap[uid];
     const ageH = cap ? (Date.now() - cap) / 3600000 : null;
     const ago = ageH == null ? 'pas encore capté' : ageH < 1 ? 'capté il y a moins d\'une heure' : ageH < 48 ? `capté il y a ${Math.round(ageH)} h` : `capté il y a ${Math.round(ageH / 24)} j`;
-    return { etat: 'ok', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}.`, ago };
+    const lu = evLu ? ` · état lu par l'extension${evQuand ? ` le ${evQuand}` : ''}` : '';
+    return { etat: 'ok', source: evLu ? 'extension' : '', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}${lu}.`, ago };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
@@ -21830,7 +21859,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
                     </div>
                     {(()=>{ const h=acctHealth(acc); return (<>
-                      <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
+                      <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
                       {h.ago && <span style={{fontSize:11,color:C.muted,marginLeft:8}}>{h.ago}</span>}
                     </>); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
