@@ -386,7 +386,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/if \(!numeroReprenable\(cle\)\) \{/.test(pose), 'la pose À LA MAIN refuse un numéro d\'archive');
     dit(/manuelAt/.test(corps('const poserNumero', 'const buyOf = (o) =>')), 'une pose à la main porte sa date (`manuelAt`) : la base la reconnaît comme un geste');
     dit(/repriseDe: String\(r\.orphan\.key\)/.test(A) && /repriseDe: String\(autres\[0\]\)/.test(A), 'une reprise dit QUELLE fiche elle remplace (`repriseDe`) : la base ne la prend pas pour une fiche perdue');
-    dit(/if \(code\) \{ _pushBloque = true; _emitSync\('refus'\); signalerNumerosPerimes\(code\);/.test(A), 'un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »');
+    dit(/if \(code\) \{ _pushBloque = true; _emitSync\('refus'(?:, '[^']*')?\); signalerNumerosPerimes\(code\);/.test(A), 'un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »');
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
     dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');

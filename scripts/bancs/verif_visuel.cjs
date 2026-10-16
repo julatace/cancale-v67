@@ -139,6 +139,8 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     for(const t of TABS){
       await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
+      // `SHOTS=dossier` : une capture par écran et par taille (pour REGARDER, §6.2).
+      if(process.env.SHOTS){ try{ fs.mkdirSync(process.env.SHOTS,{recursive:true}); await pg.screenshot({path:require('path').join(process.env.SHOTS,`${t}-${W}.png`),fullPage:true}); }catch(_){} }
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
         sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth,
         txt:(document.body.innerText||'')}));

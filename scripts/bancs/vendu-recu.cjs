@@ -157,7 +157,7 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
 const lire = (pg) => pg.evaluate(() => {
     const a = (sel, at) => { const e = document.querySelector(sel); return e ? e.getAttribute(at) : null; };
     const jours = {};
-    for (const e of document.querySelectorAll('[data-vendu-recu] [data-jour]')) jours[e.getAttribute('data-jour')] = { vendu: e.getAttribute('data-vendu'), recu: e.getAttribute('data-recu') };
+    for (const e of document.querySelectorAll('[data-courbe-semaine] [data-jour]')) jours[e.getAttribute('data-jour')] = { vendu: e.getAttribute('data-vendu'), recu: e.getAttribute('data-recu') };
     return { venduMois: a('[data-vendu-mois]', 'data-vendu-mois'), recuMois: a('[data-recu-mois]', 'data-recu-mois'), venduJour: a('[data-vendu-jour]', 'data-vendu-jour'),
       dashJour: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour'), dashJourN: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour-n'),
       dashMois: a('[data-dash-stat="caMois"]', 'data-dash-cents'),
@@ -185,12 +185,16 @@ const lire = (pg) => pg.evaluate(() => {
         dit(lu.venduMois !== lu.recuMois, 'les deux notions donnent deux nombres différents sur ces ventes (sinon on ne prouve rien)');
         const auj = attendu.jour(0), hier = attendu.jour(1), avant = attendu.jour(2);
         const rj = (n) => lu.jours[cle(il(n))] || {};
-        dit(Object.keys(lu.jours).length === 14, 'le graphique porte 14 jours', `${Object.keys(lu.jours).length}`);
+        // (16 oct.) Le graphique est la SEMAINE EN COURS (lundi → dimanche) :
+        // un jour d'avant lundi n'y est pas — son contrôle est sauté, et dit.
+        const dansSemaine = (n) => ((maintenant.getDay() + 6) % 7) >= n;
+        const siSemaine = (n, ok, quoi, det) => dansSemaine(n) ? dit(ok, quoi, det) : console.log('  (sauté : ' + quoi + ' — jour d’avant lundi)');
+        dit(Object.keys(lu.jours).length === 7, 'le graphique porte les 7 jours de la semaine', `${Object.keys(lu.jours).length}`);
         dit(rj(0).vendu === String(auj.vendu) && rj(0).recu === String(auj.recu), 'aujourd’hui : vendu et reçu chacun à SA date', `vendu ${rj(0).vendu}/${auj.vendu} · reçu ${rj(0).recu}/${auj.recu}`);
-        dit(rj(1).vendu === String(hier.vendu), 'hier : la vente annulée n’est pas « vendue »', `vendu ${rj(1).vendu}/${hier.vendu}`);
-        dit(rj(1).recu === String(hier.recu), 'hier : la vente faite il y a 20 jours et versée hier est REÇUE hier', `reçu ${rj(1).recu}/${hier.recu}`);
-        dit(rj(2).vendu === String(avant.vendu) && rj(2).recu === '0', 'avant-hier : vendue ce jour-là, pas encore d’argent ce jour-là', `vendu ${rj(2).vendu}/${avant.vendu} · reçu ${rj(2).recu}`);
-        dit(rj(3).recu === '0' && rj(3).vendu === String(attendu.jour(3).vendu), 'la vente finalisée SANS date de versement est vendue, jamais placée dans « reçu »', `vendu ${rj(3).vendu} · reçu ${rj(3).recu}`);
+        siSemaine(1, rj(1).vendu === String(hier.vendu), 'hier : la vente annulée n’est pas « vendue »', `vendu ${rj(1).vendu}/${hier.vendu}`);
+        siSemaine(1, rj(1).recu === String(hier.recu), 'hier : la vente faite il y a 20 jours et versée hier est REÇUE hier', `reçu ${rj(1).recu}/${hier.recu}`);
+        siSemaine(2, rj(2).vendu === String(avant.vendu) && rj(2).recu === '0', 'avant-hier : vendue ce jour-là, pas encore d’argent ce jour-là', `vendu ${rj(2).vendu}/${avant.vendu} · reçu ${rj(2).recu}`);
+        siSemaine(3, rj(3).recu === '0' && rj(3).vendu === String(attendu.jour(3).vendu), 'la vente finalisée SANS date de versement est vendue, jamais placée dans « reçu »', `vendu ${rj(3).vendu} · reçu ${rj(3).recu}`);
         dit(lu.aDater === '1', 'et c’est dit : 1 vente attend sa date de versement', `${lu.aDater}`);
         dit(lu.venduJour === rj(0).vendu, '« Vendu aujourd’hui » = la colonne du jour (une seule liste)', `${lu.venduJour} · ${rj(0).vendu}`);
         await ctx.close();
@@ -220,7 +224,7 @@ const lire = (pg) => pg.evaluate(() => {
       dit(lu.venduMois === String(attendu.venduMois), 'le VENDU reste juste (il ne dépend pas des versements)', `${lu.venduMois}`);
       dit(lu.recuMois === '', 'aucun montant « reçu » inventé', `rendu « ${lu.recuMois} »`);
       const recus = Object.values(lu.jours).map((j) => j.recu);
-      dit(recus.length === 14 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
+      dit(recus.length === 7 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
       await ctx.close();
     });
     console.log('\n── Déclarée le mois dernier, versée aujourd’hui');

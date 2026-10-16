@@ -4196,6 +4196,26 @@ const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
   for (const l of (recues || [])) { const j = par[cleJourLocal(l.ts)]; if (j && j.recu) { j.recu.n += 1; j.recu.eur += l.eur; } }
   return J;
 };
+// La SEMAINE EN COURS, du lundi au dimanche (16 oct., Julien : « un graphique
+// avec les jours en abscisse et le chiffre d'affaires en ordonnée, pour la
+// semaine en cours »). Mêmes règles que `joursVenduRecu` (vendu au jour de la
+// vente, reçu au jour du versement) ; un jour pas encore arrivé est `futur` :
+// il n'a pas de point (zéro serait un faux).
+const joursSemaine = (vendues, recues, maintenant = Date.now()) => {
+  const d0 = new Date(maintenant); d0.setHours(0, 0, 0, 0);
+  const lundi = new Date(d0); lundi.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));
+  const J = [], par = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(lundi); d.setDate(lundi.getDate() + i);
+    const j = { cle: cleJourLocal(d.getTime()), jour: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][d.getDay()], num: d.getDate(),
+      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), futur: d.getTime() > d0.getTime(), auj: d.getTime() === d0.getTime(),
+      vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
+    J.push(j); par[j.cle] = j;
+  }
+  for (const l of (vendues || [])) { const j = par[cleJourLocal(l.ts)]; if (j) { j.vendu.n += 1; j.vendu.eur += l.eur; } }
+  for (const l of (recues || [])) { const j = par[cleJourLocal(l.ts)]; if (j && j.recu) { j.recu.n += 1; j.recu.eur += l.eur; } }
+  return J;
+};
 // L'argent REÇU dans un mois = les lignes dont la date de VERSEMENT (`ts`) tombe
 // dans ce mois — la MÊME date que les barres « reçu » ci-dessus (§11).
 // ⚠️ Jamais `l.ym` (revue du 6 octobre) : depuis le registre « J'ai déclaré ce
@@ -7573,6 +7593,47 @@ function BarresVenduRecu({ jours, hauteur = 96 }) {
         })}
       </div>
     </div>
+  );
+}
+
+// Courbe à POINTS RELIÉS de la semaine : en abscisse les jours (lun → dim), en
+// ordonnée le chiffre d'affaires, la valeur écrite au-dessus de chaque point.
+// Vendu (trait plein, accent) et reçu (pointillé, gris) quand il est connu.
+function CourbeSemaine({ jours }) {
+  const W = 340, H = 168, gx = 34, gy = 22, bas = 26;
+  const vus = jours.filter(j => !j.futur);
+  const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
+  const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
+  const haut = Math.ceil(max / pas) * pas;
+  const X = (i) => gx + (i * (W - gx - 10)) / 6;
+  const Y = (v) => gy + (1 - v / haut) * (H - gy - bas);
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const chemin = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean).map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
+  const avecRecu = jours.every(j => j.recu);
+  const graduations = []; for (let v = 0; v <= haut; v += pas) graduations.push(v);
+  return (
+    <svg data-courbe-semaine="" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
+      {graduations.map(v => (
+        <g key={v}>
+          <line x1={gx} x2={W - 6} y1={Y(v)} y2={Y(v)} stroke={C.border} strokeWidth="1"/>
+          <text x={gx - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="9.5" fill={C.muted}>{v}</text>
+        </g>
+      ))}
+      {avecRecu && <path d={chemin('recu')} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 3"/>}
+      <path d={chemin('vendu')} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+      {jours.map((j, i) => (
+        <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
+          {!j.futur && <>
+            <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
+            {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.6" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
+            <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.2 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
+            {j.vendu.eur > 0 && <text x={X(i)} y={Y(j.vendu.eur) - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.text}>{Math.round(j.vendu.eur)}</text>}
+          </>}
+          <text x={X(i)} y={H - 10} textAnchor="middle" fontSize="10" fontWeight={j.auj ? 700 : 500} fill={j.auj ? C.text : C.muted}>{j.jour} {j.num}</text>
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -24439,6 +24500,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [vendus]);
   // Les 14 derniers jours, VENDU et REÇU côte à côte (`joursVenduRecu`).
   const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
+  const semaine = useMemo(() => joursSemaine(vendus.lignes, declarables ? declarables.lignes : null), [vendus, declarables]);
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
@@ -28798,7 +28860,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const h = new Date().getHours();
         const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
         const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
+        // ⚠️ (16 oct., Julien : « enlève répondre à 112 messages, c'est
+        //    incohérent »). Mesuré sur sa base : 159 conversations marquées non
+        //    lues, dont 21 seulement ont bougé ces 7 derniers jours — le reste
+        //    est de vieux échanges jamais rouverts. On ne compte que ce qui
+        //    attend VRAIMENT une réponse : non lu, de moins de 7 jours, compte
+        //    pas écarté.
+        const MSG_RECENT_MS = 7 * 864e5;
+        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS).length;
         const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
@@ -28812,6 +28881,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // dérivation pour les rendus qui ne passent pas la prop.
         const premierJour = premierJourProp !== undefined ? !!premierJourProp : (!!accountsReady && !baseKO && accounts.length===0);
         const jobs=[];
+        // (16 oct.) Les quatre gestes du quotidien sont une BARRE compacte —
+        // icône, nombre, deux mots — et plus quatre cartes de texte. La liste en
+        // dessous ne garde que les vraies alertes (double vente, colis cochés
+        // non partis, litige, emails mis de côté).
+        const tuiles = { envoyer: { n: 0, sub: 'Aucun colis à envoyer' }, retirer: { n: 0, sub: 'Aucun colis à retirer' }, messages: null, prix: null };
         // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
         // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
         // le bordereau est déjà en base** — et la carte disait seulement
@@ -28838,8 +28912,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + paire au stock, coche par colis';
-          jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`${toShip.length} colis`,action:'Expédier',sub,tab:'cat_bord',prio:late>0?0:1,
-            photos:toShip.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
+          tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
         }
         // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
         // même liste que l'alerte de Colis (`cochesNonPartis`, §11). Coché, le
@@ -28885,7 +28958,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      // dans Achats) ; l'auto-capture ne couvre les casiers Vinted Go
                      // qu'avec une version récente — ne pas la promettre seule.
                      return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
-          jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
+          tuiles.retirer = { n: pickupCount, sub, alerte: hd>0 };
         }
         // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
         //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
@@ -28895,8 +28968,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
-        if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
-        if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
+        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -28959,7 +29032,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 logique §5/§11 (chiffres sûrs, « vendu » ≠ « reçu », escrow ≠
                 dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
                 plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
-            {!baseKO && !premierJour && (
+            {!baseKO && (
               <div className="vrm-day-greeting" style={{marginBottom:14}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
                 <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
@@ -28973,6 +29046,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 serait le pire des deux mondes. Le bandeau s'auto-masque dès que
                 tout va bien. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
+
+            {/* LA BARRE DU QUOTIDIEN (16 oct., Julien : « juste les logos —
+                colis à envoyer, à retirer, messages, baisser les prix — sans les
+                textes, une barre en largeur »). Le nombre est un fait ; « — »
+                quand il n'a pas pu être lu (jamais un zéro inventé, §5). */}
+            {!baseKO && !premierJour && (()=>{
+              const ko = nomsVentesKO.length > 0;
+              const T = [
+                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || (ko && !(tuiles.envoyer && tuiles.envoyer.n)) },
+                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
+                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:'cat_msg', pasSu: loading || convs.items == null },
+                { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
+              ];
+              return (
+                <div data-barre-jour="" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:8,marginBottom:14}}>
+                  {T.map(x => {
+                    const n = x.t ? x.t.n : 0;
+                    const vif = !x.pasSu && n > 0;
+                    return (
+                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                        style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'12px 6px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',minWidth:0}}>
+                        <span style={{display:'flex',color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
+                        <span className="vrm-display" style={{fontSize:20,fontWeight:700,lineHeight:1.1,color:vif ? C.text : C.muted,fontVariantNumeric:'tabular-nums'}}>{x.pasSu ? '—' : n}</span>
+                        <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{x.l}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
                 claire : le gros chiffre en encre, l'accent réservé au lien. */}
@@ -29007,17 +29110,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
 
             {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
-            {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
-              <ResumePlateforme title="Évolution · 14 derniers jours" className="vrm-day-history">
+            {!baseKO && !premierJour && !loading && sales.items && (
+              <ResumePlateforme title="Ta semaine" className="vrm-day-history">
               <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Cette semaine · <span className="vrm-display" data-total-semaine={Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)*100)}>{Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)).toLocaleString('fr-FR')} €</span> vendus</div>
                   <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
                     <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
                   </div>
                 </div>
-                <BarresVenduRecu jours={jours14}/>
+                <CourbeSemaine jours={semaine}/>
                 <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
                   <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
                   {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
@@ -29076,9 +29179,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
-              : <div style={{padding:'12px 14px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12,color:C.muted}}>
-                  <span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.
-                </div>
+              : (tuiles.envoyer && tuiles.envoyer.n === 0 && tuiles.retirer && tuiles.retirer.n === 0 && !(tuiles.messages && tuiles.messages.n > 0)
+                  ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
+                  : null)
             )}
 
             {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
@@ -40288,11 +40391,8 @@ function AppCoeur() {
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
-            <button className="vrm-icon-control" type="button" onClick={()=>{setPlatSub('messages');setTab('plat_vinted');}} title="Messages Vinted" aria-label="Ouvrir les messages Vinted" style={{background:'transparent',border:`1px solid ${bd}`,borderRadius:8,padding:'6px 11px',color:ink,cursor:'pointer'}}><Icon name="chat" size={17}/></button>
-            <button className="vrm-header-settings" type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
-              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              <Icon name="gear" size={17}/>
-            </button>
+            {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
+                dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
           </div>
         </div>
@@ -40401,29 +40501,8 @@ function AppCoeur() {
           </div>
         </div>
       )}
-      {/* Bandeau de notification in-app */}
-      {notifBanner&&(notifBanner.ventes>0||notifBanner.factures>0)&&(
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.accent,color:C.onAccent,fontSize:13,fontWeight:500}}>
-          <span>
-            🔔 {notifBanner.ventes>0&&`${notifBanner.ventes} vente${notifBanner.ventes>1?'s':''} comptabilisée${notifBanner.ventes>1?'s':''}`}
-            {notifBanner.ventes>0&&notifBanner.factures>0&&' · '}
-            {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
-          </span>
-          <button type="button" onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:5,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
-        </div>
-      )}
-      {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
-      {vintedNotif&&(vintedNotif.messages>0||vintedNotif.ventes>0)&&(
-        <div onClick={()=>{setTab('cat_msg');setVintedNotif(null);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.blue||C.accent,color:'#fff',fontSize:13,fontWeight:500,cursor:'pointer'}}>
-          <span>
-            🔔 {vintedNotif.ventes>0&&`${vintedNotif.ventes} nouvelle${vintedNotif.ventes>1?'s':''} vente${vintedNotif.ventes>1?'s':''}`}
-            {vintedNotif.ventes>0&&vintedNotif.messages>0&&' · '}
-            {vintedNotif.messages>0&&`${vintedNotif.messages} nouveau${vintedNotif.messages>1?'x':''} message${vintedNotif.messages>1?'s':''}`}
-            {' '}sur Vinted
-          </span>
-          <button type="button" onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:5,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
-        </div>
-      )}
+      {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
+          la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
       {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
           Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
           mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
