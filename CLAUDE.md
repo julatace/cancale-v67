@@ -10468,6 +10468,95 @@ passe interrompue (rien n'en était vérifié) : tout ce qui suit a été relanc
   14:58:07 (l'heure de la migration 013) et les journaux de la base comptent
   **33 « canceling statement due to statement timeout »** sur 24 h — à rapprocher de
   « l'icône nuage barré » (P0 d'un autre chantier).
+### ⚠️⚠️ « MON ENTREPRISE » (PROFIL FISCAL) ET FACTURES / AVOIRS (15 octobre)
+Julien : « micro-entreprise, société, régime de la marge, à adapter à chaque
+entrepreneur… voir s'il est en versement libératoire… mettre son SIREN… pour les
+factures, il va falloir faire ça parfaitement ». **Mesuré d'abord** (lecture
+seule) : aucune facture émise chez personne (`vinted_invoices` absente),
+`vinted_regime = micro`, `vinted_urssaf_freq = mensuel` chez Julien,
+`vrm_pro_facture` active mais SIRET, nom, adresse et mentions VIDES.
+- **Une règle, deux lecteurs : `api/_lib/facturation.js`** (importé par l'app ET
+  par `api/email-inbound`). Profil `vrm_profil_entreprise` (synchronisé, rattrapé
+  par `onCloudReady`) : forme (micro · EI au réel · société), TVA (franchise ·
+  facturée), régime de la marge (si TVA facturée), versement libératoire (micro
+  seulement), SIREN/SIRET/n° de TVA (clés vérifiées : Luhn, exception La Poste,
+  clé FR calculée), coordonnées, forme/capital/RCS pour une société. Le rythme
+  (`vinted_urssaf_freq`), le taux de cotisations (`vinted_urssaf_taux`) et le
+  taux de TVA (`vinted_tva`) restent où leurs lecteurs les attendent ;
+  `vinted_regime` devient la copie PUBLIÉE du profil (`micro` · `marge` ·
+  `reel`) pour les rapports et le serveur.
+- ⚠️ **RIEN N'EST DÉDUIT DU SIREN** : il se vérifie, et un lien ouvre
+  l'Annuaire des entreprises (site public de l'État) sur son clic — rien n'est
+  importé (le format de sa réponse n'a pas pu être mesuré d'ici : proxy 403).
+  L'ancien choix « micro » garde la forme mais **la TVA reste à préciser**
+  (« pas de TVA » était la phrase de l'app, pas sa déclaration).
+- **Les règles affichées sont datées et sourcées** (`reglesDuProfil` : CGI
+  293 B, 297 A, 297 E, ann. II art. 242 nonies A, art. 151-0 ; loi 2022-172 ;
+  code de commerce R123-237 ; repère 2026 vente de marchandises 12,3 % + 1 %
+  VL), et le bloc dit « à faire valider par ton comptable ». ⚠️ **Recoupées le
+  15 octobre sur des sources SECONDAIRES** : legifrance, bofip, urssaf et
+  service-public sont bloqués depuis le conteneur (CONNECT 403, WebFetch ne
+  résout pas `.gouv.fr`). Le texte officiel n'a pas été ouvert ; c'est écrit à
+  l'écran.
+- **Factures et avoirs** : un document = une ligne `facture_{année}_{rang}`
+  (une suite par année, factures ET avoirs), insérée **sans écrasement**
+  (`resolution=ignore-duplicates`) : un numéro pris entre-temps par un autre
+  appareil n'est pas réécrit, la boucle partagée (`FACT.emettre`) prend le
+  suivant. Rang calculé sur une liste **lue** (pas su ⇒ rien n'est émis).
+  Le document est **figé** (vendeur, régime, mentions, montants en centimes,
+  empreinte SHA-256 ; « modifiée depuis l'émission » si la ligne est réécrite).
+  **Plus aucune suppression** (le « 🗑 » redonnait le numéro au suivant) : une
+  erreur se corrige par un **avoir** qui cite la facture (TypeCode 381 en
+  Factur-X). Mentions selon le profil : franchise « TVA non applicable, art.
+  293 B du CGI » ; marge « Régime particulier – Biens d'occasion » et **aucune
+  TVA affichée** ; TVA facturée : HT, taux, TVA, TTC, n° de TVA ; « EI » après
+  le nom d'un entrepreneur individuel. Profil incomplet ⇒ « Nouvelle facture »
+  grisé avec ce qui manque (jamais une mention devinée). Export CSV de tous les
+  documents (avoirs signés, empreintes). Les factures d'AVANT (ligne `main`)
+  restent lisibles, repliées, jamais supprimées.
+- ⚠️ **Plus de logo de Cancale par défaut** sur la facture d'un vendeur sans logo
+  (seul `vinted_custom_logo`). L'entité de « Réglages factures » (plusieurs
+  micro-entreprises, jamais utilisée en base) est remplacée par le profil ; le
+  reçu d'achat lit le profil, l'ancienne entité en repli.
+- **Facture Pro (serveur)** : dans LA suite de l'app, par la même boucle. Un email
+  **rejoué** retrouve sa facture (`sourceId = email_sale_{clé}`) : ni nouveau
+  numéro, ni ligne d'envoi remise « à envoyer » (avant : FA-0001 → FA-0004 et
+  une facture envoyée repartait). Lecture ratée ⇒ rien d'émis, **503**
+  (avant : le compteur illisible redonnait le n° 1). Profil incomplet ⇒ aucune
+  facture, une notification « complète Mon entreprise ». La Facturation Pro ne
+  saisit plus d'identité (deux identités pour une entreprise) ; son texte libre
+  devient un « message en bas de facture » et « ✓ enregistré » ne s'affiche plus
+  sur un refus.
+- Rapports : le libellé du régime vient du profil ; au réel, les cotisations
+  s'écrivent « — » (« pas un % du CA »), jamais estimées.
+- Preuves : `audit-facturation.cjs` **58 contrôles**, **20 rouges** sur w15
+  (partie route en boîte noire : rejeu, lecture ratée, suite partagée, numéro
+  volé, marge) ; mutations `merge-duplicates` (2 rouges), sans `sourceId`
+  (3), lecture ratée lue vide (1), mention de marge remplacée (3).
+  Banc `bancs/fiscal.cjs` (port 5981, données inventées, 390/1512, clair/sombre) :
+  tout vert ; **16 rouges** sur le build de w15 ; mutations rouges (insertion
+  en `merge-duplicates` + empreinte qui garde `_…` ⇒ 9 ; profil incomplet
+  accepté ⇒ 2).
+  `audit-xss-facture.cjs` suit la règle partagée (le serveur n'a plus
+  `buildInvoiceHtml`) et reste rouge sans la politique de la fenêtre.
+- ⚠️ **Vu au rendu, pas au banc** : à la première capture chaque facture se
+  disait « modifiée depuis l'émission » (l'écran ajoutait `_id` avant de
+  recalculer l'empreinte). L'empreinte ignore les marques de lecteur (`_…`) ;
+  le banc et l'audit l'exigent désormais.
+- **Pas fait, à savoir** : (1) joindre la facture au bordereau (Colis) lit
+  encore l'ancienne liste `vinted_invoices` par N° de paire — à brancher sur les
+  documents par n° de transaction ; (2) aucune garde EN BASE n'interdit de
+  réécrire une ligne `facture_*` (l'empreinte le DIT, elle n'empêche pas) — une
+  migration (déclencheur qui refuse UPDATE/DELETE) reste à écrire et à poser
+  par Julien ; (3) codes VATEX en Factur-X non posés (liste non vérifiable
+  d'ici) ; (4) après fusion avec la comptabilité (p1-compta), `RegimeSetting`
+  (= « Mon entreprise ») vit dans Déclarations, et le rappel URSSAF de cf5ca42
+  doit traiter `vinted_regime = 'reel'` comme une société (aujourd'hui seul
+  `'marge'` coupe le rappel micro) ; (5) TVA sur la marge d'une micro-entreprise
+  assujettie : non calculée, et c'est dit.
+- **Geste de Julien** : Réglages → Mon entreprise : SIREN, TVA (franchise ou
+  facturée), versement libératoire oui/non, coordonnées. Sans ça, aucune facture
+  ne s'émet — ni dans l'app, ni pour une vente Pro.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

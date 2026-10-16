@@ -24,6 +24,9 @@ import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
+// Le profil d'entreprise et les factures (15 octobre) : LE fichier que le
+// serveur lit aussi (api/email-inbound, factures Pro) — une règle, deux lecteurs.
+import * as FACT from "../api/_lib/facturation.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -1057,6 +1060,11 @@ const SYNC_KEYS = [
   // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
   // factures. Chaque facture porte son `entrepriseId` (numérotation par entité).
   'vinted_entreprises','vinted_entreprise_active',
+  // Profil d'entreprise (15 octobre) : forme, régime de TVA, régime de la
+  // marge, versement libératoire, SIREN et coordonnées de facturation. LE
+  // propriétaire de ces notions (api/_lib/facturation.js) ; `vinted_regime` en
+  // est une copie publiée pour les lecteurs d'avant (rapports, serveur).
+  'vrm_profil_entreprise',
   // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
   // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
   'vinted_annonces_email_sold',
@@ -2948,6 +2956,31 @@ const fetchProInvoices = async ({metadata=false}={}) => {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   } catch (_) { return []; }
 };
+// (16 octobre) Une vente Pro arrivée pendant que le profil était incomplet est
+// GARDÉE par le serveur (ligne `email_invoice_*`, status 'profil', aucune
+// facture). C'est l'app qui l'émet, sur SON clic, une fois le profil complété —
+// puis la ligne devient une vraie ligne d'envoi (number + html, status 'draft').
+// On ne remplace la ligne QUE si elle est encore 'profil' (filtre serveur) : un
+// rejeu de l'email qui l'aurait déjà émise entre-temps n'est pas écrasé.
+const majLigneEnvoiApresEmission = async (inv, doc, html) => {
+  if (!inv || !inv._id) return false;
+  try {
+    const base = `${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(inv._id)}`;
+    const read = await fetch(base + '&select=id,data', { headers: sbAuth() });
+    if (!read.ok) return false;
+    const rows = await read.json();
+    const fresh = Array.isArray(rows) && rows.length === 1 ? rows[0].data : null;
+    if (!fresh || fresh.type !== 'facture_pro') return false;
+    if (fresh.status !== 'profil') return true;            // déjà émise par un rejeu : rien à écrire
+    const res = await fetch(base + `&data->>status=eq.profil&select=id`, {
+      method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data: { ...fresh, status: 'draft', number: doc.numero, document: FACT.idDocument(doc.annee, doc.rang), html, manque: null } }),
+    });
+    if (!res.ok) return false;
+    const changed = await res.json().catch(() => null);
+    return Array.isArray(changed) && changed.length === 1;
+  } catch (_) { return false; }
+};
 // Relire avant l'envoi et modifier seulement un brouillon encore identique.
 const setProInvoiceStatus = async (inv, status) => {
   if(status!=='queued' || !inv?._id || !inv.buyerEmail || inv.type!=='facture_pro')return false;
@@ -3917,6 +3950,79 @@ const tauxUrssaf = () => {
   const v = parseFloat(String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)).replace(',', '.'));
   return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// LE PROFIL D'ENTREPRISE, LU PAR L'APP (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// La règle vit dans api/_lib/facturation.js (§11) ; ici on ne fait que lire la
+// clé synchronisée et ce que l'app savait AVANT le profil (l'ancien choix de
+// régime, l'entité des anciennes factures), pour ne rien perdre de ce qu'il a
+// déjà tapé. ⚠️ Rien n'est déduit du SIREN.
+const entiteFacturesAncienne = () => {
+  const ents = load('vinted_entreprises', []);
+  const actif = load('vinted_entreprise_active', '');
+  return (Array.isArray(ents) && ents.length)
+    ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0])
+    : load('vinted_invoice_settings', null);
+};
+const profilEntreprise = (pro) => FACT.normProfil(load(FACT.PROFIL_CLE, null), {
+  regime: load('vinted_regime', null), pro, entite: entiteFacturesAncienne(),
+});
+// Le taux de TVA n'existe que s'il l'a CHOISI (l'ancien défaut « 20 » était une
+// supposition de l'app, pas sa déclaration).
+const tauxTvaChoisi = () => {
+  const v = parseFloat(String(load('vinted_tva', '')).replace(',', '.'));
+  return isFinite(v) && v > 0 && v <= 30 ? v : null;
+};
+// L'identité déjà tapée dans « Facturation Pro » (ligne à part, vrm_pro_facture),
+// lue UNE fois par session et seulement pour pré-remplir un profil vide.
+// Une lecture ratée ne reprend rien (et n'écrit rien) : on ne devine pas.
+let _proFacturePromesse = null;
+const lireProFacturePourReprise = () => {
+  if (!_proFacturePromesse) {
+    _proFacturePromesse = (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_pro_facture&select=data`, { headers: sbAuth() });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : null;
+      } catch (_) { return null; }
+    })().then(v => { if (v === null) _proFacturePromesse = null; return v; });
+  }
+  return _proFacturePromesse;
+};
+// Le profil rangé, et sa copie publiée pour les lecteurs d'avant
+// (`vinted_regime` : rapports, reçu d'achat, serveur). Un écran publie, les
+// autres consomment (§11).
+const rangerProfilEntreprise = (p) => {
+  save(FACT.PROFIL_CLE, FACT.profilARanger(p));
+  const r = FACT.regimeDe(p);
+  if (r && load('vinted_regime', null) !== r) save('vinted_regime', r);
+};
+function useProfilEntreprise() {
+  const [brut, setBrut] = useState(() => load(FACT.PROFIL_CLE, null));
+  const [regime, setRegime] = useState(() => load('vinted_regime', null));
+  const [pro, setPro] = useState(null);
+  const [pret, setPret] = useState(() => isCloudReady());
+  // §5.49 : réglage synchronisé lu au montage ⇒ rattrapé à l'arrivée du nuage,
+  // et seulement s'il est resté VIDE (jamais par-dessus une saisie).
+  useEffect(() => onCloudReady(() => {
+    setBrut(v => (v == null ? load(FACT.PROFIL_CLE, null) : v));
+    setRegime(v => (v == null ? load('vinted_regime', null) : v));
+    setPret(true);
+  }), []);
+  useEffect(() => { let stop = false; lireProFacturePourReprise().then(d => { if (!stop && d) setPro(d); }); return () => { stop = true; }; }, []);
+  useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === FACT.PROFIL_CLE) setBrut(load(FACT.PROFIL_CLE, null)); if (k === 'vinted_regime') setRegime(load('vinted_regime', null)); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const profil = useMemo(() => FACT.normProfil(brut, { regime, pro, entite: entiteFacturesAncienne() }), [brut, regime, pro]);
+  const maj = (champs) => {
+    const next = { ...profil, ...champs };
+    setBrut(FACT.profilARanger(next));
+    rangerProfilEntreprise(next);
+  };
+  return { profil, pret, maj };
+}
 // À payer à l'URSSAF, arrondi UNE fois au centime (en centimes entiers), et le
 // net qui s'en DÉDUIT. Vu au banc le 5 octobre sur ses vraies données : CA
 // 157,00 €, « à payer 21,20 € », « net 135,81 € » — 157 × 13,5 % = 21,195,
@@ -7129,13 +7235,21 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const G = rgb(0.45,0.45,0.45), N = rgb(0.1,0.1,0.1);
   let y = height - 44;
 
-  // QUI ACHÈTE. L'entité active des Factures (raison sociale, adresse, SIRET) —
-  // aucun appelant ne la passait, donc chaque reçu disait « Ma boutique ».
+  // QUI ACHÈTE. Depuis le 15 octobre : « Mon entreprise » (le profil, la même
+  // identité que ses factures — §11). Avant : l'entité active des Factures
+  // (`vinted_entreprises` / `vinted_entreprise_active`), gardée en repli pour
+  // qui n'a pas encore rempli son profil — aucun appelant ne la passait, donc
+  // chaque reçu disait « Ma boutique ».
+  const pe = profilEntreprise();
   const ents = load('vinted_entreprises', []);
   const actif = load('vinted_entreprise_active', '');
-  const ent = (Array.isArray(ents) && ents.length)
-    ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0])
-    : load('vinted_invoice_settings', null);
+  const ent = (pe.nom || pe.siren)
+    ? { companyName: FACT.nomVendeur(pe), companyType: FACT.FORMES[pe.forme] || '',
+        companyAddress: [[pe.adresse, [pe.cp, pe.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), !pe.siret && pe.siren ? 'SIREN ' + pe.siren : ''].filter(Boolean).join(' · '),
+        siret: pe.siret || '' }
+    : (Array.isArray(ents) && ents.length)
+      ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0])
+      : load('vinted_invoice_settings', null);
   const acheteur = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ');
 
   page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:N }); y -= 16;
@@ -7194,7 +7308,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
 
   y -= 4;
   const notes = [
-    opts.regime==='marge'
+    (opts.regime==='marge' || FACT.margeAppliquee(pe))
       ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
       : 'Achat de seconde main a un particulier : pas de TVA deductible.',
     // ⚠️ NE PAS RETIRER. Sans cette phrase, le document se lit comme la facture
@@ -7240,9 +7354,11 @@ const generateRemboursementAttestation = async (o, opts = {}) => {
   const { height } = page.getSize();
   const G = rgb(0.45, 0.45, 0.45), N = rgb(0.1, 0.1, 0.1);
   let y = height - 44;
+  const pe = profilEntreprise();
   const ents = load('vinted_entreprises', []);
   const actif = load('vinted_entreprise_active', '');
-  const ent = (Array.isArray(ents) && ents.length) ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0]) : load('vinted_invoice_settings', null);
+  const ent = (pe.nom || pe.siren) ? { companyName: FACT.nomVendeur(pe), companyType: FACT.FORMES[pe.forme] || '' }
+    : (Array.isArray(ents) && ents.length) ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0]) : load('vinted_invoice_settings', null);
   const qui = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ');
   page.drawText('Attestation de remboursement', { x: 32, y, size: 18, font: bold, color: N }); y -= 16;
   page.drawText(qui || opts.account || 'Achat de marchandise', { x: 32, y, size: 10, font: reg, color: G }); y -= 24;
@@ -17502,10 +17618,25 @@ function CarteUrssafMois({ liveStats }) {
   // sur « ouvre Ventes une fois » alors que le chiffre vient d'arriver.
   const [maj, setMaj] = useState(0);
   useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_urssaf_mois' || k === 'vinted_urssaf_taux' || k === 'vinted_regime') setMaj(x => x + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_urssaf_mois' || k === 'vinted_urssaf_taux' || k === 'vinted_regime' || k === FACT.PROFIL_CLE) setMaj(x => x + 1); };
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, []);
+  // §5.49 : ces clés sont synchronisées et lues au montage — à l'arrivée du
+  // nuage on relit (les `useMemo` ci-dessous ne font que LIRE, rien n'est écrit,
+  // donc aucune saisie faite pendant le chargement ne peut être écrasée).
+  useEffect(() => onCloudReady(() => setMaj(x => x + 1)), []);
+  // ── LE RÉGIME FISCAL DE CETTE CARTE (16 octobre) ────────────────────────────
+  // « À payer (13,5 %) », « Déclarer sur l'URSSAF », l'échéance de déclaration
+  // s'affichaient pour TOUT LE MONDE — société et EI au réel comprises — alors
+  // que le profil « Mon entreprise », sur le même écran, dit « tes cotisations
+  // ne sont pas un % du CA : VRM ne les estime pas » : deux verdicts sur une
+  // notion (§11). La règle est `FACT.regimeEffectif` (la même que le serveur,
+  // rappel du 1er compris) ; pas de profil déclaré ⇒ micro, comme avant.
+  const fiscalDash = useMemo(() => {
+    const regime = FACT.regimeEffectif(load(FACT.PROFIL_CLE, null), load('vinted_regime', null));
+    return { regime, micro: regime === 'micro' };
+  }, [maj]);
   // La photo publiée par l'écran Ventes : ventes FINALISÉES, datées au jour du
   // versement, toutes plateformes. Sans elle : `null` = on ne sait pas encore.
   const urssafMois = useMemo(() => {
@@ -17582,14 +17713,27 @@ function CarteUrssafMois({ liveStats }) {
               <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>sur {liveStats.ventesMois} vendue{liveStats.ventesMois>1?'s':''} ce mois-ci</div>
             )}
           </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
-          </div>
+          {/* (16 octobre) L'estimation « % du CA » n'existe QUE pour une micro.
+              Société ou EI au réel : la carte écrivait quand même un « à payer »
+              chiffré — un montant inventé sur l'écran où il décide ce qu'il
+              verse. Même mot que le rapport comptable (§11) :
+              « Cotisations — · au réel : pas un % du CA ». */}
+          {fiscalDash.micro ? <>
+            <div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
+            </div>
+          </> : (
+            <div data-cotisations-regime={fiscalDash.regime}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Cotisations</div>
+              <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>—</div>
+              <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>{fiscalDash.regime==='marge'?'pas un % du CA — le détail est dans le rapport comptable':'au réel : pas un % du CA'}</div>
+            </div>
+          )}
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
           {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
@@ -17616,7 +17760,12 @@ function CarteUrssafMois({ liveStats }) {
               const decl = (urssafInfo && urssafInfo.declare) || '';
               return <span data-urssaf-declare={decl}>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {nomMois}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, <b>hors {nA} vente{nA>1?'s':''} ({fmt(caA)})</b> versée{nA>1?'s':''} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} — {nA>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici</span>}
-                . Estimation au taux que tu as posé (plus bas) — le chiffre officiel se saisit sur l'URSSAF.
+                {/* (16 octobre) L'« estimation au taux » n'existe que pour une
+                    micro : une société ou une EI au réel lisait une somme à
+                    verser qui n'existe pas. La phrase suit la donnée. */}
+                . {fiscalDash.micro
+                  ? <>Estimation au taux que tu as posé (plus bas) — le chiffre officiel se saisit sur l'URSSAF.</>
+                  : <>Tes cotisations ne se calculent pas sur ce chiffre : VRM ne les estime pas.</>}
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
               </span>;
             })()}
@@ -17651,10 +17800,14 @@ function CarteUrssafMois({ liveStats }) {
             silence. L'écart est de quelques jours à quelques semaines : on le
             DIT au lieu de laisser croire à un chiffre officiel. */}
         <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. {fiscalDash.micro ? <>Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</> : <>Je ne suis pas comptable : fais valider tes chiffres par le tien.</>}
         </div>
-        {/* Prochaine échéance de DÉCLARATION (rappel) */}
-        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+        {/* Prochaine échéance de DÉCLARATION (rappel) — MICRO seulement : la
+            déclaration mensuelle/trimestrielle sur autoentrepreneur.urssaf.fr
+            n'existe pas au réel ni pour une société (16 octobre : le bouton
+            « Déclarer sur l'URSSAF → » s'affichait pour tout le monde — la même
+            règle que le rappel du 1er côté serveur, `regimeEffectif`). */}
+        {fiscalDash.micro && <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
             <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
             <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
@@ -17680,7 +17833,7 @@ function CarteUrssafMois({ liveStats }) {
               </div>
             );
           })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
-        </div>
+        </div>}
       </Card>
     </>
   );
@@ -19177,468 +19330,465 @@ function Door({h}) {
 }
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
-  const [searchInput,setSearchInput]=useState('');
-  const [search,setSearch]=useState('');
-  const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
-  const [page,setPage]=useState(null);
-  const [showAll,setShowAll]=useState(false);
-  const [showForm,setShowForm]=useState(false);
-  const [showSettings,setShowSettings]=useState(false);
-  // « Facturation Pro » vit ICI depuis le 30 sept. (Julien : « ça doit être dans
-  // l'onglet Facture », plus dans Réglages). Même composant, même ligne
-  // `vrm_pro_facture` — seul l'endroit change (§11 : un seul propriétaire).
-  const [showPro,setShowPro]=useState(false);
-  const [fetching,setFetching]=useState(false);
-  const [proInvs,setProInvs]=useState(null); // factures Pro (pipeline email)
-  const PER_PAGE=50;
-  useEffect(()=>{ fetchProInvoices().then(setProInvs); },[]);
-
-  // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
-  // `fetchVintedInvoices` appelait un Apps Script
-  // (`script.google.com/macros/s/…/exec`) au montage de l'écran ET TOUTES LES
-  // 5 MINUTES, en silence (`silencieux=true`, donc aucun message). Interrogé
-  // le 9 septembre : **404**, réponse HTML — donc `res.json()` levait, le
-  // `catch` avalait, et l'écran retentait indéfiniment un endpoint qui
-  // n'existe plus.
-  // ⚠️ Et l'écran vide DISAIT à Julien « elles arrivent de tes emails Vinted,
-  // par ta feuille Google », avec un bouton « Aller les chercher maintenant » :
-  // il pouvait attendre des factures qui ne pouvaient PAS arriver, et cliquer
-  // sur un bouton qui ne pouvait QUE échouer (avec « Erreur récupération : … »,
-  // du vocabulaire d'informaticien par-dessus le marché).
-  // ⚠️ Le dossier annonçait pourtant cette architecture retirée le 30 août
-  // (« plus AUCUN appelant ») : c'était FAUX, ce caller-ci avait survécu.
-  // Même famille que le tiroir `Nav` — sauf qu'ici le code mort TOURNAIT.
-  // ⚠️ Et l'URL `/exec` d'un Apps Script est une URL-capacité : quiconque la
-  // connaît peut l'invoquer. Elle vivait en clair dans un dépôt PUBLIC.
-  //
-  // La VRAIE source est juste à côté et elle est vivante : `fetchProInvoices`
-  // lit `email_invoice_*` en base — les reçus Vinted arrivés par email
-  // (`api/email-inbound`). Plus « + Nouvelle facture » pour la saisie.
-
-  // 🔄 Rafraîchissement automatique toutes les 5 min — sur la source VIVANTE.
-  // ⚠️ Cette boucle interrogeait l'Apps Script mort (404) toutes les 5 minutes,
-  //    en silence. Elle relit maintenant les reçus Vinted arrivés par email
-  //    (`email_invoice_*`), c'est-à-dire ce qui remplit réellement l'écran.
-  const _autoFetchedRef=React.useRef(false);
-  useEffect(()=>{
-    if(_autoFetchedRef.current) return;
-    _autoFetchedRef.current=true;
-    const interval=setInterval(()=>{ fetchProInvoices().then(setProInvs); }, 5*60*1000);
-    return ()=>clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-  
-  // Numéro auto pour la prochaine facture — SÉQUENCE PROPRE À L'ENTITÉ ACTIVE.
-  // Une facture sans `entrepriseId` appartient à la 1ʳᵉ entité (rétro-compat).
-  // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
-  const firstEntId=(Array.isArray(entreprises)&&entreprises[0]&&entreprises[0].id)||'ent_1';
-  const invBelongsToActive=(i)=>{ const eid=i.entrepriseId||firstEntId; return eid===(activeEnt||firstEntId); };
-  const nextInvoiceNumber=useMemo(()=>{
-    const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`)&&invBelongsToActive(i));
-    const maxNum=yearInvoices.reduce((mx,i)=>{
-      const n=parseInt(i.number.split('-')[1],10);
-      return isNaN(n)?mx:Math.max(mx,n);
-    },0);
-    return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices,activeEnt,firstEntId]);
-  
-  // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
-  const accountedSet=useMemo(()=>{
-    const s=new Set();
-    sales.forEach(v=>{
-      if(v.productId) String(v.productId).trim().split('+').forEach(id=>{const t=id.trim();if(t) s.add(t);});
+// ══════════════════════════════════════════════════════════════════════════
+// FACTURES ET AVOIRS — « IL VA FALLOIR FAIRE ÇA PARFAITEMENT » (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Mesuré avant de coder (base en lecture seule, 15 octobre) : aucune facture
+// émise chez personne (`vinted_invoices` absente), `vrm_pro_facture` active chez
+// Julien mais sans SIRET ni mention. Ce qui était faux dans l'écran d'avant :
+//  · « 🗑 » SUPPRIMAIT une facture émise, et la suivante reprenait son numéro
+//    (max + 1) : un trou, puis un doublon, sur un document légal ;
+//  · le numéro se calculait sur la ligne `main`, réécrite à chaque synchro :
+//    deux appareils donnaient le même numéro, un appareil en retard pouvait
+//    effacer une facture ;
+//  · la mention « TVA non applicable, art. 293 B » était posée pour TOUT LE
+//    MONDE (même une société au régime de la marge), et le logo de Cancale
+//    partait sur la facture de n'importe quel vendeur sans logo ;
+//  · la facture se REGÉNÉRAIT avec l'entité du moment : changer d'adresse
+//    changeait les anciennes factures.
+// ⇒ Chaque document émis est une LIGNE à lui (`facture_{année}_{rang}`), FIGÉE :
+//   le vendeur, le régime, les mentions et les montants sont copiés dedans, et
+//   son empreinte SHA-256 dit s'il a été réécrit depuis. Le numéro est la ligne
+//   elle-même : insérée sans écrasement, un numéro ne sert qu'une fois, et un
+//   rang n'est calculé que sur une liste LUE (pas su ⇒ rien n'est émis).
+//   On ne supprime rien : une erreur se corrige par un AVOIR, dans la même suite.
+const lireDocumentsFactures = async () => {
+  const r = await lireTout('id=like.facture_*&select=id,data&order=id.asc', { strict: true });
+  if (r === null) return null;
+  return r.filter(x => x && FACT.lireIdDocument(x.id) && x.data && x.data.numero).map(x => ({ ...x.data, _id: x.id }));
+};
+const insererDocumentFacture = async (id, doc) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      // `ignore-duplicates` : si un autre appareil a pris ce numéro entre-temps,
+      // la base ne réécrit PAS sa facture — elle ne rend rien, et on prend le
+      // rang suivant. Jamais `merge-duplicates` ici.
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }),
+      body: JSON.stringify([withOwner({ id, data: doc })]),
     });
-    return s;
-  },[sales]);
-  
-  const triggerSearch=()=>{setSearch(searchInput);setPage(null);};
-  const clearSearch=()=>{setSearchInput('');setSearch('');setPage(null);};
-  
-  // Filtrage par zone + recherche
-  const fullList=useMemo(()=>{
-    let list=invoices;
-    // Si une recherche est active, on cherche dans TOUTES les zones (pratique pour retrouver/supprimer une facture)
-    if(search.trim()){
-      const q=search.trim().toLowerCase();
-      list=list.filter(i=>(i.number||'').toLowerCase().includes(q)||
-        String(i.productId||'').toLowerCase().includes(q)||
-        (i.itemName||'').toLowerCase().includes(q)||
-        (i.buyerName||'').toLowerCase().includes(q)||
-        fmtDate(i.saleDate||'').toLowerCase().includes(q)||
-        String(i.saleDate||'').toLowerCase().includes(q));
-      return [...list].sort((a,b)=>(b.saleDate||'').localeCompare(a.saleDate||''));
+    if (!r.ok) return r.status >= 500 ? 'incertain' : 'refus';
+    const j = await r.json().catch(() => null);
+    if (!Array.isArray(j)) return 'incertain';
+    return j.length ? 'ok' : 'pris';
+  } catch (_) { return 'incertain'; }
+};
+const trouverFactureParJeton = async (jeton) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.facture_*&meta->>jeton=eq.${encodeURIComponent(jeton)}&select=id,data`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return j[0] && j[0].data ? { ...j[0].data, _id: j[0].id } : false;
+  } catch (_) { return null; }
+};
+const jetonFacture = () => {
+  try { if (crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, ''); } catch (_) {}
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+};
+// La facture VIVANTE d'une source (`vinted:{tx}`, `email_sale_{key}`) : celle
+// qui n'est pas entièrement annulée par ses avoirs. Trois états — `null` pas
+// su · `false` aucune · le document. (16 octobre : l'app n'avait AUCUN contrôle
+// par sourceId — la même vente pouvait recevoir deux factures.)
+const factureVivanteParSource = async (sourceId) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.facture_*&meta->>sourceId=eq.${encodeURIComponent(sourceId)}&select=id,data`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const factures = j.filter(x => x && x.data && x.data.type === 'facture' && x.data.numero);
+    for (const f of factures) {
+      const ra = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.facture_*&meta->>origineNumero=eq.${encodeURIComponent(f.data.numero)}&select=id,t:data->>type,ttcC:data->ttcC`, { headers: sbAuth() });
+      if (!ra.ok) return null;                              // pas su ⇒ on n'émet pas
+      const av = await ra.json();
+      if (!Array.isArray(av)) return null;
+      const credite = av.filter(x => x && x.t === 'avoir').reduce((s, x) => s + (Number(x.ttcC) || 0), 0);
+      if (credite < (Number(f.data.ttcC) || 0)) return { ...f.data, _id: f.id };   // encore vivante
     }
-    // Sinon, filtrage normal par zone
-    if(zone==='attente') list=list.filter(i=>!accountedSet.has(String(i.productId).trim()));
-    else if(zone==='comptabilisees') list=list.filter(i=>accountedSet.has(String(i.productId).trim()));
-    return [...list].sort((a,b)=>(b.saleDate||'').localeCompare(a.saleDate||''));
-  },[invoices,zone,search,accountedSet]);
-  
-  const totalPages=Math.max(1,Math.ceil(fullList.length/PER_PAGE));
-  const currentPage=page===null?0:Math.min(page,totalPages-1);
-  const list=showAll?fullList:fullList.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
-  
-  // Compteurs par zone
-  const counters=useMemo(()=>{
-    const attente=invoices.filter(i=>!accountedSet.has(String(i.productId).trim())).length;
-    const comptabilisees=invoices.filter(i=>accountedSet.has(String(i.productId).trim())).length;
-    return {attente,comptabilisees};
-  },[invoices,accountedSet]);
-  
-  const deleteInvoice=async (id)=>{
-    const inv=invoices.find(i=>i.id===id);
-    const isAcc=inv&&accountedSet.has(String(inv.productId).trim());
-    const msg=isAcc
-      ? `⚠️ La paire #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
-      : 'Supprimer cette facture ?';
-    if(!await askConfirm(msg)) return;
-    const u=invoices.filter(i=>i.id!==id);
-    setInvoices(u); save('vinted_invoices',u);
+    return false;
+  } catch (_) { return null; }
+};
+// `entree.jeton` : STABLE, posé par le formulaire — après « la base n'a pas
+// confirmé l'écriture », le second clic retrouve le document déjà écrit au lieu
+// d'en émettre un deuxième (16 octobre). `anciennes` : les factures d'avant le
+// 15 octobre (`vinted_invoices`) — leurs numéros « AAAA-NNNNNN » de la même
+// année ne sont jamais redonnés.
+const emettreDocumentFacture = async (entree, { anciennes } = {}) => {
+  const annee = FACT.anneeParis();
+  const jeton = entree.jeton || jetonFacture();
+  // Une vente n'a qu'UNE facture vivante : une source déjà facturée (et pas
+  // entièrement annulée par un avoir) ne se refacture pas — « cette vente a
+  // déjà sa facture n° X ». Un avoir, lui, peut citer sa facture plusieurs fois.
+  if (entree.type !== 'avoir' && entree.sourceId) {
+    const v = await factureVivanteParSource(entree.sourceId);
+    if (v === null) return { ok: false, raison: 'lecture' };
+    if (v) return { ok: false, raison: 'source', doc: v };
+  }
+  return FACT.emettre({
+    annee, jeton,
+    reserves: FACT.rangsReserves(anciennes, annee),
+    lireIds: async (a) => { const r = await lireTout(`id=like.facture_${a}_*&select=id`, { strict: true }); return r === null ? null : r.map(x => x.id); },
+    preparer: async (rang) => {
+      const { doc } = FACT.construireDocument({ ...entree, annee, rang, emiseLe: new Date().toISOString(), jeton, creeVia: 'app' });
+      if (!doc) return null;
+      doc.empreinte = await FACT.empreinte(doc);
+      return doc;
+    },
+    inserer: insererDocumentFacture,
+    trouverParJeton: trouverFactureParJeton,
+  });
+};
+const RAISON_EMISSION = {
+  lecture: 'Je n\'ai pas pu lire tes factures déjà émises : rien n\'est émis (le numéro pourrait déjà être pris). Réessaie dans un instant.',
+  incertain: 'La base n\'a pas confirmé l\'écriture. Relis la liste avant de réessayer : rien ne sera émis deux fois.',
+  refus: 'La base a refusé l\'écriture : rien n\'est émis.',
+  concurrence: 'Un autre appareil émet en même temps : réessaie dans un instant.',
+  document: 'Il manque une information pour émettre cette facture.',
+};
+// L'export comptable : TOUS les documents, dans l'ordre des numéros, avec leurs
+// montants signés (un avoir est négatif) et leur empreinte.
+const csvDocumentsFactures = (docs, anciennes) => {
+  const eur = (c, signe) => (c == null ? '' : ((signe ? -c : c) / 100).toFixed(2).replace('.', ','));
+  const tete = ['Type', 'N°', 'Émise le', 'Date de vente', 'Vendeur', 'SIREN', 'Client', 'Email client', 'Adresse client', 'Désignation', 'Réf. paire', 'Transaction', 'HT', 'TVA', 'Taux TVA', 'TTC', 'Mentions', 'Facture d\'origine', 'Motif', 'Empreinte'];
+  const lignes = (docs || []).slice().sort((a, b) => String(a._id).localeCompare(String(b._id))).map(d => {
+    const av = d.type === 'avoir'; const l = (d.lignes && d.lignes[0]) || {};
+    return [av ? 'Avoir' : 'Facture', d.numero, d.jour, d.dateVente, (d.vendeur || {}).nom, (d.vendeur || {}).siren, (d.client || {}).nom, (d.client || {}).email, (d.client || {}).adresse,
+      l.designation, l.refPaire, l.transaction, eur(d.htC, av), eur(d.tvaC, av), d.tauxTva == null ? '' : String(d.tauxTva).replace('.', ','), eur(d.ttcC, av),
+      (d.mentions || []).join(' / '), d.origineNumero, d.motif, d.empreinte];
+  });
+  const vieilles = (anciennes || []).map(i => ['Facture (avant le 15 octobre)', i.number || '', i.saleDate || '', i.saleDate || '', '', '', i.buyerName || '', i.buyerEmail || '', i.buyerAddress || '',
+    i.itemName || '', i.productId || '', i.vintedNumber || '', '', '', '', String(i.sellPrice || '').replace('.', ','), '', '', '', '']);
+  return '﻿' + [tete, ...lignes, ...vieilles].map(r => r.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(';')).join('\n');
+};
+
+function Invoices({ invoices }) {
+  const { profil, pret } = useProfilEntreprise();
+  const [docs, setDocs] = useState(undefined);          // undefined : lecture · null : pas su · [] : lu
+  const [integrite, setIntegrite] = useState({});
+  const [proInvs, setProInvs] = useState(null);
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState(null);                // null · { type:'facture' } · { type:'avoir', origine }
+  const [profilOuvert, setProfilOuvert] = useState(false);
+  const [showPro, setShowPro] = useState(false);
+  const [anciennesOuvert, setAnciennesOuvert] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const relire = async () => {
+    const [d, p] = await Promise.all([lireDocumentsFactures(), fetchProInvoices()]);
+    setDocs(d); setProInvs(p);
   };
-  
-  const addInvoice=(data)=>{
-    const newInvoice={
-      id:'inv_'+Date.now(),
-      number:nextInvoiceNumber,
-      entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
-      ...data,
-      createdAt:new Date().toISOString(),
-    };
-    const u=[newInvoice,...invoices];
-    setInvoices(u); save('vinted_invoices',u);
-    setShowForm(false);
+  useEffect(() => { relire(); }, []);
+  useEffect(() => {
+    if (!Array.isArray(docs)) return undefined;
+    let stop = false;
+    (async () => { const m = {}; for (const d of docs) m[d.numero] = await FACT.empreinteIntacte(d); if (!stop) setIntegrite(m); })();
+    return () => { stop = true; };
+  }, [docs]);
+  const tva = tauxTvaChoisi();
+  const manque = FACT.manquePourFacturer(profil, { tauxTva: tva });
+  const avoirs = useMemo(() => FACT.etatAvoirs(docs || []), [docs]);
+  const cont = useMemo(() => FACT.continuite((docs || []).map(d => d._id)), [docs]);
+  const anciennes = Array.isArray(invoices) ? invoices : [];
+  const peutEmettre = pret && Array.isArray(docs) && !manque.length && !busy;
+  const raisonGrise = !pret ? 'Chargement de tes réglages…'
+    : docs === undefined ? 'Lecture de tes factures…'
+      : docs === null ? 'Tes factures n\'ont pas pu être lues : rien ne peut être émis tant que la liste n\'est pas lue.'
+        : manque.length ? `Pour émettre, il manque : ${manque.join(', ')}.` : '';
+  const liste = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const t = (docs || []).slice().sort((a, b) => String(b._id).localeCompare(String(a._id)));
+    if (!q) return t;
+    return t.filter(d => [d.numero, d.client && d.client.nom, d.client && d.client.email, d.lignes && d.lignes[0] && d.lignes[0].designation, d.lignes && d.lignes[0] && d.lignes[0].refPaire, d.origineNumero]
+      .some(v => String(v || '').toLowerCase().includes(q)));
+  }, [docs, search]);
+  const exporter = () => {
+    if (!Array.isArray(docs)) { toast('Tes factures n\'ont pas pu être lues : rien à exporter pour l\'instant.'); return; }
+    if (!docs.length && !anciennes.length) { toast('Aucune facture à exporter'); return; }
+    const blob = new Blob([csvDocumentsFactures(docs, anciennes)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `factures-avoirs-${FACT.jourParis()}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
-  
-  // Export CSV/Excel
-  const exportExcel=()=>{
-    if(fullList.length===0){toast('Aucune facture à exporter');return;}
-    const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
-    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
-    const rows=fullList.map(i=>{
-      const e=entForInvoice(i,entreprises,activeEnt,invoiceSettings);
-      return [
-      i.number||'',...(multiEnt?[e&&e.companyName||'',e&&e.siret||'']:[]),i.saleDate||'',i.productId||'',i.itemName||'',
-      (i.sellPrice||'').toString().replace('.',','),
-      i.buyerName||'',i.buyerEmail||'',i.buyerAddress||'',i.vintedNumber||'',
-      accountedSet.has(String(i.productId).trim())?'Comptabilisée':'En attente',
-    ];});
-    const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=`factures-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const emettre = async (entree, libelle) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await emettreDocumentFacture(entree, { anciennes });
+      // `deja` : le document de CE formulaire existait déjà (écriture
+      // « incertaine » du clic précédent, retrouvée par son jeton) — on le dit,
+      // on ferme, on n'émet jamais deux fois (16 octobre).
+      if (r.ok && r.deja) { toast(`${libelle} n° ${r.doc.numero} déjà émis${libelle === 'Facture' ? 'e' : ''} — rien de nouveau n'a été écrit.`); setForm(null); }
+      else if (r.ok) { toast(`${libelle} n° ${r.doc.numero} émis${libelle === 'Facture' ? 'e' : ''}`); setForm(null); }
+      else if (r.raison === 'source' && r.doc) { toast(`Cette vente a déjà sa facture n° ${r.doc.numero} — rien n'a été émis. Une erreur se corrige par un avoir.`); setForm(null); }
+      else toast(RAISON_EMISSION[r.raison] || 'Rien n\'a été émis.');
+      setDocs(await lireDocumentsFactures());
+    } finally { setBusy(false); }
   };
-  
+  // Émettre la facture d'une vente GARDÉE « en attente du profil » (serveur,
+  // 16 octobre) : même boucle d'émission, sourceId de la vente (une seule
+  // facture, même si on reclique), puis la ligne d'envoi devient réelle.
+  const emettreAttente = async (inv) => {
+    if (busy || !peutEmettre) return;
+    const ttcC = FACT.centimesDe(inv.prix);
+    if (!isFinite(ttcC) || ttcC <= 0) { toast('Le prix de cette vente est illisible — émets sa facture à la main (+ Nouvelle facture).'); return; }
+    if (!await askConfirm({ title: `Émettre la facture de « ${inv.designation || 'cette vente'} » (${FACT.eurosDe(ttcC)}) ?`, desc: 'Elle prend le numéro suivant de ta suite et ne se modifie plus.', ok: 'Émettre' })) return;
+    setBusy(true);
+    try {
+      const entree = { type: 'facture', jeton: jetonFacture(), profil, tauxTva: tva, ttcC,
+        designation: inv.designation || 'Article Vinted', dateVente: String(inv.createdAt || '').slice(0, 10) || FACT.jourParis(),
+        refPaire: inv.numero || '', transaction: '',
+        client: { nom: inv.buyerName || '', email: inv.buyerEmail || '', adresse: inv.buyerAddress || '' },
+        sourceId: inv.sourceId || '' };
+      const r = await emettreDocumentFacture(entree, { anciennes });
+      const doc = r.ok ? r.doc : (r.raison === 'source' ? r.doc : null);
+      if (!doc) { toast(RAISON_EMISSION[r.raison] || 'Rien n\'a été émis.'); return; }
+      // La ligne d'envoi : le HTML de la facture (le même que le serveur, §11),
+      // avec le logo de la Facturation Pro s'il existe.
+      const cfg = (await lireProFacturePourReprise()) || {};
+      const html = FACT.corpsHtmlDocument(doc, { logoSrc: cfg.logo ? 'cid:logoFacture' : '' });
+      const maj = await majLigneEnvoiApresEmission(inv, doc, html);
+      toast(r.raison === 'source'
+        ? `Cette vente avait déjà sa facture n° ${doc.numero} — la ligne d'envoi est ${maj ? 'reliée' : 'à relier (réessaie)'}.`
+        : `Facture n° ${doc.numero} émise${maj ? '' : ' — la ligne d\'envoi n\'a pas pu être mise à jour, réessaie'}.`);
+      setDocs(await lireDocumentsFactures());
+      setProInvs(await fetchProInvoices());
+    } finally { setBusy(false); }
+  };
+  const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
+    borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 });
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
-          dans une rangée à part, ils sortaient de la zone protégée et
-          glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
-          invisible (vu en capture). Le slot `right` existe pour ça. */}
-      <div>
-        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
-          right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-          <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
-          {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
-              pouvait QUE échouer. Il relit maintenant les reçus arrivés par
-              email — la source qui remplit vraiment cet écran. */}
-          <Btn small outline color={C.muted} disabled={fetching}
-            onClick={async()=>{ setFetching(true); try{ setProInvs(await fetchProInvoices()); toast('Reçus Vinted relus'); } finally { setFetching(false); } }}
-            style={{display:'inline-flex',alignItems:'center',gap:5}}>
-            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les reçus'}
-          </Btn>
-          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Facturation Pro</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
+    <div data-ecran-factures style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <ScreenHead icon="receipt" title="Factures" desc="Tes factures et avoirs, émis au nom de ton entreprise."
+        right={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" data-nouvelle-facture disabled={!peutEmettre} title={raisonGrise || undefined} onClick={() => setForm({ type: 'facture' })}
+            style={{ ...btn(true), opacity: peutEmettre ? 1 : 0.45, cursor: peutEmettre ? 'pointer' : 'default' }}>+ Nouvelle facture</button>
+          <button type="button" onClick={exporter} data-exporter-factures style={btn(false)}><Icon name="save" size={13}/>Exporter</button>
+          <button type="button" aria-expanded={profilOuvert} onClick={() => setProfilOuvert(v => !v)} style={btn(false)}><Icon name="gear" size={13}/>Mon entreprise</button>
+          <button type="button" aria-expanded={showPro} onClick={() => setShowPro(v => !v)} style={btn(false)}><Icon name="receipt" size={13}/>Facturation Pro</button>
         </div>}/>
+
+      {/* L'entité, en une ligne : c'est elle qui part sur chaque facture. */}
+      <div data-entite-factures style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+        {profil.nom ? <>Au nom de <b style={{ color: C.text }}>{FACT.nomVendeur(profil)}</b>{profil.siren ? ` · SIREN ${profil.siren}` : ''} · {FACT.libelleProfil(profil)}</> : <>{FACT.libelleProfil(profil)}</>}
+        {pret && manque.length > 0 && (
+          <div data-facture-bloquee style={{ color: C.text, marginTop: 4 }}>
+            Pour émettre, il manque : {manque.join(', ')}.{' '}
+            <button type="button" onClick={() => setProfilOuvert(true)} style={{ ...btn(false), padding: '3px 9px', fontSize: 12 }}>Compléter</button>
+          </div>
+        )}
       </div>
+      {profilOuvert && <ProfilEntreprise ouvertParDefaut/>}
       {showPro && <ProFactureSetting/>}
 
-      {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
-      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-        <input
-          value={searchInput}
-          onChange={e=>setSearchInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="N° de paire ou date de vente... puis Entrée"
-          style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
-            color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
-        />
-        <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
-        {search&&<Btn small onClick={clearSearch} color={C.border}>✕ Effacer</Btn>}
-      </div>
-      {search&&<div style={{fontSize:12,color:C.warn}}>
-        🔍 Recherche « {search} » dans toutes les factures — {fullList.length} résultat{fullList.length>1?'s':''}. Tu peux supprimer directement avec 🗑.
-      </div>}
-      
-      {/* Factures Pro (pipeline email) : préparées par le serveur, envoi Gmail */}
-      {Array.isArray(proInvs)&&proInvs.length>0&&(
-        <div>
-          <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'0 0 8px'}}>🧾 Factures Pro ({proInvs.length})</div>
-          <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {proInvs.slice(0,20).map(inv=>{
-              const col=inv.status==='sent'?'#27a85d':inv.status==='queued'?C.warn:C.muted;
-              const lbl=inv.status==='sent'?'📧 envoyée':inv.status==='queued'?'⏳ envoi en cours':'brouillon';
-              return (
-                <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:10,flexWrap:'wrap'}}>
-                  <div style={{flex:1,minWidth:140}}>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text}}>
-                      {inv.number} <span style={{fontSize:11,fontWeight:600,color:col,marginLeft:4}}>{lbl}</span>
-                    </div>
-                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260}}>
-                      {inv.designation||'Article'} · {inv.prix} € · <span data-stream="prive">{inv.buyerName||inv.buyerEmail}</span>
-                    </div>
+      {/* La continuité de la suite, vérifiable d'un coup d'œil. */}
+      {Array.isArray(docs) && cont.length > 0 && (
+        <div data-continuite style={{ fontSize: 12, color: C.muted, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {cont.map(c => c.manquants.length
+            ? <span key={c.annee} data-trou={c.manquants.join(',')} style={{ color: C.warn }}>{c.annee} : il manque {c.manquants.length > 1 ? 'les n°' : 'le n°'} {c.manquants.join(', ')} dans la suite — un document a été retiré de la base.</span>
+            : <span key={c.annee}>{c.annee} : n° 1 à {c.max}, suite continue.</span>)}
+        </div>
+      )}
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Chercher un n°, un client, une paire…" aria-label="Chercher une facture"
+        style={{ padding: '9px 12px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', maxWidth: 420 }}/>
+
+      {docs === undefined && <div style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes factures…</div>}
+      {docs === null && (
+        <div data-factures-pas-lues style={{ fontSize: 12.5, color: C.text, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
+          Je n'ai pas pu lire tes factures (la base n'a pas répondu). Rien n'est perdu ; l'émission attend que la lecture marche.{' '}
+          <button type="button" onClick={relire} style={{ ...btn(false), padding: '4px 10px', fontSize: 12 }}>Réessayer</button>
+        </div>
+      )}
+      {Array.isArray(docs) && docs.length === 0 && (
+        <div data-factures-vide style={{ fontSize: 12.5, color: C.muted, textAlign: 'center', padding: '22px 10px' }}>Aucune facture émise pour l'instant.</div>
+      )}
+      {Array.isArray(docs) && docs.length > 0 && (
+        <div data-liste-documents style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
+          {liste.map(d => {
+            const av = d.type === 'avoir';
+            const etat = !av ? avoirs[d.numero] : null;
+            const annulee = etat && etat.avoirs.length && etat.resteC <= 0;
+            const l = (d.lignes && d.lignes[0]) || {};
+            return (
+              <div key={d._id} data-document={d.numero} data-type={d.type} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px', padding: '10px 12px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
+                <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'ui-monospace,Menlo,monospace' }}>{d.numero}</span>
+                    {av && <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '0 7px' }}>Avoir · facture {d.origineNumero}</span>}
+                    {annulee ? <span data-annulee style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>annulée par avoir</span>
+                      : etat && etat.avoirs.length ? <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>avoir partiel</span> : null}
+                    {integrite[d.numero] === false && <span data-empreinte-ko style={{ fontSize: 11, fontWeight: 600, color: C.warn }}>modifiée depuis l'émission</span>}
                   </div>
-                  <div style={{display:'flex',gap:6,flexShrink:0}}>
-                    <button type="button" onClick={()=>{ ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}</body></html>`); }}
-                      style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
-                    {inv.status==='draft'&&inv.buyerEmail&&(
-                      <button type="button" onClick={async()=>{
-                        if(!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
-                        const ok=await setProInvoiceStatus(inv,'queued');
-                        if(ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
-                      }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
+                  <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {/* (fusion du 16 octobre) Le nom du client est marqué privé
+                        pour le mode stream, comme dans l'écran d'avant (§11). */}
+                    {[FACT.jourParis(new Date(d.emiseLe)).split('-').reverse().join('/'), l.designation].filter(Boolean).join(' · ')}
+                    {d.client && (d.client.nom || d.client.email) ? <> · <span data-stream="prive">{d.client.nom || d.client.email}</span></> : null}
+                  </div>
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{av ? '−' : ''}{FACT.eurosDe(d.ttcC)}</div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button type="button" onClick={() => imprimerDocumentFacture(d)} title="Ouvrir et imprimer" style={{ ...btn(false), padding: '5px 9px', fontSize: 12 }}>PDF</button>
+                  <button type="button" onClick={() => telechargerFacturX(d)} title="Facture électronique (PDF + XML EN16931)" style={{ ...btn(false), padding: '5px 9px', fontSize: 12 }}>Factur-X</button>
+                  {!av && etat && etat.resteC > 0 && (
+                    <button type="button" data-faire-avoir={d.numero} disabled={!peutEmettre} title={raisonGrise || 'Corriger ou annuler cette facture'} onClick={() => setForm({ type: 'avoir', origine: d })}
+                      style={{ ...btn(false), padding: '5px 9px', fontSize: 12, opacity: peutEmettre ? 1 : 0.45 }}>Avoir</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {liste.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: 14 }}>Rien ne correspond à « {search} ».</div>}
+        </div>
+      )}
+      {Array.isArray(docs) && docs.length > 0 && (
+        <div style={{ fontSize: 11.5, color: C.muted }}>Une facture émise ne se modifie ni ne se supprime : une erreur se corrige par un avoir.</div>
+      )}
+
+      {/* Les factures préparées par le serveur pour un envoi par email (Pro). */}
+      {Array.isArray(proInvs) && proInvs.length > 0 && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.text, margin: '0 0 8px' }}>Envois par email ({proInvs.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {proInvs.slice(0, 20).map(inv => {
+              // 'profil' (16 octobre) : la vente est arrivée profil incomplet —
+              // AUCUNE facture n'existe encore, c'est son clic qui l'émet.
+              const attente = inv.status === 'profil';
+              const lbl = attente ? 'en attente de ton profil' : inv.status === 'sent' ? 'envoyée' : inv.status === 'queued' ? 'envoi en cours' : 'à envoyer';
+              return (
+                <div key={inv._id} data-envoi-statut={inv.status || 'draft'} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{attente ? 'Sans numéro' : inv.number} <span style={{ fontSize: 11, fontWeight: 600, color: attente ? C.warn : C.muted, marginLeft: 4 }}>{lbl}</span></div>
+                    <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>{inv.designation || 'Article'} · {inv.prix} € · <span data-stream="prive">{inv.buyerName || inv.buyerEmail}</span></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {attente && (
+                      <button type="button" data-emettre-attente={inv._id} disabled={!peutEmettre} title={raisonGrise || 'Émettre la facture de cette vente'} onClick={() => emettreAttente(inv)}
+                        style={{ ...btn(true), padding: '5px 10px', fontSize: 12, opacity: peutEmettre ? 1 : 0.45, cursor: peutEmettre ? 'pointer' : 'default' }}>Émettre sa facture</button>
+                    )}
+                    {!attente && <button type="button" onClick={() => { ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html || '').replace('cid:logoFacture', '')}</body></html>`); }} style={{ ...btn(false), padding: '5px 10px', fontSize: 12 }}>Voir</button>}
+                    {inv.status === 'draft' && inv.buyerEmail && (
+                      <button type="button" onClick={async () => {
+                        if (!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
+                        const ok = await setProInvoiceStatus(inv, 'queued');
+                        if (ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
+                      }} style={{ ...btn(true), padding: '5px 10px', fontSize: 12 }}>Envoyer</button>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Préparées automatiquement à chaque vente Pro (coordonnées acheteur dans l'email Vinted). Réglages : Paramètres → Facturation Pro.</div>
         </div>
       )}
 
-      {/* Sous-onglets zones */}
-      <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
-        {[
-          {id:'attente',icon:'clock',label:'En attente',count:counters.attente},
-          {id:'comptabilisees',icon:'check',label:'Comptabilisées',count:counters.comptabilisees},
-        ].map(z=>(
-          <button key={z.id} type="button" onClick={()=>{setZone(z.id);setPage(null);}}
-            style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
-              color:zone===z.id?C.accent:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
+      {/* Les factures d'avant le 15 octobre (ligne `main`) : lisibles, jamais
+          supprimées, hors de la nouvelle suite. */}
+      {anciennes.length > 0 && (
+        <div data-anciennes-factures>
+          <button type="button" aria-expanded={anciennesOuvert} onClick={() => setAnciennesOuvert(v => !v)}
+            style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: C.text }}>
+            {anciennesOuvert ? '▾' : '▸'} Factures d'avant le 15 octobre ({anciennes.length})
           </button>
-        ))}
-      </div>
-      {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
-          identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
-      
-      {/* Tableau factures */}
-      <Card style={{padding:0,overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
-          <thead>
-            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Paire</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Prix</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Acheteur</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
-                développeur — « Aucune facture en attente » ne se rattrape
-                nulle part). D'où l'origine des lignes, et la porte : le même
-                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
-                constate le vide. */}
-            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:12.5,lineHeight:1.5}}>
-              {search.trim()
-                ? <>Aucune facture trouvée pour « {search} ».</>
-                : zone==='attente'
-                  ? <>Aucune facture en attente.<br/>
-                      {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
-                          pipeline Apps Script est mort (404, mesuré). Il aurait
-                          attendu des factures qui ne pouvaient pas arriver. Ce
-                          qui remplit vraiment cet écran, ce sont les reçus
-                          Vinted reçus par email, et sa propre saisie. */}
-                      <span style={{fontSize:11.5}}>Les reçus Vinted arrivent par email, à l'adresse de l'app. Tu peux aussi en créer une à la main.</span>
-                      <br/>
-                      <span style={{display:'inline-block',marginTop:10}}>
-                        <Btn small color={C.accent} onClick={()=>setShowForm(true)}
-                          style={{display:'inline-flex',alignItems:'center',gap:5}}>+ Nouvelle facture</Btn>
-                      </span>
-                    </>
-                  : <>Aucune facture comptabilisée.<br/>
-                      <span style={{fontSize:11.5}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
-                    </>}
-            </td></tr>}
-            {list.map(inv=>{
-              const isAccounted=accountedSet.has(String(inv.productId).trim());
-              return (
-                <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:9.5,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
-                  <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
-                  <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
-                  <td data-stream="prive" style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
-                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
-                    <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
-      
-      {/* Pagination */}
-      {!showAll&&totalPages>1&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?0:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>← Précédent</Btn>
-        <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
-          Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullList.length} résultats)</span>
-        </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
-      </div>}
-      {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} factures</span>
-        <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
-      </div>}
-      
-      {/* Modale création facture */}
-      {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
-      
-      {/* Modale réglages */}
-      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} onClose={()=>setShowSettings(false)}/>}
-    </div>
-  );
-}
-
-// Formulaire de création d'une facture
-function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
-  const [data,setData]=useState({
-    productId:'',itemName:'',sellPrice:'',saleDate:tod(),
-    buyerName:'',buyerEmail:'',buyerAddress:'',
-    vintedNumber:'',source:'manual',
-  });
-  const [err,setErr]=useState('');
-  
-  const submit=()=>{
-    setErr('');
-    if(!data.productId.trim()){setErr('Le numéro de paire est obligatoire');return;}
-    if(!data.sellPrice||+data.sellPrice<=0){setErr('Prix de vente invalide');return;}
-    if(!data.itemName.trim()){setErr('La désignation est obligatoire');return;}
-    onSave(data);
-  };
-  
-  return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
-      onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
-        </div>
-        <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accent}}>{nextNumber}</b></div>
-        
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="N° paire (étiquetage) *">
-            <Input type="number" value={data.productId} onChange={e=>{
-              const id=e.target.value;
-              const p=catalog.find(p=>p.id===id);
-              setData(d=>({...d,productId:id, itemName:p?(d.itemName||''):d.itemName}));
-            }} placeholder="ex: 1280"/>
-          </Field>
-          <Field label="Désignation *">
-            <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder="ex: Adidas Spezial bleu marine taille 365"/>
-          </Field>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            <Field label="Prix de vente € *">
-              <Input type="number" step="0.01" value={data.sellPrice} onChange={e=>setData(d=>({...d,sellPrice:e.target.value}))} placeholder="38.00"/>
-            </Field>
-            <Field label="Date vente">
-              <Input type="date" value={data.saleDate} onChange={e=>setData(d=>({...d,saleDate:e.target.value}))}/>
-            </Field>
-          </div>
-
-          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>Acheteur</div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <Field label="Nom complet"><Input data-stream="champ" value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Prénom Nom"/></Field>
-              <Field label="Email"><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder="prenom.nom@exemple.fr"/></Field>
-              <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="N° et rue, code postal, ville, pays"/></Field>
+          {anciennesOuvert && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {anciennes.map(inv => (
+                <div key={inv.id || inv.number} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.text }}>
+                  <span style={{ fontFamily: 'ui-monospace,Menlo,monospace' }}>{inv.number || '—'}</span>
+                  <span style={{ color: C.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmtDate(inv.saleDate)} · {inv.itemName || '—'}</span>
+                  <span>{fmt(+inv.sellPrice || 0)}</span>
+                  <button type="button" onClick={() => generatePDF(inv, entiteFacturesAncienne() || {})} style={{ ...btn(false), padding: '4px 9px', fontSize: 12 }}>PDF</button>
+                </div>
+              ))}
             </div>
-          </div>
-
-          <Field label="N° transaction Vinted">
-            <Input value={data.vintedNumber} onChange={e=>setData(d=>({...d,vintedNumber:e.target.value}))} placeholder="19921523337"/>
-          </Field>
-
-          {err&&<div style={{color:C.danger,fontSize:12}}>⚠ {err}</div>}
-
-          <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={submit} color={C.accent} style={{flex:1}}>✓ Créer la facture</Btn>
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
-          </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {form && <FactureForm type={form.type} origine={form.origine} profil={profil} tauxTva={tva} busy={busy} etatAvoir={form.origine ? avoirs[form.origine.numero] : null}
+        onClose={() => !busy && setForm(null)} onEmettre={emettre}/>}
     </div>
   );
 }
 
-// Réglages personnalisables
-// Réglages factures — gère PLUSIEURS micro-entreprises. Rétro-compatible : si une
-// seule entité, c'est exactement comme avant. `setSettings` continue de refléter
-// l'entité ACTIVE dans `vinted_invoice_settings` (pour tout code hérité qui le lit).
-function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,onClose}) {
-  const list = (Array.isArray(entreprises)&&entreprises.length) ? entreprises : [{id:'ent_1',...settings}];
-  const [sel,setSel]=useState(()=>{ const a=list.find(e=>e.id===activeEnt); return (a&&a.id)||list[0].id; });
-  const cur = list.find(e=>e.id===sel)||list[0];
-  const [data,setData]=useState(cur);
-  // Quand on change d'entité sélectionnée, charge ses champs dans le formulaire.
-  const pick=(id)=>{ setSel(id); const e=list.find(x=>x.id===id); if(e) setData(e); };
-  const mirror=(entList,activeId)=>{ const act=entList.find(e=>e.id===activeId)||entList[0]; if(act) setSettings({companyName:act.companyName||'',companyType:act.companyType||'',companyAddress:act.companyAddress||'',siret:act.siret||'',footer:act.footer||''}); };
-  const persist=(entList,activeId)=>{ setEntreprises(entList); if(activeId!==undefined){ setActiveEnt(activeId); } mirror(entList, activeId!==undefined?activeId:activeEnt); };
-  const saveCur=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next); onClose(); };
-  const addEnt=()=>{ const id='ent_'+Date.now(); const blank={id,companyName:'',companyType:'Entrepreneur individuel',companyAddress:'',siret:'',tvaMention:'TVA non applicable, art. 293 B du CGI',footer:'Merci pour votre achat !'}; const next=[...list,blank]; setEntreprises(next); setSel(id); setData(blank); };
-  const delEnt=()=>{ if(list.length<=1) return; const next=list.filter(e=>e.id!==sel); const newActive=(activeEnt===sel)?next[0].id:activeEnt; persist(next,newActive); const nsel=next[0].id; setSel(nsel); setData(next[0]); };
-  const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
+// La saisie d'une facture (ou d'un avoir). Rien n'est numéroté avant le clic
+// « Émettre » : le numéro est donné par la base, à la suite du dernier.
+function FactureForm({ type, origine, profil, tauxTva, busy, etatAvoir, onClose, onEmettre }) {
+  const av = type === 'avoir';
+  const lo = (origine && origine.lignes && origine.lignes[0]) || {};
+  // La désignation d'un avoir est L'ARTICLE, pas « Avoir sur la facture X — … » :
+  // le document cite déjà sa facture d'origine (« Sur la facture N° X »), et la
+  // liste portait la même phrase deux fois (badge + désignation, §7, 16 octobre).
+  const [d, setD] = useState(() => av
+    ? { designation: lo.designation || '', prix: etatAvoir ? (etatAvoir.resteC / 100).toFixed(2).replace('.', ',') : '', motif: '' }
+    : { designation: '', prix: '', dateVente: FACT.jourParis(), refPaire: '', transaction: '', nom: '', email: '', adresse: '' });
+  const [err, setErr] = useState('');
+  // UN jeton par formulaire, PAS par clic : après « la base n'a pas confirmé
+  // l'écriture », le second clic du même formulaire retrouve le document déjà
+  // écrit (par son jeton) au lieu d'en émettre un deuxième (16 octobre).
+  const [jeton] = useState(() => jetonFacture());
+  // Un avoir suit le régime de SA facture (le profil a pu changer depuis).
+  const profilDoc = av ? { ...profil, tva: origine.mode === 'franchise' ? 'franchise' : 'assujetti', marge: origine.mode === 'marge' } : profil;
+  const tauxDoc = av ? origine.tauxTva : tauxTva;
+  const ttcC = FACT.centimesDe(d.prix);
+  const mt = isFinite(ttcC) ? FACT.montantsDocument(ttcC, profilDoc, tauxDoc) : null;
+  const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: C.bg, color: C.text, outline: 'none' };
+  const set = (k) => (e) => setD(x => ({ ...x, [k]: e.target.value }));
+  const valider = async () => {
+    setErr('');
+    if (!d.designation.trim()) { setErr('La désignation est obligatoire.'); return; }
+    if (!mt) { setErr('Montant invalide.'); return; }
+    // Le NOM du client fait partie des mentions de la facture : sans lui, le
+    // document imprimait « Client » à la place du nom (16 octobre).
+    if (!av && !d.nom.trim()) { setErr('Le nom du client est obligatoire : il apparaît sur la facture.'); return; }
+    if (av && etatAvoir && ttcC > etatAvoir.resteC) { setErr(`L'avoir ne peut pas dépasser ${FACT.eurosDe(etatAvoir.resteC)} (ce qui reste de la facture).`); return; }
+    const ok = await askConfirm(av
+      ? { title: `Émettre un avoir de ${FACT.eurosDe(ttcC)} ?`, desc: `Sur la facture ${origine.numero}. Il prend le numéro suivant de ta suite et ne se modifie plus.`, ok: 'Émettre' }
+      : { title: 'Émettre cette facture ?', desc: 'Une fois émise, elle ne se modifie ni ne se supprime : une erreur se corrigera par un avoir.', ok: 'Émettre' });
+    if (!ok) return;
+    if (av) {
+      await onEmettre({ type: 'avoir', jeton, profil: profilDoc, tauxTva: tauxDoc, ttcC, designation: d.designation, motif: d.motif, origineNumero: origine.numero, origineJour: origine.jour,
+        client: origine.client, refPaire: lo.refPaire, transaction: lo.transaction, dateVente: origine.dateVente, sourceId: `avoir:${origine.numero}` }, 'Avoir');
+    } else {
+      await onEmettre({ type: 'facture', jeton, profil, tauxTva, ttcC, designation: d.designation, dateVente: d.dateVente, refPaire: d.refPaire, transaction: d.transaction,
+        client: { nom: d.nom, email: d.email, adresse: d.adresse }, sourceId: d.transaction ? `vinted:${d.transaction}` : '' }, 'Facture');
+    }
+  };
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div data-facture-form={type} onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'grid', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{av ? `Avoir sur la facture ${origine.numero}` : 'Nouvelle facture'}</div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ background: 'none', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', padding: 0 }}>×</button>
         </div>
-        {/* Sélecteur de micro-entreprise */}
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:5}}>Mes micro-entreprises</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-            {list.map(e=>(
-              <button key={e.id} type="button" onClick={()=>pick(e.id)}
-                style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                {e.id===activeEnt?'⭐ ':''}{e.companyName||'(sans nom)'}
-              </button>
-            ))}
-            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
-          </div>
-          <div style={{fontSize:10.5,color:C.muted,marginTop:5}}>⭐ = entité utilisée pour les nouvelles factures. Chaque entité a sa propre numérotation.</div>
+        <Field label="Désignation"><input value={d.designation} onChange={set('designation')} placeholder="ex : Nike Air Max 90 blanches, pointure 42" style={champ}/></Field>
+        <div style={{ display: 'grid', gridTemplateColumns: av ? '1fr' : 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }}>
+          <Field label={av ? 'Montant de l\'avoir (€)' : 'Prix payé par le client (€)'}><input value={d.prix} onChange={set('prix')} inputMode="decimal" placeholder="54,00" style={champ}/></Field>
+          {!av && <Field label="Date de la vente"><input type="date" value={d.dateVente} onChange={set('dateVente')} style={champ}/></Field>}
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="Nom de l'entreprise"><Input value={data.companyName||''} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
-          <Field label="Forme juridique"><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
-          <Field label="Adresse"><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
-          <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
-          <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
-          <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
-          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
-          <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
-            {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
-            <Btn onClick={onClose} color={C.border}>Annuler</Btn>
+        {av && <Field label="Motif (facultatif)"><input value={d.motif} onChange={set('motif')} placeholder="ex : retour de l'article, erreur de prix" style={champ}/></Field>}
+        {!av && <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }}>
+            <Field label="Réf. paire (facultatif)"><input value={d.refPaire} onChange={set('refPaire')} style={champ}/></Field>
+            <Field label="N° de transaction (facultatif)"><input value={d.transaction} onChange={set('transaction')} inputMode="numeric" style={champ}/></Field>
           </div>
+          <Field label="Nom du client"><input data-stream="champ" value={d.nom} onChange={set('nom')} placeholder="Prénom Nom" style={champ}/></Field>
+          <Field label="Email du client (facultatif)"><input type="email" value={d.email} onChange={set('email')} style={champ}/></Field>
+          <Field label="Adresse du client (mention de la facture — mets-la si tu l'as)"><input value={d.adresse} onChange={set('adresse')} style={champ}/></Field>
+        </>}
+        {/* Ce qui sera écrit, tiré du régime — jamais une mention tapée à la main. */}
+        <div data-apercu-montants style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          {mt ? (mt.mode === 'normale'
+            ? `HT ${FACT.eurosDe(mt.htC)} · TVA ${String(mt.tauxTva).replace('.', ',')} % ${FACT.eurosDe(mt.tvaC)} · TTC ${FACT.eurosDe(mt.ttcC)}`
+            : `Total ${FACT.eurosDe(mt.ttcC)}`) : 'Montant à saisir.'}
+          {FACT.mentionsLegales(profilDoc).map(m => <div key={m} data-mention>{m}</div>)}
+        </div>
+        {err && <div role="alert" style={{ color: C.danger, fontSize: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button type="button" data-emettre disabled={busy} onClick={valider}
+            style={{ flex: 1, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '10px 12px', fontSize: 13.5, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Émission…' : av ? 'Émettre l\'avoir' : 'Émettre la facture'}</button>
+          <button type="button" onClick={onClose} disabled={busy} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '10px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
         </div>
       </div>
     </div>
@@ -19694,151 +19844,119 @@ function ouvrirDocumentImprimable(html) {
   setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 400);
   return w;
 }
-function generatePDF(inv,settings) {
-  let _logo=LOGO_CANCALE;
-  try{ const _c=localStorage.getItem('vinted_custom_logo'); if(_c){ _logo=JSON.parse(_c); } }catch(_){}
-  const html=`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Facture ${xmlEsc(inv.number)}</title>
-<style>
-body{font-family:Arial,sans-serif;color:#222;max-width:800px;margin:30px auto;padding:30px;background:#fff;}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;}
-.logo{width:140px;height:140px;background:#0a0a0a;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;text-align:center;padding:10px;box-sizing:border-box;}
-.logo .top{font-size:14px;letter-spacing:2px;border:1.5px solid #fff;border-radius:4px;padding:2px 8px;}
-.logo .shoe{font-size:50px;margin:8px 0;}
-.logo .bot{font-size:9px;letter-spacing:3px;}
-.title{text-align:right;}
-.title h1{margin:0;font-size:32px;letter-spacing:1px;}
-.title .num{color:#666;font-size:14px;margin-top:6px;}
-.parties{display:flex;justify-content:space-between;margin-bottom:30px;}
-.party{flex:1;}
-.party-label{font-weight:700;font-size:13px;color:#666;margin-bottom:4px;}
-.party-info{font-size:13px;line-height:1.5;}
-.party-info b{font-size:14px;}
-table{width:100%;border-collapse:collapse;margin-bottom:20px;}
-th{background:#f5f5f5;text-align:left;padding:10px;font-size:13px;border-bottom:2px solid #ddd;}
-th.right{text-align:right;}
-td{padding:10px;font-size:13px;border-bottom:1px solid #eee;}
-td.right{text-align:right;}
-.totals{margin-left:auto;width:50%;}
-.totals .row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;}
-.totals .row b{font-weight:700;}
-.totals .total{border-top:1px solid #ccc;margin-top:6px;padding-top:8px;font-size:14px;}
-.acquittee{color:#27a85d;text-align:right;margin-top:14px;font-size:14px;font-weight:700;}
-.remarques{margin-top:40px;padding-top:20px;border-top:1px solid #eee;}
-.remarques .label{font-weight:700;font-size:13px;color:#666;margin-bottom:6px;}
-.remarques p{margin:4px 0;font-size:13px;}
-.footer{margin-top:50px;text-align:center;color:#999;font-size:10px;}
-@media print{body{margin:0;}}
-</style></head><body>
-<div class="header">
-  <div class="logo">
-    <img src="${xmlEsc(_logo)}" alt="Cancale Shoes Store" style="width:140px;height:auto;border-radius:8px;" />
-  </div>
-  <div class="title">
-    <h1>FACTURE</h1>
-    <div class="num"># ${xmlEsc(inv.number)}</div>
-    <div class="num">Date : ${fmtDate(inv.saleDate)}</div>
-  </div>
-</div>
-<div class="parties">
-  <div class="party">
-    <div class="party-label">De :</div>
-    <div class="party-info"><b>${xmlEsc(settings.companyName)}</b><br>${xmlEsc(settings.companyType)}<br>${xmlEsc(settings.companyAddress)}<br>SIRET : ${xmlEsc(settings.siret)}</div>
-  </div>
-  <div class="party" style="text-align:right">
-    <div class="party-label">À :</div>
-    <div class="party-info"><b>${xmlEsc(inv.buyerName||inv.buyerEmail||'Client')}</b>${inv.buyerAddress?'<br>'+xmlEsc(inv.buyerAddress):''}${inv.buyerEmail&&inv.buyerName?'<br>'+xmlEsc(inv.buyerEmail):''}</div>
-  </div>
-</div>
-<table>
-  <thead><tr><th>Objet</th><th class="right">Quantité</th><th class="right">Prix unitaire (HT)</th><th class="right">Montant (HT)</th></tr></thead>
-  <tbody><tr><td>${xmlEsc(inv.itemName||'')}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
-</table>
-<div class="totals">
-  <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-</div>
-<div style="text-align:right;font-size:11px;color:#555;margin-top:6px;font-style:italic">${xmlEsc(settings.tvaMention||'TVA non applicable, art. 293 B du CGI')}</div>
-<div class="acquittee">Facture acquittée</div>
-<div class="remarques">
-  <div class="label">Remarques :</div>
-  ${inv.vintedNumber?`<p>Transaction Vinted n°${xmlEsc(inv.vintedNumber)}</p>`:''}
-  <p>${xmlEsc(settings.footer||'Merci pour votre achat !')}</p>
-</div>
-<div class="footer">N° d'étiquetage : ${xmlEsc(inv.productId)}</div>
-</body></html>`;
-  ouvrirDocumentImprimable(html);
+// Le logo de SES factures : celui qu'il a posé dans Réglages, sinon AUCUN.
+// ⚠️ Avant le 15 octobre, toute facture sans logo personnel portait celui de
+//    Cancale Shoes Store (et « Cancale Shoes Store » en texte de remplacement) —
+//    chez n'importe quel vendeur : l'identité d'un autre sur un document légal.
+const logoFacture = () => {
+  const l = load('vinted_custom_logo', null);
+  return typeof l === 'string' && /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/i.test(l) ? l : '';
+};
+// La page imprimable d'un document figé (facture ou avoir). Le corps vient de
+// la règle partagée avec le serveur (api/_lib/facturation.js) : la facture
+// envoyée par email et celle imprimée ici ne peuvent pas diverger.
+function pageFactureHtml(doc) {
+  const titre = (doc && doc.type === 'avoir' ? 'Avoir ' : 'Facture ') + xmlEsc(doc && doc.numero);
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titre}</title>`
+    + `<style>body{margin:0;background:#fff}@media print{body{margin:0}}</style></head><body>`
+    + FACT.corpsHtmlDocument(doc, { logoSrc: logoFacture() }) + `</body></html>`;
 }
+// Une facture d'AVANT le 15 octobre (ligne `main`, `vinted_invoices`), mise à la
+// forme d'un document : elle ne connaissait que la franchise de TVA et sa
+// propre mention ; son entité est celle qu'elle portait.
+function legacyVersDoc(inv, ent) {
+  const e = ent || {};
+  const ttcC = Math.round((Number(String(inv && inv.sellPrice != null ? inv.sellPrice : '').replace(',', '.')) || 0) * 100);
+  const siret = FACT.chiffresSeuls(e.siret);
+  const jour = String((inv && inv.saleDate) || '').slice(0, 10);
+  return {
+    v: 1, type: 'facture', numero: String((inv && inv.number) || ''), jour, dateVente: jour, mode: 'franchise',
+    htC: ttcC, tvaC: 0, ttcC, tauxTva: null,
+    vendeur: { nom: e.companyName || '', forme: '', formeLibelle: e.companyType || '', adresse: e.companyAddress || '', cp: '', ville: '',
+      siren: siret.slice(0, 9), siret: siret.length === 14 ? siret : '', tvaIntra: '' },
+    client: { nom: (inv && inv.buyerName) || '', email: (inv && inv.buyerEmail) || '', adresse: (inv && inv.buyerAddress) || '' },
+    lignes: [{ designation: (inv && inv.itemName) || '', quantite: 1, ttcC, refPaire: String((inv && inv.productId) || ''), transaction: String((inv && inv.vintedNumber) || '') }],
+    mentions: [e.tvaMention || FACT.MENTION_FRANCHISE], piedDePage: e.footer || '', origineNumero: '', motif: '',
+  };
+}
+function generatePDF(inv, settings) { return ouvrirDocumentImprimable(pageFactureHtml(legacyVersDoc(inv, settings))); }
+const imprimerDocumentFacture = (doc) => ouvrirDocumentImprimable(pageFactureHtml(doc));
 
-// ── FACTURATION ÉLECTRONIQUE (Factur-X / CII, profil EN16931 BASIC) ─────────
-// Génère le XML normalisé « Cross Industry Invoice » de la facture, importable
-// dans un outil de e-facturation (Indy, plateforme agréée…). Micro-entreprise en
-// franchise de TVA → taxe catégorie « E » (exonéré) + mention art. 293 B du CGI.
-// ⚠️ On produit le XML normalisé (la partie machine) ; l'assemblage en PDF/A-3
-// Factur-X (PDF + XML embarqué) reste une étape ultérieure. Rien n'est inventé :
-// tous les montants viennent de la facture, TVA à 0 (régime réel de Julien).
+// ── FACTURATION ÉLECTRONIQUE (Factur-X / CII, EN16931) ──────────────────────
+// Le XML normalisé « Cross Industry Invoice » du document, lu dans le document
+// FIGÉ (jamais dans le profil du moment). Le régime décide de la taxe :
+//   · franchise → catégorie « E » (exonéré) + la mention de l'art. 293 B ;
+//   · marge     → catégorie « E » + « Régime particulier – Biens d'occasion »
+//                 (la TVA n'apparaît pas sur la facture, art. 297 E) ;
+//   · normale   → catégorie « S » avec le taux et le montant de TVA.
+// Un avoir est un document 381 qui CITE sa facture (InvoiceReferencedDocument).
+// ⚠️ Les codes de motif d'exonération (VATEX) ne sont pas posés : leur liste n'a
+//    pas pu être vérifiée d'ici. Le motif est écrit en clair.
 function xmlEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
-function factureCII(inv, ent){
-  const total=(+inv.sellPrice||0).toFixed(2);
-  const d=new Date(inv.saleDate); const ymd=isNaN(d)?String(inv.saleDate||'').replace(/-/g,''):`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  const siret=String(ent.siret||'').replace(/\s/g,'');
-  const buyer=inv.buyerName||inv.buyerEmail||'Client';
+function factureCII(doc){
+  const m2 = (c) => (Number(c || 0) / 100).toFixed(2);
+  const ymd = (j) => String(j || '').replace(/-/g, '').slice(0, 8);
+  const v = doc.vendeur || {}, cl = doc.client || {};
+  const l = (doc.lignes && doc.lignes[0]) || {};
+  const normale = doc.mode === 'normale';
+  const ht = normale ? doc.htC : doc.ttcC;
+  const cat = normale ? 'S' : 'E';
+  const taux = normale ? String(doc.tauxTva) : '0';
+  const motif = normale ? '' : ((doc.mentions && doc.mentions[0]) || '');
+  const taxe = (montantC, base) => `<ram:ApplicableTradeTax>${montantC != null ? `<ram:CalculatedAmount>${m2(montantC)}</ram:CalculatedAmount>` : ''}<ram:TypeCode>VAT</ram:TypeCode>${motif ? `<ram:ExemptionReason>${xmlEsc(motif)}</ram:ExemptionReason>` : ''}${base != null ? `<ram:BasisAmount>${m2(base)}</ram:BasisAmount>` : ''}<ram:CategoryCode>${cat}</ram:CategoryCode><ram:RateApplicablePercent>${xmlEsc(taux)}</ram:RateApplicablePercent></ram:ApplicableTradeTax>`;
+  const adresse = (a, cp, ville) => `<ram:PostalTradeAddress>${cp ? `<ram:PostcodeCode>${xmlEsc(cp)}</ram:PostcodeCode>` : ''}${a ? `<ram:LineOne>${xmlEsc(a)}</ram:LineOne>` : ''}${ville ? `<ram:CityName>${xmlEsc(ville)}</ram:CityName>` : ''}<ram:CountryID>FR</ram:CountryID></ram:PostalTradeAddress>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
   <rsm:ExchangedDocumentContext>
     <ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
-    <ram:ID>${xmlEsc(inv.number)}</ram:ID>
-    <ram:TypeCode>380</ram:TypeCode>
-    <ram:IssueDateTime><udt:DateTimeString format="102">${xmlEsc(ymd)}</udt:DateTimeString></ram:IssueDateTime>
+    <ram:ID>${xmlEsc(doc.numero)}</ram:ID>
+    <ram:TypeCode>${doc.type === 'avoir' ? '381' : '380'}</ram:TypeCode>
+    <ram:IssueDateTime><udt:DateTimeString format="102">${xmlEsc(ymd(doc.jour))}</udt:DateTimeString></ram:IssueDateTime>
+    ${(doc.mentions || []).map(t => `<ram:IncludedNote><ram:Content>${xmlEsc(t)}</ram:Content></ram:IncludedNote>`).join('')}
   </rsm:ExchangedDocument>
   <rsm:SupplyChainTradeTransaction>
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument><ram:LineID>1</ram:LineID></ram:AssociatedDocumentLineDocument>
-      <ram:SpecifiedTradeProduct><ram:Name>${xmlEsc(inv.itemName||'Article')}</ram:Name></ram:SpecifiedTradeProduct>
-      <ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>${total}</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedTradeProduct><ram:Name>${xmlEsc(l.designation || 'Article')}</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>${m2(ht)}</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
       <ram:SpecifiedLineTradeSettlement>
-        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>E</ram:CategoryCode><ram:RateApplicablePercent>0</ram:RateApplicablePercent></ram:ApplicableTradeTax>
-        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${total}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+        ${taxe(null, null)}
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${m2(ht)}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
       </ram:SpecifiedLineTradeSettlement>
     </ram:IncludedSupplyChainTradeLineItem>
     <ram:ApplicableHeaderTradeAgreement>
       <ram:SellerTradeParty>
-        <ram:Name>${xmlEsc(ent.companyName||'')}</ram:Name>
-        ${siret?`<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${xmlEsc(siret)}</ram:ID></ram:SpecifiedLegalOrganization>`:''}
-        <ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(ent.companyAddress||'')}</ram:LineOne></ram:PostalTradeAddress>
+        <ram:Name>${xmlEsc(v.nom || '')}</ram:Name>
+        ${v.siren ? `<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${xmlEsc(v.siren)}</ram:ID></ram:SpecifiedLegalOrganization>` : ''}
+        ${adresse(v.adresse, v.cp, v.ville)}
+        ${v.tvaIntra ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xmlEsc(v.tvaIntra)}</ram:ID></ram:SpecifiedTaxRegistration>` : ''}
       </ram:SellerTradeParty>
-      <ram:BuyerTradeParty><ram:Name>${xmlEsc(buyer)}</ram:Name>${inv.buyerAddress?`<ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(inv.buyerAddress)}</ram:LineOne></ram:PostalTradeAddress>`:''}</ram:BuyerTradeParty>
+      <ram:BuyerTradeParty><ram:Name>${xmlEsc(cl.nom || cl.email || 'Client')}</ram:Name>${cl.adresse ? adresse(cl.adresse, '', '') : ''}</ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery/>
     <ram:ApplicableHeaderTradeSettlement>
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
-      <ram:ApplicableTradeTax>
-        <ram:CalculatedAmount>0.00</ram:CalculatedAmount>
-        <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:ExemptionReason>${xmlEsc(ent.tvaMention||'TVA non applicable, art. 293 B du CGI')}</ram:ExemptionReason>
-        <ram:BasisAmount>${total}</ram:BasisAmount>
-        <ram:CategoryCode>E</ram:CategoryCode>
-        <ram:RateApplicablePercent>0</ram:RateApplicablePercent>
-      </ram:ApplicableTradeTax>
+      ${taxe(normale ? doc.tvaC : 0, ht)}
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        <ram:LineTotalAmount>${total}</ram:LineTotalAmount>
-        <ram:TaxBasisTotalAmount>${total}</ram:TaxBasisTotalAmount>
-        <ram:TaxTotalAmount currencyID="EUR">0.00</ram:TaxTotalAmount>
-        <ram:GrandTotalAmount>${total}</ram:GrandTotalAmount>
-        <ram:DuePayableAmount>${total}</ram:DuePayableAmount>
+        <ram:LineTotalAmount>${m2(ht)}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>${m2(ht)}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">${m2(normale ? doc.tvaC : 0)}</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>${m2(doc.ttcC)}</ram:GrandTotalAmount>
+        ${doc.type === 'avoir' ? '' : `<ram:TotalPrepaidAmount>${m2(doc.ttcC)}</ram:TotalPrepaidAmount>`}
+        <ram:DuePayableAmount>${doc.type === 'avoir' ? m2(doc.ttcC) : '0.00'}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      ${doc.type === 'avoir' && doc.origineNumero ? `<ram:InvoiceReferencedDocument><ram:IssuerAssignedID>${xmlEsc(doc.origineNumero)}</ram:IssuerAssignedID>${doc.origineJour ? `<ram:FormattedIssueDateTime><qdt:DateTimeString xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100" format="102">${xmlEsc(ymd(doc.origineJour))}</qdt:DateTimeString></ram:FormattedIssueDateTime>` : ''}</ram:InvoiceReferencedDocument>` : ''}
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
 }
 // XMP Factur-X (identification PDF/A-3 + schéma d'extension fx) — permet aux
-// outils (Indy…) de reconnaître la facture électronique embarquée.
+// outils de reconnaître la facture électronique embarquée.
 function facturxXMP(inv){
-  const t=xmlEsc('Facture '+(inv.number||''));
+  const t=xmlEsc((inv && inv.type === 'avoir' ? 'Avoir ' : 'Facture ')+((inv && (inv.numero || inv.number))||''));
   return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -19862,75 +19980,89 @@ function facturxXMP(inv){
 </x:xmpmeta>
 <?xpacket end="w"?>`;
 }
-// Génère le VRAI fichier Factur-X : un PDF de la facture AVEC le XML EN16931
-// embarqué (nom normalisé `factur-x.xml`, relation « Alternative ») + le XMP
-// d'identification. Un seul fichier, lisible à l'œil ET par la machine.
-// ⚠️ Format Factur-X respecté (embarquement + XMP) ; la conformité PDF/A-3 stricte
-// (polices embarquées, profil ICC) n'est pas certifiée par un validateur ici.
-// Construit les OCTETS du PDF Factur-X (facture + XML EN16931 embarqué) SANS le
-// télécharger — factorisé pour pouvoir aussi le fusionner avec un bordereau à
-// l'impression (voir printBordAndInvoice). generateFacturXPdf en dessous ne fait
-// que l'envelopper + déclencher le téléchargement.
-async function buildFacturXBytes(inv, ent){
+// Les polices standard du PDF ne savent écrire que le jeu WinAnsi : un « − »,
+// un emoji ou une écriture non latine faisaient lever pdf-lib au milieu de la
+// facture (le nom de l'acheteur est écrit par l'acheteur).
+const pdfTxt = (t) => String(t == null ? '' : t)
+  .replace(/[−‐‑‒]/g, '-').replace(/[“”«»]/g, '"').replace(/…/g, '...').replace(/ /g, ' ')
+  .replace(/[^ -~ -ÿ€–—‘’•]/g, '?');
+// Les OCTETS du PDF Factur-X (le document + son XML EN16931 embarqué), sans le
+// télécharger — partagé avec l'impression « bordereau + facture » (Colis).
+async function buildFacturXBytesDoc(doc){
   const { PDFDocument, StandardFonts, rgb, PDFName, AFRelationship } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
-  {
-    const page = pdf.addPage([595.28, 841.89]);
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
-    const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
-    const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
-    try{
-      let logoSrc=LOGO_CANCALE;
-      try{ const c=localStorage.getItem('vinted_custom_logo'); if(c) logoSrc=JSON.parse(c); }catch(_){}
-      const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
-      if(m){ const img=/png/i.test(m[1])?await pdf.embedPng(b64ToBytes(m[2])):await pdf.embedJpg(b64ToBytes(m[2])); const dim=img.scale(1); const h=62,w=h*(dim.width/dim.height||1); page.drawImage(img,{x:W-M-Math.min(w,90),y:762,width:Math.min(w,90),height:h}); }
-    }catch(_){}
-    let y=792;
-    T('FACTURE',M,y,{s:26,b:true}); y-=20;
-    T('# '+(inv.number||''),M,y,{s:11,c:gray}); y-=15;
-    T('Date : '+fmtDate(inv.saleDate),M,y,{s:10,c:gray});
-    y-=34;
-    const colB=W-M-210;
-    T('DE :',M,y,{s:8.5,b:true,c:gray}); T('CLIENT :',colB,y,{s:8.5,b:true,c:gray}); y-=15;
-    T(ent.companyName||'',M,y,{s:11,b:true}); T(inv.buyerName||inv.buyerEmail||'Client',colB,y,{s:11,b:true}); y-=13;
-    T(ent.companyType||'',M,y,{s:9,c:gray}); if(inv.buyerAddress) T(String(inv.buyerAddress).slice(0,46),colB,y,{s:9,c:gray}); y-=12;
-    T(String(ent.companyAddress||'').slice(0,52),M,y,{s:9,c:gray}); y-=12;
-    if(ent.siret) T('SIRET : '+ent.siret,M,y,{s:9,c:gray});
-    y-=36;
-    page.drawRectangle({x:M,y:y-5,width:W-2*M,height:20,color:rgb(0.95,0.96,0.97)});
-    T('Objet',M+6,y+1,{s:9,b:true}); T('Qté',350,y+1,{s:9,b:true}); T('P.U. HT',455,y+1,{s:9,b:true,right:true}); T('Montant',W-M-6,y+1,{s:9,b:true,right:true});
-    y-=22;
-    T(String(inv.itemName||'Article').slice(0,52),M+6,y,{s:10}); T('1',350,y,{s:10}); T(eur,455,y,{s:10,right:true}); T(eur,W-M-6,y,{s:10,right:true});
-    y-=8; page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.85,0.85,0.85)});
-    y-=22;
-    T('Total :',W-M-140,y,{s:12,b:true}); T(eur,W-M-6,y,{s:12,b:true,right:true}); y-=16;
-    T('Montant payé :',W-M-140,y,{s:9,c:gray}); T(eur,W-M-6,y,{s:9,c:gray,right:true}); y-=18;
-    T(ent.tvaMention||'TVA non applicable, art. 293 B du CGI',W-M-6,y,{s:9,c:gray,right:true}); y-=24;
-    T('Facture acquittée',W-M-6,y,{s:12,b:true,c:green,right:true}); y-=44;
-    if(inv.vintedNumber){ T('Transaction Vinted n°'+inv.vintedNumber,M,y,{s:9,c:gray}); y-=13; }
-    T(ent.footer||'Merci pour votre achat !',M,y,{s:9,c:gray});
-    T('Facture electronique - Factur-X (XML EN16931 embarque)',M,40,{s:7.5,c:gray});
-    const xml=factureCII(inv, ent);
-    const bytes=new TextEncoder().encode(xml);
-    await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
-    pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM Cancale'); pdf.setCreator('VRM Cancale');
-    try{ const stream=pdf.context.stream(facturxXMP(inv),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
+  const page = pdf.addPage([595.28, 841.89]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42);
+  const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=pdfTxt(t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
+  const av = doc.type === 'avoir';
+  const sg = av ? '-' : '';
+  const eur = (c) => sg + (Number(c||0)/100).toFixed(2).replace('.',',') + ' €';
+  const v = doc.vendeur || {}, cl = doc.client || {}, l = (doc.lignes && doc.lignes[0]) || {};
+  const jfr = (j) => String(j||'').slice(0,10).split('-').reverse().join('/');
+  try {
+    const logoSrc = logoFacture();
+    const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
+    if(m){ const img=/png/i.test(m[1])?await pdf.embedPng(b64ToBytes(m[2])):await pdf.embedJpg(b64ToBytes(m[2])); const dim=img.scale(1); const h=62,w=h*(dim.width/dim.height||1); page.drawImage(img,{x:W-M-Math.min(w,90),y:762,width:Math.min(w,90),height:h}); }
+  } catch(_) {}
+  let y=792;
+  T(av ? 'AVOIR' : 'FACTURE',M,y,{s:26,b:true}); y-=20;
+  T('N° '+(doc.numero||''),M,y,{s:11,c:gray}); y-=15;
+  T('Émise le '+jfr(doc.jour),M,y,{s:10,c:gray}); y-=13;
+  if (doc.dateVente) { T('Date de la vente : '+jfr(doc.dateVente),M,y,{s:10,c:gray}); y-=13; }
+  if (av && doc.origineNumero) { T('Sur la facture N° '+doc.origineNumero+(doc.origineJour?' du '+jfr(doc.origineJour):''),M,y,{s:10,c:gray}); y-=13; }
+  y-=22;
+  const colB=W-M-210;
+  T('VENDEUR',M,y,{s:8.5,b:true,c:gray}); T('CLIENT',colB,y,{s:8.5,b:true,c:gray}); y-=15;
+  T(String(v.nom||'').slice(0,48),M,y,{s:11,b:true}); T(String(cl.nom||cl.email||'Client').slice(0,40),colB,y,{s:11,b:true}); y-=13;
+  const lv = [];
+  if (v.forme === 'societe') lv.push(`${v.formeJuridique||''}${v.capital?` au capital de ${v.capital}${/€|eur/i.test(v.capital)?'':' €'}`:''}`);
+  lv.push([v.adresse,[v.cp,v.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+  if (v.forme === 'societe' && v.rcs) lv.push(`RCS ${v.rcs} ${v.siren||''}`);
+  lv.push(`SIREN ${v.siren||''}${v.siret?` · SIRET ${v.siret}`:''}`);
+  if (v.tvaIntra) lv.push('N° TVA '+v.tvaIntra);
+  const lc = [cl.adresse, cl.nom && cl.email ? cl.email : ''].filter(Boolean);
+  for (let i=0;i<Math.max(lv.length,lc.length);i++){ if(lv[i]) T(String(lv[i]).slice(0,56),M,y,{s:9,c:gray}); if(lc[i]) T(String(lc[i]).slice(0,46),colB,y,{s:9,c:gray}); y-=12; }
+  y-=24;
+  page.drawRectangle({x:M,y:y-5,width:W-2*M,height:20,color:rgb(0.95,0.96,0.97)});
+  T('Désignation',M+6,y+1,{s:9,b:true}); T('Qté',380,y+1,{s:9,b:true}); T(doc.mode==='normale'?'P.U. TTC':'Prix',W-M-6,y+1,{s:9,b:true,right:true});
+  y-=22;
+  T(String(l.designation||'Article').slice(0,58),M+6,y,{s:10}); T('1',380,y,{s:10}); T(eur(l.ttcC),W-M-6,y,{s:10,right:true});
+  if (l.refPaire) { y-=12; T('Réf. '+l.refPaire,M+6,y,{s:8.5,c:gray}); }
+  y-=8; page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.85,0.85,0.85)});
+  y-=22;
+  if (doc.mode === 'normale') {
+    T('Total HT',W-M-160,y,{s:10}); T(eur(doc.htC),W-M-6,y,{s:10,right:true}); y-=15;
+    T(`TVA ${String(doc.tauxTva).replace('.',',')} %`,W-M-160,y,{s:10}); T(eur(doc.tvaC),W-M-6,y,{s:10,right:true}); y-=15;
+    T('Total TTC',W-M-160,y,{s:12,b:true}); T(eur(doc.ttcC),W-M-6,y,{s:12,b:true,right:true}); y-=18;
+  } else {
+    T(av?"Montant de l'avoir":'Total',W-M-160,y,{s:12,b:true}); T(eur(doc.ttcC),W-M-6,y,{s:12,b:true,right:true}); y-=18;
   }
+  for (const mtn of (doc.mentions||[])) { T(mtn,W-M-6,y,{s:9,c:gray,right:true}); y-=13; }
+  if (av && doc.motif) { T('Motif : '+String(doc.motif).slice(0,80),M,y,{s:9,c:gray}); y-=13; }
+  if (!av) { T('Facture acquittée',W-M-6,y-6,{s:11,b:true,right:true}); y-=24; }
+  if (doc.piedDePage) T(String(doc.piedDePage).slice(0,90),M,y-20,{s:9,c:gray});
+  T('Facture électronique - Factur-X (XML EN16931 embarqué)',M,40,{s:7.5,c:gray});
+  const bytes=new TextEncoder().encode(factureCII(doc));
+  await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
+  pdf.setTitle(pdfTxt((av?'Avoir ':'Facture ')+(doc.numero||''))); pdf.setAuthor(pdfTxt(v.nom||'')); pdf.setSubject(av?'Avoir':'Facture'); pdf.setProducer('VRM'); pdf.setCreator('VRM');
+  try{ const stream=pdf.context.stream(facturxXMP(doc),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
   return await pdf.save({ useObjectStreams:false });
 }
-async function generateFacturXPdf(inv, ent){
+// Les factures d'AVANT (Colis joint encore celle d'un compte pro au bordereau).
+async function buildFacturXBytes(inv, ent){ return buildFacturXBytesDoc(legacyVersDoc(inv, ent)); }
+async function telechargerFacturX(doc){
   try{
-    const out = await buildFacturXBytes(inv, ent);
-    const blob=new Blob([out],{type:'application/pdf'});
-    const url=URL.createObjectURL(blob);
+    const out = await buildFacturXBytesDoc(doc);
+    const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
     const a=document.createElement('a');
-    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
+    a.href=url; a.download=`${doc.type==='avoir'?'avoir':'facture'}-${String(doc.numero||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
   }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
 }
+async function generateFacturXPdf(inv, ent){ return telechargerFacturX(legacyVersDoc(inv, ent)); }
 
 /* ── Garage ──────────────────────────────────────────── */
 // ── « Mon local en photo » ────────────────────────────────────────────────
@@ -30917,7 +31049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const R=report; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
     const L=[];
     L.push([`Rapport ${R.monthLabel}`]);
-    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([`Régime`, FACT.libelleRegime(R.regime)]);
     L.push([]);
     L.push(['VENTES']); L.push(['Date','N°','Titre','Vente','Achat','Boost','Bénéfice net']);
     R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'',s.num,(s.plateforme&&s.plateforme!=='Vinted'?'['+s.plateforme+'] ':'')+s.title,s.sell.toFixed(2),s.buy!=null?s.buy.toFixed(2):'',s.fee?s.fee.toFixed(2):'',s.buy!=null?(s.sell-s.buy-s.fee).toFixed(2):'']));
@@ -30928,7 +31060,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    // (16 octobre) Au réel, l'écran dit « Cotisations — » mais le CSV écrivait
+    // « Estimation cotisations (13,5%) » : le document qui part chez le
+    // comptable portait un chiffre que l'écran refuse d'afficher.
+    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); if (R.regime==='reel') L.push(['Cotisations','au reel : pas un % du CA - non estimees']); else L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     // ⚠️ Le document part chez un comptable : ce qui n'y est PAS encore doit
     // partir avec lui, sinon un mois se présente comme terminé (§5.84).
@@ -30953,13 +31088,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
     let y=800; const T=(t,x,s,f,c)=>page.drawText(String(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur'),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
+    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+FACT.libelleRegime(R.regime),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
     const kv=(k,v,big)=>{ T(k,40,9,reg,rgb(0.45,0.45,0.45)); page.drawText(String(v),{x:40,y:y-14,size:big?15:12,font:big?bold:reg,color:rgb(0.1,0.1,0.1)}); y-=big?36:30; };
     kv('Chiffre d\'affaires des ventes finalisees', R.ca.toFixed(2)+' EUR', true);
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    // (16 octobre) Même règle que l'écran : au réel, aucune cotisation estimée.
+    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); if (R.regime==='reel') kv('Cotisations', 'au reel : pas un % du CA - non estimees'); else kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
@@ -31177,7 +31313,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const caTxt = caAnnuelInconnu(R) ? '—' : R.ca.toFixed(2);
     const L=[];
     L.push([`Bilan annuel ${R.year}`]);
-    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([`Régime`, FACT.libelleRegime(R.regime)]);
     manquesAnnuel(R).forEach(t => L.push([`ATTENTION : ${t}`]));
     L.push([]);
     // Le bénéfice d'un mois n'est écrit que si TOUTES ses ventes ont leur coût
@@ -31208,7 +31344,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.regime==='marge') { L.push(['Marge TTC',passu?'—':R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,passu?'—':R.tvaMarge.toFixed(2)]); L.push(['Marge HT',passu?'—':R.margeHT.toFixed(2)]); }
     else {
       if (!complet && R.nbCout > 0 && !passu) L.push([`Benefice net des ventes au cout d'achat connu (${R.nbCout}/${R.nb})`, R.benefNet.toFixed(2)]);
-      L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`, passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)]);
+      // (16 octobre) Même règle que l'écran du bilan : au réel, les cotisations
+      // ne sont pas un % du CA — jamais estimées, jamais chiffrées.
+      if (R.regime==='reel') L.push(['Cotisations','au reel : pas un % du CA - non estimees']);
+      else L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`, passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)]);
     }
     // LA règle du résultat (la même que l'onglet Comptabilité) : un nombre, ou
     // « — » et sa raison.
@@ -31227,7 +31366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
     let y=800; const T=(t,x,yy,s,f,c)=>page.drawText(String(t),{x,y:yy,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur',40,y,11,reg,rgb(0.4,0.4,0.4)); y-=22;
+    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(FACT.libelleRegime(R.regime),40,y,11,reg,rgb(0.4,0.4,0.4)); y-=22;
     // Ce qui manque, EN TÊTE (§5) : le comptable le lit avant les chiffres.
     for (const t of manquesAnnuel(R)) { T('ATTENTION : '+t,40,y,8.5,bold,rgb(0.55,0.35,0)); y-=13; }
     y-=6;
@@ -31242,7 +31381,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.regime==='marge') { kv('Marge TTC', passu?'—':R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', passu?'—':R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', passu?'—':R.margeHT.toFixed(2)+' EUR'); }
     else {
       kv('Bénéfice net', passu ? '—' : complet ? R.benefNet.toFixed(2)+' EUR' : R.nbCout ? R.benefNet.toFixed(2)+` EUR (sur ${R.nbCout}/${R.nb} ventes au coût connu)` : `— (aucun prix d'achat saisi, 0/${R.nb})`);
-      kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)+' EUR');
+      // (16 octobre) Même règle que l'écran du bilan : au réel, les cotisations
+      // ne sont pas un % du CA — jamais estimées, jamais chiffrées.
+      if (R.regime==='reel') kv('Cotisations', 'au reel : pas un % du CA - non estimees');
+      else kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)+' EUR');
     }
     if (R.charges.total>0) {
       kv('Depenses (depenses, abonnements)', R.charges.total.toFixed(2)+' EUR');
@@ -35907,7 +36049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
-                <div style={{fontSize:11,color:C.muted}}>{annual.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{FACT.libelleRegime(annual.regime)} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
               </div>
               <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -35960,7 +36102,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice estimé" value={inc ?? ((annual.nb && !annual.nbCout) ? '—' : fmtE(annual.benefNet))} color={inc ? C.muted : annual.benefNet<0?C.warn:C.text}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={inc ? undefined : annual.nbCout<annual.nb?(annual.nbCout ? `sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants` : `aucun prix d'achat saisi (0 vente sur ${annual.nb})`):(annual.frais>0?`frais renseignés ${fmtE(annual.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
+                  {/* (16 octobre) Au réel, les cotisations ne sont pas un % du CA :
+                      un montant « estimé » serait inventé (même règle que le rapport). */}
+                  {annual.regime==='reel'
+                    ? <StatBox label="Cotisations" value="—" sub="au réel : pas un % du CA"/>
+                    : <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>}
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
                   <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={'dépenses + abonnements (à chaque échéance)' + (annual.charges.fixesSansDebut ? ` · ${annual.charges.fixesSansDebut} abonnement${annual.charges.fixesSansDebut>1?'s':''} sans date de début, pas compté${annual.charges.fixesSansDebut>1?'s':''}` : '')}/>
@@ -36513,7 +36659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{report.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{FACT.libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -36584,7 +36730,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice estimé" value={report.enCours?'…':report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`frais renseignés ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')} % du CA · réglable`}/>
+                  {/* (15 octobre) Au réel, les cotisations ne sont pas un % du CA :
+                      un montant « estimé » serait inventé. */}
+                  {report.regime==='reel'
+                    ? <StatBox label="Cotisations" value="—" sub="au réel : pas un % du CA"/>
+                    : <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')} % du CA · réglable`}/>}
                 </>)}
               </div>); })()}
               {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
@@ -40572,12 +40722,14 @@ function ProFactureSetting() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
-        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
           method: 'POST',
           headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
         });
-        setStatus('✓ enregistré');
+        // ⚠️ « ✓ enregistré » s'affichait aussi sur un refus 4xx/5xx (aucun `ok`
+        //    lu) : il croyait son réglage gardé alors qu'il ne l'était pas.
+        setStatus(r.ok ? '✓ enregistré' : '⚠ échec — réessaie');
       } catch (_) { setStatus('⚠ échec — réessaie'); }
     }, 600);
   };
@@ -40594,11 +40746,6 @@ function ProFactureSetting() {
     </div>
   );
 
-  const input = (field, placeholder, flex) => (
-    <input value={cfg[field]||''} onChange={e=>upd(field, e.target.value)} placeholder={placeholder}
-      style={{flex:flex||'1 1 130px',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',minWidth:0}}/>
-  );
-
   return (
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
@@ -40610,7 +40757,7 @@ function ProFactureSetting() {
         }}>{cfg.actif?'Activée':'Désactivée'}</button>
       </div>
       <div style={{fontSize:12,color:C.muted,marginBottom:cfg.actif?12:0,lineHeight:1.4}}>
-        Pour les comptes Vinted Pro : l'email de vente contient les coordonnées de l'acheteur — l'app prépare la facture avec tes informations ci-dessous.
+        Pour les comptes Vinted Pro : l'email de vente contient les coordonnées de l'acheteur — l'app prépare sa facture à l'arrivée de la vente.
       </div>
       {cfg.actif && (<>
         {/* Logo */}
@@ -40629,31 +40776,18 @@ function ProFactureSetting() {
           </label>
           {cfg.logo && <button type="button" onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
         </div>
-        {/* Identité */}
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:8}}>
-          {input('nom','Nom commercial','1 1 100%')}
-          {input('adresse','Adresse','1 1 100%')}
-          {input('codePostal','Code postal','1 1 90px')}
-          {input('ville','Ville')}
-          {input('siret','SIRET','1 1 100%')}
-          {input('tva','N° TVA intracom. (si assujetti)','1 1 100%')}
+        {/* ⚠️ L'IDENTITÉ N'EST PLUS SAISIE ICI (15 octobre). Nom, adresse, SIRET,
+            n° de TVA, taux et mention légale vivaient en double : ici pour le
+            serveur, dans « Réglages factures » pour l'app — deux identités pour
+            une entreprise, et une mention « 293 B » tapée à la main qui partait
+            même au régime de la marge. Elles viennent de « Mon entreprise »
+            (une notion, un propriétaire), et la facture prend le numéro suivant
+            de LA suite de l'app. */}
+        <div style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.45}}>
+          Coordonnées, mentions et numéro : ceux de « Mon entreprise », dans la même suite que tes autres factures.
         </div>
-        {/* Préfixe + taux TVA */}
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:8}}>
-          <span style={{fontSize:12,fontWeight:500,color:C.text}}>Préfixe</span>
-          {input('prefixe','FA','0 1 70px')}
-          <span style={{fontSize:12,fontWeight:500,color:C.text,marginLeft:6}}>TVA</span>
-          <select value={cfg.tauxTva||'0'} onChange={e=>upd('tauxTva', e.target.value)}
-            style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}>
-            <option value="0">0 % (franchise)</option>
-            <option value="5.5">5,5 %</option>
-            <option value="10">10 %</option>
-            <option value="20">20 %</option>
-          </select>
-        </div>
-        {/* Mentions */}
         <textarea value={cfg.mentions||''} onChange={e=>upd('mentions', e.target.value)} rows={2}
-          placeholder="Mentions légales / pied de facture (ex : TVA non applicable – art. 293 B du CGI)"
+          placeholder="Message en bas de facture (facultatif, ex : Merci pour votre achat)"
           style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
         {/* Envoi automatique */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
@@ -41831,72 +41965,171 @@ function EcranMasques({ comptes, ordi }) {
   );
 }
 
-// Réglage du régime fiscal : détermine comment le rapport comptable présente les
-// chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
-// régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
-function RegimeSetting() {
-  const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
-  // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
-  // lue au montage. Scalaire à défaut non vide : remplacer SEULEMENT s'il est
-  // resté au défaut, jamais un choix fait pendant le chargement.
-  useEffect(() => onCloudReady(() => setRegime(v => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
-  const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
-  // ⚠️ LE TAUX DE COTISATIONS EST UN RÉGLAGE, PAS UNE CONSTANTE. Il était écrit
-  // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
-  // pour l'URSSAF. Le bon taux dépend de son activité et de son option pour le
-  // versement libératoire — lui seul le connaît, et il change chaque année.
-  // ⚠️ À LA FRANÇAISE, comme partout ailleurs dans l'app. Le champ affichait
-  //    « 13.5 » (le nombre recopié tel quel) alors que les deux rapports qui
-  //    l'utilisent écrivent « 13,5 % » : le même taux, deux orthographes, sur
-  //    l'écran qui sert justement à le régler. Même défaut que les prix
-  //    d'achat « 21.0 € » de l'écran Achats. La saisie, elle, accepte
-  //    toujours les deux (`replace(',','.')` à la validation).
+// ══════════════════════════════════════════════════════════════════════════
+// MON ENTREPRISE — le profil fiscal (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Remplace l'ancien « Régime fiscal » (micro OU société au régime de la marge).
+// Julien : « micro-entreprise, société, régime de la marge, à adapter à la
+// situation de chaque entrepreneur… voir s'il est en versement libératoire… que
+// la personne puisse mettre son SIREN ». Le composant garde le nom
+// `RegimeSetting` : c'est lui que les écrans d'avant montent (Réglages, et
+// Déclarations après la fusion de la comptabilité) — une porte, pas deux.
+// ⚠️ Ce qu'il DÉCLARE est appliqué, jamais jugé : aucun régime n'est déduit du
+//    SIREN, et chaque règle affichée porte sa source et sa date (« à faire
+//    valider par ton comptable »).
+// ⚠️ Les choix d'avant restent rangés là où leurs lecteurs les attendent :
+//    rythme URSSAF (`vinted_urssaf_freq`), taux de cotisations
+//    (`vinted_urssaf_taux`), taux de TVA (`vinted_tva`). Le profil ne les
+//    recopie pas : une notion, un endroit (§11).
+function RegimeSetting() { return <ProfilEntreprise/>; }
+function ProfilEntreprise({ ouvertParDefaut }) {
+  const { profil: p, pret, maj } = useProfilEntreprise();
   const virgule = (n) => String(n).replace('.', ',');
+  const [freq, setFreq] = useState(() => load('vinted_urssaf_freq', null));
   const [txUrs, setTxUrs] = useState(() => virgule(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)));
-  const pick = (r) => { setRegime(r); save('vinted_regime', r); };
-  const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
+  const [tva, setTva] = useState(() => tauxTvaChoisi());
+  useEffect(() => onCloudReady(() => {
+    setFreq(v => (v == null ? load('vinted_urssaf_freq', null) : v));
+    setTxUrs(v => (v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)) : v));
+    setTva(v => (v == null ? tauxTvaChoisi() : v));
+  }), []);
+  const [siren, setSiren] = useState(p.siren);
+  useEffect(() => { setSiren(p.siren); }, [p.siren]);
+  const [coordOuvert, setCoordOuvert] = useState(!!ouvertParDefaut);
+  const [reglesOuvert, setReglesOuvert] = useState(false);
+  const eSiren = FACT.etatSiren(siren);
+  const manqueDetail = FACT.manquePourFacturerDetaille(p, { tauxTva: tva });
+  const manque = manqueDetail.map(x => x.texte);
+  // L'en-tête « Coordonnées · N à compléter » ne compte que les COORDONNÉES :
+  // il comptait « ton régime de TVA », qui n'en est pas une (16 octobre).
+  const manqueCoord = manqueDetail.filter(x => x.coord);
+  const regles = FACT.reglesDuProfil(p, { tauxUrssaf: parseFloat(String(txUrs).replace(',', '.')) });
+  const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: C.bg, color: C.text, outline: 'none', minWidth: 0 };
+  const lab = { fontSize: 12, fontWeight: 600, color: C.text };
+  const choix = (cle, options, valeur, onPick) => (
+    <div role="group" aria-label={cle} data-champ={cle} style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {options.map(([v, t]) => {
+        const actif = valeur === v;
+        return (
+          <button type="button" key={String(v)} aria-pressed={actif} disabled={!pret} onClick={() => onPick(v)}
+            style={{ border: `1px solid ${actif ? C.accent : C.border}`, background: actif ? `${C.accent}14` : 'transparent', color: actif ? C.accent : C.text,
+              borderRadius: 8, padding: '6px 11px', fontSize: 12.5, fontWeight: actif ? 700 : 500, cursor: pret ? 'pointer' : 'default', fontFamily: 'inherit' }}>{t}</button>
+        );
+      })}
+    </div>
+  );
+  const ligne = (titre, contenu, attr) => (
+    <div {...(attr || {})} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 6, padding: '10px 0', borderTop: `1px solid ${C.border}` }}>
+      <span style={lab}>{titre}</span>{contenu}
+    </div>
+  );
+  // Un LIBELLÉ visible au-dessus de chaque champ : le placeholder disparaît dès
+  // que le champ est rempli — « Saint-Malo » ne disait plus si c'était la ville
+  // de l'adresse ou celle du RCS, et « Code postal » sortait coupé (« Code
+  // posta ») à 390 px (16 octobre). Le placeholder redevient un EXEMPLE.
+  const texteChamp = (cle, libelle, opts = {}) => (
+    <label data-libelle-champ={cle} style={{ display: 'grid', gap: 3, minWidth: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>{libelle}</span>
+      <input value={p[cle] || ''} disabled={!pret} placeholder={opts.exemple || ''} inputMode={opts.inputMode} aria-label={libelle} data-champ={cle}
+        onChange={e => maj({ [cle]: opts.norm ? opts.norm(e.target.value) : e.target.value })} style={champ}/>
+    </label>
+  );
+  const sirenPhrase = { vide: '', format: '9 chiffres attendus.', cle: 'La clé de contrôle ne correspond pas : vérifie les chiffres.', ok: 'Numéro valide (clé vérifiée).' }[eSiren];
+  const tvaCalc = FACT.tvaIntraDuSiren(p.siren);
+  const eTvaIntra = FACT.etatTvaIntra(p.tvaIntra, p.siren);
+  const eSiret = FACT.etatSiret(p.siret, p.siren);
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
-      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
-          ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
-          <button type="button" key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:8,cursor:'pointer',
-            border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
-            <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:8,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              {regime===id && <span style={{width:9,height:9,borderRadius:8,background:C.accent}}/>}
-            </span>
-            <span style={{minWidth:0}}>
-              <span style={{fontSize:13,fontWeight:600,color:C.text,display:'block'}}>{t}</span>
-              <span style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{d}</span>
-            </span>
-          </button>
-        ))}
+    <div data-profil-entreprise={p.forme || 'vide'} data-regime={FACT.regimeDe(p) || 'vide'}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Mon entreprise</div>
+        <div data-libelle-profil style={{ fontSize: 12, color: C.muted }}>{FACT.libelleProfil(p)}</div>
       </div>
-      {regime!=='marge' && (
-        <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
-            <input type="text" inputMode="decimal" value={txUrs}
-              onChange={e=>setTxUrs(e.target.value)}
-              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok); }}
-              style={{width:70,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
-            <span style={{fontSize:12,color:C.muted}}>% du CA</span>
+      {!pret && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Chargement de tes réglages…</div>}
+
+      {ligne('SIREN', <>
+        <input value={siren} disabled={!pret} inputMode="numeric" placeholder="9 chiffres" aria-label="SIREN" data-champ="siren"
+          onChange={e => { const v = FACT.chiffresSeuls(e.target.value).slice(0, 9); setSiren(v); maj({ siren: v }); }} style={{ ...champ, maxWidth: 220, letterSpacing: '0.04em' }}/>
+        {sirenPhrase && <span data-siren-etat={eSiren} style={{ fontSize: 12, color: eSiren === 'ok' ? C.muted : C.warn }}>{eSiren === 'ok' ? '✓ ' : ''}{sirenPhrase}</span>}
+        {eSiren === 'ok' && (
+          <a data-annuaire href={FACT.lienAnnuaire(p.siren)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+            Voir sur l'Annuaire des entreprises ↗ <span style={{ color: C.muted, fontWeight: 400 }}>(site public de l'État, rien n'est importé)</span>
+          </a>
+        )}
+      </>)}
+
+      {ligne('Forme', choix('forme', Object.entries(FACT.FORMES), p.forme, (v) => maj({ forme: v })))}
+      {ligne('TVA', choix('tva', Object.entries(FACT.REGIMES_TVA), p.tva, (v) => maj({ tva: v })))}
+
+      {p.tva === 'assujetti' && ligne('Régime de la marge (biens d\'occasion)',
+        choix('marge', [[true, 'Oui'], [false, 'Non']], p.marge, (v) => maj({ marge: v })))}
+      {p.tva === 'assujetti' && p.marge === false && ligne('Taux de TVA',
+        choix('tauxTva', [[20, '20 %'], [10, '10 %'], [5.5, '5,5 %'], [2.1, '2,1 %']], tva, (v) => { setTva(v); save('vinted_tva', v); }))}
+
+      {p.forme === 'micro' && <>
+        {ligne('Versement libératoire de l\'impôt', choix('vl', [[true, 'Oui'], [false, 'Non']], p.vl, (v) => maj({ vl: v })))}
+        {ligne('Déclarations URSSAF', choix('freq', [['mensuel', 'Chaque mois'], ['trimestriel', 'Chaque trimestre']], freq, (v) => { setFreq(v); save('vinted_urssaf_freq', v); }))}
+        {ligne('Taux de cotisations', <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="text" inputMode="decimal" value={txUrs} disabled={!pret} aria-label="Taux de cotisations" data-champ="tauxUrssaf"
+            onChange={e => setTxUrs(e.target.value)}
+            onBlur={() => { const v = parseFloat(String(txUrs).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok); }}
+            style={{ ...champ, width: 80 }}/>
+          <span style={{ fontSize: 12, color: C.muted }}>% du chiffre d'affaires, celui de ton espace URSSAF</span>
+        </div>)}
+      </>}
+
+      {/* Les coordonnées : repliées, avec ce qu'il manque pour facturer. */}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, marginTop: 2 }}>
+        <button type="button" aria-expanded={coordOuvert} onClick={() => setCoordOuvert(v => !v)} data-coordonnees
+          style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: C.text, display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span aria-hidden="true">{coordOuvert ? '▾' : '▸'}</span> Coordonnées sur tes factures
+          <span data-manque-n={manqueCoord.length} style={{ fontWeight: 400, color: manqueCoord.length ? C.warn : C.muted }}>{manqueCoord.length ? `· ${manqueCoord.length} à compléter` : '· complètes'}</span>
+        </button>
+        {coordOuvert && (
+          <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+            {texteChamp('nom', p.forme === 'societe' ? 'Raison sociale' : 'Prénom et nom (ou nom commercial)')}
+            {FACT.estEI(p) && p.nom && <span style={{ fontSize: 11.5, color: C.muted, marginTop: -4 }}>Sur tes factures : « {FACT.nomVendeur(p)} ».</span>}
+            {texteChamp('adresse', 'Adresse', { exemple: 'ex : 4 rue du Port' })}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,130px) minmax(0,1fr)', gap: 8 }}>
+              {texteChamp('cp', 'Code postal', { inputMode: 'numeric', exemple: 'ex : 35260' })}{texteChamp('ville', 'Ville')}
+            </div>
+            {texteChamp('siret', 'SIRET (facultatif)', { inputMode: 'numeric', exemple: '14 chiffres', norm: (v) => FACT.chiffresSeuls(v).slice(0, 14) })}
+            {p.siret && eSiret !== 'ok' && <span data-siret-etat={eSiret} style={{ fontSize: 12, color: C.warn }}>{eSiret === 'autre_siren' ? 'Ce SIRET ne commence pas par ton SIREN.' : eSiret === 'format' ? '14 chiffres attendus.' : 'La clé de contrôle ne correspond pas.'}</span>}
+            {p.tva === 'assujetti' && <>
+              {texteChamp('tvaIntra', 'N° de TVA intracommunautaire', { exemple: 'ex : FR…', norm: (v) => v.replace(/\s/g, '').toUpperCase() })}
+              {p.tvaIntra && !['ok', 'ok_non_verifie'].includes(eTvaIntra) && <span data-tva-etat={eTvaIntra} style={{ fontSize: 12, color: C.warn }}>{eTvaIntra === 'autre_siren' ? 'Ce numéro ne porte pas ton SIREN.' : eTvaIntra === 'cle' ? 'La clé ne correspond pas à ton SIREN.' : 'Forme attendue : FR + 2 caractères + 9 chiffres.'}</span>}
+              {!p.tvaIntra && tvaCalc && <button type="button" data-tva-calcul onClick={() => maj({ tvaIntra: tvaCalc })}
+                style={{ justifySelf: 'start', border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Utiliser {tvaCalc} <span style={{ color: C.muted }}>(calculé depuis ton SIREN)</span></button>}
+            </>}
+            {p.forme === 'societe' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8 }}>
+              {texteChamp('formeJuridique', 'Forme juridique', { exemple: 'ex : SAS' })}{texteChamp('capital', 'Capital social (€)', { exemple: 'ex : 1000' })}{texteChamp('rcs', 'Ville du RCS', { exemple: 'ex : Saint-Malo' })}
+            </div>}
+            {manque.length > 0 && <div data-manque style={{ fontSize: 12, color: C.muted }}>Pour émettre une facture, il manque : {manque.join(', ')}.</div>}
           </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-            Sert au rapport mensuel et annuel. Il se compose des <b>cotisations sociales</b>, de la <b>contribution à la formation</b>, et du <b>versement libératoire de l'impôt</b> si tu l'as choisi — donc il dépend de ta situation et il change d'une année à l'autre.
-            {' '}Vérifie le tien et déclare sur{' '}
-            <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{color:C.accent,fontWeight:700,textDecoration:'none'}}>autoentrepreneur.urssaf.fr →</a>
-            {' '}: l'app ne le devine pas, elle applique celui que tu poses ici.
-          </div>
-        </div>
-      )}
-      {regime==='marge' && (
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
-          <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de TVA</span>
-          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
-          <span style={{fontSize:12,color:C.muted}}>%</span>
+        )}
+      </div>
+
+      {/* Ce que VRM applique — daté et sourcé, jamais présenté comme certain. */}
+      {regles.length > 0 && (
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, marginTop: 10 }}>
+          <button type="button" aria-expanded={reglesOuvert} onClick={() => setReglesOuvert(v => !v)} data-regles-ouvrir
+            style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: C.text, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span aria-hidden="true">{reglesOuvert ? '▾' : '▸'}</span> Ce que VRM applique pour toi <span style={{ fontWeight: 400, color: C.muted }}>· {regles.length} règles</span>
+          </button>
+          {reglesOuvert && (
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              {regles.map(r => (
+                <div key={r.id} data-regle={r.id} data-source={r.source} data-verifie-le={r.verifieLe} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+                  {r.texte}
+                  <div style={{ fontSize: 11, color: C.muted }}>{r.source}</div>
+                </div>
+              ))}
+              <div data-regles-avertissement style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>
+                Recoupé le {FACT.REGLES_VERIFIEES_LE.split('-').reverse().join('/')} sur des sources secondaires (le texte officiel n'a pas pu être ouvert). VRM applique ce que tu déclares ici, sans vérifier ton éligibilité : à faire valider par ton comptable.
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

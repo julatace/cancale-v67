@@ -605,9 +605,15 @@ libelles.length === 2
   : nok('le tableau de bord consomme ce récap');
 
 // ── 4. Plus aucun 13,5 % en dur sur un chemin URSSAF ───────────────────────
-const enDur = SRC.split('\n')
+// ⚠️ Un audit lit le CODE : les commentaires `/* … */` (dont les commentaires
+// JSX) sont neutralisés d'abord, en GARDANT les retours à la ligne pour que
+// les numéros signalés restent ceux du fichier — la règle ne voyait que les
+// lignes qui COMMENCENT par « // », et criait au loup sur un commentaire qui
+// cite le libellé d'avant (« À payer (13,5 %) », 16 octobre).
+const SRC_SANS_BLOCS = SRC.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+const enDur = SRC_SANS_BLOCS.split('\n')
   .map((l, i) => [i + 1, l])
-  .filter(([, l]) => /(\*\s*0\.135|0\.135\s*\*|13,5\s*%|13,5%)/.test(l) && !/^\s*\/\//.test(l) && !/TAUX_URSSAF_DEFAUT/.test(l));
+  .filter(([, l]) => /(\*\s*0\.135|0\.135\s*\*|13,5\s*%|13,5%)/.test(l) && !/^\s*\/\//.test(l) && !/\/\/.*13,5/.test(l) && !/TAUX_URSSAF_DEFAUT/.test(l));
 enDur.length
   ? nok('aucun taux de cotisations écrit en dur', enDur.map(([n]) => 'l.' + n).join(', '))
   : ok('aucun taux de cotisations écrit en dur');
