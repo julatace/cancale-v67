@@ -1,3 +1,4 @@
+import {resumerStockJournee} from './stockJournee.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -9330,25 +9331,19 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 88;
+const NAV_LARGEUR = 120;
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
-  const [gestion, setGestion] = useState(()=>outils.some(t=>t.id===tab));
-  const declencheur = useRef(null);
   const actif = BAR_GROUPE[tab] || tab;
-  useEffect(()=>{setGestion(outils.some(t=>t.id===tab));},[tab]);
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmWord height={19} color={C.onChrome} accent={C.onChrome}/></div>
-    <div className="vrm-rail-scroll" onKeyDown={e=>{if(e.key==='Escape' && gestion){e.preventDefault();setGestion(false);declencheur.current?.focus();}}}>
+    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/></div>
+    <div className="vrm-rail-scroll">
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
-      <div className="vrm-rail-management-group">
-        <button ref={declencheur} type="button" className="vrm-rail-button" aria-label="Gestion" title="Gestion" aria-expanded={gestion} aria-controls="vrm-gestion-laterale" onClick={()=>setGestion(v=>!v)} data-active={outils.some(t=>t.id===actif)||undefined}><Icon name="grid" size={23}/></button>
-        {gestion && <section id="vrm-gestion-laterale" className="vrm-rail-management" aria-label="Gestion">{outils.map(bouton)}</section>}
-      </div>
+      <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
     </div>
     <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button></div>
   </nav>;
@@ -31011,6 +31006,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
+            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
+                Empilées, chacune traversait 900 px pour porter trois mots et
+                laissait 400 px de vide sous l'écran (mesuré en capture à
+                1440×900). Une grille qui se remplit toute seule
+                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
+                grand écran et UNE sur téléphone — la même règle, sans test de
+                largeur dans le JavaScript. */}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
+            )}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
+                {jobs.map((j,i)=>(
+                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
+                     différentes, empilées : c'est exactement ce qui faisait
+                     « brouillon ». La couleur reste sur l'icône et le chevron —
+                     elle sert à reconnaître la nature de l'action, pas à
+                     repeindre un quart de l'écran. */
+                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
+                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
+                        empilés, c'est ce qui faisait « application générée ».
+                        Maintenant : une pastille neutre et l'icône au trait, du
+                        même dessin que la barre du bas. La couleur ne sert plus
+                        qu'à l'icône et au chevron — le fond reste calme. */}
+                    {/* 30 sept. — « pas assez de photos » : une action qui porte
+                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
+                        les autres gardent leur icône. */}
+                    {j.photos && j.photos.length
+                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
+                          {j.photos.map((ph,k)=>(
+                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
+                          ))}
+                        </div>
+                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
+                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
+                          « 3 en retard — à poster en priorité » et « 3 hors
+                          délai — va vite les chercher » se lisaient de la même
+                          couleur que « Bordereau + paire au stock ». La
+                          consigne porte la couleur seulement quand il y a
+                          vraiment quelque chose à rattraper (§5.65 : c'est le
+                          chiffre qui se colore, pas le fond). */}
+                      <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+                    </div>
+                    <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* LE HAUT DE LA JOURNÉE : héros + semaine (+ argent). Sur
                 téléphone : empilés dans cet ordre. Sur ordinateur : le héros et
                 l'argent à gauche, la semaine à droite (`.vrm-day-top`). */}
@@ -31143,59 +31191,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : null)
             )}
 
-            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
-                Empilées, chacune traversait 900 px pour porter trois mots et
-                laissait 400 px de vide sous l'écran (mesuré en capture à
-                1440×900). Une grille qui se remplit toute seule
-                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
-                grand écran et UNE sur téléphone — la même règle, sans test de
-                largeur dans le JavaScript. */}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
-            )}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
-                {jobs.map((j,i)=>(
-                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
-                     différentes, empilées : c'est exactement ce qui faisait
-                     « brouillon ». La couleur reste sur l'icône et le chevron —
-                     elle sert à reconnaître la nature de l'action, pas à
-                     repeindre un quart de l'écran. */
-                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
-                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
-                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
-                        empilés, c'est ce qui faisait « application générée ».
-                        Maintenant : une pastille neutre et l'icône au trait, du
-                        même dessin que la barre du bas. La couleur ne sert plus
-                        qu'à l'icône et au chevron — le fond reste calme. */}
-                    {/* 30 sept. — « pas assez de photos » : une action qui porte
-                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
-                        les autres gardent leur icône. */}
-                    {j.photos && j.photos.length
-                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
-                          {j.photos.map((ph,k)=>(
-                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
-                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
-                          ))}
-                        </div>
-                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
-                          « 3 en retard — à poster en priorité » et « 3 hors
-                          délai — va vite les chercher » se lisaient de la même
-                          couleur que « Bordereau + paire au stock ». La
-                          consigne porte la couleur seulement quand il y a
-                          vraiment quelque chose à rattraper (§5.65 : c'est le
-                          chiffre qui se colore, pas le fond). */}
-                      <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
-                    </div>
-                    <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* 🏷️ OFFRES REÇUES — RETIRÉ DE L'ACCUEIL (demande de Julien,
                 28 sept. : « enlève le nombre d'offres reçues, laisse simplement
                 les notifications »). Les offres restent dans le centre de
@@ -31218,6 +31213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 règle CSS, aucun test de largeur en JavaScript (§7). Chaque carte
                 porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
                 serait un faux, §5) — le prix de vente, qui est un fait. */}
+            <div className="vrm-day-lower">
             {!loading && dernieresVentes.length>0 && (
               <div className="vrm-day-recent" style={{marginTop:24}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
@@ -31257,6 +31253,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
             )}
+
+            {!premierJour && (()=>{
+              const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
+              const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
+              return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+                <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
+                <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>annonce{stock?.total===1?'':'s'} en ligne</span></div>
+                {stock ? <>
+                  <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
+                  <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
+                  <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
+                </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
+                {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
+                <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
+              </section>;
+            })()}
+            </div>
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier

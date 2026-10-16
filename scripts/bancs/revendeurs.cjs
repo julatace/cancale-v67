@@ -15,6 +15,7 @@ const ventes = [
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
 ventes[0].photo={url:'https://images1.vinted.net/expired.png'};
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
+rows.push({id:'harvest_111_listings',data:{capturedAt:maintenant,payload:{items:[{id:880,title:'Ordinateur portable',price:{amount:'250',currency_code:'EUR'},photo:{url:'https://images1.vinted.net/test.png'},is_closed:false}],pagination:{total_entries:1}}}});
 rows.push({id:'harvest_111_txn_9002',data:{payload:{transaction:{id:9002,item_photo:{url:'https://images1.vinted.net/test.png'}}}}});
 rows.push({id:'harvest_111_txn_9001',data:{payload:{transaction:{id:9001,item_id:777}}}},{id:'coffre_111_777',data:{id:'777',uid:'111',photos:['https://images1.vinted.net/test.png']}});
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
@@ -93,6 +94,23 @@ async function brancher(p){
    if(['repondre','repondreoffre'].includes(a)){writes.push(body);j={ok:false,error:'Refus simulé eBay'};}
    return r.fulfill({contentType:'application/json',body:JSON.stringify(j)});
   });
+  await p.setViewportSize({width:1512,height:900});
+  await p.goto(base+'/?tab=journee');await p.locator('[data-barre-jour]').waitFor();
+  await p.getByRole('region',{name:'Aperçu du stock Vinted'}).waitFor();
+  await p.waitForFunction(()=>document.querySelector('[data-stock-en-ligne]')?.dataset.stockEnLigne==='1');
+  for(const zoom of [.65,1]){
+    await p.evaluate(z=>{document.documentElement.style.zoom=String(z);document.documentElement.style.minWidth='';document.documentElement.style.setProperty('--vrm-zoom',String(z));document.querySelector('main').scrollTop=0;},zoom);
+    await p.waitForTimeout(200);
+    const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
+    check(bar.y<160,'actions quotidiennes en haut à densité '+zoom);
+    check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
+    check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
+    check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
+    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'journee-'+zoom+'.png')});}
+  }
+  check((await p.locator('.vrm-day-stock').innerText()).includes('1 à compléter'),'stock sans prix connu expliqué sans faux montant');
+  await p.locator('.vrm-day-stock').getByRole('button',{name:'Ouvrir le stock'}).click();await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
+  await p.setViewportSize({width:390,height:844});
   for(const [tab,nom] of [['plat_vinted','Vinted'],['plat_leboncoin','Leboncoin'],['plat_ebay','eBay']]){
    await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
@@ -104,16 +122,12 @@ async function brancher(p){
     await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
     if(width===1512 && nom==='Vinted'){
       const rail=p.locator('.vrm-atelier-rail');
-      check((await rail.boundingBox()).width<100,'navigation bureau réduite à un rail de logos');
+      check(await rail.evaluate(e=>parseFloat(getComputedStyle(e).width)===120),'bandeau bureau élargi à 120 pixels');
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
-      const gestion=rail.getByRole('button',{name:'Gestion',exact:true});
-      await gestion.click();
-      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion accessible directement dans le rail');
-      check(await rail.locator('.vrm-rail-management').evaluate(e=>{const r=e.getBoundingClientRect(),n=e.closest('nav').getBoundingClientRect();return r.left>=n.left && r.right<=n.right;}),'Gestion intégrée dans le rail sans panneau flottant');
-      if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'gestion-desktop.png')});}
-      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures conservés dans Gestion');
-      await p.keyboard.press('Escape');
-      check(await gestion.evaluate(e=>e===document.activeElement) && await gestion.getAttribute('aria-expanded')==='false','Échap ferme Gestion et restitue le focus');
+      check(await rail.getByRole('button',{name:'Gestion',exact:true}).count()===0,'aucun bouton à déplier pour Gestion');
+      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion visible en permanence dans le rail');
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures toujours accessibles');
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
     if(width===1512){
