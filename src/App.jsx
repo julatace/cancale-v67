@@ -54,7 +54,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.181.0';
+const EXT_ATTENDUE = '5.182.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -157,6 +157,100 @@ const lbcTitre = (brand, base, size, max) => {
   return (t + suff).trim();
 };
 
+// <annonce-lbc-regle> — LA MÊME RÈGLE DANS L'APP ET L'EXTENSION, §11 ; texte
+// identique, comparé (et exécuté des deux côtés) par scripts/audit-lbc-fiche.cjs.
+// (16 oct., Julien : « je veux que le poste d'annonce sur leboncoin se fasse
+// comme pour eBay, pour tout gérer depuis VRM ».) La fiche de l'app montre et
+// laisse corriger titre, description, prix, état et photos ; l'extension les
+// REVÉRIFIE avant de les poser — elle ne croit pas la page sur parole :
+//   · le titre tient en 50 caractères, la description en 4 000, le prix est un
+//     nombre en euros (> 0, deux décimales au plus) ;
+//   · la référence VRM-{n°} reste DANS la description (c'est elle qui relie
+//     l'annonce à la paire sans rapprochement par titre, §5) — retirée, elle
+//     est remise à la fin ;
+//   · une photo n'est acceptée que si c'est une photo CAPTÉE de cette annonce
+//     (même chemin chez vinted.net) : on choisit et on ordonne, on n'ajoute rien
+//     venu d'ailleurs ;
+//   · l'état est un libellé MESURÉ du dépôt Leboncoin (`lbc_recon.etapes`), ou
+//     l'état Vinted d'origine (le remplissage ne clique qu'une option au texte
+//     exactement égal), ou vide (Leboncoin le laisse à choisir).
+const LBC_DESC_MAX = 4000;
+const LBC_PRIX_MAX = 100000;
+const LBC_PHOTOS_MAX = 15;
+const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+function refLbcPresente(texte, ref) {
+  if (!ref) return false;
+  return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
+}
+function clePhotoLbc(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol !== 'https:' || !/(^|\.)vinted\.net$/i.test(x.hostname)) return '';
+    return x.pathname.replace(/\/(f\d+(?:x\d+)?|tc)\//, '/');
+  } catch (_) { return ''; }
+}
+function categorieLbcDe(titre, description, taille) {
+  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
+  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
+  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
+  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
+  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
+  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
+  const p = parseFloat(String(taille || '').replace(',', '.'));
+  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+  return '';
+}
+function descriptionLbcDe(o) {
+  const ref = String(o.ref || '');
+  const specs = [];
+  if (o.marque) specs.push('Marque : ' + o.marque);
+  if (o.taille) specs.push('Taille : ' + o.taille);
+  if (o.etat) specs.push('État : ' + o.etat);
+  if (o.couleur) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
+  parts.push('');
+  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  parts.push('Réf. ' + ref);
+  return parts.join('\n');
+}
+// `base` = ce que la file de l'extension sait de CETTE paire : { ref, photos
+// (captées), etat (Vinted d'origine) }. Rend { ok, annonce } ou { ok:false,
+// erreurs:[{champ, raison}] } — jamais une annonce à moitié vérifiée.
+function valideAnnonceLbc(saisie, base) {
+  const s = saisie && typeof saisie === 'object' ? saisie : {};
+  const b = base && typeof base === 'object' ? base : {};
+  const err = [];
+  const titre = String(s.title == null ? '' : s.title).replace(/\s+/g, ' ').trim();
+  if (!titre) err.push({ champ: 'title', raison: 'le titre est vide' });
+  else if (titre.length > LBC_TITRE_MAX) err.push({ champ: 'title', raison: 'le titre dépasse ' + LBC_TITRE_MAX + ' caractères (' + titre.length + ')' });
+  let desc = String(s.description == null ? '' : s.description).replace(/\r\n?/g, '\n').trim();
+  if (!desc) err.push({ champ: 'description', raison: 'la description est vide' });
+  else if (b.ref && !refLbcPresente(desc, b.ref)) desc = desc + '\n\nRéf. ' + b.ref;
+  if (desc.length > LBC_DESC_MAX) err.push({ champ: 'description', raison: 'la description dépasse ' + LBC_DESC_MAX + ' caractères (' + desc.length + ')' });
+  const brut = String(s.price == null ? '' : s.price).replace(/[\s€]/g, '').replace(',', '.');
+  const p = /^\d+(?:\.\d{1,2})?$/.test(brut) ? Number(brut) : NaN;
+  if (!(isFinite(p) && p > 0 && p <= LBC_PRIX_MAX)) err.push({ champ: 'price', raison: 'le prix doit être un nombre en euros, plus grand que 0' });
+  const parCle = new Map();
+  for (const u of (Array.isArray(b.photos) ? b.photos : [])) { const k = clePhotoLbc(u); if (k && !parCle.has(k)) parCle.set(k, String(u)); }
+  const photos = []; const vues = new Set();
+  if (!Array.isArray(s.photos)) err.push({ champ: 'photos', raison: 'aucune photo choisie' });
+  else {
+    for (const u of s.photos) {
+      const k = clePhotoLbc(u);
+      if (!k || !parCle.has(k)) { err.push({ champ: 'photos', raison: 'une photo n\'est pas une photo captée de cette annonce' }); break; }
+      if (!vues.has(k)) { vues.add(k); photos.push(parCle.get(k)); }
+    }
+    if (!photos.length && !err.some((e) => e.champ === 'photos')) err.push({ champ: 'photos', raison: 'choisis au moins une photo — Leboncoin refuse une annonce sans photo' });
+    if (photos.length > LBC_PHOTOS_MAX) err.push({ champ: 'photos', raison: 'au plus ' + LBC_PHOTOS_MAX + ' photos' });
+  }
+  const etat = String(s.etat == null ? '' : s.etat).trim();
+  if (etat && LBC_ETATS.indexOf(etat) < 0 && etat !== String(b.etat || '').trim()) err.push({ champ: 'etat', raison: 'état inconnu de Leboncoin' });
+  if (err.length) return { ok: false, erreurs: err };
+  return { ok: true, annonce: { title: titre, description: desc, price: String(Math.round(p * 100) / 100), photos, etat } };
+}
+// </annonce-lbc-regle>
+
 const MP_DEFAUT = MP_PLACES.reduce((a, p) => (a[p.cle] = p.defaut, a), {});
 // `undefined` (jamais touché) ≠ `false` (retiré exprès) : le premier suit le
 // défaut, le second est un choix. Le même piège que partout ailleurs.
@@ -220,7 +314,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -241,6 +335,7 @@ const CAPACITES_DITES = [
   ['commande', 'générer un bordereau depuis VRM'],
   ['messagerie', 'répondre et faire une offre depuis VRM'],
   ['publication', 'publier une annonce sur Leboncoin depuis VRM'],
+  ['lbcfiche', 'publier sur Leboncoin l\'annonce corrigée dans la fiche de VRM'],
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['detourage', 'détourer tes photos'],
@@ -1094,10 +1189,10 @@ function sheetTexte(q, defaut) {
 }
 
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
-function SheetShell({ onClose, children }) {
+function SheetShell({ onClose, children, maxWidth = 460 }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
-      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
+      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
         {children}
       </div>
@@ -10508,7 +10603,7 @@ const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sa
 //    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
 //    demande une confirmation (l'extension l'exige aussi, `confirme`).
 const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
-function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) {
+function BoutonPublier({ place, id, croitVendue, photos = null, total = null, onFiche = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -10523,6 +10618,11 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
   const abandonne = job && job.etape === 'abandonne';
   const lancer = async () => {
     if (envoi) return;                       // la demande précédente est en vol : son résultat arrive
+    // 5.182 : sur Leboncoin, le bouton OUVRE LA FICHE (voir `FicheLbc`) — c'est
+    // elle qui montre ce qui partira, laisse corriger, puis publie (les gardes y
+    // vivent aussi). Grisé ou déjà publiée : on le dit ici, comme avant — une
+    // fiche qu'on ne pourrait pas publier ne s'ouvre pas pour rien.
+    if (lbc && onFiche && !glob && !fait) { setRefus(null); onFiche(); return; }
     // ⚠️ Un clic refusé dit TOUJOURS pourquoi (11 octobre) : avant, ces trois
     //    cas faisaient `return` en silence — « je ne peux pas poster ».
     if (glob) { setRefus(glob.texte); return; }
@@ -10575,6 +10675,260 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
       </button>
       {refus && <span data-refus-publier="" style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
+  );
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// LA FICHE « PUBLIER SUR LEBONCOIN » (5.182, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux que le poste d'annonce sur leboncoin se fasse comme pour
+// eBay, pour tout gérer depuis VRM ». Leboncoin n'a pas d'API : c'est
+// l'extension qui remplit le dépôt dans son Chrome. La fiche lui montre AVANT
+// ce qui partira — titre (50 car.), description avec sa référence VRM-{n°},
+// prix, état, les photos captées (choisies et ordonnées), la catégorie et le
+// compte — et le laisse corriger. Puis UN bouton : l'app envoie l'annonce
+// corrigée, l'extension la REVÉRIFIE (`valideAnnonceLbc`, la même règle des
+// deux côtés, §11), ouvre le dépôt, remplit, publie sans option payante, et
+// raconte l'avancement que la fiche affiche en direct.
+// ⚠️ Ce qui ne bouge pas : une paire vendue, décochée ou déjà publiée est
+//    refusée par l'extension (elle relit SA file) ; un dépôt en cours n'est pas
+//    relancé ; un dépôt dont VRM n'a pas vu la fin ne repart qu'avec sa
+//    confirmation (il a pu le finir à la main) ; jamais un bouton payant.
+// ⚠️ Une extension plus ancienne que la 5.182 ne sait pas recevoir la fiche :
+//    publier « tel quel » reste possible (elle publie SA version, comme avant),
+//    mais une fiche CORRIGÉE ne part pas — le bouton le dit, il ne promet rien.
+const ETAPES_FICHE_LBC = [
+  ['ouverture', 'Dépôt ouvert sur Leboncoin'],
+  ['remplissage', 'Titre, description, prix'],
+  ['photos', 'Photos'],
+  ['publication', 'Publication, sans option payante'],
+];
+const RANG_PROGRES_LBC = { ouverture: 0, remplissage: 1, 'champ-manquant': 1, photos: 2, etapes: 2, publication: 3, 'publication-refusee': 3 };
+function defautsFicheLbc(q) {
+  const etat = String(q.etat || '').trim();
+  return {
+    title: q.title || '',
+    price: q.prix != null && isFinite(Number(q.prix)) ? Number(q.prix).toFixed(2).replace('.', ',') : '',
+    etat,
+    description: descriptionLbcDe({ ref: 'VRM-' + q.numero, texte: q.texte, base: q.base || q.vinted, marque: q.marque, taille: q.taille, etat, couleur: q.couleur }),
+    photos: Array.isArray(q.photosAll) ? q.photosAll.slice(0, LBC_PHOTOS_MAX) : [],
+  };
+}
+function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
+  const { jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const jobId = 'lbc:' + q.id;
+  const job = jobs[jobId] || null;
+  const defauts = React.useMemo(() => defautsFicheLbc(q), [q]);
+  const [titre, setTitre] = React.useState(defauts.title);
+  const [prix, setPrix] = React.useState(defauts.price);
+  const [etat, setEtat] = React.useState(defauts.etat);
+  const [desc, setDesc] = React.useState(defauts.description);
+  const [photos, setPhotos] = React.useState(defauts.photos);
+  const [envoi, setEnvoi] = React.useState(false);
+  const [refus, setRefus] = React.useState(null);
+  const [aConfirmer, setAConfirmer] = React.useState(false);
+  const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
+  const ref = 'VRM-' + q.numero;
+  const saisie = { title: titre, description: desc, price: prix, etat, photos };
+  const v = valideAnnonceLbc(saisie, { ref, photos: toutes, etat: q.etat });
+  const errDe = (champ) => (!v.ok && v.erreurs.find((e) => e.champ === champ)) || null;
+  const corrigee = titre !== defauts.title || desc !== defauts.description || prix !== defauts.price || etat !== defauts.etat
+    || photos.length !== defauts.photos.length || photos.some((u, i) => u !== defauts.photos[i]);
+  const saitFiche = extSait('lbcfiche');
+  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+    || (q.croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
+  const fait = !!(job && job.etape === 'fait');
+  const enCours = !!(job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000));
+  const abandonne = !!(job && job.etape === 'abandonne');
+  const progres = (job && job.progres) || null;
+  // Ce qui empêche de publier, une seule raison à la fois (la plus en amont).
+  const bloque = fait ? null
+    : glob ? { code: glob.code, texte: glob.texte }
+    : (corrigee && saitFiche !== 'ok') ? { code: 'fiche-retard', texte: `Tes corrections ne partiraient pas : ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la fiche de VRM. Mets-la à jour (${EXT_CAPACITES.lbcfiche}), ou publie la version d'origine.` }
+    // La fiche n'est jugée que si elle PART : une extension plus ancienne publie
+    // sa propre version (l'identifiant seul), la fiche ne la contraint pas.
+    : (!v.ok && saitFiche === 'ok') ? { code: 'fiche', texte: 'À corriger : ' + v.erreurs[0].raison + '.' }
+    : null;
+  const envoyer = (confirme) => vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(q.id) },
+    saitFiche === 'ok' ? { annonce: v.annonce } : {}, confirme ? { confirme: true } : {}), 30000);
+  const publier = async (confirme) => {
+    if (envoi || fait) return;
+    if (bloque && !enCours) { setRefus(bloque.texte); return; }
+    if (abandonne && !confirme) { setAConfirmer(true); return; }
+    setRefus(null); setAConfirmer(false); setEnvoi(true);
+    let r = await envoyer(!!confirme);
+    setEnvoi(false);
+    if (r && !r.accepte && r.code === 'confirmer') {
+      __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
+      setAConfirmer(true); return;
+    }
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r.accepte) { setRefus(r.raison ? (r.raison.charAt(0).toUpperCase() + r.raison.slice(1) + '.') : "Refusé par l'extension."); return; }
+    __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() });
+    __vmrNotifier();
+  };
+  const basculerPhoto = (u) => setPhotos((l) => (l.includes(u) ? l.filter((x) => x !== u) : (l.length >= LBC_PHOTOS_MAX ? l : [...l, u])));
+  const categorie = categorieLbcDe(titre, desc, q.taille);
+  const etatsProposes = [...LBC_ETATS];
+  if (q.etat && !etatsProposes.includes(q.etat)) etatsProposes.push(q.etat);
+  const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' };
+  const Etiquette = ({ children, droite, err }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, margin: '14px 0 6px' }}>
+      <span className="vrm-label" style={{ fontSize: 12, fontWeight: 700, color: err ? C.warn : C.muted, letterSpacing: '.02em' }}>{children}</span>
+      {droite != null && <span style={{ fontSize: 11.5, color: err ? C.warn : C.muted, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>}
+    </div>
+  );
+  // L'étape où en est le dépôt : -1 avant le clic, puis 0 à 3 ; 4 = publiée.
+  const rang = fait ? 4 : progres ? (RANG_PROGRES_LBC[progres.etape] != null ? RANG_PROGRES_LBC[progres.etape] : 1) : (enCours ? 0 : -1);
+  const ph = progres && progres.photos;
+  const textePhotosProgres = ph && ph.total != null
+    ? (ph.confirmees != null ? `${ph.confirmees}/${ph.total} confirmées` : `${ph.posees || 0}/${ph.total} envoyées — vérifie sur la page qu'elles y sont toutes`) + (ph.rates ? ` · ${ph.rates} illisible${ph.rates > 1 ? 's' : ''}` : '')
+    : `${photos.length} à poser`;
+  const etatFiche = fait ? 'publiee' : abandonne ? 'abandonne' : enCours ? 'encours' : bloque ? 'bloque' : 'pret';
+  const libelle = envoi ? 'Envoi…' : fait ? 'Publiée sur Leboncoin ✓' : enCours ? 'Remettre le dépôt devant' : abandonne ? 'Relancer le dépôt' : 'Publier sur Leboncoin';
+  const grise = !!bloque && !enCours;
+  // Le dépôt démarre : on remonte la fiche jusqu'à l'avancement (le bouton est
+  // en bas, l'avancement en haut — sinon on publie sans rien voir bouger).
+  const refProgres = React.useRef(null);
+  const actif = rang >= 0 || abandonne;
+  React.useEffect(() => { if (actif && refProgres.current && refProgres.current.scrollIntoView) { try { refProgres.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {} } }, [actif]);
+  return (
+    <SheetShell onClose={onClose} maxWidth={560}>
+      <div data-fiche-lbc={q.id} data-fiche-etat={etatFiche} data-fiche-corrigee={corrigee ? '1' : '0'}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {photos[0]
+            ? <PhotoVinted src={photos[0]} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 || C.border }}/>
+            : <span style={{ width: 56, height: 56, borderRadius: 12, flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/></span>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>Publier sur Leboncoin</div>
+            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              N°{q.numero}{q.compte ? ` · depuis ${q.compte}` : ''}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ flexShrink: 0, width: 34, height: 34, minHeight: 0, borderRadius: 999, border: 'none', background: C.card2 || C.card, color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* L'avancement EN HAUT : c'est ce qu'on regarde une fois le dépôt lancé. */}
+        {(rang >= 0 || abandonne) && (
+          <div ref={refProgres} data-fiche-progres={fait ? 'publiee' : abandonne ? 'abandonne' : (progres ? progres.etape : 'ouverture')} style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px', scrollMarginTop: 12 }}>
+            {ETAPES_FICHE_LBC.map(([k, lib], i) => {
+              const fini = rang > i; const ici = rang === i && !abandonne;
+              return (
+                <div key={k} data-fiche-etape={k} data-fini={fini ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 13, color: fini || ici ? C.text : C.muted }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
+                    background: fini ? C.accent : 'transparent', color: fini ? '#fff' : C.muted, border: fini ? 'none' : `1.5px solid ${ici ? C.accent : C.border}` }}>{fini ? '✓' : ''}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: ici ? 700 : 500 }}>{lib}</span>
+                  {k === 'photos' && (ph || (rang >= 2 && !fait)) && <span data-fiche-photos-progres="" style={{ fontSize: 11.5, color: C.muted, textAlign: 'right' }}>{textePhotosProgres}</span>}
+                </div>
+              );
+            })}
+            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — la paire est maintenant marquée <b>« sur Leboncoin »</b> dans VRM.</div>}
+            {!fait && progres && progres.etape === 'champ-manquant' && (
+              <div data-fiche-manque={(progres.manque || []).join('|')} style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
+                {(progres.manque && progres.manque.length) ? `${progres.manque.map((m) => `« ${m} »`).join(', ')} ${progres.manque.length > 1 ? 'restent' : 'reste'} à choisir` : 'Un champ obligatoire reste à choisir'} sur la page Leboncoin : fais-le, VRM continue tout seul.
+              </div>
+            )}
+            {!fait && progres && progres.etape === 'publication-refusee' && (
+              <div data-fiche-fin="refusee" style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>VRM n'a pas publié — {progres.raison || 'à faire sur la page'}.</div>
+            )}
+            {abandonne && (
+              <div data-fiche-fin="abandonne" style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
+                {RAISON_ABANDON[job.raison] ? RAISON_ABANDON[job.raison].charAt(0).toUpperCase() + RAISON_ABANDON[job.raison].slice(1) : "VRM n'a pas vu la fin du dépôt"}. Si tu l'as publiée toi-même, choisis « Déjà publiée » ; sinon relance.
+              </div>
+            )}
+          </div>
+        )}
+
+        <Etiquette droite={`${titre.replace(/\s+/g, ' ').trim().length}/${LBC_TITRE_MAX}`} err={errDe('title')}>Titre</Etiquette>
+        <input data-fiche-champ="titre" value={titre} onChange={(e) => setTitre(e.target.value)} maxLength={80} disabled={enCours || fait}
+          style={{ ...champ, borderColor: errDe('title') ? C.warn : C.border }}/>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+            <Etiquette err={errDe('price')}>Prix</Etiquette>
+            <div style={{ position: 'relative' }}>
+              <input data-fiche-champ="prix" value={prix} onChange={(e) => setPrix(e.target.value)} inputMode="decimal" disabled={enCours || fait}
+                style={{ ...champ, paddingRight: 30, borderColor: errDe('price') ? C.warn : C.border }}/>
+              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span>
+            </div>
+          </div>
+          <div style={{ flex: '1.3 1 0', minWidth: 0 }}>
+            <Etiquette err={errDe('etat')}>État</Etiquette>
+            <select data-fiche-champ="etat" value={etat} onChange={(e) => setEtat(e.target.value)} disabled={enCours || fait}
+              style={{ ...champ, appearance: 'auto', paddingRight: 8 }}>
+              <option value="">Laisser Leboncoin le demander</option>
+              {etatsProposes.map((x) => <option key={x} value={x}>{LBC_ETATS.includes(x) ? x : `${x} (état Vinted)`}</option>)}
+            </select>
+          </div>
+        </div>
+        {etat && !LBC_ETATS.includes(etat) && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>« {etat} » n'est pas un libellé de Leboncoin : l'état restera à choisir sur la page.</div>}
+
+        <Etiquette droite={`${photos.length} sur ${toutes.length}${q.nReelles != null && q.nReelles > toutes.length ? ` captées (${q.nReelles} sur Vinted)` : ''}`} err={errDe('photos')}>Photos</Etiquette>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: -2, marginBottom: 8, lineHeight: 1.4 }}>Touche-les dans l'ordre voulu — la n°1 est la couverture.</div>
+        <div data-fiche-photos={photos.length} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
+          {toutes.map((u) => {
+            const i = photos.indexOf(u);
+            const pris = i >= 0;
+            return (
+              <button type="button" key={u} data-fiche-photo={pris ? i + 1 : 0} onClick={() => !(enCours || fait) && basculerPhoto(u)} aria-pressed={pris}
+                style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
+                  border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
+                <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
+                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
+                {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
+              </button>
+            );
+          })}
+        </div>
+        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Aucune photo captée pour cette annonce : ouvre-la sur Vinted, l'extension lit ses photos au passage. Leboncoin refuse une annonce sans photo.</div>}
+
+        <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
+        <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
+          style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
+          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cette paire{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
+        </div>
+
+        <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
+          {[
+            ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
+            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (dernier vu : ${compteLbc.name})` : ''}`],
+            ['Options payantes', 'aucune — VRM publie sans booster'],
+          ].map(([k, val], i) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
+              <span style={{ color: C.muted, flexShrink: 0 }}>{k}</span>
+              <span data-fiche-info={k} style={{ color: C.text, textAlign: 'right', minWidth: 0 }}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {aConfirmer && (
+          <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
+              <button type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ position: 'sticky', bottom: 'calc(-18px - env(safe-area-inset-bottom))', background: C.bg, margin: '14px -18px 0', padding: '12px 18px calc(20px + env(safe-area-inset-bottom))', borderTop: `1px solid ${C.border}` }}>
+          {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}</div>}
+          {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version de l'annonce : pour envoyer cette fiche, mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
+          {refus && <div data-fiche-refus="" style={{ fontSize: 12, color: C.warn, lineHeight: 1.45, marginBottom: 8, fontWeight: 600 }}>{refus}</div>}
+          <button type="button" data-fiche-publier={grise ? 'grise' : etatFiche} onClick={() => publier(false)} aria-disabled={grise || fait ? 'true' : undefined}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: grise || fait ? 'default' : 'pointer',
+              background: grise ? (C.card2 || C.border) : fait ? 'transparent' : C.accent, color: grise ? C.muted : fait ? C.accent : '#fff',
+              boxShadow: grise || fait ? 'none' : C.shadow, opacity: envoi ? 0.75 : 1 }}>
+            {libelle}
+          </button>
+          {!fait && (
+            <button type="button" data-fiche-deja="" onClick={() => { onMarquer(q.id); onClose(); }}
+              style={{ display: 'block', margin: '8px auto 0', border: 'none', background: 'transparent', minHeight: 0, padding: '6px 8px', color: C.muted, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>Déjà publiée sur Leboncoin</button>
+          )}
+        </div>
+      </div>
+    </SheetShell>
   );
 }
 function LbcCroitVendue({ n }) {
@@ -36921,7 +37275,7 @@ function LeboncoinScreen() {
           : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
         if (it.is_closed || it.is_hidden || it.is_draft) continue;
         onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid);
-        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
+        online.push({ id: oid, uid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', status: it.status || '', color: [it.color1, it.color2].filter(Boolean).join(' '), price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
       }
     }
     // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
@@ -36937,6 +37291,11 @@ function LeboncoinScreen() {
     const prep = prepRows === null ? null : ((prepRows[0] && prepRows[0].data) || {});
 
     // Comptes Leboncoin réellement vus dans le navigateur (captés par l'extension).
+    // Le compte Vinted d'où vient chaque paire (la fiche le nomme) : login, ou
+    // le nom qu'il lui a donné. Lecture ratée ⇒ aucun nom, jamais un faux.
+    const vaRows = await sbGet('vinted_accounts?select=vinted_user_id,login');
+    const labelsComptes = load('vinted_account_labels', {}) || {};
+    const nomCompteDe = (u) => { const a = (vaRows || []).find((x) => String(x.vinted_user_id) === String(u)); return labelsComptes[String(u)] || (a && a.login) || ''; };
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
       .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
@@ -37031,6 +37390,11 @@ function LeboncoinScreen() {
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
         croitVendue: ancienne.has(String(o.id)),
+        // 5.182 : ce que la fiche « Publier sur Leboncoin » montre et laisse
+        // corriger — les mêmes entrées que `buildLbcAd` dans l'extension (§11).
+        base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
+        etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
+        compte: nomCompteDe(o.uid),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -37108,6 +37472,8 @@ function LeboncoinScreen() {
     /* eslint-disable-next-line */
   }, []);
   const marquer = async (id) => { const r = await vmrCmd({ cmd: 'lbcMarque', id: String(id), etat: 'posted' }); if (r && r.accepte) reload(); };
+  // 5.182 : la fiche « Publier sur Leboncoin » ouverte (une paire de la file).
+  const [fiche, setFiche] = useState(null);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
   const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
@@ -37120,6 +37486,7 @@ function LeboncoinScreen() {
   const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
+      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcAccounts && data.lbcAccounts[0]} onClose={() => setFiche(null)} onMarquer={marquer}/>}
       <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0, minWidth: 0 }}>Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
@@ -37406,7 +37773,7 @@ function LeboncoinScreen() {
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles}/>}
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
                     <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
                       style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.181.0';
+const CODE_VERSION = '5.182.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1812,6 +1812,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               if (msg.action === 'depotArrete') await majCmd(jid, { etape: 'abandonne', raison: String(msg.raison || 'arret').slice(0, 30), tabId });
               else await majCmd(jid, { etape: 'depot', raison: null, tabId });
             }
+            sendResponse({ ok: true }); return;
+          }
+          // 5.182 : l'avancement d'un dépôt lancé depuis l'app (étape, photos
+          // posées N/M, champ obligatoire manquant). Seulement pour un dépôt EN
+          // COURS de cette paire, et seulement depuis SON onglet quand on le
+          // connaît — une autre page de dépôt ne parle pas à sa place.
+          if (msg.action === 'depotProgres' && /^\d+$/.test(String(msg.id || ''))) {
+            const jid = 'lbc:' + String(msg.id);
+            const cur = (await lireCmds())[jid];
+            const tabId = sender && sender.tab ? sender.tab.id : null;
+            if (cur && cur.etape === 'depot' && (cur.tabId == null || tabId == null || cur.tabId === tabId)) await majCmd(jid, { progres: progresLbcSur(msg.progres) });
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'markPosted' && msg.id) {
@@ -5397,6 +5408,37 @@ async function depotOngletFerme(tabId) {
 }
 try { chrome.tabs.onRemoved.addListener((tabId) => { depotOngletFerme(tabId).catch(() => {}); }); } catch (_) {}
 const PUBLICATIONS_EN_VOL = new Set();
+// La fiche envoyée par l'app pour CETTE paire (5.182). On ne prend que les champs
+// qu'on sait vérifier (`valideAnnonceLbc`, la règle partagée avec l'app, §11) ;
+// l'identifiant, le N°, la référence et la catégorie restent ceux de la file.
+// Une fiche invalide est REFUSÉE en entier (jamais une annonce à moitié
+// corrigée), avec la raison du premier champ fautif.
+function appliquerAnnonceLbc(ad, saisie) {
+  const v = valideAnnonceLbc(saisie, { ref: ad.ref || ('VRM-' + ad.numero), photos: ad.photos, etat: ad.etat });
+  if (!v.ok) return { ok: false, erreurs: v.erreurs, raison: (v.erreurs[0] && v.erreurs[0].raison) || 'fiche invalide' };
+  // Les drapeaux disent à lbc.js quels champs POSER par-dessus ce que Leboncoin
+  // aurait écrit : seulement ceux qu'il a vraiment changés dans la fiche.
+  return { ok: true, ad: Object.assign({}, ad, v.annonce, {
+    edite: true,
+    titreEdite: v.annonce.title !== String(ad.title || ''),
+    descriptionEditee: v.annonce.description !== String(ad.description || ''),
+    prixEdite: Number(v.annonce.price) !== Number(String(ad.price).replace(',', '.')),
+  }) };
+}
+// Ce que lbc.js dit de l'avancement d'un dépôt lancé depuis l'app : une étape
+// connue, des NOMBRES, et le libellé des champs obligatoires que VRM n'a pas pu
+// remplir (des libellés de Leboncoin, jamais un contenu saisi).
+const ETAPES_PROGRES_LBC = ['ouverture', 'remplissage', 'photos', 'etapes', 'publication', 'champ-manquant', 'publication-refusee'];
+function progresLbcSur(p) {
+  const x = p && typeof p === 'object' ? p : {};
+  const nb = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.min(Math.round(n), 99) : null; };
+  const out = { etape: ETAPES_PROGRES_LBC.indexOf(String(x.etape)) >= 0 ? String(x.etape) : 'remplissage', at: Date.now() };
+  if (x.photos && typeof x.photos === 'object') out.photos = { posees: nb(x.photos.posees), total: nb(x.photos.total), confirmees: nb(x.photos.confirmees), rates: nb(x.photos.rates) };
+  if (x.champs != null) out.champs = nb(x.champs);
+  if (Array.isArray(x.manque)) out.manque = x.manque.slice(0, 5).map((t) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean);
+  if (x.raison) out.raison = String(x.raison).slice(0, 140);
+  return out;
+}
 async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // Capture au clic : si les photos de CETTE paire manquent, on les cherche
   // MAINTENANT (1 lecture, sur son clic) avant de construire l'ad — ainsi
@@ -5407,8 +5449,16 @@ async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
   const lecturesKO = lbc ? !!(r && r.stats && r.stats.lecturesKO) : !!(r && r.lecturesKO);
   if (lecturesKO) return { accepte: false, code: 'lecture', raison: "je n'ai pas pu relire tes annonces Vinted — réessaie dans un moment" };
-  const ad = ((r && r.queue) || []).find((a) => String(a.id) === id);
+  let ad = ((r && r.queue) || []).find((a) => String(a.id) === id);
   if (!ad) return { accepte: false, code: 'absente', raison: "elle n'est plus dans la file (vendue, déjà publiée, ou décochée)" };
+  // 5.182 : la FICHE de l'app (titre, description, prix, état, photos choisies et
+  // ordonnées). L'identité et toutes les gardes viennent d'ABORD de la file
+  // ci-dessus ; la fiche ne fait que remplacer des champs, revérifiés ici.
+  if (lbc && msg.annonce !== undefined) {
+    const a = appliquerAnnonceLbc(ad, msg.annonce);
+    if (!a.ok) return { accepte: false, code: 'invalide', raison: a.raison, erreurs: a.erreurs };
+    ad = a.ad;
+  }
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   if (lbc) await chrome.storage.local.set({ vrmPendingAd: { ad: Object.assign({}, ad, { publier: true }), at: Date.now() } });
   else await chrome.storage.local.set({ vrmPendingEbay: { ad, at: Date.now() } });
@@ -6913,18 +6963,9 @@ function viderMemoVisite(uid) {
 //    ⚠️ Les vêtements sont testés AVANT la pointure : « jean taille 40 » est un
 //    vêtement, pas une paire du 40.
 function lbcCategory(det, raw) {
-  const t = ((det.title || raw.title || '') + ' ' + (det.description || '')).toLowerCase();
-  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
-  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
-  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
-  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
-  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
-  // Pointure : une taille NUMÉRIQUE en fourchette chaussure (34–50), et aucun mot
-  //   de vêtement au-dessus. C'est ce qui garde l'auto-catégorie de ses sneakers
-  //   (dont le titre ne dit pas « chaussure »), sans forcer les autres articles.
-  const p = parseFloat(String(det.size || raw.size || det.size_title || raw.size_title || '').replace(',', '.'));
-  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
-  return '';   // inconnu : on ne force pas — Leboncoin propose, l'utilisateur choisit
+  // La règle vit dans le bloc partagé avec l'app (`categorieLbcDe`, §11) : la
+  // fiche de VRM montre la catégorie que l'extension choisira.
+  return categorieLbcDe(det.title || raw.title || '', det.description || '', det.size || raw.size || det.size_title || raw.size_title || '');
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE TITRE LEBONCOIN — 50 caractères, et ils se gagnent
@@ -7013,6 +7054,100 @@ function lbcTitre(brand, base, size, max) {
   return (t + suff).trim();
 }
 
+// <annonce-lbc-regle> — LA MÊME RÈGLE DANS L'APP ET L'EXTENSION, §11 ; texte
+// identique, comparé (et exécuté des deux côtés) par scripts/audit-lbc-fiche.cjs.
+// (16 oct., Julien : « je veux que le poste d'annonce sur leboncoin se fasse
+// comme pour eBay, pour tout gérer depuis VRM ».) La fiche de l'app montre et
+// laisse corriger titre, description, prix, état et photos ; l'extension les
+// REVÉRIFIE avant de les poser — elle ne croit pas la page sur parole :
+//   · le titre tient en 50 caractères, la description en 4 000, le prix est un
+//     nombre en euros (> 0, deux décimales au plus) ;
+//   · la référence VRM-{n°} reste DANS la description (c'est elle qui relie
+//     l'annonce à la paire sans rapprochement par titre, §5) — retirée, elle
+//     est remise à la fin ;
+//   · une photo n'est acceptée que si c'est une photo CAPTÉE de cette annonce
+//     (même chemin chez vinted.net) : on choisit et on ordonne, on n'ajoute rien
+//     venu d'ailleurs ;
+//   · l'état est un libellé MESURÉ du dépôt Leboncoin (`lbc_recon.etapes`), ou
+//     l'état Vinted d'origine (le remplissage ne clique qu'une option au texte
+//     exactement égal), ou vide (Leboncoin le laisse à choisir).
+const LBC_DESC_MAX = 4000;
+const LBC_PRIX_MAX = 100000;
+const LBC_PHOTOS_MAX = 15;
+const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+function refLbcPresente(texte, ref) {
+  if (!ref) return false;
+  return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
+}
+function clePhotoLbc(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol !== 'https:' || !/(^|\.)vinted\.net$/i.test(x.hostname)) return '';
+    return x.pathname.replace(/\/(f\d+(?:x\d+)?|tc)\//, '/');
+  } catch (_) { return ''; }
+}
+function categorieLbcDe(titre, description, taille) {
+  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
+  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
+  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
+  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
+  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
+  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
+  const p = parseFloat(String(taille || '').replace(',', '.'));
+  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+  return '';
+}
+function descriptionLbcDe(o) {
+  const ref = String(o.ref || '');
+  const specs = [];
+  if (o.marque) specs.push('Marque : ' + o.marque);
+  if (o.taille) specs.push('Taille : ' + o.taille);
+  if (o.etat) specs.push('État : ' + o.etat);
+  if (o.couleur) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
+  parts.push('');
+  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  parts.push('Réf. ' + ref);
+  return parts.join('\n');
+}
+// `base` = ce que la file de l'extension sait de CETTE paire : { ref, photos
+// (captées), etat (Vinted d'origine) }. Rend { ok, annonce } ou { ok:false,
+// erreurs:[{champ, raison}] } — jamais une annonce à moitié vérifiée.
+function valideAnnonceLbc(saisie, base) {
+  const s = saisie && typeof saisie === 'object' ? saisie : {};
+  const b = base && typeof base === 'object' ? base : {};
+  const err = [];
+  const titre = String(s.title == null ? '' : s.title).replace(/\s+/g, ' ').trim();
+  if (!titre) err.push({ champ: 'title', raison: 'le titre est vide' });
+  else if (titre.length > LBC_TITRE_MAX) err.push({ champ: 'title', raison: 'le titre dépasse ' + LBC_TITRE_MAX + ' caractères (' + titre.length + ')' });
+  let desc = String(s.description == null ? '' : s.description).replace(/\r\n?/g, '\n').trim();
+  if (!desc) err.push({ champ: 'description', raison: 'la description est vide' });
+  else if (b.ref && !refLbcPresente(desc, b.ref)) desc = desc + '\n\nRéf. ' + b.ref;
+  if (desc.length > LBC_DESC_MAX) err.push({ champ: 'description', raison: 'la description dépasse ' + LBC_DESC_MAX + ' caractères (' + desc.length + ')' });
+  const brut = String(s.price == null ? '' : s.price).replace(/[\s€]/g, '').replace(',', '.');
+  const p = /^\d+(?:\.\d{1,2})?$/.test(brut) ? Number(brut) : NaN;
+  if (!(isFinite(p) && p > 0 && p <= LBC_PRIX_MAX)) err.push({ champ: 'price', raison: 'le prix doit être un nombre en euros, plus grand que 0' });
+  const parCle = new Map();
+  for (const u of (Array.isArray(b.photos) ? b.photos : [])) { const k = clePhotoLbc(u); if (k && !parCle.has(k)) parCle.set(k, String(u)); }
+  const photos = []; const vues = new Set();
+  if (!Array.isArray(s.photos)) err.push({ champ: 'photos', raison: 'aucune photo choisie' });
+  else {
+    for (const u of s.photos) {
+      const k = clePhotoLbc(u);
+      if (!k || !parCle.has(k)) { err.push({ champ: 'photos', raison: 'une photo n\'est pas une photo captée de cette annonce' }); break; }
+      if (!vues.has(k)) { vues.add(k); photos.push(parCle.get(k)); }
+    }
+    if (!photos.length && !err.some((e) => e.champ === 'photos')) err.push({ champ: 'photos', raison: 'choisis au moins une photo — Leboncoin refuse une annonce sans photo' });
+    if (photos.length > LBC_PHOTOS_MAX) err.push({ champ: 'photos', raison: 'au plus ' + LBC_PHOTOS_MAX + ' photos' });
+  }
+  const etat = String(s.etat == null ? '' : s.etat).trim();
+  if (etat && LBC_ETATS.indexOf(etat) < 0 && etat !== String(b.etat || '').trim()) err.push({ champ: 'etat', raison: 'état inconnu de Leboncoin' });
+  if (err.length) return { ok: false, erreurs: err };
+  return { ok: true, annonce: { title: titre, description: desc, price: String(Math.round(p * 100) / 100), photos, etat } };
+}
+// </annonce-lbc-regle>
+
 function firstDefined(...v) { for (const x of v) if (x !== undefined && x !== null && x !== '') return x; return ''; }
 function buildLbcAd(raw, det, num, account) {
   const brand = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
@@ -7032,26 +7167,11 @@ function buildLbcAd(raw, det, num, account) {
   if (Array.isArray(ph)) photos = ph.map((p) => firstDefined(p.full_size_url, p.url, typeof p === 'string' ? p : '')).filter(Boolean);
   if (!photos.length && raw.photo && raw.photo.url) photos = [raw.photo.url];
   const title = lbcTitre(brand, base, size);
-  // Description structurée
-  const specs = [];
-  if (brand) specs.push('Marque : ' + brand);
-  if (size) specs.push('Taille : ' + size);
-  if (cond) specs.push('État : ' + cond);
-  if (color) specs.push('Couleur : ' + color);
-  // RÉFÉRENCE UNIVERSELLE : on écrit NOTRE numéro « VRM-{num} » dans l'annonce,
-  // en HAUT (visible pour retrouver la paire en rayon) ET en bas. Ça marche sur
-  // TOUT compte — pas besoin de la numérotation auto des comptes PRO. C'est aussi
-  // la clé qui permettra de resynchroniser (vendu sur LBC → retirer de Vinted).
+  // Description structurée — la règle vit dans le bloc partagé avec l'app
+  // (`descriptionLbcDe`, §11) : la fiche de VRM montre exactement ce texte.
+  // RÉFÉRENCE UNIVERSELLE : NOTRE numéro « VRM-{num} », en HAUT et en bas.
   const ref = 'VRM-' + num;
-  const parts = [];
-  parts.push('📦 Réf. ' + ref);
-  parts.push('');
-  parts.push(desc0 || base);
-  if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
-  parts.push('');
-  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
-  parts.push('Réf. ' + ref);
-  const description = parts.join('\n');
+  const description = descriptionLbcDe({ ref, texte: desc0, base, marque: brand, taille: size, etat: cond, couleur: color });
   // marque/taille : le formulaire Leboncoin a des listes déroulantes pour ça.
   return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }

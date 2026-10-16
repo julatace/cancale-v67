@@ -135,63 +135,81 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         orange: [...document.querySelectorAll('a')].some((a) => /Déposer une annonce/.test(a.innerText)),
         texte: document.body.innerText,
       }));
+      // 5.182 : le bouton de la ligne OUVRE LA FICHE ; c'est elle qui publie.
+      // `publier()` = ouvrir la fiche (si elle n'est pas déjà ouverte) puis
+      // cliquer son bouton ; `ficheTxt()` = ce qu'elle dit.
+      const publier = async () => {
+        if (!(await pg.$('[data-fiche-lbc]'))) { await pg.click('[data-bouton-publier] button'); await pg.waitForSelector('[data-fiche-lbc]', { timeout: 5000 }); }
+        await pg.click('[data-fiche-publier]');
+      };
+      const ficheTxt = () => pg.evaluate(() => { const f = document.querySelector('[data-fiche-lbc]'); return f ? { etat: f.getAttribute('data-fiche-etat'), txt: f.innerText } : null; });
       const v = await lire();
       dit(!errs.length, 'aucune erreur', errs[0]);
       dit(v.boutons.length === 1 && v.boutons[0].id === '7001', 'la paire avec photos a SON bouton, la paire sans photo n\'en a pas', JSON.stringify(v.boutons.map((x) => x.id)));
       dit(!v.orange, 'plus de lien orange « Déposer une annonce » au bas de l\'écran');
       if (cas.suite === 'abandon') {
-        await pg.click('[data-bouton-publier="pret"] button');
+        await publier();
         await pg.waitForTimeout(1000);
+        const fa = await ficheTxt();
+        dit(fa && fa.etat === 'abandonne' && /onglet Leboncoin a été fermé/.test(fa.txt) && /Déjà publiée/.test(fa.txt), 'la fiche ouverte le dit aussi (raison + « Déjà publiée »)', fa && fa.etat);
+        await pg.click('[data-fiche-lbc] button[aria-label="Fermer"]');
+        await pg.waitForTimeout(300);
         const a = (await lire()).boutons[0] || {};
         // ⚠️ Revue du 11 octobre : VRM ne voit pas la fin d'un dépôt fini À LA
         //    MAIN — « n'a pas abouti » était une affirmation sans mesure. On dit
         //    « pas su », la raison, et « Déjà publiée » en face de « Réessayer ».
         dit(a.etat === 'abandonne' && !/n'a pas abouti/.test(a.abandon) && /onglet Leboncoin a été fermé/.test(a.abandon) && /Déjà publiée/.test(a.abandon) && /Réessayer/.test(a.txt), 'onglet du dépôt fermé : la raison, « si tu l’as publiée toi-même, Déjà publiée », et le bouton dit « Réessayer » — jamais « n’a pas abouti »', JSON.stringify(a));
-        await pg.click('[data-bouton-publier] button');
+        await publier();
         await pg.waitForTimeout(600);
         const avantOk = await pg.evaluate(() => window.__cmds.length);
         dit(avantOk === 1, '« Réessayer » ne relance RIEN avant sa confirmation (un second dépôt publierait une seconde fois)', String(avantOk));
-        const annuler = await pg.$('button:has-text("Annuler")');
+        const annuler = await pg.$('[data-fiche-confirmer] button:has-text("Annuler")');
         if (annuler) { await annuler.click(); await pg.waitForTimeout(400); }
         dit(!!annuler && (await pg.evaluate(() => window.__cmds.length)) === 1, 'Annuler : rien ne part', String(await pg.evaluate(() => window.__cmds.length)));
-        await pg.click('[data-bouton-publier] button');
+        await publier();
         await pg.waitForTimeout(500);
-        const relancer = await pg.$('button:has-text("Relancer le dépôt")');
+        const relancer = await pg.$('[data-fiche-relancer]');
         if (relancer) { await relancer.click(); await pg.waitForTimeout(700); }
         const cmds = await pg.evaluate(() => window.__cmds);
         dit(cmds.length === 2 && /confirme/.test(cmds[1]), 'confirmé : « Réessayer » renvoie la commande, AVEC sa confirmation (l’extension l’exige)', JSON.stringify(cmds));
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'publier-abandon.png') });
       } else if (cas.suite === 'confirmer') {
-        await pg.click('[data-bouton-publier="pret"] button');
+        await publier();
         await pg.waitForTimeout(900);
-        const relancer = await pg.$('button:has-text("Relancer le dépôt")');
-        const a = (await lire()).boutons[0] || {};
+        const relancer = await pg.$('[data-fiche-relancer]');
+        const a = (await ficheTxt()) || {};
         dit(!!relancer && a.etat === 'abandonne' && (await pg.evaluate(() => window.__cmds.length)) === 1, 'l’extension découvre un dépôt abandonné : l’app le dit, et DEMANDE avant de relancer', JSON.stringify({ relancer: !!relancer, etat: a.etat }));
         if (relancer) { await relancer.click(); await pg.waitForTimeout(800); }
         const cmds = await pg.evaluate(() => window.__cmds);
         dit(cmds.length === 2 && /confirme/.test(cmds[1]), 'confirmé : la commande repart avec sa confirmation', JSON.stringify(cmds));
       } else if (cas.suite === 'rien') {
-        await pg.click('[data-bouton-publier="pret"] button');
+        await publier();
         await pg.waitForTimeout(800);
-        const a = (await lire()).boutons[0] || {};
-        dit(a.etat === 'encours', 'le dépôt est ouvert : « Publication en cours… »', JSON.stringify(a));
-        await pg.click('[data-bouton-publier] button');
+        const a = (await ficheTxt()) || {};
+        dit(a.etat === 'encours' && /Remettre le dépôt devant/.test(a.txt), 'le dépôt est ouvert : la fiche dit « Remettre le dépôt devant »', JSON.stringify(a.etat));
+        await pg.click('[data-fiche-publier]');
         await pg.waitForTimeout(600);
         const cmds = await pg.evaluate(() => window.__cmds);
         dit(cmds.length === 2, '« en cours » : un clic RENVOIE la commande (l’extension remet l’onglet devant, ou relance) — jamais un clic muet', JSON.stringify(cmds));
       } else if (cas.suite === 'refus') {
-        await pg.click('[data-bouton-publier="pret"] button');
+        await publier();
         await pg.waitForTimeout(800);
-        const a = (await lire()).boutons[0] || {};
-        dit(/plus dans la file/.test(a.txt), 'un refus de l’extension est DIT sous le bouton, avec sa raison', JSON.stringify(a));
+        const a = (await ficheTxt()) || {};
+        dit(/plus dans la file/.test(a.txt || ''), 'un refus de l’extension est DIT dans la fiche, avec sa raison', JSON.stringify(a.etat));
       } else if (cas.version === SEUIL_PUBLIER) {
         dit(v.boutons[0] && v.boutons[0].etat === 'pret', 'extension à jour : le bouton est actif', v.boutons[0] && v.boutons[0].etat);
         dit(v.boutons[0] && v.boutons[0].photos === '2' && v.boutons[0].total === '5' && /2 photos sur 5/.test(v.boutons[0].txt), 'le bouton annonce les photos CAPTÉES sur le total de l’annonce (« 2 photos sur 5 »)', JSON.stringify(v.boutons[0]));
         dit(v.raisons === 0, 'et aucune raison de blocage affichée');
-        await pg.click('[data-bouton-publier="pret"] button');
+        await publier();
         await pg.waitForTimeout(900);
         const cmds = await pg.evaluate(() => window.__cmds);
+        // Extension au seuil de publication (avant la fiche, 5.182) : la fiche
+        // non corrigée part « tel quel » — l'identifiant SEUL, comme avant.
         dit(cmds.length === 1 && cmds[0] === 'cmd,id=lbcPublier:7001', 'le clic commande `lbcPublier` avec l\'identifiant SEUL', JSON.stringify(cmds));
+        const fo = await ficheTxt();
+        dit(fo && fo.etat === 'publiee' && /Publiée sur Leboncoin/.test(fo.txt), 'la fiche suit ce que l\'extension renvoie (« Publiée »)', fo && fo.etat);
+        await pg.click('[data-fiche-lbc] button[aria-label="Fermer"]');
+        await pg.waitForTimeout(300);
         const apres = await lire();
         dit(apres.boutons[0] && apres.boutons[0].etat === 'fait' && /Publiée/.test(apres.boutons[0].txt), 'et le bouton suit ce que l\'extension renvoie (« Publiée »)', JSON.stringify(apres.boutons[0]));
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'publier-ok.png') });
