@@ -18,6 +18,7 @@ import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, rec
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
+import { installerLecturesPartagees } from "./lecturesPartagees.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -361,6 +362,10 @@ const INIT_SAL = [];
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
+// Une lecture identique de notre base ne part qu'une fois (16 oct., mesuré :
+// 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans
+// `src/lecturesPartagees.js` (un échec n'est jamais gardé, une écriture vide tout).
+installerLecturesPartagees(SUPABASE_URL);
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -1862,15 +1867,15 @@ function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
-const lireSupprimees = (uid) => cachedRow(`s:${uid}`, async () => {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return null;
-    const ids = rows[0] && rows[0].ids;
-    return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
-  } catch (_) { return null; }
+// (16 oct., « app plus rapide ») Lue dans la lecture de TOUS les comptes
+// (`lireSupprimeesTous`, une ligne par compte, famille bornée) : chaque écran qui
+// lit les dressings faisait UNE lecture par compte, à la suite de celle des
+// lectures publiques (7 allers-retours pour 7 comptes, mesuré au banc
+// `vitesse.cjs`). Mêmes trois états, même forme : `ids` · `{}` · `null`.
+const lireSupprimees = (uid) => lireSupprimeesTous().then((m) => {
+  if (m === null) return null;
+  const ids = m.get(String(uid));
+  return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
 });
 // Toutes les lignes (une par compte : famille bornée) → Map uid → ids, ou `null`.
 const lireSupprimeesTous = () => cachedRow('s:*', async () => {
@@ -3498,12 +3503,20 @@ const fetchCapturedLabelMetas = async (uid) => {
 // ⚠️ On lit ici DEUX SCALAIRES par transaction, jamais le payload (§34) :
 // la transaction et l'identifiant d'annonce que Vinted lui rattache — l'identité
 // certaine sur laquelle repose tout le reste (§5.34).
+// ⚠️ UNE SEULE LECTURE POUR LES DEUX (16 oct., mesuré au banc `vitesse.cjs`) :
+// le pont transaction → annonce et les dates de versement balayaient CHACUN
+// toute la famille `harvest_*_txn_*` (~1 200 lignes, deux pages), avec deux
+// projections différentes — trois à quatre balayages par écran ouvert, la
+// requête la plus coûteuse de la base (`pg_stat_statements`). Même adresse ⇒
+// `lecturesPartagees` n'en fait partir qu'un. Chaque fonction garde SA règle
+// (« pas su » : `{}` pour l'un, `null` pour l'autre), rien d'autre ne change.
+const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at';
 const fetchTxnItemIds = async () => {
   try {
     // `meta` : la base y range les petits champs à chaque écriture — lire la
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id');
+    const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return {};
     const map = {};
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
@@ -3522,7 +3535,7 @@ const fetchTxnItemIds = async () => {
 // lignes et Supabase coupe à 1 000 sans le dire (§4.5).
 const fetchVersementsVinted = async () => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at');
+    const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return null;
     const map = {};
     for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
@@ -24009,7 +24022,18 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
-const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+// ⚠️ (16 oct., « app plus rapide ») Chaque rangement (ventes, achats, annonces,
+// conversations) réécrivait TOUT le cache dans `sessionStorage` — quatre
+// `JSON.stringify` de plus en plus gros à l'ouverture (mesuré au profileur,
+// téléphone émulé : ~150 ms de processeur). Un rangement programme UNE écriture
+// (`_persistAcctCacheBientot`, 400 ms plus tard) ; un EFFACEMENT reste écrit
+// tout de suite (`_persistAcctCache`) et annule l'écriture en attente — sinon un
+// rechargement juste après « Synchroniser » relirait l'ancien cache. Le cache
+// n'est qu'un raccourci : une écriture perdue relit simplement la base.
+let _persistAcctTimer = null;
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ clearTimeout(_persistAcctTimer); _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return; _persistAcctTimer = setTimeout(_persistAcctCache, 400); };
+try { window.addEventListener('pagehide', ()=>{ if(_persistAcctTimer) _persistAcctCache(); }); } catch(_) {}
 // ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
 // Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
 // annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
@@ -27332,7 +27356,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'aujourd'hui (`comptes`) : un compte ajouté depuis serait « lu · 0 », un
   // compte retiré resterait compté.
   const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL && c.comptes===cleComptes) ? c : null; };
-  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
+  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCacheBientot(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -28720,6 +28744,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // deps avant sa déclaration plante au rendu — « Cannot access before init »).
   useEffect(()=>{ if(showWrapped) setWrapStep(0); }, [showWrapped, wrappedYear, wrappedMode, wrappedMonth]);
   const wrapped = useMemo(() => {
+    // (16 oct.) Calculé seulement quand le récap plein écran est ouvert — il
+    // l'était à chaque arrivée de données, sur tous les écrans (~100 ms de
+    // processeur au démarrage sur téléphone émulé, mesuré au profileur).
+    if (!showWrapped) return null;
     const yr = wrappedYear; const mode = wrappedMode; const mo = wrappedMonth;
     const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const inPeriod = (d) => d.getFullYear()===yr && (mode==='year' || d.getMonth()===mo);
@@ -28746,7 +28774,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const periodLabel = mode==='month' ? `${moisNoms[mo]} ${yr}` : String(yr);
     return { yr, mode, mo, moisNoms, periodLabel, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, wrappedYear, wrappedMode, wrappedMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [showWrapped, sales.items, wrappedYear, wrappedMode, wrappedMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
@@ -29338,6 +29366,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [releveMois, reportMonth, accounts]);
   const report = useMemo(() => {
+    // ⚠️ (16 oct., « app plus rapide ») Calculé SEULEMENT quand le rapport comptable est ouvert :
+    // il était recalculé à chaque arrivée de données sur TOUS les écrans du
+    // composant (Ma journée comprise), où il n'est jamais affiché — mesuré au
+    // profileur, téléphone émulé : ~170 ms de processeur au démarrage. Seul ce
+    // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
+    if (!showReport) return null;
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
@@ -29440,7 +29474,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
+  }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -29604,6 +29638,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return [...s].sort((a,b)=>b-a);
   }, [sales.items, buysBase]);
   const annual = useMemo(() => {
+    // ⚠️ (16 oct., « app plus rapide ») Calculé SEULEMENT quand le registre annuel est ouvert :
+    // il était recalculé à chaque arrivée de données sur TOUS les écrans du
+    // composant (Ma journée comprise), où il n'est jamais affiché — mesuré au
+    // profileur, téléphone émulé : ~125 ms de processeur au démarrage. Seul ce
+    // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
+    if (!showAnnual) return null;
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
@@ -29684,7 +29724,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       vintedParUid: declRapport.vinted === 'lu' ? vintedParUid : declRapport.vinted === 'passu' ? null : undefined,
       vintedADater: declRapport.vinted === 'lu' ? (declRapport.aDater || []).filter(l => l.plateforme === 'Vinted') : [] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
+  }, [showAnnual, sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
