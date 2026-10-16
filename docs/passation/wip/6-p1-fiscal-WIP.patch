@@ -1,4 +1,4 @@
-From 8dbb5695a5cfada0533de0875fe9bf56a724e0a7 Mon Sep 17 00:00:00 2001
+From 1b0904cbbc04ea98a0a2342da107d7c410e22686 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 16 Oct 2026 05:35:14 +0000
 Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p1-fiscal)=20=E2=80=94=20fi?=
@@ -16,12 +16,12 @@ Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
  2 files changed, 113 insertions(+)
 
 diff --git a/CLAUDE.md b/CLAUDE.md
-index 920b552..b3b211f 100644
+index d8a8e3a..ee31358 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
-@@ -9074,6 +9074,105 @@ seule) : aucune facture émise chez personne (`vinted_invoices` absente),
-   facturée), versement libératoire oui/non, coordonnées. Sans ça, aucune facture
-   ne s'émet — ni dans l'app, ni pour une vente Pro.
+@@ -10677,6 +10677,105 @@ lignes, la règle ne change QUE celle-là.
+   priorité moyenne) ; le widget ne lit pas le détail 440 (la règle de liste
+   suffit au cas mesuré, et le résumé posé par l'extension est corrigé).
  
 +### ⚠️⚠️ RELECTURE DU LOT FISCAL : NEUF DÉFAUTS REPRODUITS, NEUF CORRIGÉS (16 octobre)
 +Relecture adverse du lot ci-dessus (ab3e057), chaque défaut REPRODUIT avant

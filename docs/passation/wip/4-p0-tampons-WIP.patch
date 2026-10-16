@@ -1,9 +1,11 @@
-From 8a79e7667a4a9164386d6c9f0d36540abef82582 Mon Sep 17 00:00:00 2001
+From 63735986ae4645887557872faf1eb567e3ec1182 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Fri, 16 Oct 2026 05:35:13 +0000
-Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p0-tampons)=20=E2=80=94=20f?=
- =?UTF-8?q?ig=C3=A9=20pour=20la=20passation=20du=2016=20octobre=20(agent?=
- =?UTF-8?q?=20coup=C3=A9=20par=20la=20limite=20de=20session)?=
+Date: Fri, 16 Oct 2026 05:41:42 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p0-tampons)=20=E2=80=94=20t?=
+ =?UTF-8?q?ampons=20titre=20+=20N=C2=B0=20par=20type=20de=20bordereau=20et?=
+ =?UTF-8?q?=20par=20imprimante=20;=20r=C3=A9solu=20PAR-DESSUS=20p0-imprime?=
+ =?UTF-8?q?r=20le=2016=20octobre=20(agent=20coup=C3=A9=20par=20la=20limite?=
+ =?UTF-8?q?=20de=20session)?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -563,10 +565,10 @@ index 0000000..769eed0
 +  process.exit(ko ? 1 : 0);
 +})();
 diff --git a/src/App.jsx b/src/App.jsx
-index 075923f..9e56296 100644
+index 65539bc..7f419cd 100644
 --- a/src/App.jsx
 +++ b/src/App.jsx
-@@ -6127,14 +6127,9 @@ const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', '
+@@ -6779,14 +6779,9 @@ const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', '
  // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
  // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
  // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
@@ -584,7 +586,7 @@ index 075923f..9e56296 100644
  // Empreinte de format = dimensions arrondies (ex "210x297").
  const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
  // Emplacement par défaut intelligent du tampon : en HAUT À GAUCHE. Sur le
-@@ -6157,21 +6152,24 @@ const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
+@@ -6809,21 +6804,24 @@ const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
    const hasNum = numero != null && String(numero).trim() !== '';
    if (pos && typeof pos.xr === 'number') {
      // Tampon positionné : cartouche blanc + bord noir. N° (si présent) + titre.
@@ -615,7 +617,7 @@ index 075923f..9e56296 100644
      }
    } else {
      const bandH = 74;
-@@ -6443,16 +6441,145 @@ const posePrefsImpression = (PL, doc) => {
+@@ -7095,16 +7093,145 @@ const posePrefsImpression = (PL, doc) => {
  // Le « tout petit SKU en bas » de l'impression thermique : sur une étiquette de
  // 10×15 cm il n'y a pas la place d'un cartouche — juste le numéro du carton, en
  // bas à gauche, sur un fond blanc pour rester lisible sur un aplat.
@@ -765,7 +767,7 @@ index 075923f..9e56296 100644
  // ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
  // Julien : « quand j'appuie sur imprimer sur ordi, ça télécharge le bordereau et
  // ça ne l'ouvre pas comme sur téléphone ». Le PDF partait en `download` (et le
-@@ -6516,9 +6643,10 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos)
+@@ -7168,9 +7295,10 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos)
  };
  // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
  // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
@@ -779,7 +781,7 @@ index 075923f..9e56296 100644
    if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
    const PL = await import('pdf-lib');
    const { PDFDocument, rgb, StandardFonts } = PL;
-@@ -6530,17 +6658,20 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+@@ -7187,17 +7315,20 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
      try {
        const src = await PDFDocument.load(it.pdfBuf);
        const first = src.getPages()[0];
@@ -805,7 +807,7 @@ index 075923f..9e56296 100644
          first.setMediaBox(z.x, z.y, z.w, z.h);
          first.setCropBox(z.x, z.y, z.w, z.h);
          isoles++;
-@@ -10855,23 +10986,31 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+@@ -12010,23 +12141,31 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
    const [bordResult, setBordResult] = React.useState(null);
    const [bordPlace, setBordPlace] = React.useState(null);
    const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
@@ -844,7 +846,7 @@ index 075923f..9e56296 100644
      URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
    };
    const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
-@@ -10904,12 +11043,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+@@ -12063,12 +12202,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
      if (!r0.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r0.error ? ' — ' + r0.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
      try {
        const bytes = b64ToBytes(r0.dataUrl.split(',')[1] || '');
@@ -860,7 +862,7 @@ index 075923f..9e56296 100644
      } catch (e) { libererOngletPdf(); toast('Impossible de tamponner ce bordereau : ' + String(e)); }
    };
    // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
-@@ -22343,8 +22481,9 @@ function LoadError({ onRetry }) {
+@@ -25200,8 +25338,9 @@ function LoadError({ onRetry }) {
  function BordPlacer({ place, onConfirm, onCancel }) {
    const { numero, title, w, h, blobUrl } = place;
    const padRef = React.useRef(null);
@@ -872,7 +874,7 @@ index 075923f..9e56296 100644
    const [xr,setXr] = useState(place.initPos?.xr ?? 0.05);
    const [yr,setYr] = useState(place.initPos?.yr ?? 0.02); // défaut : haut de page
    const dragging = React.useRef(false);
-@@ -22381,10 +22520,198 @@ function BordPlacer({ place, onConfirm, onCancel }) {
+@@ -25238,15 +25377,203 @@ function BordPlacer({ place, onConfirm, onCancel }) {
              <div style={{fontSize:'min(2.4vw,9px)',color:'#222',lineHeight:1.1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{title}</div>
            </div>
          </div>
@@ -885,12 +887,12 @@ index 075923f..9e56296 100644
            <button type="button" onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
 -          <button type="button" onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
 +          <button type="button" onClick={()=>onConfirm({xr,yr,s})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
-+        </div>
-+      </div>
-+    </div>
-+  );
-+}
-+
+         </div>
+       </div>
+     </div>
+   );
+ }
+ 
 +// ── « MES BORDEREAUX » (Réglages, 15 octobre) ────────────────────────────────
 +// La liste des TYPES de bordereaux rencontrés (§ tampons-regle), avec pour
 +// chacun : où le tampon est posé, par imprimante (classique / thermique), un
@@ -1053,7 +1055,7 @@ index 075923f..9e56296 100644
 +        </div>
 +        <div data-tampon-inconnu-note style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, margin: '6px 0 12px' }}>
 +          L'app retient chaque <b>type</b> de bordereau rencontré (transporteur + format de page) et l'endroit du tampon <b>N° + titre</b> — un réglage par imprimante (classique / thermique). Un type encore jamais rencontré part avec le tampon <b>à la position par défaut</b> (en haut à gauche), puis apparaît ici dès le premier bordereau imprimé. Le tampon s'ajoute à la copie imprimée — le bordereau d'origine n'est jamais modifié.
-         </div>
++        </div>
 +        {types.length === 0 && <div data-tampon-vide style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, padding: '10px 0' }}>Aucun type de bordereau rencontré pour l'instant. Imprime un premier bordereau : son type apparaîtra ici, réglable.</div>}
 +        {types.map((t) => (
 +          <div key={t.cle} data-tampon-type={t.cle} data-tampon-connu={t.connu ? '1' : '0'} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 12px', marginBottom: 10 }}>
@@ -1069,10 +1071,15 @@ index 075923f..9e56296 100644
 +        {types.length > 0 &&
 +          <button type="button" onClick={async () => { if (await askConfirm('Oublier TOUS les emplacements de tampon mémorisés ? L\'app repartira de la position par défaut pour chaque type.')) { ecrit({}); toast('✓ Emplacements réinitialisés.'); } }}
 +            style={{ marginTop: 2, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 500, padding: '8px 12px', fontFamily: 'inherit' }}>Tout réinitialiser</button>}
-       </div>
-     </div>
-   );
-@@ -28178,19 +28505,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
++      </div>
++    </div>
++  );
++}
++
+ // Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
+ // l'ajuster), puis TU envoies. Aucun envoi automatique → aucun risque de blocage.
+ const QUICK_REPLIES = [
+@@ -31469,19 +31796,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
    // le N° une fois (bouton « déplacer »), TOUS les prochains bordereaux de ce
    // format le mettent au même endroit. `mut` = autorise l'enregistrement (on le
    // coupe pendant un lot pour ne pas empiler les setState).
@@ -1101,7 +1108,7 @@ index 075923f..9e56296 100644
      } catch(err){ libererOngletPdf(); toast('Impossible de lire ce PDF : '+String(err)); }
    };
    // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
-@@ -28249,8 +28577,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+@@ -31540,8 +31868,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
        if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
        const numero = numForBord(b), title = b.modele || b.article || '';
        if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
@@ -1113,7 +1120,7 @@ index 075923f..9e56296 100644
        const inv = invForBord(b);
        const ent = inv ? entForBordInvoice(inv) : null;
        const PL = await import('pdf-lib');
-@@ -28265,7 +28594,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+@@ -31556,7 +31885,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
        const zTh = imprMode(imprimante) === 'thermique' ? zoneEtiquette(PL, src.getPages()[0]) : { ok: false };
        let thermiqueOK = false, thermiqueRaison = '';
        if (zTh.ok) {
@@ -1122,7 +1129,7 @@ index 075923f..9e56296 100644
          src.getPages()[0].setMediaBox(zTh.x, zTh.y, zTh.w, zTh.h);
          src.getPages()[0].setCropBox(zTh.x, zTh.y, zTh.w, zTh.h);
          thermiqueOK = true;
-@@ -28287,7 +28616,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+@@ -31578,7 +31907,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
        // Sur ordinateur : le PDF s'ouvre dans un onglet (bouton imprimer de
        // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
        const printed = ouvrirPdfOnglet(url);
@@ -1131,16 +1138,16 @@ index 075923f..9e56296 100644
                        thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
      } catch(err){ libererOngletPdf(); toast('Erreur impression : '+String(err)); }
    };
-@@ -28414,7 +28743,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
-         items.push({ numero, title, pdfBuf: buf, invBytes });
+@@ -31804,7 +32133,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Aucun de ces bordereaux n'a son PDF — le détail est écrit sur l'écran.");
+         setBatchBusy(false); return;
        }
-       if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
 -      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
 +      const r = await mergeAndDownloadBordereaux(items, bordFormats, { autoprint: true, imprimante });
-       setBordResult({ ...r, batch: true });
-       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
-       // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
-@@ -28439,15 +28768,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       // Les PDF que la fusion a dû écarter (abîmés, chiffrés) — nommés un par un.
+       for (const x of (r.rates || [])) { const r0 = aImprimer.find((y) => y.cle === x.cle); if (r0) echecs.push({ ...r0, erreur: 'PDF illisible (abîmé ou chiffré) — retélécharge-le depuis la vente sur Vinted' }); }
+       const okSet = new Set(r.clesOk || []);
+@@ -31832,15 +32161,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
    const adjustBordPlacement = () => {
      const r = bordResult; if(!r || !r.pdfBuf) return;
      const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type:'application/pdf' }));
@@ -1159,7 +1166,7 @@ index 075923f..9e56296 100644
      URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
    };
    const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
-@@ -35707,6 +36036,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
+@@ -39689,6 +40018,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
    // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
    // exactement ce qui fait « page web bricolée » au lieu d'« application ».
    const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
@@ -1168,8 +1175,8 @@ index 075923f..9e56296 100644
    const Row = ({icon,title,desc,onClick,color}) => (
      <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
        {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
-@@ -36009,7 +36340,11 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
-       <RegimeSetting/>
+@@ -39997,7 +40328,11 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
+       <Row icon="doc" title="Régime fiscal et déclarations" desc="Taux de cotisations, rapport du mois, registre annuel." onClick={()=>setTab('fiscal')}/>
        <Row icon="cash" title="Compléter les prix d'achat" desc="Saisie par paire, pour calculer ton bénéfice." onClick={()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');}}/>
        <div style={{height:10}}/>
 -      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
