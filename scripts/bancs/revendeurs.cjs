@@ -226,7 +226,7 @@ async function brancher(p){
   await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
   const send=p.getByRole('button',{name:'Envoyer',exact:true});check((await send.count()===0 || await send.isDisabled()) && await p.getByText('Vinted ne permet pas de répondre dans cette conversation.',{exact:true}).isVisible(),'conversation sans réponse autorisée bloquée et expliquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
-  await p.goto(base+'/?tab=dashboard');await p.locator('.vrm-finance-overview').waitFor();check(await p.locator('.vrm-finance-overview').isVisible(),'indicateurs financiers prioritaires');
+  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible(),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();
   check(await p.getByRole('progressbar',{name:'Progression vers l’objectif du mois'}).getAttribute('aria-valuemax')==='2000','objectif réel saisi avec progression accessible');
   check(await p.locator('.vrm-finance-goal').evaluate(e=>e.getBoundingClientRect().top<document.querySelector('.vrm-finance-stock').getBoundingClientRect().top),'objectif placé avant les détails du stock');
