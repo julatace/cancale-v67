@@ -154,7 +154,10 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
   //  ⚠️ Ce contrôle est là pour que personne ne « complète » la liste noire un
   //    jour en l'étendant au diagnostic : ce serait rendre muet exactement le
   //    compte qu'on cherche à documenter.
-  console.log('\n── Le compte est dans la liste noire : le mouchard doit quand même relever');
+  // ⛔ RENVERSÉ LE 16 OCTOBRE (5.180) — décision de Julien : « quand on
+  //    supprime un compte, ça doit supprimer vraiment ». Un compte supprimé
+  //    définitivement n'est plus capté DU TOUT, diagnostic compris.
+  console.log('\n── Le compte est dans la liste noire : RIEN n’est plus relevé (16 octobre)');
   await essaie('un compte supprimé définitivement', async () => {
     const vm = require('vm');
     const BG = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
@@ -192,10 +195,13 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
     c.activeAccountId = async () => UID;
     await c.storeSeenUrls('www.vinted.fr', ['/parametres/donnees-personnelles'], { 'POST /api/v2/data_export': { st: 403, n: 1 } });
     const ligne = (ecrits.flat() || []).find((e) => e && e.id === `harvest_${UID}_seen_urls`);
-    dit(!!ligne, 'le relevé est quand même écrit pour ce compte — la liste noire ne porte que sur les JETONS',
-      ligne ? '' : 'RIEN écrit : le diagnostic serait muet sur le compte qu’on cherche à documenter');
-    dit(!!(ligne && ligne.data && ligne.data.reponses && ligne.data.reponses['POST /api/v2/data_export']),
-      'et il porte le statut de la requête d’export', JSON.stringify(ligne && ligne.data && ligne.data.reponses));
+    dit(!ligne, 'aucun relevé n’est écrit pour un compte supprimé définitivement', ligne ? 'écrit à tort' : '');
+    // Et ses DONNÉES non plus (dressing, ventes) — la voie active comme la passive.
+    c.activeAccountId = async () => UID;
+    const r = await c.storeHarvestRow(UID, 'listings', { items: [{ id: 1, title: 'x' }], pagination: { total_entries: 1 } }, 'www.vinted.fr');
+    await c.storeHarvest('www.vinted.fr', 'orders_sold', '', JSON.stringify({ my_orders: [{ transaction_id: 5, title: 'y' }] }));
+    const donnees = (ecrits.flat() || []).filter((e) => e && /^harvest_199082413_/.test(String(e.id || '')));
+    dit(r === 'ignore' && donnees.length === 0, 'ni son dressing ni ses ventes ne sont rangés', `${r} · ${donnees.map((e) => e.id).join(',')}`);
     // ⚠️ L'AUTRE MOITIÉ : les JETONS, eux, ne doivent toujours PAS être écrits.
     //    Sans ce contrôle, « faire marcher le diagnostic » pourrait ressusciter
     //    le compte — c'est exactement ce qu'il ne veut pas.

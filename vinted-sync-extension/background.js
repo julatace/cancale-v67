@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.179.0';
+const CODE_VERSION = '5.180.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -790,6 +790,22 @@ async function activeAccountId(domain) {
 // ⇒ `null` = « pas su ». On ne met pas en cache un échec, on garde la dernière
 //   valeur connue, et l'appelant n'efface RIEN tant qu'il ne sait pas.
 let _blockedAccts = null, _blockedAt = 0, _blockedNames = {};
+// ⛔ (5.180, 16 octobre) UN COMPTE SUPPRIMÉ DÉFINITIVEMENT N'EST PLUS CAPTÉ DU
+//    TOUT — Julien : « quand on supprime les annonces d'un compte, ça doit
+//    supprimer vraiment ; dans la recherche il y a encore les annonces de
+//    Shopcancale ». Mesuré : une visite du 19 septembre sur ce compte (pour le
+//    diagnostic d'export) avait réécrit son dressing, ses ventes et sa boîte.
+//    Avant, `vrm_blocked_accounts` ne gardait que les JETONS ; il garde
+//    maintenant toutes ses lignes. Liste illisible ⇒ « pas su » ⇒ on capte
+//    comme avant (sur-exclure couperait un compte vivant sur un hoquet).
+async function compteSupprime(uid) {
+  if (uid == null) return false;
+  const l = await blockedAccounts();
+  if (!(l && l.has(String(uid)))) return false;
+  // Réautorisé depuis l'app (`panel_accounts_off[uid] === false`) : il revit.
+  const r = await unblockedAccounts();
+  return !!(r && !r.has(String(uid)));
+}
 async function blockedAccounts() {
   if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
   try {
@@ -1345,6 +1361,7 @@ async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
+  if (await compteSupprime(uid)) { noterDiag('ignore_compte_supprime'); return; }
   let parsed = null;
   try { parsed = JSON.parse(body); } catch (_) {
     noterDiag(`abandon_json_${type || 'inconnu'}`);
@@ -1939,6 +1956,7 @@ async function noterStatutsOffres(parsed) {
 async function storeSeenUrls(domain, paths, reponses) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
+  if (await compteSupprime(uid)) return;
   // ⚠️⚠️ ÇA ÉCRASAIT LA LISTE À CHAQUE VISITE. Une page ne fait qu'une poignée
   //    d'appels : la visite suivante remplaçait donc tout ce qu'on avait appris
   //    ailleurs. Mesuré le 19 septembre — 41 chemins distincts en tout sur
@@ -3773,6 +3791,7 @@ function resumeCommandes(type, payload) {
 //    page vide). Elle le SAIT ; une page captée en passant, jamais.
 //    Voir `dressingCompletFaitFoi`.
 async function storeHarvestRow(uid, type, payload, domain, opts) {
+  if (await compteSupprime(uid)) { noterDiag('ignore_compte_supprime'); return 'ignore'; }
   // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
   // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
   // près : seule la voie passive archivait. C'est pour ça que le coffre plafonne
@@ -4221,6 +4240,7 @@ async function runActive() {
   //    propriétaire ne passe pas RLS). Vingt requêtes Vinted pour rien (§3 :
   //    aucune requête sans raison), et une garde de 5 min consommée.
   if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }
+  try { if (await compteSupprime(await activeUidForDomain('www.vinted.fr'))) { noterDiag('moisson_compte_supprime'); return false; } } catch (_) {}
   // Revue 5.165 : NOTRE base refuse tout depuis peu (panne, RLS) — rien ne part
   // chez Vinted pour une lecture qu'on ne pourrait pas ranger. Ici, et pas
   // seulement dans la visite : l'alarme des 20 min et le changement de cookie
@@ -4442,6 +4462,7 @@ async function rafraichirVentes(uid) {
   }
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
   const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  if (issue === 'ignore') return { ok: true, ecrit: false, raison: 'compte-supprime' };
   if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
   if (issue !== 'ecrit') { await poserReculBase(); return { ok: false, ecrit: false, raison: 'ecriture' }; }
   // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
@@ -4539,6 +4560,7 @@ async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
+    if (await compteSupprime(uid)) { noterDiag('visite_compte_supprime'); return; }
     // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
     // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
