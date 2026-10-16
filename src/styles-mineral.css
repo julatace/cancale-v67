@@ -560,9 +560,10 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-pickup-location-label { display:none; }
 .vrm-pickup-card { position:relative; border:0 !important; border-radius:0 !important; margin-bottom:0 !important; padding:12px !important; }
 .vrm-pickup-card + .vrm-pickup-card { border-top:1px solid var(--vrm-line) !important; }
-.vrm-pickup-card > div:first-of-type { padding-right:104px; }
 .vrm-pickup-card > div:first-of-type > div:first-child { white-space:normal !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3; }
-.vrm-pickup-collect { position:absolute; right:10px; top:10px; min-height:36px !important; padding:6px 9px !important; font-size:11px !important; }
+/* (16 oct.) « J'ai retiré » n'est plus posé en absolu dans le coin : il
+   recouvrait le code de retrait. Il suit le code, sur la même ligne. */
+.vrm-pickup-collect { align-self:stretch; min-height:40px !important; padding:6px 12px !important; font-size:12px !important; }
 .vrm-pickup-code { padding:8px; }
 @media(max-width:767px) { .vrm-main .vrm-pickup-collect { min-height:40px !important; } }
 .vrm-main button[aria-label^="Couleur de"] { min-width:44px; min-height:44px; }
