@@ -7411,6 +7411,23 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
 const LBC_ORANGE = '#EC5A13';
+// (16 oct.) LE MODE STREAM — masquer les données sensibles quand il filme son
+// écran (pseudos d'acheteurs, noms de comptes, emails, téléphones, codes de
+// retrait). Réglage PROPRE À L'APPAREIL (on streame depuis un appareil, pas
+// partout) : `localStorage.vrm_stream`. Il pose `data-stream` sur la racine ;
+// la règle CSS floute tout élément `.vrm-sensible` (index.html).
+const streamActif = () => { try { return localStorage.getItem('vrm_stream') === '1'; } catch (_) { return false; } };
+const poserStream = (on) => {
+  try { localStorage.setItem('vrm_stream', on ? '1' : '0'); } catch (_) {}
+  try { document.documentElement.setAttribute('data-stream', on ? '1' : '0'); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:stream', { detail: !!on })); } catch (_) {}
+};
+try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-stream', streamActif() ? '1' : '0'); } catch (_) {}
+const useStream = () => {
+  const [on, setOn] = React.useState(streamActif);
+  React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
+  return on;
+};
 // (16 oct.) Les comptes que la RECHERCHE regarde : liés et pas masqués. Un
 // compte supprimé (plus dans `vinted_accounts`) ou masqué n'y apparaît plus.
 // Liste vide ⇒ `null` (« pas su » : on n'écarte rien).
@@ -10975,7 +10992,7 @@ function CodeRetraitCopiable({label,code}) {
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
-    <span>{label}</span><strong style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
+    <span>{label}</span><strong className="vrm-sensible" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
     <small aria-live="polite">{etat || 'Copier'}</small>
   </button>;
 }
@@ -21073,7 +21090,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       </div>
                     ) : (
                       <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
-                        <div style={{fontWeight:600,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
+                        <div className="vrm-sensible" style={{fontWeight:600,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
                         <span style={{color:C.muted,display:'inline-flex'}}><Icon name="pencil" size={12}/></span>
                       </div>
                     )}
@@ -22494,7 +22511,7 @@ function AcctTag({ acc, name }) {
   // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
   return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
-    <span style={{width:6,height:6,borderRadius:8,background:col,flexShrink:0}}/>{name}
+    <span style={{width:6,height:6,borderRadius:8,background:col,flexShrink:0}}/><span className="vrm-sensible">{name}</span>
   </span>;
 }
 
@@ -32102,7 +32119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
-                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
+                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><span className="vrm-sensible">{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span></span>
                           {plusieurs && c._acc && <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>· {accName(c._acc)}</span>}
                           <span style={{marginLeft:'auto',fontSize:11,color:C.muted,flexShrink:0}}>{quand(c.updated_at)}</span>
                         </span>
@@ -36485,6 +36502,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+      <StreamSetting/>
       <ZoomSetting/>
       </>)}
     </div>
@@ -37195,6 +37213,25 @@ function DetourageSetting() {
 // explique une fonction qui n'existe plus est du bruit (§7). Les offres se
 // tranchent dans Messages, sur son clic.
 
+function PastilleStream() {
+  const on = useStream();
+  if (!on) return null;
+  return <button type="button" data-stream-pastille="" onClick={() => poserStream(false)} title="Mode stream actif — cliquer pour l'arrêter" aria-label="Arrêter le mode stream"
+    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+    <span aria-hidden="true" style={{width:7,height:7,borderRadius:99,background:C.danger}}/>Stream</button>;
+}
+function StreamSetting() {
+  const on = useStream();
+  return (
+    <div data-stream-reglage={on ? 'on' : 'off'} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,marginBottom:8}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:600,color:C.text}}>Mode stream</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Floute les pseudos des acheteurs, les noms de tes comptes, les emails, les téléphones et les codes de retrait — pour filmer ou partager ton écran. Seulement sur cet appareil.</div>
+      </div>
+      <button type="button" role="switch" aria-checked={on} onClick={() => poserStream(!on)} style={{flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>{on ? 'ON' : 'OFF'}</button>
+    </div>
+  );
+}
 function ZoomSetting() {
   const [z, setZ] = React.useState(readZoom);
   const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
@@ -40337,6 +40374,7 @@ function AppCoeur() {
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
+            <PastilleStream/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
