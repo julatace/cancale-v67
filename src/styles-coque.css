@@ -64,7 +64,7 @@
   display: flex; gap: 2px; padding: 3px; margin: 0; border: 0;
   border-radius: var(--vrm-r-md);
   /* La piste est un voile NEUTRE tiré du texte secondaire du thème (lisible
-     sur le fond clair comme sur le sombre) ; l'onglet eBay pose la sienne. */
+     sur le fond clair comme sur le sombre, eBay compris : son skin suit le thème). */
   background: var(--seg-piste, color-mix(in srgb, var(--vrm-muted) 13%, transparent));
   overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
   scroll-padding-inline: 3px;
@@ -183,7 +183,7 @@
   .vrm-tab:active:not(:disabled) { transform: none; filter: none; opacity: .6; }
   .vrm-tab-ic { display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; }
   .vrm-tab .vrm-nav-label {
-    font-size: 10.5px; font-weight: 500; letter-spacing: .01em; line-height: 1.1;
+    font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.1;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
   .vrm-tab[aria-current="page"] { color: var(--vrm-accent); }

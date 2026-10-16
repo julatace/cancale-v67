@@ -342,7 +342,7 @@ const THEMES = {
     glass:"rgba(16,20,27,.90)",
     chrome:"#030406", onChrome:"#F2F5FA", chromeMuted:"#6D7788", chromeLine:"#161B24",
     s1:"#3D7BFF", s2:"#8AB4FF",
-    faint:"#5F6878", hair:"rgba(255,255,255,.08)", bar:"rgba(12,15,21,.84)",
+    faint:"#5F6878", hair:"rgba(255,255,255,.08)", bar:"rgba(3,4,6,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
   },
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
@@ -9417,7 +9417,7 @@ function BottomBar({tab,setTab}) {
        Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
        c'est `<main>` qui défile — elle ne peut donc pas « flotter au milieu de
        l'écran » pendant l'inertie iOS. Masquée au clavier par `display:none`.
-       (16 oct.) BARRE D'ONGLETS NATIVE : icônes fines, libellé 10,5 px, l'onglet
+       (16 oct.) BARRE D'ONGLETS NATIVE : icônes fines, libellé 11 px, l'onglet
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
@@ -11260,7 +11260,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
   return (
     <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
       <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
-        style={{ ...(dark ? { '--seg-piste': 'rgba(255,255,255,.08)', '--seg-on': 'rgba(255,255,255,.16)' } : {}), '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent }}>
+        style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent }}>
         {sections.map(([id,label,point])=>{ const on = sub===id; return (
           <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
             <span>{label}</span>
