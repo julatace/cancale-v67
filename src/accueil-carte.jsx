@@ -269,26 +269,28 @@ export default function CarteJour({ onVers }) {
     const b = boite.current, c = tilt.current;
     if (!b || !c || reduit) return;
     let fine = false;
-    try { fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (_) {}
-    if (!fine) return;
+    try { fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth > 1099; } catch (_) {}
+    if (!fine) return;                         // mono-colonne / tactile : pas de suivi (le relief vient de la pose au chargement + la matière)
     let raf = 0, rx = 0, ry = 0;
     const poser = () => { raf = 0; c.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`; };
     const bouge = (e) => {
       const r = b.getBoundingClientRect();
       if (!r.width || !r.height) return;
-      ry = ((e.clientX - r.left) / r.width - 0.5) * 9;   // ±4,5°
-      rx = -((e.clientY - r.top) / r.height - 0.5) * 7;  // ±3,5°
+      ry = ((e.clientX - r.left) / r.width - 0.5) * 16;   // ±8°
+      rx = -((e.clientY - r.top) / r.height - 0.5) * 12;  // ±6°
       if (!raf) raf = requestAnimationFrame(poser);
     };
-    const sort = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } c.style.transform = ''; };
+    const sort = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } c.style.transform = ''; }; // retour à plat, adouci par la transition
     b.addEventListener('pointermove', bouge);
     b.addEventListener('pointerleave', sort);
     return () => { b.removeEventListener('pointermove', bouge); b.removeEventListener('pointerleave', sort); if (raf) cancelAnimationFrame(raf); };
   }, [reduit]);
   return (
     <div className="acc-carte-jour" ref={boite}>
-      <div className="acc-tilt" ref={tilt}>
-        <CarteJourEcran s={s} etatScene={etat} onVers={onVers} />
+      <div className="acc-flotte">
+        <div className="acc-tilt" ref={tilt}>
+          <CarteJourEcran s={s} etatScene={etat} onVers={onVers} />
+        </div>
       </div>
       <div className="acc-revoir-l">
         {etat === 'fin' && !reduit && <RevoirBouton onClick={rejouer} libelle="Revoir l’exemple" />}
