@@ -117,8 +117,8 @@ const CSS = `
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(7,9,13,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(7,9,13,.78);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(244,246,250,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:rgba(244,246,250,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
@@ -131,12 +131,12 @@ const CSS = `
 
 /* Les boutons : une forme, trois poids. */
 .acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(36,88,230,.28)}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(36,88,230,.30)}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.5),0 10px 28px rgba(36,88,230,.36)}
+  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(36,88,230,.38)}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
 .acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
@@ -150,7 +150,7 @@ const CSS = `
 
 /* Le haut de page. */
 .acc-hero{position:relative;padding:56px 0 64px}
-.acc-hero:before{content:"";position:absolute;right:max(0px,calc(50% - 640px));top:-40px;width:760px;height:700px;background:radial-gradient(closest-side,rgba(61,123,255,.12),transparent);pointer-events:none}
+.acc-hero:before{content:"";position:absolute;right:max(0px,calc(50% - 640px));top:-40px;width:820px;height:740px;background:radial-gradient(closest-side,rgba(61,123,255,.17),transparent);pointer-events:none}
 .acc-hero .acc-in{position:relative;display:grid;grid-template-columns:minmax(0,580px) minmax(0,500px);gap:60px;align-items:start}
 .acc-def{display:inline-flex;align-items:center;font-size:14px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:6px 12px;line-height:1.3;text-wrap:balance}
 .acc-h1{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin:22px 0 0}
@@ -164,16 +164,32 @@ const CSS = `
 .acc-lignes b{color:${K.text};font-weight:600}
 .acc-lignes .sep{padding-left:6px;color:${K.faint}}
 .acc-lignes .nw{white-space:nowrap}
-.acc-carte-jour{position:relative;perspective:1200px}
-.acc-carte-jour:before{content:"";position:absolute;inset:-80px -60px;background:radial-gradient(closest-side,rgba(61,123,255,.12),transparent);pointer-events:none;z-index:0}
+.acc-carte-jour{position:relative}
+.acc-carte-jour:before{content:"";position:absolute;inset:-110px -80px;background:radial-gradient(closest-side,rgba(61,123,255,.22),transparent);pointer-events:none;z-index:0;filter:blur(2px)}
 .acc-carte-jour > *{position:relative;z-index:1}
-/* Profondeur 3D de la carte démo : elle s'incline légèrement vers le pointeur
-   (vitrine marketing — jamais sur les écrans de données de l'app). transform
-   seul, retargeté par une transition (interruptible). Souris fine seulement ;
-   coupé en mouvement réduit. Le film ne rend que CarteJourEcran : il n'est pas
-   touché (fonction pure du temps). */
-.acc-tilt{transition:transform 260ms ${COURBE_SORTIE};transform-style:preserve-3d;will-change:transform}
-@media (prefers-reduced-motion:reduce){.acc-tilt{transition:none!important;transform:none!important}}
+/* PROFONDEUR 3D DE LA CARTE DÉMO (vitrine marketing — JAMAIS sur les écrans de
+   données de l'app). Trois couches, transform/opacity seuls :
+   • .acc-flotte  : flotte doucement (translateY) — marche SANS souris, donc sur
+     téléphone aussi ; porte la matière (ombre portée + halo bleu) qui la fait
+     décoller du fond. perspective ici pour que la rotation de l'enfant ait du
+     relief.
+   • .acc-tilt    : inclinaison 3D. Au REPOS une pose légère (rotateY/rotateX) —
+     visible tout de suite, sans bouger la souris ; à la souris fine elle suit le
+     pointeur (JS, retargeté par la transition, interruptible). Mono-colonne
+     (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
+   Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
+   Mouvement réduit : tout est coupé, carte à plat et immobile. */
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(36,88,230,.16)}
+/* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
+   se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
+   À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
+   ne doit ni bouger sans fin ni déformer son contenu). À la souris fine, elle
+   suit ensuite le pointeur (JS). Au repos, la profondeur vient de la matière
+   au-dessus (ombre portée + halo), pas d'une rotation figée. */
+.acc-tilt{transform-style:preserve-3d;transition:transform 320ms ${COURBE_SORTIE};will-change:transform}
+@media (prefers-reduced-motion:no-preference){.acc-tilt{animation:accCarte3D 780ms ${COURBE_SORTIE} 240ms both}}
+@keyframes accCarte3D{from{transform:rotateX(14deg) translateY(10px)}to{transform:rotateX(0) translateY(0)}}
+@media (prefers-reduced-motion:reduce){.acc-tilt{animation:none!important;transition:none!important;transform:none!important}}
 .acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
 .acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
@@ -241,7 +257,7 @@ const CSS = `
 @media (min-width:1440px){
   .acc-fil{display:block;position:absolute;left:calc(50% - 620px);top:0;bottom:0;width:1px;background:${K.line2};pointer-events:none}
   .acc-fil i{position:absolute;inset:0;background:rgba(238,241,246,.4);transform-origin:top}
-  .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:500;color:${K.muted};line-height:18px}
+  .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:600;color:${K.text};line-height:18px}
   .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(238,241,246,.5)}
 }
 @supports (animation-timeline:view()){

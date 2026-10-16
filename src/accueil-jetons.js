@@ -11,30 +11,39 @@
 //    4,11:1. `cta` vaut #2458E6 : le blanc dessus tient 5,8:1 (sur #3D7BFF, le
 //    bouton d'avant, 3,84:1 — sous le seuil AA).
 export const K = {
-  bg: '#07090D',
-  surface: '#0B0E13',
-  card: '#10141B',
-  card2: '#151A23',
-  line: 'rgba(255,255,255,0.08)',
-  line2: 'rgba(255,255,255,0.13)',
-  text: '#EEF1F6',
-  muted: '#9AA3B2',
-  faint: '#8A93A3',
-  cta: '#2458E6',
-  accent: '#3D7BFF',
-  accentSoft: 'rgba(61,123,255,0.14)',
-  warn: '#FFB23E',
-  paper: '#F4F6FA',
-  ink: '#111620',
+  bg: '#F4F6FA',           // fond clair (contenu de la maquette)
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  card2: '#EEF2F8',        // puce / zone intérieure
+  line: 'rgba(18,27,44,0.09)',
+  line2: 'rgba(18,27,44,0.15)',
+  text: '#121B2C',         // encre (15:1 sur le fond)
+  muted: '#566077',        // 6:1
+  faint: '#5E6878',        // 5:1 — jamais sous AA
+  cta: '#2458E6',          // bleu de marque, blanc dessus 5,8:1
+  accent: '#2E6BFF',
+  accentSoft: 'rgba(46,107,255,0.12)',
+  warn: '#B45309',         // ambre lisible sur clair (texte)
+  warnDot: '#F59E0B',      // la pastille ambre (décor, pas du texte)
+  paper: '#FFFFFF',
+  ink: '#121B2C',
+  // ── Bleu nuit du rail et du héros (identité de la maquette) ──
+  rail: '#0E1A2B',
+  rail2: '#0A1420',
+  railText: '#EAEFF7',
+  railMuted: '#93A1B8',
+  railLine: 'rgba(255,255,255,0.08)',
+  railActive: '#17263B',
 };
 
 // Les deux courbes, en CSS (les mêmes que `sortie` et `trajet` du moteur).
 export const COURBE_SORTIE = 'cubic-bezier(0.23, 1, 0.32, 1)';
 export const COURBE_TRAJET = 'cubic-bezier(0.77, 0, 0.175, 1)';
 
-// Ombres à deux couches (contact serré + diffusion large et pâle).
-export const OMBRE_CARTE = '0 1px 2px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.45)';
-export const REFLET = 'inset 0 1px 0 rgba(255,255,255,.06)';
+// Ombres à deux couches sur fond clair (contact net + diffusion large et pâle,
+// teintée encre/bleu — les cartes « décollent » sans noircir).
+export const OMBRE_CARTE = '0 1px 2px rgba(18,27,44,.06), 0 18px 44px rgba(18,27,44,.10)';
+export const REFLET = 'inset 0 1px 0 rgba(255,255,255,.6)';
 
 // La hauteur FINALE de chaque écran dessiné, [ordinateur, compact (< 560 px)].
 // La page réserve cette boîte AVANT que le morceau des scènes arrive : rien ne
