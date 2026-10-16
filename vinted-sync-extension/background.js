@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.180.0';
+const CODE_VERSION = '5.181.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1378,6 +1378,7 @@ async function storeHarvest(domain, type, id, body) {
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
   verifFormeListe(type, parsed, id);
   verifFormeObjet(type, parsed, id);   // transaction/conversation : un champ lu renommé
+  if (type === 'profile') { try { await noterEtatCompte(uid, parsed); } catch (_) {} }   // 5.181 : actif / banni, lu dans la réponse déjà reçue
 
   // ⚠️⚠️ 5.165 — LE DRESSING D'UN AUTRE MEMBRE N'EST JAMAIS LE SIEN (§5).
   //    `/wardrobe/{id}/items` passe par ici quel que soit `{id}` : ouvrir le
@@ -2373,6 +2374,58 @@ async function storeLabel(domain, url, b64) {
 // Double bénéfice : ça range enfin le PDF, ET ça APPREND l'URL du bordereau —
 // la pièce qui manquait pour aller le chercher soi-même plus tard.
 const LABEL_VU = 'panel_label_urls';   // ce qu'on a appris des URL de bordereaux
+
+// ── ÉTAT DU COMPTE : ACTIF OU BANNI (5.181) ──────────────────────────────────
+// Julien (16 oct.) : « l'extension doit être capable d'évaluer l'état du compte ;
+// il doit juste y avoir s'il est actif ou banni ». ⚠️ AUCUNE REQUÊTE DE PLUS (§3) :
+// on lit la réponse de `/api/v2/users/current` que la moisson et la capture
+// passive reçoivent DÉJÀ (le profil du compte connecté, rangé dans
+// `harvest_{uid}_profile`). MESURÉ le 16 octobre sur sa base (lecture seule) :
+// ce profil porte `is_account_banned` (booléen) et `account_status` ; les trois
+// comptes bloqués connus valent `true` / 8, les sept vivants `false` / 0 — et
+// Vinted RÉPOND bien `/users/current` à un compte banni (captures datées).
+// ⇒ « banni » UNIQUEMENT sur `is_account_banned === true` ; `false` ⇒ « actif » ;
+//   champ absent ou d'une autre forme ⇒ « passu ». Un statut HTTP (429 = frein,
+//   401 = session expirée, 403 = frein ou refus) ne fait JAMAIS « banni » : il
+//   n'arrive même pas ici (le profil n'est pas rendu). Doute ⇒ jamais « banni ».
+const ETAT_COMPTE_ROW = 'panel_comptes_etat';
+function etatDuProfil(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return { etat: 'passu', preuve: 'profil illisible' };
+  if (u.is_account_banned === true) return { etat: 'banni', preuve: 'champ profil is_account_banned' };
+  if (u.is_account_banned === false) return { etat: 'actif', preuve: 'champ profil is_account_banned' };
+  return { etat: 'passu', preuve: 'champ profil is_account_banned absent' };
+}
+// Une écriture à la fois (lire-fusionner-réécrire) : deux profils rangés coup sur
+// coup ne s'effacent pas l'un l'autre. Une chaîne perdue au réveil du service
+// worker ne perd qu'une mise à jour, refaite à la visite suivante (§4.9).
+let chaineEtatCompte = Promise.resolve();
+function noterEtatCompte(uid, json) {
+  const k = String(uid || '');
+  if (!k) return Promise.resolve(false);
+  const ev = etatDuProfil(json);
+  const fait = chaineEtatCompte.then(async () => {
+    try {
+      const rows = await sbGet(`app_data?id=eq.${ETAT_COMPTE_ROW}&select=data`);
+      if (rows === null) { noterDiag('etat_compte_lecture_ratee'); return false; }   // pas su : on n'écrit rien (§5)
+      const cur = (rows && rows[0] && rows[0].data) || {};
+      const comptes = (cur.comptes && typeof cur.comptes === 'object') ? { ...cur.comptes } : {};
+      const avant = comptes[k];
+      // « passu » ne remplace jamais un verdict lu (un profil illisible n'apprend rien).
+      if (ev.etat === 'passu' && avant && (avant.etat === 'actif' || avant.etat === 'banni')) return false;
+      const maintenant = Date.now();
+      const recent = avant && avant.etat === ev.etat && avant.at && (maintenant - Date.parse(avant.at)) < 3600000;
+      if (recent) return false;                     // rien de neuf : pas d'écriture (égress)
+      comptes[k] = { etat: ev.etat, at: new Date(maintenant).toISOString(), preuve: ev.preuve };
+      const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
+      noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${ev.etat}`);
+      if (ok !== false && (!avant || avant.etat !== ev.etat)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+  chaineEtatCompte = fait.catch(() => false);
+  return fait;
+}
 
 async function noterUrlLabel(url, ok) {
   try {
@@ -3802,6 +3855,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
+  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} }   // 5.181 : actif / banni
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre

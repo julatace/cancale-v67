@@ -23,10 +23,12 @@
 // ⚠️ IL FAUT RENDRE L'ÉCRAN VENTES D'ABORD. C'est lui le propriétaire (§11) :
 // il publie `vinted_urssaf_mois`, le tableau de bord consomme. Ouvrir le
 // tableau de bord seul mesurerait un écran qui n'a pas encore sa source.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const path=require('path');
+let chromium;
+try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
+catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const { metaVersData } = require('./_meta.cjs');
-const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
-const fs=require('fs'), http=require('http'), path=require('path');
+const fs=require('fs'), http=require('http');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
 // cet arbre. Avec '/home/user/cancale-v67/dist' écrit en dur, le banc servait
@@ -34,10 +36,49 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // d'avant, et sortait VERT sur le défaut. Un banc qui ne peut pas échouer est
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
-const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
-const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
+const DIST=path.join(__dirname,'..','..','dist'), SC=__dirname;
+const PORT=Number(process.env.BANC_PORT)||4474;
+// ── DES VENTES INVENTÉES, PAS `fx/` (16 octobre) ─────────────────────────────
+// Ce banc lisait la copie de sa base (`fx/`, gitignorée). Une copie vide ou
+// absente ne donne AUCUNE vente : l'écran Ventes ne peut rien publier (un
+// compte lié sans ventes lisibles bloque à raison la publication, §5) et le
+// banc sortait rouge sur une app intacte — il mesurait la fixture, pas l'app.
+// Les ventes sont donc inventées ICI (le banc vit dans le dépôt, qui est
+// public : aucune donnée réelle), avec la FORME que l'app lit : la liste des
+// ventes (`harvest_{uid}_orders_sold`, prix en objet `{amount}`) et la
+// transaction finalisée (`harvest_{uid}_txn_{tx}`, statut 450 +
+// `status_updated_at` = la date du VERSEMENT, qui date le CA déclaré).
+const maintenant=new Date();
+const ceMois=(j,h=12)=>{ const d=new Date(maintenant.getFullYear(),maintenant.getMonth(),Math.min(j,Math.max(1,maintenant.getDate())),h); return d>maintenant?new Date(maintenant.getTime()-3600e3):d; };
+const moisPasse=(j)=>new Date(maintenant.getFullYear(),maintenant.getMonth()-1,j,12);
+const iso=(d)=>d.toISOString();
+const accounts=[
+  { id:1, vinted_user_id:'111', login:'atelier_sneak', domain:'www.vinted.fr', updated_at:iso(maintenant), created_at:iso(moisPasse(1)), owner:null },
+  { id:2, vinted_user_id:'222', login:'paris_kicks', domain:'www.vinted.fr', updated_at:iso(maintenant), created_at:iso(moisPasse(1)), owner:null },
+];
+const main=[{ id:'main', data:{} }];
+// [compte, tx, prix, statut, date de vente, date de versement (null = pas de transaction captée)]
+const VENTES=[
+  ['111','90001',48.5,'Commande finalisée',moisPasse(27),ceMois(1,9)],   // vendue le mois dernier, versée ce mois-ci
+  ['111','90002',61,  'Commande finalisée',ceMois(1,10),ceMois(2,15)],
+  ['222','90003',39.9,'Commande finalisée',ceMois(1,11),ceMois(2,16)],
+  ['222','90004',72.4,'Commande finalisée',ceMois(1,12),null],            // finalisée, pas de date de versement ⇒ « à dater »
+  ['111','90005',55,  'Le paiement a été validé',ceMois(2,13),null],      // en cours : pas de CA
+  ['222','90006',44,  'Commande finalisée',moisPasse(3),moisPasse(9)],     // versée le mois dernier
+];
+const vente=(v)=>({ transaction_id:Number(v[1]), id:Number(v[1]), title:'Baskets inventées '+v[1], price:{amount:String(v[2]),currency_code:'EUR'}, status:v[3], date:iso(v[4]) });
+const rows=[];
+for(const a of accounts){
+  const uid=a.vinted_user_id;
+  rows.push({ id:`harvest_${uid}_orders_sold`, data:{ capturedAt:iso(maintenant), payload:{ my_orders:VENTES.filter(v=>v[0]===uid).map(vente) } } });
+  rows.push({ id:`harvest_${uid}_listings`, data:{ capturedAt:iso(new Date(maintenant.getTime()-60000)), payload:{ items:[] } } });
+}
+for(const v of VENTES) if(v[5]) rows.push({ id:`harvest_${v[0]}_txn_${v[1]}`, data:{ capturedAt:iso(maintenant), payload:{ transaction:{ id:Number(v[1]), item_id:Number(v[1])+500000, status:450, status_title:'Commande finalisée', status_updated_at:iso(v[5]) } } } });
+// Ce que le banc ATTEND (calculé ici, jamais lu dans l'app) : ventes Vinted
+// finalisées dont le VERSEMENT tombe ce mois-ci.
+const ymDe=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const attenduMois=VENTES.filter(v=>v[5]&&ymDe(v[5])===ymDe(maintenant));
+const caAttendu=Math.round(attenduMois.reduce((s,v)=>s+v[2],0)*100)/100;
 function projette(row,select){
   if(!select||select==='*') return row;
   const out={};
@@ -56,7 +97,8 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4474);
+srv.on('error',(e)=>{ console.log('KO  le port '+PORT+' est pris ('+e.code+') — relance avec BANC_PORT=…'); process.exit(1); });
+srv.listen(PORT);
 
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 // « 1 234,56 € » → 1234.56
@@ -68,22 +110,17 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
   await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
-    const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
+    const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*','content-range':`0-${Math.max(0,d.length-1)}/${d.length}`},body:JSON.stringify(d)});
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
-    // ⚠️ LE NAVIGATEUR ENCODE `>` DANS LA REQUÊTE (`-%3E%3E`) : testé sur
-    //    l'URL brute, ce motif ne se déclenchait JAMAIS — la famille `txn`
-    //    tombait dans `id=like.` (qui ne la porte pas) et l'app lisait `[]`.
-    //    Depuis la 5.133 (029d44a, « CA déclaré daté au jour du versement »)
-    //    c'est la transaction qui DATE le CA : sans elle, toutes les ventes
-    //    finalisées partaient « à dater », le mois courant valait 0 €, et
-    //    « CA × taux = à payer » se vérifiait sur 0 × 13,5 % = 0 — vert sur
-    //    n'importe quel défaut (§6.3 : servir la forme que l'app demande).
-    let ud=u; try{ ud=decodeURIComponent(u); }catch(_){}
-    if(/transaction->>id/.test(ud)) return j(txn);
+    // ⚠️ LE NAVIGATEUR ENCODE `>` DANS LA REQUÊTE (`-%3E%3E`) : les motifs se
+    //    testent sur l'URL DÉCODÉE (§6.3). Les transactions (`_txn_`) passent
+    //    par `id=like.` avec leur projection : c'est la transaction qui DATE le
+    //    CA déclaré (5.133) — sans elle, « CA × taux = à payer » se vérifierait
+    //    sur 0 × 13,5 % = 0, vert sur n'importe quel défaut.
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
       return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
@@ -91,7 +128,7 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
 
   // L'écran Ventes publie, le tableau de bord consomme (§11).
-  await pg.goto('http://localhost:4474/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT+'/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
   // ⚠️ On attend la PUBLICATION, pas un délai. Depuis la 5.133, Ventes ne
   //    publie qu'une fois les dates de versement lues (`declarables` reste
   //    `undefined` avant) : servies pour de vrai, elles arrivent après les 4 s
@@ -106,8 +143,14 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
     return v.mois.find(m=>m.ym===ym)||{ym,ca:0,n:0}; }catch(_){ return null; } });
   dit(!!publie, "l'écran Ventes publie `vinted_urssaf_mois`",
     publie?`mois courant : ${publie.n} vente(s) · ${publie.ca} €`:'sans lui, le tableau de bord n\'a pas de source');
+  // Et ce qu'il publie est le CA des ventes VERSÉES ce mois-ci, calculé ici
+  // depuis les ventes inventées (ni la vente en cours, ni celle sans date de
+  // versement, ni celle versée le mois dernier).
+  if(publie) dit(publie.n===attenduMois.length && Math.abs(publie.ca-caAttendu)<0.005,
+    "la ligne publiée compte les ventes versées ce mois-ci, et seulement elles",
+    `attendu ${attenduMois.length} vente(s) · ${caAttendu} € — publié ${publie.n} · ${publie.ca} €`);
 
-  await pg.goto('http://localhost:4474/?tab=dashboard',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT+'/?tab=dashboard',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4500);
   await pg.screenshot({path:SC+'/z-urssaf.png',fullPage:true});
   const t=await pg.evaluate(()=>document.body.innerText||'');
