@@ -8939,7 +8939,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   // ── QUAND TOUT VA BIEN : une ligne, pas un tableau. Le détail reste à un clic.
   return (
     <details style={{marginBottom:10}}>
-      <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
+      <summary className="vrm-reception-sum" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
         {/* ⚠️ Ni triangle ambre (rien ne cloche), ni coche verte (rien n'est
             confirmé non plus) : gris, comme une sonde qui n'a pas encore de
             quoi répondre. */}
@@ -29960,13 +29960,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
-                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
+            {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
+                là qu'on le cherche), la personne et la paire, l'actualisation à
+                droite. La source (« lu sur Vinted ») passe dans l'infobulle. */}
+            <div className="vrm-chat-head" style={{borderBottom:`1px solid ${C.border}`,background:C.card}} title={`${accName(openConv.acc)} · ${openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}`}>
+              <button type="button" className="vrm-chat-back" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{color:C.accent}}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
+              <div className="vrm-chat-head-t">
+                <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
+                <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
               </div>
-              <button className="vrm-icon-control" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
@@ -29982,31 +29988,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : null; })()}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
                 m.kind==='event'
-                  ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
-                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'8px 12px',textAlign:'center'}}>
-                          <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
-                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
-                          {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
+                  // Un évènement sans aucun texte lisible ne donne que son type
+                  // technique (« offer_request_message ») : ce n'est pas un message
+                  // pour lui. L'offre, elle, a sa carte sous le fil.
+                  ? (/^[a-z]+(_[a-z]+)+$/.test(String(m.body||'').trim()) && !(m.links||[]).length ? null
+                    : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
+                      ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
+                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis · retrait</div>
+                          <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
-                  : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
-                      {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
-                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
-                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
-                      {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
+                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                  : <div key={i} className={m.mine?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'}>
+                      <div className="vrm-bulle" style={m.mine?{background:C.accent,color:C.onAccent||'#fff'}:{background:C.card,color:C.text,border:`1px solid ${C.border}`}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
+                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
+                      {(m.ts || (!m.mine && m.body)) && <div className="vrm-bulle-pied">
+                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                        {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
+                      </div>}
                     </div>
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); return (
-              <div data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const sansExt = !vmrExtPresent(); const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
+              <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
                 {ro && (
-                  <div data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12,color:C.text,lineHeight:1.45,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',marginBottom:8}}>
+                  <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
                     <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
                   </div>
@@ -30019,49 +30031,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (!off && !tx) return null;
                   const etat = extSait('messagerie');
                   if (etat !== 'ok' || __vmrPlusieurs) return (
-                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
-                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
-                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
+                    <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+                      {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
+                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>
+                        {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le Chrome où l'extension est installée."}
+                        {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a></>}
+                      </div>
                     </div>
                   );
                   return (
-                    <div data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8,opacity:ro?0.55:1}}>
+                    <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
                       {off && (
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
-                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                        <div className="vrm-chat-offre-l">
+                          <span className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b></span>
+                          <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
                       {tx && (
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
-                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${ro?C.border:C.accent}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                        <div className="vrm-chat-offre-l">
+                          <span className="vrm-chat-offre-k" style={{color:C.muted}}>{off?'Contre-offre':'Faire une offre'}</span>
+                          <input className="vrm-chat-prix" inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                            style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div>
                       )}
-                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                      {offreMsg && <div style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
                     </div>
                   );
                 })()}
-                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
-                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {replyErr && <div style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
+                {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
+                    envoyer : un champ de saisie inutilisable n'y a pas sa place.
+                    Le seul geste qui marche — répondre sur Vinted — prend la
+                    place du champ, une fois. */}
+                {sansExt ? (
+                  <a className="vrm-chat-vinted" href={lienVinted} target="_blank" rel="noreferrer" style={{background:C.accent,color:C.onAccent||'#fff'}}>Répondre sur Vinted ↗</a>
+                ) : (<>
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch',opacity:ro?0.5:1}}>
+                <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
                     <button key={i} type="button" disabled={ro} onClick={()=>setReplyText(q.t)} title={q.t}
-                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
-                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                <div className="vrm-chat-compose">
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
+                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
-                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
+                </>)}
               </div>
             ); })()}
           </div>
@@ -31359,7 +31380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
 
-      {curSub==='achats' && (<>
+      {curSub==='achats' && (<div className="vrm-achats">
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
@@ -31375,7 +31396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        <div className="vrm-seg" role="group" aria-label="Étapes de tes achats" style={{background:C.bg,border:`1px solid ${C.border}`}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque paire entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -31388,7 +31409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
             return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
+            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{color:aFilter===id?C.text:C.muted,background:aFilter===id?C.card:'transparent'}}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -31406,9 +31427,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
           const unSeul = comptes.length===1;
           return (
-            <div data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:10,padding:'10px 13px',marginBottom:12}}>
-              <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>↩ {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
-              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
+            <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -31434,8 +31455,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Tous, où ils filtrent vraiment quelque chose. */}
         {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && aFilter!=='attente' && (
-          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
-            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
+            style={{color:C.text}}/></label>
         )}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
@@ -31463,11 +31484,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const prix = vrais.map(M).filter(v=>v>0).sort((a,b)=>a-b);
           const med = prix.length ? prix[Math.floor(prix.length/2)] : 0;
           return (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(150px, 100%), 1fr))',gap:8,marginBottom:12}}>
-              <StatBox label="Dépensé" value={fmtE0(somme(vrais))} sub={`${vrais.length} paire${vrais.length>1?'s':''}`}/>
-              <StatBox label="Prix médian" value={fmtE0(med)} sub="par paire achetée"/>
-              <StatBox label="En route" value={fmtE0(somme(rte))} color={rte.length?C.warn:C.muted} sub={`${rte.length} paire${rte.length>1?'s':''} en chemin`}/>
-              <StatBox label="Annulés" value={fmtE0(somme(ann))} color={tauxAnn>=20?C.danger:C.muted} sub={`${ann.length} sur ${dans.length} · ${tauxAnn} %`}/>
+            // (16 oct.) Une seule surface, quatre cellules — plus quatre cartes de
+            // même poids. La couleur ne reste que sur le taux d'annulation quand
+            // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
+            <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              {[
+                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} paire${vrais.length>1?'s':''}`, null],
+                ['Prix médian', fmtE0(med), 'par paire', null],
+                ['En route', fmtE0(somme(rte)), `${rte.length} paire${rte.length>1?'s':''}`, null],
+                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.danger:null],
+              ].map(([k,v,sub,col])=>(
+                <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
+                  <div className="vrm-achats-kpi-k" style={{color:C.muted}}>{k}</div>
+                  <div className="vrm-achats-kpi-v" data-montant="" style={{color:col||C.text}}>{v}</div>
+                  <div className="vrm-achats-kpi-s" style={{color:col||C.muted}}>{sub}</div>
+                </div>
+              ))}
             </div>
           );
         })()}
@@ -31506,8 +31538,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // ce qui fait « pas fini » (vu en capture sur « Salomon sneakers »).
           const thumb = (src) => src && !imgMortes.has(src)
             ? <PhotoVinted src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
-                style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
-            : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
+                className="vrm-pickup-thumb" style={{width:48,height:48,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
+            : <span className="vrm-pickup-thumb" style={{flexShrink:0,color:C.muted,background:C.card2||C.bg,width:48,height:48,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="bag" size={20}/></span>;
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
           // compte la localisation, seulement les informations du mail »).
           // Avant, un email sans adresse de relais héritait du relais le plus
@@ -31532,8 +31564,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const groups = {};
           avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
-            <div className="vrm-pickup-board" style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
+            <div className="vrm-pickup-board">
+              <div className="vrm-pickup-head">
                 <div style={{flex:1,minWidth:0}}>
                   {/* ⚠️ UN TOTAL QUI NE DIT PAS LE HORS-DÉLAI EST TROMPEUR : sur
                       les 4 colis affichés, 3 avaient leur date limite passée.
@@ -31547,7 +31579,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       c'est la phrase qui dit ce qu'on peut en faire — exactement
                       ce que §5.83 a fait pour la tuile de Ma journée. */}
                   {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
-                    return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
+                    return (<div className="vrm-pickup-title" style={{color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
@@ -31604,7 +31636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Le nom du lieu en premier (c'est là qu'on va), l'adresse
                       dessous, et LE GESTE à faire une fois sur place — chaque
                       transporteur remet le colis à sa façon (§28). */}
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div className="vrm-pickup-dest" style={{borderBottom:`1px solid ${C.border}`}}>
                     {g.carrier&&<CarrierBadge carrier={g.carrier} size={24}/>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* ⚠️ « NE PRENDS PLUS EN COMPTE LA LOCALISATION, JUSTE LES
@@ -31750,7 +31782,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             )}
                           </div>
                         )}
-                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                       </div>
                     );
                   })}
@@ -31805,7 +31837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const adresseSuite = pt.adresse && pt.nom && pt.adresse.length > pt.nom.length ? pt.adresse.slice(pt.nom.length).replace(/^\s*[,—-]\s*/, '') : '';
                   return (
                 <div className="vrm-pickup-point" key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div className="vrm-pickup-dest" style={{borderBottom:`1px solid ${C.border}`}}>
                     {transpUn ? <CarrierBadge carrier={transpUn} size={24}/> : <span aria-hidden="true" style={{display:'inline-flex',width:24,height:24,alignItems:'center',justifyContent:'center',color:C.muted}}><Icon name="box" size={18}/></span>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* Nom du relais quand la conversation Vinted le donne (une
@@ -31924,11 +31956,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             : cd ? 'Ouvrir la conversation ↗'
                             : 'Voir mon code de retrait ↗';
                           return primaire ? (
-                            <a href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:5,border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                            <a className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:8,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
                               {quoi}
                             </a>
                           ) : (
-                            <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
+                            <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{fontSize:12.5,color:C.accent,fontWeight:600,textDecoration:'none'}}>
                               {quoi}
                             </a>
                           );
@@ -31937,7 +31969,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                     </div>
                     );
                   })}
@@ -32021,7 +32053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                 </div>
               )}
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — il passe en gris le temps que Vinted l'enregistre, puis disparaît tout seul. <b>Son QR et son code restent accessibles</b> tant que ce n'est pas confirmé.</div>
+              <div className="vrm-pickup-foot" style={{color:C.muted}}>Coche <b>✓</b> quand tu l'as récupéré : il reste en gris, avec son code, jusqu'à ce que Vinted confirme.</div>
             </div>
           );
         })()}
@@ -32117,33 +32149,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!rendus.length) return null;
           const tot = rendus.reduce((t,o) => t + montantCommande(o), 0);
           return (
-            <div style={{position:'relative',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,padding:'13px 15px 11px 17px',marginBottom:12,overflow:'hidden'}}>
-              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.warn}}/>
-              <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${C.warn}0e, transparent 42%)`,pointerEvents:'none'}}/>
-              <div style={{display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap'}}>
-                <span aria-hidden="true" style={{flexShrink:0,color:C.warn,marginTop:1,display:'flex'}}><Icon name="alert" size={18}/></span>
-                <div style={{flex:'1 1 190px',minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>
-                    {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'} — {tot.toFixed(2).replace('.',',')} € à vérifier
-                  </div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-                    Vinted dit « commande non réclamée ». La paire ne viendra pas : ouvre chaque conversation et vérifie que le remboursement est bien arrivé.
-                  </div>
-                </div>
+            <div className="vrm-achats-bloc" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}>
+                <span aria-hidden="true" style={{color:C.warn,display:'inline-flex',verticalAlign:'-3px',marginRight:6}}><Icon name="alert" size={16}/></span>
+                {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'} — <span data-montant="" style={{whiteSpace:'nowrap'}}>{tot.toFixed(2).replace('.',',')} €</span> à vérifier
               </div>
-              <div style={{marginTop:9,display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(360px,100%), 1fr))',gap:7}}>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
+                Commande non réclamée : la paire ne viendra pas. Vérifie le remboursement dans la conversation.
+              </div>
+              <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map(o=>{
                   const j = Math.round((Date.now() - new Date(o.date||0).getTime())/86400000);
                   const href = lienConv(o);
                   return (
-                    <div key={'nr'+o.transaction_id} style={{display:'flex',gap:9,alignItems:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',background:C.card2||C.card}}>
+                    <div key={'nr'+o.transaction_id} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+                        <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
+                        <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                           {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}
                         </div>
                       </div>
-                      {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:11.5,fontWeight:700,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
+                      {href && <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
                     </div>
                   );
                 })}
@@ -32182,30 +32208,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Liste blanche groupée (style démo iOS) : une seule surface, des lignes
             séparées par un filet fin, beaucoup d'air — plus de cartes encadrées
             séparées. La couleur ne sert qu'au point de statut ; les actions sont
-            de petites icônes discrètes à droite. */}
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          {achatsAffiches.slice(0, achatsMax).map(({o,tk,st},i)=>{
+            de petites icônes discrètes à droite.
+            (16 oct.) Ligne dense alignée : vignette · titre · statut · montant,
+            et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
+            dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
+            quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
+        {(()=>{ const tranche = achatsAffiches.slice(0, achatsMax);
+          const cptes = [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
+          const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
+          return (<>
+        {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
+        <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
+          {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} data-achat-tx={String(o.transaction_id)} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
-              <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div key={o.transaction_id} className="vrm-buy-row" data-achat-tx={String(o.transaction_id)} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5,flexShrink:0,fontSize:11.5,fontWeight:600,color:C.text,background:C.card2,borderRadius:5,padding:'3px 9px'}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
-                  <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                  <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+              <div className="vrm-buy-main">
+                <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
+                <div className="vrm-buy-meta" style={{color:C.muted}}>
+                  <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
+                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                  <span style={{whiteSpace:'nowrap'}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
-                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
+                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.danger:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
-                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
-                  {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
+                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
+                  {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
@@ -32216,19 +32251,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     et on dit clairement ce que VRM fait et ne fait pas. Le lien
                     de commande est celui déjà utilisé par le bouton bordereau. */}
                 {st.retour && (
-                  <div style={{marginTop:7}}>
+                  <div className="vrm-buy-retour">
                     <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
-                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
                       ↩ Bordereau de retour sur Vinted
                     </a>
-                    <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : la paire doit repartir. Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
+                    <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>
+                      Litige : la paire doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
                     </div>
                   </div>
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toFixed(2).replace('.',',')}{' '}{cur(o.price?.currency_code)}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
@@ -32242,21 +32277,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // RIEN automatiquement (§5) : il la renumérote/rephotographie.
                 const arrive = st.step>=3 && !cancelled && !st.retour;
                 const prixPaye = montantCommande(o).toFixed(2).replace('.',',');
-                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit' };
+                const peutSuivre = !!(suivi && (st.step===2||st.step===3));
+                const peutCode = !!(st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)));
+                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:14,fontWeight:500,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
                 return (
-              <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,position:'relative'}}>
-                {note && <button className="vrm-icon-control" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={14}/></button>}
-                {suivi && (st.step===2||st.step===3) && (
-                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,color:C.blue||C.accent,textDecoration:'none'}}><Icon name="truck" size={15}/></a>
+              <div className="vrm-buy-act">
+                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{color:C.accent}}><Icon name="doc" size={15}/></button>}
+                {peutSuivre && (
+                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{color:C.muted}}><Icon name="truck" size={16}/></a>
                 )}
-                {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
-                  <button className="vrm-icon-control" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
+                {peutCode && (
+                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{color:C.warn}}><Icon name="key" size={16}/></button>
                 )}
-                <button className="vrm-icon-control" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${achatMenu===tid?C.accent:C.border}`,background:achatMenu===tid?`${C.accent}12`:'transparent',color:achatMenu===tid?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:17,lineHeight:1}}>⋯</button>
+                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
-                  <div role="menu" style={{position:'absolute',top:34,right:0,zIndex:41,minWidth:226,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow||'0 8px 24px rgba(0,0,0,.18)',overflow:'hidden',padding:'4px 0'}}>
+                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                    {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>Code de retrait</button>}
+                    {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>Suivre le colis</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye} € — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?'Reçu d\'achat (Vinted)':'Attestation d\'achat'}</button>
@@ -32272,6 +32311,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );})}
         </div>
+          </>); })()}
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
@@ -32281,7 +32321,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
           </button>
         )}
-      </>)}
+      </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
@@ -33109,7 +33149,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
-        <input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher une conversation…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{width:'100%',padding:'10px 12px',marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text}}/>
+        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -33186,15 +33226,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const jourCourt = (t)=> new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
           return (
             <div data-messagerie style={{marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+              {/* (16 oct.) UNE barre : le filtre en contrôle segmenté, le nombre
+                  (déjà dans « Toutes N ») lu par les lecteurs d'écran seulement,
+                  et l'actualisation en icône — plus deux rangées de commandes. */}
+              <div className="vrm-msg-bar">
+                <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
+                  <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
+                  <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                </div>
+                <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
-                <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
-              </div>
-              <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
-                <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
-                <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
@@ -33224,7 +33267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
-              <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
+              <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   const ro = !!prioMsg && uidC(c)!==prioMsg;
@@ -33236,39 +33279,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <React.Fragment key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id}>
                     {debutActif && (
-                      <div data-msg-groupe-actif={prioMsg} style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px 7px',fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted,background:C.bg,borderBottom:`1px solid ${C.border}`}}>
+                      <div className="vrm-msg-section" data-msg-groupe-actif={prioMsg} style={{color:C.muted,background:C.bg}}>
                         <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.accent,flexShrink:0}}/>
                         <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert dans Chrome</span>
                       </div>
                     )}
                     {debutRo && (
-                      <div data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{padding:'10px 12px 9px',background:C.bg,borderTop:i?`1px solid ${C.border}`:'none',borderBottom:`1px solid ${C.border}`}}>
-                        <div style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted}}>
-                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo}\u00a0non\u00a0lu${nonLusRo>1?'s':''}`:''}</span>
+                      <div className="vrm-msg-section vrm-msg-section-ro" data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{color:C.muted,background:C.bg}}>
+                        <div className="vrm-msg-section-t">
+                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo} non lu${nonLusRo>1?'s':''}`:''}</span>
                         </div>
-                        <div style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginTop:4}}>
-                          Chrome est connecté sur <b>{nomActif}</b> : VRM ne peut répondre et faire une offre qu'au nom de ce compte. Pour répondre à un autre, bascule Chrome sur ce compte (ouvre vinted.fr connecté dessus) — ses conversations remonteront ici.
+                        <div className="vrm-msg-section-p" style={{color:C.text}}>
+                          Chrome est sur <b>{nomActif}</b> : VRM ne répond qu'au nom de ce compte. Pour répondre aux autres, bascule Chrome sur leur compte.
                         </div>
                       </div>
                     )}
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i&&!debutRo)?`1px solid ${C.border}`:'none',background:'transparent',color:ro?C.muted:C.text,cursor:'pointer',fontFamily:'inherit',...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
-                      {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
-                      <span style={{flex:1,minWidth:0}}>
-                        <span style={{display:'flex',alignItems:'baseline',gap:6}}>
-                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><span className="vrm-sensible">{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span></span>
-                          {plusieurs && c._acc && <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>· {accName(c._acc)}</span>}
-                          <span style={{marginLeft:'auto',fontSize:11,color:C.muted,flexShrink:0}}>{quand(c.updated_at)}</span>
-                        </span>
-                        <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
+                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined} onClick={()=>openConversation(c)}
+                      style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
+                      <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
+                        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className="vrm-msg-ini vrm-sensible" style={{color:C.muted}}>{String(nom).trim().charAt(0).toUpperCase()||'·'}</span>}
                       </span>
-                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:ro?C.muted:C.accent,flexShrink:0}}/>}
+                      <span className="vrm-msg-body">
+                        <span className="vrm-msg-l1">
+                          <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
+                          {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
+                          <span className="vrm-msg-time" style={{color:c.unread&&!ro?C.accent:C.muted}}>{quand(c.updated_at)}</span>
+                        </span>
+                        <span className="vrm-msg-l2">
+                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{c.description||''}</span>
+                          {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
+                        </span>
+                      </span>
                     </button>
+                    ); })()}
                     </React.Fragment>
                   );
                 })}
               </div>
-              {tri.length>convMax && <button type="button" onClick={()=>setConvMax(m=>m+40)} style={{display:'block',margin:'8px auto 0',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'7px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
+              {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>setConvMax(m=>m+40)} style={{color:C.text}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
             </div>
           );
         })()}
