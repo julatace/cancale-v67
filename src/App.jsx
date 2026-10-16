@@ -31255,7 +31255,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
 
             {!premierJour && (()=>{
-              const lu=!baseKO && accountsReady && Array.isArray(listings.items);
+              const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
               const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
               return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
                 <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
@@ -31264,7 +31264,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
                   <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
                   <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
-                </> : <p>{baseKO?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
+                </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
+                {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
                 <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
               </section>;
             })()}
