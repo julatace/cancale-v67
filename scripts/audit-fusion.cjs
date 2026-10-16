@@ -97,6 +97,15 @@ const CAS = [
   //    moment — tous les chemins appris, effacés. *Un banc qui énumère à la main
   //    ne couvre que ce qu'on a pensé à écrire* (mot pour mot la leçon du
   //    17 septembre, refaite ici).
+  // 5.181 — l'état actif / banni de CHAQUE compte, évalué par l'extension :
+  //    une lecture ratée réécrivant la ligne avec le seul compte du moment
+  //    ferait oublier le « banni » des autres.
+  { id: 'panel_comptes_etat',
+    avant: { comptes: { '111': { etat: 'banni', at: new Date().toISOString(), preuve: 'champ profil is_account_banned' } } },
+    quoi: 'l\'état actif / banni des autres comptes',
+    geste: (c) => c.noterEtatCompte('222', { user: { id: 9, is_account_banned: false } }),
+    garde: (d) => d.comptes && d.comptes['111'] && d.comptes['111'].etat === 'banni' && d.comptes['222'] },
+
   { id: 'panel_label_urls',
     avant: { vus: { 'www.vinted.fr/api/v2/shipments/_id/label': { ok: true, vuAt: new Date().toISOString() } }, majAt: new Date().toISOString() },
     quoi: 'les chemins de bordereau déjà observés (la mesure qui accélère la capture)',
