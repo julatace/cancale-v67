@@ -1226,7 +1226,51 @@ function ConfirmHost() {
 // Indicateur de synchro (mis a jour par l'app)
 let _syncListeners = [];
 const onSyncChange = (fn) => { _syncListeners.push(fn); return () => { _syncListeners = _syncListeners.filter(f=>f!==fn); }; };
-const _emitSync = (status) => { _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}}); };
+// (16 oct., Julien : « pourquoi le nuage en haut est barré ? ») L'état de la
+// synchro porte maintenant SA RAISON et l'heure : le panneau du nuage les dit
+// en clair (« la base a répondu 503 », « pas de réseau ») au lieu d'une icône.
+let _syncInfo = { etat: 'attente', raison: '', at: null, okAt: null, reprise: null };
+const _emitSync = (status, raison) => {
+  const now = Date.now();
+  _syncInfo = { ..._syncInfo, etat: status, raison: status === 'error' || status === 'refus' ? (raison || _syncInfo.raison || '') : '', at: now, okAt: status === 'synced' ? now : _syncInfo.okAt };
+  _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}});
+};
+// Une sauvegarde ratée se RELANCE toute seule (5 s, 15 s, 1 min, puis toutes
+// les 2 min) : avant, le nuage restait barré jusqu'à la prochaine saisie, et
+// ce qu'il venait de taper n'arrivait jamais dans la base s'il ne touchait à
+// rien d'autre. Rien n'est perdu entre-temps : tout reste sur cet appareil.
+let _repriseN = 0, _repriseT = null;
+const planifierReprise = () => {
+  if (_repriseT) return;
+  const d = [5000, 15000, 60000][_repriseN] || 120000; _repriseN++;
+  _syncInfo = { ..._syncInfo, reprise: Date.now() + d };
+  _repriseT = setTimeout(() => { _repriseT = null; cloudPush(); }, d);
+};
+function PanneauSync({ onFermer, onReglages }) {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const off = onSyncChange(() => maj()); const t = setInterval(maj, 5000); const f = (e) => { if (!e.target.closest || !e.target.closest('[data-sync-panneau],.vrm-sync-status')) onFermer(); }; document.addEventListener('pointerdown', f); return () => { off(); clearInterval(t); document.removeEventListener('pointerdown', f); }; }, []);
+  const i = _syncInfo;
+  const h = (t) => t ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null;
+  const titre = i.etat === 'synced' ? 'Tout est sauvegardé' : i.etat === 'saving' ? 'Sauvegarde en cours…' : i.etat === 'loading' ? 'Chargement de tes réglages…' : i.etat === 'refus' ? 'Sauvegarde bloquée' : i.etat === 'error' ? 'Dernière sauvegarde pas partie' : 'En attente';
+  const sec = i.reprise ? Math.max(0, Math.round((i.reprise - Date.now()) / 1000)) : null;
+  return (
+    <div data-sync-panneau={i.etat} role="dialog" aria-label="Synchronisation" data-noswipe="1"
+      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(300px, calc(100vw - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '12px 14px', fontSize: 12.5, lineHeight: 1.5, textAlign: 'left' }}>
+      <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>{titre}</div>
+      {i.okAt && <div style={{ color: C.muted }}>Dernière sauvegarde réussie à {h(i.okAt)}.</div>}
+      {!i.okAt && i.etat !== 'synced' && <div style={{ color: C.muted }}>Aucune sauvegarde réussie depuis l’ouverture de l’app.</div>}
+      {(i.etat === 'error' || i.etat === 'refus') && <div data-sync-raison style={{ marginTop: 6 }}>Pourquoi : {i.raison || 'la base n’a pas répondu'}.</div>}
+      {i.etat === 'error' && <div style={{ color: C.muted, marginTop: 6 }}>Rien n’est perdu : tes changements restent sur cet appareil{sec != null ? ` — nouvel essai dans ${sec} s` : ''}.</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
+        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
+        <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réglages</button>
+      </div>
+    </div>
+  );
+}
+if (typeof window !== 'undefined') window.addEventListener('online', () => { if (_syncInfo.etat === 'error') { _repriseN = 0; setTimeout(() => reprendreSyncMaintenant(), 500); } });
+const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT); _repriseT = null; } cloudPush(); };
 
 // Signal « chargement initial du cloud terminé ». CRUCIAL pour la numérotation :
 // tant que le cloud n'est pas chargé, un composant ne doit PAS numéroter (sinon
@@ -1328,7 +1372,7 @@ const cloudPush = () => {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
       // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
-      if (Object.keys(payload).length === 0) { _emitSync('error'); _cloudTimer = null; return; }
+      if (Object.keys(payload).length === 0) { _emitSync('error', 'rien à sauvegarder sur cet appareil (réglages pas encore chargés)'); _cloudTimer = null; return; }
       // UPSERT et non PATCH : un PATCH ne modifie qu'une ligne existante, donc
       // un vendeur qui vient de créer son compte (pas encore de ligne) n'aurait
       // jamais rien de sauvegardé. L'upsert crée la ligne au premier envoi.
@@ -1345,16 +1389,17 @@ const cloudPush = () => {
           try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
           try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
           toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
-          _emitSync('error'); _cloudTimer = null;
+          _emitSync('error', 'lettre de numérotation refusée'); _cloudTimer = null;
           // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
           // sans la lettre (jamais en boucle).
           if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
           return;
         }
-        if (code) { _pushBloque = true; _emitSync('refus'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
-      }
-      _emitSync(res.ok ? 'synced' : 'error');
-    } catch (_) { _emitSync('error'); }
+        if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
+        _emitSync('error', res.status === 401 || res.status === 403 ? `la base a refusé l'envoi (${res.status}) — ta session a peut-être expiré` : res.status >= 500 ? `la base ne répond pas (${res.status})` : `la base a répondu ${res.status}`);
+        planifierReprise();
+      } else { _repriseN = 0; _emitSync('synced'); }
+    } catch (_) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : 'la base n’a pas répondu'); planifierReprise(); }
     _cloudTimer = null;
   }, 800);
 };
@@ -28423,7 +28468,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
   // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
   const [batchBusy, setBatchBusy] = useState(false);
-  const batchBordereaux = async () => {
+  // ── « TOUT IMPRIMER » PASSE PAR UN APERÇU (16 octobre) ─────────────────────
+  // Julien : « j'ai appuyé sur Tout imprimer, ça m'a donné des bordereaux
+  // d'anciennes ventes d'il y a un mois ». Le lot ne prend que les ventes que
+  // Vinted dit encore « à expédier » — mais cet état n'est relu que quand
+  // l'extension repasse sur le compte : une vente d'un compte pas relu depuis
+  // des semaines garde « à expédier » pour toujours. Or Vinted annule une vente
+  // non postée dans les jours qui suivent : une vente de plus de
+  // `VENTE_LOT_MAX_J` jours encore « à expédier », c'est presque toujours un
+  // état périmé. ⇒ Le bouton ouvre un APERÇU trié par date de vente (la plus
+  // récente en haut, tous comptes mêlés) : on voit date, compte, N°, titre.
+  // Les ventes anciennes et les bordereaux déjà imprimés sont DÉCOCHÉS avec la
+  // raison (jamais cachés) ; on imprime exactement ce qui est coché, et un
+  // échec se relance seul (« Réessayer les échecs »).
+  const VENTE_LOT_MAX_J = 14;
+  const [lot, setLot] = useState(null);   // null · { coches: Set(cle), echecs: [cle] }
+  const ageVenteJ = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? (Date.now() - t) / 864e5 : null; };
+  const lignesLot = () => expeditions()
+    .filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
+    .map(e => { const cle = e.txn || e.key; const age = ageVenteJ(e.o); const imprime = (e.txn && bordsPrinted[e.txn]) || (e.b && isBordPrinted(e.b) ? bordsPrinted[bordKey(e.b)] : null) || null;
+      return { cle, e, age, imprime, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
+    .sort((a, b) => (Date.parse(b.e.o && b.e.o.date) || 0) - (Date.parse(a.e.o && a.e.o.date) || 0));
+  const ouvrirLot = () => {
+    const L = lignesLot();
+    if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    setLot({ coches: new Set(L.filter(l => !l.ancienne && !l.imprime).map(l => l.cle)), echecs: [] });
+  };
+  const batchBordereaux = async (cles) => {
     if (batchBusy) return;
     // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
     // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
@@ -28441,8 +28512,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
     //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
     const ex = expeditions();
-    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
-    if (!aImprimer.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    const choisis = cles instanceof Set ? cles : null;
+    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
+      .filter(e => !choisis || choisis.has(e.txn || e.key));
+    if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    const echecs = [], faits = [];
     setBatchBusy(true);
     try {
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
@@ -28458,7 +28532,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
         if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
         const buf = lu && lu.octets ? lu.octets : null;
-        if (!buf) continue;   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+        if (!buf) { echecs.push(e.txn || e.key); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+        faits.push(e.txn || e.key);
         // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
         // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
         const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
@@ -28479,6 +28554,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // est écarté par la fusion, et il doit être compté ici aussi.
       const imprimes = Number(r && r.count) || 0;
       const illisibles = Math.max(0, items.length - imprimes);
+      // Les imprimés sont notés « ✓ Imprimé » (le prochain lot les décoche) ;
+      // quand la fusion a écarté un PDF illisible on ne sait pas lequel : rien
+      // n'est noté plutôt qu'un faux « imprimé ».
+      if (!illisibles && faits.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); faits.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      if (choisis) setLot(echecs.length || illisibles ? { coches: new Set(echecs), echecs } : null);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -28488,7 +28568,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     if(only!=='bordereaux' || !_pendingBordPrint || !Array.isArray(emailBords)) return;
     _pendingBordPrint=false;
-    const t=setTimeout(()=>{ try{ batchBordereaux(); }catch(_){} }, 400);
+    const t=setTimeout(()=>{ try{ ouvrirLot(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only]);
@@ -31959,13 +32039,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
-                  <button type="button" data-imprime="1" onClick={batchBordereaux} disabled={batchBusy}
+                  <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
                     style={{flexShrink:0,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
+                {lot && (()=>{
+                  const L = lignesLot();
+                  const nb = L.filter(l=>lot.coches.has(l.cle)).length;
+                  const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
+                  const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
+                  return (
+                    <div data-noswipe="1" data-lot={L.length} role="dialog" aria-modal="true" aria-label="Bordereaux à imprimer"
+                      onClick={e=>{ if(e.target===e.currentTarget) setLot(null); }}
+                      style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(10,15,25,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                      <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
+                        <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
+                          <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
+                          <div style={{fontSize:12,color:C.muted,marginTop:3}}>Le plus récent en haut. Seuls les cochés partent à l'impression, chacun sur sa feuille.</div>
+                        </div>
+                        <div style={{overflowY:'auto',padding:'4px 18px'}}>
+                          {L.map(l => {
+                            const o = l.e.o, coche = lot.coches.has(l.cle);
+                            const num = (l.e.b ? numForBord(l.e.b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+                            return (
+                              <label key={l.cle} data-lot-ligne={l.cle} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
+                                <input type="checkbox" checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/>
+                                <span style={{flex:1,minWidth:0}}>
+                                  <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{(o && o.title) || (l.e.b && (l.e.b.modele || l.e.b.article)) || 'Bordereau'}</span>
+                                  <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>
+                                    Vinted · {o && o._acc ? accNameOf(o._acc) : 'compte inconnu'} · vendue le {fmtD(o)}
+                                    {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
+                                    {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
+                                    {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
+                          <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
+                          <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
+                            style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
+                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
                   clique sur fait, ça sert à rien, tu peux enlever ». */}
@@ -38732,7 +38857,8 @@ function AppCoeur() {
   const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
-  const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
+  const [syncStatus,setSyncStatus]=useState('idle');
+  const [syncOuvert, setSyncOuvert] = useState(false); // idle | saving | synced | error | loading
   const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
@@ -39004,7 +39130,7 @@ function AppCoeur() {
       // au lieu de conclure « nuage vide ». Rien n'est poussé entre-temps.
       let cloud = await cloudLoad();
       for (let attente = 2000; cloud === undefined && !stop; attente = Math.min(attente * 2, 30000)) {
-        setSyncStatus('error');
+        _emitSync('error', 'tes réglages n’ont pas pu être lus dans la base — je réessaie');
         await new Promise(r => setTimeout(r, attente));
         if (!stop) cloud = await cloudLoad();
       }
@@ -40108,7 +40234,8 @@ function AppCoeur() {
           <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
-            <button type="button" className="vrm-sync-status" aria-label="Voir la synchronisation" onClick={()=>setTab('settings')} title={
+            <span style={{position:'relative',display:'inline-flex'}}>
+            <button type="button" className="vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
@@ -40126,6 +40253,8 @@ function AppCoeur() {
                   cloche, rouage — huit éléments. L'icône de nuage dit déjà si
                   c'est synchronisé ; l'heure exacte est dans Réglages. */}
             </button>
+            {syncOuvert && <PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/>}
+            </span>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
           <div style={{display:'flex',gap:6}}>
