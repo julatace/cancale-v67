@@ -7896,12 +7896,12 @@ function PlateformeLogo({ p, title }) {
   );
 }
 function BrandIcon({plateforme,size=24,style}) {
-  const source={vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg'}[plateforme];
+  const source={vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg',vestiaire:'/brands/vestiaire.svg'}[plateforme];
   if(!source)return null;
   return <img className="vrm-brand-icon" src={source} alt="" aria-hidden="true" width={size} height={size} style={{objectFit:'contain',flexShrink:0,...style}}/>;
 }
 function NavigationIcon({item,size=20,style}) {
-  const marque={plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay'}[item.id];
+  const marque={plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[item.id];
   return marque?<BrandIcon plateforme={marque} size={size+3} style={style}/>:<Icon name={item.icon} size={size} style={style}/>;
 }
 function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null,compact=false}) {
@@ -8656,7 +8656,7 @@ const BOTTOM_TABS=[
   {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
   {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
   {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire', autre:true},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire Collective', autre:true},   // le nom complet (Julien, 15 oct.)
   {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
 ];
 // ⚠️⚠️ 15 octobre — « quand je publie sur eBay et que j'appuie sur n'importe
@@ -17208,125 +17208,74 @@ function VestiaireMesure() {
   const vu = m && m.vuAt ? Date.parse(m.vuAt) : 0;
   const age = vu ? (() => { const h = Math.round((Date.now() - vu) / 3600000); return h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; })() : '';
   const style = { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
-  if (m === null) return <div data-vc-mesure="pas-su" style={style}>Je n'ai pas pu lire où en est la mesure de Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  if (m === null) return <div data-vc-mesure="pas-su" style={style}>Je n'ai pas pu lire où en est la mesure de Vestiaire Collective — rien n'est perdu, réessaie dans un moment.</div>;
   if (vu) return (
     <div data-vc-mesure="lu" style={style}>
-      <b style={{ color: C.text }}>VRM apprend à lire Vestiaire.</b> Dernier relevé {age} : {Number(m.nPages) || 0} page{Number(m.nPages) > 1 ? 's' : ''}, {Number(m.nChemins) || 0} appel{Number(m.nChemins) > 1 ? 's' : ''}, {Number(m.nSchemas) || 0} forme{Number(m.nSchemas) > 1 ? 's' : ''} de réponse relevés — la forme des pages, jamais leur contenu. Passe sur <b>tes ventes</b>, <b>tes articles</b> et <b>tes paiements</b> pour compléter la carte.
+      <b style={{ color: C.text }}>VRM apprend à lire Vestiaire Collective.</b> Dernier relevé {age} : {Number(m.nPages) || 0} page{Number(m.nPages) > 1 ? 's' : ''}, {Number(m.nChemins) || 0} appel{Number(m.nChemins) > 1 ? 's' : ''}, {Number(m.nSchemas) || 0} forme{Number(m.nSchemas) > 1 ? 's' : ''} de réponse relevés — la forme des pages, jamais leur contenu. Passe sur <b>tes ventes</b>, <b>tes articles</b> et <b>tes paiements</b> pour compléter la carte.
     </div>
   );
   return (
     <div data-vc-mesure="jamais" style={style}>
       {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Collective</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
-        : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
-        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui apprendra à lire Vestiaire quand tu y passes.</>}
+        : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire Collective, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
+        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui apprendra à lire Vestiaire Collective quand tu y passes.</>}
     </div>
   );
 }
 
-function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, comptes = [], onGo, onSub, baseKO }) {
-  const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
-  // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
-  // permet ; sinon (compat) elles naviguent vers l'écran séparé (onGo).
-  const aller = (section, tabId) => (onSub ? onSub(section) : (onGo && onGo(tabId)));
-  const estVinted = plat === 'Vinted';
-  const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
-  const online = liveStats && liveStats.online != null ? liveStats.online : null;
-  const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
-  // Argent Vinted : « disponible » et « en attente » sont DEUX montants qui ne
-  // se confondent jamais (§5.14). Consommés de liveStats (même source que Ma
-  // journée et Statistiques, §11) — jamais recalculés ici.
-  const wDispo   = liveStats && liveStats.walletDispo   != null ? liveStats.walletDispo   : null;
-  const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
-  const wComptes = (liveStats && liveStats.walletComptes) || 0;
-  const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
-  // Âge de la capture la plus ancienne : explique un colis déjà parti qui traîne.
-  const dAge     = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
-  const court = plat === 'Vestiaire Collective' ? 'Vestiaire' : plat;
-  const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
-  const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
-  const gros = {fontSize:24,fontWeight:700,color:C.text};
-  // ⚠️ TOUT L'ÉCRAN eBay AU LOOK eBay (Julien, 27 sept. : « je veux exactement le
-  // même visuel que dans eBay », « tout, rien ne va »). L'onglet eBay entier —
-  // fond noir, en-tête eBay, cartes eBay — pas seulement le sous-formulaire.
-  // Exception ASSUMÉE à §7, bornée à l'espace eBay, à la demande de l'owner.
-  // eBay et Leboncoin n'ont plus d'« Aperçu » (3 oct.) : résumé + sections,
-  // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
+// ── VESTIAIRE COLLECTIVE : LA MÊME MISE EN PAGE QUE LES AUTRES PLATEFORMES ──
+// Julien, 15 octobre : « l'onglet Vestiaire doit être marqué Vestiaire
+// Collective ; bientôt : préparer les achats, les ventes, etc. ; la mise en page
+// doit être exactement la même que Leboncoin, eBay, Vinted ». Donc : l'en-tête
+// (logo + nom complet), les sections (Ventes · Achats · Annonces · Compte), et
+// dans chaque section ce qui est VRAI aujourd'hui :
+//   · Ventes, Achats, Annonces : « Bientôt disponible » — rien n'y est capté
+//     (`vc_recon` ne relève que la FORME des pages, §« Vestiaire : mesurer la
+//     forme »), donc aucun chiffre, aucune liste, aucun bouton qui ferait
+//     semblant ;
+//   · Compte : ce qui MARCHE déjà — où en est la mesure (`VestiaireMesure`,
+//     trois états) et le geste qui la fait avancer.
+// ⚠️ La bande de chiffres des autres plateformes n'est PAS posée : elle ne
+//    pourrait rien afficher, jamais, tant que rien n'est capté (§7 : une carte
+//    qui ne peut rien afficher n'apprend rien). Elle viendra avec la première
+//    vente lue.
+// ⚠️ L'ancien écran (`Plateforme`, un hub « pas encore reliée » qui ne servait
+//    plus qu'à Vestiaire) est retiré : plus aucun appelant (§4.11).
+const VC_SECTIONS = [['ventes', 'Ventes'], ['achats', 'Achats'], ['annonces', 'Annonces'], ['compte', 'Compte']];
+const VC_BIENTOT = {
+  ventes: 'Tes ventes Vestiaire Collective arriveront ici dès que VRM saura les lire — jamais un chiffre inventé avant.',
+  achats: 'Tes achats Vestiaire Collective arriveront ici dès que VRM saura les lire.',
+  annonces: 'Tes annonces Vestiaire Collective arriveront ici dès que VRM saura les lire.',
+};
+function VestiaireCollective({ sub, setSub, baseKO }) {
+  const s = VC_SECTIONS.some(([k]) => k === sub) ? sub : 'ventes';
+  const nom = (VC_SECTIONS.find(([k]) => k === s) || [])[1];
   return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : `Ce que VRM sait de ${court}`}/>
-      {baseKO ? (
-        <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
-      ) : estVinted ? (<>
-        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
-        <Card style={{padding:18}}>
-          <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca==null?'aucune vente finalisée captée pour l’instant':'ventes finalisées, tous comptes'}</div>
-        </Card>
-        {wComptes>0 && (
-          <Card style={{padding:16}}>
-            <div style={{...eti,marginBottom:8}}>Argent Vinted</div>
-            <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
-              <div>
-                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text}}>{wDispo==null?'—':fmt(wDispo)}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:2}}>disponible à virer</div>
-              </div>
-              <div>
-                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>{wAttente==null?'—':fmt(wAttente)}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente (retenu par Vinted)</div>
-              </div>
+    <section className="vrm-market-space" aria-label="Vestiaire Collective">
+      <EntetePlateforme nom="Vestiaire Collective" plateforme="vestiaire"/>
+      <PlatSubNav sub={s} setSub={setSub} sections={VC_SECTIONS}/>
+      <div data-vc-section={s} style={{ padding: 16 }}>
+        {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
+          : s === 'compte' ? (
+            <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '14px 16px', boxShadow: C.shadow || 'none' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Vestiaire Collective dans VRM</div>
+              <VestiaireMesure/>
             </div>
-            <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5}}>
-              Lu sur {wComptes} porte-monnaie{wComptes>1?'s':''}. Ce sont les chiffres de Vinted, pas une estimation.{wAge!=null && wAge>7 ? ` Le plus ancien date de ${wAge} j — repasse sur ces comptes pour rafraîchir.` : ''}
+          ) : (
+            <div data-bientot={s} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '14px 16px', boxShadow: C.shadow || 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{nom}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', whiteSpace: 'nowrap' }}>Bientôt disponible</span>
+              </div>
+              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 6 }}>{VC_BIENTOT[s]}</div>
+              <button type="button" onClick={() => setSub('compte')}
+                style={{ marginTop: 10, border: 'none', background: 'transparent', padding: 0, color: C.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Où en est VRM →
+              </button>
             </div>
-          </Card>
-        )}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-          <button type="button" onClick={()=>aller('annonces','cat_annonces')} style={carte}>
-            <div style={eti}>Annonces en ligne</div>
-            <div className="vrm-display" style={gros}>{online==null?'—':online}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Voir toutes les annonces ›</div>
-          </button>
-          <button type="button" onClick={()=>aller('ventes','cat_ventes')} style={carte}>
-            <div style={eti}>Ventes finalisées</div>
-            <div className="vrm-display" style={gros}>{ventesVinted==null?'—':ventesVinted}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{enAttente==null?'Voir les ventes ›':`+ ${enAttente} en cours · voir les ventes ›`}</div>
-          </button>
-          <button type="button" onClick={()=>aller('achats','cat_achats')} style={carte}>
-            <div style={eti}>Achats</div>
-            <div className="vrm-display" style={{...gros,fontSize:18,color:C.muted}}>Voir ›</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes commandes et colis reçus</div>
-          </button>
-        </div>
-        <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
-          Les chiffres viennent du Tableau de bord et des écrans Ventes/Annonces — c'est la même source, ils ne peuvent pas se contredire.
-        </div>
-      </>) : (<>
-        {/* Chaque site a son espace avec SES infos (Julien : « chaque info par
-            site »). Le CA vient de `caParPlateforme` (§11) : pour Leboncoin il
-            porte les ventes PROUVÉES par référence VRM (jamais un titre, §5) —
-            on l'affiche vraiment, au lieu d'un « — » systématique. */}
-        <Card style={{padding:18}}>
-          <div style={{...eti,marginBottom:4}}>{court} · chiffre d'affaires</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
-        </Card>
-        <Card style={{padding:16}}>
-          <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
-            {plat==='Vestiaire Collective'
-              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/></>
-              : plat==='Leboncoin'
-              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à une paire — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
-              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes paires depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
-          </div>
-          {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
-            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
-              Ouvrir l'écran Annonces →
-            </button>
           )}
-        </Card>
-      </>)}
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -25279,6 +25228,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
+  // ── OÙ EST CHAQUE PAIRE (15 octobre) : les sources des logos de plateforme ──
+  // La règle est `presencesPaires` (§11). Lues seulement sur l'écran Annonces.
+  // Trois états chacune : `undefined` en cours · `null` pas su · objet lu.
+  // Leboncoin : les annonces captées (lecture PARTAGÉE avec le tableau de bord,
+  // une fois par session, `lbcAnnoncesSession`), ses ventes (5 Ko, projetées) et
+  // ses liens posés à la main ; eBay : les annonces de TOUS ses comptes (2 Ko).
+  const [presLbc, setPresLbc] = useState(undefined);
+  const [presEbay, setPresEbay] = useState(undefined);
+  const [liensLbcPres, setLiensLbcPres] = useState(() => load('vrm_lbc_liens', {}) || {});
+  useEffect(() => onCloudReady(() => setLiensLbcPres((m) => (m && Object.keys(m).length) ? m : (load('vrm_lbc_liens', {}) || {}))), []);
+  useEffect(() => {
+    if (only !== 'annonces') return undefined;
+    let stop = false;
+    (async () => {
+      const [items, ventes] = await Promise.all([
+        lbcAnnoncesSession(),
+        (async () => {
+          try {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+            if (!r.ok) return null;
+            const rows = await r.json();
+            if (!Array.isArray(rows)) return null;
+            return (rows[0] && rows[0].ventes && typeof rows[0].ventes === 'object') ? rows[0].ventes : {};
+          } catch (_) { return null; }
+        })(),
+      ]);
+      if (!stop) setPresLbc(items && ventes ? { items, ventes } : null);
+    })();
+    (async () => {
+      try {
+        const lu = await lireEbayTous('ebay_listings', 'items:data->items,cap:data->>capturedAt', 'items');
+        if (stop) return;
+        if (!lu) { setPresEbay(null); return; }
+        const caps = {};
+        for (const x of (lu.lignes || [])) if (x && x.ligne && x.compte) caps[x.compte.ref] = x.ligne.cap;
+        setPresEbay({ items: lu.items, illisibles: (lu.illisibles || []).map(nomCompteEbay), caps });
+      } catch (_) { if (!stop) setPresEbay(null); }
+    })();
+    return () => { stop = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only]);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
   // vente Leboncoin et vente Vinted sur l'app ». Captées par l'extension dans
   // `lbc_ventes` (chaque transaction, clé = id). ⚠️⚠️ §5 : une VENTE, c'est
@@ -25990,6 +25980,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
+  // Filtre par PLATEFORME (15 oct.) : '' tout · 'lbc' / 'ebay' aussi là-bas
+  // (prouvé) · 'demandee' Leboncoin demandée, pas encore vue · 'seul' Vinted seul.
+  const [annPlat, setAnnPlat] = useVueSession('annonces-plateforme', '');
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // Répartiteur de lot : ventile le prix d'un achat groupé sur plusieurs paires.
   const [lotOpen, setLotOpen] = useState(false);
@@ -27779,6 +27772,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const annAConfirmer = useMemo(() => (listings.aConfirmer || []).filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.aConfirmer, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  // Où est chaque paire en ligne (15 oct.) — la règle `presencesPaires` (§11),
+  // sur la MÊME base que la grille. Posée AVANT `annShown` et `annStats`, qui
+  // la lisent (§4.6).
+  const presences = useMemo(() => presencesPaires({
+    annonces: annBase, numeros,
+    lbc: presLbc === undefined ? undefined : (presLbc ? { ...presLbc, liens: liensLbcPres } : null),
+    ebay: presEbay, demandesLbc: lbcPosted,
+    nomCompte: (it) => (it && it._acc ? accNameOf(it._acc) : ''),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [annBase, numeros, presLbc, presEbay, liensLbcPres, lbcPosted]);
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
   // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
@@ -27831,6 +27834,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         || (it.brand||'').toLowerCase().includes(q)
         || num.toLowerCase()===q || num.toLowerCase().includes(q);
     });
+    // Par plateforme : la présence PROUVÉE (`presencesPaires`), jamais la file.
+    if (annPlat) arr = arr.filter(it => {
+      const ail = presencesAilleurs(presences, it.id);
+      if (annPlat === 'seul') return ail.length === 0;
+      if (annPlat === 'demandee') return (presences.par.get(String(it.id)) || []).some(x => x.p === 'lbc' && x.etat === 'demandee');
+      return ail.some(x => x.p === annPlat);
+    });
     const price = it => (it.price!=null ? Number(it.price) : 0);
     // Timestamp d'ajout : date de mise en ligne Vinted (createdTs) sinon date de
     // numérotation. Sert au tri « du plus ancien au plus récent ».
@@ -27879,7 +27889,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
+  }, [annBase, annSearch, annSort, annPlat, presences, numeros, compteSel, compteConnecte, selEff]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -28151,10 +28161,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // en annonce (`photoCount`/nPhotos) ET une description. C'est la mesure que
     // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
-    let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
+    let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0, aussiEbay=0, vintedSeul=0, lbcDemandee=0;
     for (const it of arr) {
       if (it.promoted === true) boostees++;
-      if (lbcPosted.has(String(it.id))) aussiLbc++;
+      // Aussi ailleurs : la présence PROUVÉE (`presencesPaires`, §11) — la même
+      // que les logos de la carte et le filtre par plateforme.
+      const ail = presencesAilleurs(presences, it.id);
+      if (ail.some(x => x.p === 'lbc')) aussiLbc++;
+      if (ail.some(x => x.p === 'ebay')) aussiEbay++;
+      if (!ail.length) vintedSeul++;
+      if ((presences.par.get(String(it.id)) || []).some(x => x.p === 'lbc' && x.etat === 'demandee')) lbcDemandee++;
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
@@ -28171,9 +28187,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
       }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
+    // « Vinted seul » ne se dit que si Leboncoin ET eBay ont été lus en entier :
+    // sinon c'est « pas su », pas « seulement Vinted » (§5).
+    const toutLu = presences.lbc === 'lu' && presences.ebay === 'lu' && !presences.ebayIllisibles.length;
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc, aussiEbay, vintedSeul: toutLu ? vintedSeul : null, lbcDemandee };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, listingDates, lbcPosted]);
+  }, [annBase, numeros, listingDates, presences]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
@@ -34016,14 +34035,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>}
 
         {listings.items?.length>0 && <div className="vrm-stock-views" role="group" aria-label="Vues rapides des annonces">
-          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
+          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()&&!annPlat} onClick={()=>{setAnnSort('oldest');setAnnSearch('');setAnnPlat('');}}>Tout le stock</button>
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+          {/* ── PAR PLATEFORME (15 oct.) : un filtre n'existe que s'il trouve
+              quelque chose (aucun faux bouton). Le logo dit la plateforme, le
+              nombre ce qu'il montrera — la présence PROUVÉE, jamais la file. */}
+          {[['lbc','leboncoin','Leboncoin',annStats.aussiLbc],['ebay','ebay','eBay',annStats.aussiEbay]].filter(([,,,n])=>n>0).map(([k,marque,nom,n])=>(
+            <button key={k} type="button" data-filtre-plateforme={k} aria-pressed={annPlat===k} onClick={()=>setAnnPlat(v=>v===k?'':k)} title={`Les paires aussi en ligne sur ${nom}`}
+              style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme={marque} size={13} style={k==='ebay'?LOGO_EBAY_LARGE(26):undefined}/>{nom} · {n}</button>
+          ))}
+          {annStats.lbcDemandee>0 && <button type="button" data-filtre-plateforme="demandee" aria-pressed={annPlat==='demandee'} onClick={()=>setAnnPlat(v=>v==='demandee'?'':'demandee')} title="Publication demandée sur Leboncoin, pas encore vue en ligne" style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme="leboncoin" size={13} style={{opacity:.45}}/>À vérifier · {annStats.lbcDemandee}</button>}
+          {annStats.vintedSeul!=null && annStats.vintedSeul>0 && annStats.vintedSeul<annStats.n && <button type="button" data-filtre-plateforme="seul" aria-pressed={annPlat==='seul'} onClick={()=>setAnnPlat(v=>v==='seul'?'':'seul')} title="Les paires en ligne sur Vinted seulement" style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme="vinted" size={13}/>Seulement Vinted · {annStats.vintedSeul}</button>}
         </div>}
-        {(annSearch.trim() || annSort!=='oldest') && <div className="vrm-filter-recap" role="status">
+        {(annSearch.trim() || annSort!=='oldest' || annPlat) && <div className="vrm-filter-recap" role="status">
           <span>{annShown.length} annonce{annShown.length>1?'s':''} dans cette sélection</span>
-          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
+          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');setAnnPlat('');}}>Réinitialiser les annonces</button>
         </div>}
+        {/* Une source pas lue se dit UNE fois (§7) : ses logos manquent, ils ne
+            sont pas absents. Rien quand tout est lu. */}
+        {listings.items?.length>0 && (()=>{
+          const manque = [presences.lbc==='passu'?'Leboncoin':null, presences.ebay==='passu'?'eBay':null].filter(Boolean);
+          const ill = presences.ebayIllisibles || [];
+          if (!manque.length && !ill.length) return null;
+          return <div data-plateformes-passu style={{fontSize:11.5,color:C.muted,margin:'-2px 0 10px',lineHeight:1.45}}>
+            {manque.length>0 && <>Je n'ai pas pu lire tes annonces {manque.join(' et ')} : {manque.length>1?'leurs':'ses'} logos peuvent manquer sur les cartes. </>}
+            {ill.length>0 && <>Compte eBay {ill.join(', ')} pas lu : ses logos peuvent manquer.</>}
+          </div>;
+        })()}
 
         </div>
         {/* ⚠️ On DIT ce que le filtre « compte banni » a mis de côté (§ : une
@@ -34203,6 +34242,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div data-ann-resume style={{fontSize:12.5,color:C.muted,marginBottom:8,lineHeight:1.5}}>
             <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
             {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
+            {annStats.aussiEbay>0?` · ${annStats.aussiEbay} aussi sur eBay`:''}
             {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
             {` · ${annStats.val.toFixed(0)} € de valeur`}
             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
@@ -34404,7 +34444,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const {it,price,sugg,why,atFloor} = rp;
                     const num = numeros[it.id]?.numero;
                     const eb = baisseEbayDe(rp);
-                    const surLbcAussi = lbcPosted.has(String(it.id));
+                    // « Aussi sur Leboncoin » : la présence PROUVÉE (`presencesPaires`, §11).
+                    const surLbcAussi = presencesAilleurs(presences, it.id).some(x => x.p === 'lbc');
                     return (
                       <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
                       <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
@@ -34629,7 +34670,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const boost = feesOf(e);
             const boostInconnu = it.promoted===true && (e.fees==null || String(e.fees).trim()==='');
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
-            const ailleurs = lbcPosted.has(String(it.id));
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
@@ -34651,8 +34691,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
-                    {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
-                    {ailleurs && <div data-aussi-sur style={{fontSize:11,color:C.text}}>Aussi sur <b>Leboncoin</b></div>}
+                    {/* ── OÙ ELLE EST EN LIGNE (15 oct.) — « mets un petit logo à côté ».
+                        Un logo par plateforme où la paire est PROUVÉE en ligne
+                        (`presencesPaires`) ; une publication seulement DEMANDÉE n'a
+                        pas de logo, elle se dit en mots. Le compte n'est écrit que
+                        s'il distingue (plusieurs comptes sur cette plateforme, §7). */}
+                    {(() => {
+                      const pres = presences.par.get(String(it.id)) || [];
+                      const enL = pres.filter(x => x.etat === 'en_ligne');
+                      const dem = pres.some(x => x.p === 'lbc' && x.etat === 'demandee');
+                      const vus = PLATEFORMES_PRESENCE.filter(pl => enL.some(x => x.p === pl.cle));
+                      return (
+                        <div data-plateformes={vus.map(pl => pl.cle).join(' ')} style={{display:'flex',alignItems:'center',gap:'2px 10px',flexWrap:'wrap',fontSize:11,color:C.muted,minWidth:0,marginTop:1}}>
+                          {vus.map(pl => {
+                            const l = enL.filter(x => x.p === pl.cle);
+                            const t = l.map(x => [pl.nom, x.compte, 'en ligne', ilYaVu(x.vu)].filter(Boolean).join(' · ')).join(' — ');
+                            const nom = pl.cle === 'vinted' ? (!annUnCompte ? l[0].compte : '') : ((presences.comptes[pl.cle] || 0) > 1 ? l.map(x => x.compte).filter(Boolean).join(', ') : '');
+                            // Le logo OUVRE l'annonce sur sa plateforme quand on en a
+                            // le lien (un geste direct, sans passer par « Gérer »).
+                            const url = l.length === 1 ? l[0].url : '';
+                            const corps = (<>
+                                <BrandIcon plateforme={pl.marque} size={14} style={{opacity:.85,...(pl.cle==='ebay'?LOGO_EBAY_LARGE(30):null)}}/>
+                                {nom ? <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</span> : null}
+                            </>);
+                            const st = {display:'inline-flex',alignItems:'center',gap:4,minWidth:0,maxWidth:160,color:'inherit',textDecoration:'none'};
+                            return url
+                              ? <a key={pl.cle} data-plateforme={pl.cle} href={url} target="_blank" rel="noreferrer" aria-label={`${t} — ouvrir l'annonce`} title={t} style={st}>{corps}</a>
+                              : <span key={pl.cle} data-plateforme={pl.cle} role="img" aria-label={t} title={t} style={st}>{corps}</span>;
+                          })}
+                          {dem && <span data-lbc-demandee title="Publication demandée sur Leboncoin, pas encore vue en ligne : ouvre « Mes annonces » sur leboncoin.fr avec l'extension pour la confirmer.">Leboncoin à vérifier</span>}
+                        </div>
+                      );
+                    })()}
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
                       <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
@@ -34674,7 +34744,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/>{it.views}</span>}
                       {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/>{it.favourites}</span>}
                       {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
-                      {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>{accNameOf(it._acc)}</span>}
                     </div>
                   </div>
                 </div>
@@ -34686,6 +34755,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <details className="vrm-ann-actions" style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
                       <summary aria-label={`Gérer ${it.title || 'cette annonce'}`} style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}><Icon name="gear" size={15}/> Gérer l’annonce <span className="vrm-action-chevron" aria-hidden="true">⌄</span></summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
+                        {/* ── OÙ ELLE EST : le statut de publication par plateforme ET
+                            par compte (15 oct.). Une ligne par plateforme ; ce qui
+                            n'est pas su se dit « pas pu lire », jamais « absente ». */}
+                        <div data-fiche-plateformes="" style={{display:'flex',flexDirection:'column',gap:3,fontSize:11.5}}>
+                          {PLATEFORMES_PRESENCE.map(pl => {
+                            const pres = (presences.par.get(String(it.id)) || []).filter(x => x.p === pl.cle);
+                            const enL = pres.filter(x => x.etat === 'en_ligne');
+                            const src = pl.cle === 'lbc' ? presences.lbc : pl.cle === 'ebay' ? presences.ebay : 'lu';
+                            const vieux = (v) => { const t = typeof v === 'number' ? v : Date.parse(String(v || '')); return Number.isFinite(t) && t > 0 && Date.now() - t > 48 * 3600000; };
+                            let etat, statut;
+                            if (enL.length) { etat = 'en_ligne'; statut = enL.map((x, i) => (
+                              <span key={i}>{i > 0 ? ' · ' : ''}en ligne{x.compte ? <> · <b style={{color:C.text,fontWeight:600}}>{x.compte}</b></> : null}{vieux(x.vu) ? ` · ${ilYaVu(x.vu)}` : ''}{x.url ? <> · <a href={x.url} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>voir ↗</a></> : null}</span>
+                            )); }
+                            else if (pres.some(x => x.etat === 'demandee')) { etat = 'demandee'; statut = 'demandée, pas encore vue en ligne'; }
+                            else if (presences.idsAmbigus.has(String(it.id))) { etat = 'ambigu'; statut = 'pas jugé : ce N° est porté par plusieurs fiches'; }
+                            else if (src === 'encours') { etat = 'encours'; statut = 'lecture…'; }
+                            else if (src === 'passu') { etat = 'passu'; statut = 'pas pu lire'; }
+                            else { etat = 'aucune'; statut = num ? 'aucune annonce reliée' : 'il lui faut un N° pour la reconnaître'; }
+                            return (
+                              <div key={pl.cle} data-fiche-plateforme={pl.cle} data-etat={etat} style={{display:'flex',alignItems:'center',gap:6,color:C.muted,minWidth:0}}>
+                                <span style={{width:28,flexShrink:0,display:'inline-flex',justifyContent:'center'}}><BrandIcon plateforme={pl.marque} size={13} style={{opacity:enL.length?.85:.35,...(pl.cle==='ebay'?LOGO_EBAY_LARGE(28):null)}}/></span>
+                                <span style={{width:66,flexShrink:0,color:C.text}}>{pl.nom}</span>
+                                <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{statut}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
                               automatique des offres (5 octobre, à sa demande) : il ne servait
@@ -37955,6 +38051,126 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   return { aRetirerEbay, aRetirerVinted, nonReliees, aAnnulerEbay };
 }
+
+// ── OÙ EST CHAQUE PAIRE EN LIGNE : LES PLATEFORMES PROUVÉES (15 octobre) ─────
+// Julien : « on ne sait pas sur quelle plateforme est postée chaque annonce :
+// mets un petit logo à côté ». UNE règle (§11) pour la carte, le filtre par
+// plateforme, la ligne de chiffres, la fiche « Où elle est » et la baisse de
+// prix des paires qui dorment. Un logo n'est posé QUE sur une présence PROUVÉE
+// par une identité (§5), jamais par le titre :
+//   · Vinted : la carte EST l'annonce Vinted en ligne (son compte) ;
+//   · Leboncoin : une annonce captée À LUI (`annonceLbcALui`), « active », pas
+//     vendue là-bas, dont une clé (`clesAnnonceLbc` : lien posé à la main,
+//     référence VRM, « nXXX ») est le N° de CETTE paire ;
+//   · eBay : une annonce en vente dont le SKU `VRM-{n°}` (`numEbayLu`, remise à
+//     zéro comprise) est le N° de cette paire ;
+//   · Vestiaire Collective : rien n'y est capté (mesure de forme seulement) —
+//     aucun logo tant qu'aucune annonce n'est lue.
+// ⚠️ « Demandée » n'est PAS « publiée » : `vinted_lbc_posted` est écrit juste
+//    après le clic « Publier » (revue du 15 octobre), sans preuve que Leboncoin
+//    l'a acceptée. Il donne l'état `demandee`, JAMAIS un logo.
+// ⚠️ Un N° porté par plusieurs fiches ne désigne personne (mieux vaut un blanc
+//    qu'un faux, comme la baisse eBay) : aucune présence ailleurs n'est
+//    attribuée, et c'est compté (`ambigus`).
+// Trois états par source, jamais deux : `undefined` en cours · `null` pas su ·
+// objet lu. « Pas su » n'invente aucun logo et n'en efface aucun prouvé ailleurs.
+const PLATEFORMES_PRESENCE = [
+  { cle: 'vinted', nom: 'Vinted', marque: 'vinted' },
+  { cle: 'lbc', nom: 'Leboncoin', marque: 'leboncoin' },
+  { cle: 'ebay', nom: 'eBay', marque: 'ebay' },
+];
+function presencesPaires({ annonces, numeros, lbc, ebay, demandesLbc, nomCompte, maintenant }) {
+  const now = maintenant != null ? maintenant : Date.now();
+  const par = new Map();
+  const ajoute = (id, x) => {
+    const k = String(id);
+    if (!par.has(k)) par.set(k, []);
+    const l = par.get(k);
+    if (!l.some((y) => y.p === x.p && y.id === x.id && y.etat === x.etat)) l.push(x);
+  };
+  // N° → les fiches qui le portent (toutes : vendues et anciennes comprises).
+  const parNum = new Map();
+  for (const id in (numeros || {})) {
+    const k = cleNum((numeros[id] || {}).numero);
+    if (!k) continue;
+    if (!parNum.has(k)) parNum.set(k, []);
+    parNum.get(k).push(String(id));
+  }
+  const enLigne = new Set((annonces || []).filter(Boolean).map((it) => String(it.id)));
+  const ambigus = new Set();
+  const cible = (k) => {
+    const ids = parNum.get(k) || [];
+    if (ids.length > 1) { if (ids.some((i) => enLigne.has(i))) ambigus.add(k); return null; }
+    return ids.length === 1 && enLigne.has(ids[0]) ? ids[0] : null;
+  };
+  for (const it of (annonces || [])) {
+    if (!it || it.id == null) continue;
+    ajoute(it.id, { p: 'vinted', etat: 'en_ligne', compte: nomCompte ? String(nomCompte(it) || '') : '', id: String(it.id), url: String(it.url || '') });
+  }
+  const etatLbc = lbc === undefined ? 'encours' : (lbc && lbc.items && typeof lbc.items === 'object' && lbc.ventes && typeof lbc.ventes === 'object') ? 'lu' : 'passu';
+  if (etatLbc === 'lu') {
+    const prouves = comptesLbcProuves(lbc.ventes, lbc.items);
+    const vendusLbc = new Set();
+    for (const v of Object.values(lbc.ventes)) if (v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v)) vendusLbc.add(String(v.itemId));
+    for (const ad of Object.values(lbc.items)) {
+      if (!ad || ad.id == null || !annonceLbcALui(ad, prouves)) continue;
+      if (String(ad.status || '').toLowerCase() !== 'active' || vendusLbc.has(String(ad.id))) continue;
+      const vus = new Set();
+      for (const k of clesAnnonceLbc(ad, lbc.liens || {})) {
+        const id = cible(k);
+        if (!id || vus.has(id)) continue;
+        vus.add(id);
+        ajoute(id, { p: 'lbc', etat: 'en_ligne', compte: String(ad.accountName || ad.lbcUserName || ''), id: String(ad.id),
+          url: /^https:\/\/(www\.)?leboncoin\.fr\//.test(String(ad.url || '')) ? String(ad.url) : '', vu: ad.seenAt || null });
+      }
+    }
+  }
+  if (demandesLbc && typeof demandesLbc.has === 'function') for (const it of (annonces || [])) {
+    if (!it || it.id == null || !demandesLbc.has(String(it.id))) continue;
+    if ((par.get(String(it.id)) || []).some((x) => x.p === 'lbc' && x.etat === 'en_ligne')) continue;
+    ajoute(it.id, { p: 'lbc', etat: 'demandee', compte: '', id: '', url: '' });
+  }
+  const etatEbay = ebay === undefined ? 'encours' : (ebay && Array.isArray(ebay.items)) ? 'lu' : 'passu';
+  const ebayIllisibles = etatEbay === 'lu' && Array.isArray(ebay.illisibles) ? ebay.illisibles.map(String) : [];
+  if (etatEbay === 'lu') for (const a of ebay.items) {
+    if (!a || !a.itemId) continue;
+    // Plus rien à vendre, ou terminée : elle n'est plus en ligne.
+    if (/^\d+$/.test(String(a.qty == null ? '' : a.qty)) && Number(a.qty) === 0) continue;
+    const fin = Date.parse(a.fin || '');
+    if (Number.isFinite(fin) && fin < now) continue;
+    const n = numEbayLu(a.sku, a.itemId);
+    if (!n) continue;                                  // sans SKU de paire : rien n'est rapproché (§5)
+    const id = cible(n);
+    if (!id) continue;
+    const cap = ebay.caps && a._compte != null ? ebay.caps[a._compte] : null;
+    ajoute(id, { p: 'ebay', etat: 'en_ligne', compte: String(a._pseudo || ''), id: String(a.itemId),
+      url: /^https:\/\/(www\.)?ebay\.[a-z.]+\//.test(String(a.url || '')) ? String(a.url) : `https://www.ebay.fr/itm/${encodeURIComponent(String(a.itemId))}`,
+      vu: cap != null && cap !== '' ? (Number.isFinite(Number(cap)) ? Number(cap) : cap) : null });
+  }
+  const ordre = PLATEFORMES_PRESENCE.map((x) => x.cle);
+  for (const l of par.values()) l.sort((a, b) => ordre.indexOf(a.p) - ordre.indexOf(b.p));
+  // Combien de comptes portent ses annonces ailleurs : un seul ⇒ le nommer sur
+  // chaque carte ne distingue rien (§7).
+  const comptes = { lbc: new Set(), ebay: new Set() };
+  for (const l of par.values()) for (const x of l) if (x.etat === 'en_ligne' && comptes[x.p] && x.compte) comptes[x.p].add(x.compte);
+  const idsAmbigus = new Set();
+  for (const k of ambigus) for (const i of (parNum.get(k) || [])) if (enLigne.has(i)) idsAmbigus.add(i);
+  return { par, lbc: etatLbc, ebay: etatEbay, ebayIllisibles, ambigus: ambigus.size, idsAmbigus, comptes: { lbc: comptes.lbc.size, ebay: comptes.ebay.size } };
+}
+// Le logo eBay est un MOT dans un carré de 24 : à 14 px il ne fait que 5 px de
+// haut. Une boîte plus large, l'image recadrée sur son milieu (rien n'est
+// déformé, seul le vide au-dessus et au-dessous est coupé).
+const LOGO_EBAY_LARGE = (w) => ({ width: w, objectFit: 'cover', objectPosition: 'center' });
+// Ce que la carte et le filtre lisent : les présences EN LIGNE d'une annonce,
+// hors Vinted (« aussi sur… »).
+const presencesAilleurs = (pres, id) => ((pres && pres.par && pres.par.get(String(id))) || []).filter((x) => x.etat === 'en_ligne' && x.p !== 'vinted');
+// « vue il y a 3 j » d'une date (ISO ou millisecondes), rien si inconnue.
+const ilYaVu = (v) => {
+  const t = typeof v === 'number' ? v : Date.parse(String(v || ''));
+  if (!Number.isFinite(t) || t <= 0) return '';
+  const h = (Date.now() - t) / 3600000;
+  return h < 1 ? "vue il y a moins d'une heure" : h < 48 ? `vue il y a ${Math.max(1, Math.round(h))} h` : `vue il y a ${Math.round(h / 24)} j`;
+};
 
 function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
   const [num, setNum] = useState('');
@@ -43938,7 +44154,7 @@ function AppCoeur() {
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<VestiaireCollective sub={platSub} setSub={setPlatSub} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO} fenetre={pqmFenetre} setFenetre={setPqmFenetre}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{

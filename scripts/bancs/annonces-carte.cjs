@@ -11,7 +11,8 @@
 //     LIBELLÉS, et un achat inconnu s'écrit « — » ;
 //   · « Boostée » quand Vinted le dit (`promoted:true`) — et RIEN quand il ne
 //     le dit pas (`promoted` absent ≠ « non boostée ») ;
-//   · « Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée ;
+//   · un logo de plateforme seulement pour une présence PROUVÉE (eBay par SKU) ;
+//     une publication Leboncoin seulement demandée se dit « à vérifier » ;
 //   · le sommeil n'est dit qu'UNE fois par carte ;
 //   · la pastille de préparation suit la DONNÉE (6/6 photos + description ⇒
 //     « prête », 2/6 ⇒ « 2/6 ») ;
@@ -123,7 +124,7 @@ const projette = (row, sel) => {
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});}
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
       const c = await pg.evaluate(() => {
-        const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: el.outerHTML, boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
+        const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: el.outerHTML, boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), plats: ((el.querySelector('[data-plateformes]') || { getAttribute: () => '' }).getAttribute('data-plateformes') || ''), demandee: !!el.querySelector('[data-lbc-demandee]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
           ...(() => {
             // La carte des places se trouve par son attribut `data-places`
@@ -153,7 +154,12 @@ const projette = (row, sel) => {
       dit(/achat\s*25,00/.test(c.a.t) && /boost\s*1,95/.test(c.a.t) && /marge\s*\+22/.test(c.a.t), 'achat, boost et marge sont LIBELLÉS (49 − 25 − 1,95 ≈ +22)', (c.a.t.match(/achat[^\n]*/) || [''])[0]);
       dit(/achat\s*—/.test(c.b.t) && !/achat\s*0,00/.test(c.b.t), 'achat inconnu ⇒ « — », jamais 0');
       dit(c.a.boost && !c.b.boost, '« Boostée » quand Vinted le dit, et rien quand il ne dit rien');
-      dit(c.b.aussi && !c.a.aussi, '« Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée');
+      // 15 oct. : `vinted_lbc_posted` est écrit au CLIC « Publier » — une publication
+      // DEMANDÉE, pas prouvée. Plus de « Aussi sur Leboncoin » déduit de lui : la
+      // 9102 dit « Leboncoin à vérifier », sans logo ; la 9101 porte le logo eBay
+      // (SKU VRM-41, une identité). Le détail vit dans `annonces-plateformes.cjs`.
+      dit(!c.a.aussi && !c.b.aussi && !/lbc/.test(c.b.plats) && c.b.demandee && /ebay/.test(c.a.plats) && !c.a.demandee,
+        'présence ailleurs : logo seulement si PROUVÉE (eBay par SKU), une publication Leboncoin seulement demandée se dit « à vérifier »', `9101:${c.a.plats} 9102:${c.b.plats}${c.b.demandee ? ' (à vérifier)' : ''}`);
       dit((c.a.t.match(/dort/g) || []).length === 1 && !/😴/.test(c.a.t), 'le sommeil n\'est dit qu\'UNE fois sur la carte', (c.a.t.match(/[^\n]*dort[^\n]*/g) || []).join(' | '));
       dit(/prête/.test(c.a.prepa) && /2\/6/.test(c.b.prepa), 'la préparation suit la DONNÉE (6/6 ⇒ prête, 2/6 ⇒ « 2/6 »)', `« ${c.a.prepa} » / « ${c.b.prepa} »`);
       dit(!/Vendue — bordereau/.test(c.c.t), 'et sa jumelle au même titre n\'est PAS marquée vendue');
