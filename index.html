@@ -377,7 +377,12 @@
     button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
     /* Respect du réglage système « réduire les animations ». */
     @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
-  </style>
+      /* (16 oct.) MODE STREAM : les données sensibles sont floutées, et le
+       survol ne les révèle pas (on filme l'écran). */
+    [data-stream="1"] .vrm-sensible,
+    [data-stream="1"] input[type="email"],
+    [data-stream="1"] input[type="tel"] { filter: blur(6px) !important; user-select: none; }
+</style>
 </head>
 <body><div id="root"></div>
 <!-- Densité d'affichage (Réglages → Affichage). Appliquée AVANT le chargement
