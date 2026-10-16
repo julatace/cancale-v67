@@ -18945,7 +18945,9 @@ function LocalPhoto({ locate, onLocateConsumed }) {
 // ranger tes N° dans ses tiroirs/rayons (empilables). La recherche te montre le
 // meuble + la case. Rangé dans une ligne Supabase dédiée (vrm_room).
 const loadRoomPlan = async () => {
-  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
+  // Trois états : l'objet lu · null (aucune ligne) · undefined (la base n'a
+  // pas répondu — « pas su », l'assistant de rangement ne propose rien).
+  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return undefined; const rows = await res.json(); if (!Array.isArray(rows)) return undefined; return rows[0]?.data || null; } catch (_) { return undefined; }
 };
 // ⚠️ Le garage porte la VERSION de la numérotation (migration 013) : la base
 //    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
@@ -19056,8 +19058,120 @@ function normalizePlan(p) {
   return { rooms: [only], active: only.id };
 }
 
-function RoomPlan({ locate, onLocateConsumed }) {
+// ── L'ASSISTANT DE RANGEMENT (vue 2D) — règles pures ───────────────────────
+// Julien : un assistant qui l'aide à RANGER (quelle paire dans quelle case),
+// avec une vue 2D simple. Il lit le MÊME plan que la 3D (`vrm_room`) et la
+// MÊME liste des paires présentes (`numsPresents`, publiée par Annonces, §11).
+// ⚠️ Il ne touche JAMAIS un numéro : il écrit un N° existant dans une case
+//    vide, ou retire d'une case le N° d'une paire qui n'est plus là.
+// Un meuble « à cases » : un rangement (pas un décor), ni pile ni boîte seule
+// (eux portent leur numéro sur le carton, ils n'ont pas de case libre).
+const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
+const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
+const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+// GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
+// trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
+// (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
+const graviteCases = (slots, nr, nc) => {
+  const out = {};
+  for (let c = 0; c < nc; c++) {
+    const pleins = [];
+    for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
+    let r = nr - 1;
+    for (let i = pleins.length - 1; i >= 0 && r >= 0; i--) { out[r + '_' + c] = pleins[i]; r--; }
+  }
+  return out;
+};
+// Les meubles à cases du plan, dans l'ordre LISIBLE : pièce, puis meuble (ordre
+// de pose), puis colonne de gauche à droite, chaque colonne du bas vers le haut.
+const meublesDuPlan = (plan) => {
+  const out = [];
+  ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
+    if (!meubleACases(it)) return;
+    const { nr, nc } = dimsMeuble(it);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, vue: graviteCases(it.slots, nr, nc) });
+  }));
+  return out;
+};
+// La position d'une case dite en français (la 3D écrit la même chose).
+const nomCase = (nr, key) => { const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r; return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`; };
+// La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
+// en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
+const premiereCaseLibre = (plan) => {
+  for (const m of meublesDuPlan(plan)) {
+    for (let c = 0; c < m.nc; c++) {
+      let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
+      if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
+    }
+  }
+  return null;
+};
+// Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
+const ouEstNumero = (plan, num) => {
+  const t = cleNum(num); if (!t) return null;
+  for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
+    if (meubleACases(it)) {
+      const { nr, nc } = dimsMeuble(it); const vue = graviteCases(it.slots, nr, nc);
+      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k) };
+    }
+    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile' };
+    if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
+  }
+  return null;
+};
+// Ranger UN numéro dans la colonne d'une case : il atterrit sur la plus basse
+// case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
+// déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
+// ou une colonne pleine. Rend { plan, ou } ou { erreur }.
+const rangerNumeroDansPlan = (plan, itemId, key, num) => {
+  const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
+  const deja = ouEstNumero(plan, v);
+  if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
+  let res = null;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
+    if (!(c >= 0 && c < nc)) return it;
+    const vue = graviteCases(it.slots, nr, nc);
+    let plein = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) plein++;
+    if (plein >= nr) return it;
+    const k = (nr - 1 - plein) + '_' + c;
+    const slots = { ...vue, [k]: [v] };
+    // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
+    let grow = {};
+    if ((FURN_TYPES[it.type] || {}).build === 'grille' && Object.keys(slots).length >= nr * nc) {
+      const maxRows = Math.max(1, Math.floor(((rm.room && rm.room.wallH) || 3.4) / (it.cell || 0.5)));
+      if (nr < maxRows) {
+        grow = { rows: nr + 1 };
+        // On décale tout d'une rangée vers le bas des index (la nouvelle rangée est en haut, r=0).
+        const dec = {}; for (const kk in slots) { const p = kk.split('_'); dec[(+p[0] + 1) + '_' + p[1]] = slots[kk]; }
+        res = { itemName: it.name, roomName: rm.name, key: (+k.split('_')[0] + 1) + '_' + c, nom: nomCase(nr + 1, (+k.split('_')[0] + 1) + '_' + c) };
+        return { ...it, ...grow, slots: dec };
+      }
+    }
+    res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
+    return { ...it, slots };
+  }) }));
+  if (!res) return { erreur: 'Cette colonne est pleine — choisis une autre case.' };
+  return { plan: { ...plan, rooms }, ou: res };
+};
+// Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
+const libererNumeroDuPlan = (plan, itemId, num) => {
+  const t = cleNum(num); let fait = false;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const slots = {};
+    for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc) } : it;
+  }) }));
+  return fait ? { ...plan, rooms } : null;
+};
+
+function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
+  // Le plan du nuage a-t-il été relu ? undefined = en cours · false = la base
+  // n'a pas répondu · true = lu (même vide). L'assistant 2D attend `true`.
+  const [planLu, setPlanLu] = useState(undefined);
   const [sel, setSel] = useState(null);
   const [openItem, setOpenItem] = useState(null);
   const [search, setSearch] = useState('');
@@ -19066,7 +19180,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
-  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } })(); }, []);
+  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud === undefined) { setPlanLu(false); return; } if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } setPlanLu(true); })(); }, []);
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
   const saveTimer = React.useRef(null);
@@ -19630,6 +19744,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     return { boxes, freeCells, furn };
   }, [items]);
 
+  if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
@@ -19922,6 +20037,216 @@ function RoomPlan({ locate, onLocateConsumed }) {
     </div>
   );
 }
+// ── ASSISTANT DE RANGEMENT — la vue 2D ─────────────────────────────────────
+// Quelle paire va dans quelle case : la liste « À ranger » (paires PRÉSENTES,
+// avec un N°, posées nulle part), la PREMIÈRE case libre proposée une seule
+// fois en tête (§7 : la même destination écrite sur chaque ligne serait une
+// seule phrase), et c'est SON clic qui range — jamais tout seul. Une case qui
+// porte le N° d'une paire partie est proposée « à libérer », sur son clic.
+// « Pas su » (plan pas relu, liste des paires présentes jamais publiée) ⇒
+// aucune proposition, et c'est dit. Aucun numéro n'est jamais modifié.
+function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
+  const [q, setQ] = useState('');
+  const [placer, setPlacer] = useState(null);   // N° en cours de placement « autre case »
+  const [flash, setFlash] = useState(null);     // { itemId, key } — la case qu'on vient de remplir
+  const [voirLiberer, setVoirLiberer] = useState(false);
+  const presents = useMemo(() => numsPresents(), [plan]);
+  const meubles = useMemo(() => meublesDuPlan(plan), [plan]);
+  const plusieursPieces = ((plan && plan.rooms) || []).filter(rm => (rm.items || []).some(meubleACases)).length > 1;
+  // Les fiches par CLÉ de numéro (photo, titre) — pour reconnaître la paire.
+  const ficheDe = useMemo(() => { const m = {}; Object.entries(ficheParNum || {}).forEach(([n, f]) => { m[cleNum(n)] = { ...f, numero: n }; }); return m; }, [ficheParNum]);
+  const ranges = useMemo(() => {
+    const s = new Set();
+    ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
+      Object.values(it.slots || {}).forEach(a => numsCase(a).forEach(v => s.add(cleNum(v))));
+      if (Array.isArray(it.nums)) it.nums.forEach(v => { const k = cleNum(v); if (k) s.add(k); });
+      if (it.num != null) { const k = cleNum(it.num); if (k) s.add(k); }
+    }));
+    return s;
+  }, [plan]);
+  const sur = planLu === true && presents != null;
+  const aRanger = useMemo(() => !sur ? [] : Array.from(presents).filter(k => k && !ranges.has(k)).sort(triNum)
+    .map(k => ({ cle: k, numero: (ficheDe[k] && ficheDe[k].numero) || k, title: (ficheDe[k] && ficheDe[k].title) || '', photo: (ficheDe[k] && ficheDe[k].photo) || null })), [sur, presents, ranges, ficheDe]);
+  const aLiberer = useMemo(() => {
+    if (!sur) return [];
+    const out = [];
+    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key), numero: v }); })));
+    return out.sort((a, b) => triNum(a.numero, b.numero));
+  }, [sur, meubles, presents]);
+  const partiesCles = useMemo(() => new Set(aLiberer.map(x => cleNum(x.numero))), [aLiberer]);
+  const prochaine = useMemo(() => premiereCaseLibre(plan), [plan]);
+  const totalCases = meubles.reduce((s, m) => s + m.nr * m.nc, 0);
+  const casesLibres = meubles.reduce((s, m) => s + (m.nr * m.nc - Object.keys(m.vue).length), 0);
+  const hit = q.trim() ? ouEstNumero(plan, q) : null;
+  const hitRef = React.useRef(null);
+  const hitCle = hit ? hit.itemId + ':' + hit.key : '';
+  useEffect(() => { if (hitCle && hitRef.current) { try { hitRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (_) {} } }, [hitCle]);
+
+  const ranger = (numero, itemId, key) => {
+    if (!sur) return;
+    const r = rangerNumeroDansPlan(plan, itemId, key, numero);
+    if (r.erreur) { toast(r.erreur); return; }
+    ecrire(r.plan); setPlacer(null); setFlash({ itemId, key: r.ou.key, at: Date.now() });
+    toast(`N°${numero} rangée : ${r.ou.itemName} · ${r.ou.nom}.`);
+  };
+  const liberer = async (x) => {
+    if (!sur) return;
+    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Elle n'est plus parmi tes paires en stock (vendue ou partie). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
+    const next = libererNumeroDuPlan(plan, x.itemId, x.numero);
+    if (!next) { toast('Ce numéro n\'est plus dans cette case — rien n\'a été changé.'); return; }
+    ecrire(next); toast(`Case libérée : N°${x.numero} sortie de ${x.itemName}.`);
+  };
+
+  const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
+    : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
+    : presents == null ? "Je ne sais pas encore quelles paires sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait une paire partie dans une case." : null;
+  const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
+  const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
+  const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
+
+  return (
+    <div data-rangement="" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+      <style>{`.vrm-rgt{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);align-items:start}
+@media (min-width:1100px){.vrm-rgt{grid-template-columns:minmax(300px,370px) minmax(0,1fr)}}
+.vrm-rgt-case{transition:transform .12s ease,box-shadow .15s ease,background .15s ease}
+.vrm-rgt-case[data-cliquable="1"]:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+@keyframes vrmrgtpose{0%{transform:scale(.86);opacity:.4}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+.vrm-rgt-grille{--rgt-c:60px;--rgt-h:46px}
+@media (min-width:1100px){.vrm-rgt-grille{--rgt-c:72px;--rgt-h:48px}}
+@media (prefers-reduced-motion:reduce){.vrm-rgt-case{transition:none;animation:none!important}}`}</style>
+
+      {/* Le résumé, en texte neutre : des chiffres, pas des alertes. */}
+      <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }} data-rgt-resume="">
+        {sur
+          ? <><b style={{ color: C.text }}>{aRanger.length}</b> paire{aRanger.length > 1 ? 's' : ''} à ranger · <b style={{ color: C.text }}>{casesLibres}</b> case{casesLibres > 1 ? 's' : ''} libre{casesLibres > 1 ? 's' : ''} sur {totalCases}{aLiberer.length ? <> · <b style={{ color: C.text }}>{aLiberer.length}</b> à libérer</> : null}</>
+          : <>{totalCases} case{totalCases > 1 ? 's' : ''} dans {meubles.length} meuble{meubles.length > 1 ? 's' : ''}</>}
+      </div>
+      {raisonPasSu && <div data-rgt-passu="" style={{ ...carte, padding: '11px 13px', fontSize: 12.5, color: C.text, lineHeight: 1.5, boxShadow: 'none', background: C.bg }}>{raisonPasSu}</div>}
+
+      {/* Où est la N° X ? — une lecture, aucune écriture. */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Où est la N° … ?" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
+          style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+        {q && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche" onClick={() => setQ('')} style={{ ...btn(false), padding: '0 12px' }}><Icon name="close" size={15} /></button>}
+      </div>
+      {q.trim() && <div data-rgt-trouve={hit ? '1' : '0'} style={{ fontSize: 12.5, color: hit ? C.text : C.muted, lineHeight: 1.45, marginTop: -4 }}>
+        {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : <>Aucune case ne porte la N°{q.trim()}.</>}
+      </div>}
+
+      <div className="vrm-rgt">
+        {/* ── Colonne gauche : ce qu'il y a à faire ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          {sur && (
+            <div style={carte} data-rgt-liste="">
+              {titreBloc('À ranger', aRanger.length)}
+              {aRanger.length === 0
+                ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tout ce qui est chez toi est déjà posé dans une case.</div>
+                : (<>
+                  {prochaine
+                    ? <div data-prochaine={`${prochaine.itemId}:${prochaine.key}`} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10, padding: '9px 11px', borderRadius: 9, background: C.bg, border: `1px solid ${C.border}` }}>
+                        Prochaine case libre : <b>{prochaine.itemName}</b>{plusieursPieces ? ` (${prochaine.roomName})` : ''} · {prochaine.nom}
+                      </div>
+                    : <div data-prochaine="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
+                  {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${C.accent}` }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
+                    <button type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
+                  </div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
+                    {aRanger.map(p => (
+                      <div key={p.cle} data-a-ranger={p.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 9px', borderRadius: 10, border: `1px solid ${placer === p.numero ? C.accent : C.border}`, background: C.card }}>
+                        {p.photo
+                          ? <PhotoVinted src={p.photo} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.card2 }} />
+                          : <span style={{ width: 40, height: 40, borderRadius: 8, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="box" size={18} style={{ color: C.muted, opacity: .6 }} /></span>}
+                        <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                          <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>N°{p.numero}</span>
+                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'paire présente'}</span>
+                        </span>
+                        <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
+                          {casesLibres > 0 && <button type="button" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)} style={{ ...btn(false), padding: '8px 10px' }}>Autre</button>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>)}
+            </div>
+          )}
+          {sur && aLiberer.length > 0 && (
+            <div style={carte} data-rgt-liberer="">
+              {titreBloc('À libérer', aLiberer.length)}
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand le carton est vide.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
+                  <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
+                    <span style={{ flex: 1, minWidth: 0 }}><b>N°{x.numero}</b> <span style={{ color: C.muted }}>· {x.itemName} · {x.nom}</span></span>
+                    <button type="button" onClick={() => liberer(x)} style={btn(false)}>Libérer</button>
+                  </div>
+                ))}
+              </div>
+              {aLiberer.length > 5 && <button type="button" onClick={() => setVoirLiberer(v => !v)} style={{ ...btn(false), marginTop: 8, border: 'none', padding: '4px 0', color: C.muted }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</button>}
+            </div>
+          )}
+        </div>
+
+        {/* ── Colonne droite : le stock vu de face, meuble par meuble ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }} data-rgt-plan="">
+          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble à cases dans ta pièce. Ajoute une grille de boîtes, une étagère ou des casiers dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
+          {meubles.map((m, mi) => {
+            const pleines = Object.keys(m.vue).length;
+            const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
+            // La case où une boîte atterrit dans chaque colonne (gravité).
+            const basLibre = {}; for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
+            return (
+              <React.Fragment key={m.it.id}>
+                {enTete && <div className="vrm-label" style={{ color: C.muted, marginTop: mi ? 4 : 0 }}>{m.roomName}</div>}
+                <div style={carte} data-rgt-meuble={m.it.id}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14, fontWeight: 650, color: C.text, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.it.name}</span>
+                    <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{pleines}/{m.nr * m.nc}</span>
+                  </div>
+                  <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
+                    <div className="vrm-rgt-grille" style={{ display: 'grid', gridTemplateColumns: `repeat(${m.nc}, var(--rgt-c))`, gap: 6, width: 'max-content' }}>
+                      {Array.from({ length: m.nr * m.nc }, (_, i) => {
+                        const r = Math.floor(i / m.nc), c = i % m.nc, key = r + '_' + c;
+                        const a = m.vue[key] || [];
+                        const estHit = !!(hit && hit.itemId === m.it.id && hit.key === key);
+                        const estProchaine = !!(sur && aRanger.length && prochaine && prochaine.itemId === m.it.id && prochaine.key === key);
+                        const cliquable = !!(placer && sur && !a.length && basLibre[key]);
+                        const partie = !!(a.length && a.some(v => partiesCles.has(cleNum(v))));
+                        const vientDetre = !!(flash && flash.itemId === m.it.id && flash.key === key && a.length);
+                        const accent = estHit || estProchaine || cliquable;
+                        const bord = accent ? C.accent : partie ? C.warn : C.border;
+                        const trait = a.length && !partie ? 'solid' : (estProchaine || estHit ? 'solid' : 'dashed');
+                        return (
+                          <div key={key} ref={estHit ? hitRef : null} className="vrm-rgt-case"
+                            data-case={`${m.it.id}:${key}`} data-num={a[0] || ''} data-hi={estHit ? '1' : undefined} data-prochaine-case={estProchaine ? '1' : undefined} data-cliquable={cliquable ? '1' : undefined} data-partie={partie ? '1' : undefined}
+                            role={cliquable || a.length ? 'button' : undefined} tabIndex={cliquable || a.length ? 0 : undefined}
+                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key)}` : nomCase(m.nr, key)}
+                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); }}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); } }}
+                            style={{ height: 'var(--rgt-h)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', cursor: cliquable || a.length ? 'pointer' : 'default',
+                              border: `${accent ? 2 : 1}px ${trait} ${bord}`,
+                              background: estHit ? C.accent : a.length ? C.card2 : 'transparent', color: estHit ? (C.onAccent || '#fff') : partie ? C.muted : C.text,
+                              animation: vientDetre ? 'vrmrgtpose .38s ease-out' : 'none', boxShadow: vientDetre && !estHit ? `0 0 0 2px ${C.accent}` : 'none' }}>
+                            {a.length
+                              ? <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', textDecoration: partie ? 'line-through' : 'none', textDecorationColor: C.warn }}>{a[0]}{a.length > 1 ? <span style={{ fontSize: 10, fontWeight: 600, opacity: .7 }}> +{a.length - 1}</span> : null}</span>
+                              : estProchaine ? <span style={{ fontSize: 10.5, fontWeight: 700, color: C.accent }}>ici</span> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : les boîtes tombent en bas de chaque colonne. Touche une case pleine pour la retrouver.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
@@ -20136,10 +20461,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      <div style={{display:'flex',gap:6,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
-        {[['plan','home','Ma pièce'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+      <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start',maxWidth:'100%',overflowX:'auto'}}>
+        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
-            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
+            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
             <Icon name={ic} size={15}/>{l}
           </button>
         ))}
@@ -20147,6 +20472,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
       {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
+      {garageView==='ranger' && <RoomPlan mode="2d"/>}
 
       {garageView==='grid' && (<>
       {placing && (
