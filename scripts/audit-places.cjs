@@ -253,8 +253,11 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
           if (mots[i] && mots[i].toLowerCase() === mots[i - 1].toLowerCase()) mauvais.push('doublon : « ' + titre + ' »');
         }
         if (titre.length > 80) mauvais.push('trop long : ' + titre.length);
-        if (/\btaille\s/i.test(titre)) mauvais.push('« taille » au long : « ' + titre + ' »');
-        if (z2 && !new RegExp('T' + z2.replace('.', '[.,]') + '$').test(titre)) mauvais.push('taille absente de la fin : « ' + titre + ' »');
+        // (16 oct., Julien : « au lieu de mettre taille 43 il a mis T43 ») : la
+        // taille s'écrit en toutes lettres, UNE fois, à la fin.
+        if ((titre.match(/\btaille\b/gi) || []).length > 1) mauvais.push('« taille » deux fois : « ' + titre + ' »');
+        if (/\sT\d/.test(titre)) mauvais.push('« T » abrégé : « ' + titre + ' »');
+        if (z2 && !new RegExp('taille ' + z2.replace('.', '[.,]') + '$').test(titre)) mauvais.push('taille absente de la fin : « ' + titre + ' »');
       }
       dit(mauvais.length === 0, 'eBay : la marque n\'est jamais doublée et la taille est en suffixe',
         mauvais[0] || '4 cas réels vérifiés');
@@ -555,7 +558,7 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       const sansTaille = cas.filter(([b, t, z]) => {
         if (!z) return false;
         const est = /^\d{1,2}([.,]\d)?$/.test(z);
-        const attendu = est ? 'T' + z.replace('.', '[.,]') + '$' : z + '$';
+        const attendu = est ? 'taille ' + z.replace('.', '[.,]') + '$' : z + '$';
         return !new RegExp(attendu).test(lbcApp(b, t, z));
       });
       dit(sansTaille.length === 0, 'la taille est toujours à la fin, même sur un titre long',

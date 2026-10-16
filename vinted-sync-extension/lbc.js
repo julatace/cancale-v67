@@ -471,21 +471,55 @@
     return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie, detourees, detourageRaison };
   }
 
-  // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
-  // Mesuré le 19 septembre sur la carte du dépôt (`lbc_recon.etapes`, étape à
-  // 5 champs : `subject, body, price_cents, location`). L'ancien code posait
-  // `ad.price` (54) directement → Leboncoin affichait **0,54 €** sur l'annonce.
-  // Le NOM du champ porte l'unité : s'il contient « cent », on pose l'entier en
-  // centimes ; sinon (un champ euros ailleurs) on pose les euros. On ne devine
-  // pas l'unité, on la LIT.
+  // ⚠️⚠️ LE CHAMP `price_cents` PREND DES EUROS (16 octobre, mesuré).
+  // Le 19 septembre on avait lu le NOM du champ et posé des centimes (« 54 » y
+  // donnait 0,54 €). Remesuré sur son dépôt du 15 octobre (`lbc_recon.etapes`,
+  // 5.177) : le champ s'intitule « Prix de vente souhaité* » et il y a tapé
+  // lui-même un prix de 2 ou 3 caractères — des EUROS. Nos « 5400 » donnaient
+  // donc 5 400 € : le « prix au pif » de sa plainte (« je veux le même que sur
+  // Vinted »). On pose les euros tels quels (« 54 », « 54,50 »), et on RELIT
+  // ce que le champ garde : s'il ne garde pas notre nombre, on le dit.
+  let prixRelu = null;
   function poserPrix(euros, siVide) {
-    const el = findField([/prix|price|montant/]);
+    const el = document.querySelector('input[name="price_cents"]') || document.querySelector('input[name="price"]') || findField([/prix|price|montant/]);
     if (!el) return false;
     if (siVide && String(el.value || '').trim()) return false;   // ne pas écraser une correction manuelle
-    const n = Number(euros);
+    const n = Number(String(euros).replace(',', '.'));
     if (!isFinite(n) || n <= 0) return false;
-    const nom = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
-    return setField(el, /cent/.test(nom) ? String(Math.round(n * 100)) : String(n));
+    const txt = Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+    const ok = setField(el, txt);
+    const garde = Number(String(el.value || '').replace(/\s/g, '').replace(',', '.'));
+    prixRelu = { voulu: n, garde: isFinite(garde) ? garde : null };
+    return ok;
+  }
+  // ── LA LOCALISATION — Julien, 16 oct. : « elle doit mettre ce que le vendeur
+  //    a rempli dans VRM ». Mesuré (`lbc_recon.etapes`) : un champ
+  //    `name="location"` en liste à choisir, dont les propositions s'écrivent
+  //    « Vannes (56000) ». On tape SA ville (`ad.ville`, Réglages de VRM), puis
+  //    on ne clique QUE la proposition « Ville (code postal) » qui porte ce nom
+  //    exact, et seulement s'il n'y en a qu'UNE — deux communes du même nom ⇒
+  //    on ne choisit pas à sa place (mieux vaut un blanc qu'un faux, §5).
+  let _villeFaite = '';
+  async function poserLocalisation(ad) {
+    const ville = String((ad && ad.ville) || '').trim();
+    if (!ville || _villeFaite === String(ad.id)) return false;
+    const box = document.querySelector('input[name="location"]');
+    if (!box || DANS_ENTETE(box)) return false;
+    if (String(box.value || '').trim()) { _villeFaite = String(ad.id); return false; }   // déjà renseignée (son profil) : on ne touche pas
+    _villeFaite = String(ad.id);
+    try { box.focus(); } catch (_) {}
+    setField(box, ville);
+    const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const cible = norm(ville);
+    for (let k = 0; k < 12; k++) {
+      await attendre(300);
+      const opts = Array.from(document.querySelectorAll('[role="option"]')).filter((o) => !DANS_ENTETE(o));
+      const bons = opts.filter((o) => { const m = /^(.*?)\s*\(\d{5}\)\s*$/.exec(String(o.textContent || '').trim()); return m && norm(m[1]) === cible; });
+      if (bons.length === 1) { try { bons[0].click(); } catch (_) {} toast('📍 Localisation : ' + String(bons[0].textContent || '').trim()); return true; }
+      if (bons.length > 1) { toast('📍 Plusieurs communes « ' + ville + ' » : choisis la tienne'); return false; }
+    }
+    toast('📍 Je n\'ai pas trouvé « ' + ville + ' » dans la liste : choisis ta ville');
+    return false;
   }
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
@@ -997,7 +1031,8 @@
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // jamais d'écrasement ; la réf est garantie
-    if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle (centimes), une seule
+    if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle, une seule
+    poserLocalisation(ad);
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
     //    listes déroulantes ne sont pas des `input` : `findField` ne les voyait
@@ -1158,6 +1193,7 @@
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
     if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
+    _villeFaite = ''; poserLocalisation(ad);
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     if (choisirCategorie(ad)) n++;
     // « Re-remplir » relance aussi les menus React et l'enchaînement d'étape

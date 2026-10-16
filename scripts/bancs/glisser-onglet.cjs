@@ -1,0 +1,127 @@
+// BANC — « Je publie sur eBay, j'appuie sur un bouton… et je me retrouve sur
+// Vestiaire Collective » (Julien, 16 octobre).
+//
+// Mesuré : VRM n'a AUCUN code qui publie sur Vestiaire. L'onglet voisin d'eBay
+// dans la liste des plateformes est Vestiaire, et le balayage entre onglets
+// (souris : glisser de 110 px ; doigt : 70 px) y menait — un clic légèrement
+// glissé sur un bouton, ou un défilement horizontal des photos, suffisait.
+//
+// Ce banc rend l'écran eBay (aucune donnée réelle : base vide) et exige :
+//   · un geste parti d'un BOUTON ne change jamais d'onglet (souris et doigt) ;
+//   · un balayage franc sur une zone vide ne mène JAMAIS à Vestiaire (il n'est
+//     pas dans la barre du bas) ;
+//   · l'autre sens : le balayage entre onglets existe toujours (Vinted ⇄
+//     Leboncoin) — « tout couper » passerait les deux premiers contrôles.
+'use strict';
+const { chromium } = require('playwright');
+const http = require('http'), fs = require('fs'), path = require('path');
+
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT) || 4951;
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } };
+
+let ko = 0;
+const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${!bon && det ? ' — ' + det : ''}`); };
+
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0];
+  if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
+  r.end(fs.readFileSync(p));
+});
+
+async function page(nav, telephone, tab) {
+  const ctx = await nav.newContext(telephone
+    ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+    : { viewport: { width: 1512, height: 950 } });
+  const pg = await ctx.newPage();
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
+  await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+  await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' }));
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await pg.route('**://*.vinted.net/**', (r) => r.abort());
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(3500);
+  return { ctx, pg };
+}
+// L'écran affiché : le lien de navigation marqué « page courante ».
+const ecran = (pg) => pg.evaluate(() => {
+  const el = document.querySelector('.vrm-sidebar-link[aria-current="page"]') || [...document.querySelectorAll('nav [aria-current="page"], .vrm-bottom-nav [aria-current="page"]')].pop();
+  return el ? (el.innerText || el.getAttribute('aria-label') || '').trim() : '';
+});
+async function glisserSouris(pg, x, y, dx) {
+  await pg.mouse.move(x, y); await pg.mouse.down();
+  for (let i = 1; i <= 10; i++) await pg.mouse.move(x + (dx * i) / 10, y);
+  await pg.mouse.up(); await pg.waitForTimeout(600);
+}
+async function glisserDoigt(pg, x, y, dx) {
+  const cdp = await pg.context().newCDPSession(pg);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (dx * i) / 8, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await pg.waitForTimeout(600);
+}
+// Le premier bouton visible du contenu (pas la navigation).
+// Un bouton de l'écran eBay lui-même (ses sous-onglets « Annonces » /
+// « Compte »), jamais la navigation de l'app. La base est vide : ce sont les
+// seuls boutons sûrs d'exister.
+const unBouton = (pg) => pg.evaluate(() => {
+  for (const b of document.querySelectorAll('button')) {
+    if (b.closest('.vrm-sidebar') || !/^(Annonces|Compte)$/.test(b.innerText.trim())) continue;
+    const r = b.getBoundingClientRect();
+    if (r.width > 20 && r.height > 14 && r.top > 40 && r.bottom < innerHeight - 70) return { x: r.left + r.width / 2, y: r.top + r.height / 2, t: b.innerText.trim() };
+  }
+  return null;
+});
+
+(async () => {
+  try { await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }); }
+  catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  try {
+    console.log('── ordinateur (souris)');
+    {
+      const { ctx, pg } = await page(nav, false, 'plat_ebay');
+      const avant = await ecran(pg);
+      dit(/ebay/i.test(avant), 'l’écran eBay est ouvert', avant);
+      const b = await unBouton(pg);
+      dit(!!b, 'un bouton de l’écran eBay est trouvé', '');
+      if (b) await glisserSouris(pg, b.x, b.y, 160);   // UN sens : un aller-retour reviendrait sur eBay (vert par accident)
+      const apresBouton = await ecran(pg);
+      dit(/ebay/i.test(apresBouton), 'un clic glissé sur un bouton ne change pas d’onglet', `→ ${apresBouton}`);
+      await glisserSouris(pg, 900, 880, 300);
+      const apresVide = await ecran(pg);
+      dit(!/vestiaire/i.test(apresVide), 'un balayage depuis eBay ne mène jamais à Vestiaire', `→ ${apresVide}`);
+      await ctx.close();
+    }
+    {
+      // L'autre sens : le balayage existe toujours entre Vinted et Leboncoin.
+      const { ctx, pg } = await page(nav, false, 'plat_vinted');
+      await pg.evaluate(() => { const s = document.createElement('div'); s.id = 'zone-vide'; s.style.cssText = 'height:200px'; (document.querySelector('main') || document.body).appendChild(s); });
+      await glisserSouris(pg, 900, 880, -300);
+      const e = await ecran(pg);
+      dit(/leboncoin/i.test(e), 'l’autre sens : balayer sur une zone vide passe toujours de Vinted à Leboncoin', `→ ${e}`);
+      await ctx.close();
+    }
+    console.log('── téléphone (doigt)');
+    {
+      const { ctx, pg } = await page(nav, true, 'plat_ebay');
+      const e0 = await ecran(pg);
+      dit(/ebay/i.test(e0), 'l’écran eBay est ouvert (et le banc sait lire l’onglet courant au téléphone)', `« ${e0} »`);
+      const b = await unBouton(pg);
+      if (b) await glisserDoigt(pg, b.x, b.y, 150);
+      const e1 = await ecran(pg);
+      dit(!b || !/vestiaire|leboncoin/i.test(e1), 'un geste parti d’un bouton ne change pas d’onglet', `→ ${e1}`);
+      await glisserDoigt(pg, 200, 780, 200);
+      const e2 = await ecran(pg);
+      dit(!/vestiaire/i.test(e2), 'un balayage depuis eBay ne mène jamais à Vestiaire', `→ ${e2}`);
+      await ctx.close();
+    }
+  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
+  finally { await nav.close(); srv.close(); }
+  console.log(ko ? `\n❌ glisser entre onglets : ${ko} rouge(s)` : '\n✅ glisser entre onglets : jamais vers Vestiaire, jamais depuis un bouton');
+  process.exit(ko ? 1 : 0);
+})();
