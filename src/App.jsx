@@ -9335,35 +9335,22 @@ const NAV_LARGEUR = 88;
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
 function SideBar({ tab, setTab }) {
-  const [gestion, setGestion] = useState(false);
-  const rail = useRef(null), declencheur = useRef(null), panneau = useRef(null);
-  const actif = BAR_GROUPE[tab] || tab;
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
-  const ouvrir = id => {setGestion(false);setTab(id);};
-  useEffect(()=>{setGestion(false);},[tab]);
-  useEffect(()=>{
-    if(!gestion)return;
-    panneau.current?.querySelector('button')?.focus();
-    const dehors=e=>{if(!rail.current?.contains(e.target))setGestion(false);};
-    const clavier=e=>{if(e.key==='Escape'){e.preventDefault();setGestion(false);declencheur.current?.focus();}};
-    document.addEventListener('pointerdown',dehors);document.addEventListener('keydown',clavier);
-    return()=>{document.removeEventListener('pointerdown',dehors);document.removeEventListener('keydown',clavier);};
-  },[gestion]);
-  return <nav ref={rail} className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  const [gestion, setGestion] = useState(()=>outils.some(t=>t.id===tab));
+  const declencheur = useRef(null);
+  const actif = BAR_GROUPE[tab] || tab;
+  useEffect(()=>{setGestion(outils.some(t=>t.id===tab));},[tab]);
+  const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
+  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmWord height={19} color={C.onChrome} accent={C.onChrome}/></div>
-    <div className="vrm-rail-platforms">
-      {BOTTOM_TABS.map(t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>ouvrir(t.id)} aria-current={actif===t.id?'page':undefined}>
-        <NavigationIcon item={t} size={25}/>
-      </button>)}
+    <div className="vrm-rail-scroll" onKeyDown={e=>{if(e.key==='Escape' && gestion){e.preventDefault();setGestion(false);declencheur.current?.focus();}}}>
+      <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
+      <div className="vrm-rail-management-group">
+        <button ref={declencheur} type="button" className="vrm-rail-button" aria-label="Gestion" title="Gestion" aria-expanded={gestion} aria-controls="vrm-gestion-laterale" onClick={()=>setGestion(v=>!v)} data-active={outils.some(t=>t.id===actif)||undefined}><Icon name="grid" size={23}/></button>
+        {gestion && <section id="vrm-gestion-laterale" className="vrm-rail-management" aria-label="Gestion">{outils.map(bouton)}</section>}
+      </div>
     </div>
-    <div className="vrm-rail-bottom">
-      <button ref={declencheur} type="button" className="vrm-rail-button" aria-label="Gestion" title="Gestion" aria-expanded={gestion} aria-controls="vrm-gestion-laterale" onClick={()=>setGestion(v=>!v)} data-active={outils.some(t=>t.id===actif)||undefined}><Icon name="grid" size={23}/></button>
-      <button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>ouvrir('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button>
-    </div>
-    {gestion && <section ref={panneau} id="vrm-gestion-laterale" className="vrm-rail-panel" aria-label="Gestion" style={{'--vrm-ink':C.text,'--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card}}>
-      <div className="vrm-rail-panel-title"><span>Gestion</span><button type="button" aria-label="Fermer la gestion" onClick={()=>{setGestion(false);declencheur.current?.focus();}}><Icon name="close" size={18}/></button></div>
-      {outils.map(t=><button key={t.id} type="button" className="vrm-sidebar-link" aria-current={tab===t.id?'page':undefined} onClick={()=>ouvrir(t.id)}><NavigationIcon item={t} size={19}/><span>{t.label}</span>{t.bientot && <span className="vrm-rail-soon">Bientôt</span>}</button>)}
-    </section>}
+    <div className="vrm-rail-bottom"><button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button></div>
   </nav>;
 }
 
@@ -42506,15 +42493,8 @@ function AppCoeur() {
       )}
       {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
           la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
-      {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
-          Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
-          mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
-          On plafonne à 1180 px, collé à gauche sous la barre latérale — la
-          respiration passe à droite, pas dans la carte. ⚠️ 980 px laissait
-          230 px de vide sur un écran de 1512 : ni rempli ni centré, ça se
-          voyait comme un décalage. 1180 occupe l'espace disponible sans que la
-          ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
-          `ordi` est faux et RIEN ne change. */}
+      {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
+          L'ordre des blocs et la disposition de chaque page restent conservés. */}
       <main className="vrm-main" data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
@@ -42524,7 +42504,7 @@ function AppCoeur() {
         flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
         WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
         width: ordi ? undefined : '100%',
-        maxWidth: ordi ? 1180 : 1200,
+        maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
         marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
         paddingRight: ordi ? 28 : undefined,
