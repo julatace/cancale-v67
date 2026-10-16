@@ -123,7 +123,7 @@ const projette = (row, sel) => {
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});}
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
       const c = await pg.evaluate(() => {
-        const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: el.outerHTML, boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
+        const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: (() => { const k = el.cloneNode(true); k.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return k.outerHTML; })(), marques: [...el.querySelectorAll('[data-marque]')].map((m) => m.getAttribute('data-marque')).join(','), boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
           ...(() => {
             // La carte des places se trouve par son attribut `data-places`
@@ -159,6 +159,11 @@ const projette = (row, sel) => {
       dit(!/Vendue — bordereau/.test(c.c.t), 'et sa jumelle au même titre n\'est PAS marquée vendue');
       const horsPalette = /#0F8A6A|#09B1BA|#EC5A13|rgb\(15, 138, 106\)|rgb\(9, 177, 186\)|rgb\(236, 90, 19\)/i;
       dit(![c.a, c.b, c.c].some((x) => horsPalette.test(x.html)), 'aucune couleur hors palette sur les cartes (§7)');
+      // (16 oct.) Les LOGOS des plateformes sont la seule exception (demande de
+      // Julien) : ils portent la couleur de leur marque, et seulement là où la
+      // présence est PROUVÉE — Vinted toujours, Leboncoin si publiée.
+      dit([c.a, c.b, c.c].every((x) => /(^|,)vinted(,|$)/.test(x.marques)), 'chaque carte porte le logo Vinted', [c.a, c.b, c.c].map((x) => x.marques).join(' | '));
+      dit(c.b && /leboncoin/.test(c.b.marques) === c.b.aussi, 'le logo Leboncoin suit la présence prouvée (aussi sur Leboncoin)', c.b && c.b.marques);
       dit(c.sw <= c.cw + 1, 'aucun débordement horizontal', `${c.sw} > ${c.cw}`);
       // 3 octobre (« trop brouillon ») : le N° et l'achat ne sont plus écrits deux
       // fois (texte + champ) ; le TEXTE se modifie en place. On le prouve en le

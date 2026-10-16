@@ -52,7 +52,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.179.0';
+const EXT_ATTENDUE = '5.180.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1572,6 +1572,39 @@ const deleteVintedAccount = async (vintedUserId, login) => {
     } catch (_) { /* le compte est de toute façon écarté par `accountUids` */ }
     return { ok: res.ok, memo };
   } catch (_) { return { ok: false, memo }; }
+};
+
+// ── LES DONNÉES D'UN COMPTE SUPPRIMÉ DÉFINITIVEMENT S'EFFACENT VRAIMENT ─────
+// (16 octobre) Julien : « quand je recherche une paire, il y a les annonces de
+// Shopcancale alors que j'avais demandé de supprimer ». Mesuré : une visite du
+// 19 septembre (diagnostic d'export) avait RÉÉCRIT ses lignes après la
+// suppression. L'extension 5.180 ne capte plus un compte supprimé ; ceci vide
+// ce qui reste. Uniquement les comptes de `vrm_blocked_accounts` qui ne sont
+// pas réautorisés (`panel_accounts_off[uid] === false`), et seulement si les
+// DEUX listes ont été lues (« pas su » ⇒ on ne touche à rien). Préfixe EXACT
+// vérifié en JS (le `_` de `like` est un joker). Les fiches numérotées restent
+// (un numéro n'est jamais réattribué, §5) : la recherche les écarte.
+const purgerComptesSupprimes = async () => {
+  try {
+    const lire = async (id) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() }); if (!r.ok) return undefined; const j = await r.json(); return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined; };
+    const [noirs, off] = await Promise.all([lire('vrm_blocked_accounts'), lire('panel_accounts_off')]);
+    if (!noirs || !off) return 0;
+    const uids = (noirs.uids || []).map(String).filter((u) => /^\d+$/.test(u) && off[u] !== false);
+    let n = 0;
+    for (const uid of uids) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id,sup:data->>supprime`, { headers: sbAuth() });
+      if (!r.ok) continue;
+      const rows = await r.json(); if (!Array.isArray(rows)) continue;
+      const cibles = rows.filter((x) => (String(x.id).startsWith(`harvest_${uid}_`) || String(x.id).startsWith(`coffre_${uid}_`)) && String(x.sup) !== 'true');
+      if (!cibles.length) continue;
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(cibles.map((x) => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
+      });
+      if (w.ok) n += cibles.length;
+    }
+    return n;
+  } catch (_) { return 0; }
 };
 
 // ── EFFACEMENT CIBLÉ DES DONNÉES D'UN COMPTE (récupérable) ───────────────────
@@ -7378,6 +7411,30 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
 const LBC_ORANGE = '#EC5A13';
+// (16 oct.) Les comptes que la RECHERCHE regarde : liés et pas masqués. Un
+// compte supprimé (plus dans `vinted_accounts`) ou masqué n'y apparaît plus.
+// Liste vide ⇒ `null` (« pas su » : on n'écarte rien).
+const comptesRecherche = (liste) => {
+  const l = Array.isArray(liste) ? liste.filter((a) => a && a.vinted_user_id != null) : [];
+  if (!l.length) return null;
+  const caches = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  return new Set(l.map((a) => String(a.vinted_user_id)).filter((u) => !caches.has(u)));
+};
+// (16 oct.) LES MARQUES DES PLATEFORMES — Julien : « mets le logo des
+// plateformes sur les annonces ». Une pastille par plateforme où la paire est
+// PROUVÉE en ligne (jamais devinée par le titre, §5). Ce sont des identifiants
+// de marque, pas un accent : petites, et toujours avec leur nom en infobulle.
+const MARQUES_PLAT = {
+  vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
+  leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
+  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0064D2', bord: '#D6DCE4' },
+};
+function MarquePlateforme({ p, taille = 18 }) {
+  const m = MARQUES_PLAT[p]; if (!m) return null;
+  return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
+    style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:5,
+      background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:800,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
+}
 // Pourquoi « J'ai déclaré ce mois » ne s'enregistre pas (revue du 6 octobre) :
 // ce qui a ÉCHOUÉ et le geste, ou ce qui se lit ENCORE. `manque` vient de
 // `lectureIncomplete` (§11 : la même règle grise le bouton et arrête le geste).
@@ -20642,7 +20699,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
    bordereaux) — un seul endroit par chose. */
 function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const [loading, setLoading] = useState(false);
-  const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, loading} }
+
   const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
@@ -20753,18 +20810,14 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // l'app n'a plus à le réclamer. La raison reste écrite dans l'infobulle.
     if (hiddenAccts.has(uid)) return { etat: 'exclu', ic: 'eyeOff', label: 'Exclu de l\'app', color: C.muted,
       hint: `Tu as masqué ce compte : ses annonces, ses ventes et ses achats n'apparaissent nulle part.${blockedAccts.has(uid) ? ' (Vinted l\'avait aussi refusé.)' : ''} Sa date de capture ne veut donc plus rien dire ici — rien à rattraper.` };
-    if (blockedAccts.has(uid)) return { etat: 'bad', ic: 'alert', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
-    // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
-    // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
-    // normal et se renouvelle automatiquement — on ne le signale pas.)
-    if (!acc.refresh_token) return { etat: 'warn', ic: 'key', label: 'À reconnecter', color: C.warn, hint: 'Pas de jeton de renouvellement : ce compte ne restera pas connecté seul. Repasse sur vinted.fr avec l\'extension pour le recapter.' };
+    if (blockedAccts.has(uid)) return { etat: 'bad', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    // (16 oct.) Julien : « juste s'il est actif ou banni, l'extension doit
+    // évaluer l'état du compte ». Deux états sur la pastille ; la fraîcheur de
+    // la capture n'est plus une alerte, seulement une ligne grise (`ago`).
     const cap = lastCap[uid];
-    if (!cap) return { etat: 'warn', ic: 'cloudOff', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
-    const ageH = (Date.now() - cap) / 3600000;
-    const ago = ageH < 1 ? 'il y a <1 h' : ageH < 48 ? `il y a ${Math.round(ageH)} h` : `il y a ${Math.round(ageH / 24)} j`;
-    if (ageH < 12) return { etat: 'ok', ic: 'check', label: 'À jour', color: INV_STATUS.online.color, hint: `Dernière capture ${ago}.` };
-    if (ageH < 72) return { etat: 'warn', ic: 'clock', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
-    return { etat: 'bad', ic: 'cloudOff', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
+    const ageH = cap ? (Date.now() - cap) / 3600000 : null;
+    const ago = ageH == null ? 'pas encore capté' : ageH < 1 ? 'capté il y a moins d\'une heure' : ageH < 48 ? `capté il y a ${Math.round(ageH)} h` : `capté il y a ${Math.round(ageH / 24)} j`;
+    return { etat: 'ok', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}.`, ago };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
@@ -20895,23 +20948,6 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   };
   useEffect(() => { refreshAccounts(); /* eslint-disable-next-line */ }, []);
 
-  // Test de connexion : un appel léger (compteur de notifications non lues) sur
-  // LE compte testé uniquement — jamais tous d'un coup, pour ne pas ressembler à
-  // un robot multi-comptes (voir CLAUDE.md §5, profil discret).
-  const testAccount = async (acc) => {
-    setTestResult(r => ({ ...r, [acc.vinted_user_id]: { loading: true } }));
-    const notifHost = VINTED_NOTIF_API_HOST[acc.domain] || 'api.vinted.fr';
-    const res = await vintedApiCall(acc, '/inbox-notifications/v1/notifications/unread_count', { host: notifHost });
-    setTestResult(r => ({
-      ...r,
-      [acc.vinted_user_id]: {
-        ok: !!res.ok,
-        label: res.ok
-          ? `✓ Connexion acceptée`
-          : `✗ Échec (${res.status || res.error || 'erreur inconnue'})${res.status === 403 ? ' — anti-robot Vinted' : ''}`,
-      },
-    }));
-  };
 
   // ── TOUT REMETTRE : le seul écran qui décide de ce qui manque ──────────────
   // Demande de Julien : « mets TOUTES les annonces et TOUTES les ventes dans
@@ -21009,12 +21045,10 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         const exclu = st.filter(s=>s.etat==='exclu').length;
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
-            <span style={{color:C.text}}>État des comptes :</span>
-            <span style={{display:'inline-flex',alignItems:'center',gap:4,color:INV_STATUS.online.color}}><Icon name="check" size={13}/>{ok} à jour</span>
-            {warn>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="clock" size={13}/>{warn} à rafraîchir</span>}
-            {bad>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="cloudOff" size={13}/>{bad} en panne</span>}
-            {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} exclu{exclu>1?'s':''} — ton choix</span>}
-            <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.{exclu>0?` Le${exclu>1?'s':''} compte${exclu>1?'s':''} exclu${exclu>1?'s':''}, ${exclu>1?'eux':'lui'}, n${exclu>1?'\u2019attendent':'\u2019attend'} rien : ${exclu>1?'ils sont':'il est'} hors de l'app tant que tu ${exclu>1?'les':'le'} laisses masqué${exclu>1?'s':''}.`:''}</span>
+            <span style={{color:C.text}}>Tes comptes :</span>
+            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}><Icon name="check" size={13}/>{ok} actif{ok>1?'s':''}</span>
+            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
+            {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} masqué{exclu>1?'s':''} — ton choix</span>}
           </div>
         );
       })()}
@@ -21022,7 +21056,6 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       {accounts.length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {accounts.map(acc => {
-            const tr = testResult[acc.vinted_user_id];
             return (
               <div key={acc.vinted_user_id} style={{borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
                 <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
@@ -21051,9 +21084,10 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                           pour savoir si c'est frais, pas pour horodater. */}
                       {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
                     </div>
-                    {(()=>{ const h=acctHealth(acc); return (
-                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
-                    ); })()}
+                    {(()=>{ const h=acctHealth(acc); return (<>
+                      <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
+                      {h.ago && <span style={{fontSize:11,color:C.muted,marginLeft:8}}>{h.ago}</span>}
+                    </>); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
                         {stars!=null?<>⭐ {stars.toFixed(2)}/5</>:''}
@@ -21062,6 +21096,11 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                         {r.neg>0?<span style={{color:C.danger,fontWeight:500}}> · {r.neg} négatif{r.neg>1?'s':''}</span>:''}
                       </div>
                     ); })()}
+                  </div>
+                </div>
+                <details data-gerer-compte="" style={{flex:'1 1 100%'}}>
+                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0',listStyle:'revert'}}>Gérer ce compte</summary>
+                  <div style={{paddingTop:8}}>
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
                       onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
@@ -21084,10 +21123,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                     {(()=>{ const n=telNorm(acctPhones[String(acc.vinted_user_id)]); if(n.length<9) return null;
                       const autres=(accounts||[]).filter(o=>String(o.vinted_user_id)!==String(acc.vinted_user_id) && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
                       return autres.length ? <div style={{fontSize:11,color:C.warn,marginTop:3}}>Ce numéro sert aussi sur {autres.join(', ')}.</div> : null; })()}
-                  </div>
-                </div>
+                  <div style={{marginTop:8}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  {tr && !tr.loading && <span style={{fontSize:11,fontWeight:500,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
                   {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
                     <button type="button" onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
                       style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
@@ -21095,14 +21132,14 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                            : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
                     </button>
                   ); })()}
-                  <button type="button" onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
-                    {tr?.loading ? 'Test…' : 'Tester la connexion'}
-                  </button>
                   <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
                   </button>
                 </div>
+                  </div>
+                  </div>
+                </details>
               </div>
             );
           })}
@@ -22694,6 +22731,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  // (16 oct.) Les N° des paires EN LIGNE sur eBay — par le SKU « VRM-{n°} »
+  // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
+  // aucune pastille eBay, jamais une fausse.
+  const [ebayNums, setEbayNums] = useState(() => new Set());
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
+      if (!lu || stop) return;
+      const set = new Set();
+      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId); if (c) set.add(cleNum(c)); }
+      setEbayNums(set);
+    } catch (_) {}
+  })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
@@ -31814,7 +31864,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
                     {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
-                    {ailleurs && <div data-aussi-sur style={{fontSize:11,color:C.text}}>Aussi sur <b>Leboncoin</b></div>}
+                    <div data-plateformes style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
+                      <MarquePlateforme p="vinted"/>
+                      {ailleurs && <MarquePlateforme p="leboncoin"/>}
+                      {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
+                      {ailleurs && <span data-aussi-sur style={{fontSize:11,color:C.muted}}>aussi sur Leboncoin</span>}
+                    </div>
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
                       <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
@@ -38756,6 +38811,8 @@ function AppCoeur() {
   const [garagePlace,setGaragePlace]=useState(null); // numéro à ranger dans une case du garage
   // Recherche globale : trouve une paire par N°, titre ou marque dans TOUS les
   // onglets (annonces en ligne, ventes, achats) + sa case au garage.
+  // (16 oct.) Vide ce qui reste des comptes supprimés définitivement (Shopcancale).
+  useEffect(()=>onCloudReady(()=>{ purgerComptesSupprimes(); }),[]);
   const [gsOpen,setGsOpen]=useState(false);
   const [gsQ,setGsQ]=useState('');
   // Recherche globale COMPLÈTE : au 1er usage, on charge une fois les données
@@ -38765,11 +38822,18 @@ function AppCoeur() {
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
-    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
+    // (16 oct.) Julien : « quand je recherche, il y a les annonces de Shopcancale
+    // alors que j'avais demandé de les supprimer ». La recherche lisait les
+    // lignes de TOUS les comptes jamais captés. Elle ne garde plus que ses
+    // comptes LIÉS et pas masqués (`comptesRecherche`) ; liste pas encore lue ⇒
+    // rien n'est écarté (pas su).
+    const okUid=comptesRecherche(vintedAccounts);
+    const duCompte=(r)=>{ if(!okUid) return true; const m=/^harvest_([^_]+)_/.exec(String(r&&r.id||'')); return !m || okUid.has(m[1]); };
+    const lst=(await lireLignesEnLigne((await sb('app_data?id=like.harvest_*_listings&select=id,data')||[]).filter(duCompte))).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
-    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
+    const so=(await sb('app_data?id=like.harvest_*_orders_sold&select=id,data')||[]).filter(duCompte);
     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
-    const po=await sb('app_data?id=like.harvest_*_orders_purchased&select=data')||[];
+    const po=(await sb('app_data?id=like.harvest_*_orders_purchased&select=id,data')||[]).filter(duCompte);
     const seenP=new Set(); for(const r of po){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
     setGsData({online,sold,bought,lbc});
@@ -40297,7 +40361,9 @@ function AppCoeur() {
         let pairs=[], ventes=[], achats=[];
         if(q){
           // Paires numérotées (index principal : N°, titre, marque).
+          const okUid = comptesRecherche(vintedAccounts);
           pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
+            .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
             .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
             .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
