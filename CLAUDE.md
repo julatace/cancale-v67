@@ -10265,6 +10265,55 @@ corrigé, puis rouge sur dc174e7 et rouge sous mutation.
   la case (1), prix illisible accepté (2), planificateur muet (2), prix écrit
   deux fois (2).
 
+### ⚠️⚠️ « ÇA M'A PUBLIÉ SUR VESTIAIRE » — C'ÉTAIT LE BALAYAGE D'ONGLETS, PAS UNE PUBLICATION (15 octobre)
+Plainte de Julien : « quand je publie sur eBay et que j'appuie sur n'importe
+quel bouton, des fois ça m'a publié sur Vestiaire Collective ».
+**MESURÉ AVANT DE CORRIGER, et rien ne publie sur Vestiaire** : aucun chemin —
+app, extension, `api/` — n'écrit, n'ouvre ni ne clique quoi que ce soit sur
+Vestiaire (`vc.js`/`vc-inject.js` ne font que REGARDER, §5.154), aucune « place »
+de publication `vc`, et l'écran Vestiaire dit « pas encore reliée » sans aucun
+bouton de publication. Ce qu'il voyait, c'est l'**ÉCRAN** Vestiaire — et la
+perte du formulaire eBay en cours, qui ressemble à « c'est parti ailleurs ».
+- ⚠️⚠️ **La cause : le balayage d'onglets parcourait `BOTTOM_TABS` BRUT**, où
+  Vestiaire est rangé juste AVANT eBay — alors que la barre du bas, le rail et
+  le menu le cachent tous dans « Autres plateformes ». Depuis eBay, le moindre
+  geste « vers la gauche » (faire défiler au doigt la rangée des sections ou des
+  photos du formulaire, presser un bouton à la souris en glissant — le pavé
+  tactile —, sélectionner du texte, ← après un clic) menait sur un écran
+  qu'aucune barre ne montre, et **démontait le formulaire eBay en cours** avec
+  tout ce qui avait été tapé. Deux listes pour une notion (§11) : la barre
+  filtrait Vestiaire, le balayage non.
+- ⇒ **UNE liste des onglets visibles** (`ONGLETS_BARRE`), lue par la barre, le
+  rail ET le balayage ; Vestiaire (`autre: true`) ne s'ouvre que par SON bouton,
+  et un onglet hors barre ne glisse nulle part.
+- ⇒ **UNE règle pour les trois gestes** (`gestePeutChangerOnglet` — doigt,
+  souris, flèches ; avant : trois boucles recopiées qui ne disaient pas la même
+  chose). Jamais de changement d'onglet : formulaire en cours monté
+  (`data-garde-onglet`, posé sur `EbayPublier` et le planificateur), champ de
+  saisie, fenêtre flottante, `data-noswipe`, rangée qui défile de côté ; à la
+  souris depuis un bouton/lien/contrôle ; au clavier dans un composant à
+  flèches. « Pas su » (exception) ⇒ on ne change pas d'onglet. Le doigt garde le
+  balayage depuis un bouton (un tap ne parcourt pas 70 px — le geste demandé en
+  septembre marche toujours, vérifié dans l'autre sens : zone neutre → voisin
+  visible Leboncoin).
+- Preuves (§6.1, sur l'arbre w15 archivé) : `audit-glisser-onglets.cjs` exécute
+  les vraies règles extraites d'App.jsx (le `slideTab` réel dans un `vm` contre
+  l'expression que la barre REND, `gestePeutChangerOnglet` dans un vrai
+  Chromium) — **7 rouges sur w15** (dont « eBay → plat_vestiaire »), 0 après,
+  et **8 mutations sur 8** rouges (`--mutation anneau·slide·garde·rangee·
+  souris·clavier·champ·fixe`). Banc `bancs/ebay-vestiaire.cjs` (données
+  inventées, 390 et 1512 px) : chaque bouton du flux eBay cliqué (double clic,
+  deux comptes eBay, réponses lentes), gestes au doigt/souris/clavier — aucun ne
+  mène à Vestiaire, RIEN ne part vers Vestiaire (requête, écriture, message au
+  pont), le formulaire garde son titre ; et l'autre sens : le bouton
+  « Vestiaire » ouvre bien Vestiaire, qui ne porte aucun bouton de publication.
+- ⚠️ **Non mesuré** : le geste réel de Julien (lequel des chemins l'a touché —
+  tous menaient au même écran) ; le banc émet les événements tactiles dans la
+  page (le protocole CDP déclenchait le « retour arrière par balayage » du
+  navigateur lui-même, mesuré sur about:blank).
+- **« Bientôt disponible »** (P1) : l'écran Vestiaire est déjà honnête (aucune
+  simulation à couper) — le libellé exact reste au lot P1 annonces.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

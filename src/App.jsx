@@ -8644,9 +8644,63 @@ const BOTTOM_TABS=[
   {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
   {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
   {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire'},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire', autre:true},
   {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
 ];
+// ⚠️⚠️ 15 octobre — « quand je publie sur eBay et que j'appuie sur n'importe
+// quel bouton, des fois ça m'a publié sur Vestiaire Collective ». MESURÉ : aucun
+// chemin ne publie sur Vestiaire (app, extension, api/ ; 0 ligne `vc_*` en
+// base) — ce qu'il voyait, c'est l'ÉCRAN Vestiaire. Le balayage entre onglets
+// (doigt, souris, flèches) parcourait `BOTTOM_TABS` BRUT, où Vestiaire est rangé
+// juste AVANT eBay, alors que la barre, le rail et le menu le cachent dans
+// « Autres plateformes » : depuis eBay, le moindre geste vers la gauche menait
+// sur un écran qu'aucune barre ne montre, et démontait le formulaire eBay en
+// cours. Une seule liste des onglets VISIBLES, lue par la barre, le rail ET le
+// balayage (§11) ; Vestiaire (`autre`) ne s'ouvre que par SON bouton.
+const ONGLETS_BARRE = BOTTOM_TABS.filter(t => !t.autre);
+const ONGLETS_AUTRES = BOTTOM_TABS.filter(t => t.autre);
+// L'onglet voisin dans la barre VISIBLE (`sens` : +1 le suivant, -1 le
+// précédent). Hors de la barre (Vestiaire, Colis, Stock…) : on ne bouge pas.
+function ongletVoisin(tab, sens) {
+  const i = ONGLETS_BARRE.findIndex(x => x.id === tab);
+  if (i < 0) return tab;
+  return ONGLETS_BARRE[Math.min(ONGLETS_BARRE.length - 1, Math.max(0, i + (sens > 0 ? 1 : -1)))].id;
+}
+// UN GESTE NE CHANGE D'ONGLET QUE S'IL N'APPARTIENT À RIEN D'AUTRE (15 octobre).
+// Une règle pour le doigt, la souris et les flèches (avant : trois boucles
+// recopiées, qui ne disaient pas la même chose). Jamais de changement d'onglet :
+//  · tant qu'un formulaire en cours est monté (`data-garde-onglet` : publier ou
+//    programmer sur eBay) — le quitter perd ce qui a été tapé ;
+//  · depuis un champ de saisie, une fenêtre flottante (`position:fixed`) ou une
+//    zone `data-noswipe` ;
+//  · depuis une rangée qui DÉFILE de côté (les photos du formulaire eBay) :
+//    le doigt fait défiler la rangée, il ne demande pas un autre écran ;
+//  · à la souris, depuis un bouton, un lien ou un contrôle : presser un bouton
+//    est un clic, même quand le pavé tactile glisse ;
+//  · au clavier, dans un composant qui se sert lui-même des flèches.
+// Le DOIGT, lui, garde le balayage depuis un bouton : un tap ne parcourt pas
+// 70 px de côté, et c'est le geste que Julien a demandé en septembre.
+// « Pas su » (une exception) ⇒ on ne change pas d'onglet.
+const CONTROLE_SOURIS = 'button,a[href],input,select,textarea,label,summary,[role="button"],[role="link"],[role="tab"],[role="option"],[role="menuitem"],[role="radio"],[role="checkbox"],[role="switch"],[role="slider"],[contenteditable=""],[contenteditable="true"]';
+const ROLES_FLECHES = /^(tab|tablist|radio|radiogroup|slider|listbox|option|menu|menubar|menuitem|menuitemradio|menuitemcheckbox|combobox|spinbutton|grid|gridcell|tree|treeitem|scrollbar)$/;
+function gestePeutChangerOnglet(depart, mode) {
+  try {
+    const doc = (depart && depart.ownerDocument) || document;
+    if (doc.querySelector('[data-garde-onglet]')) return false;
+    let n = depart && depart.nodeType === 1 ? depart : (depart && depart.parentElement) || null;
+    if (n && n.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"]')) return false;
+    if (mode === 'souris' && n && n.closest(CONTROLE_SOURIS)) return false;
+    if (mode === 'clavier' && n) { const r = n.closest('[role]'); if (r && ROLES_FLECHES.test(r.getAttribute('role') || '')) return false; }
+    const vue = doc.defaultView || window;
+    for (; n && n !== doc.body && n !== doc.documentElement; n = n.parentElement) {
+      if (n.dataset && n.dataset.noswipe != null) return false;
+      const cs = vue.getComputedStyle(n);
+      if (cs.position === 'fixed') return false;
+      if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return false;
+    }
+    return true;
+  } catch (_) { return false; }
+}
 // Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
 // (séparation par site) : on y arrive par les cartes du hub Vinted. Mais ils
 // restent listés dans la navigation, sous « Vinted », pour rester DÉCOUVRABLES
@@ -9450,11 +9504,11 @@ function SideBar({ tab, setTab }) {
       <div className="vrm-sidebar-brand"><VrmWord height={26} color={C.onChrome} accent={C.onChrome}/></div>
       <div className="vrm-sidebar-group">
         <div className="vrm-sidebar-label">Plateformes</div>
-        {BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(bouton)}
+        {ONGLETS_BARRE.map(bouton)}
       </div>
-      <details className="vrm-sidebar-group" open={tab==='plat_vestiaire'||undefined}>
+      <details className="vrm-sidebar-group" open={ONGLETS_AUTRES.some(t=>t.id===tab)||undefined}>
         <summary className="vrm-sidebar-label">Autres plateformes</summary>
-        {BOTTOM_TABS.filter(t=>t.id==='plat_vestiaire').map(bouton)}
+        {ONGLETS_AUTRES.map(bouton)}
       </details>
       <div className="vrm-sidebar-group">
         <div className="vrm-sidebar-label">Gestion</div>
@@ -9515,7 +9569,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
     };
   }, [open]);
   const groupes = [
-    { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
+    { titre: bottom?'Autres plateformes':'Plateformes', items: bottom?ONGLETS_AUTRES:BOTTOM_TABS.filter(t => t.id !== 'journee') },
     { titre: 'Gestion', items: NAV_GESTION },
     ...(!bottom?[{ titre: 'Dans Vinted', items: VINTED_TABS }]:[]),
     { titre: 'Autres outils', items: NAV_OUTILS },
@@ -9632,7 +9686,7 @@ function BottomBar({tab,setTab}) {
       // `display:none` (elle est dans le flux, un translate laisserait un vide).
       }}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab;
-        const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
+        const items=ONGLETS_BARRE.map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
@@ -13424,7 +13478,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     </button>
   );
   return (
-    <div ref={racine} data-publier-brouillon-id={brouillonId || ''} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow, scrollMarginTop: 12 }}>
+    // `data-garde-onglet` (15 octobre) : tant que ce formulaire est ouvert,
+    // aucun balayage ni flèche ne change d'onglet — le quitter perdait tout
+    // ce qui avait été tapé (et menait sur Vestiaire, voir `ongletVoisin`).
+    <div ref={racine} data-garde-onglet="ebay-publier" data-publier-brouillon-id={brouillonId || ''} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow, scrollMarginTop: 12 }}>
       {/* En-tête façon feuille de vente eBay */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.card, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 9, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
@@ -15186,7 +15243,7 @@ function EbayPlanificateur({ brouillons = [], paires = [], annoncesEbay, program
   const heureLibre = depart.mode === 'libre' ? depart.heure : (departConcret && departConcret.heure) || '20:00';
   const bilan = envoi && envoi.bilan;
   return (
-    <div data-planif="1" style={{ background: E.card, border: `1px solid ${E.accent}`, borderRadius: 14, padding: '14px', marginTop: 12 }}>
+    <div data-planif="1" data-garde-onglet="ebay-programmer" style={{ background: E.card, border: `1px solid ${E.accent}`, borderRadius: 14, padding: '14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ flex: 1, fontSize: 16, fontWeight: 800, color: E.text }}>Programmer la sélection ({brouillons.length})</span>
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: E.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
@@ -41698,13 +41755,11 @@ function AppCoeur() {
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
   // clavier : une seule règle, sinon les trois finissent par diverger.
+  // ⚠️ 15 octobre : la barre VISIBLE (`ongletVoisin`), jamais `BOTTOM_TABS`
+  // brut — c'est lui qui menait d'eBay à Vestiaire.
   const slideTab=React.useCallback((dx,dy,seuil)=>{
     if(Math.abs(dx)<=seuil || Math.abs(dx)<=Math.abs(dy)*2) return;
-    setTab(t=>{
-      const i=BOTTOM_TABS.findIndex(x=>x.id===t); if(i<0) return t;
-      const ni=dx<0?Math.min(BOTTOM_TABS.length-1,i+1):Math.max(0,i-1);
-      return BOTTOM_TABS[ni].id;
-    });
+    setTab(t=>ongletVoisin(t, dx<0?1:-1));
   },[]);
   // La largeur rendue au zoom est calculée en pixels : il faut la recalculer
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
@@ -41720,9 +41775,8 @@ function AppCoeur() {
   React.useEffect(()=>{
     const onKey=e=>{
       if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
-      if(e.metaKey||e.ctrlKey||e.altKey) return;
-      const a=document.activeElement, tag=a&&a.tagName;
-      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;
+      if(e.metaKey||e.ctrlKey||e.altKey||e.defaultPrevented) return;
+      if(!gestePeutChangerOnglet(document.activeElement||document.body,'clavier')) return;
       slideTab(e.key==='ArrowRight'?-999:999, 0, 1);
     };
     window.addEventListener('keydown',onKey);
@@ -43036,9 +43090,9 @@ function AppCoeur() {
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
       // sinon glisser le tampon changeait d'onglet et perdait le réglage !
-      let n=e.target, overlay=false;
-      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay){ swipeStart.current=null; return; }
+      // (15 octobre) ni dans une rangée qui défile, ni pendant un formulaire en
+      // cours : UNE règle pour les trois gestes (`gestePeutChangerOnglet`).
+      if(!gestePeutChangerOnglet(e.target,'doigt')){ swipeStart.current=null; return; }
       const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
       }}
       onTouchEnd={e=>{
@@ -43054,12 +43108,9 @@ function AppCoeur() {
       // met à défiler, le navigateur envoie `pointercancel` à la place).
       onPointerDown={e=>{
       if(e.pointerType!=='mouse' || e.button!==0) return;
-      const t=e.target, tag=t&&t.tagName;
-      // Ne pas confondre avec une sélection de texte ou l'usage d'un champ.
-      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) { swipeStart.current=null; return; }
-      let n=e.target, overlay=false;
-      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay){ swipeStart.current=null; return; }
+      // Ne pas confondre avec l'usage d'un champ, un bouton pressé qui glisse
+      // (le pavé tactile), une fenêtre flottante ou un formulaire en cours.
+      if(!gestePeutChangerOnglet(e.target,'souris')) { swipeStart.current=null; return; }
       swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
       // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
