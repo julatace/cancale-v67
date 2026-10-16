@@ -17,11 +17,14 @@
 // `vinted`, comme background.js de la 5.116 à la 5.163), `etat` = le cookie.
 // Ce qui est jugé : des attributs `data-*`, la valeur du `<select>`, le style
 // calculé des lignes — jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const path = require('path');
+let chromium;
+try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
+catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const { metaVersData } = require('./_meta.cjs');
-const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
+const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 5700;
+const PORT = Number(process.env.BANC_PORT) || 5700;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -192,13 +195,17 @@ const messagerie = (pg) => pg.evaluate(() => {
       dit(m.etat === 'nonlus' && m.nonlus === '2' && !m.toutLu, 'l’en-tête compte les non-lus de TOUTE la liste affichée — jamais « Tout est lu » au-dessus d’eux', JSON.stringify(m));
       dit(m.autres && m.autres.n === '2' && /bascule Chrome/i.test(m.autres.txt) && m.convs.includes('401') && m.convs.includes('402'), 'ceux de l’autre compte restent listés, leurs non-lus dits À CÔTÉ, avec le geste', JSON.stringify({ ailleurs: m.ailleurs, autres: m.autres, convs: m.convs }));
       dit(!m.convs.includes('501'), 'la conversation du compte EXCLU n’est ni listée ni comptée', JSON.stringify(m.convs));
-      // Les offres : celle d'un compte exclu (333) et d'un compte retiré (444)
-      // n'ont rien à faire là ; celle sans compte connu reste (pas su ≠ autre).
+      // Les offres reçues par EMAIL : leur bloc a été RETIRÉ de Messages
+      // (13f6c89, 13 octobre, « simplifier les écrans revendeurs »). Ce qui
+      // reste à exiger : rien ne le remplace en douce — aucune offre d'un compte
+      // EXCLU (333) ou RETIRÉ (444) n'est listée ni nommée, et aucun bloc
+      // « offres à trancher » ne réapparaît sans la règle `offresAtraiter`
+      // (compte, chronologie, titre non ambigu) qui allait avec.
       await r.pg.waitForTimeout(600);
-      const of = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')), txt: b.innerText } : null; });
-      dit(of && !of.ids.includes('email_offer_x1') && !/compte_c/.test(of.txt), 'l’offre d’un compte EXCLU n’est ni listée ni nommée', JSON.stringify(of && of.ids));
-      dit(of && !of.ids.includes('email_offer_r1') && !/compte_retire/.test(of.txt), 'l’offre d’un compte RETIRÉ de l’app non plus', JSON.stringify(of && of.ids));
-      dit(of && of.ids.includes('email_offer_a1') && of.ids.includes('email_offer_n1') && of.n === '2', 'l’autre sens : la sienne et celle sans compte connu restent, et le nombre suit', JSON.stringify(of && { n: of.n, ids: of.ids }));
+      const of = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages],[data-offre-email]'), txt: document.body.innerText }));
+      dit(!/compte_c|Nike Air Force 1 blanche 42/.test(of.txt), 'l’offre d’un compte EXCLU n’est ni listée ni nommée', of.bloc ? 'un bloc d’offres est rendu' : '');
+      dit(!/compte_retire|Salomon XT-6 noir 43/.test(of.txt), 'l’offre d’un compte RETIRÉ de l’app non plus', '');
+      dit(!of.bloc, 'aucun bloc d’offres par email ne revient sans sa règle (retiré le 13 octobre)', '');
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'filtre-compte-messages-1512.png') });
       // L'autre sens : « Tous les comptes » choisi exprès ⇒ plus de flou, plus de « dont ».
@@ -220,7 +227,12 @@ const messagerie = (pg) => pg.evaluate(() => {
       await r.pg.waitForTimeout(500);
       const m = await messagerie(r.pg);
       const f = await lignesFloues(r.pg, /acheteur_b\d/);
-      dit(!m.toutLu && /^2 non lus/.test(m.texte), 'compte choisi : l’en-tête dit « 2 non lus », jamais « Tout est lu » au-dessus des lignes estompées', JSON.stringify({ texte: m.texte, f }));
+      // ⚠️ (16 octobre) Un choix EXPLICITE filtre désormais la liste (13
+      //    octobre) : les conversations de compte_b ne sont plus estompées mais
+      //    absentes. La RÈGLE ne change pas : leurs 2 non-lus ne disparaissent
+      //    jamais en silence — dits à côté, avec le geste — et l'en-tête ne
+      //    passe pas à « tout lu » au-dessus d'eux.
+      dit(m.etat !== 'toutlu' && !m.toutLu && m.ailleurs === '2', 'compte choisi : les 2 non-lus de l’autre compte sont DITS, jamais « tout lu » au-dessus d’eux', JSON.stringify({ etat: m.etat, ailleurs: m.ailleurs, texte: m.texte, f }));
       await r.ctx.close();
     });
 
@@ -248,7 +260,10 @@ const messagerie = (pg) => pg.evaluate(() => {
         try { return await rendre(b, { chrome: '111', onglet: 'cat_msg' }); } finally { LIGNES[2] = save; }
       })();
       const m = await messagerie(r2.pg);
-      dit(m.toutLu && m.etat === 'toutlu' && m.ko === null && m.ailleurs === null, 'autre sens : rien de non lu, toutes les boîtes lues ⇒ « Tout est lu »', JSON.stringify(m));
+      // L'en-tête n'écrit plus « Tout est lu » en toutes lettres (13 octobre :
+      // « N conversations » + le filtre « Non lues N ») : on juge l'ÉTAT décidé
+      // et le compteur des non-lus, pas la phrase.
+      dit(m.etat === 'toutlu' && m.nonlus === '0' && m.ko === null && m.ailleurs === null, 'autre sens : rien de non lu, toutes les boîtes lues ⇒ état « tout lu »', JSON.stringify(m));
       await r2.ctx.close();
     });
 
