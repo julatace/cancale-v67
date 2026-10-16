@@ -34152,6 +34152,17 @@ function relierAnnonceLbc(id, n) {
   try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
   save('vrm_lbc_liens', liens);
 }
+// « Je me suis trompé » (16 oct., Julien : « j'ai mal relié une paire, il faut
+// que je puisse enlever ça »). On ne SUPPRIME pas la clé : le nuage la
+// rendrait à la fusion (local par-dessus nuage). On pose une valeur VIDE, que
+// l'app (`clesAnnonceLbc`) et l'extension (`adRefKeys`, `cleNum('')`) ignorent
+// — l'annonce redevient « non reliée » et peut être reliée à la bonne paire.
+function delierAnnonceLbc(id) {
+  if (id == null) return;
+  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: '' };
+  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+  save('vrm_lbc_liens', liens);
+}
 // « Ce n'est aucune de celles-là » (16 oct., Julien : « ça sert à rien de relier
 // une paire vendue, je n'ai plus de numéro »). Sa réponse, rangée par identité
 // — `tx:{transaction}` pour une vente, `ad:{annonce}` pour une annonce en ligne —
@@ -35156,10 +35167,14 @@ function LeboncoinScreen() {
     const nonRelieesTout = unlinked.length;
     const unlinkedAsk = unlinked.filter((u) => !pasDePaire['ad:' + (u.id != null ? u.id : '')]);
     const nonRelieesSansJumelle = nonRelieesTout - unlinkedAsk.length;
+    // Les liens qu'IL a posés (non vides) : la liste qui permet de les défaire.
+    const adParId = new Map((Array.isArray(lbcAds) ? lbcAds : []).map((a) => [String(a && a.id), a]));
+    const liensPoses = Object.entries(liens).filter(([, n]) => n != null && String(n).trim())
+      .map(([id, n]) => { const a = adParId.get(String(id)) || {}; return { id, numero: String(n), titre: a.subject || a.title || '', image: (Array.isArray(a.images) && a.images[0]) || '' }; });
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -35214,7 +35229,13 @@ function LeboncoinScreen() {
                     {d.vendueVinted.length > 0 && <span style={{ color: C.warn, fontWeight: 700 }}> · vendue AUSSI sur Vinted : une des deux ventes ne pourra pas partir — annule-en une</span>}
                   </div>
                 </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
                 {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
+                {data.liensMain && String(data.liensMain[String(d.ad.id)] || '').trim() && (
+                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans paire » et tu pourras choisir la bonne.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
+                    style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas la bonne paire</button>
+                )}
+                </div>
               </div>
             );
           })}
@@ -35504,6 +35525,26 @@ function LeboncoinScreen() {
           le DERNIER de douze blocs, après la préparation de la publication, un
           paragraphe d'explication, les comptes et la limite de l'offre. Ce qui
           se LIT une fois descend ici ; ce qui se FAIT reste en haut. */}
+      {data && Array.isArray(data.liensPoses) && data.liensPoses.length > 0 && (
+        <details data-lbc-liens={data.liensPoses.length} style={{ marginTop: 6 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: C.muted, padding: '8px 2px' }}>Paires que tu as reliées ({data.liensPoses.length}) — corriger une erreur</summary>
+          <Card>
+            {data.liensPoses.map((l, i) => (
+              <div key={l.id} data-lien-lbc={l.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>
+                  {l.image ? <PhotoVinted src={l.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
+                </div>
+                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Annonce Leboncoin'}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>reliée à la N°{l.numero}</div>
+                </div>
+                <button type="button" data-lbc-delier={l.id} onClick={() => { if (window.confirm(`Retirer le lien avec la N°${l.numero} ? L'annonce redevient « non reliée » et tu pourras choisir la bonne paire.`)) { delierAnnonceLbc(l.id); reload(); } }}
+                  style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer' }}>Délier</button>
+              </div>
+            ))}
+          </Card>
+        </details>
+      )}
       {data && (
         <details data-lbc-details="" style={{ marginTop: 6 }}>
           <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: C.muted, padding: '8px 2px' }}>Détails et réglages</summary>
