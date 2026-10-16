@@ -111,6 +111,10 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   });
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  // Au téléphone (16 octobre), « Adresses de réception » est un SOUS-ÉCRAN de
+  // Réglages (chevron) : on l'ouvre, comme lui. Sur ordinateur tout est déplié.
+  const sousAdr = pg.locator('[data-sous-ouvrir="adresses"]').first();
+  if (await sousAdr.isVisible().catch(() => false)) { await sousAdr.click(); await pg.waitForTimeout(600); }
   return { ctx, pg, erreurs, appels, lecturesRls, etat };
 }
 // Le panneau « Mes adresses de réception », lu sur ce qui est RENDU.
