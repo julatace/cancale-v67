@@ -1,3 +1,4 @@
+import {etatCommandeEbay} from './ebay-etat-commande.js';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_',textNodeName:'#text',parseTagValue:false,trimValues:false,removeNSPrefix:true});
@@ -16,7 +17,7 @@ export function lireXmlEbay(source,appel) {
 export function messagesEbay(root) {
   return liste(root?.MemberMessage?.MemberMessageExchange).map(e=>{
     const q=e.Question || {},it=e.Item || {};
-    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(texte),status:texte(e.MessageStatus),date:texte(e.CreationDate)};
+    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(r=>typeof r==='object'?texte(r.Body ?? r.Message ?? r):texte(r)).filter(Boolean),status:texte(e.MessageStatus),date:texte(e.CreationDate)};
   }).filter(m=>m.id);
 }
 export function offresEbay(root) {
@@ -81,7 +82,7 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const f=await ebayJson(`${apiOrigin}/sell/fulfillment/v1/order/${encodeURIComponent(b.orderId)}/shipping_fulfillment`,a.token);
     if(!f.ok || !Array.isArray(f.data?.fulfillments))return echec('Le suivi existant n’a pas pu être vérifié. Rien n’a été envoyé.',502);
     if(f.data.fulfillments.some(x=>x.shipmentTrackingNumber===tracking && String(x.shippingCarrierCode).toLowerCase()===carrier.toLowerCase()))return succes({deja:true});
-    if(o.order.orderFulfillmentStatus==='FULFILLED')return echec('Cette commande est déjà expédiée. Actualise son suivi.',409);
+    if(!etatCommandeEbay(o.order).peutExpedier)return echec('L’état d’expédition de cette commande doit être vérifié. Actualise son suivi.',409);
     const lineItems=lignesRestantAExpedier(o.order,f.data.fulfillments);
     if(!lineItems)return echec('Les quantités à expédier ne sont pas lisibles.',502);
     if(!lineItems.length)return echec('Toutes les pièces ont déjà une expédition.',409);
@@ -108,6 +109,20 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const total=Number(texte(r.root.PaginationResult?.TotalNumberOfPages));
     return succes({messages:messagesEbay(r.root),page,totalPages:Number.isInteger(total)&&total>=0?total:null});
   }
+  async function message(b,owner){
+    if(!id(b.itemId) || !/^[A-Za-z0-9_-]{1,64}$/.test(String(b.messageId || '')))return echec('Message invalide.');
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await lire('GetMemberMessages',`<MailMessageType>All</MailMessageType><ItemID>${b.itemId}</ItemID><MemberMessageID>${b.messageId}</MemberMessageID>`,a.token);if(!r.root)return r;
+    const m=messagesEbay(r.root).find(m=>m.id===String(b.messageId) && m.itemId===String(b.itemId));
+    return m?succes({message:m}):echec('Ce message n’est plus disponible pour cette annonce.',404);
+  }
+  async function offre(b,owner){
+    if(!id(b.itemId) || !id(b.offerId))return echec('Offre invalide.');
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await lire('GetBestOffers',`<BestOfferID>${b.offerId}</BestOfferID>`,a.token);if(!r.root)return r;
+    const o=offresEbay(r.root).find(o=>o.id===String(b.offerId) && o.itemId===String(b.itemId));
+    return o?succes({offre:o}):echec('Cette offre n’est plus disponible pour cette annonce.',404);
+  }
   async function repondre(b,owner){
     if(b.confirme!==true)return echec('Confirme la réponse.',400,'confirmation');
     const body=String(b.body || '').trim();
@@ -130,7 +145,7 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     const a=await jeton(owner);if(!a.token)return a;
     const r=await lire('GetBestOffers',`<BestOfferID>${b.offerId}</BestOfferID>`,a.token);if(!r.root)return r;
     const offer=offresEbay(r.root).find(o=>o.id===String(b.offerId) && o.itemId===String(b.itemId));
-    if(!offer || !['Pending','Active'].includes(offer.status) || (offer.expiresAt && Date.parse(offer.expiresAt)<=Date.now()))return echec('Cette offre n’est plus en attente.',409);
+    if(!offer || !['Pending','Active'].includes(offer.status) || (offer.expiresAt && (!Number.isFinite(Date.parse(offer.expiresAt)) || Date.parse(offer.expiresAt)<=Date.now())))return echec('Cette offre n’est plus en attente.',409);
     if((!argent(b.expectedPrice) || !argent(offer.price) || Math.round(Number(String(b.expectedPrice).replace(',','.'))*100)!==Math.round(Number(offer.price)*100)) || b.currency!==offer.currency || !/^[A-Z]{3}$/.test(offer.currency || '') || !Number.isInteger(offer.quantity) || offer.quantity<1)return echec('L’offre a changé ou ses montants ne sont pas lisibles. Actualise-la.',409);
     let inner=`<ItemID>${offer.itemId}</ItemID><BestOfferID>${offer.id}</BestOfferID><Action>${b.decision}</Action>`;
     if(b.decision==='Counter')inner+=`<CounterOfferPrice currencyID="${offer.currency}">${Number(String(b.price).replace(',','.')).toFixed(2)}</CounterOfferPrice><CounterOfferQuantity>${offer.quantity}</CounterOfferQuantity>`;
@@ -164,5 +179,5 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     if(!id(b.itemId))return echec('Annonce invalide.');const a=await jeton(owner);if(!a.token)return a;
     return ecrire('EndFixedPriceItem',`<ItemID>${b.itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`,a.token);
   }
-  return {commande,transporteurs,expedier,contacterAcheteur,messages,repondre,offres,repondreOffre,modifierAnnonce,terminerAnnonce};
+  return {commande,transporteurs,expedier,contacterAcheteur,messages,message,repondre,offres,offre,repondreOffre,modifierAnnonce,terminerAnnonce};
 }

@@ -1,3 +1,6 @@
+import {creerLectureCommandesEbay} from './_lib/ebay-commandes-pages.js';
+import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
+import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
 //
 // ⚠️ POURQUOI TOUT EN UN FICHIER : le plan Vercel Hobby limite à 12 fonctions
@@ -23,7 +26,7 @@ import crypto from 'crypto';
 import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
+import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -1492,17 +1495,20 @@ async function handleSync(ctx) {
   //    capture.
   const at2 = Date.now();
   let rangeRegles = null;
+  let annoncesRange=false,commandesRange=false,programmeesRange=false,stockRange=false;
   if (liste.ok) {
-    await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner);
-    await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner);
+    annoncesRange=await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner)===true;
+    programmeesRange=await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner)===true;
     // Les règles : lire-fusionner-réécrire GARDÉ (une lecture ratée de la ligne
     // n'écrit rien). Une liste COMPLÈTE dit quelles annonces n'existent plus :
     // leurs règles sortent ; une liste incomplète ne prouve aucune absence.
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  if (orders.ok && orders.data) await storeData(ligneDe('ebay_orders', ctx), { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, ctx.owner);
-  if (inv.ok && inv.data) await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
+  const lectureCommandesId=crypto.randomUUID();
+  const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
+  if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
+  if (inv.ok && Array.isArray(inv.data?.inventoryItems))stockRange=await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems, status: inv.status, capturedAt: at2 }, ctx.owner)===true;
   // Le principal dont l'identité n'est pas encore apprise : on la demande à
   // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
   // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
@@ -1511,7 +1517,8 @@ async function handleSync(ctx) {
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: !!liste.ok, programmees: !!liste.ok, commandes: !!(orders.ok && orders.data), stock: !!(inv.ok && inv.data), regles: rangeRegles === true },
+    lu: { annonces: annoncesRange, programmees: programmeesRange, commandes: commandesRange, stock: stockRange, regles: rangeRegles === true },
+    complet: {annonces:annoncesRange && liste.complet===true,commandes:commandesRange && captureCommandes?.complet===true},
     listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
@@ -1649,6 +1656,7 @@ async function handleModifierAnnonceGestion(b,ctx){
 }
 
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
+const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeCommandes,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
 
 async function handleApp(req, res) {
@@ -1743,17 +1751,26 @@ async function handleApp(req, res) {
     // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
     // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
+      agent:async(ctx)=>preparerAgentEbay({
+        orders:await lireDonnee(ligneDe('ebay_orders',ctx),ctx.owner),
+        messages:await gestionEbay.messages({page:1},ctx),
+        offres:await gestionEbay.offres({page:1},ctx),
+        journal:await lireDonnee(ligneDe('ebay_agent_journal',ctx),ctx.owner),
+      }),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),
       messageacheteur:(ctx)=>gestionEbay.contacterAcheteur(b,ctx),
       messages:(ctx)=>gestionEbay.messages(b,ctx),
+      message:(ctx)=>gestionEbay.message(b,ctx),
+      offredetail:(ctx)=>gestionEbay.offre(b,ctx),
       repondre:(ctx)=>gestionEbay.repondre(b,ctx),
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
       sync: (ctx) => handleSync(ctx),
+      commandessuite:(ctx)=>chargerCommandesSuivantes(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),
       pubverify: (ctx) => handleVerify(b, ctx),
@@ -1775,7 +1792,11 @@ async function handleApp(req, res) {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);
     if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
-    const r = await ACTIONS[action]({ owner, compte: rc.compte });
+    const ctx={owner,compte:rc.compte};
+    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce']);
+    const r = commerciales.has(action) && b.confirme===true
+      ? await executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
+      : await ACTIONS[action](ctx);
     res.status(r.status).json(r.body);
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

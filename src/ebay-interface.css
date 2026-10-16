@@ -1,0 +1,69 @@
+/* eBay : compact sur téléphone, lisible sans changer les actions métier. */
+.vrm-ebay-task-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vrm-ebay-task-filters button{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:40px;transition:background .15s}
+.vrm-ebay-filter-count{font-size:10px;font-variant-numeric:tabular-nums;opacity:.7}
+.vrm-ebay-tasks button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.vrm-ebay-task-row{min-height:54px}
+.vrm-ebay-task-row:hover{filter:brightness(.97)}
+@media(min-width:1000px){.vrm-ebay-task-groups{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}}
+@media(max-width:480px){
+.vrm-ebay-task-filters{gap:4px}
+.vrm-ebay-task-filters button{padding:7px 3px!important;font-size:11px!important;gap:3px}
+.vrm-ebay-heading h2{font-size:18px!important}
+.vrm-ebay-task-row{padding:9px 10px!important}
+.vrm-ebay-task-row small{font-size:10px;overflow-wrap:anywhere}
+.vrm-ebay-tasks input[type=search]{font-size:16px!important}
+}
+
+/* Listes et offres : même rythme, actions courtes, détails à la demande. */
+.vrm-ebay-sales{max-width:1200px;margin-inline:auto}
+.vrm-ebay-sales .vrm-shared-workbar{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.vrm-ebay-sales .vrm-shared-workbar>input{flex:1 1 260px;width:auto!important;margin:0!important;min-width:0;box-sizing:border-box;min-height:40px}
+.vrm-ebay-sales .vrm-sales-filters{margin:0!important;gap:4px!important}
+.vrm-ebay-results{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 12px;color:var(--vrm-muted);font-size:11px}
+.vrm-ebay-results button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer;min-height:36px;font:inherit}
+.vrm-ebay-empty{padding:24px 16px;border:1px dashed var(--vrm-line);border-radius:12px;font-size:13px}
+.vrm-ebay-empty p{color:var(--vrm-muted);font-size:12px;line-height:1.5}
+.vrm-ebay-sale-status{display:inline-block;padding:3px 6px;border-radius:5px;background:var(--vrm-surface);color:var(--vrm-ink);font-size:10px;font-weight:600}
+.vrm-ebay-sale-status[data-state=pending]{box-shadow:inset 2px 0 var(--vrm-accent)}
+.vrm-ebay-sales .vrm-sale-meta{line-height:1.6}
+.vrm-ebay-sales .vrm-sale-price{font-variant-numeric:tabular-nums}
+.vrm-ebay-offers{max-width:1200px;margin-inline:auto}
+.vrm-ebay-offer-card{position:relative;box-shadow:0 2px 8px #00000004}
+.vrm-ebay-offer-heading b.vrm-display{letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.vrm-ebay-offer-actions{display:grid!important;grid-template-columns:1fr 1fr;max-width:320px}
+.vrm-ebay-offer-actions button{min-height:40px}
+.vrm-ebay-offer-state{font-size:11px;color:var(--vrm-muted)}
+.vrm-ebay-counteroffer{border-top:1px solid var(--vrm-line);padding-top:10px}
+.vrm-ebay-counteroffer input{min-width:0}
+.vrm-ebay-counteroffer summary{min-height:32px;display:flex;align-items:center}
+.vrm-ebay-offers button:focus-visible,.vrm-ebay-sales button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+@media(max-width:767px){
+.vrm-ebay-sales{padding:12px!important;padding-bottom:40px!important}
+.vrm-ebay-sales .vrm-shared-workbar{gap:8px}
+.vrm-ebay-sales .vrm-shared-workbar>input{flex-basis:100%;font-size:16px!important}
+.vrm-ebay-sales .vrm-sales-filters{display:grid!important;width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+.vrm-ebay-sales .vrm-sales-filters button{padding:8px 4px!important;min-height:38px;font-size:11px!important}
+.vrm-ebay-sales .vrm-ebay-order-actions{margin-left:86px;margin-right:12px}
+.vrm-ebay-sales .vrm-ebay-order-actions>summary{padding:4px 0;min-height:32px;font-size:11px}
+.vrm-ebay-offer-card{padding:12px!important}
+.vrm-ebay-offer-heading{gap:8px!important}
+.vrm-ebay-offer-heading>.vrm-display{font-size:18px!important}
+.vrm-ebay-offer-actions{max-width:none;gap:6px!important}
+.vrm-ebay-offers input,.vrm-ebay-offers textarea{font-size:16px!important}
+}
+
+.vrm-ebay-offer-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 145px;align-items:end;gap:10px;margin-bottom:10px}
+.vrm-ebay-offer-toolbar>input{min-width:0}
+.vrm-ebay-offer-card{min-width:0;align-self:start}
+.vrm-ebay-offer-heading b{overflow-wrap:anywhere}
+@media(min-width:1000px){.vrm-ebay-offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.vrm-ebay-offer-toolbar{grid-template-columns:minmax(0,1fr) 114px;gap:6px}.vrm-ebay-offer-toolbar>label{font-size:10px!important}.vrm-ebay-offer-toolbar input,.vrm-ebay-offer-toolbar select{padding:9px 7px!important}.vrm-ebay-offers h2{font-size:18px!important}}
+
+.vrm-ebay-order-state{font-size:11px;font-weight:600;color:var(--vrm-muted)}
+.vrm-ebay-order-items h3{margin:0 0 8px;font-size:12px}
+.vrm-ebay-order-items p{font-size:12px;color:var(--vrm-muted)}
+.vrm-ebay-order-item{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--vrm-line);font-size:12px}
+.vrm-ebay-order-item>div{min-width:0;overflow-wrap:anywhere}
+.vrm-ebay-order-item small{display:block;margin-top:4px;color:var(--vrm-muted);font-size:10px}
+.vrm-ebay-order-item>span{flex-shrink:0;font-variant-numeric:tabular-nums}
