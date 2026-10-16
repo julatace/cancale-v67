@@ -1,11 +1,11 @@
 /* Direction claire Minéral. Chargée après la feuille historique.
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
-:root[data-theme="light"] { --vrm-focus:#A63F23; }
-:root[data-theme="light"] body { background:#F4F3EF; }
+:root[data-theme="light"] { --vrm-focus:#2458E6; }
+:root[data-theme="light"] body { background:#F4F6FA; }
 :root[data-theme="light"] body::before { content:none; }
-:root[data-theme="light"] ::selection { background:rgba(166,63,35,.16); }
-:root[data-theme="light"] :focus-visible { outline:2px solid #A63F23; outline-offset:3px; }
+:root[data-theme="light"] ::selection { background:rgba(36,88,230,.14); }
+:root[data-theme="light"] :focus-visible { outline:2px solid #2458E6; outline-offset:3px; }
 .vrm-button {
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
   min-height:44px; max-width:100%; padding:11px 18px; border-radius:8px;
@@ -17,7 +17,7 @@
 .vrm-button svg { flex-shrink:0; }
 .vrm-button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
 .vrm-button:active:not(:disabled) { transform:translateY(1px); }
-.vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#A63F23); outline-offset:3px; }
+.vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#2458E6); outline-offset:3px; }
 
 /* Une navigation par plateforme et des pages composées dans le même gabarit. */
 .vrm-sidebar {
@@ -187,8 +187,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-finance-metric { background:var(--vrm-surface); border:1px solid var(--vrm-line); border-radius:12px; padding:18px; min-width:0; }
 .vrm-finance-metric > * { padding:0 !important; border:0 !important; }
 .vrm-finance-metric .vrm-display { font-size:28px !important; letter-spacing:-.8px; line-height:1.2; }
-.vrm-finance-metric.is-primary { background:#153e36; border-color:#153e36; }
-.vrm-finance-metric.is-primary * { color:#f5faf7 !important; }
+.vrm-finance-metric.is-primary { background:#0E1A2B; border-color:#0E1A2B; }
+.vrm-finance-metric.is-primary * { color:#EAEFF7 !important; }
 .vrm-finance-metric.is-primary .vrm-display { font-size:36px !important; }
 .vrm-finance-stock > summary { font-size:12px; cursor:pointer; color:var(--vrm-muted); padding:8px 0; }
 .vrm-finance-stock-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:8px; }
@@ -199,7 +199,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-message-workspace { display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:14px; align-items:start; }
 .vrm-inbox-column { min-width:0; }
 .vrm-chat-column { min-width:0; position:sticky; top:0; }
-.vrm-inbox-row.is-current { background:var(--vrm-bg) !important; box-shadow:inset 3px 0 #007f85; }
+.vrm-inbox-row.is-current { background:var(--vrm-bg) !important; box-shadow:inset 3px 0 #2458E6; }
 .vrm-chat-inline { position:static !important; inset:auto !important; background:transparent !important; z-index:auto !important; align-items:stretch !important; }
 .vrm-chat-inline .vrm-chat-panel { width:100% !important; max-width:none !important; height:620px; max-height:calc(100dvh - 150px) !important; border:1px solid var(--vrm-line); border-radius:12px !important; }
 .vrm-chat-history { min-height:0; overscroll-behavior:contain; }
@@ -347,7 +347,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* Poste de travail, 14 octobre : repères stables et surfaces plus légères. */
 .vrm-mobile-nav { gap:2px; background:var(--vrm-surface) !important; border-top:1px solid var(--vrm-line) !important; }
 .vrm-mobile-nav > button[aria-current="page"] { color:var(--vrm-ink) !important; }
-.vrm-mobile-nav > button[aria-current="page"] > span:first-child { background:var(--vrm-focus,#A63F23); color:#fff; border-radius:9px; width:44px !important; }
+.vrm-mobile-nav > button[aria-current="page"] > span:first-child { background:var(--vrm-focus,#2458E6); color:#fff; border-radius:9px; width:44px !important; }
 .vrm-mobile-nav .vrm-nav-more { flex:1 1 0; width:auto !important; height:auto !important; min-width:0; flex-direction:column; gap:5px; border:0 !important; border-radius:0 !important; background:transparent !important; color:var(--vrm-muted) !important; font-weight:500; }
 .vrm-menu-bottom { top:auto !important; bottom:0; border-radius:20px 20px 0 0; border-bottom:0 !important; padding:14px 14px calc(18px + env(safe-area-inset-bottom)) !important; }
 .vrm-menu-bottom .vrm-menu-group:first-of-type { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
@@ -365,7 +365,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-sale-title { letter-spacing:-.015em; }
 .vrm-finance-overview { gap:1px; border:1px solid var(--vrm-line); border-radius:16px; overflow:hidden; background:var(--vrm-line); }
 .vrm-finance-metric { border:0; border-radius:0; padding:22px; }
-.vrm-finance-metric.is-primary { background:#173c35; }
+.vrm-finance-metric.is-primary { background:#0E1A2B; }
 .vrm-finance-metric.is-primary .vrm-display { font-size:40px !important; letter-spacing:-1.4px; }
 .vrm-finance-goal > div { border-radius:12px; }
 .vrm-inbox-filters { display:flex; gap:6px; padding:0 0 12px; }
@@ -375,7 +375,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-inbox-feedback { color:var(--vrm-muted); font-size:12px; padding:12px 0; }
 .vrm-inbox-row { border-radius:0 !important; padding:14px 12px !important; }
 .vrm-inbox-row > img { width:46px !important; height:58px !important; border-radius:7px !important; }
-.vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#A63F23); }
+.vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#2458E6); }
 .vrm-inbox-column input[type="search"] { border-radius:10px !important; background:var(--vrm-surface) !important; }
 .vrm-chat-empty { border-style:dashed; background:transparent; min-height:320px; }
 @media(hover:hover) and (pointer:fine) {
@@ -512,7 +512,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 
 /* Commandes : cible claire, focus visible et états explicites. */
 .vrm-app-shell button { touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-.vrm-app-shell button:focus-visible, .vrm-app-shell summary:focus-visible, .vrm-app-shell a:focus-visible { outline:2px solid var(--vrm-focus,#A63F23); outline-offset:3px; }
+.vrm-app-shell button:focus-visible, .vrm-app-shell summary:focus-visible, .vrm-app-shell a:focus-visible { outline:2px solid var(--vrm-focus,#2458E6); outline-offset:3px; }
 .vrm-app-shell button:disabled { cursor:not-allowed; }
 .vrm-icon-control { min-width:36px; min-height:36px; }
 @media(hover:hover) and (pointer:fine) {
@@ -547,7 +547,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 }
 .vrm-setting-switch { min-width:46px; min-height:44px; height:44px !important; background:transparent !important; border:0 !important; }
 .vrm-setting-switch::before { content:''; position:absolute; left:0; top:calc(50% - 13.5px); width:46px; height:27px; border:1px solid var(--vrm-line); border-radius:999px; background:var(--vrm-bg); }
-.vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#A63F23); border-color:var(--vrm-focus,#A63F23); }
+.vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#2458E6); border-color:var(--vrm-focus,#2458E6); }
 .vrm-setting-switch > span { top:calc(50% - 10.5px) !important; }
 .vrm-mobile-nav .vrm-nav-more > span:first-child { display:grid; place-items:center; width:44px; height:26px; }
 .vrm-pickup-point { position:relative; overflow:visible !important; }
@@ -572,4 +572,18 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 @media(max-width:767px){
  .vrm-chat-panel input:not([type="checkbox"]):not([type="radio"]),
  .vrm-chat-panel select{font-size:16px!important;min-height:40px;max-width:100%;box-sizing:border-box}
+}
+
+/* ── Barre latérale BLEU NUIT (direction du 16 octobre, maquette de Julien) ──
+   On redéfinit localement les variables de couleur sur la barre : tous les
+   enfants (labels, liens, lien actif, filets) les lisent déjà, donc ils
+   passent en « sur fond sombre » sans toucher à leur structure. Scopé au
+   thème clair ; en sombre, l'app est déjà sombre partout. */
+:root[data-theme="light"] .vrm-sidebar {
+  background:#0E1A2B;
+  --vrm-ink:#EAEFF7; --vrm-muted:#93A1B8;
+  --vrm-line:rgba(255,255,255,.10); --vrm-surface:rgba(255,255,255,.08);
+}
+:root[data-theme="light"] .vrm-sidebar-link[aria-current="page"] {
+  background:rgba(255,255,255,.10); color:#FFFFFF;
 }

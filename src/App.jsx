@@ -321,11 +321,13 @@ const THEMES = {
     s1:"#3D7BFF", s2:"#8AB4FF",
   },
 };
-// ── DIRECTION « MINÉRAL » (choisie par Julien, 13 octobre) ───────────────────
-// Palette claire préparée par codex (src/themeMineral.js), appliquée VERBATIM
-// au thème clair : papier chaud, actions à l'encre. Les valeurs de codex
-// gagnent ; toute clé qu'elles ne couvrent pas garde sa valeur d'avant (aucun
-// jeton ne devient indéfini). Le thème SOMBRE n'est pas touché.
+// ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
+// La palette de src/themeMineral.js est appliquée VERBATIM au thème clair :
+// fond clair FROID, encre, un bleu de marque, barre latérale bleu nuit (via le
+// jeton `chrome`). Elle REMPLACE la direction « Minéral » pierre du 13 octobre,
+// que Julien a refusée. Mêmes hex que la page d'accueil (identité commune).
+// Toute clé non couverte garde sa valeur d'avant ; le thème SOMBRE n'est pas
+// touché.
 Object.assign(THEMES.light, MINERAL);
 let C = THEMES.light;
 
@@ -34681,11 +34683,11 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
   const sugg = (suggestions || []).filter((s) => s && s.numero);
   return (
     <div data-lbc-relier={id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: '1 1 150px', minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
         <div style={{ fontSize: 11, color: C.muted }}>
           {detail || (ad.price != null ? `${ad.price} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
@@ -34693,7 +34695,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
         </div>
         {msg && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg}</div>}
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
         <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
           inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
           style={{ width: 54, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 7px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
