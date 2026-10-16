@@ -33,7 +33,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4771;
+const PORT = Number(process.env.BANC_PORT) || 4771;
 
 const now = Date.now();
 const iso = (h) => new Date(now - h * 3600e3).toISOString();
@@ -384,7 +384,13 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
         etat[nom] = await r.pg.evaluate(() => { const t = document.body.innerText; const i = t.indexOf('compte_444'); return t.slice(i, i + 120).replace(/\s+/g, ' '); });
         await r.ctx.close();
       }
-      dit(/Pas capté/.test(etat.avec) && !/À jour/.test(etat.avec), 'compte figé depuis 3 jours, relu en public il y a 10 min : toujours « Pas capté », jamais « À jour »', JSON.stringify(etat));
+      // (16 octobre) La pastille ne dit plus que « Actif / Banni » (#539) ; la
+      // fraîcheur vit dans une ligne grise « capté il y a … ». La RÈGLE reste :
+      // la lecture PUBLIQUE n'est pas une capture de SA session
+      // (`ligneDeSaSession`) — la ligne doit dire le même âge (3 j) avec ou
+      // sans elle, jamais « il y a moins d'une heure ».
+      const age = (t) => (/capté il y a ([^A-Z]*?)(?= Gérer|$)/.exec(t) || [])[1] || null;
+      dit(/3 j/.test(age(etat.avec) || '') && age(etat.avec) === age(etat.sans) && !/À jour|moins d.une heure/.test(etat.avec), 'compte figé depuis 3 jours, relu en public il y a 10 min : toujours « capté il y a 3 j », jamais rajeuni', JSON.stringify(etat));
       // Un compte « refusé par Vinted » (liste propre à l'appareil), sans aucune
       // capture de SA session depuis 10 jours, le reste — même relu en public.
       const dix = 240;

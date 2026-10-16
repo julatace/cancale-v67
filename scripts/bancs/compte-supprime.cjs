@@ -71,6 +71,11 @@ async function preparer(b, vp, opts = {}) {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
+    // 5.181 : l'état actif / banni évalué par l'extension (`panel_comptes_etat`).
+    if (eq && eq[1] === 'panel_comptes_etat') {
+      if (opts.etatKO) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
+      return j(opts.etatExt ? [{ data: { comptes: opts.etatExt } }] : []);
+    }
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
     const ors = [...u.matchAll(/id\.like\.([^,)]+)/g)].map((m) => m[1]);
     if (ors.length) { const res = ors.map((x) => new RegExp('^' + x.replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$')); return j(ROWS.filter((r) => res.some((re) => re.test(r.id))).map(forme)); }
@@ -123,6 +128,24 @@ async function main() {
         const net = await pg.evaluate(() => { const e = document.querySelector('.vrm-sensible'); return e ? getComputedStyle(e).filter : ''; });
         dit(!/blur/.test(net), `${T} un clic sur la pastille arrête le flou`, net);
         dit(!errs.length, `${T} aucune erreur d’app`, errs[0]);
+        await ctx.close();
+      });
+    }
+    // 5.181 — l'EXTENSION a lu `is_account_banned: true` dans le profil : la carte
+    // dit « Banni par Vinted » ; une lecture ratée de cette ligne ne bannit rien.
+    for (const [nom, opts, attendu] of [
+      ['l\'extension dit banni', { etatExt: { '111': { etat: 'banni', at: new Date(MAINTENANT).toISOString(), preuve: 'champ profil is_account_banned' } } }, 'banni'],
+      ['ligne illisible (522)', { etatKO: true }, 'actif'],
+      ['l\'extension dit passu', { etatExt: { '111': { etat: 'passu', at: new Date(MAINTENANT).toISOString(), preuve: 'champ profil is_account_banned absent' } } }, 'actif'],
+    ]) {
+      await essaie(nom, async () => {
+        const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, opts);
+        await pg.goto(`http://localhost:${PORT}/?tab=vintedaccounts`, { waitUntil: 'domcontentloaded' });
+        await pg.getByText('compte_vivant').first().waitFor({ timeout: 12000 });
+        await pg.waitForTimeout(1200);
+        const ec = await pg.evaluate(() => [...document.querySelectorAll('[data-etat-compte]')].map((e) => e.getAttribute('data-etat-compte') + ':' + e.getAttribute('data-etat-source')).join(','));
+        dit(ec.split(':')[0] === attendu, `${nom} ⇒ « ${attendu} »`, ec);
+        dit(!errs.length, `${nom} : aucune erreur d’app`, errs[0]);
         await ctx.close();
       });
     }
