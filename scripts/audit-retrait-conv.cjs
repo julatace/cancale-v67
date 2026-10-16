@@ -173,5 +173,20 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
   dit(memeRegle, 'app.isAtRelayStatus === ext.AT_RELAY sur les mêmes statuts (§11)',
     (bgRelay && appRelay) ? 'ok' : 'une des deux non extraite');
 }
+// 5.179 — LE TRANSPORTEUR : seulement s'il est NOMMÉ dans le message.
+{
+  const sans = ctx.retraitDeConversation(conv([act('Ta commande est arrivée. ',
+    'Ton colis a été livré dans le Point Relais MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE.')]));
+  dit(!!sans && sans.transporteur === '', '« point relais » seul ne nomme aucun transporteur (on ne devine pas)', sans ? `«${sans.transporteur}»` : 'null');
+  const mr = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    'Rends-toi au Point Relais Mondial Relay Phone Cash, 12 rue du Port, 35260 Cancale pour récupérer ta commande.')]));
+  dit(!!mr && mr.transporteur === 'mondialrelay', 'un message qui écrit « Mondial Relay » → mondialrelay', mr ? `«${mr.transporteur}»` : 'null');
+  const vg = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    'Récupère-le au casier Vinted Go Speed Queen, 56000 Vannes. Scanne ton code de retrait ou saisis le code C49341 pour le récupérer.')]));
+  dit(!!vg && vg.transporteur === 'vinted' && vg.code === 'C49341', 'un message qui écrit « Vinted Go » → vinted', vg ? `«${vg.transporteur}» ${vg.code}` : 'null');
+  const deux = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    'Rends-toi au relais Mondial Relay. Un casier Vinted Go est aussi proche, 35260 Cancale.')]));
+  dit(!deux || deux.transporteur === '', 'deux transporteurs nommés → on ne choisit pas', deux ? `«${deux.transporteur}»` : 'null');
+}
 console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent');
 process.exit(ko ? 1 : 0);

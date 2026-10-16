@@ -52,7 +52,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.178.0';
+const EXT_ATTENDUE = '5.179.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -218,7 +218,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -8156,7 +8156,7 @@ const BOTTOM_TABS=[
   {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
   {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
   {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire'},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire Collective', bientot:true},
   {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
 ];
 // Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
@@ -8793,6 +8793,7 @@ function SideBar({ tab, setTab }) {
     <button key={t.id} type="button" className="vrm-sidebar-link" onClick={() => setTab(t.id)} aria-current={tab===t.id?'page':undefined}
       style={{color:tab===t.id?C.onChrome:C.chromeMuted}}>
       <NavigationIcon item={t} size={19}/><span>{t.label}</span>
+      {t.bientot && <span data-bientot="" style={{marginLeft:'auto',fontSize:10,fontWeight:600,letterSpacing:.2,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted,whiteSpace:'nowrap'}}>Bientôt</span>}
     </button>
   );
   return (
@@ -8906,6 +8907,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
                       fontSize:15,fontWeight:on?600:500}}>
                     <NavigationIcon item={t} size={20} style={{opacity:on?1:.7,flexShrink:0}}/>
                     <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
+                    {t.bientot && <span data-bientot="" style={{marginLeft:'auto',flexShrink:0,fontSize:10,fontWeight:600,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted}}>Bientôt</span>}
                   </button>
                 );})}
               </div>
@@ -15893,7 +15895,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
   // Âge de la capture la plus ancienne : explique un colis déjà parti qui traîne.
   const dAge     = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
-  const court = plat === 'Vestiaire Collective' ? 'Vestiaire' : plat;
+  // (16 oct.) Le nom entier, partout : « Vestiaire Collective », jamais « Vestiaire ».
+  const court = plat;
   const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
   const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
   const gros = {fontSize:24,fontWeight:700,color:C.text};
@@ -15905,7 +15908,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : `Ce que VRM sait de ${court}`}/>
+      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Bientôt disponible' : `Ce que VRM sait de ${court}`}/>
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
@@ -30538,10 +30541,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   //    une fois en tête si c'est le même, sur chaque ligne sinon.
                   const comptesGr = [...new Set(pt.colis.map(o => (o && o._acc) ? accName(o._acc) : '').filter(Boolean))];
                   const memeCompte = comptesGr.length === 1 ? comptesGr[0] : null;
+                  // (16 oct.) LE TRANSPORTEUR DU GROUPE : celui que la conversation
+                  // NOMME (extension ≥ 5.179), et seulement s'il est le même pour
+                  // tous les colis du lieu. Avant : un badge « Vinted Go » écrit en
+                  // dur sur un relais Mondial Relay. Inconnu ⇒ aucun badge.
+                  const transpGr = [...new Set(pt.colis.map(o => { const r = relaisDe(o); return (r && r.transporteur) || ''; }))];
+                  const transpUn = transpGr.length === 1 && transpGr[0] && CARRIERS[transpGr[0]] ? transpGr[0] : '';
+                  const adresseSuite = pt.adresse && pt.nom && pt.adresse.length > pt.nom.length ? pt.adresse.slice(pt.nom.length).replace(/^\s*[,—-]\s*/, '') : '';
                   return (
                 <div className="vrm-pickup-point" key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
-                    <CarrierBadge carrier="vinted" size={24}/>
+                    {transpUn ? <CarrierBadge carrier={transpUn} size={24}/> : <span aria-hidden="true" style={{display:'inline-flex',width:24,height:24,alignItems:'center',justifyContent:'center',color:C.muted}}><Icon name="box" size={18}/></span>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* Nom du relais quand la conversation Vinted le donne (une
                           identité, §5) ; sinon un libellé neutre. Plus d'adresse
@@ -30551,8 +30561,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           ET le code sont dans la conversation Vinted), jamais un
                           libellé vague qu'un novice ne comprend pas. */}
                       <div className="vrm-pickup-location-label" style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{pt.nom?'Va à':'Point relais'}</div>
-                      <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:pt.nom?'nowrap':'normal',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{pt.nom || 'À voir dans ta conversation Vinted'}</div>
-                      {memeCompte && <div style={{fontSize:11,color:C.muted,marginTop:2}}>{memeCompte}</div>}
+                      <div data-relais-nom="" style={{fontSize:15,fontWeight:700,color:C.text,lineHeight:1.25,overflowWrap:'anywhere'}}>{pt.nom || 'À voir dans ta conversation Vinted'}</div>
+                      {adresseSuite && <div data-relais-adresse="" style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35,overflowWrap:'anywhere'}}>{adresseSuite}</div>}
+                      {(transpUn || memeCompte) && <div data-relais-transporteur={transpUn||''} style={{fontSize:11,color:C.muted,marginTop:2}}>{[transpUn ? CARRIERS[transpUn].name : '', memeCompte].filter(Boolean).join(' · ')}</div>}
                       {!pt.nom && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Le lieu exact et le code sont écrits dans la conversation du colis.</div>}
                     </div>
                   </div>
@@ -36288,7 +36299,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {voirReglages && (<>
       {MULTI_USER && (<>
         <NumerosSetting/>
-        <RepondreSetting/>
+        {/* ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision). */}
         <DetourageSetting/>
       </>)}
 
@@ -37032,131 +37043,6 @@ function NumerosSetting() {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// RÉPONDRE AUX MESSAGES À SA PLACE — SA DÉCISION DU 19 SEPTEMBRE
-// ══════════════════════════════════════════════════════════════════════════════
-// Je lui ai posé la question avec le risque écrit noir sur blanc, et il a
-// répondu « tout, elle répond à tout ». C'est tranché ; l'interrupteur ne le
-// redemande pas, il dit seulement ce qui se passe et montre ce qui est parti.
-// ⚠️ ÉTEINT PAR DÉFAUT, comme le moteur d'offres (§3) : allumer est un geste,
-//    et un geste se fait une fois, en connaissance.
-// ⚠️⚠️ ET LE DÉFAUT LE PLUS COÛTEUX DU PROJET NE SE REFAIT PAS : c'est
-//    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
-//    promettrait « elle répond à tes messages » à une extension qui ne sait pas
-//    le faire — pour la septième fois. Trois états, jamais deux.
-const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
-// Les causes d'une IA qui n'a rien rendu, tirées du bilan de l'extension (une
-// cause à zéro n'est pas écrite).
-const causesIaKO = (c) => {
-  const m = (c && typeof c === 'object') ? c : {};
-  const l = [
-    m.pasBranchee ? 'pas branchée sur le serveur' : '',
-    m.injoignable ? 'injoignable' : '',
-    m.illisible ? 'réponse inutilisable, elle ne sera pas redemandée' : '',
-  ].filter(Boolean);
-  return l.length ? ` (${l.join(' · ')})` : '';
-};
-function RepondreSetting() {
-  const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
-  const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
-  const [bilan, setBilan] = React.useState(undefined);
-  const touche = React.useRef(false);
-  React.useEffect(() => onCloudReady(() => {
-    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
-    setOn((p) => p || !!load('vinted_repond_auto', false));
-  }), []);
-  React.useEffect(() => {
-    let vivant = true;
-    (async () => {
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_msg_repondus&select=data`, { headers: sbAuth() });
-        if (!vivant) return;
-        // « Rien lu » ne vaut pas « rien envoyé » : trois états.
-        if (!r.ok) { setEnvois(null); setBilan(null); return; }
-        const j = await r.json();
-        const d = (j && j[0] && j[0].data) || {};
-        // `bilan` et `demandes` sont des clés réservées : ce ne sont pas des
-        // envois, on ne les liste pas. (`demandes` = ce que l'extension a déjà
-        // demandé à l'IA, une fois par message — 5.168, la « fuite » du 11 oct.)
-        setBilan(d.bilan || null);
-        setEnvois(Object.keys(d).filter((k) => !CLES_RESERVEES_REPONDUS.includes(k)).map((k) => d[k]).filter(Boolean)
-          .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
-      } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
-    })();
-    return () => { vivant = false; };
-  }, [on]);
-  const cap = extSait('repond');
-  const basculer = () => { touche.current = true; const n = !on; setOn(n); save('vinted_repond_auto', n); };
-  // ⚠️⚠️ « ELLE RÉPOND À TOUT » SERAIT FAUX, ET MESURÉ FAUX. Sur ses 32
-  //    conversations non lues du 19 septembre, **3** portaient une question
-  //    d'acheteur sur une de SES annonces : les autres n'ont pas de conversation
-  //    captée, pas de message dedans, sont refusées à la réponse par Vinted, ou
-  //    sont des échanges où c'est LUI qui achète. Un total partiel présenté
-  //    comme complet est pire qu'un total absent (§5) : on écrit les deux
-  //    nombres et la RAISON, jamais le seul « à tout ».
-  const ecartees = bilan ? [
-    bilan.pasVendeur ? `${bilan.pasVendeur} où c’est toi qui achètes (là, c’est au vendeur de parler)` : '',
-    bilan.pasCaptee ? `${bilan.pasCaptee} dont l’extension n’a pas encore lu l’échange` : '',
-    bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
-    bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
-    bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
-    // ⚠️ Revue du 11 octobre : quand c'est l'IA qui n'a rien rendu d'utilisable
-    //    (pas branchée, injoignable, sortie illisible), ce n'est PAS « elle
-    //    n'était pas sûre ». L'extension ≥ 5.173 le compte à part, avec la cause.
-    bilan.iaKO ? `${bilan.iaKO} où l’IA n’a pas répondu${causesIaKO(bilan.iaKOcauses)} — rien n’est parti` : '',
-  ].filter(Boolean) : [];
-  return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Répondre à mes messages Vinted</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-            À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>plusieurs par visite</b> (le reste à la visite suivante, sans jamais dépasser une limite sûre par heure), jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
-          </div>
-        </div>
-        <button className="vrm-setting-switch" aria-label="Répondre automatiquement aux messages Vinted" type="button" role="switch" onClick={basculer} aria-checked={on}
-          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
-          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
-        </button>
-      </div>
-      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
-      {on && cap === 'absente' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-          C’est l’extension, dans ton Chrome, qui répond — pas cette page. Ouvre l’app sur l’ordinateur où elle est installée pour voir ce qui est parti.
-        </div>
-      )}
-      {on && cap === 'retard' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.warn,lineHeight:1.5}}>
-          L’extension installée ici ne sait pas encore répondre. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, rien ne partira.
-        </div>
-      )}
-      {on && (
-        <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:9}} data-bilan={bilan ? 'lu' : bilan === null ? 'pasSu' : 'attente'}>
-          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:4}}>Ce qui est parti en ton nom</div>
-          {bilan ? (
-            <div style={{fontSize:11.5,color:C.muted,lineHeight:1.5,marginBottom:6}}>
-              Au dernier passage&nbsp;: <b style={{color:C.text}}>{bilan.envoyes || 0}</b> réponse{(bilan.envoyes || 0) > 1 ? 's' : ''} envoyée{(bilan.envoyes || 0) > 1 ? 's' : ''} sur <b style={{color:C.text}}>{bilan.nonLues || 0}</b> conversation{(bilan.nonLues || 0) > 1 ? 's' : ''} non lue{(bilan.nonLues || 0) > 1 ? 's' : ''}.
-              {ecartees.length ? <> Les autres ne sont pas pour elle&nbsp;: {ecartees.join(' · ')}.</> : null}
-            </div>
-          ) : null}
-          {envois === undefined ? <div style={{fontSize:11.5,color:C.muted}}>Chargement…</div>
-            : envois === null ? <div style={{fontSize:11.5,color:C.muted}}>Je n’ai pas pu lire la liste. Rien n’est perdu — rouvre cet écran dans un moment.</div>
-            : !envois.length ? <div style={{fontSize:11.5,color:C.muted}}>Aucune réponse envoyée pour l’instant.</div>
-            : <div style={{display:'grid',gap:6}}>
-                {envois.slice(0, 8).map((e, i) => (
-                  <div key={i} style={{fontSize:11.5,lineHeight:1.5}}>
-                    <span style={{color:C.text,fontWeight:600}}>{e.login || 'un acheteur'}</span>
-                    {e.titre ? <span style={{color:C.muted}}> · {e.titre}</span> : null}
-                    <div style={{color:C.muted}}>« {e.texte} »</div>
-                  </div>
-                ))}
-                {envois.length > 8 ? <div style={{fontSize:11,color:C.muted}}>et {envois.length - 8} autre{envois.length - 8 > 1 ? 's' : ''}.</div> : null}
-              </div>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DÉTOURAGE DES PHOTOS (Photoroom) — juste avant de les attacher à une annonce

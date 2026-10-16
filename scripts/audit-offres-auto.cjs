@@ -147,5 +147,16 @@ essaie('eBay', () => {
   dit(/BestOfferAutoAcceptPrice/.test(eb) && /ReviseFixedPriceItem/.test(eb), "l'autre sens : la route pose bien le seuil natif d'eBay (sur SON clic, par ReviseFixedPriceItem)");
 });
 
+// 6. (16 oct.) AUCUNE RÉPONSE NE PART TOUTE SEULE SUR VINTED — sa décision.
+//    Le moteur `repondreAuxMessages` est retiré ; `/replies` ne part que de
+//    `executerPourApp` (la messagerie de l'app, sur son clic).
+{
+  const bg = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
+  dit(!/repondreAuxMessages|vinted_repond_auto/.test(bg), "l'extension ne porte plus de moteur de réponse automatique aux messages");
+  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  dit(!/function RepondreSetting|<RepondreSetting/.test(app), "l'app ne propose plus d'allumer une réponse automatique");
+}
+
 console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — rien n'accepte une offre tout seul`);
 process.exit(ko ? 1 : 0);
