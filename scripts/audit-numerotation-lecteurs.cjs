@@ -84,9 +84,10 @@ const MUTATIONS = {
   // L'extension ne projette plus le marqueur (la clé vaudrait `undefined`, en silence).
   'extension-projection': { ext: (s) => remplace(s, "'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];", "'vinted_pairs_lost', 'vrm_lbc_liens'];", 'extension-projection') },
   // Réglages laisse choisir « B » (la lettre des anciens) pour les nouveaux numéros.
-  'reglage-lettre-archive': { app: (s) => remplace(s, "    if (n && arch && n === arch) { setRefusee(n); setP(prefixeNumeros()); return; }\n", "", 'reglage-lettre-archive') },
-  // Cliquer « Avec une lettre » enregistre une lettre par défaut (C), en silence.
-  'reglage-pastille-enregistre': { app: (s) => remplace(s, "const choix = (m) => { setMode(m); setRefusee(''); if (m === 'chiffres') poser(''); };", "const choix = (m) => { setMode(m); setRefusee(''); poser(m === 'chiffres' ? '' : defaut); };", 'reglage-pastille-enregistre') },
+  // (15 octobre : l'assistant — la pastille de la lettre des anciens redevient choisissable.)
+  'reglage-lettre-archive': { app: (s) => remplace(s, "const prise = !!arch && l === arch, on = l === choix;", "const prise = false, on = l === choix;", 'reglage-lettre-archive') },
+  // Toucher « Une lettre devant » enregistre une lettre par défaut, en silence.
+  'reglage-pastille-enregistre': { app: (s) => remplace(s, "onClick={() => { setRefusee(''); setEtape('lettre'); }}", "onClick={() => { setRefusee(''); setEtape('lettre'); save('vrm_num_prefixe', lettreEx); }}", 'reglage-pastille-enregistre') },
   // Les exemples de Réglages citent la lettre des anciens (« B125 ») alors que l'app la refuse.
   'reglage-exemple-archive': { app: (s) => remplace(s, "const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';", "const lettreEx = 'B';", 'reglage-exemple-archive') },
   // (relecture du 11 octobre, mutations du relecteur) La version relue ne compte plus.
@@ -256,7 +257,10 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     const cas = [[ad, {}], [ad, { 2900000001: '7' }], [{ id: '2900000099', ref: '230', subject: 'Nike n230' }, {}], [{ id: '2900000001', customRef: 'VRM-B12', subject: 'x' }, {}]];
     const ecarts = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
     dit(!ecarts.length, 'l\'extension (file Leboncoin) lit les mêmes clés que l\'app, marqueur compris (§11)', ecarts.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
-    dit(/'vrm_lbc_liens', 'vrm_numerotation'\];/.test(EXT) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
+    // ⚠️ La RÈGLE (la projection de la file contient le marqueur), pas l'ordre des
+    //    clés : ajouter une clé à MAIN_FILE (15 octobre, `vrm_ville`) ne la casse pas.
+    const mf = /const MAIN_FILE = \[([^\]]*)\]/.exec(EXT);
+    dit(!!mf && /'vrm_numerotation'/.test(mf[1]) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
     cas.push([{ id: '2900000553', ref: '553', subject: 'Autry n553' }, {}], [{ id: '2900000553', ref: '7', subject: 'Autry' }, {}]);
     const ecarts2 = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
     dit(!ecarts2.length, 'et l\'extension lit pareil le numéro provisoire et la référence réécrite (§11)', ecarts2.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
@@ -390,10 +394,16 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
     dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
-    const reglage = corps('function NumerosSetting() {', '\n}\n');
-    dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
-    dit(/const choix = \(m\) => \{ setMode\(m\); setRefusee\(''\); if \(m === 'chiffres'\) poser\(''\); \};/.test(reglage), '« Avec une lettre » n\'enregistre RIEN tout seul : la série ne change qu\'à la lettre tapée et acceptée');
-    dit(/const lettreEx = arch \? \(arch === 'C' \? 'D' : 'C'\) : 'B';/.test(reglage) && /Les anciens numéros/.test(reglage), 'ses exemples ne citent pas la lettre des anciens (et disent qu\'ils ne se redonnent pas)');
+    // (15 octobre) Le réglage est devenu un ASSISTANT (NumerosSetting + NumerosAssistant) :
+    // on suit les RÈGLES dans le nouveau code, pas l'orthographe d'avant.
+    const reglage = corps('function NumerosSetting() {', '\n}\n') + '\n' + corps('function NumerosAssistant(', '\n}\n');
+    const ecritures = reglage.split("save('vrm_num_prefixe'").length - 1;
+    const enreg = (() => { const i = reglage.indexOf('const enregistrer = () => {'); const j = i >= 0 ? reglage.indexOf('\n  };', i) : -1; return i >= 0 && j > i ? reglage.slice(i, j) : ''; })();
+    dit(/const prise = !!arch && l === arch/.test(reglage) && /disabled=\{prise\}/.test(reglage) && /if \(arch && n === arch\) \{ setRefusee\(n\); return; \}/.test(reglage) && /if \(n && arch && n === arch\) \{ setRefusee\(n\);/.test(enreg),
+      'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (pastille grisée, refusée au choix ET à l\'enregistrement)');
+    dit(ecritures === 1 && /save\('vrm_num_prefixe'/.test(enreg) && /data-numeros-enregistrer/.test(reglage) && /onClick=\{enregistrer\}/.test(reglage),
+      '« Une lettre devant » n\'enregistre RIEN tout seul : le réglage ne s\'écrit qu\'au clic sur « Enregistrer »', `${ecritures} écriture(s) de vrm_num_prefixe dans le réglage`);
+    dit(/const lettreEx = arch \? \(arch === 'C' \? 'D' : 'C'\) : 'B';/.test(reglage) && /anciens numéros/.test(reglage), 'ses exemples ne citent pas la lettre des anciens (et disent qu\'ils ne se redonnent pas)');
     // (relecture du 11 octobre, mutations du relecteur) Ce qui était prouvé par RIEN :
     const numForBord = corps('const numForBord = (b) => {', '\n  };');
     dit(/if \(b\.numero && numeroEmailAdmis\(b, numeros\)\) return String\(b\.numero\);/.test(numForBord) && !/if \(b\.numero\) return/.test(numForBord), 'le N° TAMPONNÉ sur un bordereau ne reprend celui d\'un email qu\'après `numeroEmailAdmis`');

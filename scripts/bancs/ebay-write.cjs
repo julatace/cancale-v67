@@ -60,11 +60,17 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
 
   // 1. Publier OK
   tradingMode = 'ok';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+  // ⚠️ (15 octobre) Depuis la relecture après publication, le DERNIER appel
+  //    est le GetItem qui relit l'annonce — on cherche l'ajout par son nom
+  //    (§6.3 : le banc juge la forme que la route envoie aujourd'hui).
+  { appels.length = 0; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+    const add = appels.find((x) => x.nom === 'AddFixedPriceItem') || { nom: '', corps: '' };
     dit(res.code === 200 && res.corps && res.corps.ok === true && res.corps.itemId === '110555000111', 'publish → AddFixedPriceItem, renvoie l\'itemId', `HTTP ${res.code} id=${res.corps && res.corps.itemId}`);
-    dit(/AddFixedPriceItem/.test(lastCall), 'l\'appel est bien AddFixedPriceItem');
-    dit(/<Name>Pointure EU<\/Name>/.test(lastBody) && /<Name>Marque<\/Name>/.test(lastBody), 'les attributs obligatoires sont envoyés dans ItemSpecifics');
-    dit(/<PictureURL>/.test(lastBody), 'les photos sont envoyées'); }
+    dit(add.nom === 'AddFixedPriceItem', 'l\'appel est bien AddFixedPriceItem');
+    dit(/<Name>Pointure EU<\/Name>/.test(add.corps) && /<Name>Marque<\/Name>/.test(add.corps), 'les attributs obligatoires sont envoyés dans ItemSpecifics');
+    dit(/<PictureURL>/.test(add.corps), 'les photos sont envoyées');
+    dit(appels.slice(appels.indexOf(add) + 1).every((x) => x.nom === 'GetItem') && res.corps.verification && res.corps.verification.lu === false,
+      'après l\'ajout, seule une RELECTURE part (GetItem) ; illisible ici ⇒ « pas lu », jamais « publiée vérifiée »', appels.map((x) => x.nom).join(',')); }
 
   // 2. Refus eBay → remonte (jamais faux succès)
   tradingMode = 'fail';

@@ -471,22 +471,180 @@
     return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie, detourees, detourageRaison };
   }
 
-  // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
-  // Mesuré le 19 septembre sur la carte du dépôt (`lbc_recon.etapes`, étape à
-  // 5 champs : `subject, body, price_cents, location`). L'ancien code posait
-  // `ad.price` (54) directement → Leboncoin affichait **0,54 €** sur l'annonce.
-  // Le NOM du champ porte l'unité : s'il contient « cent », on pose l'entier en
-  // centimes ; sinon (un champ euros ailleurs) on pose les euros. On ne devine
-  // pas l'unité, on la LIT.
-  function poserPrix(euros, siVide) {
-    const el = findField([/prix|price|montant/]);
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ LE PRIX — 15 OCTOBRE : « IL A MIS UN PRIX AU PIF »
+  // ══════════════════════════════════════════════════════════════════════════
+  // MESURÉ sur la carte de SON dépôt du 15 octobre (`lbc_recon.etapes`) :
+  //   · le champ `price_cents` (« Prix de vente souhaité* ») était DÉJÀ rempli,
+  //     3 caractères, à la première seconde de l'étape — pas par nous (son prix
+  //     Vinted est 49 €, en centimes « 4900 », 4 caractères) : c'est Leboncoin,
+  //     dont l'envoi porte `attributes.price_reco` et `attributes.predicted_price`
+  //     (mesuré dans `lbc_recon.envois`). Il PROPOSE un prix, et il l'écrit.
+  //   · l'ancien `poserPrix(…, siVide)` ne touchait pas un champ déjà rempli :
+  //     la recommandation de Leboncoin partait donc telle quelle — le « prix au
+  //     pif ». Même chose le 20 septembre (3 caractères, même mécanique).
+  //   · puis le champ est passé à 2 caractères : c'est LUI qui l'a corrigé
+  //     (« 49 »). ⇒ Le champ s'écrit en EUROS, comme un humain le tape — le nom
+  //     `price_cents` est celui de l'ENVOI, pas du champ. La règle « centimes »
+  //     de la 5.82 venait du NOM, jamais d'une page vue : elle aurait affiché
+  //     4 900 € le jour où le champ aurait été vide.
+  // ⇒ On pose le prix VINTED (`ad.price`, relu au clic — `prixVinted`), en
+  //   euros, PAR-DESSUS la recommandation de Leboncoin, puis on le RELIT. S'il
+  //   relit n/100 (un champ en centimes, jamais vu), on repose en centimes : on
+  //   mesure l'unité, on ne la devine pas. Leboncoin qui réécrit après nous ⇒ on
+  //   repose (3 fois au plus). Ce qu'il TAPE lui-même n'est jamais touché.
+  //   Prix inconnu ⇒ le champ reste VIDE (la recommandation est effacée : c'est
+  //   un nombre deviné) et le bandeau le dit. Jamais publié sans prix vérifié.
+  let prixEtat = null, prixTouche = false, lieuTouche = false;
+  // Une frappe RÉELLE (isTrusted) : c'est lui. Nos `setField` envoient des
+  // événements synthétiques, que ce filtre ignore.
+  try {
+    document.addEventListener('input', (e) => {
+      try {
+        const t = e && e.target; if (!e.isTrusted || !t || !t.getAttribute) return;
+        const h = ((t.name || '') + ' ' + (t.id || '') + ' ' + (t.getAttribute('aria-label') || '') + ' ' + (t.placeholder || '')).toLowerCase();
+        if (/prix|price|montant/.test(h)) prixTouche = true;
+        else if (/location|localisation|adresse|\blieu\b|\bville\b/.test(h)) lieuTouche = true;
+      } catch (_) {}
+    }, true);
+  } catch (_) {}
+  const lireEuros = (v) => {
+    const t = String(v == null ? '' : v).replace(/[\s  €]/g, '').replace(',', '.');
+    if (!t) return null;
+    const n = Number(t); return Number.isFinite(n) ? n : null;
+  };
+  const texteEuros = (n) => Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
+  const prixDe = (ad) => {
+    const p = ad && ad.price;
+    if (p === undefined || p === null || p === '') return null;
+    const n = typeof p === 'number' ? p : lireEuros(p);
+    return (n !== null && n > 0) ? Math.round(n * 100) / 100 : null;
+  };
+  // Rend `true` quand il vient de POSER quelque chose (pour le compte du bandeau).
+  // `prixPoses` borne la partie de ping-pong avec Leboncoin (3 poses par dépôt ;
+  // « ↻ Reprendre » les rend).
+  let prixPoses = 0;
+  // Le champ prix du DÉPÔT : un champ texte (jamais une case d'option payante
+  // dont le libellé parlerait de prix).
+  const champPrix = () => { const el = findField([/prix|price|montant/]); return el && el.tagName === 'INPUT' && /^(text|number|tel|)$/i.test(el.type || '') ? el : null; };
+  function poserPrix(ad) {
+    const el = champPrix();
     if (!el) return false;
-    if (siVide && String(el.value || '').trim()) return false;   // ne pas écraser une correction manuelle
-    const n = Number(euros);
-    if (!isFinite(n) || n <= 0) return false;
-    const nom = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
-    return setField(el, /cent/.test(nom) ? String(Math.round(n * 100)) : String(n));
+    if (prixTouche) { prixEtat = Object.assign({}, prixEtat, { utilisateur: true }); return false; }
+    const n = prixDe(ad);
+    const lu = lireEuros(el.value);
+    if (n === null) {
+      // Inconnu : la recommandation de Leboncoin est un nombre DEVINÉ — on
+      // l'efface, le champ (obligatoire) reste vide, et c'est dit.
+      if (String(el.value || '').trim()) setField(el, '');
+      prixEtat = { inconnu: true };
+      return false;
+    }
+    const unite = (prixEtat && prixEtat.unite) || 'euros';
+    if (lu !== null && Math.abs(lu - n) < 0.005) { prixEtat = { ok: true, pose: n, unite }; return false; }
+    // Posé en euros et relu n/100 : ce champ-là compte en centimes. Mesuré, pas deviné.
+    if (unite === 'euros' && prixEtat && prixEtat.pose === n && lu !== null && Math.abs(lu - n / 100) < 0.005 && prixPoses < 4) {
+      prixPoses++;
+      prixEtat = Object.assign({}, prixEtat, { unite: 'centimes', attente: true });
+      return setField(el, String(Math.round(n * 100)));
+    }
+    if (prixPoses >= 3) { prixEtat = { ok: false, pose: n, lu, unite }; return false; }
+    prixPoses++;
+    const fait = setField(el, unite === 'centimes' ? String(Math.round(n * 100)) : texteEuros(n));
+    prixEtat = { ok: false, pose: n, lu, unite, attente: true };
+    return fait;
   }
+  const prixPret = () => !!(prixTouche || (prixEtat && (prixEtat.ok || prixEtat.utilisateur)));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ LE LIEU — « CE QUE LE VENDEUR A REMPLI DANS VRM » (15 octobre)
+  // ══════════════════════════════════════════════════════════════════════════
+  // MESURÉ sur SON dépôt du 15 octobre (`lbc_recon.etapes`) : le lieu est un
+  // champ `name="location"`, `role="combobox"` (« Adresse »), relié à une liste
+  // `role="listbox"` (« À quelle adresse se trouve le bien ?* ») dont les
+  // options `role="option"` s'écrivent « Vannes (56000) », « Rocade de Vannes,
+  // Vannes (56000) », « Vannes-sur-Cosson (45510) »… Il a tapé « Vannes »
+  // (6 caractères), choisi une option, et le champ est passé à 14 caractères :
+  // « Vannes (56000) ». `findField` ne le voyait pas, et rien ne le remplissait.
+  // ⇒ On tape la ville du vendeur (`ad.lieu`, `vrm_ville` dans VRM) et on ne
+  //   choisit une option que sur CORRESPONDANCE EXACTE : la forme « Ville (CP) »,
+  //   la ville identique (accents, majuscules et tirets mis à part), et le code
+  //   postal identique s'il l'a donné. Une rue, une autre ville au nom voisin, ou
+  //   deux villes homonymes ⇒ on ne choisit PAS (jamais « le premier de la
+  //   liste ») et le bandeau le dit. Rien de rempli dans VRM ⇒ rien de deviné.
+  let lieuEtat = null, lieuEnCours = false, lieuEssais = 0;
+  const normLieu = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[-'’]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cibleLieu = (lieu) => {
+    const cp = (/\b(\d{5})\b/.exec(String(lieu)) || [])[1] || '';
+    const ville = String(lieu).replace(/\(?\b\d{5}\b\)?/g, ' ').replace(/[,;]/g, ' ').replace(/\s+/g, ' ').trim();
+    return { ville, cp };
+  };
+  const lieuCorrespond = (texte, cible) => {
+    const m = /^\s*(.+?)\s*\((\d{5})\)\s*$/.exec(String(texte == null ? '' : texte));
+    if (!m || !cible.ville) return false;           // une rue, un lieu-dit : pas « la ville »
+    if (normLieu(m[1]) !== normLieu(cible.ville)) return false;
+    return !cible.cp || m[2] === cible.cp;
+  };
+  function champLieu() {
+    const els = Array.from(document.querySelectorAll('input')).filter((el) => el.type !== 'hidden' && !el.disabled && !DANS_ENTETE(el));
+    const parNom = els.find((el) => (el.name || '') === 'location');
+    if (parNom) return parNom;
+    return els.find((el) => {
+      const h = ((el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + ((el.labels && el.labels[0] && el.labels[0].innerText) || '')).toLowerCase();
+      return el.getAttribute('role') === 'combobox' && /\blocation\b|localisation|adresse|\blieu\b/.test(h);
+    }) || null;
+  }
+  function optionsLieu(box) {
+    let boite = null;
+    try { const id = box.getAttribute('aria-controls') || box.getAttribute('aria-owns'); if (id) boite = document.getElementById(id); } catch (_) {}
+    if (!boite && box.id) boite = document.getElementById(box.id + '-menu');
+    const els = boite ? boite.querySelectorAll('[role="option"]') : document.querySelectorAll('[role="listbox"] [role="option"]');
+    return Array.from(els).filter((o) => !DANS_ENTETE(o));
+  }
+  async function poserLieu(ad) {
+    if (lieuEnCours) return;
+    if (lieuEtat && /^(ok|utilisateur|aucune|plusieurs|aVerifier)$/.test(lieuEtat.etat)) return;
+    const box = champLieu();
+    if (!box) return;
+    if (lieuTouche) { lieuEtat = { etat: 'utilisateur' }; return; }
+    const lieu = String((ad && ad.lieu) || '').trim();
+    if (!lieu) { lieuEtat = { etat: ad && ad.lieuEtat === 'pasSu' ? 'pasSu' : 'vide' }; return; }
+    const cible = cibleLieu(lieu);
+    if (lieuCorrespond(box.value, cible)) { lieuEtat = { etat: 'ok', choisi: String(box.value).trim() }; return; }
+    lieuEnCours = true; lieuEtat = { etat: 'enCours' }; lieuEssais++;
+    try {
+      try { box.focus(); } catch (_) {}
+      setField(box, cible.ville);
+      // Leboncoin cherche les suggestions après la frappe : on les attend (5 s au plus).
+      // Des suggestions affichées depuis 1 s sans aucune qui corresponde : c'est
+      // la réponse (inutile d'attendre les 5 s).
+      let bons = [], vues = 0;
+      for (let i = 0; i < 20; i++) {
+        await attendre(250);
+        if (lieuTouche) { lieuEtat = { etat: 'utilisateur' }; return; }
+        const opts = optionsLieu(box);
+        bons = opts.filter((o) => lieuCorrespond(String(o.textContent || '').trim(), cible));
+        if (bons.length) { await attendre(150); bons = optionsLieu(box).filter((o) => lieuCorrespond(String(o.textContent || '').trim(), cible)); break; }
+        if (opts.length && ++vues >= 4) break;
+      }
+      if (bons.length === 1) {
+        const choisi = String(bons[0].textContent || '').trim();
+        try { bons[0].click(); } catch (_) {}
+        await attendre(300);
+        lieuEtat = lieuCorrespond(box.value, cible) ? { etat: 'ok', choisi } : { etat: 'aVerifier', choisi };
+      } else if (bons.length > 1) {
+        lieuEtat = { etat: 'plusieurs', valeur: lieu };
+      } else {
+        // Aucune suggestion qui corresponde (encore) : un second essai, puis on le dit.
+        lieuEtat = lieuEssais < 2 ? null : { etat: 'aucune', valeur: lieu };
+      }
+    } catch (_) { lieuEtat = { etat: 'aVerifier' }; }
+    finally { lieuEnCours = false; try { banner(); } catch (_) {} }
+  }
+  // La livraison : ce que `activerLivraison` a trouvé (absent tant que le lieu
+  // n'est pas choisi — mesuré : l'interrupteur n'apparaît qu'après).
+  let livEtat = '';
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
   let derniereEtape = '';
@@ -750,7 +908,7 @@
     pendingTimer = setInterval(() => {
       pendingTries++;
       const n = fillNow(pending);
-      if (n > pendingDone) { pendingDone = n; banner(); }
+      if (n > pendingDone) { pendingDone = n; banner(); } else rafraichirFiche();
       // Les photos : dès qu'une étape porte un champ fichier, on attache. Une
       // seule fois — ré-attacher écraserait ce qu'il vient d'ajouter lui-même.
       if (!photosFaites && champsFichier().length) lancerPhotos();
@@ -759,7 +917,7 @@
       //   (mesurée), et seulement si des photos ont été ENVOYÉES (sinon Leboncoin
       //   refuse de toute façon — on ne clique pas pour rien). Une fois.
       if (!publieFait && pending.publier !== false && estEtapePublication()
-          && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+          && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0 && prixPermetPublier()) {
         publieFait = true;
         publierSansBooster().then((r) => {
           publieEtat = r; banner();
@@ -926,11 +1084,20 @@
     // Une étape qui porte un champ photo n'avance pas avant que les photos soient
     // POSÉES (elles peuvent mettre 45 s à revenir du détourage).
     const photosAttendues = () => photosEnCours || (!photosFaites && champsFichier().length > 0);
-    if (_avanceEnCours || photosAttendues()) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
+    // ⚠️ 15 octobre : l'étape du PRIX et du LIEU n'avance pas tant que le prix
+    //    posé n'est pas RELU juste, ni pendant que le lieu se choisit. Un prix
+    //    inconnu ou faux ⇒ on reste sur l'étape : c'est à lui de le voir (le
+    //    bandeau dit pourquoi) — jamais « Continuer » par-dessus un prix au pif.
+    const prixOuLieuAttendus = () => {
+      const surPrix = !!champPrix();
+      if (surPrix && !prixPret()) return true;
+      return lieuEnCours || (!!champLieu() && lieuEtat === null && !lieuTouche);
+    };
+    if (_avanceEnCours || photosAttendues() || prixOuLieuAttendus()) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
     const n = (_avanceEssais[sig] = (_avanceEssais[sig] || 0) + 1);
     if (n > 4) { if (n === 5) toast('⚠️ Un champ obligatoire reste à choisir (ex. Univers) — fais-le, je continue'); return; }
     _avanceEnCours = true;
-    try { await attendre(1100); if (!photosAttendues() && cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
+    try { await attendre(1100); if (!photosAttendues() && !prixOuLieuAttendus() && cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
     _avanceEnCours = false;
   }
   // ══════════════════════════════════════════════════════════════════════════
@@ -993,11 +1160,27 @@
   // On est à l'étape de publication quand l'étape des boosts (cases mesurées) est
   // là : c'est la dernière, tout le reste a été rempli pour y arriver.
   const estEtapePublication = () => optionsBoost().length > 0;
+  // ⚠️⚠️ 15 octobre : JAMAIS PUBLIÉ SANS UN PRIX VÉRIFIÉ. Le prix de Vinted posé
+  //    et RELU juste, ou celui qu'il a tapé lui-même (c'est sa décision). Prix
+  //    inconnu, faux, ou jamais vu sur cette page (« pas su » ne vaut pas
+  //    « oui ») ⇒ on ne clique pas « Publier », et le bandeau dit pourquoi.
+  //    Rend `true` quand on peut publier ; sinon pose le refus (une fois).
+  function prixPermetPublier() {
+    if (prixPret()) return true;
+    if (!publieFait) {
+      publieFait = true;
+      publieEtat = { ok: false, raison: !prixEtat ? 'je n\'ai pas vu le prix de cette annonce — vérifie-le, puis publie toi-même, sans booster'
+        : prixEtat.inconnu ? 'son prix Vinted est inconnu — mets-le, puis publie toi-même, sans booster'
+        : 'le prix affiché n\'est pas celui de Vinted — corrige-le, puis publie toi-même, sans booster' };
+      try { banner(); } catch (_) {}
+    }
+    return false;
+  }
   function fillNow(ad) {
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // jamais d'écrasement ; la réf est garantie
-    if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle (centimes), une seule
+    if (poserPrix(ad)) n++;   // §11 : le prix a UNE règle — celui de Vinted, posé PAR-DESSUS la recommandation de Leboncoin, puis relu
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
     //    listes déroulantes ne sont pas des `input` : `findField` ne les voyait
@@ -1014,7 +1197,10 @@
     if (choisirCategorie(ad)) n++;
     // Les menus React (pointure, état) — sans bloquer le comptage synchrone.
     remplirComposants(ad);
-    if (activerLivraison() === 'active') n++;   // garantir l'envoi activé (son défaut)
+    // Le LIEU : la ville que le vendeur a remplie dans VRM (async : on tape, on
+    // attend les suggestions, on ne choisit que la correspondance exacte).
+    poserLieu(ad);
+    { const l = activerLivraison(); if (l !== 'absent') livEtat = l; if (l === 'active') n++; }   // garantir l'envoi activé
     // Puis on enchaîne l'étape : clic « Continuer » (JAMAIS « Publier »).
     avancer();
     return n;
@@ -1076,7 +1262,40 @@
     const ok = setField(el, actuel.replace(/\s+$/, '') + '\n\nRéférence : ' + ref);
     return { trouve: true, fait: false, garde: true, ref: ok };
   }
+  // ── PRIX · LIEU · LIVRAISON, en une ligne (§7) — le chiffre, jamais la
+  //    promesse : on dit ce qui est posé et RELU, et en ambre seulement ce qu'il
+  //    a à faire. Rien tant que l'étape n'est pas arrivée.
+  function ligneFiche() {
+    const OK = '#E8ECF2', AMBRE = '#F5A524';
+    const morceaux = [];
+    if (prixEtat) {
+      const e = prixEtat.pose != null ? texteEuros(prixEtat.pose) + ' €' : '';
+      morceaux.push(prixTouche || prixEtat.utilisateur ? 'Prix : <b style="color:' + OK + '">le tien</b>'
+        : prixEtat.ok ? 'Prix <b style="color:' + OK + '">' + esc(e) + '</b> (celui de Vinted)'
+        : prixEtat.inconnu ? '<span style="color:' + AMBRE + '">Prix Vinted inconnu — mets-le toi-même</span>'
+        : prixEtat.attente ? 'Prix ' + esc(e) + '…'
+        : '<span style="color:' + AMBRE + '">Le prix affiché n\'est pas celui de Vinted (' + esc(e) + ') — corrige-le</span>');
+    }
+    if (lieuEtat) {
+      const l = lieuEtat;
+      morceaux.push(l.etat === 'ok' ? 'Lieu <b style="color:' + OK + '">' + esc(l.choisi || '') + '</b>'
+        : l.etat === 'utilisateur' ? 'Lieu : <b style="color:' + OK + '">le tien</b>'
+        : l.etat === 'enCours' ? 'Lieu…'
+        : l.etat === 'vide' ? '<span style="color:' + AMBRE + '">Lieu : remplis « Ta ville » dans VRM → Réglages (choisis-le ici pour cette annonce)</span>'
+        : l.etat === 'pasSu' ? '<span style="color:' + AMBRE + '">Lieu : VRM n\'a pas pu lire ta ville — choisis-le ici</span>'
+        : l.etat === 'plusieurs' ? '<span style="color:' + AMBRE + '">Lieu : plusieurs « ' + esc(l.valeur || '') + ' » — choisis le bon dans la liste</span>'
+        : l.etat === 'aucune' ? '<span style="color:' + AMBRE + '">Lieu : aucune suggestion exacte pour « ' + esc(l.valeur || '') + ' » — choisis-le dans la liste</span>'
+        : '<span style="color:' + AMBRE + '">Lieu : vérifie-le</span>');
+    }
+    if (livEtat === 'active' || livEtat === 'deja') morceaux.push('Livraison <b style="color:' + OK + '">activée</b>');
+    else if (livEtat === 'illisible') morceaux.push('<span style="color:' + AMBRE + '">Livraison : vérifie qu\'elle est activée</span>');
+    else if (lieuEtat && lieuEtat.etat === 'ok' && (estEtapePublication() || pendingArrete)) morceaux.push('<span style="color:' + AMBRE + '">Livraison : pas trouvée — vérifie qu\'elle est activée</span>');
+    return morceaux.length ? '<div style="color:#8A93A3;margin-top:3px">' + morceaux.join(' · ') + '</div>' : '';
+  }
+  let _derniereFiche = '';
+  const rafraichirFiche = () => { try { const f = ligneFiche(); if (f !== _derniereFiche) banner(); } catch (_) {} };
   function banner() {
+    try { _derniereFiche = ligneFiche(); } catch (_) {}
     let el = document.getElementById('vrm-lbc-banner');
     if (!el) {
       el = document.createElement('div');
@@ -1103,6 +1322,7 @@
               + (photosEtat.total <= 6 ? '<br><span style="color:#F5A524">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
             : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
         : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +
+      ligneFiche() +
       // Statut de PUBLICATION : ce qui compte, dit clairement.
       (publieEtat
         ? '<div style="margin-top:6px">' + (publieEtat.ok
@@ -1143,9 +1363,9 @@
     pendingTimer = setInterval(() => {
       pendingTries++;
       const n2 = fillNow(pending);
-      if (n2 > pendingDone) { pendingDone = n2; banner(); }
+      if (n2 > pendingDone) { pendingDone = n2; banner(); } else rafraichirFiche();
       if (!photosFaites && champsFichier().length) lancerPhotos();
-      if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+      if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0 && prixPermetPublier()) {
         publieFait = true;
         publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
       }
@@ -1157,13 +1377,17 @@
     let n = 0;
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
-    if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
+    // « Reprendre » : on repart de zéro sur le prix et le lieu, sauf ce qu'il a
+    // tapé lui-même (on ne l'écrase jamais).
+    prixEtat = null; prixPoses = 0; if (!lieuTouche) { lieuEtat = null; lieuEssais = 0; }
+    if (poserPrix(ad)) n++;   // §11 : la même règle de prix que partout
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     if (choisirCategorie(ad)) n++;
     // « Re-remplir » relance aussi les menus React et l'enchaînement d'étape
     // (on oublie qu'on les a déjà faits, au cas où on serait revenu en arrière).
     _composFaits = new Set(); remplirComposants(ad);
-    if (activerLivraison() === 'active') n++;
+    poserLieu(ad);
+    { const l = activerLivraison(); if (l !== 'absent') livEtat = l; if (l === 'active') n++; }
     _avanceFaite = new Set(); avancer();
     return n;
   }

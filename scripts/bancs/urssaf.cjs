@@ -56,7 +56,8 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4474);
+const PORT=Number(process.env.BANC_PORT)||4474;
+srv.listen(PORT);
 
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 // « 1 234,56 € » → 1234.56
@@ -91,7 +92,7 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
 
   // L'écran Ventes publie, le tableau de bord consomme (§11).
-  await pg.goto('http://localhost:4474/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
+  await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`,{waitUntil:'domcontentloaded'});
   // ⚠️ On attend la PUBLICATION, pas un délai. Depuis la 5.133, Ventes ne
   //    publie qu'une fois les dates de versement lues (`declarables` reste
   //    `undefined` avant) : servies pour de vrai, elles arrivent après les 4 s
@@ -107,7 +108,8 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   dit(!!publie, "l'écran Ventes publie `vinted_urssaf_mois`",
     publie?`mois courant : ${publie.n} vente(s) · ${publie.ca} €`:'sans lui, le tableau de bord n\'a pas de source');
 
-  await pg.goto('http://localhost:4474/?tab=dashboard',{waitUntil:'domcontentloaded'});
+  // (15 octobre) La carte URSSAF vit dans Déclarations (plus dans Statistiques).
+  await pg.goto(`http://localhost:${PORT}/?tab=fiscal`,{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4500);
   await pg.screenshot({path:SC+'/z-urssaf.png',fullPage:true});
   const t=await pg.evaluate(()=>document.body.innerText||'');

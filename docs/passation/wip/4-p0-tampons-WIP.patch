@@ -1,0 +1,1193 @@
+From 63735986ae4645887557872faf1eb567e3ec1182 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:41:42 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p0-tampons)=20=E2=80=94=20t?=
+ =?UTF-8?q?ampons=20titre=20+=20N=C2=B0=20par=20type=20de=20bordereau=20et?=
+ =?UTF-8?q?=20par=20imprimante=20;=20r=C3=A9solu=20PAR-DESSUS=20p0-imprime?=
+ =?UTF-8?q?r=20le=2016=20octobre=20(agent=20coup=C3=A9=20par=20la=20limite?=
+ =?UTF-8?q?=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ scripts/audit-impression.cjs |   3 +
+ scripts/audit-tampons.cjs    | 320 +++++++++++++++++++++++++
+ scripts/bancs/tampons.cjs    | 197 +++++++++++++++
+ src/App.jsx                  | 449 ++++++++++++++++++++++++++++++-----
+ 4 files changed, 912 insertions(+), 57 deletions(-)
+ create mode 100644 scripts/audit-tampons.cjs
+ create mode 100644 scripts/bancs/tampons.cjs
+
+diff --git a/scripts/audit-impression.cjs b/scripts/audit-impression.cjs
+index 8146c7a..3d5ffcd 100644
+--- a/scripts/audit-impression.cjs
++++ b/scripts/audit-impression.cjs
+@@ -50,6 +50,9 @@ const parts = [
+   morceau(/const zoneEtiquette = \([\s\S]*?\n\};/, '`zoneEtiquette`'),
+   morceau(/const posePrefsImpression = \([\s\S]*?\n\};/, '`posePrefsImpression`'),
+   morceau(/const drawSkuThermique = \([\s\S]*?\n\};/, '`drawSkuThermique`'),
++  // Depuis le 15 octobre, `drawSkuThermique` lit la TAILLE réglée (`tailleTampon`,
++  // § tampons-regle) : sans elle le vm lèverait « tailleTampon is not defined ».
++  morceau(/const tailleTampon = \([^\n]*\n/, '`tailleTampon`'),
+ ];
+ 
+ let R = null;
+diff --git a/scripts/audit-tampons.cjs b/scripts/audit-tampons.cjs
+new file mode 100644
+index 0000000..1125cb6
+--- /dev/null
++++ b/scripts/audit-tampons.cjs
+@@ -0,0 +1,320 @@
++// ⚠️⚠️ CONTRÔLE PERMANENT — LA POSITION DU TAMPON PAR TYPE DE BORDEREAU (15 oct.)
++//
++// Demande de Julien : « l'application enregistre tous les bordereaux de
++// différents types que l'utilisateur a eus, et l'endroit où le numéro est
++// tamponné ; une fois cliqué dessus, il peut régler l'endroit où il a placé
++// ses tampons ; adapter pour imprimante thermique et classique ».
++//
++// MESURÉ AVANT DE CODER : la clé des emplacements était la TAILLE de page seule
++// (`bordereauFormatKey`) — or InPost, Mondial Relay et Colissimo sont tous en
++// A4 portrait (595×842, § impression du dossier). Trois mises en page
++// différentes partageaient donc UN emplacement : le tampon réglé pour l'une
++// atterrissait sur l'autre, potentiellement sur son code-barres. Et
++// l'imprimante thermique n'avait AUCUN réglage (petit N° figé en bas à gauche),
++// ni la taille du tampon.
++//
++// CE QUE CE CONTRÔLE EXIGE, en EXÉCUTANT le vrai code extrait d'App.jsx sur des
++// PDF synthétiques passés par save/load (§6.3 — la forme reçue de Vinted) :
++//   1. le TYPE est reconnu DANS le PDF (transporteur + format), sinon format
++//      seul, dit (`connu:false`) ;
++//   2. deux transporteurs au MÊME format de page n'ont JAMAIS le même réglage ;
++//   3. classique et thermique ont chacun LEUR réglage ;
++//   4. le réglage HISTORIQUE (clé format seul) reste lu — une nouveauté
++//      n'éteint pas ce qui marchait ;
++//   5. type jamais réglé ⇒ position par DÉFAUT, et `defaut:true` le DIT ;
++//   6. la TAILLE (`pos.s`) agit vraiment sur le cartouche (mesuré au rendu PDF) ;
++//   7. le réglage thermique DÉPLACE le petit N° dans l'étiquette — et sans
++//      réglage, il reste en bas à gauche (l'historique) ;
++//   8. le tampon s'ajoute à une COPIE : les octets SOURCE ne bougent pas.
++//
++// §6.1 : sur le code d'AVANT (sans le bloc <tampons-regle>), l'audit REJOUE la
++// règle d'avant (clé = format seul, aucune imprimante, aucune taille) au lieu
++// de mourir — « la fonction n'existait pas avant » n'est pas une preuve, c'est
++// le COMPORTEMENT d'avant qui doit sortir rouge. `--mutation x` réaffaiblit la
++// règle nouvelle et doit faire repasser les contrôles au rouge :
++//   cletype · imprimante · taille · thermpos · defaut · legacy · ditdefaut
++const fs = require('fs'), vm = require('vm'), path = require('path');
++const racine = path.join(__dirname, '..');
++let APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
++const PL = require(path.join(racine, 'node_modules', 'pdf-lib', 'cjs', 'index.js'));
++
++const MUT = (() => { const i = process.argv.indexOf('--mutation'); return i > -1 ? process.argv[i + 1] : ''; })();
++
++let ko = 0;
++const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
++const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi, String((e && e.stack || e.message) || e).slice(0, 300)); return null; } };
++
++// ── Mutations : on réaffaiblit le CODE avant de l'extraire, et on vérifie que
++//    la mutation a bien mordu (une mutation qui ne s'applique pas prouverait
++//    n'importe quoi).
++const muter = (src) => {
++  const avant = src;
++  if (MUT === 'cletype') {
++    // la clé retombe sur le FORMAT seul : deux transporteurs se partagent un réglage
++    src = src.replace(/\/\/ <tampons-regle>[\s\S]*?\/\/ <\/tampons-regle>/, (bloc) => bloc.replace(/type\.cle/g, 'type.fmt'));
++  } else if (MUT === 'imprimante') {
++    src = src.replace(/const cleTampon = \([^\n]*\n/,
++      "const cleTampon = (typeCle, mode) => String(typeCle || '');\n");
++  } else if (MUT === 'taille') {
++    src = src.replace(/const s = tailleTampon\(pos\);\n    const boxW = Math\.min\(width - 4/,
++      'const s = 1;\n    const boxW = Math.min(width - 4');
++  } else if (MUT === 'thermpos') {
++    src = src.replace(/const xr = pos && typeof pos\.xr === 'number' \? Math\.max\(0, Math\.min\(1, pos\.xr\)\) : 0;\n  const yrTop = pos && typeof pos\.yr === 'number' \? Math\.max\(0, Math\.min\(1, pos\.yr\)\) : 1;/,
++      'const xr = 0;\n  const yrTop = 1;');
++  } else if (MUT === 'defaut') {
++    src = src.replace(/\/\/ <tampons-regle>[\s\S]*?\/\/ <\/tampons-regle>/, (bloc) => bloc.replace(/defaut: true/g, 'defaut: false'));
++  } else if (MUT === 'legacy') {
++    src = src.replace(/const ancien = type\.cle !== type\.fmt \? f\[type\.fmt\] : null;/, 'const ancien = null;');
++  } else if (MUT === 'ditdefaut') {
++    // une entrée écrite aux valeurs par défaut redevient « réglée » : le mot ne
++    // suit plus la position (le défaut disparaît après la première impression)
++    src = src.replace(/ && !estDefautTampon\(exact, m\)/, '').replace(/ && !estDefautTampon\(ancien, m\)/, '');
++  }
++  if (MUT && src === avant) { console.log(`❌ la mutation « ${MUT} » ne s'applique pas — rien n'est prouvé`); process.exit(1); }
++  return src;
++};
++APP = muter(APP);
++
++// ── Extraction du VRAI code (le même harnais qu'audit-impression.cjs) ─────────
++const morceau = (re, quoi, optionnel) => { const m = re.exec(APP); if (!m) { if (!optionnel) dit(false, `${quoi} introuvable dans App.jsx`); return null; } return m[0]; };
++const parts = [
++  morceau(/const IMPR_MODES = \[[^\n]*\n/, '`IMPR_MODES`'),
++  morceau(/const imprMode = \([^\n]*\n/, '`imprMode`'),
++  morceau(/const PAS_L_ETIQUETTE = \/[^\n]*\n/, '`PAS_L_ETIQUETTE`'),
++  morceau(/const _mulM = \([^\n]*\n/, '`_mulM`'),
++  morceau(/const _apM = \([^\n]*\n/, '`_apM`'),
++  morceau(/const relevePage = \([\s\S]*?\n\};/, '`relevePage`'),
++  morceau(/const _couperSelon = \([\s\S]*?\n\};/, '`_couperSelon`'),
++  morceau(/const zoneEtiquette = \([\s\S]*?\n\};/, '`zoneEtiquette`'),
++  morceau(/const bordereauFormatKey = [^\n]*\n/, '`bordereauFormatKey`'),
++  morceau(/const smartDefaultBordPos = [^\n]*\n/, '`smartDefaultBordPos`'),
++  morceau(/const drawBordereauStamp = \([\s\S]*?\n\};/, '`drawBordereauStamp`'),
++  morceau(/const drawSkuThermique = \([\s\S]*?\n\};/, '`drawSkuThermique`'),
++];
++// Le bloc de la règle nouvelle. ABSENT sur le code d'avant : on rejoue alors la
++// règle d'AVANT (posForFormat : clé = bordereauFormatKey(w,h), défaut
++// smartDefaultBordPos, aucune imprimante, aucune taille) — c'est elle qui doit
++// sortir ROUGE, pas une erreur d'extraction (§6.1).
++const bloc = morceau(/\/\/ <tampons-regle>[\s\S]*?\/\/ <\/tampons-regle>/, '`<tampons-regle>`', true);
++const AVANT = !bloc;
++if (AVANT) console.log('⚠️  <tampons-regle> absent : on rejoue la règle d\'AVANT (clé = format seul, aucune imprimante, aucune taille).');
++
++const EMULATION_AVANT = `
++const typeDepuisPage = (PL, page) => { const { width, height } = page.getSize(); const fmt = bordereauFormatKey(width, height); return { cle: fmt, fmt, transporteur: '', w: width, h: height, connu: false }; };
++const cleTampon = (typeCle) => String(typeCle || '');
++const tailleTampon = () => 1;
++const posTampon = (formats, type) => { const f = formats || {}; const p = f[type.fmt]; if (p && typeof p.xr === 'number') return { xr: p.xr, yr: p.yr, s: 1, defaut: false }; return { ...smartDefaultBordPos(type.w, type.h), s: 1, defaut: true }; };
++const noterTampon = (formats, type, mode, pos) => ({ ...(formats || {}), [type.fmt]: { xr: pos.xr, yr: pos.yr } });
++const typesTampon = (formats) => Object.keys(formats || {}).map((k) => ({ cle: k }));
++const nomTransporteurBordereau = () => '';
++`;
++// ⚠️ L'ancien `drawSkuThermique`/`drawBordereauStamp` existent dans les DEUX
++// versions : eux se testent tels quels (c'est la vraie preuve rouge/vert).
++// L'ancien drawSkuThermique appelle parfois `tailleTampon` (version nouvelle) —
++// l'émulation ci-dessus la fournit à 1 quand le bloc est absent.
++let R = null;
++if (parts.every(Boolean)) {
++  const src = parts.join('\n') + '\n' + (AVANT ? EMULATION_AVANT : bloc);
++  try {
++    const ctx = { console: { log() {} }, TextDecoder, Date, Math, Number, Object, String };
++    vm.createContext(ctx);
++    vm.runInContext(`${src}\nglobalThis.R = { imprMode, zoneEtiquette, drawBordereauStamp, drawSkuThermique, bordereauFormatKey, smartDefaultBordPos, typeDepuisPage, cleTampon, tailleTampon, posTampon, noterTampon, typesTampon, nomTransporteurBordereau };`, ctx, { filename: 'App.jsx' });
++    R = ctx.R;
++  } catch (e) { dit(false, 'le code du tampon se charge', String((e && e.message) || e)); }
++}
++
++// ── Les PDF synthétiques, passés par save/load (§6.3) ────────────────────────
++const A4 = [595.28, 841.89];
++const pdfTexte = async (mots, paysage) => {
++  const d = await PL.PDFDocument.create();
++  const p = d.addPage(paysage ? [A4[1], A4[0]] : A4);
++  const f = await d.embedFont(PL.StandardFonts.Helvetica);
++  let y = p.getSize().height - 60;
++  for (const m of mots) { p.drawText(m, { x: 40, y, size: 11, font: f }); y -= 22; }
++  for (let i = 0; i < 10; i++) { p.drawText('contenu quelconque du bordereau ' + i, { x: 40, y: y - i * 18, size: 9, font: f }); }
++  return PL.PDFDocument.load(await d.save());
++};
++// La mise en page « colonnes » d'audit-impression (étiquette isolable) pour le thermique.
++const pdfColonnes = async () => {
++  const d = await PL.PDFDocument.create();
++  const p = d.addPage(A4);
++  const f = await d.embedFont(PL.StandardFonts.Helvetica);
++  p.drawRectangle({ x: 20, y: 380, width: 260, height: 430, borderColor: PL.rgb(0, 0, 0), borderWidth: 1 });
++  for (let i = 0; i < 12; i++) p.drawText('ADRESSE DESTINATION 35260', { x: 28, y: 780 - i * 30, size: 9, font: f });
++  p.drawRectangle({ x: 30, y: 700, width: 240, height: 60, color: PL.rgb(0, 0, 0) });
++  p.drawText('Fiche destinataire', { x: 340, y: 700, size: 14, font: f });
++  p.drawText('A mettre a l interieur du colis', { x: 340, y: 680, size: 10, font: f });
++  for (let i = 0; i < 8; i++) p.drawText('Dimensions max de mon colis', { x: 340, y: 640 - i * 24, size: 9, font: f });
++  return d.save();
++};
++// Relevé des RECTANGLES rendus (via le vrai relevePage, à travers zoneEtiquette
++// on n'a pas accès direct : on recharge le doc et on appelle relevePage via un
++// petit pont — le plus simple est de réutiliser zoneEtiquette ? Non : on relit
++// les cadres nous-mêmes avec le code extrait).
++const rectsDe = (page) => {
++  // On passe par le même chemin que zoneEtiquette : relevePage est dans le vm,
++  // pas exporté — on réutilise zoneEtiquette ? Il filtre. On ré-extrait ici.
++  const src2 = parts.slice(0, 8).join('\n') + '\nglobalThis.releve = (PL, page) => {\n' +
++    "  const ctx = page.doc.context, out = [];\n" +
++    "  let res = null; try { res = ctx.lookup(page.node.get(PL.PDFName.of('Resources'))); } catch (_) {}\n" +
++    "  const c = page.node.get(PL.PDFName.of('Contents'));\n" +
++    "  const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';\n" +
++    "    if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());\n" +
++    "    if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\\n'); return ''; } catch (_) { return ''; } };\n" +
++    '  relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);\n  return out;\n};';
++  const ctx2 = { console: { log() {} }, TextDecoder };
++  vm.createContext(ctx2);
++  vm.runInContext(src2, ctx2, { filename: 'releve.js' });
++  return ctx2.releve(PL, page);
++};
++// Le cartouche/SKU AJOUTÉ par un tampon : les rectangles présents APRÈS qui ne
++// l'étaient pas AVANT (comparés par coin+taille arrondis).
++const rectsAjoutes = (avant, apres) => {
++  const cle = (o) => [o.x, o.y, o.X, o.Y].map((v) => Math.round(v)).join(',');
++  const vus = new Set(avant.filter((o) => !o.s).map(cle));
++  return apres.filter((o) => !o.s && !vus.has(cle(o)));
++};
++
++(async () => {
++  if (!R) { console.log(`\n${ko} contrôle(s) au rouge.`); process.exit(1); }
++
++  // ── 1. LE TYPE EST RECONNU DANS LE PDF ─────────────────────────────────────
++  let tChrono = null, tMondial = null, tMuet = null;
++  await essaie('reconnaissance du type', async () => {
++    tChrono = R.typeDepuisPage(PL, (await pdfTexte(['CHRONOPOST', 'Point relais 35260'])).getPages()[0]);
++    tMondial = R.typeDepuisPage(PL, (await pdfTexte(['Mondial Relay', 'Point relais 35260'])).getPages()[0]);
++    tMuet = R.typeDepuisPage(PL, (await pdfTexte(['bordereau sans nom de transporteur'])).getPages()[0]);
++    dit(tChrono && tChrono.transporteur === 'chronopost' && tChrono.connu === true,
++      'un bordereau Chronopost est RECONNU comme type « chronopost »', tChrono && (tChrono.cle || ''));
++    dit(tMondial && tMondial.transporteur === 'mondial-relay',
++      'un bordereau Mondial Relay est reconnu comme type « mondial-relay »', tMondial && (tMondial.cle || ''));
++    dit(tChrono && tMondial && tChrono.cle !== tMondial.cle,
++      'deux transporteurs au MÊME format de page font DEUX types', `${tChrono && tChrono.cle} / ${tMondial && tMondial.cle}`);
++    dit(tMuet && tMuet.connu === false && tMuet.cle === tMuet.fmt,
++      'aucun transporteur lisible ⇒ type = format seul, et c\'est DIT (connu:false)', tMuet && tMuet.cle);
++  });
++  if (!tChrono || !tMondial || !tMuet) { console.log(`\n${ko} contrôle(s) au rouge.`); process.exit(ko ? 1 : 0); }
++
++  // ── 2. DEUX TRANSPORTEURS, MÊME FORMAT : JAMAIS LE MÊME RÉGLAGE ───────────
++  await essaie('isolation par type', async () => {
++    const f1 = R.noterTampon({}, tChrono, 'normale', { xr: 0.7, yr: 0.8, s: 1 });
++    const pM = R.posTampon(f1, tMondial, 'normale');
++    dit(!(Math.abs(pM.xr - 0.7) < 1e-6 && Math.abs(pM.yr - 0.8) < 1e-6),
++      'le tampon réglé pour Chronopost ne se pose PAS sur un Mondial Relay du même format',
++      `Mondial Relay reçoit xr=${pM.xr} yr=${pM.yr}`);
++    const pC = R.posTampon(f1, tChrono, 'normale');
++    dit(Math.abs(pC.xr - 0.7) < 1e-6 && Math.abs(pC.yr - 0.8) < 1e-6 && pC.defaut === false,
++      'et Chronopost retrouve bien SON réglage', `xr=${pC.xr} yr=${pC.yr}`);
++  });
++
++  // ── 3. CLASSIQUE ET THERMIQUE : CHACUN SON RÉGLAGE ─────────────────────────
++  await essaie('isolation par imprimante', async () => {
++    let f = R.noterTampon({}, tChrono, 'normale', { xr: 0.7, yr: 0.8, s: 1 });
++    f = R.noterTampon(f, tChrono, 'thermique', { xr: 1, yr: 0, s: 2 });
++    const pN = R.posTampon(f, tChrono, 'normale');
++    const pT = R.posTampon(f, tChrono, 'thermique');
++    dit(Math.abs(pN.xr - 0.7) < 1e-6 && Math.abs(pN.yr - 0.8) < 1e-6,
++      'régler le THERMIQUE ne bouge pas le réglage CLASSIQUE', `classique xr=${pN.xr} yr=${pN.yr}`);
++    dit(Math.abs(pT.xr - 1) < 1e-6 && Math.abs(pT.yr - 0) < 1e-6 && Math.abs(pT.s - 2) < 1e-6,
++      'et le thermique retrouve le sien (position + taille)', `thermique xr=${pT.xr} yr=${pT.yr} s=${pT.s}`);
++  });
++
++  // ── 4. LE RÉGLAGE HISTORIQUE (clé format seul) RESTE LU ────────────────────
++  await essaie('réglage historique conservé', async () => {
++    const ancien = { '595x842': { xr: 0.33, yr: 0.44 } };   // la forme d'AVANT, telle qu'en base
++    const pInc = R.posTampon(ancien, tMuet, 'normale');
++    dit(Math.abs(pInc.xr - 0.33) < 1e-6 && pInc.defaut === false,
++      'un type NON reconnu lit toujours le réglage historique de son format', `xr=${pInc.xr}`);
++    const pRec = R.posTampon(ancien, tMondial, 'normale');
++    dit(Math.abs(pRec.xr - 0.33) < 1e-6 && pRec.defaut === false,
++      'un type reconnu SANS réglage propre retombe sur l\'historique du format (rien d\'appris n\'est perdu)', `xr=${pRec.xr}`);
++  });
++
++  // ── 5. TYPE JAMAIS RÉGLÉ ⇒ DÉFAUT, ET C'EST DIT ───────────────────────────
++  await essaie('défaut dit', async () => {
++    const d1 = R.posTampon({}, tMondial, 'normale');
++    const def = R.smartDefaultBordPos(tMondial.w, tMondial.h);
++    dit(d1.defaut === true && Math.abs(d1.xr - def.xr) < 1e-6 && Math.abs(d1.yr - def.yr) < 1e-6,
++      'type jamais réglé ⇒ la position par DÉFAUT actuelle, et `defaut:true` le dit', `xr=${d1.xr} defaut=${d1.defaut}`);
++    const d2 = R.posTampon({}, tMondial, 'thermique');
++    dit(d2.defaut === true, 'pareil en thermique', `defaut=${d2.defaut}`);
++    // `posForType` NOTE le type dès le premier bordereau (c'est ce qui le fait
++    // apparaître dans « Mes bordereaux ») : l'entrée écrite aux valeurs par
++    // défaut doit RESTER dite « par défaut » — le mot suit la position.
++    const d3 = R.posTampon(R.noterTampon({}, tMondial, 'normale', { ...def, s: 1 }), tMondial, 'normale');
++    dit(d3.defaut === true && Math.abs(d3.xr - def.xr) < 1e-6,
++      'une entrée ÉCRITE aux valeurs par défaut reste DITE « par défaut »', `defaut=${d3.defaut}`);
++  });
++
++  // ── 6. LA TAILLE AGIT SUR LE CARTOUCHE (mesuré au RENDU du PDF) ────────────
++  await essaie('taille du cartouche', async () => {
++    const mesure = async (s) => {
++      const doc = await pdfTexte(['bordereau quelconque']);
++      const avant = rectsDe(doc.getPages()[0]);
++      const bold = await doc.embedFont(PL.StandardFonts.HelveticaBold);
++      const reg = await doc.embedFont(PL.StandardFonts.Helvetica);
++      R.drawBordereauStamp(doc, PL.rgb, bold, reg, '412', 'Salomon XT-6 blanc', { xr: 0.1, yr: 0.1, s });
++      const relu = await PL.PDFDocument.load(await doc.save({ useObjectStreams: false }));
++      const ajout = rectsAjoutes(avant, rectsDe(relu.getPages()[0]));
++      ajout.sort((a, b) => (b.X - b.x) * (b.Y - b.y) - (a.X - a.x) * (a.Y - a.y));
++      return ajout.length ? { w: ajout[0].X - ajout[0].x, h: ajout[0].Y - ajout[0].y } : null;
++    };
++    const m1 = await mesure(1), m2 = await mesure(2);
++    dit(!!m1 && !!m2, 'le cartouche se mesure au rendu', JSON.stringify({ m1, m2 }));
++    if (m1 && m2) dit(m2.w > m1.w * 1.6 && m2.h > m1.h * 1.6,
++      'la taille ×2 AGRANDIT vraiment le cartouche (pas un réglage de façade)',
++      `×1 = ${Math.round(m1.w)}×${Math.round(m1.h)} pt · ×2 = ${Math.round(m2.w)}×${Math.round(m2.h)} pt`);
++  });
++
++  // ── 7. LE RÉGLAGE THERMIQUE DÉPLACE LE PETIT N° — ET SANS RÉGLAGE, L'HISTORIQUE
++  await essaie('position du N° thermique', async () => {
++    const skuPose = async (pos) => {
++      const doc = await PL.PDFDocument.load(await pdfColonnes());
++      const page = doc.getPages()[0];
++      const z = R.zoneEtiquette(PL, page);
++      if (!z.ok) { dit(false, 'l\'étiquette du PDF synthétique est repérée', z.raison || ''); return null; }
++      const avant = rectsDe(page);
++      const bold = await doc.embedFont(PL.StandardFonts.HelveticaBold);
++      R.drawSkuThermique(page, PL.rgb, bold, '412', z, pos);
++      const relu = await PL.PDFDocument.load(await doc.save({ useObjectStreams: false }));
++      const ajout = rectsAjoutes(avant, rectsDe(relu.getPages()[0]));
++      ajout.sort((a, b) => (a.X - a.x) * (a.Y - a.y) - (b.X - b.x) * (b.Y - b.y));
++      return ajout.length ? { x: ajout[0].x, y: ajout[0].y, z } : null;
++    };
++    const sans = await skuPose(undefined);
++    const regle = await skuPose({ xr: 1, yr: 0, s: 1 });
++    dit(!!sans && !!regle, 'le petit N° se mesure au rendu', JSON.stringify({ sans: sans && { x: Math.round(sans.x), y: Math.round(sans.y) }, regle: regle && { x: Math.round(regle.x), y: Math.round(regle.y) } }));
++    if (sans) dit(Math.abs(sans.x - (sans.z.x + 4)) < 2 && Math.abs(sans.y - (sans.z.y + 4)) < 2,
++      'SANS réglage, le N° reste en bas à gauche de l\'étiquette (l\'historique ne bouge pas)',
++      `x=${Math.round(sans.x)} y=${Math.round(sans.y)} (attendu ${Math.round(sans.z.x + 4)},${Math.round(sans.z.y + 4)})`);
++    if (sans && regle) dit((regle.x - sans.x) > 40 && (regle.y - sans.y) > 40,
++      'le réglage thermique DÉPLACE le N° (ici : en haut à droite de l\'étiquette)',
++      `déplacé de ${Math.round(regle.x - sans.x)} pt en x, ${Math.round(regle.y - sans.y)} pt en y`);
++  });
++
++  // ── 8. LE TAMPON S'AJOUTE À UNE COPIE : LES OCTETS SOURCE NE BOUGENT PAS ───
++  await essaie('le PDF source n\'est jamais altéré', async () => {
++    const d0 = await pdfTexte(['CHRONOPOST']);
++    const buf = await d0.save();
++    const empreinte = Buffer.from(buf).toString('base64');
++    const doc = await PL.PDFDocument.load(buf);
++    const bold = await doc.embedFont(PL.StandardFonts.HelveticaBold);
++    const reg = await doc.embedFont(PL.StandardFonts.Helvetica);
++    R.drawBordereauStamp(doc, PL.rgb, bold, reg, '412', 'Salomon XT-6', { xr: 0.1, yr: 0.1, s: 1 });
++    const out = await doc.save();
++    dit(Buffer.from(buf).toString('base64') === empreinte, 'les octets SOURCE sont intacts après tamponnage');
++    dit(Buffer.from(out).toString('base64') !== empreinte, 'et la copie imprimée, elle, porte bien le tampon');
++  });
++
++  // ── 9. LE CÂBLAGE DANS L'APP (présence — le rendu est jugé par le banc) ────
++  dit(/SYNC_KEYS[\s\S]{0,2000}?'vinted_bordereau_formats'/.test(APP) || /'vinted_bordereau_formats'[\s\S]{0,400}?SYNC_KEYS/.test(APP) || /'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats'/.test(APP),
++    'le réglage `vinted_bordereau_formats` est SYNCHRONISÉ');
++  dit(/data-mes-bordereaux/.test(APP), 'la page « Mes bordereaux » existe (data-mes-bordereaux)');
++  dit(/<MesBordereaux /.test(APP), 'et elle est RENDUE depuis Réglages (pas un composant mort, §4.11)');
++  dit(/typesTampon\(formats\)/.test(APP), 'elle liste les types par la règle (`typesTampon`), pas un second calcul');
++  dit(/mergeAndDownloadBordereaux\(items, bordFormats/.test(APP),
++    'le lot « Tout imprimer » reçoit le store des tampons (le N° tombe au même endroit que l\'unitaire, §11)');
++
++  console.log(`\n${ko ? `${ko} contrôle(s) au rouge.` : 'Chaque type de bordereau a son tampon, par imprimante — et le PDF source ne bouge jamais.'}`);
++  process.exit(ko ? 1 : 0);
++})();
+diff --git a/scripts/bancs/tampons.cjs b/scripts/bancs/tampons.cjs
+new file mode 100644
+index 0000000..769eed0
+--- /dev/null
++++ b/scripts/bancs/tampons.cjs
+@@ -0,0 +1,197 @@
++// Banc : « Mes bordereaux » (Réglages) — la position des tampons par TYPE de
++// bordereau et par IMPRIMANTE, avec aperçu et réglage manuel (15 octobre).
++//
++// Données INVENTÉES (le banc vit dans le dépôt, qui est public) : le store
++// `vinted_bordereau_formats` est posé dans le navigateur avec trois entrées —
++//   · `mondial-relay:595x842`     → un type RECONNU, réglé en classique ;
++//   · `th:mondial-relay:595x842`  → son réglage thermique ;
++//   · `842x595`                   → un type NON reconnu (clé historique).
++// Le banc juge le RENDU et les ÉCRITURES (localStorage), jamais une formule
++// (§6.5) :
++//   1. la page liste les deux types, le reconnu est NOMMÉ, l'inconnu est dit
++//      « non reconnu » (data-tampon-connu) ;
++//   2. le réglage classique se DÉPLACE au doigt et s'ENREGISTRE (xr/yr changent
++//      dans le store, `s` est porté) ;
++//   3. régler le THERMIQUE (taille ×2) n'écrit QUE la clé `th:` — le réglage
++//      classique ne bouge pas (un réglage par imprimante) ;
++//   4. sans PDF d'exemple dans la session, l'éditeur le DIT (pas d'aperçu
++//      inventé) — et le réglage s'applique quand même ;
++//   5. un type jamais réglé s'affiche « par défaut » (data-tampon-defaut) ;
++//   6. à 390 px comme à 1512 px : pas de débordement, pas d'écran mort.
++//
++// Lancer : npm run build && node scripts/bancs/tampons.cjs [--port 5861]
++const path = require('path');
++let chromium;
++try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
++catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
++const fs = require('fs'), http = require('http');
++const DIST = path.join(__dirname, '..', '..', 'dist');
++const PORT = (() => { const i = process.argv.indexOf('--port'); return i > -1 ? Number(process.argv[i + 1]) : 5861; })();
++
++let ko = 0, ok = 0;
++const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
++
++const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
++const srv = http.createServer((q, r) => {
++  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
++  const p = path.join(DIST, f);
++  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
++  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
++});
++srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
++srv.listen(PORT);
++
++// Le store posé AVANT le chargement — trois entrées, aucune donnée réelle.
++const STORE = {
++  'mondial-relay:595x842': { xr: 0.5, yr: 0.6, s: 1, w: 595, h: 842, transporteur: 'mondial-relay', vuLe: Date.now() - 3600000 },
++  'th:mondial-relay:595x842': { xr: 0, yr: 1, s: 1, w: 595, h: 842, transporteur: 'mondial-relay', vuLe: Date.now() - 3600000 },
++  '842x595': { xr: 0.05, yr: 0.02, w: 842, h: 595, vuLe: Date.now() - 7200000 },
++};
++
++(async () => {
++  let b;
++  try {
++    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
++
++    const rendre = async (viewport) => {
++      const ctx = await b.newContext({ viewport });
++      const pg = await ctx.newPage();
++      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
++      await pg.addInitScript((store) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_bordereau_formats', JSON.stringify(store)); } catch (_) {} }, STORE);
++      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
++      await pg.route('**/rest/v1/**', (route) => {
++        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
++        if (route.request().method() !== 'GET') return j([]);
++        if (/select=owner/.test(decodeURIComponent(route.request().url()))) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
++        return j([]);
++      });
++      await pg.route('**/auth/v1/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
++      await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
++      await pg.waitForTimeout(1600);
++      return { ctx, pg, errs };
++    };
++
++    // ── 1512 px : la page, le réglage, les écritures ──────────────────────────
++    const { ctx, pg, errs } = await rendre({ width: 1512, height: 950 });
++
++    // La porte : le Row « Mes bordereaux » dans Réglages.
++    const row = pg.locator('button:has-text("Mes bordereaux")').first();
++    dit(await row.count() > 0, 'Réglages porte une entrée « Mes bordereaux »');
++    await row.click({ timeout: 8000 }).catch(() => {});
++    await pg.waitForTimeout(400);
++    const page = pg.locator('[data-mes-bordereaux]');
++    dit(await page.count() === 1, 'la page « Mes bordereaux » s\'ouvre');
++
++    // 1. Les deux types listés, le reconnu NOMMÉ, l'inconnu DIT non reconnu.
++    const nTypes = await pg.locator('[data-tampon-type]').count();
++    dit(nTypes === 2, 'les DEUX types rencontrés sont listés', `${nTypes} affiché(s)`);
++    const reconnu = pg.locator('[data-tampon-type="mondial-relay:595x842"]');
++    dit(await reconnu.count() === 1 && /Mondial Relay/.test(await reconnu.innerText({ timeout: 4000 }).catch(() => '')),
++      'le type reconnu est NOMMÉ par son transporteur (Mondial Relay)');
++    const inconnu = pg.locator('[data-tampon-type="842x595"]');
++    dit(await inconnu.getAttribute('data-tampon-connu', { timeout: 4000 }).catch(() => null) === '0' && /non reconnu/i.test(await inconnu.innerText({ timeout: 4000 }).catch(() => '')),
++      'le type NON reconnu est dit tel quel (format seul)');
++    // 5. Un réglage jamais posé s'affiche « par défaut » (le thermique de l'inconnu).
++    dit(await pg.locator('[data-tampon-resume="thermique:842x595"]').getAttribute('data-tampon-defaut', { timeout: 4000 }).catch(() => null) === '1',
++      'un réglage jamais posé est affiché PAR DÉFAUT (dit, jamais inventé)');
++    dit(await pg.locator('[data-tampon-resume="normale:mondial-relay:595x842"]').getAttribute('data-tampon-defaut', { timeout: 4000 }).catch(() => null) === '0',
++      'et un réglage posé n\'est PAS dit « par défaut »');
++    // L'entrée 842x595 a la FORME auto-écrite d'avant ({xr:0.05, yr:0.02}) : la
++    // position EST le défaut, le mot doit le rester — sinon « par défaut »
++    // disparaissait après la première impression de chaque type.
++    dit(await pg.locator('[data-tampon-resume="normale:842x595"]').getAttribute('data-tampon-defaut', { timeout: 4000 }).catch(() => null) === '1',
++      'une entrée écrite AUX VALEURS PAR DÉFAUT reste dite « par défaut » (le mot suit la position)');
++
++    // ⚠️ `save()` est DÉBOUNCÉ à 500 ms dans l'app : lire le store 300 ms après
++    //    le clic mesurait le vide (vu au premier passage de ce banc). On ATTEND
++    //    que l'écriture soit passée (sondage borné), jamais un délai au doigt
++    //    mouillé.
++    const lireStore = () => pg.evaluate(() => JSON.parse(localStorage.getItem('vinted_bordereau_formats') || '{}'));
++    const attendreStore = async (pred) => { for (let i = 0; i < 20; i++) { const s = await lireStore(); if (pred(s)) return s; await pg.waitForTimeout(150); } return lireStore(); };
++
++    // 2. Déplacer le tampon classique : drag sur le pad, puis Enregistrer.
++    await pg.locator('[data-tampon-regler="normale:mondial-relay:595x842"]').click({ timeout: 8000 }).catch(() => {});
++    await pg.waitForTimeout(300);
++    const editeur = pg.locator('[data-mes-bordereaux] [data-tampon-editeur="normale"]');
++    dit(await editeur.count() === 1, 'l\'éditeur du réglage classique s\'ouvre');
++    dit(await editeur.locator('[data-tampon-sans-exemple]').count() === 1,
++      'sans PDF d\'exemple dans la session, l\'aperçu le DIT (rien d\'inventé)');
++    const pad = editeur.locator('[data-tampon-pad]');
++    // ⚠️ Attentes BORNÉES : sur le build d'AVANT l'éditeur n'existe pas, et un
++    //    `boundingBox()` sans garde bloque 30 s puis tue la suite des contrôles
++    //    (un banc ne meurt pas, il rapporte — §6).
++    const bb = (await pad.count()) ? await pad.boundingBox() : null;
++    if (bb) {
++      await pg.mouse.move(bb.x + bb.width * 0.5, bb.y + bb.height * 0.6);
++      await pg.mouse.down();
++      await pg.mouse.move(bb.x + bb.width * 0.15, bb.y + bb.height * 0.2, { steps: 4 });
++      await pg.mouse.up();
++    }
++    await editeur.locator('[data-tampon-save]').click({ timeout: 8000 }).catch(() => {});
++    const apres1 = await attendreStore((s) => Math.abs(((s['mondial-relay:595x842'] || {}).xr ?? 0.5) - 0.5) > 0.05);
++    const e1 = apres1['mondial-relay:595x842'] || {};
++    dit(typeof e1.xr === 'number' && Math.abs(e1.xr - 0.5) > 0.05 && typeof e1.s === 'number',
++      'le tampon déplacé est ENREGISTRÉ pour ce type (xr a bougé, la taille est portée)', `xr=${e1.xr} yr=${e1.yr} s=${e1.s}`);
++    dit((apres1['842x595'] || {}).xr === 0.05, 'le réglage de l\'AUTRE type n\'a pas bougé');
++
++    // 3. Régler le THERMIQUE (taille ×2) n'écrit que la clé `th:`.
++    await pg.locator('[data-tampon-regler="thermique:mondial-relay:595x842"]').click({ timeout: 8000 }).catch(() => {});
++    await pg.waitForTimeout(300);
++    const edTh = pg.locator('[data-mes-bordereaux] [data-tampon-editeur="thermique"]');
++    dit(await edTh.count() === 1, 'l\'éditeur du réglage thermique s\'ouvre');
++    // Glisser le N° tout en HAUT À DROITE de l'étiquette : `xr`/`yr` thermiques
++    // sont des fractions de la COURSE (drawSkuThermique) — le premier jet de
++    // l'éditeur plafonnait xr à ~0,5 (poignée de 50 %), le N° ne pouvait jamais
++    // atteindre le bord droit.
++    const padTh = edTh.locator('[data-tampon-pad]');
++    const bbTh = (await padTh.count()) ? await padTh.boundingBox() : null;
++    if (bbTh) {
++      await pg.mouse.move(bbTh.x + bbTh.width * 0.5, bbTh.y + bbTh.height * 0.5);
++      await pg.mouse.down();
++      await pg.mouse.move(bbTh.x + bbTh.width * 0.97, bbTh.y + bbTh.height * 0.04, { steps: 4 });
++      await pg.mouse.up();
++    }
++    await edTh.locator('[data-tampon-taille]').evaluate((el) => {
++      const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
++      set.call(el, '2'); el.dispatchEvent(new Event('input', { bubbles: true }));
++    }, undefined, { timeout: 4000 }).catch(() => {});
++    await edTh.locator('[data-tampon-save]').click({ timeout: 8000 }).catch(() => {});
++    const apres2 = await attendreStore((s) => ((s['th:mondial-relay:595x842'] || {}).s || 1) !== 1);
++    const th2 = apres2['th:mondial-relay:595x842'] || {};
++    dit(Math.abs((th2.s || 0) - 2) < 1e-6, 'la taille ×2 du thermique est enregistrée sous SA clé (th:)', `s=${th2.s}`);
++    dit(typeof th2.xr === 'number' && th2.xr > 0.9 && th2.yr < 0.1,
++      'le N° thermique ATTEINT le bord haut-droit de l\'étiquette (xr/yr couvrent toute la course)', `xr=${th2.xr} yr=${th2.yr}`);
++    dit((apres2['mondial-relay:595x842'] || {}).xr === e1.xr && (apres2['mondial-relay:595x842'] || {}).s === e1.s,
++      'et le réglage CLASSIQUE n\'a pas bougé — un réglage par imprimante', `classique xr=${(apres2['mondial-relay:595x842'] || {}).xr}`);
++
++    // La note sur le type inconnu : la position par défaut est DITE une fois.
++    dit(await pg.locator('[data-tampon-inconnu-note]').count() === 1,
++      'la page dit UNE fois ce qu\'il advient d\'un type jamais rencontré (défaut)');
++
++    // Pas d'écran mort, pas d'erreur de page.
++    const texte = await pg.locator('[data-mes-bordereaux]').innerText({ timeout: 4000 }).catch(() => '');
++    dit(!/n'a pas pu s'afficher|Cannot access|is not defined/i.test(texte), 'aucun écran mort (§6.4)');
++    dit(errs.length === 0, 'aucune erreur de page à 1512 px', errs.slice(0, 2).join(' · '));
++    await ctx.close();
++
++    // ── 390 px : la même page, sans débordement ───────────────────────────────
++    const m = await rendre({ width: 390, height: 844 });
++    await m.pg.locator('button:has-text("Mes bordereaux")').first().click({ timeout: 8000 }).catch(() => {});
++    await m.pg.waitForTimeout(400);
++    dit(await m.pg.locator('[data-mes-bordereaux]').count() === 1, 'la page s\'ouvre à 390 px');
++    await m.pg.locator('[data-tampon-regler="normale:mondial-relay:595x842"]').click({ timeout: 8000 }).catch(() => {});
++    await m.pg.waitForTimeout(300);
++    dit(await m.pg.locator('[data-mes-bordereaux] [data-tampon-editeur="normale"]').count() === 1, 'l\'éditeur s\'ouvre à 390 px');
++    const deborde = await m.pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
++    dit(deborde <= 1, 'aucun débordement horizontal à 390 px', `${deborde} px`);
++    dit(m.errs.length === 0, 'aucune erreur de page à 390 px', m.errs.slice(0, 2).join(' · '));
++    await m.ctx.close();
++  } catch (e) {
++    dit(false, 'le banc rapporte au lieu de mourir', String((e && e.message) || e).slice(0, 300));
++  } finally {
++    try { if (b) await b.close(); } catch (_) {}
++    srv.close();
++  }
++  console.log(`\n${ko ? ko + ' contrôle(s) au rouge.' : ok + ' contrôles verts — le tampon se règle par type et par imprimante, au rendu.'}`);
++  process.exit(ko ? 1 : 0);
++})();
+diff --git a/src/App.jsx b/src/App.jsx
+index 65539bc..7f419cd 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -6779,14 +6779,9 @@ const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', '
+ // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
+ // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
+ // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
+-// Lit la taille (en points PDF) de la 1re page — sert d'empreinte de "format"
+-// de bordereau (chaque transporteur a des dimensions d'étiquette différentes).
+-const readPdfFirstPageSize = async (pdfArrayBuffer) => {
+-  const { PDFDocument } = await import('pdf-lib');
+-  const pdf = await PDFDocument.load(pdfArrayBuffer);
+-  const { width, height } = pdf.getPages()[0].getSize();
+-  return { width, height };
+-};
++// `readPdfFirstPageSize` est REMPLACÉ par `typeDuBordereau` (15 octobre), qui
++// rend la taille ET le transporteur reconnu — plus aucun appelant, retiré
++// (§4.11 : un helper sans appelant est un piège pour la session suivante).
+ // Empreinte de format = dimensions arrondies (ex "210x297").
+ const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
+ // Emplacement par défaut intelligent du tampon : en HAUT À GAUCHE. Sur le
+@@ -6809,21 +6804,24 @@ const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
+   const hasNum = numero != null && String(numero).trim() !== '';
+   if (pos && typeof pos.xr === 'number') {
+     // Tampon positionné : cartouche blanc + bord noir. N° (si présent) + titre.
+-    const boxW = Math.min(width * 0.62, 230);
+-    const boxH = 46;
++    // `pos.s` (15 octobre) = la TAILLE réglée par le vendeur pour ce type de
++    // bordereau (« Mes bordereaux ») — 1 = la taille historique.
++    const s = tailleTampon(pos);
++    const boxW = Math.min(width - 4, Math.min(width * 0.62, 230) * s);
++    const boxH = 46 * s;
+     let x = pos.xr * width, yTop = pos.yr * height;
+     x = Math.max(2, Math.min(width - boxW - 2, x));
+     let y = height - yTop - boxH; // origine PDF en bas à gauche
+     y = Math.max(2, Math.min(height - boxH - 2, y));
+     first.drawRectangle({ x, y, width:boxW, height:boxH, color: rgb(1,1,1), borderColor: rgb(0,0,0), borderWidth:1.5 });
+-    const maxChars = Math.max(16, Math.floor((boxW - 16) / 5));
++    const maxChars = Math.max(16, Math.floor((boxW - 16 * s) / (5 * s)));
+     const t = (title || '').slice(0, maxChars);
+     if (hasNum) {
+-      first.drawText(`N° ${numero}`, { x:x+8, y:y+boxH-26, size:20, font:bold, color:rgb(0,0,0) });
+-      if (t) first.drawText(t, { x:x+8, y:y+6, size:9, font:reg, color:rgb(0.12,0.12,0.12) });
++      first.drawText(`N° ${numero}`, { x:x+8*s, y:y+boxH-26*s, size:20*s, font:bold, color:rgb(0,0,0) });
++      if (t) first.drawText(t, { x:x+8*s, y:y+6*s, size:9*s, font:reg, color:rgb(0.12,0.12,0.12) });
+     } else if (t) {
+       // Pas de numéro : le titre prend toute la place, plus gros.
+-      first.drawText(t.slice(0, Math.max(20, Math.floor((boxW-16)/6.5))), { x:x+8, y:y+boxH/2-6, size:13, font:bold, color:rgb(0,0,0) });
++      first.drawText(t.slice(0, Math.max(20, Math.floor((boxW-16*s)/(6.5*s)))), { x:x+8*s, y:y+boxH/2-6*s, size:13*s, font:bold, color:rgb(0,0,0) });
+     }
+   } else {
+     const bandH = 74;
+@@ -7095,16 +7093,145 @@ const posePrefsImpression = (PL, doc) => {
+ // Le « tout petit SKU en bas » de l'impression thermique : sur une étiquette de
+ // 10×15 cm il n'y a pas la place d'un cartouche — juste le numéro du carton, en
+ // bas à gauche, sur un fond blanc pour rester lisible sur un aplat.
+-const drawSkuThermique = (page, rgb, bold, numero, zone) => {
++// `pos` (facultatif, 15 octobre) = réglage du vendeur pour CE type de bordereau :
++// `xr`/`yr` en ratio DANS l'étiquette découpée (yr depuis le HAUT, comme le
++// cartouche), `s` la taille. Sans réglage : bas gauche, taille 1 — l'historique.
++const drawSkuThermique = (page, rgb, bold, numero, zone, pos) => {
+   const n = numero == null ? '' : String(numero).trim();
+   if (!n) return false;
+-  const t = `N° ${n}`, taille = 11, larg = t.length * taille * 0.62 + 10;
+-  const x = zone.x + 4, y = zone.y + 4;
+-  page.drawRectangle({ x, y, width: larg, height: taille + 7, color: rgb(1, 1, 1), borderColor: rgb(0, 0, 0), borderWidth: 0.8 });
++  const s = tailleTampon(pos);
++  const t = `N° ${n}`, taille = 11 * s, larg = t.length * taille * 0.62 + 10, haut = taille + 7;
++  const xr = pos && typeof pos.xr === 'number' ? Math.max(0, Math.min(1, pos.xr)) : 0;
++  const yrTop = pos && typeof pos.yr === 'number' ? Math.max(0, Math.min(1, pos.yr)) : 1;
++  const x = zone.x + 4 + xr * Math.max(0, zone.w - larg - 8);
++  const y = zone.y + 4 + (1 - yrTop) * Math.max(0, zone.h - haut - 8);
++  page.drawRectangle({ x, y, width: larg, height: haut, color: rgb(1, 1, 1), borderColor: rgb(0, 0, 0), borderWidth: 0.8 });
+   page.drawText(t, { x: x + 5, y: y + 5, size: taille, font: bold, color: rgb(0, 0, 0) });
+   return true;
+ };
+ 
++// ── LE TAMPON PAR TYPE DE BORDEREAU, ET PAR IMPRIMANTE (15 octobre) ─────────
++// Julien : « l'application enregistre tous les bordereaux de différents types
++// que l'utilisateur a eus, et l'endroit où le numéro est tamponné ; une fois
++// cliqué dessus, il peut régler l'endroit où il a placé ses tampons ; adapter
++// pour imprimante thermique et classique ».
++// ⚠️ MESURÉ AVANT DE CODER : la clé des emplacements était la TAILLE de page
++// seule (`bordereauFormatKey`) — or InPost, Mondial Relay et Colissimo sont
++// tous en A4 portrait (595×842, § impression). Trois mises en page différentes
++// partageaient donc UN emplacement : le tampon placé pour l'une atterrissait
++// sur l'autre — potentiellement sur son code-barres. Et l'imprimante thermique
++// n'avait AUCUN réglage : le petit N° était toujours en bas à gauche.
++// Le tampon s'ajoute toujours à la COPIE imprimée (pdf-lib recharge les octets,
++// `audit-tampons.cjs` le vérifie) : le PDF source, en base, n'est jamais touché.
++// <tampons-regle>
++// Le TYPE d'un bordereau = sa mise en page RECONNUE : le transporteur lu DANS
++// le PDF lui-même + le format de page — jamais le compte, jamais le titre.
++// Transporteur illisible (44 des 81 Mondial Relay n'ont aucun texte : police
++// sans table ToUnicode, § impression) ⇒ le type est le FORMAT seul — la clé
++// HISTORIQUE de `vinted_bordereau_formats`, donc rien d'appris n'est perdu.
++const TRANSPORTEURS_BORDEREAU = [
++  ['mondial-relay', /mondial\s*relay/i, 'Mondial Relay'],
++  ['chronopost', /chronopost/i, 'Chronopost'],
++  ['colissimo', /colissimo/i, 'Colissimo'],
++  ['la-poste', /la\s+poste/i, 'La Poste'],
++  ['inpost', /inpost/i, 'InPost'],
++  ['vinted-go', /vinted\s*go/i, 'Vinted Go'],
++  ['relais-colis', /relais\s*colis|shop2shop/i, 'Relais Colis'],
++  ['ups', /\bUPS\b/, 'UPS'],
++  ['dhl', /\bdhl\b/i, 'DHL'],
++  ['gls', /\bgls\b/i, 'GLS'],
++];
++const nomTransporteurBordereau = (slug) => { const t = TRANSPORTEURS_BORDEREAU.find((x) => x[0] === slug); return t ? t[2] : ''; };
++// Relève le type d'une PAGE déjà chargée (pdf-lib). Lecture seule.
++const typeDepuisPage = (PL, page) => {
++  const { width, height } = page.getSize();
++  const fmt = bordereauFormatKey(width, height);
++  let transporteur = '';
++  try {
++    const ctx = page.doc.context, out = [];
++    let res = null; try { res = ctx.lookup(page.node.get(PL.PDFName.of('Resources'))); } catch (_) {}
++    const c = page.node.get(PL.PDFName.of('Contents'));
++    const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
++      if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
++      if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
++    relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);
++    const texte = out.map((o) => o.s || '').join(' ');
++    for (const [slug, re] of TRANSPORTEURS_BORDEREAU) { if (re.test(texte)) { transporteur = slug; break; } }
++  } catch (_) { /* pas su ⇒ type = format seul, jamais une erreur */ }
++  return { cle: transporteur ? `${transporteur}:${fmt}` : fmt, fmt, transporteur, w: width, h: height, connu: !!transporteur };
++};
++// Même relevé depuis les octets. Garde le dernier exemplaire de chaque type EN
++// MÉMOIRE (session seulement, borné) pour l'aperçu de « Mes bordereaux » — le
++// PDF source n'est écrit nulle part.
++const APERCUS_BORDEREAU = new Map();
++const typeDuBordereau = async (pdfArrayBuffer) => {
++  const PL = await import('pdf-lib');
++  const pdf = await PL.PDFDocument.load(pdfArrayBuffer);
++  const type = typeDepuisPage(PL, pdf.getPages()[0]);
++  try {
++    if (APERCUS_BORDEREAU.size >= 8 && !APERCUS_BORDEREAU.has(type.cle)) APERCUS_BORDEREAU.delete(APERCUS_BORDEREAU.keys().next().value);
++    APERCUS_BORDEREAU.set(type.cle, pdfArrayBuffer);
++  } catch (_) {}
++  return type;
++};
++// La clé d'un réglage : par TYPE et par IMPRIMANTE. Classique = la clé nue
++// (celle d'avant : rien d'appris n'est perdu) ; thermique = préfixe `th:`.
++const cleTampon = (typeCle, mode) => (imprMode(mode) === 'thermique' ? 'th:' + String(typeCle || '') : String(typeCle || ''));
++// La taille du tampon : un facteur 0,5…2,5 — 1 = la taille historique.
++const tailleTampon = (pos) => { const s = pos && Number(pos.s); return Number.isFinite(s) && s > 0 ? Math.max(0.5, Math.min(2.5, s)) : 1; };
++// Défaut thermique : le petit N° en bas à gauche de l'étiquette (l'historique).
++const defautTamponThermique = () => ({ xr: 0, yr: 1, s: 1 });
++// Une entrée ÉCRITE aux valeurs par défaut reste DITE « par défaut » : l'ancienne
++// app écrivait le défaut au premier bordereau de chaque format (toutes les
++// entrées de sa vraie base ont cette forme), et `posForType` note toujours le
++// type dès le premier passage pour qu'il apparaisse dans « Mes bordereaux ».
++// Sans cette règle, « par défaut » disparaissait après la PREMIÈRE impression —
++// la position est la même, le mot doit l'être (type inconnu ⇒ défaut, DIT).
++const estDefautTampon = (e, mode) => {
++  if (!e || typeof e.xr !== 'number') return true;
++  const d = imprMode(mode) === 'thermique' ? defautTamponThermique() : { ...smartDefaultBordPos(), s: 1 };
++  return Math.abs(e.xr - d.xr) < 1e-9 && Math.abs(e.yr - d.yr) < 1e-9 && Math.abs(tailleTampon(e) - d.s) < 1e-9;
++};
++// LA position du tampon pour CE bordereau — une seule règle (§11) :
++//   1. le réglage du TYPE (transporteur + format) pour CETTE imprimante ;
++//   2. en classique : le réglage HISTORIQUE du format seul, s'il existe
++//      (une nouveauté n'éteint pas ce qui marchait) ;
++//   3. sinon le DÉFAUT actuel — et `defaut:true` le DIT (type inconnu ⇒
++//      position par défaut, dite, jamais devinée).
++const posTampon = (formats, type, mode) => {
++  const f = formats || {}, m = imprMode(mode);
++  const exact = f[cleTampon(type.cle, m)];
++  if (exact && typeof exact.xr === 'number' && !estDefautTampon(exact, m)) return { xr: exact.xr, yr: exact.yr, s: tailleTampon(exact), defaut: false };
++  if (m !== 'thermique') {
++    const ancien = type.cle !== type.fmt ? f[type.fmt] : null;   // clé historique « WxH »
++    if (ancien && typeof ancien.xr === 'number' && !estDefautTampon(ancien, m)) return { xr: ancien.xr, yr: ancien.yr, s: tailleTampon(ancien), defaut: false };
++    return { ...smartDefaultBordPos(type.w, type.h), s: 1, defaut: true };
++  }
++  return { ...defautTamponThermique(), defaut: true };
++};
++// Mémorise un réglage — avec de quoi LISTER le type sur « Mes bordereaux » :
++// format, transporteur, date. Jamais le compte, jamais un titre d'article.
++const noterTampon = (formats, type, mode, pos) => ({
++  ...(formats || {}),
++  [cleTampon(type.cle, mode)]: { xr: pos.xr, yr: pos.yr, s: tailleTampon(pos), w: Math.round(type.w) || 0, h: Math.round(type.h) || 0, transporteur: type.transporteur || '', vuLe: Date.now() },
++});
++// Les types rencontrés, lus depuis le store : une ligne par type, avec ses deux
++// réglages (classique / thermique) quand ils existent.
++const typesTampon = (formats) => {
++  const parType = new Map();
++  for (const [k, v] of Object.entries(formats || {})) {
++    if (!v || typeof v.xr !== 'number') continue;
++    const th = k.startsWith('th:'), cle = th ? k.slice(3) : k;
++    const m2 = /^(?:([a-z-]+):)?(\d+)x(\d+)$/.exec(cle); if (!m2) continue;
++    const e = parType.get(cle) || { cle, fmt: `${m2[2]}x${m2[3]}`, transporteur: m2[1] || '', w: Number(v.w) || Number(m2[2]), h: Number(v.h) || Number(m2[3]), connu: !!m2[1], vuLe: 0 };
++    e[th ? 'thermique' : 'normale'] = v;
++    e.vuLe = Math.max(e.vuLe, Number(v.vuLe) || 0);
++    parType.set(cle, e);
++  }
++  return [...parType.values()].sort((a, b) => (b.vuLe - a.vuLe) || (a.cle < b.cle ? -1 : 1));
++};
++// </tampons-regle>
++
+ // ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
+ // Julien : « quand j'appuie sur imprimer sur ordi, ça télécharge le bordereau et
+ // ça ne l'ouvre pas comme sur téléphone ». Le PDF partait en `download` (et le
+@@ -7168,9 +7295,10 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos)
+ };
+ // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
+ // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
+-// [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
+-// tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
+-const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
++// [{ numero, title, pdfBuf }]. `formats` = le store `vinted_bordereau_formats` :
++// la position mémorisée du tampon pour chaque TYPE de bordereau et chaque
++// imprimante (§ tampons-regle) → le N° tombe au MÊME endroit sur tous.
++const mergeAndDownloadBordereaux = async (items, formats, opts = {}) => {
+   if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+   const PL = await import('pdf-lib');
+   const { PDFDocument, rgb, StandardFonts } = PL;
+@@ -7187,17 +7315,20 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+     try {
+       const src = await PDFDocument.load(it.pdfBuf);
+       const first = src.getPages()[0];
+-      const { width, height } = first.getSize();
+-      const pos = resolvePos ? resolvePos(width, height) : null;
+-      // On tamponne dans le PDF source (avec des polices embarquées dans out via
+-      // copyPages : pdf-lib ré-embarque les ressources à la copie).
++      // Le TYPE de ce bordereau (transporteur + format) décide de la position du
++      // tampon — par imprimante (§ tampons-regle). `formats` absent ⇒ défauts.
++      const type = typeDepuisPage(PL, first);
++      const pos = posTampon(formats, type, 'normale');
++      // On tamponne dans la COPIE chargée (avec des polices embarquées dans out
++      // via copyPages : pdf-lib ré-embarque les ressources à la copie) — jamais
++      // dans les octets source.
+       const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+       const sReg = await src.embedFont(StandardFonts.Helvetica);
+       // IMPRIMANTE THERMIQUE : on ne garde que l'étiquette. Si on ne SAIT pas où
+       // elle est, la page part ENTIÈRE — jamais un code-barres coupé au hasard.
+       const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+       if (thermique && z.ok) {
+-        drawSkuThermique(first, rgb, sBold, it.numero, z);
++        drawSkuThermique(first, rgb, sBold, it.numero, z, posTampon(formats, type, 'thermique'));
+         first.setMediaBox(z.x, z.y, z.w, z.h);
+         first.setCropBox(z.x, z.y, z.w, z.h);
+         isoles++;
+@@ -12010,23 +12141,31 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+   const [bordResult, setBordResult] = React.useState(null);
+   const [bordPlace, setBordPlace] = React.useState(null);
+   const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
+-  const posForFormat = (w, h) => {
+-    const key = bordereauFormatKey(w, h);
+-    let pos = bordFormats[key];
+-    if (!pos) { pos = smartDefaultBordPos(w, h); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next); }
++  // Réglage SYNCHRONISÉ lu au montage ⇒ rattrapé à l'arrivée du nuage, et
++  // seulement s'il est resté VIDE (§5.49) — sinon, sur un appareil neuf, la
++  // première impression Leboncoin réécrivait le nuage réduit à une entrée.
++  React.useEffect(() => onCloudReady(() => setBordFormats((n) => (!n || Object.keys(n).length === 0) ? (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}) : n)), []);
++  // LA position pour CE bordereau : par TYPE reconnu et par imprimante
++  // (§ tampons-regle — la même règle que l'écran Colis Vinted, §11). Au premier
++  // bordereau d'un type, le réglage est mémorisé ⇒ le type apparaît dans
++  // Réglages → « Mes bordereaux ».
++  const posForType = (type) => {
++    const pos = posTampon(bordFormats, type, 'normale');
++    if (pos.defaut) { const next = noterTampon(bordFormats, type, 'normale', pos); setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next); }
+     return pos;
+   };
+   const adjustBordPlacement = () => {
+     const r = bordResult; if (!r || !r.pdfBuf) return;
+     const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type: 'application/pdf' }));
+-    setBordPlace({ numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, w: r.w, h: r.h, key: r.key, blobUrl, initPos: bordFormats[r.key] });
++    setBordPlace({ numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, w: r.w, h: r.h, key: r.key, type: r.type, blobUrl, initPos: posTampon(bordFormats, r.type || { cle: r.key, fmt: r.key, w: r.w, h: r.h }, 'normale') });
+     if (r.url) URL.revokeObjectURL(r.url);
+     setBordResult(null);
+   };
+   const confirmBordPlacement = async (pos) => {
+     const p = bordPlace; if (!p) return;
+-    const next = { ...bordFormats, [p.key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next);
+-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); }
++    const next = noterTampon(bordFormats, p.type || { cle: p.key, fmt: p.key, w: p.w, h: p.h }, 'normale', pos);
++    setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next);
++    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, type: p.type, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); }
+     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
+   };
+   const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
+@@ -12063,12 +12202,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+     if (!r0.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r0.error ? ' — ' + r0.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
+     try {
+       const bytes = b64ToBytes(r0.dataUrl.split(',')[1] || '');
+-      const { width, height } = await readPdfFirstPageSize(bytes);
+-      const key = bordereauFormatKey(width, height);
+-      const pos = posForFormat(width, height);   // emplacement APPRIS pour ce format
++      const type = await typeDuBordereau(bytes);   // transporteur + format (§ tampons-regle)
++      const pos = posForType(type);                // emplacement APPRIS pour ce type
+       const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
+       // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
+-      setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
++      setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key: type.cle, type, w: type.w, h: type.h });
+     } catch (e) { libererOngletPdf(); toast('Impossible de tamponner ce bordereau : ' + String(e)); }
+   };
+   // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
+@@ -25200,8 +25338,9 @@ function LoadError({ onRetry }) {
+ function BordPlacer({ place, onConfirm, onCancel }) {
+   const { numero, title, w, h, blobUrl } = place;
+   const padRef = React.useRef(null);
+-  const boxW = Math.min(w*0.62, 230), boxH = 46;      // taille réelle du tampon (pt)
+-  const wr = boxW/w, hr = boxH/h;                       // taille en ratio de page
++  const [s, setS] = useState(tailleTampon(place.initPos));   // la TAILLE du tampon (15 octobre)
++  const boxW = Math.min(w*0.62, 230)*s, boxH = 46*s;    // taille réelle du tampon (pt)
++  const wr = Math.min(1, boxW/w), hr = Math.min(1, boxH/h); // taille en ratio de page
+   const [xr,setXr] = useState(place.initPos?.xr ?? 0.05);
+   const [yr,setYr] = useState(place.initPos?.yr ?? 0.02); // défaut : haut de page
+   const dragging = React.useRef(false);
+@@ -25238,15 +25377,203 @@ function BordPlacer({ place, onConfirm, onCancel }) {
+             <div style={{fontSize:'min(2.4vw,9px)',color:'#222',lineHeight:1.1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{title}</div>
+           </div>
+         </div>
++        <label style={{display:'flex',alignItems:'center',gap:10,marginTop:12,fontSize:12,color:C.muted}}>
++          Taille du tampon
++          <input type="range" min="0.5" max="2.5" step="0.1" value={s} data-tampon-taille onChange={(e)=>setS(Number(e.target.value)||1)} style={{flex:1}}/>
++          <span style={{minWidth:34,textAlign:'right',fontWeight:600,color:C.text}}>×{String(s).replace('.',',')}</span>
++        </label>
+         <div style={{display:'flex',gap:8,marginTop:14}}>
+           <button type="button" onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
+-          <button type="button" onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
++          <button type="button" onClick={()=>onConfirm({xr,yr,s})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
+         </div>
+       </div>
+     </div>
+   );
+ }
+ 
++// ── « MES BORDEREAUX » (Réglages, 15 octobre) ────────────────────────────────
++// La liste des TYPES de bordereaux rencontrés (§ tampons-regle), avec pour
++// chacun : où le tampon est posé, par imprimante (classique / thermique), un
++// réglage manuel (déplacer, taille) et un APERÇU — le PDF d'exemple TAMPONNÉ.
++// L'aperçu est une COPIE : le PDF source n'est jamais modifié (le tampon ne
++// s'ajoute qu'à la copie imprimée).
++const apercuTamponne = async (pdfBuf, mode, pos) => {
++  try {
++    const PL = await import('pdf-lib');
++    const { PDFDocument, rgb, StandardFonts } = PL;
++    const pdf = await PDFDocument.load(pdfBuf);
++    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
++    const reg = await pdf.embedFont(StandardFonts.Helvetica);
++    if (imprMode(mode) === 'thermique') {
++      const first = pdf.getPages()[0];
++      const z = zoneEtiquette(PL, first);
++      if (!z.ok) return { raison: z.raison || "l'étiquette de ce PDF n'a pas pu être isolée — il partirait entier" };
++      drawSkuThermique(first, rgb, bold, '123', z, pos);
++      first.setMediaBox(z.x, z.y, z.w, z.h);
++      first.setCropBox(z.x, z.y, z.w, z.h);
++    } else {
++      drawBordereauStamp(pdf, rgb, bold, reg, '123', 'Exemple de titre', pos);
++    }
++    const bytes = await pdf.save();
++    return { url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) };
++  } catch (e) { return { raison: String((e && e.message) || e) }; }
++};
++
++// L'éditeur d'un réglage : un pad aux proportions de la page (classique) ou de
++// l'étiquette 10×15 (thermique), le tampon déplaçable, la taille, et l'aperçu
++// réel quand un bordereau de ce type est passé dans la session.
++function TamponEditeur({ type, mode, init, onSave, onCancel }) {
++  const th = imprMode(mode) === 'thermique';
++  const w = th ? 100 : (type.w || 595), h = th ? 150 : (type.h || 842);
++  const [s, setS] = useState(tailleTampon(init));
++  const [xr, setXr] = useState(typeof init?.xr === 'number' ? init.xr : (th ? 0 : 0.05));
++  const [yr, setYr] = useState(typeof init?.yr === 'number' ? init.yr : (th ? 1 : 0.02));
++  const padRef = React.useRef(null);
++  // Taille de la poignée, en ratio du pad. ⚠️ En thermique le sens de `xr`/`yr`
++  // n'est PAS « ratio de la page » : `drawSkuThermique` les mappe sur la COURSE
++  // disponible (0 = tout à gauche, 1 = tout à droite / bas). Le premier jet de
++  // cet éditeur les traitait comme un ratio de pad avec une poignée de 50 % —
++  // le N° ne pouvait donc jamais être posé au-delà du milieu de l'étiquette.
++  // On convertit : visuel = fraction × (1 − taille de la poignée), et retour.
++  const boxW = th ? w * 0.26 * s : Math.min(w * 0.62, 230) * s;
++  const boxH = th ? h * 0.055 * s : 46 * s;
++  const wr = Math.min(1, boxW / w), hr = Math.min(1, boxH / h);
++  const vx = th ? xr * (1 - wr) : xr;                       // position VISUELLE (pad)
++  const vy = th ? yr * (1 - hr) : Math.min(yr, 1 - hr);
++  const dragging = React.useRef(false);
++  const moveTo = (cx, cy) => {
++    const r = padRef.current?.getBoundingClientRect(); if (!r) return;
++    const nx = Math.max(0, Math.min(1 - wr, (cx - r.left) / r.width - wr / 2));
++    const ny = Math.max(0, Math.min(1 - hr, (cy - r.top) / r.height - hr / 2));
++    if (th) { setXr(wr >= 1 ? 0 : nx / (1 - wr)); setYr(hr >= 1 ? 0 : ny / (1 - hr)); }
++    else { setXr(nx); setYr(ny); }
++  };
++  const pt = (e) => (e.touches && e.touches[0] ? e.touches[0] : e);
++  const onDown = (e) => { dragging.current = true; const p = pt(e); moveTo(p.clientX, p.clientY); };
++  const onMove = (e) => { if (!dragging.current) return; const p = pt(e); moveTo(p.clientX, p.clientY); if (e.cancelable) e.preventDefault(); };
++  const onUp = () => { dragging.current = false; };
++  // L'APERÇU RÉEL : le dernier PDF de ce type vu dans la session, TAMPONNÉ à la
++  // position en cours (une copie — jamais le PDF source). Régénéré après chaque
++  // réglage, avec un petit délai pour ne pas regénérer à chaque pixel.
++  const exemple = APERCUS_BORDEREAU.get(type.cle) || null;
++  const [apercu, setApercu] = useState(null);   // { url } | { raison } | null
++  React.useEffect(() => {
++    if (!exemple) return;
++    let mort = false, url = null;
++    const t = setTimeout(async () => {
++      const r = await apercuTamponne(exemple, mode, { xr, yr, s });
++      if (mort) { if (r.url) URL.revokeObjectURL(r.url); return; }
++      url = r.url || null;
++      setApercu((prev) => { if (prev && prev.url) URL.revokeObjectURL(prev.url); return r; });
++    }, 350);
++    return () => { mort = true; clearTimeout(t); if (url) URL.revokeObjectURL(url); };
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [xr, yr, s, mode, type.cle]);
++  return (
++    <div data-tampon-editeur={th ? 'thermique' : 'normale'} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, background: C.surface }}>
++      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>
++        {th ? <>Fais glisser le <b>petit N°</b> là où tu le veux sur l'<b>étiquette découpée</b> (10×15 cm).</>
++            : <>Fais glisser le cartouche <b>N° + titre</b> là où il y a de la place sur ce bordereau.</>}
++      </div>
++      <div ref={padRef} data-tampon-pad
++        onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
++        onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
++        style={{ position: 'relative', aspectRatio: `${w} / ${h}`, maxWidth: th ? 220 : 300, maxHeight: '46vh', margin: '0 auto', background: C.card, border: `1px dashed ${C.border}`, borderRadius: 8, touchAction: 'none', cursor: 'grab', overflow: 'hidden' }}>
++        {!th && <div style={{ position: 'absolute', top: '3%', left: 0, right: 0, textAlign: 'center', fontSize: 9, color: C.muted }}>haut de la page</div>}
++        <div style={{ position: 'absolute', left: `${vx * 100}%`, top: `${vy * 100}%`, width: `${wr * 100}%`, height: `${hr * 100}%`, background: '#fff', border: '1.5px solid #000', borderRadius: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '1px 4px', boxSizing: 'border-box', boxShadow: '0 1px 6px rgba(0,0,0,.25)', cursor: 'grab' }}>
++          <div style={{ fontSize: th ? 'min(2.6vw,10px)' : 'min(3.2vw,14px)', fontWeight: 700, color: '#000', lineHeight: 1, whiteSpace: 'nowrap' }}>N° 123</div>
++          {!th && <div style={{ fontSize: 'min(2.2vw,8px)', color: '#222', lineHeight: 1.1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Exemple de titre</div>}
++        </div>
++      </div>
++      <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, fontSize: 12, color: C.muted }}>
++        Taille
++        <input type="range" min="0.5" max="2.5" step="0.1" value={s} data-tampon-taille onChange={(e) => setS(Number(e.target.value) || 1)} style={{ flex: 1 }} />
++        <span style={{ minWidth: 34, textAlign: 'right', fontWeight: 600, color: C.text }}>×{String(s).replace('.', ',')}</span>
++      </label>
++      {/* L'aperçu : le PDF d'exemple tamponné (une copie). Pas d'exemple sous la
++          main ⇒ on le DIT, le réglage s'applique quand même. */}
++      {exemple
++        ? (apercu && apercu.url
++          ? <div style={{ marginTop: 10 }}>
++              {!estIOS() && <iframe title="Aperçu du bordereau tamponné" data-tampon-apercu src={apercu.url + '#toolbar=0&navpanes=0'} style={{ width: '100%', height: 260, border: `1px solid ${C.border}`, borderRadius: 8, background: '#fff' }} />}
++              <button type="button" onClick={() => window.open(apercu.url, '_blank')} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accent, fontWeight: 500, cursor: 'pointer', padding: 0, fontSize: 12 }}>👁 Ouvrir l'aperçu tamponné</button>
++            </div>
++          : apercu && apercu.raison
++          ? <div data-tampon-apercu-ko style={{ marginTop: 10, fontSize: 12, color: C.muted }}>Aperçu indisponible : {apercu.raison}</div>
++          : <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>Aperçu en préparation…</div>)
++        : <div data-tampon-sans-exemple style={{ marginTop: 10, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Imprime un bordereau de ce type pour voir l'aperçu réel ici — le réglage s'applique quand même dès maintenant.</div>}
++      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
++        <button type="button" onClick={onCancel} style={{ flex: 1, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '9px' }}>Annuler</button>
++        <button type="button" data-tampon-save onClick={() => onSave({ xr, yr, s })} style={{ flex: 2, border: 'none', borderRadius: 8, background: C.accent, color: C.onAccent, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '9px' }}>Enregistrer cet emplacement</button>
++      </div>
++    </div>
++  );
++}
++
++// La page « Mes bordereaux » : chaque type rencontré, ses deux réglages
++// (classique / thermique), l'aperçu, et la remise à zéro. Le réglage est
++// SYNCHRONISÉ (`vinted_bordereau_formats`, SYNC_KEYS) et rattrapé par
++// `onCloudReady` seulement s'il est resté vide (§5.49).
++function MesBordereaux({ onClose }) {
++  const [formats, setFormats] = useState(() => load('vinted_bordereau_formats', {}) || {});
++  useEffect(() => onCloudReady(() => setFormats((n) => (!n || Object.keys(n).length === 0) ? (load('vinted_bordereau_formats', {}) || {}) : n)), []);
++  const [ouvert, setOuvert] = useState(null);   // { cle, mode }
++  const types = typesTampon(formats);
++  const ecrit = (next) => { setFormats(next); save('vinted_bordereau_formats', next); };
++  const enregistrer = (type, mode, pos) => { ecrit(noterTampon(formats, type, mode, pos)); setOuvert(null); toast('✓ Emplacement retenu pour ce type de bordereau.'); };
++  const oublier = async (cle) => {
++    if (!(await askConfirm('Oublier les emplacements réglés pour ce type ? Le tampon repartira à la position par défaut.'))) return;
++    const next = { ...formats }; delete next[cle]; delete next['th:' + cle]; ecrit(next); setOuvert(null);
++  };
++  const pc = (v) => `${Math.round((Number(v) || 0) * 100)} %`;
++  const resume = (type, mode) => {
++    const p = posTampon(formats, type, mode);
++    return p.defaut
++      ? (imprMode(mode) === 'thermique' ? 'par défaut — en bas à gauche de l\'étiquette' : 'par défaut — en haut à gauche')
++      : `à ${pc(p.xr)} / ${pc(p.yr)} · taille ×${String(p.s).replace('.', ',')}`;
++  };
++  const ligne = (type, mode, titre) => (
++    <div style={{ marginTop: 8 }}>
++      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
++        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, minWidth: 128 }}>{titre}</span>
++        <span data-tampon-resume={`${mode}:${type.cle}`} data-tampon-defaut={posTampon(formats, type, mode).defaut ? '1' : '0'} style={{ fontSize: 12, color: C.muted, flex: '1 1 140px' }}>{resume(type, mode)}</span>
++        <button type="button" data-tampon-regler={`${mode}:${type.cle}`} onClick={() => setOuvert(ouvert && ouvert.cle === type.cle && ouvert.mode === mode ? null : { cle: type.cle, mode })}
++          style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 12px', fontFamily: 'inherit' }}>Régler</button>
++      </div>
++      {ouvert && ouvert.cle === type.cle && ouvert.mode === mode &&
++        <TamponEditeur type={type} mode={mode} init={posTampon(formats, type, mode)} onSave={(pos) => enregistrer(type, mode, pos)} onCancel={() => setOuvert(null)} />}
++    </div>
++  );
++  return (
++    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
++      <div data-mes-bordereaux onClick={(e) => e.stopPropagation()} style={{ background: C.bg, borderRadius: 10, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
++        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
++          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>🖨 Mes bordereaux</div>
++          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', padding: 4 }}>✕</button>
++        </div>
++        <div data-tampon-inconnu-note style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, margin: '6px 0 12px' }}>
++          L'app retient chaque <b>type</b> de bordereau rencontré (transporteur + format de page) et l'endroit du tampon <b>N° + titre</b> — un réglage par imprimante (classique / thermique). Un type encore jamais rencontré part avec le tampon <b>à la position par défaut</b> (en haut à gauche), puis apparaît ici dès le premier bordereau imprimé. Le tampon s'ajoute à la copie imprimée — le bordereau d'origine n'est jamais modifié.
++        </div>
++        {types.length === 0 && <div data-tampon-vide style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, padding: '10px 0' }}>Aucun type de bordereau rencontré pour l'instant. Imprime un premier bordereau : son type apparaîtra ici, réglable.</div>}
++        {types.map((t) => (
++          <div key={t.cle} data-tampon-type={t.cle} data-tampon-connu={t.connu ? '1' : '0'} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 12px', marginBottom: 10 }}>
++            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
++              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{t.connu ? nomTransporteurBordereau(t.transporteur) : `Format ${t.w}×${t.h} pt`}</span>
++              <span style={{ fontSize: 11.5, color: C.muted }}>{t.connu ? `${t.w}×${t.h} pt` : 'transporteur non reconnu dans le PDF — ce format partage un seul réglage'}</span>
++            </div>
++            {ligne(t, 'normale', 'Imprimante classique')}
++            {ligne(t, 'thermique', 'Imprimante thermique')}
++            <button type="button" onClick={() => oublier(t.cle)} style={{ marginTop: 8, border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 11.5, padding: 0, textDecoration: 'underline' }}>Oublier ce type</button>
++          </div>
++        ))}
++        {types.length > 0 &&
++          <button type="button" onClick={async () => { if (await askConfirm('Oublier TOUS les emplacements de tampon mémorisés ? L\'app repartira de la position par défaut pour chaque type.')) { ecrit({}); toast('✓ Emplacements réinitialisés.'); } }}
++            style={{ marginTop: 2, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 500, padding: '8px 12px', fontFamily: 'inherit' }}>Tout réinitialiser</button>}
++      </div>
++    </div>
++  );
++}
++
+ // Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
+ // l'ajuster), puis TU envoies. Aucun envoi automatique → aucun risque de blocage.
+ const QUICK_REPLIES = [
+@@ -31469,19 +31796,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   // le N° une fois (bouton « déplacer »), TOUS les prochains bordereaux de ce
+   // format le mettent au même endroit. `mut` = autorise l'enregistrement (on le
+   // coupe pendant un lot pour ne pas empiler les setState).
+-  const posForFormat = (w, h, mut = true) => {
+-    const key = bordereauFormatKey(w, h);
+-    let pos = bordFormats[key];
+-    if (!pos) { pos = smartDefaultBordPos(w, h); if (mut) { const next = { ...bordFormats, [key]: pos }; setBordFormats(next); save('vinted_bordereau_formats', next); } }
++  const posForType = (type, mut = true) => {
++    const pos = posTampon(bordFormats, type, 'normale');
++    // Premier bordereau de ce TYPE : on mémorise le réglage (défaut) pour que le
++    // type apparaisse dans Réglages → « Mes bordereaux ». `mut` coupe
++    // l'enregistrement pendant un lot (pas d'empilement de setState).
++    if (pos.defaut && mut) { const next = noterTampon(bordFormats, type, 'normale', pos); setBordFormats(next); save('vinted_bordereau_formats', next); }
+     return pos;
+   };
+   const processBordereau = async (numero, title, pdfBuf) => {
+     try {
+-      const { width, height } = await readPdfFirstPageSize(pdfBuf);
+-      const key = bordereauFormatKey(width, height);
+-      const pos = posForFormat(width, height);
++      const type = await typeDuBordereau(pdfBuf);   // transporteur + format (§ tampons-regle)
++      const pos = posForType(type);
+       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
+-      setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
++      setBordResult({ ...r, numero, title, pdfBuf, key: type.cle, type, w: type.w, h: type.h });
+     } catch(err){ libererOngletPdf(); toast('Impossible de lire ce PDF : '+String(err)); }
+   };
+   // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
+@@ -31540,8 +31868,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+       const numero = numForBord(b), title = b.modele || b.article || '';
+       if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
+-      const { width, height } = await readPdfFirstPageSize(buf);
+-      const pos = posForFormat(width, height);
++      const type = await typeDuBordereau(buf);   // transporteur + format (§ tampons-regle)
++      const { w: width, h: height } = type;
++      const pos = posForType(type);
+       const inv = invForBord(b);
+       const ent = inv ? entForBordInvoice(inv) : null;
+       const PL = await import('pdf-lib');
+@@ -31556,7 +31885,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       const zTh = imprMode(imprimante) === 'thermique' ? zoneEtiquette(PL, src.getPages()[0]) : { ok: false };
+       let thermiqueOK = false, thermiqueRaison = '';
+       if (zTh.ok) {
+-        drawSkuThermique(src.getPages()[0], rgb, sBold, numero, zTh);
++        drawSkuThermique(src.getPages()[0], rgb, sBold, numero, zTh, posTampon(bordFormats, type, 'thermique'));
+         src.getPages()[0].setMediaBox(zTh.x, zTh.y, zTh.w, zTh.h);
+         src.getPages()[0].setCropBox(zTh.x, zTh.y, zTh.w, zTh.h);
+         thermiqueOK = true;
+@@ -31578,7 +31907,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       // Sur ordinateur : le PDF s'ouvre dans un onglet (bouton imprimer de
+       // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
+       const printed = ouvrirPdfOnglet(url);
+-      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
++      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: type.cle, type, w:width, h:height, withInvoice: joined, printed,
+                       thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
+     } catch(err){ libererOngletPdf(); toast('Erreur impression : '+String(err)); }
+   };
+@@ -31804,7 +32133,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Aucun de ces bordereaux n'a son PDF — le détail est écrit sur l'écran.");
+         setBatchBusy(false); return;
+       }
+-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
++      const r = await mergeAndDownloadBordereaux(items, bordFormats, { autoprint: true, imprimante });
+       // Les PDF que la fusion a dû écarter (abîmés, chiffrés) — nommés un par un.
+       for (const x of (r.rates || [])) { const r0 = aImprimer.find((y) => y.cle === x.cle); if (r0) echecs.push({ ...r0, erreur: 'PDF illisible (abîmé ou chiffré) — retélécharge-le depuis la vente sur Vinted' }); }
+       const okSet = new Set(r.clesOk || []);
+@@ -31832,15 +32161,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   const adjustBordPlacement = () => {
+     const r = bordResult; if(!r || !r.pdfBuf) return;
+     const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type:'application/pdf' }));
+-    setBordPlace({ numero:r.numero, title:r.title, pdfBuf:r.pdfBuf, w:r.w, h:r.h, key:r.key, blobUrl, initPos: bordFormats[r.key] });
++    setBordPlace({ numero:r.numero, title:r.title, pdfBuf:r.pdfBuf, w:r.w, h:r.h, key:r.key, type:r.type, blobUrl, initPos: posTampon(bordFormats, r.type || { cle: r.key, fmt: r.key, w: r.w, h: r.h }, 'normale') });
+     if (r.url) URL.revokeObjectURL(r.url);
+     setBordResult(null);
+   };
+   const confirmBordPlacement = async (pos) => {
+     const p = bordPlace; if(!p) return;
+-    const next = { ...bordFormats, [p.key]: pos };
++    const next = noterTampon(bordFormats, p.type || { cle: p.key, fmt: p.key, w: p.w, h: p.h }, 'normale', pos);
+     setBordFormats(next); save('vinted_bordereau_formats', next);
+-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); }
++    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, type:p.type, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); }
+     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
+   };
+   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
+@@ -39689,6 +40018,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
+   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
+   // exactement ce qui fait « page web bricolée » au lieu d'« application ».
+   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
++  // « Mes bordereaux » (15 octobre) : les types rencontrés + le réglage du tampon.
++  const [mesBordereaux, setMesBordereaux] = React.useState(false);
+   const Row = ({icon,title,desc,onClick,color}) => (
+     <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+       {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
+@@ -39997,7 +40328,11 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
+       <Row icon="doc" title="Régime fiscal et déclarations" desc="Taux de cotisations, rapport du mois, registre annuel." onClick={()=>setTab('fiscal')}/>
+       <Row icon="cash" title="Compléter les prix d'achat" desc="Saisie par paire, pour calculer ton bénéfice." onClick={()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');}}/>
+       <div style={{height:10}}/>
+-      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
++      {/* « Mes bordereaux » (15 octobre) : remplace le simple bouton de remise à
++          zéro — la liste des TYPES rencontrés, l'endroit du tampon par
++          imprimante, l'aperçu et le réglage manuel. La remise à zéro vit dedans. */}
++      <Row icon="doc" title="Mes bordereaux" desc="Les types de bordereaux rencontrés : où le N° est tamponné, réglable par imprimante (classique / thermique)." onClick={()=>setMesBordereaux(true)}/>
++      {mesBordereaux && <MesBordereaux onClose={()=>setMesBordereaux(false)}/>}
+ 
+       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
+       <PushSetting/>
+-- 
+2.43.0
+

@@ -23,7 +23,8 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4383);
+const PORT_BANC = Number(process.env.BANC_PORT) || 4383;
+srv.listen(PORT_BANC);
 // Ce que la VRAIE base contient, calculé ici pour comparer à l'écran.
 const AT=(s)=>/d[ée]pos[ée]/i.test(s||'')&&/point\s+relais|bureau\s+de\s+poste/i.test(s||'');
 // ⚠️ LE COMPTE VIENT DE L'IDENTIFIANT DE LIGNE, PAS DE LA COMMANDE. Mesuré :
@@ -103,7 +104,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)));}
     return j([]);});
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-  await pg.goto('http://localhost:4383/?tab=cat_achats',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT_BANC+'/?tab=cat_achats',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
   await pg.screenshot({path:SC+'/z-retrait.png',fullPage:true});
   const v=await pg.evaluate(()=>{
@@ -155,7 +156,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // bon compte » sans dire lequel est une consigne qu'on ne peut pas suivre :
   // il en a NEUF. Rendu avec les vraies donnees (§26 : un bloc conditionnel ne
   // compte que RENDU).
-  await pg.goto('http://localhost:4383/?tab=journee',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT_BANC+'/?tab=journee',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
   await pg.screenshot({path:SC+'/z-retrait-journee.png',fullPage:true});
   const j2=await pg.evaluate(()=>document.body.innerText||'');
@@ -166,13 +167,16 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // qu'il devait attraper. C'est la base qui decide : s'il existe un colis sans
   // code, la ligne DOIT nommer un compte, quelle que soit la formulation.
   const logins=[...new Set(accounts.map(a=>String(a.login||'')).filter(Boolean))];
-  const ligne=(/Retirer \d+ colis[\s\S]{0,220}/.exec(j2)||[''])[0];
+  // (15 octobre) La case « À retirer » de la barre porte son nombre (`data-n`)
+  // et son détail — dont le COMPTE — dans son nom (`aria-label`).
+  const caseR=await pg.evaluate(()=>{const e=document.querySelector('[data-journee="retrait"]');return e?{n:Number(e.getAttribute('data-n')||0),nom:e.getAttribute('aria-label')||''}:null;});
+  const ligne=caseR?caseR.nom:'';
   const sansCode=aRetirer.filter(o=>!codes[String(o.transaction_id||'')]);
   console.log('base servie : '+sansCode.length+' colis sans code, sur '
     +[...new Set(sansCode.map(o=>o.__uid).filter(Boolean))].length+' compte(s)');
   if(sansCode.length===0){ console.log('--  (aucun colis sans code dans ces fixtures)'); }
   else {
-    dit(/Retirer \d+ colis/.test(j2), 'Ma journee annonce les colis a retirer');
+    dit(!!caseR && caseR.n>0, 'Ma journee annonce les colis a retirer');
     dit(!/Ouvre la conversation UNE fois/.test(j2),
       "et ne reclame plus d'ouvrir chaque conversation",
       "l'extension va les chercher toute seule depuis le 27 aout");
@@ -278,9 +282,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // colis perdu). `pickupUnion` publie maintenant, le tableau de bord consomme.
   const nombres = {};
   for (const t of ['cat_achats','journee','dashboard']) {
-    await pg.goto('http://localhost:4383/?tab='+t,{waitUntil:'domcontentloaded'});
+    await pg.goto('http://localhost:'+PORT_BANC+'/?tab='+t,{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(5000);
-    const txt = await pg.evaluate(()=>document.body.innerText||'');
+    const txt = await pg.evaluate(()=>{ const e=document.querySelector('[data-journee="retrait"]'); return (e&&e.getAttribute('aria-label'))||document.body.innerText||''; });
     const m = /(\d+)\s+colis à retirer/.exec(txt) || /Retirer\s+(\d+)\s+colis/.exec(txt);
     if (m) nombres[t] = Number(m[1]);
   }

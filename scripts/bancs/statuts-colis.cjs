@@ -57,7 +57,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4351;
+const PORT = Number(process.env.BANC_PORT) || 4351;
 
 const MAINTENANT = Date.now();
 const ilYa = (j, h = 0) => new Date(MAINTENANT - j * 86400000 - h * 3600000).toISOString();
@@ -163,21 +163,20 @@ async function sain(pg, ecran) {
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
 
-// La cloche : on l'ouvre et on lit le NOMBRE de la ligne « ventes à expédier ».
+// « La cloche » : la liste d'actions de la coque (`notifItems`). Son bouton a
+// quitté l'en-tête (et son panneau, mort, est retiré le 15 octobre) : elle se
+// lit là où elle est rendue — « À faire » de l'écran Collectif. On y lit le
+// NOMBRE de la ligne « ventes à expédier ».
 async function lireCloche(pg) {
-  await pg.click('[aria-label="Notifications"]', { timeout: 5000 });
-  await pg.waitForTimeout(500);
-  const n = await pg.evaluate(() => {
+  await pg.goto(`http://localhost:${PORT}/?tab=collectif`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(5000);
+  return pg.evaluate(() => {
     for (const bt of document.querySelectorAll('button')) {
       const m = /(\d+)\s+ventes?\s+à\s+expédier/.exec(bt.innerText || '');
       if (m && !/eBay/.test(bt.innerText)) return Number(m[1]);
     }
     return 0;      // aucune ligne : zéro colis annoncé
   });
-  await pg.click('[aria-label="Notifications"]', { timeout: 3000 }).catch(() => {});
-  await pg.keyboard.press('Escape').catch(() => {});
-  await pg.waitForTimeout(200);
-  return n;
 }
 
 // Les lignes de vente/d'achat rendues : titre (attribut `title`, la donnée
@@ -238,11 +237,13 @@ async function filtre(pg, nom) {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(4500);
         const j = await pg.evaluate(() => {
-          const m = /Expédier\s+(\d+)\s+colis/.exec(document.body.innerText);
+          // (15 octobre) La case « À envoyer » de la barre de Ma journée porte
+          // son nombre dans `data-n` (« Expédier N colis » n'existe plus).
+          const e = document.querySelector('[data-journee="colis"]');
           let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) {}
-          return { n: m ? Number(m[1]) : 0, pub };
+          return { n: e && e.getAttribute('data-n') !== '' ? Number(e.getAttribute('data-n')) : 0, pub };
         });
-        dit(j.n === 2, 'Ma journée : « Expédier N colis » vaut 2', 'lu ' + j.n);
+        dit(j.n === 2, 'Ma journée : la case « À envoyer » vaut 2', 'lu ' + j.n);
         dit(!!j.pub && j.pub.total === 2, 'Ma journée publie 2 colis à poster pour la cloche', JSON.stringify(j.pub));
         await sain(pg, 'Ma journée');
         const n = await lireCloche(pg);

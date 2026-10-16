@@ -1,0 +1,1008 @@
+From ab1b48cf995ab5d70aa0fcc9acc23fffbb5b2223 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:35:14 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p1-annonces)=20=E2=80=94=20?=
+ =?UTF-8?q?fig=C3=A9=20pour=20la=20passation=20du=2016=20octobre=20(agent?=
+ =?UTF-8?q?=20coup=C3=A9=20par=20la=20limite=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ scripts/audit-presences.cjs            |  45 +++-
+ scripts/bancs/annonces-plateformes.cjs | 237 +++++++++++++++---
+ src/App.jsx                            | 327 ++++++++++++++++++-------
+ 3 files changed, 476 insertions(+), 133 deletions(-)
+
+diff --git a/scripts/audit-presences.cjs b/scripts/audit-presences.cjs
+index 15d2797..24485fe 100644
+--- a/scripts/audit-presences.cjs
++++ b/scripts/audit-presences.cjs
+@@ -13,7 +13,12 @@
+ //     « VRM-230 » est la B230, pas la nouvelle 230) ; ni sans SKU, ni épuisée,
+ //     ni terminée ;
+ //   · un N° porté par deux fiches ne désigne personne ;
+-//   · « pas su » (Leboncoin ou eBay illisible) n'invente rien.
++//   · « pas su » (Leboncoin ou eBay illisible) n'invente rien ;
++//   · (revue du 15 oct.) une observation de PLUS DE 24 H (`ENLIGNE_FRAIS_MS`,
++//     la borne de Vinted, §11) n'est JAMAIS « en ligne » : elle prend l'état
++//     `vue`, `presencesAilleurs` ne la compte pas, `presencesAVerifier` la rend ;
++//   · (revue du 15 oct.) un compte eBay pas lu ⇒ `etatSourcePresence` dit
++//     « partiel », jamais « lu » (« rien lu » ne vaut pas « rien », §5).
+ //
+ // `--mutation <nom>` réaffaiblit la règle : le contrôle doit passer au ROUGE.
+ //   demande  : une publication demandée compte comme en ligne
+@@ -21,6 +26,8 @@
+ //   ambigu   : un N° porté par deux fiches désigne quand même la paire en ligne
+ //   statut   : une annonce Leboncoin désactivée compte comme en ligne
+ //   archive  : le SKU eBay est lu sans la traduction de la remise à zéro
++//   frais    : une observation de 40 jours redevient une preuve « en ligne »
++//   partiel  : un compte eBay pas lu redevient « lu »
+ // « La fonction n'existait pas avant » n'est pas une preuve (§6.1).
+ const fs = require('fs'), vm = require('vm'), path = require('path');
+ const racine = path.join(__dirname, '..');
+@@ -40,6 +47,8 @@ if (MUT) {
+     ambigu: ["if (ids.length > 1) { if (ids.some((i) => enLigne.has(i))) ambigus.add(k); return null; }", "if (ids.length > 1) { const e = ids.find((i) => enLigne.has(i)); return e || null; }"],
+     statut: ["if (String(ad.status || '').toLowerCase() !== 'active' || vendusLbc.has(String(ad.id))) continue;", "if (vendusLbc.has(String(ad.id))) continue;"],
+     archive: ["const n = numEbayLu(a.sku, a.itemId);\n    if (!n) continue;                                  // sans SKU", "const n = numDeSkuEbay(a.sku);\n    if (!n) continue;                                  // sans SKU"],
++    frais: ["const frais = (v) => { const t = quand(v); return t != null && now - t <= ENLIGNE_FRAIS_MS; };", "const frais = () => true;"],
++    partiel: ["return pres.ebay === 'lu' && (pres.ebayIllisibles || []).length ? 'partiel' : pres.ebay;", "return pres.ebay;"],
+   }[MUT];
+   if (!R) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
+   APP = APP.replace(R[0], R[1]);
+@@ -65,11 +74,11 @@ function extraire(src, nom) {
+ 
+ const NOMS = ['cleNum', 'NUM_OK', 'refVRMDe', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'traductionAnnonce', 'numeroExterne',
+   'numDeSkuEbay', 'numEbayLu', 'lbcAnnulee', 'numDeTitreLbc', 'clesAnnonceLbc', 'comptesLbcProuves', 'annonceLbcALui',
+-  'PLATEFORMES_PRESENCE', 'presencesPaires', 'presencesAilleurs'];
++  'ENLIGNE_FRAIS_MS', 'PLATEFORMES_PRESENCE', 'presencesPaires', 'presencesAilleurs', 'etatSourcePresence', 'presencesAVerifier'];
+ const src = NOMS.map((n) => extraire(APP, n)).join('\n');
+ const ctx = { STORE: {} };
+ vm.createContext(ctx);
+-essaie('la règle se charge', () => vm.runInContext('const load = (k, d) => (k in STORE ? STORE[k] : d);\n' + src + '\n;this.R = { presencesPaires, presencesAilleurs };', ctx));
++essaie('la règle se charge', () => vm.runInContext('const load = (k, d) => (k in STORE ? STORE[k] : d);\n' + src + '\n;this.R = { presencesPaires, presencesAilleurs, etatSourcePresence, presencesAVerifier };', ctx));
+ const R = ctx.R || {};
+ 
+ // ── Données INVENTÉES, à la forme de sa base (mesurée le 15 octobre) ──────────
+@@ -87,21 +96,26 @@ const annonces = [
+   ann(1007, A2, { title: 'Nike Air Force 1 blanc taille 44' }),  // N°230 (NOUVELLE série) : un vieux SKU eBay « VRM-230 » désigne la B230
+   ann(1008, A1, { title: 'Vans Old Skool noir taille 40' }),     // N°18 : un lien posé À LA MAIN sur une annonce Leboncoin
+   ann(1009, A1, { title: 'Converse Chuck 70 noir taille 39' }),  // N°19 : rien ailleurs (une annonce d'AUTRUI au même titre)
++  ann(1010, A1, { title: 'Reebok Club C 85 blanc taille 42' }),  // N°20 : annonce Leboncoin VUE IL Y A 40 J (périmée)
+ ];
+ const numeros = {
+   1001: { numero: '12' }, 1002: { numero: '13' }, 1003: { numero: '15' }, 1004: { numero: '14' },
+   9004: { numero: '14' },                                         // une fiche VENDUE au même N° (héritage)
+-  1005: { numero: '16' }, 1006: { numero: '17' }, 1007: { numero: '230' }, 9230: { numero: 'B230' }, 1008: { numero: '18' }, 1009: { numero: '19' },
++  1005: { numero: '16' }, 1006: { numero: '17' }, 1007: { numero: '230' }, 9230: { numero: 'B230' }, 1008: { numero: '18' }, 1009: { numero: '19' }, 1010: { numero: '20' },
+ };
+ const lbcItems = {
+-  // À lui (lbcUser) : sa référence (la forme captée : « 12 ») ⇒ N°12.
+-  '5001': { id: 5001, status: 'active', ref: '12', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'Salomon XT-6', url: 'https://www.leboncoin.fr/ad/chaussures/5001', seenAt: '2026-10-14T10:00:00Z' },
++  // À lui (lbcUser) : sa référence (la forme captée : « 12 ») ⇒ N°12. Vue il y a
++  // 3 h : fraîche (≤ 24 h), donc une vraie preuve « en ligne ».
++  '5001': { id: 5001, status: 'active', ref: '12', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'Salomon XT-6', url: 'https://www.leboncoin.fr/ad/chaussures/5001', seenAt: '2026-10-15T09:00:00Z' },
++  // À lui, VUE IL Y A 40 JOURS : elle a pu être vendue ou retirée depuis —
++  // jamais « en ligne », l'état `vue` (revue du 15 oct.).
++  '5008': { id: 5008, status: 'active', ref: '20', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'Reebok Club C', url: 'https://www.leboncoin.fr/ad/chaussures/5008', seenAt: '2026-09-05T10:00:00Z' },
+   // À lui, DÉSACTIVÉE ⇒ pas en ligne.
+-  '5002': { id: 5002, status: 'inactive', ref: '16', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'Puma Suede' },
++  '5002': { id: 5002, status: 'inactive', ref: '16', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'Puma Suede', seenAt: '2026-10-15T09:00:00Z' },
+   // À lui, VENDUE sur Leboncoin (vente où il est le vendeur) ⇒ pas en ligne.
+-  '5003': { id: 5003, status: 'active', ref: '17', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'New Balance 550' },
++  '5003': { id: 5003, status: 'active', ref: '17', lbcUser: 'u-moi', accountName: 'Moi_LBC', subject: 'New Balance 550', seenAt: '2026-10-15T09:00:00Z' },
+   // À lui par le COMPTE prouvé (une vente), relié À LA MAIN au N°18.
+-  '5004': { id: 5004, status: 'active', account: 'acc-lbc-1', accountName: 'Moi_LBC', subject: 'Vans Old Skool', url: 'https://www.leboncoin.fr/ad/chaussures/5004' },
++  '5004': { id: 5004, status: 'active', account: 'acc-lbc-1', accountName: 'Moi_LBC', subject: 'Vans Old Skool', url: 'https://www.leboncoin.fr/ad/chaussures/5004', seenAt: '2026-10-15T08:00:00Z' },
+   // D'AUTRUI (aucun signe d'appartenance), MÊME titre que la N°19 et un « n19 » ⇒ rien.
+   '5005': { id: 5005, status: 'active', account: 'inconnu-9', accountName: 'Quelqu_un', subject: 'Converse Chuck 70 noir taille 39' },
+   '5007': { id: 5007, status: 'active', account: 'inconnu-8', accountName: 'Autre', subject: 'Chuck 70 n19' },
+@@ -124,7 +138,7 @@ ctx.STORE.vrm_numerotation = { version: 2, archive: 'B', coupure: '2026-10-09T00
+ const nomCompte = (it) => it._acc.login;
+ const base = { annonces, numeros, nomCompte, maintenant: MAINTENANT,
+   lbc: { items: lbcItems, ventes: lbcVentes, liens: { 5004: '18' } },
+-  ebay: { items: ebayItems, illisibles: [], caps: { principal: '1792011691423' } },
++  ebay: { items: ebayItems, illisibles: [], caps: { principal: '1792011691423', cle2: '1792011691423' } },
+   demandesLbc: new Set(['1003']) };
+ 
+ const res = essaie('la règle rend un résultat', () => R.presencesPaires(base)) || { par: new Map(), idsAmbigus: new Set(), comptes: {} };
+@@ -149,6 +163,17 @@ dit(R.presencesAilleurs && R.presencesAilleurs(res, 1001).map((x) => x.p).join()
+ // Ordre : Vinted, Leboncoin, eBay.
+ dit(de(1001).map((x) => x.p).join(',') === 'vinted,lbc', 'les plateformes sont rangées Vinted, Leboncoin, eBay', de(1001).map((x) => x.p).join(','));
+ 
++// ── Observation périmée (revue du 15 oct.) : « vue », jamais « en ligne » ─────
++dit(enL(1010, 'lbc').length === 0 && de(1010).some((x) => x.p === 'lbc' && x.etat === 'vue'), 'une annonce Leboncoin vue il y a 40 j n’est PAS « en ligne » : état « vue »', JSON.stringify(de(1010)));
++dit(R.presencesAilleurs && R.presencesAilleurs(res, 1010).length === 0, '« aussi ailleurs » ne compte pas une observation périmée', JSON.stringify(R.presencesAilleurs ? R.presencesAilleurs(res, 1010) : null));
++dit(R.presencesAVerifier && R.presencesAVerifier(res, 1010).map((x) => x.cle + ':' + x.cause).join() === 'lbc:vue', '`presencesAVerifier` la rend « à vérifier » (cause : vue)', JSON.stringify(R.presencesAVerifier ? R.presencesAVerifier(res, 1010) : null));
++dit(R.presencesAVerifier && R.presencesAVerifier(res, 1003).map((x) => x.cle + ':' + x.cause).join() === 'lbc:demandee', 'la publication demandée aussi (cause : demandée)', JSON.stringify(R.presencesAVerifier ? R.presencesAVerifier(res, 1003) : null));
++
++// ── Un compte eBay pas lu ⇒ « partiel », jamais « lu » (§5) ───────────────────
++const resPartiel = essaie('eBay partiel : la règle rend un résultat', () => R.presencesPaires({ ...base, ebay: { ...base.ebay, illisibles: ['second'] } }));
++dit(R.etatSourcePresence && resPartiel && R.etatSourcePresence(resPartiel, 'ebay') === 'partiel', 'un compte eBay pas lu ⇒ `etatSourcePresence` dit « partiel »', resPartiel && R.etatSourcePresence ? R.etatSourcePresence(resPartiel, 'ebay') : '');
++dit(R.etatSourcePresence && R.etatSourcePresence(res, 'ebay') === 'lu', 'tous les comptes lus ⇒ « lu »', R.etatSourcePresence ? R.etatSourcePresence(res, 'ebay') : '');
++
+ // ── « Pas su » ─────────────────────────────────────────────────────────────────
+ const passu = essaie('pas su : la règle rend un résultat', () => R.presencesPaires({ ...base, lbc: null, ebay: null })) || { par: new Map() };
+ const deP = (id) => (passu.par.get(String(id)) || []);
+diff --git a/scripts/bancs/annonces-plateformes.cjs b/scripts/bancs/annonces-plateformes.cjs
+index 6c5471a..7a18c01 100644
+--- a/scripts/bancs/annonces-plateformes.cjs
++++ b/scripts/bancs/annonces-plateformes.cjs
+@@ -12,13 +12,25 @@
+ //     carte), Leboncoin (une annonce À LUI dont la référence est le N°), eBay
+ //     (le SKU VRM-{n°}) — et RIEN sur une annonce d'autrui au même titre, ni
+ //     sur une annonce eBay sans SKU au même titre ;
++//   · (revue du 15 oct.) une observation de PLUS DE 24 H n'est pas une preuve :
++//     pas de logo, « à vérifier » — la carte, la fiche (« vue il y a 5 j ») et
++//     le filtre disent la même chose ;
+ //   · une publication Leboncoin seulement DEMANDÉE (`vinted_lbc_posted`) : pas
+ //     de logo, les mots « à vérifier » ;
+ //   · le compte nommé quand il distingue (deux comptes Vinted) ;
+-//   · les filtres par plateforme n'existent que s'ils trouvent quelque chose,
+-//     portent le bon nombre, et filtrent pour de vrai ;
++//   · les filtres par plateforme n'existent que s'ils trouvent quelque chose
++//     SUR UNE SOURCE LUE, portent le bon nombre, et filtrent pour de vrai ;
++//   · (revue du 15 oct.) le filtre est rangé en session : au RETOUR sur l'écran
++//     avec sa source illisible, il est RETIRÉ (jamais « 0 annonce » dit comme un
++//     fait, jamais « Seulement Vinted » sur du pas su) ; source encore EN
++//     LECTURE ⇒ la grille attend et le dit, jamais « Aucune annonce ne
++//     correspond » ;
++//   · la LOUPE (recherche globale) donne la MÊME réponse que la carte (§11) :
++//     prouvée ⇒ « Leboncoin », demandée ou périmée ⇒ « Leboncoin à vérifier »,
++//     jamais « 🟠 Leboncoin » (couleur hors palette) sur une déduction ;
+ //   · la fiche (« Gérer l'annonce ») donne le statut par plateforme ET par
+-//     compte, avec le lien vers l'annonce ;
++//     compte, avec le lien vers l'annonce — et « pas pu lire » (jamais « aucune
++//     annonce reliée ») quand la ligne eBay d'un compte n'a pas pu être lue ;
+ //   · Leboncoin illisible (522) : aucun logo Leboncoin inventé, UNE ligne qui le
+ //     dit, et pas de filtre « Seulement Vinted » (ce serait « pas su ») ;
+ //   · Vestiaire Collective : le nom complet (navigation et en-tête), les mêmes
+@@ -37,11 +49,11 @@ const auj = new Date();
+ const ilYa = (j) => Math.floor((Date.now() - j * 86400000) / 1000);
+ const ann = (id, o) => Object.assign({ id, price: { amount: '59.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 12, favourite_count: 1, nPhotos: 4, created_at_ts: ilYa(6), url: `https://www.vinted.fr/items/${id}` }, o);
+ const ITEMS_A = [
+-  ann(9201, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon' }),   // N°21 : aussi sur Leboncoin (sa référence)
++  ann(9201, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon' }),   // N°21 : annonce Leboncoin VUE IL Y A 5 J → « à vérifier », jamais un logo
+   ann(9202, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas' }),   // N°22 : aussi sur eBay (SKU)
+   ann(9203, { title: 'Nike Dunk low panda taille 41' }),                          // N°23 : Leboncoin DEMANDÉ seulement
+   ann(9204, { title: 'Converse Chuck 70 noir taille 39', brand_title: 'Converse' }), // N°24 : nulle part ailleurs (sosies)
+-  ann(9205, { title: 'Asics Gel-Kayano 14 argent taille 43', brand_title: 'Asics' }), // N°25 : Leboncoin ET eBay
++  ann(9205, { title: 'Asics Gel-Kayano 14 argent taille 43', brand_title: 'Asics' }), // N°25 : Leboncoin (vue aujourd'hui) ET eBay
+ ];
+ const ITEMS_B = [ann(9206, { title: 'Puma Suede gris taille 41', brand_title: 'Puma' })]; // N°26, autre compte
+ const MAIN = { vinted_annonce_numeros: { 9201: { numero: '21' }, 9202: { numero: '22' }, 9203: { numero: '23' }, 9204: { numero: '24' }, 9205: { numero: '25' }, 9206: { numero: '26' } } };
+@@ -57,6 +69,8 @@ const EBAY = { capturedAt: Date.now(), items: [
+   // Sans SKU de paire, au MÊME titre que la N°24 : ne désigne rien (§5).
+   { itemId: '8899', sku: '', qty: '1', price: '40.00', title: 'Converse Chuck 70 noir taille 39' },
+ ] };
++// Deux comptes eBay pour le scénario « partiel » (CLE_COMPTE_EBAY : 16 hex).
++const CLE2 = 'abcdef0123456789';
+ const rows = [
+   { id: 'main', data: MAIN },
+   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS_A } } },
+@@ -94,18 +108,27 @@ const projette = (row, sel) => {
+   }
+   return out;
+ };
+-const ouvrir = async (b, vp, { sombre = false, lbcKO = false, url }) => {
++// `etat` se change EN COURS de scénario (le retour sur l'écran relit les
++// sources) : lbcVentesKO (522), lbcVentesLentMs (retardée), ebayKO (522),
++// ebayPartiel (2 comptes, le second en 522).
++const ouvrir = async (b, vp, { sombre = false, lbcKO = false, url, etat = {} }) => {
+   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+   const pg = await ctx.newPage();
+   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) { localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } } catch (_) {} }, sombre);
+   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+-  await pg.route('**/rest/v1/**', (route) => {
++  await pg.route('**/rest/v1/**', async (route) => {
+     const u = decodeURIComponent(metaVersData(route.request().url()));
+     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
++    const panne = () => route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
+     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+-    if (lbcKO && /id=eq\.lbc_listings/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
++    if (lbcKO && /id=eq\.lbc_listings/.test(u)) return panne();
++    if (etat.lbcVentesKO && /id=eq\.lbc_ventes/.test(u)) return panne();
++    if (etat.lbcVentesLentMs && /id=eq\.lbc_ventes/.test(u)) await new Promise((res) => setTimeout(res, etat.lbcVentesLentMs));
++    if (etat.ebayKO && /id=eq\.ebay_listings/.test(u)) return panne();
++    if (etat.ebayPartiel && /id=eq\.ebay_comptes/.test(u)) return j([projette({ id: 'ebay_comptes', data: { comptes: [{ principal: true }, { cle: CLE2, pseudo: 'second' }] } }, (/[?&]select=([^&]*)/.exec(u) || [])[1])]);
++    if (etat.ebayPartiel && new RegExp('id=eq\\.ebay_listings_' + CLE2).test(u)) return panne();
+     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+     const eq = /id=eq\.([^&]*)/.exec(u);
+@@ -124,13 +147,29 @@ const cartes = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySe
+   return [el.getAttribute('data-carte-annonce'), {
+     plats: pl ? (pl.getAttribute('data-plateformes') || '').split(' ').filter(Boolean) : null,
+     imgs: pl ? [...pl.querySelectorAll('img')].map((i) => (i.getAttribute('src') || '').replace(/.*\//, '')) : [],
+-    ligne: pl ? pl.innerText : '', demandee: !!el.querySelector('[data-lbc-demandee]'), t: el.innerText, html: el.outerHTML,
++    ligne: pl ? pl.innerText : '', demandee: !!el.querySelector('[data-lbc-demandee]'),
++    averifier: pl ? [...pl.querySelectorAll('[data-averifier]')].map((x) => x.getAttribute('data-averifier') + '|' + (x.getAttribute('title') || '')) : [],
++    t: el.innerText, html: el.outerHTML,
+     liens: pl ? Object.fromEntries([...pl.querySelectorAll('[data-plateforme]')].map((x) => [x.getAttribute('data-plateforme'), x.tagName === 'A' ? x.href : ''])) : {},
+   }];
+ })));
+-const filtres = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-filtre-plateforme]')].map((b) => [b.getAttribute('data-filtre-plateforme'), b.innerText.trim()])));
++const filtres = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-filtre-plateforme]')].map((b) => [b.getAttribute('data-filtre-plateforme'), b.innerText.trim() + (b.getAttribute('aria-pressed') === 'true' ? ' *' : '')])));
+ const visibles = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce]')].map((e) => e.getAttribute('data-carte-annonce')).sort());
+-const nCarte = (t) => Number((String(t).match(/(\d+)\s*$/) || [])[1]);
++const etatEcran = (pg) => pg.evaluate(() => ({
++  recap: (document.querySelector('.vrm-filter-recap') || {}).innerText || '',
++  passu: [...document.querySelectorAll('[data-plateformes-passu]')].map((x) => x.innerText),
++  vide: /Aucune annonce ne correspond/.test(document.body.innerText),
++  // La ligne de chiffres vit dans « Stock et ajustements » (replié) : on lit
++  // textContent — c'est ce qu'elle DIT qu'on juge, pas son dépliage.
++  resume: (document.querySelector('[data-ann-resume]') || {}).textContent || '',
++}));
++const nCarte = (t) => Number((String(t).match(/(\d+)(\s*\*)?\s*$/) || [])[1]);
++// Naviguer par le rail / la barre (comme un doigt ou une souris, pas un setTab).
++const cliqueNav = async (pg, t) => pg.evaluate((t) => {
++  const el = [...document.querySelectorAll('aside button, aside a, nav button, nav a')].find((x) => x.innerText.trim() === t);
++  if (el) { el.click(); return true; } return false;
++}, t);
++const horsPalette = /#09B1BA|#EC5A13|#3665F3|rgb\(9, 177, 186\)|rgb\(236, 90, 19\)|rgb\(54, 101, 243\)/i;
+ 
+ (async () => {
+   let b;
+@@ -146,28 +185,33 @@ const nCarte = (t) => Number((String(t).match(/(\d+)\s*$/) || [])[1]);
+       const P = (id) => (c[id] && c[id].plats) || [];
+       dit(!!c['9201'] && !!c['9206'], 'les six cartes sont rendues', Object.keys(c).join(','));
+       dit(Object.values(c).every((x) => x.plats && x.plats.includes('vinted')), 'chaque carte porte le logo Vinted (la paire EST en ligne sur Vinted)', JSON.stringify(Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.plats]))));
+-      dit(P('9201').join() === 'vinted,lbc', 'N°21 : logo Leboncoin (une annonce À LUI dont la référence est 21), pas eBay', P('9201').join());
++      // ⚠️ Revue du 15 oct. : l'annonce Leboncoin de la N°21 a été VUE IL Y A
++      // 5 JOURS — elle a pu être vendue ou retirée depuis. JAMAIS un logo sur
++      // une observation périmée : « à vérifier », avec l'âge dans l'infobulle.
++      dit(P('9201').join() === 'vinted' && (c['9201'] || { averifier: [] }).averifier.some((x) => /^lbc\|/.test(x) && /vue il y a 5 j/.test(x) && /à vérifier|pas confirmée/.test(x)) && /Leboncoin à vérifier/.test((c['9201'] || {}).ligne),
++        'N°21 : annonce Leboncoin vue il y a 5 j ⇒ PAS de logo, « Leboncoin à vérifier » avec l’âge', JSON.stringify([P('9201').join(), (c['9201'] || {}).averifier]));
+       dit(P('9202').join() === 'vinted,ebay', 'N°22 : logo eBay (SKU VRM-22), pas Leboncoin', P('9202').join());
+-      dit(P('9205').join() === 'vinted,lbc,ebay', 'N°25 : Leboncoin ET eBay, dans cet ordre', P('9205').join());
++      dit(P('9205').join() === 'vinted,lbc,ebay', 'N°25 : Leboncoin (vue aujourd’hui) ET eBay, dans cet ordre', P('9205').join());
+       dit(P('9204').join() === 'vinted', 'N°24 : RIEN ailleurs — ni l’annonce Leboncoin d’autrui, ni l’annonce eBay sans SKU, au même titre (§5)', P('9204').join());
+       dit(P('9203').join() === 'vinted' && c['9203'] && c['9203'].demandee && /Leboncoin à vérifier/.test(c['9203'].ligne), 'N°23 : publication Leboncoin seulement DEMANDÉE ⇒ pas de logo, « Leboncoin à vérifier »', c['9203'] && c['9203'].ligne);
+       dit(c['9205'] && /leboncoin\.fr\/ad\/chaussures\/6105/.test(c['9205'].liens.lbc || '') && /ebay\.fr\/itm\/8805/.test(c['9205'].liens.ebay || '') && /vinted\.fr\/items\/9205/.test(c['9205'].liens.vinted || ''),
+         'chaque logo OUVRE l’annonce sur sa plateforme (un geste direct)', JSON.stringify(c['9205'] && c['9205'].liens));
+-      dit(c['9201'] && c['9201'].imgs.join() === 'vinted.svg,leboncoin.svg', 'ce sont de VRAIS logos (les fichiers de la marque, monochromes)', c['9201'] && c['9201'].imgs.join());
++      dit(c['9205'] && c['9205'].imgs.join() === 'vinted.svg,leboncoin.svg,ebay.svg', 'ce sont de VRAIS logos (les fichiers de la marque, monochromes)', c['9205'] && c['9205'].imgs.join());
+       dit(/compte_a/.test((c['9201'] || {}).ligne) && /compte_b/.test((c['9206'] || {}).ligne), 'deux comptes Vinted : le compte est nommé à côté du logo', `${(c['9201'] || {}).ligne} | ${(c['9206'] || {}).ligne}`);
+-      dit(!/Moi_LBC/.test((c['9201'] || {}).ligne), 'un seul compte Leboncoin : il n’est pas répété sur chaque carte (§7)', (c['9201'] || {}).ligne);
++      dit(!/Moi_LBC/.test((c['9205'] || {}).ligne), 'un seul compte Leboncoin : il n’est pas répété sur chaque carte (§7)', (c['9205'] || {}).ligne);
+       dit(!Object.values(c).some((x) => /data-aussi-sur/.test(x.html)), 'l’ancienne ligne « Aussi sur Leboncoin » (déduite d’un clic) n’existe plus');
+-      const horsPalette = /#09B1BA|#EC5A13|#3665F3|rgb\(9, 177, 186\)|rgb\(236, 90, 19\)|rgb\(54, 101, 243\)/i;
+       dit(!Object.values(c).some((x) => horsPalette.test(x.html)), 'aucune couleur de marque en dur sur les cartes (§7 : une seule teinte d’accent)');
+-      // Filtres par plateforme.
++      const res0 = await etatEcran(pg);
++      dit(/1 aussi sur Leboncoin/.test(res0.resume) && /2 aussi sur eBay/.test(res0.resume) && !/au moins/.test(res0.resume), 'la ligne de chiffres compte les présences PROUVÉES (1 Leboncoin · 2 eBay), sans « au moins »', res0.resume);
++      // Filtres par plateforme — ils lisent la MÊME règle que les cartes.
+       const f = await filtres(pg);
+-      dit(nCarte(f.lbc) === 2 && nCarte(f.ebay) === 2 && nCarte(f.demandee) === 1 && nCarte(f.seul) === 3, 'filtres : Leboncoin 2 · eBay 2 · À vérifier 1 · Seulement Vinted 3', JSON.stringify(f));
++      dit(nCarte(f.lbc) === 1 && nCarte(f.ebay) === 2 && nCarte(f.averifier) === 2 && nCarte(f.seul) === 2, 'filtres : Leboncoin 1 · eBay 2 · À vérifier 2 (vue 5 j + demandée) · Seulement Vinted 2', JSON.stringify(f));
+       try {
+         await pg.click('[data-filtre-plateforme="lbc"]', { timeout: 4000 });
+         await pg.waitForTimeout(400);
+         await capture(pg, `annonces-${vp.width}-filtre-leboncoin`);
+         const vLbc = await visibles(pg);
+-        dit(vLbc.join() === '9201,9205', 'filtre Leboncoin : seules les paires PROUVÉES là-bas', vLbc.join());
++        dit(vLbc.join() === '9205', 'filtre Leboncoin : seules les paires PROUVÉES là-bas (vue ≤ 24 h)', vLbc.join());
+         await pg.click('[data-filtre-plateforme="ebay"]', { timeout: 4000 });
+         await pg.waitForTimeout(400);
+         const vEb = await visibles(pg);
+@@ -175,13 +219,13 @@ const nCarte = (t) => Number((String(t).match(/(\d+)\s*$/) || [])[1]);
+         await pg.click('[data-filtre-plateforme="seul"]', { timeout: 4000 });
+         await pg.waitForTimeout(400);
+         const vSeul = await visibles(pg);
+-        dit(vSeul.join() === '9203,9204,9206', 'filtre Seulement Vinted : ni Leboncoin ni eBay prouvé', vSeul.join());
+-        await pg.click('[data-filtre-plateforme="demandee"]', { timeout: 4000 });
++        dit(vSeul.join() === '9204,9206', 'filtre Seulement Vinted : ni prouvée, ni à vérifier ailleurs', vSeul.join());
++        const recap2 = await pg.evaluate(() => (document.querySelector('.vrm-filter-recap') || {}).innerText || '');
++        dit(/2 annonces dans cette sélection/.test(recap2), 'la sélection dit combien elle montre', recap2);
++        await pg.click('[data-filtre-plateforme="averifier"]', { timeout: 4000 });
+         await pg.waitForTimeout(400);
+         const vDem = await visibles(pg);
+-        dit(vDem.join() === '9203', 'filtre À vérifier : la publication demandée, pas encore vue', vDem.join());
+-        const recap = await pg.evaluate(() => (document.querySelector('.vrm-filter-recap') || {}).innerText || '');
+-        dit(/1 annonce dans cette sélection/.test(recap), 'la sélection dit combien elle montre', recap);
++        dit(vDem.join() === '9201,9203', 'filtre À vérifier : la demandée ET la vue il y a 5 j', vDem.join());
+         await pg.getByRole('button', { name: 'Réinitialiser les annonces', exact: true }).click({ timeout: 4000 });
+         await pg.waitForTimeout(400);
+         dit((await visibles(pg)).length === 6, 'réinitialiser rend toutes les annonces');
+@@ -193,21 +237,103 @@ const nCarte = (t) => Number((String(t).match(/(\d+)\s*$/) || [])[1]);
+             const d = document.querySelector(`[data-carte-annonce="${id}"] details.vrm-ann-actions`); if (d) d.open = true;
+             return Object.fromEntries([...document.querySelectorAll(`[data-carte-annonce="${id}"] [data-fiche-plateforme]`)].map((e) => [e.getAttribute('data-fiche-plateforme'), { etat: e.getAttribute('data-etat'), t: e.innerText, liens: [...e.querySelectorAll('a')].map((a) => a.href) }]));
+           };
+-          return { a: lire('9201'), d: lire('9203'), x: lire('9204') };
++          return { a: lire('9201'), d: lire('9203'), x: lire('9204'), e: lire('9205') };
+         });
+         if (CAPT) { const el = await pg.$('[data-carte-annonce="9201"]'); if (el) { await el.scrollIntoViewIfNeeded(); await el.screenshot({ path: path.join(CAPT, `fiche-${vp.width}.png`) }); } }
+-        dit(fiche.a.lbc && fiche.a.lbc.etat === 'en_ligne' && /Moi_LBC/.test(fiche.a.lbc.t) && fiche.a.lbc.liens.some((h) => /leboncoin\.fr\/ad\/chaussures\/6101/.test(h)) && /vue il y a 5 j/.test(fiche.a.lbc.t),
+-          'fiche N°21 : Leboncoin · en ligne · le compte · « vue il y a 5 j » · le lien vers SON annonce', JSON.stringify(fiche.a.lbc));
++        dit(fiche.a.lbc && fiche.a.lbc.etat === 'vue' && /vue il y a 5 j/.test(fiche.a.lbc.t) && /à vérifier/.test(fiche.a.lbc.t) && /Moi_LBC/.test(fiche.a.lbc.t) && fiche.a.lbc.liens.some((h) => /leboncoin\.fr\/ad\/chaussures\/6101/.test(h)),
++          'fiche N°21 : Leboncoin « vue il y a 5 j — à vérifier » (jamais « en ligne »), le compte, le lien vers SON annonce', JSON.stringify(fiche.a.lbc));
++        dit(fiche.e.lbc && fiche.e.lbc.etat === 'en_ligne' && /Moi_LBC/.test(fiche.e.lbc.t), 'fiche N°25 : Leboncoin · en ligne · le compte (vue aujourd’hui)', JSON.stringify(fiche.e.lbc));
+         dit(fiche.a.vinted && fiche.a.vinted.etat === 'en_ligne' && /compte_a/.test(fiche.a.vinted.t), 'fiche N°21 : Vinted · en ligne · compte_a', JSON.stringify(fiche.a.vinted));
+         dit(fiche.d.lbc && fiche.d.lbc.etat === 'demandee', 'fiche N°23 : Leboncoin « demandée, pas encore vue en ligne »', JSON.stringify(fiche.d.lbc));
+-        dit(fiche.x.lbc && fiche.x.lbc.etat === 'aucune' && fiche.x.ebay && fiche.x.ebay.etat === 'aucune', 'fiche N°24 : « aucune annonce reliée » sur Leboncoin et eBay', JSON.stringify([fiche.x.lbc, fiche.x.ebay]));
++        dit(fiche.x.lbc && fiche.x.lbc.etat === 'aucune' && fiche.x.ebay && fiche.x.ebay.etat === 'aucune', 'fiche N°24 : « aucune annonce reliée » sur Leboncoin et eBay (sources LUES)', JSON.stringify([fiche.x.lbc, fiche.x.ebay]));
+       } catch (e) { dit(false, 'la fiche se lit', String(e.message).slice(0, 120)); }
++      // ── LA LOUPE : la même réponse que la carte (§11, revue du 15 oct.) ────
++      try {
++        await pg.click('[aria-label="Rechercher une paire"]', { timeout: 5000 });
++        await pg.waitForTimeout(2200);
++        const loupe = async (q) => {
++          await pg.fill('input[placeholder="N°, nom du modèle ou marque…"]', q);
++          await pg.waitForTimeout(700);
++          return pg.evaluate(() => [...document.querySelectorAll('button')].filter((x) => /^#\d/.test(x.innerText.trim())).map((x) => ({ t: x.innerText.replace(/\s+/g, ' ').trim(), html: x.outerHTML })));
++        };
++        const l23 = await loupe('23');
++        dit(l23.length === 1 && /Leboncoin à vérifier/.test(l23[0].t) && !/🟠/.test(l23[0].t), 'loupe N°23 (demandée) : « Leboncoin à vérifier » — la même réponse que la carte, jamais « 🟠 Leboncoin »', l23[0] && l23[0].t);
++        const l21 = await loupe('21');
++        dit(l21.length === 1 && /Leboncoin à vérifier/.test(l21[0].t), 'loupe N°21 (vue il y a 5 j) : « Leboncoin à vérifier » aussi', l21[0] && l21[0].t);
++        const l25 = await loupe('25');
++        dit(l25.length === 1 && /Leboncoin/.test(l25[0].t) && !/à vérifier/.test(l25[0].t), 'loupe N°25 (prouvée ≤ 24 h) : « Leboncoin », sans « à vérifier »', l25[0] && l25[0].t);
++        dit(![...l23, ...l21, ...l25].some((x) => horsPalette.test(x.html)), 'loupe : aucune couleur de marque en dur (§7)');
++        await capture(pg, `loupe-${vp.width}`);
++        await pg.click('[aria-label="Fermer la recherche"]', { timeout: 4000 }).catch(() => {});
++      } catch (e) { dit(false, 'la loupe se lit', String(e.message).slice(0, 120)); }
+       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText) }));
+       dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+       dit(!r.mort && !errs.length, 'aucun écran tombé, aucune erreur', errs[0]);
+       await ctx.close();
+ 
+-      // ── Leboncoin illisible (522) ────────────────────────────────────────
++      // ── Le filtre rangé en session + source illisible AU RETOUR (revue) ────
++      // Il allume « Seulement Vinted », va sur Ventes ; pendant ce temps la
++      // lecture `lbc_ventes` tombe en 522 ; il revient. Avant : « 4 annonces
++      // dans cette sélection » avec la N°21 dedans (du « pas su » affirmé), ou
++      // « 0 annonce » filtre Leboncoin — sans aucun bouton allumé.
++      console.log(`── Annonces, retour avec Leboncoin illisible · ${vp.width} px`);
++      const etatR = {};
++      const w = await ouvrir(b, vp, { url: '?tab=cat_annonces', etat: etatR });
++      await w.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
++      await w.pg.waitForTimeout(2500);
++      try {
++        await w.pg.click('[data-filtre-plateforme="seul"]', { timeout: 4000 });
++        await w.pg.waitForTimeout(300);
++        etatR.lbcVentesKO = true;
++        dit(await cliqueNav(w.pg, vp.width < 600 ? 'Accueil' : 'Ventes'), 'on quitte l’écran Annonces');
++        await w.pg.waitForTimeout(1500);
++        if (vp.width < 600) { await cliqueNav(w.pg, 'Vinted'); await w.pg.waitForTimeout(800); }
++        await cliqueNav(w.pg, 'Annonces');
++        await w.pg.waitForSelector('[data-carte-annonce]', { timeout: 15000 }).catch(() => {});
++        await w.pg.waitForTimeout(3000);
++        const e2 = await etatEcran(w.pg);
++        const v2 = await visibles(w.pg);
++        await capture(w.pg, `retour-panne-${vp.width}`);
++        dit(v2.length === 6, 'au retour, source illisible : le filtre est RETIRÉ, les six annonces sont là (jamais « Seulement Vinted » sur du pas su)', v2.join());
++        dit(!e2.vide && !/0 annonce/.test(e2.recap) && !/annonce.*dans cette sélection/.test(e2.recap), 'ni « 0 annonce » ni une sélection affirmée', JSON.stringify(e2.recap));
++        dit(e2.passu.length === 1 && /Leboncoin/.test(e2.passu[0]), 'UNE ligne dit que Leboncoin n’a pas pu être lu', JSON.stringify(e2.passu));
++        dit(!(await filtres(w.pg)).seul, 'le bouton « Seulement Vinted » n’existe plus (il serait faux)', JSON.stringify(await filtres(w.pg)));
++      } catch (e) { dit(false, 'le scénario du retour se joue', String(e.message).slice(0, 120)); }
++      dit(!w.errs.length, 'retour : aucune erreur', w.errs[0]);
++      await w.ctx.close();
++
++      // ── Le filtre rangé en session + source seulement LENTE au retour ──────
++      // Aucune panne : la lecture met 4 s. Avant : « 0 annonce dans cette
++      // sélection » et « Aucune annonce ne correspond » pendant 4 s, dits comme
++      // des faits. Maintenant : la grille ATTEND et le dit, le filtre reste
++      // allumé, puis la sélection arrive.
++      console.log(`── Annonces, retour avec Leboncoin LENT · ${vp.width} px`);
++      const etatL = {};
++      const le = await ouvrir(b, vp, { url: '?tab=cat_annonces', etat: etatL });
++      await le.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
++      await le.pg.waitForTimeout(2500);
++      try {
++        await le.pg.click('[data-filtre-plateforme="lbc"]', { timeout: 4000 });
++        await le.pg.waitForTimeout(300);
++        etatL.lbcVentesLentMs = 4000;
++        await cliqueNav(le.pg, vp.width < 600 ? 'Accueil' : 'Ventes');
++        await le.pg.waitForTimeout(1200);
++        if (vp.width < 600) { await cliqueNav(le.pg, 'Vinted'); await le.pg.waitForTimeout(600); }
++        await cliqueNav(le.pg, 'Annonces');
++        await le.pg.waitForTimeout(1200);
++        const p1 = await etatEcran(le.pg);
++        const fl = await filtres(le.pg);
++        dit(/Lecture de Leboncoin/.test(p1.recap), 'pendant la lecture : « Lecture de Leboncoin… », jamais « 0 annonce »', JSON.stringify(p1.recap));
++        dit(!p1.vide, 'pendant la lecture : jamais « Aucune annonce ne correspond »');
++        dit(/\*/.test(fl.lbc || ''), 'pendant la lecture : son bouton reste affiché, allumé', JSON.stringify(fl));
++        await le.pg.waitForTimeout(4500);
++        const v3 = await visibles(le.pg);
++        dit(v3.join() === '9205', 'la lecture finit : la sélection Leboncoin arrive (9205)', v3.join());
++      } catch (e) { dit(false, 'le scénario de la lecture lente se joue', String(e.message).slice(0, 120)); }
++      dit(!le.errs.length, 'lenteur : aucune erreur', le.errs[0]);
++      await le.ctx.close();
++
++      // ── Leboncoin illisible dès l'ouverture (522) ─────────────────────────
+       console.log(`── Annonces, Leboncoin illisible · ${vp.width} px`);
+       const k = await ouvrir(b, vp, { url: '?tab=cat_annonces', lbcKO: true });
+       await k.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
+@@ -217,17 +343,66 @@ const nCarte = (t) => Number((String(t).match(/(\d+)\s*$/) || [])[1]);
+       const ligne = await k.pg.evaluate(() => (document.querySelector('[data-plateformes-passu]') || {}).innerText || '');
+       dit(!Object.values(ck).some((x) => (x.plats || []).includes('lbc')), 'pas su : aucun logo Leboncoin inventé', JSON.stringify(Object.fromEntries(Object.entries(ck).map(([i, v]) => [i, v.plats]))));
+       dit(/Leboncoin/.test(ligne) && (await k.pg.$$('[data-plateformes-passu]')).length === 1, 'pas su : UNE ligne dit que Leboncoin n’a pas pu être lu', ligne);
+-      dit(!fk.seul && nCarte(fk.ebay) === 2, 'pas su : pas de « Seulement Vinted » (ce serait faux), eBay reste filtrable', JSON.stringify(fk));
++      dit(!fk.seul && !fk.averifier && !fk.lbc && nCarte(fk.ebay) === 2, 'pas su : ni « Seulement Vinted », ni « À vérifier », ni « Leboncoin » (ils seraient faux) — eBay reste filtrable', JSON.stringify(fk));
+       dit(ck['9203'] && ck['9203'].demandee, 'pas su : la publication demandée reste « à vérifier »');
+       dit(!k.errs.length, 'aucune erreur', k.errs[0]);
+       await k.ctx.close();
+ 
++      // ── eBay illisible (522) : la fiche dit « pas pu lire » (revue) ────────
++      console.log(`── Annonces, eBay illisible · ${vp.width} px`);
++      const ek = await ouvrir(b, vp, { url: '?tab=cat_annonces', etat: { ebayKO: true } });
++      await ek.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
++      await ek.pg.waitForTimeout(2500);
++      try {
++        const lignEk = await ek.pg.evaluate(() => (document.querySelector('[data-plateformes-passu]') || {}).innerText || '');
++        dit(/eBay/.test(lignEk), 'UNE ligne dit qu’eBay n’a pas pu être lu', lignEk);
++        const fe = await ek.pg.evaluate(() => {
++          const lire = (id) => {
++            const d = document.querySelector(`[data-carte-annonce="${id}"] details.vrm-ann-actions`); if (d) d.open = true;
++            return Object.fromEntries([...document.querySelectorAll(`[data-carte-annonce="${id}"] [data-fiche-plateforme]`)].map((e) => [e.getAttribute('data-fiche-plateforme'), { etat: e.getAttribute('data-etat'), t: e.innerText }]));
++          };
++          return { b: lire('9202') };
++        });
++        await capture(ek.pg, `fiche-ebay522-${vp.width}`);
++        dit(fe.b.ebay && fe.b.ebay.etat === 'passu' && /pas pu lire/.test(fe.b.ebay.t) && !/aucune annonce reliée/.test(fe.b.ebay.t),
++          'fiche N°22 (SKU VRM-22 chez eBay) : « pas pu lire » — JAMAIS « aucune annonce reliée » sur du pas su (§5)', JSON.stringify(fe.b.ebay));
++        const fke = await filtres(ek.pg);
++        dit(!fke.ebay && !fke.seul, 'pas su : ni filtre eBay, ni « Seulement Vinted »', JSON.stringify(fke));
++      } catch (e) { dit(false, 'le scénario eBay illisible se joue', String(e.message).slice(0, 120)); }
++      dit(!ek.errs.length, 'eBay illisible : aucune erreur', ek.errs[0]);
++      await ek.ctx.close();
++
++      // ── eBay PARTIEL : un compte lu, le second en 522 (revue) ──────────────
++      console.log(`── Annonces, eBay partiel (compte « second » pas lu) · ${vp.width} px`);
++      const ep = await ouvrir(b, vp, { url: '?tab=cat_annonces', etat: { ebayPartiel: true } });
++      await ep.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
++      await ep.pg.waitForTimeout(2500);
++      try {
++        const cp = await cartes(ep.pg);
++        dit((cp['9202'].plats || []).includes('ebay'), 'le compte LU garde ses logos eBay', (cp['9202'].plats || []).join());
++        const lignEp = await ep.pg.evaluate(() => (document.querySelector('[data-plateformes-passu]') || {}).innerText || '');
++        dit(/eBay \(second\)/.test(lignEp), 'la ligne nomme le compte eBay pas lu', lignEp);
++        const rp = await etatEcran(ep.pg);
++        dit(/au moins 2 aussi sur eBay/.test(rp.resume), 'un compte pas lu ⇒ « au moins N aussi sur eBay » (jamais un total partiel présenté comme complet, §5)', rp.resume);
++        const fp = await ep.pg.evaluate(() => {
++          const d = document.querySelector('[data-carte-annonce="9204"] details.vrm-ann-actions'); if (d) d.open = true;
++          const e = document.querySelector('[data-carte-annonce="9204"] [data-fiche-plateforme="ebay"]');
++          return e ? { etat: e.getAttribute('data-etat'), t: e.innerText } : null;
++        });
++        dit(fp && fp.etat === 'passu' && /pas pu lire/.test(fp.t) && /second/.test(fp.t) && !/aucune annonce reliée/.test(fp.t),
++          'fiche N°24 : « pas pu lire (second) » — le compte pas lu pourrait porter l’annonce', JSON.stringify(fp));
++        const fpe = await filtres(ep.pg);
++        dit(/≥ 2/.test(fpe.ebay || '') && !fpe.seul, 'filtre eBay « ≥ 2 » (au moins), pas de « Seulement Vinted »', JSON.stringify(fpe));
++      } catch (e) { dit(false, 'le scénario eBay partiel se joue', String(e.message).slice(0, 120)); }
++      dit(!ep.errs.length, 'eBay partiel : aucune erreur', ep.errs[0]);
++      await ep.ctx.close();
++
+       // ── Sombre (capture + logos lisibles) ─────────────────────────────────
+       const s = await ouvrir(b, vp, { url: '?tab=cat_annonces', sombre: true });
+       await s.pg.waitForSelector('[data-carte-annonce="9201"]', { timeout: 15000 }).catch(() => {});
+       await s.pg.waitForTimeout(2500);
+       await capture(s.pg, `annonces-${vp.width}-sombre`);
+-      const filtreLogo = await s.pg.evaluate(() => { const i = document.querySelector('[data-carte-annonce="9201"] [data-plateformes] img'); return i ? getComputedStyle(i).filter : ''; });
++      const filtreLogo = await s.pg.evaluate(() => { const i = document.querySelector('[data-carte-annonce="9205"] [data-plateformes] img'); return i ? getComputedStyle(i).filter : ''; });
+       dit(/invert/.test(filtreLogo), 'sombre : les logos noirs sont inversés (lisibles sur la carte sombre)', filtreLogo);
+       await s.pg.click('[data-filtre-plateforme="ebay"]', { timeout: 4000 }).catch(() => {});
+       await s.pg.waitForTimeout(300);
+diff --git a/src/App.jsx b/src/App.jsx
+index ce3eb6a..53557b7 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -22476,16 +22476,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   // aucune pastille verte : on n'affirme JAMAIS « publiée » à tort (sous-affirmer
+   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
+   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
+-  const [lbcPosted, setLbcPosted] = useState(() => new Set());
+-  useEffect(() => { (async () => {
+-    try {
+-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
+-      if (!r.ok) return;
+-      const rows = await r.json();
+-      const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
+-      if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
+-    } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
+-  })(); }, []);
++  // (revue du 15 oct.) Trois états : `undefined` en cours · `null` pas su · Set.
++  // Un Set vide sur une lecture ratée faisait compter « Seulement Vinted » une
++  // paire dont la publication était peut-être demandée.
++  const [lbcPosted, setLbcPosted] = useState(undefined);
++  useEffect(() => { let stop = false; lireDemandesLbc().then((d) => { if (!stop) setLbcPosted(d); }); return () => { stop = true; }; }, []);
+   // ── OÙ EST CHAQUE PAIRE (15 octobre) : les sources des logos de plateforme ──
+   // La règle est `presencesPaires` (§11). Lues seulement sur l'écran Annonces.
+   // Trois états chacune : `undefined` en cours · `null` pas su · objet lu.
+@@ -22499,31 +22494,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   useEffect(() => {
+     if (only !== 'annonces') return undefined;
+     let stop = false;
+-    (async () => {
+-      const [items, ventes] = await Promise.all([
+-        lbcAnnoncesSession(),
+-        (async () => {
+-          try {
+-            const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+-            if (!r.ok) return null;
+-            const rows = await r.json();
+-            if (!Array.isArray(rows)) return null;
+-            return (rows[0] && rows[0].ventes && typeof rows[0].ventes === 'object') ? rows[0].ventes : {};
+-          } catch (_) { return null; }
+-        })(),
+-      ]);
+-      if (!stop) setPresLbc(items && ventes ? { items, ventes } : null);
+-    })();
+-    (async () => {
+-      try {
+-        const lu = await lireEbayTous('ebay_listings', 'items:data->items,cap:data->>capturedAt', 'items');
+-        if (stop) return;
+-        if (!lu) { setPresEbay(null); return; }
+-        const caps = {};
+-        for (const x of (lu.lignes || [])) if (x && x.ligne && x.compte) caps[x.compte.ref] = x.ligne.cap;
+-        setPresEbay({ items: lu.items, illisibles: (lu.illisibles || []).map(nomCompteEbay), caps });
+-      } catch (_) { if (!stop) setPresEbay(null); }
+-    })();
++    lirePresenceLbc().then((x) => { if (!stop) setPresLbc(x); });
++    lirePresenceEbay().then((x) => { if (!stop) setPresEbay(x); });
+     return () => { stop = true; };
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [only]);
+@@ -24977,6 +24949,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     nomCompte: (it) => (it && it._acc ? accNameOf(it._acc) : ''),
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }), [annBase, numeros, presLbc, presEbay, liensLbcPres, lbcPosted]);
++  // Les comptes par plateforme (ligne de chiffres, filtres) et l'état du filtre
++  // rangé en session — une règle pour « le bouton existe » et « le filtre
++  // s'applique » (`etatFiltrePlateforme`, revue du 15 oct.). Posés AVANT
++  // `annShown` et `annStats`, qui les lisent (§4.6).
++  const cptPlat = useMemo(() => comptesPlateformes(annBase, presences, Array.isArray(listings.items)), [annBase, presences, listings.items]);
++  const filtrePlat = useMemo(() => etatFiltrePlateforme(annPlat, presences, cptPlat), [annPlat, presences, cptPlat]);
++  // Illisible, ou ne trouve plus rien : le filtre est retiré (pas gardé en
++  // session pour réapparaître sans bouton). En lecture : il attend.
++  useEffect(() => { if (filtrePlat.etat === 'passu' || filtrePlat.etat === 'vide') setAnnPlat(''); }, [filtrePlat.etat]); // eslint-disable-line react-hooks/exhaustive-deps
++  const annPlatEff = filtrePlat.etat === 'actif' || filtrePlat.etat === 'encours' ? filtrePlat.cle : '';
+ 
+   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
+   // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
+@@ -25029,13 +25011,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         || (it.brand||'').toLowerCase().includes(q)
+         || num.toLowerCase()===q || num.toLowerCase().includes(q);
+     });
+-    // Par plateforme : la présence PROUVÉE (`presencesPaires`), jamais la file.
+-    if (annPlat) arr = arr.filter(it => {
+-      const ail = presencesAilleurs(presences, it.id);
+-      if (annPlat === 'seul') return ail.length === 0;
+-      if (annPlat === 'demandee') return (presences.par.get(String(it.id)) || []).some(x => x.p === 'lbc' && x.etat === 'demandee');
+-      return ail.some(x => x.p === annPlat);
+-    });
++    // Par plateforme : la présence PROUVÉE (`presencesPaires`), jamais la file —
++    // et seulement sur une source LUE (`filtrePlat`). En lecture, la grille
++    // attend : ni « 0 annonce », ni la liste entière sous un filtre allumé.
++    if (filtrePlat.etat === 'encours') return [];
++    if (filtrePlat.etat === 'actif') arr = arr.filter(it => garderParPlateforme(filtrePlat.cle, presences, it.id));
+     const price = it => (it.price!=null ? Number(it.price) : 0);
+     // Timestamp d'ajout : date de mise en ligne Vinted (createdTs) sinon date de
+     // numérotation. Sert au tri « du plus ancien au plus récent ».
+@@ -25084,7 +25064,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
+     return arr;
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [annBase, annSearch, annSort, annPlat, presences, numeros, compteSel, compteConnecte, selEff]);
++  }, [annBase, annSearch, annSort, filtrePlat, presences, numeros, compteSel, compteConnecte, selEff]);
+   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
+   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
+   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
+@@ -25356,16 +25336,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     // en annonce (`photoCount`/nPhotos) ET une description. C'est la mesure que
+     // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
+     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
+-    let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0, aussiEbay=0, vintedSeul=0, lbcDemandee=0;
++    let pretLbc=0, aRecapturer=0, boostees=0;
+     for (const it of arr) {
+       if (it.promoted === true) boostees++;
+-      // Aussi ailleurs : la présence PROUVÉE (`presencesPaires`, §11) — la même
+-      // que les logos de la carte et le filtre par plateforme.
+-      const ail = presencesAilleurs(presences, it.id);
+-      if (ail.some(x => x.p === 'lbc')) aussiLbc++;
+-      if (ail.some(x => x.p === 'ebay')) aussiEbay++;
+-      if (!ail.length) vintedSeul++;
+-      if ((presences.par.get(String(it.id)) || []).some(x => x.p === 'lbc' && x.etat === 'demandee')) lbcDemandee++;
+       const p = it.price!=null ? Number(it.price) : 0;
+       if (it.price!=null) val += p;
+       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
+@@ -25382,12 +25355,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
+       }
+     }
+-    // « Vinted seul » ne se dit que si Leboncoin ET eBay ont été lus en entier :
+-    // sinon c'est « pas su », pas « seulement Vinted » (§5).
+-    const toutLu = presences.lbc === 'lu' && presences.ebay === 'lu' && !presences.ebayIllisibles.length;
+-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc, aussiEbay, vintedSeul: toutLu ? vintedSeul : null, lbcDemandee };
++    // Aussi ailleurs / à vérifier / Vinted seul : `comptesPlateformes` (§11) —
++    // le même compte que les logos des cartes et les filtres.
++    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees,
++      aussiLbc: cptPlat.aussiLbc, aussiEbay: cptPlat.aussiEbay, ebayPartiel: cptPlat.ebayPartiel };
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [annBase, numeros, listingDates, presences]);
++  }, [annBase, numeros, listingDates, cptPlat]);
+   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
+   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
+   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
+@@ -30938,32 +30911,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+           </div>}
+ 
+         {listings.items?.length>0 && <div className="vrm-stock-views" role="group" aria-label="Vues rapides des annonces">
+-          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()&&!annPlat} onClick={()=>{setAnnSort('oldest');setAnnSearch('');setAnnPlat('');}}>Tout le stock</button>
++          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()&&!annPlatEff} onClick={()=>{setAnnSort('oldest');setAnnSearch('');setAnnPlat('');}}>Tout le stock</button>
+           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
+           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+           {/* ── PAR PLATEFORME (15 oct.) : un filtre n'existe que s'il trouve
+-              quelque chose (aucun faux bouton). Le logo dit la plateforme, le
+-              nombre ce qu'il montrera — la présence PROUVÉE, jamais la file. */}
+-          {[['lbc','leboncoin','Leboncoin',annStats.aussiLbc],['ebay','ebay','eBay',annStats.aussiEbay]].filter(([,,,n])=>n>0).map(([k,marque,nom,n])=>(
+-            <button key={k} type="button" data-filtre-plateforme={k} aria-pressed={annPlat===k} onClick={()=>setAnnPlat(v=>v===k?'':k)} title={`Les paires aussi en ligne sur ${nom}`}
+-              style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme={marque} size={13} style={k==='ebay'?LOGO_EBAY_LARGE(26):undefined}/>{nom} · {n}</button>
+-          ))}
+-          {annStats.lbcDemandee>0 && <button type="button" data-filtre-plateforme="demandee" aria-pressed={annPlat==='demandee'} onClick={()=>setAnnPlat(v=>v==='demandee'?'':'demandee')} title="Publication demandée sur Leboncoin, pas encore vue en ligne" style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme="leboncoin" size={13} style={{opacity:.45}}/>À vérifier · {annStats.lbcDemandee}</button>}
+-          {annStats.vintedSeul!=null && annStats.vintedSeul>0 && annStats.vintedSeul<annStats.n && <button type="button" data-filtre-plateforme="seul" aria-pressed={annPlat==='seul'} onClick={()=>setAnnPlat(v=>v==='seul'?'':'seul')} title="Les paires en ligne sur Vinted seulement" style={{display:'inline-flex',alignItems:'center',gap:5}}><BrandIcon plateforme="vinted" size={13}/>Seulement Vinted · {annStats.vintedSeul}</button>}
++              quelque chose sur une source LUE (`etatFiltrePlateforme` : la même
++              règle décide s'il existe et s'il s'applique). Le logo dit la
++              plateforme, le nombre ce qu'il montrera — la présence PROUVÉE,
++              jamais la file. Celui qu'il a allumé et dont la source est encore
++              en lecture reste affiché, allumé, sans nombre. */}
++          {[['lbc','leboncoin','Leboncoin','Les paires aussi en ligne sur Leboncoin'],['ebay','ebay','eBay','Les paires aussi en ligne sur eBay'],
++            ['averifier','','À vérifier','Ailleurs, mais pas confirmé : publication demandée, ou annonce vue il y a plus de 24 h'],['seul','vinted','Seulement Vinted','Les paires en ligne sur Vinted seulement']].map(([k,marque,nom,titre])=>{
++            const f = etatFiltrePlateforme(k, presences, cptPlat);
++            const attend = annPlat===k && filtrePlat.etat==='encours';
++            if (f.etat!=='actif' && !attend) return null;
++            return (
++              <button key={k} type="button" data-filtre-plateforme={k} aria-pressed={annPlatEff===k} onClick={()=>setAnnPlat(v=>v===k?'':k)} title={titre}
++                style={{display:'inline-flex',alignItems:'center',gap:5}}>{marque?<BrandIcon plateforme={marque} size={13} style={k==='ebay'?LOGO_EBAY_LARGE(26):undefined}/>:null}{nom}{attend?' · …':` · ${f.auMoins?'≥ ':''}${f.n}`}</button>
++            );
++          })}
+         </div>}
+-        {(annSearch.trim() || annSort!=='oldest' || annPlat) && <div className="vrm-filter-recap" role="status">
+-          <span>{annShown.length} annonce{annShown.length>1?'s':''} dans cette sélection</span>
++        {(annSearch.trim() || annSort!=='oldest' || annPlatEff) && <div className="vrm-filter-recap" role="status">
++          <span>{filtrePlat.etat==='encours'
++            ? `Lecture de ${[...new Set((filtrePlat.sources||[]).map(x=>x==='ebay'?'eBay':'Leboncoin'))].join(' et ') || 'tes annonces'}…`
++            : `${filtrePlat.etat==='actif'&&filtrePlat.auMoins?'au moins ':''}${annShown.length} annonce${annShown.length>1?'s':''} dans cette sélection`}</span>
+           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');setAnnPlat('');}}>Réinitialiser les annonces</button>
+         </div>}
+         {/* Une source pas lue se dit UNE fois (§7) : ses logos manquent, ils ne
+             sont pas absents. Rien quand tout est lu. */}
+         {listings.items?.length>0 && (()=>{
+-          const manque = [presences.lbc==='passu'?'Leboncoin':null, presences.ebay==='passu'?'eBay':null].filter(Boolean);
+-          const ill = presences.ebayIllisibles || [];
+-          if (!manque.length && !ill.length) return null;
++          const eb = etatSourcePresence(presences, 'ebay');
++          const manque = [presences.lbc==='passu'?'Leboncoin':null, eb==='passu'?'eBay':eb==='partiel'?`eBay (${presences.ebayIllisibles.join(', ')})`:null].filter(Boolean);
++          if (!manque.length) return null;
+           return <div data-plateformes-passu style={{fontSize:11.5,color:C.muted,margin:'-2px 0 10px',lineHeight:1.45}}>
+-            {manque.length>0 && <>Je n'ai pas pu lire tes annonces {manque.join(' et ')} : {manque.length>1?'leurs':'ses'} logos peuvent manquer sur les cartes. </>}
+-            {ill.length>0 && <>Compte eBay {ill.join(', ')} pas lu : ses logos peuvent manquer.</>}
++            Je n'ai pas pu lire tes annonces {manque.join(' et ')} : des logos peuvent manquer sur les cartes.
+           </div>;
+         })()}
+ 
+@@ -31145,7 +31126,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+           <div data-ann-resume style={{fontSize:12.5,color:C.muted,marginBottom:8,lineHeight:1.5}}>
+             <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
+             {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
+-            {annStats.aussiEbay>0?` · ${annStats.aussiEbay} aussi sur eBay`:''}
++            {annStats.aussiEbay>0?` · ${annStats.ebayPartiel?'au moins ':''}${annStats.aussiEbay} aussi sur eBay`:''}
+             {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
+             {` · ${annStats.val.toFixed(0)} € de valeur`}
+             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
+@@ -31433,7 +31414,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+               reste visible là où on en a besoin — dans le champ N° d'une paire
+               qui n'en a pas. */}
+         </details>)}
+-        {listings.items && listings.items.length>0 && annShown.length===0 && (
++        {listings.items && listings.items.length>0 && annShown.length===0 && filtrePlat.etat!=='encours' && (
+           <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
+         )}
+         {/* ⚠️ SUR ORDINATEUR, `minmax(160px, …)` FAISAIT DES COLONNES, PAS DES
+@@ -31601,7 +31582,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                     {(() => {
+                       const pres = presences.par.get(String(it.id)) || [];
+                       const enL = pres.filter(x => x.etat === 'en_ligne');
+-                      const dem = pres.some(x => x.p === 'lbc' && x.etat === 'demandee');
++                      // « À vérifier » = demandée OU vue il y a plus de 24 h (revue du
++                      // 15 oct.) — la même règle que le filtre et la fiche (§11). Un logo
++                      // ne se pose jamais sur une observation périmée.
++                      const aVerif = presencesAVerifier(presences, it.id);
+                       const vus = PLATEFORMES_PRESENCE.filter(pl => enL.some(x => x.p === pl.cle));
+                       return (
+                         <div data-plateformes={vus.map(pl => pl.cle).join(' ')} style={{display:'flex',alignItems:'center',gap:'2px 10px',flexWrap:'wrap',fontSize:11,color:C.muted,minWidth:0,marginTop:1}}>
+@@ -31621,7 +31605,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                               ? <a key={pl.cle} data-plateforme={pl.cle} href={url} target="_blank" rel="noreferrer" aria-label={`${t} — ouvrir l'annonce`} title={t} style={st}>{corps}</a>
+                               : <span key={pl.cle} data-plateforme={pl.cle} role="img" aria-label={t} title={t} style={st}>{corps}</span>;
+                           })}
+-                          {dem && <span data-lbc-demandee title="Publication demandée sur Leboncoin, pas encore vue en ligne : ouvre « Mes annonces » sur leboncoin.fr avec l'extension pour la confirmer.">Leboncoin à vérifier</span>}
++                          {aVerif.map(av => (
++                            <span key={av.cle} {...(av.cle === 'lbc' && av.cause === 'demandee' ? { 'data-lbc-demandee': '' } : {})} data-averifier={av.cle}
++                              title={av.cause === 'vue'
++                                ? `Annonce ${av.nom} ${ilYaVu(av.x.vu) || 'vue il y a longtemps'} — pas confirmée depuis plus de 24 h : elle a pu être vendue ou retirée. Rouvre « Mes annonces » là-bas avec l'extension pour la confirmer.`
++                                : 'Publication demandée sur Leboncoin, pas encore vue en ligne : ouvre « Mes annonces » sur leboncoin.fr avec l\'extension pour la confirmer.'}>
++                              {av.nom} à vérifier</span>
++                          ))}
+                         </div>
+                       );
+                     })()}
+@@ -31654,16 +31644,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                           {PLATEFORMES_PRESENCE.map(pl => {
+                             const pres = (presences.par.get(String(it.id)) || []).filter(x => x.p === pl.cle);
+                             const enL = pres.filter(x => x.etat === 'en_ligne');
+-                            const src = pl.cle === 'lbc' ? presences.lbc : pl.cle === 'ebay' ? presences.ebay : 'lu';
+-                            const vieux = (v) => { const t = typeof v === 'number' ? v : Date.parse(String(v || '')); return Number.isFinite(t) && t > 0 && Date.now() - t > 48 * 3600000; };
++                            const vues = pres.filter(x => x.etat === 'vue');
++                            // L'état de la SOURCE vient d'`etatSourcePresence` (§11, revue du
++                            // 15 oct.) : un compte eBay pas lu (« partiel ») ne dit JAMAIS
++                            // « aucune annonce reliée » — c'est « rien lu », pas « rien ».
++                            const src = etatSourcePresence(presences, pl.cle);
+                             let etat, statut;
+                             if (enL.length) { etat = 'en_ligne'; statut = enL.map((x, i) => (
+-                              <span key={i}>{i > 0 ? ' · ' : ''}en ligne{x.compte ? <> · <b style={{color:C.text,fontWeight:600}}>{x.compte}</b></> : null}{vieux(x.vu) ? ` · ${ilYaVu(x.vu)}` : ''}{x.url ? <> · <a href={x.url} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>voir ↗</a></> : null}</span>
++                              <span key={i}>{i > 0 ? ' · ' : ''}en ligne{x.compte ? <> · <b style={{color:C.text,fontWeight:600}}>{x.compte}</b></> : null}{x.url ? <> · <a href={x.url} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>voir ↗</a></> : null}</span>
++                            )); }
++                            // Observation de plus de 24 h (revue du 15 oct.) : on dit QUAND,
++                            // jamais « en ligne » — elle a pu être vendue ou retirée depuis.
++                            else if (vues.length) { etat = 'vue'; statut = vues.map((x, i) => (
++                              <span key={i}>{i > 0 ? ' · ' : ''}{ilYaVu(x.vu) || 'vue il y a longtemps'} — à vérifier{x.compte ? <> · <b style={{color:C.text,fontWeight:600}}>{x.compte}</b></> : null}{x.url ? <> · <a href={x.url} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>voir ↗</a></> : null}</span>
+                             )); }
+                             else if (pres.some(x => x.etat === 'demandee')) { etat = 'demandee'; statut = 'demandée, pas encore vue en ligne'; }
+                             else if (presences.idsAmbigus.has(String(it.id))) { etat = 'ambigu'; statut = 'pas jugé : ce N° est porté par plusieurs fiches'; }
+                             else if (src === 'encours') { etat = 'encours'; statut = 'lecture…'; }
+                             else if (src === 'passu') { etat = 'passu'; statut = 'pas pu lire'; }
++                            else if (src === 'partiel') { etat = 'passu'; statut = `pas pu lire (${(presences.ebayIllisibles || []).join(', ')})`; }
+                             else { etat = 'aucune'; statut = num ? 'aucune annonce reliée' : 'il lui faut un N° pour la reconnaître'; }
+                             return (
+                               <div key={pl.cle} data-fiche-plateforme={pl.cle} data-etat={etat} style={{display:'flex',alignItems:'center',gap:6,color:C.muted,minWidth:0}}>
+@@ -34795,6 +34794,12 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
+ //    attribuée, et c'est compté (`ambigus`).
+ // Trois états par source, jamais deux : `undefined` en cours · `null` pas su ·
+ // objet lu. « Pas su » n'invente aucun logo et n'en efface aucun prouvé ailleurs.
++// ⚠️ (revue du 15 oct.) Une observation de plus de 24 h n'est plus une preuve
++//    d'« en ligne » — la même borne que Vinted (`ENLIGNE_FRAIS_MS`, §11) :
++//    l'annonce Leboncoin dont `seenAt` (ou la lecture eBay du compte,
++//    `capturedAt`) est plus vieille, ou sans date, prend l'état `vue` — dite
++//    « vue il y a 25 j », JAMAIS un logo. Mesuré chez lui le 15 oct. : 7 de ses
++//    8 annonces Leboncoin vues pour la dernière fois le 20 septembre.
+ const PLATEFORMES_PRESENCE = [
+   { cle: 'vinted', nom: 'Vinted', marque: 'vinted' },
+   { cle: 'lbc', nom: 'Leboncoin', marque: 'leboncoin' },
+@@ -34829,6 +34834,10 @@ function presencesPaires({ annonces, numeros, lbc, ebay, demandesLbc, nomCompte,
+     ajoute(it.id, { p: 'vinted', etat: 'en_ligne', compte: nomCompte ? String(nomCompte(it) || '') : '', id: String(it.id), url: String(it.url || '') });
+   }
+   const etatLbc = lbc === undefined ? 'encours' : (lbc && lbc.items && typeof lbc.items === 'object' && lbc.ventes && typeof lbc.ventes === 'object') ? 'lu' : 'passu';
++  // Fraîche = vue il y a 24 h au plus (une date future d'une minute d'horloge
++  // compte comme fraîche) ; sans date lisible, elle ne l'est pas.
++  const quand = (v) => { const t = typeof v === 'number' ? v : /^\d+$/.test(String(v == null ? '' : v)) ? Number(v) : Date.parse(String(v || '')); return Number.isFinite(t) && t > 0 ? t : null; };
++  const frais = (v) => { const t = quand(v); return t != null && now - t <= ENLIGNE_FRAIS_MS; };
+   if (etatLbc === 'lu') {
+     const prouves = comptesLbcProuves(lbc.ventes, lbc.items);
+     const vendusLbc = new Set();
+@@ -34841,14 +34850,16 @@ function presencesPaires({ annonces, numeros, lbc, ebay, demandesLbc, nomCompte,
+         const id = cible(k);
+         if (!id || vus.has(id)) continue;
+         vus.add(id);
+-        ajoute(id, { p: 'lbc', etat: 'en_ligne', compte: String(ad.accountName || ad.lbcUserName || ''), id: String(ad.id),
++        ajoute(id, { p: 'lbc', etat: frais(ad.seenAt) ? 'en_ligne' : 'vue', compte: String(ad.accountName || ad.lbcUserName || ''), id: String(ad.id),
+           url: /^https:\/\/(www\.)?leboncoin\.fr\//.test(String(ad.url || '')) ? String(ad.url) : '', vu: ad.seenAt || null });
+       }
+     }
+   }
+-  if (demandesLbc && typeof demandesLbc.has === 'function') for (const it of (annonces || [])) {
++  // Les publications DEMANDÉES (`vinted_lbc_posted`) : trois états aussi.
++  const etatDemandes = demandesLbc === undefined ? 'encours' : (demandesLbc && typeof demandesLbc.has === 'function') ? 'lu' : 'passu';
++  if (etatDemandes === 'lu') for (const it of (annonces || [])) {
+     if (!it || it.id == null || !demandesLbc.has(String(it.id))) continue;
+-    if ((par.get(String(it.id)) || []).some((x) => x.p === 'lbc' && x.etat === 'en_ligne')) continue;
++    if ((par.get(String(it.id)) || []).some((x) => x.p === 'lbc')) continue;   // déjà vue (en ligne ou il y a longtemps) : c'est plus précis
+     ajoute(it.id, { p: 'lbc', etat: 'demandee', compte: '', id: '', url: '' });
+   }
+   const etatEbay = ebay === undefined ? 'encours' : (ebay && Array.isArray(ebay.items)) ? 'lu' : 'passu';
+@@ -34864,9 +34875,9 @@ function presencesPaires({ annonces, numeros, lbc, ebay, demandesLbc, nomCompte,
+     const id = cible(n);
+     if (!id) continue;
+     const cap = ebay.caps && a._compte != null ? ebay.caps[a._compte] : null;
+-    ajoute(id, { p: 'ebay', etat: 'en_ligne', compte: String(a._pseudo || ''), id: String(a.itemId),
++    ajoute(id, { p: 'ebay', etat: frais(cap) ? 'en_ligne' : 'vue', compte: String(a._pseudo || ''), id: String(a.itemId),
+       url: /^https:\/\/(www\.)?ebay\.[a-z.]+\//.test(String(a.url || '')) ? String(a.url) : `https://www.ebay.fr/itm/${encodeURIComponent(String(a.itemId))}`,
+-      vu: cap != null && cap !== '' ? (Number.isFinite(Number(cap)) ? Number(cap) : cap) : null });
++      vu: quand(cap) });
+   }
+   const ordre = PLATEFORMES_PRESENCE.map((x) => x.cle);
+   for (const l of par.values()) l.sort((a, b) => ordre.indexOf(a.p) - ordre.indexOf(b.p));
+@@ -34876,7 +34887,122 @@ function presencesPaires({ annonces, numeros, lbc, ebay, demandesLbc, nomCompte,
+   for (const l of par.values()) for (const x of l) if (x.etat === 'en_ligne' && comptes[x.p] && x.compte) comptes[x.p].add(x.compte);
+   const idsAmbigus = new Set();
+   for (const k of ambigus) for (const i of (parNum.get(k) || [])) if (enLigne.has(i)) idsAmbigus.add(i);
+-  return { par, lbc: etatLbc, ebay: etatEbay, ebayIllisibles, ambigus: ambigus.size, idsAmbigus, comptes: { lbc: comptes.lbc.size, ebay: comptes.ebay.size } };
++  return { par, lbc: etatLbc, ebay: etatEbay, demandes: etatDemandes, ebayIllisibles, ambigus: ambigus.size, idsAmbigus, comptes: { lbc: comptes.lbc.size, ebay: comptes.ebay.size } };
++}
++// L'état d'une source quand il s'agit de juger une ABSENCE (§5 : « rien lu ne
++// vaut pas rien ») : 'lu' · 'partiel' (eBay : au moins un compte pas lu) ·
++// 'encours' · 'passu'. La fiche, la ligne « pas pu lire » et les filtres le
++// lisent ici — jamais `ebay === 'lu'` seul, qui affirmait « aucune annonce
++// reliée » sur un compte eBay jamais lu (revue du 15 octobre).
++const etatSourcePresence = (pres, p) => {
++  if (!pres || p === 'vinted') return 'lu';
++  if (p === 'lbc') return pres.lbc;
++  if (p === 'demandes') return pres.demandes;
++  return pres.ebay === 'lu' && (pres.ebayIllisibles || []).length ? 'partiel' : pres.ebay;
++};
++// Ce qui est « à vérifier » ailleurs : sur une plateforme où la paire n'est PAS
++// prouvée en ligne, une annonce vue il y a plus de 24 h (`vue`) ou une
++// publication seulement demandée (`demandee`). Une règle pour la carte, la
++// fiche, le filtre « À vérifier » et la loupe (§11).
++const presencesAVerifier = (pres, id) => {
++  const l = (pres && pres.par && pres.par.get(String(id))) || [];
++  const out = [];
++  for (const pl of PLATEFORMES_PRESENCE) {
++    if (pl.cle === 'vinted' || l.some((x) => x.p === pl.cle && x.etat === 'en_ligne')) continue;
++    const v = l.find((x) => x.p === pl.cle && x.etat === 'vue');
++    const d = l.find((x) => x.p === pl.cle && x.etat === 'demandee');
++    if (v || d) out.push({ ...pl, cause: v ? 'vue' : 'demandee', x: v || d });
++  }
++  return out;
++};
++// Les comptes par plateforme, sur la MÊME base que la grille : la ligne de
++// chiffres, l'existence de chaque filtre et son application lisent ceci (§11).
++// `lu` = la liste d'annonces elle-même est arrivée.
++function comptesPlateformes(annonces, pres, lu) {
++  let aussiLbc = 0, aussiEbay = 0, vintedSeul = 0, aVerifier = 0;
++  for (const it of (annonces || [])) {
++    if (!it || it.id == null) continue;
++    const ail = presencesAilleurs(pres, it.id), av = presencesAVerifier(pres, it.id);
++    if (ail.some((x) => x.p === 'lbc')) aussiLbc++;
++    if (ail.some((x) => x.p === 'ebay')) aussiEbay++;
++    if (av.length) aVerifier++;
++    if (!ail.length && !av.length) vintedSeul++;
++  }
++  const n = (annonces || []).length;
++  const tout = ['lbc', 'ebay', 'demandes'].every((s) => etatSourcePresence(pres, s) === 'lu');
++  return { n, lu: !!lu, aussiLbc, aussiEbay, aVerifier, vintedSeul: tout ? vintedSeul : null, ebayPartiel: etatSourcePresence(pres, 'ebay') === 'partiel' };
++}
++// ⚠️⚠️ LE FILTRE PAR PLATEFORME NE S'APPLIQUE QUE SUR CE QUI EST LU (revue du
++// 15 octobre). Il est rangé en session : au retour sur l'écran, sa source peut
++// être encore en lecture, ou illisible. Appliqué sans regarder, il disait
++// « 0 annonce dans cette sélection » (Leboncoin pas encore lu) et « Seulement
++// Vinted » sur du pas su — sans aucun bouton allumé. Une règle pour « le
++// bouton existe » ET « le filtre s'applique » :
++//   · 'encours' : une source en lecture ⇒ la grille attend, le filtre aussi ;
++//   · 'passu'   : une source illisible ⇒ le filtre est retiré, la ligne
++//                 « pas pu lire » le dit ;
++//   · 'vide'    : lu, et il ne trouve rien ⇒ le filtre n'existe pas ;
++//   · 'actif'   : `auMoins` quand un compte eBay n'a pas pu être lu.
++const FILTRES_PLATEFORME = { lbc: ['lbc'], ebay: ['ebay'], averifier: ['lbc', 'ebay', 'demandes'], seul: ['lbc', 'ebay', 'demandes'] };
++function etatFiltrePlateforme(cle, pres, cpt) {
++  if (!cle) return { cle: '', etat: 'aucun' };
++  const besoin = FILTRES_PLATEFORME[cle];
++  if (!besoin) return { cle, etat: 'vide' };                       // une valeur d'une ancienne version
++  const etats = besoin.map((s) => etatSourcePresence(pres, s));
++  const enCours = besoin.filter((s, i) => etats[i] === 'encours');
++  if (!cpt || !cpt.lu || enCours.length) return { cle, etat: 'encours', sources: enCours };
++  if (etats.includes('passu') || (cle === 'seul' && etats.includes('partiel'))) return { cle, etat: 'passu' };
++  const n = cle === 'lbc' ? cpt.aussiLbc : cle === 'ebay' ? cpt.aussiEbay : cle === 'averifier' ? cpt.aVerifier : cpt.vintedSeul;
++  if (!(n > 0) || (cle === 'seul' && n >= cpt.n)) return { cle, etat: 'vide' };
++  return { cle, etat: 'actif', n, auMoins: etats.includes('partiel') };
++}
++// Ce que le filtre GARDE, carte par carte (appelé seulement quand il est actif).
++const garderParPlateforme = (cle, pres, id) => {
++  const ail = presencesAilleurs(pres, id);
++  if (cle === 'seul') return ail.length === 0 && presencesAVerifier(pres, id).length === 0;
++  if (cle === 'averifier') return presencesAVerifier(pres, id).length > 0;
++  return ail.some((x) => x.p === cle);
++};
++// Les SOURCES des logos — une lecture pour l'écran Annonces ET la loupe (§11).
++// Chacune rend `null` quand elle n'a pas pu lire (l'appelant tient `undefined`
++// pour « en cours »).
++async function lirePresenceLbc() {
++  const [items, ventes] = await Promise.all([
++    lbcAnnoncesSession(),
++    (async () => {
++      try {
++        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
++        if (!r.ok) return null;
++        const rows = await r.json();
++        if (!Array.isArray(rows)) return null;
++        return (rows[0] && rows[0].ventes && typeof rows[0].ventes === 'object') ? rows[0].ventes : {};
++      } catch (_) { return null; }
++    })(),
++  ]);
++  return items && ventes ? { items, ventes } : null;
++}
++async function lirePresenceEbay() {
++  try {
++    const lu = await lireEbayTous('ebay_listings', 'items:data->items,cap:data->>capturedAt', 'items');
++    if (!lu) return null;
++    // AUCUN compte lu, c'est « pas su » — pas « aucune annonce eBay ».
++    if (Array.isArray(lu.comptes) && lu.comptes.length && (lu.illisibles || []).length >= lu.comptes.length) return null;
++    const caps = {};
++    for (const x of (lu.lignes || [])) if (x && x.ligne && x.compte) caps[x.compte.ref] = x.ligne.cap;
++    return { items: lu.items, illisibles: (lu.illisibles || []).map(nomCompteEbay), caps };
++  } catch (_) { return null; }
++}
++// Les publications Leboncoin DEMANDÉES (`vinted_lbc_posted`, écrit au clic) :
++// un Set, ou `null` si la base n'a pas répondu (jamais « aucune »).
++async function lireDemandesLbc() {
++  try {
++    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=ids:data->ids`, { headers: sbAuth() });
++    if (!r.ok) return null;
++    const rows = await r.json();
++    if (!Array.isArray(rows)) return null;
++    const ids = (rows[0] && rows[0].ids) || [];
++    return new Set(Array.isArray(ids) ? ids.map(String) : []);
++  } catch (_) { return null; }
+ }
+ // Le logo eBay est un MOT dans un carré de 24 : à 14 px il ne fait que 5 px de
+ // haut. Une boîte plus large, l'image recadrée sur son milieu (rien n'est
+@@ -38711,17 +38837,30 @@ function AppCoeur() {
+   // Recherche globale COMPLÈTE : au 1er usage, on charge une fois les données
+   // moissonnées (annonces/ventes/achats en ligne + publiées Leboncoin) depuis
+   // Supabase → la recherche marche même sans avoir ouvert les onglets Ventes/Achats.
+-  const [gsData,setGsData]=useState(null); // { online:Set, sold:[], bought:[], lbc:Set }
++  const [gsData,setGsData]=useState(null); // { online:Set, sold:[], bought:[], lbc:Map(id → 'en_ligne' | 'averifier') }
+   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
+     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+-    const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
++    const online=new Set(); const annonces=[];
++    const sold=[]; const bought=[];
+     const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
+-    for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
++    for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft){ online.add(String(it.id)); annonces.push(it); } } }
+     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
+     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
+     const po=await sb('app_data?id=like.harvest_*_orders_purchased&select=data')||[];
+     const seenP=new Set(); for(const r of po){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
+-    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
++    // Leboncoin : la MÊME règle que la carte Annonces (`presencesPaires`, §11,
++    // revue du 15 oct.) — la loupe disait « 🟠 Leboncoin » (un logo de publiée)
++    // sur une publication seulement DEMANDÉE, pendant que la carte disait
++    // « à vérifier ». Prouvée en ligne (≤ 24 h) → 'en_ligne' ; demandée ou vue
++    // il y a plus de 24 h → 'averifier' ; sources illisibles → rien (jamais un
++    // faux « publiée »).
++    const [pLbc,dem]=await Promise.all([lirePresenceLbc(),lireDemandesLbc()]);
++    const pres=presencesPaires({ annonces, numeros: load('vinted_annonce_numeros', {}), lbc: pLbc, ebay: null, demandesLbc: dem });
++    const lbc=new Map();
++    for(const [id,l] of pres.par){
++      if(l.some(x=>x.p==='lbc'&&x.etat==='en_ligne')) lbc.set(id,'en_ligne');
++      else if(l.some(x=>x.p==='lbc'&&(x.etat==='vue'||x.etat==='demandee'))) lbc.set(id,'averifier');
++    }
+     setGsData({online,sold,bought,lbc});
+   })(); /* eslint-disable-next-line */ },[gsOpen]);
+   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
+@@ -40228,7 +40367,7 @@ function AppCoeur() {
+         const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
+         const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
+         const onlineIds = new Set([...listCache.map(it=>String(it.id)), ...((gsData && [...gsData.online]) || [])]);
+-        const lbcSet = (gsData && gsData.lbc) || new Set();
++        const lbcMap = (gsData && gsData.lbc) || new Map();   // id → 'en_ligne' | 'averifier' (presencesPaires, §11)
+         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
+         const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
+         let pairs=[], ventes=[], achats=[];
+@@ -40236,7 +40375,7 @@ function AppCoeur() {
+           // Paires numérotées (index principal : N°, titre, marque).
+           pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
+             .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
+-            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
++            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const lbcEtat=lbcMap.get(String(e.id))||''; return {...e, box, online, lbcEtat}; })
+             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
+             .slice(0,40);
+           const numeredIds = new Set(pairs.map(p=>String(p.id)));
+@@ -40269,7 +40408,11 @@ function AppCoeur() {
+                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
+                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
+-                    {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
++                    {/* La même réponse que la carte Annonces (§11) : prouvée ⇒ le nom,
++                        demandée ou vue il y a plus de 24 h ⇒ « à vérifier » — jamais un
++                        logo orange (couleur hors palette, §7) sur une déduction. */}
++                    {p.lbcEtat==='en_ligne' && <span data-gs-lbc="en_ligne" style={{display:'inline-flex',alignItems:'center',gap:4}}><BrandIcon plateforme="leboncoin" size={11} style={{opacity:.85}}/>Leboncoin</span>}
++                    {p.lbcEtat==='averifier' && <span data-gs-lbc="averifier">Leboncoin à vérifier</span>}
+                     {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
+                     {p.buyPrice && <span>achat {p.buyPrice}€</span>}
+                     {p.price && <span>· {p.price}€</span>}
+-- 
+2.43.0
+

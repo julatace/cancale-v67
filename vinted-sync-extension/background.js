@@ -1664,9 +1664,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'photo') {
       (async () => {
         try {
-          // Seulement le CDN d'images de Vinted : ce pont ne doit pas devenir un
-          // téléchargeur d'URL arbitraire pour n'importe quelle page.
-          if (!/^https:\/\/[\w.-]*vinted\.net\//i.test(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
+          // Seulement les CDN d'images : celui de Vinted, et (15 octobre) l'hôte
+          // d'images de Leboncoin EXACT mesuré sur sa base (`img.leboncoin.fr`,
+          // 1 071 adresses sur 1 071 dans `lbc_listings`) — rien d'autre, ni
+          // `www.`/`api.leboncoin.fr`, ni un nom qui l'imite. Ce pont ne doit pas
+          // devenir un téléchargeur d'URL arbitraire pour n'importe quelle page.
+          if (!PHOTO_PONT_PERMISE(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
           const r = await photoBytes(msg.url);
           sendResponse(r);
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -3131,7 +3134,18 @@ async function capterPhotosAnnonces(uid) {
       // Il manque des photos, OU la fiche de codes (pour republier). La même
       // lecture de page donne les deux : aucune requête de plus par annonce.
       return (veut > 1 && a < veut) || !d0.codes;
-    }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
+    })
+    // ⚠️ (15 octobre) LES PHOTOS QUI MANQUENT PASSENT DEVANT. « Une paire publiée
+    //    sur Vinted 2 min avant n'a pas ses photos » : le tri ne regardait que
+    //    `nPhotos`, et une annonce DÉJÀ complète à qui ne manque que la fiche de
+    //    codes (mesuré : `fiche_codes_absents` 253 fois sur 253 — la fiche ne se
+    //    lit jamais, donc ces annonces repassent toutes les 6 h) passait devant
+    //    l'annonce neuve qui n'a que sa couverture. Les mêmes lectures, le même
+    //    plafond — seul l'ORDRE change : d'abord celles à qui il MANQUE des
+    //    photos (le plus de manquantes d'abord), puis les autres.
+    .map((it) => { const veut = Number(it.nPhotos || 0); const a = ((dej[String(it.id)] || {}).photos || []).length; return { it, manque: veut > 1 && a < veut ? veut - a : 0 }; })
+    .sort((x, y) => ((y.manque > 0) - (x.manque > 0)) || (y.manque - x.manque) || (Number(y.it.nPhotos || 0) - Number(x.it.nPhotos || 0)))
+    .map((x) => x.it);
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
     let n = 0, dirty = false;
@@ -3177,7 +3191,9 @@ async function capterPhotosAnnonces(uid) {
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
       else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
     }
-    if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
+    // L'app relit ces photos sans attendre qu'on rouvre l'écran (15 octobre) —
+    // seulement si l'écriture a PRIS.
+    if (dirty && await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id')) notifierApp({ type: 'maj', quoi: 'photos' });
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
@@ -3189,33 +3205,102 @@ async function capterPhotosAnnonces(uid) {
 // déclenchée par SON clic (donc humaine), sous garde de LECTURE, dans la file
 // Vinted (une à la fois). Jamais de rafale. Il ne publie plus une annonce sans
 // ses photos, et il n'attend aucun fond.
-async function completerPhotos(uid, id) {
+// `out` (facultatif) reçoit CE qui s'est passé — `code` et `n` — pour qu'un
+// appelant qui doit le DIRE (la commande « photos » de l'app) ne devine rien.
+// Le retour reste un booléen : vrai = photos lues ET rangées.
+async function completerPhotos(uid, id, out) {
+  const note = (code, n) => { if (out && typeof out === 'object') { out.code = code; if (n != null) out.n = n; } };
   try {
     const accts = await getStoredAccounts();
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
-    if (!acc) return false;
+    if (!acc) { note('compte'); return false; }
     const refus = await gardeLecture(uid, acc, 'clic');      // SON clic : pas de réserve à respecter
-    if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); return false; }
+    if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); note(refus.code || 'garde'); if (out) out.raison = refus.error; return false; }
     const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
-    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
+    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); note('page-' + (rep.status || 0)); return false; }
     const det = extraireDetailPage(rep.text, id);
-    if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
-    await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); note('vide'); return false; }
+    const ecrit = await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    if (ecrit !== true) { note(ecrit === null ? 'lecture' : 'ecriture', det.photos.length); return false; }
     noterDiag('photos_page_ecrit');
+    note('ok', Math.min(20, det.photos.length));
     return true;
-  } catch (_) { return false; }
+  } catch (_) { note('erreur'); return false; }
 }
 // Ne va chercher QUE si ça manque (évite une lecture inutile quand c'est déjà là).
-async function completerPhotosSiManque(uid, id) {
+// `voulu` (facultatif, 15 octobre) : le nombre de photos que VINTED annonce pour
+// l'annonce (`nPhotos`). Sans lui, comme avant : on ne lit que s'il n'y a AUCUNE
+// photo (la publication Leboncoin — le fond complète le reste). Avec lui, on lit
+// dès qu'il en MANQUE (la préparation eBay : « une paire publiée sur Vinted
+// 2 min avant n'a que sa couverture »).
+// Rend ce qui s'est passé : `{ etat, avant, n, code }` — `etat` = 'deja' (rien à
+// lire) · 'lu' · 'echec' · 'passu' (la base n'a pas répondu : on ne force rien).
+async function completerPhotosSiManque(uid, id, voulu) {
   try {
-    if (!uid || !id) return;
+    if (!uid || !id) return { etat: 'echec', code: 'invalide', avant: null, n: null };
     const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-    if (dr === null) return;                       // pas su : on ne force rien
+    if (dr === null) return { etat: 'passu', code: 'lecture', avant: null, n: null };   // pas su : on ne force rien
     const d0 = (dr[0] && dr[0].data && dr[0].data[String(id)]) || null;
     const a = (d0 && Array.isArray(d0.photos)) ? d0.photos.length : 0;
-    if (a > 0) return;                             // on a déjà des photos : le fond complétera le reste
-    await completerPhotos(uid, id);
-  } catch (_) {}
+    const v = Number(voulu);
+    const manque = Number.isFinite(v) && v > 0 ? a < Math.min(20, v) : a === 0;
+    if (!manque) return { etat: 'deja', code: 'deja', avant: a, n: a };   // déjà là : aucune requête Vinted
+    const out = {};
+    const ok = await completerPhotos(uid, id, out);
+    return { etat: ok ? 'lu' : 'echec', code: out.code || (ok ? 'ok' : 'erreur'), raison: out.raison || '', avant: a, n: ok ? (out.n != null ? out.n : null) : a };
+  } catch (_) { return { etat: 'echec', code: 'erreur', avant: null, n: null }; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LES PHOTOS D'UNE PAIRE, LUES SUR SON CLIC DANS L'APP (15 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « j'ai publié une paire sur Vinted et 2 min après j'ai voulu la mettre
+// sur eBay, VRM n'a pas capté les photos ». MESURÉ : une annonce neuve n'a, dans
+// le dressing, que sa COUVERTURE (`photo`, un objet) et le nombre réel
+// (`nPhotos`) ; le jeu complet n'arrive que par le fond (`capterPhotosAnnonces`,
+// compte connecté seulement, budget de lecture) ou la page ouverte. Le
+// formulaire eBay de l'app (`EbayPublier`, choisir une paire) demande donc, sur
+// SON clic, la lecture de CETTE annonce — la même que « Publier sur
+// Leboncoin » (`completerPhotosSiManque`, 5.144) : UNE page publique
+// (`credentials: 'omit'` — aucune session n'y part), sous garde STRICTE (pause
+// de Vinted, compte connecté dans ce Chrome) puis garde de LECTURE (budget du
+// clic), DANS la file Vinted (une requête à la fois). Rien n'est lu si les
+// photos sont déjà toutes là. L'état vit dans `vrmCmds` (`photos:{id}`) et
+// l'app est prévenue à la fin (`maj · photos`).
+const PHOTOS_CLIC_EN_VOL = new Set();
+async function photosDepuisApp(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  const v = Number(msg && msg.voulu);
+  const voulu = Number.isFinite(v) && v > 0 ? Math.min(40, Math.floor(v)) : 0;
+  const jobId = 'photos:' + id;
+  // Un double clic (ou deux onglets) ne lit pas deux fois : vérifié AVANT toute
+  // attente, comme les bordereaux.
+  if (PHOTOS_CLIC_EN_VOL.has(jobId)) return { accepte: true, jobId, etape: 'file', vivant: true, enFile: true };
+  PHOTOS_CLIC_EN_VOL.add(jobId);
+  let parti = false;
+  try {
+    const uid = await compteConnecte('www.vinted.fr');
+    if (!uid) return { accepte: false, code: 'vinted-absent', raison: "aucun compte Vinted n'est connecté dans ce Chrome — ouvre vinted.fr connecté sur n'importe lequel de tes comptes" };
+    const accts = await avecDelai(getStoredAccounts({ ouNull: true }), 4000, null);
+    if (!Array.isArray(accts)) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Vinted, réessaie dans un moment" };
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid)) || null;
+    if (!acc) return { accepte: false, code: 'compte', raison: "le compte Vinted ouvert dans ce Chrome n'est pas dans VRM" };
+    const stop = await gardeStricte(uid, acc, { lecture: true });
+    if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+    await majCmd(jobId, { etape: 'file', id, voulu: voulu || null, n: null, avant: null, code: null, raison: null, deja: false });
+    parti = true;
+    avecVinted(async () => {
+      try {
+        const r = await completerPhotosSiManque(uid, id, voulu || null);
+        const etape = r.etat === 'lu' ? 'fait' : r.etat === 'deja' ? 'fait' : 'echec';
+        await majCmd(jobId, { etape, deja: r.etat === 'deja', n: r.n, avant: r.avant, code: r.code || null, raison: r.raison || null });
+      } catch (e) {
+        await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) });
+      } finally { PHOTOS_CLIC_EN_VOL.delete(jobId); }
+    }).catch(() => { PHOTOS_CLIC_EN_VOL.delete(jobId); });
+    return { accepte: true, jobId, etape: 'file', vivant: true };
+  } finally { if (!parti) PHOTOS_CLIC_EN_VOL.delete(jobId); }
 }
 
 // ⚠️ CAPTURE PLUS RAPIDE, SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. :
@@ -4566,10 +4651,19 @@ async function visiteVinted() {
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
     // Vinted). Elle relit ses bordereaux quand on la prévient.
     if (Number(genes) > 0) notifierApp({ type: 'maj', quoi: 'label', uid: String(uid) });
-    // ⚠️ ET LES MESSAGES, sur sa décision du 19 septembre (« tout, elle répond à
-    //    tout »). Éteint par défaut : c'est lui qui allume depuis l'app.
+    // ⚠️ Un frein reçu PENDANT la génération (429/403 sur l'adresse, le
+    //    bordereau…) arrête la visite ICI (revue du 15 octobre) : cette ligne
+    //    était partie avec l'appel des réponses automatiques qu'elle précédait.
+    //    Sans elle, la suite consommait la garde de 5 min de la moisson et
+    //    comptait un faux échec (« Rien n'a pu être rangé »), sans requête de
+    //    plus — mais au retour de la pause, un échec passager ne rendait plus
+    //    la garde.
     if (await pauseVinted()) { await purgeBordereaux(); return; }
-    try { await avecVinted(() => repondreAuxMessages(uid)); } catch (_) {}
+    // ⛔ (15 octobre) PLUS AUCUNE RÉPONSE AUTOMATIQUE AUX MESSAGES. Julien :
+    //    « l'extension lit les messages et permet de répondre directement sur
+    //    VRM, mais elle n'agit pas toute seule ». Le moteur est retiré (voir
+    //    plus bas) ; une réponse ne part QUE sur son clic dans l'app
+    //    (`executerPourApp`, liste blanche `EXEC_PERMIS`).
 
     // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
     // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
@@ -4702,12 +4796,15 @@ async function saveListingDate(id, ts, text) {
 // app_data `vinted_item_details` = { id: {description, photos, readAt} }.
 // Sert (1) aux annonces Leboncoin (vraie description au lieu d'un texte
 // générique) et (2) d'archive de tes textes/photos.
+// Rend `true` (écrit) · `false` (la base a refusé l'écriture) · `null` (la base
+// n'a pas répondu à la lecture : rien n'est écrit). Un appelant qui doit DIRE ce
+// qui s'est passé (la commande « photos » de l'app, 15 octobre) le lit.
 async function saveItemDetail(id, detail) {
   const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
   //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
   //    reste. On n'écrit pas.
-  if (rows === null) return;
+  if (rows === null) return null;
   const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
   const prev = cur[key] || {};
@@ -4715,12 +4812,19 @@ async function saveItemDetail(id, detail) {
   const photos = Array.isArray(detail.photos) ? detail.photos.filter(Boolean).slice(0, 20) : [];
   // On complète sans écraser par du vide (une relecture partielle ne doit pas
   // effacer une description déjà captée).
-  cur[key] = {
+  // ⚠️ (15 octobre) `...prev` d'abord : la fiche de codes et les identifiants de
+  //    photos posés par `capterPhotosAnnonces` (`codes`, `photoIds`) étaient
+  //    EFFACÉS à chaque passage ici — la ligne ne gardait que ces trois clés.
+  cur[key] = Object.assign({}, prev, {
     description: desc || prev.description || '',
     photos: photos.length ? photos : (prev.photos || []),
     readAt: new Date().toISOString(),
-  };
-  await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+  });
+  const ok = await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+  // L'app relit les photos de CETTE annonce sans attendre de rouvrir l'écran
+  // (le formulaire eBay, 15 octobre). Rien n'est envoyé si rien n'est écrit.
+  if (ok) notifierApp({ type: 'maj', quoi: 'photos', id: key, n: (cur[key].photos || []).length });
+  return !!ok;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5004,7 +5108,15 @@ async function majCmd(jobId, patch) {
 // worker (pas seulement notée « file » dans le stockage). L'app s'y fie pour
 // garder « En file… » tant qu'elle attend son tour, sans délai arbitraire ;
 // une demande orpheline (service worker redémarré) ne le porte plus.
-const avecVivant = (jobId) => (/^bord:/.test(String(jobId)) && BORD_EN_COURS.has(String(jobId)) ? { vivant: true } : {});
+// (15 octobre) Une lecture de photos demandée par l'app (`photos:{id}`) porte
+// `vivant` de la même façon : un service worker mort au milieu ne laisse pas
+// l'app dire « je lis les autres » pour toujours.
+const avecVivant = (jobId) => {
+  const j = String(jobId);
+  if (/^bord:/.test(j) && BORD_EN_COURS.has(j)) return { vivant: true };
+  if (/^photos:/.test(j) && PHOTOS_CLIC_EN_VOL.has(j)) return { vivant: true };
+  return {};
+};
 // ── « LES INFORMATIONS CIRCULENT-ELLES BIEN ? » ─────────────────────────────
 // Le petit écran de l'extension le dit, plateforme par plateforme : dernier
 // envoi réussi, dernier envoi refusé. MESURÉ aux points d'écriture, jamais
@@ -5364,6 +5476,8 @@ async function executerCommande(msg) {
     }).catch(() => {});
     return { accepte: true, jobId, etape: 'file' };
   }
+  // (15 octobre) Les photos d'UNE annonce, lues sur son clic (formulaire eBay).
+  if (msg && msg.cmd === 'photos') return await photosDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
@@ -5756,6 +5870,10 @@ async function pdfBordereauLbc(url) {
   } catch (e) { return { ok: false, error: String(e).slice(0, 80) }; }
 }
 
+// Les adresses que le pont « photo » de l'app peut faire lire (voir le
+// gestionnaire `action: 'photo'`) : le CDN de Vinted, et l'hôte d'images de
+// Leboncoin — EXACTEMENT celui-là (mesuré le 15 octobre).
+const PHOTO_PONT_PERMISE = (u) => /^https:\/\/[\w.-]*vinted\.net\//i.test(u) || /^https:\/\/img\.leboncoin\.fr\//i.test(u);
 async function photoBytes(url) {
   try {
     if (!/^https:/i.test(String(url || ''))) return { ok: false };
@@ -5942,288 +6060,22 @@ const BORD_RATTRAPAGE_J = 21;
 // LECTURE, sur ses propres achats, plafonnée en volume — la même forme que la
 // récupération du bordereau (§5.29). Elle ne décide de rien et n'engage rien.
 // ══════════════════════════════════════════════════════════════════════════════
-// RÉPONDRE AUX MESSAGES — IL A TRANCHÉ : « TOUT, ELLE RÉPOND À TOUT »
+// ⛔ LA RÉPONSE AUTOMATIQUE AUX MESSAGES EST RETIRÉE (15 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
-// Demande de Julien, 19 septembre, après que je lui ai posé la question et
-// présenté le risque : « tout, elle répond à tout ». C'est SA décision, elle est
-// prise, elle ne se re-négocie pas.
-//
-// Les trois morceaux existaient déjà et ne se parlaient pas :
-//   · `convLastMessage(convId)` — le dernier message de l'ACHETEUR, lu dans la
-//     donnée moissonnée (pas dans la page) ;
-//   · `aiReply(...)` — `/api/ai` mode `reply`, qui rend une intention, une
-//     confiance et 3 à 5 suggestions ;
-//   · `POST /api/v2/conversations/{id}/replies` — **mesuré dans SES propres
-//     requêtes**. ⚠️ Remesuré le 30 sept. sur les 9 captures (`wreq_…_replies`) :
-//     `reply` est un OBJET — `{reply:{body, photo_temp_uuids:null,
-//     is_personal_data_sharing_check_skipped:false}}` — pas une chaîne. La
-//     5.77→5.118 envoyait `{reply: texte}` : l'endpoint était juste, la FORME
-//     du corps non (§6 : vérifier le nom ET la forme du champ).
-// Il ne manquait que le maillon qui envoie. C'est exactement l'histoire du
-// bordereau : le pipeline était là, le dernier chaînon absent.
-//
-// ⚠️ LES GARDE-FOUS RESTENT, ET CE N'EST PAS UNE RE-NÉGOCIATION DE SON CHOIX :
-//    ce sont des protections ANTI-BLOCAGE (§3), pas des scrupules. `vanessa5723`
-//    a été bloqué, et neuf comptes sont son gagne-pain :
-//      · uniquement le compte connecté dans l'onglet (`garde`) ;
-//      · plafond de 20 actions/heure par compte, déjà tenu par `garde` —
-//        **c'est LUI la vraie protection anti-blocage**, pas le plafond par
-//        visite (§ « répond à tout mais étalé ») ;
-//      · **8 réponses par visite** — Julien, 24 septembre : « améliore la
-//        fiabilité, tu peux mettre plus de 3 répétitions… répond à tout mais
-//        étalé ». Le plafond par visite n'évite qu'une RAFALE sur une seule
-//        page ; répondre à tout se fait sur plusieurs visites, borné par le
-//        plafond horaire de 20 qui, lui, ne bouge pas. Monté de 3 à 8 : plus de
-//        3 (sa demande), mais jamais une salve de vingt d'un coup.
-//      · une requête à la fois, jamais deux en vol.
-// ⚠️ ET DEUX RÈGLES DE FOND, celles du dossier :
-//    1. **JAMAIS DEUX FOIS LE MÊME MESSAGE.** L'identité est l'`id` du message
-//       de l'acheteur — pas le texte, pas la date (§5 : jamais une
-//       ressemblance). Sans ça, un acheteur reçoit trois réponses au même
-//       message et ça se lit comme un robot.
-//    2. **MIEUX VAUT UN BLANC QU'UN FAUX.** Si l'IA ne rend rien, ou rend une
-//       réponse vide, on n'envoie RIEN. Un silence d'une heure coûte moins
-//       qu'une réponse inventée sur un prix ou une disponibilité.
-// ⚠️ ET ON DIT CE QU'ON A ENVOYÉ EN SON NOM. Le texte parti est gardé dans
-//    `panel_msg_repondus` et le journal l'annonce : un message envoyé à sa place
-//    qu'il ne peut pas relire serait le pire de tout — c'est « un colis caché
-//    est un colis perdu » appliqué à ce qu'on dit à ses acheteurs.
-const MSG_MAX_PAR_VISITE = 8;
-const MSG_MIN_CONFIANCE = 55;    // en dessous, l'IA hésite : on ne parle pas à sa place
-const MSG_DEMANDES_MAX = 300;    // questions à l'IA mémorisées (une par message, voir `demandes`)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ⚠️⚠️ QUI VEND ? C'EST UNE IDENTITÉ, ET ELLE M'A ÉVITÉ D'ÉCRIRE N'IMPORTE QUOI
-// ══════════════════════════════════════════════════════════════════════════════
-// MESURÉ LE 19 SEPTEMBRE, avant de brancher quoi que ce soit, sur ses 32
-// conversations NON LUES : **deux** sont des échanges où c'est LUI l'acheteur —
-// « Trainers are in post, thanks for buying », « juste pour vous dire que
-// j'envoie demain, le colis est prêt ». Or `api/ai` répond en VENDEUR (sa
-// consigne dit mot pour mot « on te donne le message d'un ACHETEUR ») : sur ces
-// deux-là elle aurait envoyé, EN SON NOM, une réponse à côté de la plaque à
-// quelqu'un qui lui expédie un colis. « toute conversation non lue = un acheteur
-// qui demande » est une RESSEMBLANCE (§5), et elle se trompait 2 fois sur 5.
-// ⇒ L'identité, c'est l'ARTICLE : `transaction.item_id` est-il une de SES
-//    annonces captées ? (§5, identité d'annonce — jamais le titre.) Mesuré :
-//    les 3 vraies questions d'acheteur passent, les 2 conversations où il achète
-//    sont écartées, 0 erreur.
-// ⚠️ CE QUE J'AI ESSAYÉ ET ÉCARTÉ, mesuré aussi :
-//    · `transaction.user_side` — **null sur les 1 030 conversations** captées ;
-//    · l'identifiant de participant déduit de `harvest_*_txn_*` : ces lignes
-//      portent AUSSI ses achats, donc `seller_id` y varie (162 fois l'un, une
-//      fois chacun des autres). Le prendre « le plus fréquent » serait un
-//      rapprochement par fréquence, exactement ce que ce projet s'interdit.
-//      Et ancré sur l'article il n'apportait **rien** (0 conversation de plus).
-// ⚠️ « PAS SU » NE VAUT PAS « OUI » : lecture ratée ⇒ `null` ⇒ on ne répond pas.
-async function sesAnnonces(uid) {
-  const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_listings&select=data`);
-  if (rows === null) return null;                 // pas su ≠ « aucune annonce à lui »
-  const items = (rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.items) || [];
-  const s = new Set();
-  for (const it of items) if (it && it.id != null) s.add(String(it.id));
-  return s;
-}
-
-async function repondreAuxMessages(uid) {
-  try {
-    if (!uid) return 0;
-    const reglages = await lireMain(['vinted_repond_auto']);
-    // ⚠️ ÉTEINT PAR DÉFAUT, comme le moteur d'offres (§3). C'est lui qui allume,
-    //    depuis l'app — et « pas su » (lecture ratée) ne vaut pas « allumé ».
-    if (reglages === null) return 0;
-    if (!reglages.vinted_repond_auto) return 0;
-    const accts = await getStoredAccounts();
-    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
-    if (!acc) return 0;
-
-    // Les conversations NON LUES de ce compte, telles que Vinted les a rendues.
-    const inbox = await sbGetMemo(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
-    if (inbox === null) return 0;                  // pas su ≠ aucune conversation
-    const convs = (inbox[0] && inbox[0].data && inbox[0].data.payload && inbox[0].data.payload.conversations) || [];
-    const nonLues = convs.filter((c) => c && c.unread && c.id != null);
-    if (!nonLues.length) return 0;
-
-    // Ses annonces : c'est ce qui dit s'il VEND dans cette conversation.
-    const miennes = await sesAnnonces(uid);
-    if (miennes === null) return 0;
-
-    // Ce à quoi on a DÉJÀ répondu — par l'identité du message, jamais son texte.
-    const rows = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
-    if (rows === null) return 0;                   // on ne risque pas de répondre deux fois
-    const deja = (rows[0] && rows[0].data) || {};
-    // ⚠️⚠️ LA FUITE DE L'IA (11 octobre). Cette fonction tourne à CHAQUE page
-    //    Vinted chargée — mesuré : ~255 passages par jour chez Julien. Un message
-    //    où l'IA HÉSITE (confiance sous le seuil) ou rend une réponse vide n'était
-    //    mémorisé nulle part : il repartait chez l'IA au passage suivant, tant
-    //    qu'il restait non lu. Un seul message hésitant ≈ 255 appels payés par
-    //    jour (≈ 15 à 18 $ par mois, plus que l'abonnement). Même chose pour une
-    //    réponse sûre que `garde` a empêchée de partir (plafond horaire atteint) :
-    //    redemandée à chaque page.
-    // ⇒ UNE question à l'IA par message, jamais deux. L'identité est la même que
-    //    pour les envois (`conversation:message`, jamais le texte ni la date) et
-    //    elle vit dans la MÊME ligne, sous une clé réservée (`demandes`) — lue et
-    //    réécrite avec la même garde (lecture ratée ⇒ rien ne part, plus haut).
-    //    · réponse sûre pas encore partie ⇒ on garde son texte et on le RÉUTILISE ;
-    //    · hésitation ou réponse vide ⇒ on ne la redemande plus (un NOUVEAU
-    //      message de l'acheteur a un autre id : lui, il est redemandé) ;
-    //    · IA injoignable (rien de facturé) ⇒ rien n'est mémorisé, on retentera.
-    const demandes = (deja.demandes && typeof deja.demandes === 'object' && !Array.isArray(deja.demandes)) ? deja.demandes : {};
-    const demandesNeuves = {};
-
-    let envoyes = 0;
-    const neufs = {};
-    // ⚠️ LE BILAN, PARCE QUE « ELLE RÉPOND À TOUT » SERAIT FAUX. Mesuré sur ses
-    //    32 non lues : 17 n'ont AUCUNE conversation captée, 9 n'ont aucun
-    //    message de l'acheteur dedans, 1 est refusée à la réponse par Vinted,
-    //    1 est un échange où il achète — il en reste **3**. L'app écrit ces
-    //    nombres ; un total partiel présenté comme complet est pire qu'absent.
-    // ⚠️ `iaKO` (revue du 11 octobre) : quand c'est l'IA qui n'a rien rendu
-    //    d'utilisable (pas branchée, injoignable, sortie illisible), ce n'est PAS
-    //    une hésitation — l'app l'écrivait « elle n'était pas sûre ». Compté à
-    //    part, avec sa cause (`iaKOcauses` : pasBranchee · injoignable · illisible).
-    const bilan = { nonLues: nonLues.length, pasCaptee: 0, sansMessage: 0, pasVendeur: 0,
-      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, iaKO: 0, iaKOcauses: {}, envoyes: 0, refusees: 0, at: new Date().toISOString() };
-    const iaKO = (cause) => { bilan.iaKO++; bilan.iaKOcauses[cause] = (bilan.iaKOcauses[cause] || 0) + 1; };
-    for (const c of nonLues) {
-      const cid = String(c.id);
-      const det = await convDernierMessageId(uid, cid);
-      if (!det) { bilan.pasCaptee++; continue; }
-      if (!det.id || !det.body) { bilan.sansMessage++; continue; }
-      if (det.allowReply === false) { bilan.replyRefuse++; continue; }   // Vinted refuse la réponse
-      // L'IDENTITÉ : cette conversation porte-t-elle une de SES annonces ?
-      if (!(det.itemId && miennes.has(String(det.itemId)))) { bilan.pasVendeur++; continue; }
-      const cle = cid + ':' + det.id;
-      if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
-      // Déjà demandé à l'IA pour CE message, et elle a hésité : on ne la repaie pas.
-      const dejaDemande = demandesNeuves[cle] || demandes[cle] || null;
-      if (dejaDemande && !dejaDemande.texte) {
-        if (dejaDemande.raison === 'illisible') { iaKO('illisible'); noterDiag('repond_illisible_memorisee'); }
-        else { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); }
-        continue;
-      }
-      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
-      let texte = '', sugg = null;
-      if (dejaDemande && dejaDemande.texte) {
-        // Une réponse SÛRE déjà obtenue pour ce message, qui n'a pas pu partir :
-        // on la renvoie telle quelle, sans redemander (ni repayer) l'IA.
-        texte = String(dejaDemande.texte);
-        sugg = { intent: dejaDemande.intention || '', confidence: Number(dejaDemande.confiance || 0) };
-        noterDiag('repond_reponse_reutilisee');
-      } else {
-        sugg = await aiReply(det.body, det.article || c.description || '', det.price);
-        if (!(sugg && sugg.ok)) {
-          // ⚠️⚠️ REVUE DU 11 OCTOBRE : une réponse PAYÉE mais illisible (JSON
-          //    tronqué, texte libre, réponse vide — le serveur dit `facture: true`,
-          //    et `reason: 'parse'` pour un serveur d'avant) se range comme une
-          //    hésitation : on ne la repaie pas à chaque page Vinted. Seuls les
-          //    refus d'AVANT l'appel payé (clé absente, session, abonnement,
-          //    réseau, Anthropic en panne) ne sont pas mémorisés : on retentera.
-          if (sugg && (sugg.facture === true || sugg.reason === 'parse')) {
-            demandesNeuves[cle] = { at: new Date().toISOString(), confiance: 0, raison: 'illisible' };
-            iaKO('illisible'); noterDiag('repond_illisible');
-            continue;
-          }
-          iaKO(sugg && sugg.reason === 'no-key' ? 'pasBranchee' : 'injoignable');
-          noterDiag(sugg && sugg.reason === 'no-key' ? 'repond_ia_pas_branchee' : 'repond_ia_injoignable');
-          continue;
-        }
-        texte = (Array.isArray(sugg.suggestions) && sugg.suggestions[0]
-          && String(sugg.suggestions[0].text || '').trim()) || '';
-        const conf = Number(sugg.confidence || 0);
-        const sure = !!texte && conf >= MSG_MIN_CONFIANCE;
-        demandesNeuves[cle] = sure
-          ? { at: new Date().toISOString(), confiance: conf, intention: String(sugg.intent || ''), texte: texte.slice(0, 1000) }
-          : { at: new Date().toISOString(), confiance: conf, raison: texte ? 'peu-sur' : 'vide' };
-        // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
-        if (!sure) {
-          bilan.pasSure++;
-          noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
-          continue;
-        }
-      }
-      // ⚠️ LE PLAFOND HORAIRE SE CONSOMME AU MOMENT DE L'ENVOI, JAMAIS AVANT.
-      //    `garde` → `compterAction` POUSSE un créneau du budget 20/h à chaque
-      //    appel. L'appeler avant l'IA brûlait un créneau pour une conversation
-      //    « pas sûre » qui n'envoyait rien : invisible à 3 par visite, mais dès
-      //    qu'on monte le plafond (sa demande « plus de 3 »), le budget de
-      //    l'heure s'épuisait sur des NON-réponses et les vraies réponses
-      //    suivantes se faisaient refuser à tort. On ne compte une action que
-      //    quand une réponse VA réellement partir. (Le contrôle « autre compte »
-      //    de `garde` reste ici : au pire on a payé un appel à NOTRE serveur IA,
-      //    jamais une requête à Vinted.)
-      const stop = await garde(uid, acc);          // compte de l'onglet + plafond horaire
-      if (stop) break;
-      const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${cid}/replies`,
-        { reply: { body: texte, photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } });
-      noterDiag(r.ok ? 'repond_envoye' : `repond_refuse_${r.status}`);
-      if (!r.ok) {
-        bilan.refusees++;
-        logActivity(`⚠️ Réponse non envoyée (Vinted a répondu ${r.status})`);
-        if (r.status === 401 || r.status === 403) break;   // inutile d'insister
-        continue;
-      }
-      envoyes++;
-      neufs[cle] = { conv: cid, at: new Date().toISOString(), texte: texte.slice(0, 400),
-        intention: String(sugg.intent || ''), confiance: Number(sugg.confidence || 0),
-        login: (c.opposite_user && c.opposite_user.login) || '', titre: String(c.description || '').slice(0, 80) };
-      // ⚠️ IL DOIT POUVOIR RELIRE CE QUE J'AI DIT EN SON NOM.
-      logActivity(`💬 Répondu à ${neufs[cle].login || 'un acheteur'} — « ${texte.slice(0, 60)}${texte.length > 60 ? '…' : ''} »`);
-    }
-    bilan.envoyes = envoyes;
-    // Lire-fusionner-réécrire, avec la garde du dossier : on ne fusionne que si
-    // on a lu (la lecture plus haut a déjà refusé le cas `null`). Le bilan vit
-    // sous une clé réservée, jamais confondue avec un envoi (`conv:message`).
-    // Les questions à l'IA : les anciennes + celles de ce passage, sans celles
-    // dont la réponse est partie (l'envoi les remplace), bornées aux 300 plus
-    // récentes (une ligne lue à chaque visite ne grossit pas sans fin, §4.4).
-    const toutesDemandes = Object.assign({}, demandes, demandesNeuves);
-    const gardees = Object.keys(toutesDemandes)
-      .filter((k) => !deja[k] && !neufs[k] && toutesDemandes[k] && typeof toutesDemandes[k] === 'object')
-      .sort((a, b) => String(toutesDemandes[b].at || '').localeCompare(String(toutesDemandes[a].at || '')))
-      .slice(0, MSG_DEMANDES_MAX);
-    const demandesEcrites = {};
-    for (const k of gardees) demandesEcrites[k] = toutesDemandes[k];
-    await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus',
-      data: Object.assign({}, deja, neufs, { demandes: demandesEcrites, bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
-    return envoyes;
-  } catch (_) { return 0; }
-}
-
-// Le dernier message de l'acheteur AVEC SON IDENTITÉ — c'est elle qui empêche
-// de répondre deux fois. `convLastMessage` ne rendait que le texte.
-// ⚠️ Et il rend AUSSI `itemId` et `allowReply` : sans l'article on ne sait pas
-//    s'il VEND dans cette conversation (voir `sesAnnonces`), et `allow_reply`
-//    est mesuré `false` sur une de ses conversations non lues — Vinted y refuse
-//    la réponse, insister ne ferait qu'un refus de plus au compteur.
-// ⚠️ La ligne est lue sur SON compte (`id=eq.harvest_{uid}_conv_{cid}`) :
-//    vérifié sur ses vraies données, une conversation est toujours captée sous
-//    le compte de sa boîte — et une identité exacte coûte moins qu'un `like`.
-async function convDernierMessageId(uid, convId) {
-  try {
-    const rows = await sbGet(`app_data?id=eq.harvest_${encodeURIComponent(String(uid))}_conv_${encodeURIComponent(String(convId))}&select=data`);
-    for (const r of (rows || [])) {
-      const conv = r.data && r.data.payload && r.data.payload.conversation;
-      if (!conv || !Array.isArray(conv.messages)) continue;
-      const oppId = conv.opposite_user && conv.opposite_user.id;
-      let last = null;
-      for (const m of conv.messages) {
-        if ((m.entity_type || '') !== 'message') continue;
-        const e = m.entity || {};
-        if (oppId != null && e.user_id !== oppId) continue;   // uniquement l'acheteur
-        if (e.body) last = { id: String(e.id != null ? e.id : (m.id != null ? m.id : '')), body: String(e.body).slice(0, 1000) };
-      }
-      const t = conv.transaction || {};
-      const commun = { itemId: t.item_id != null ? String(t.item_id) : '', allowReply: conv.allow_reply,
-        article: String(conv.description || conv.title || '').slice(0, 160),
-        price: t.offer_price != null ? t.offer_price : undefined };
-      // ⚠️ On rend l'objet MÊME sans message lisible : c'est ce qui permet au
-      //    bilan de distinguer « pas de conversation captée » de « captée, mais
-      //    aucun message de l'acheteur dedans » — deux causes, deux phrases.
-      return Object.assign({ id: '', body: '' }, commun, last || {});
-    }
-    return null;
-  } catch (_) { return null; }
-}
+// Julien, 15 octobre : « ils répondent à mes messages Vinted : enlève, parce que
+// l'extension lit les messages et permet de répondre directement sur VRM, mais
+// elle n'agit pas toute seule ». C'est SA décision ; elle remplace celle du
+// 19 septembre (« tout, elle répond à tout »). Mesuré le 15 octobre avant de
+// retirer : `vinted_repond_auto` absent des 3 lignes `main`, aucune ligne
+// `panel_msg_repondus` — le moteur n'avait jamais rien envoyé.
+// Retirés ensemble : l'appel à chaque visite, le moteur, l'identité « qui
+// vend ? » qui ne servait qu'à lui, la lecture du dernier message de
+// l'acheteur, et la question à l'IA (`/api/ai` mode `reply`). Ce qui RESTE :
+// lire les conversations (moisson, `GET /conversations/{id}` sur son clic) et
+// répondre sur SON clic depuis l'app (`executerPourApp`, `EXEC_PERMIS`).
+// ⚠️ Un message envoyé par un programme ressemble à un robot (§3, le compte
+//    bloqué). `audit-reponses-auto.cjs` refuse tout autre chemin vers
+//    `/conversations/{id}/replies` que la liste blanche.
 
 // ══ UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (relecture croisée de la 5.174) ══════
 // Les lecteurs bornés (`capterRetraits` 6 h, `capterDatesVersement` 24 h,
@@ -6953,27 +6805,9 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
   } catch (_) { return 0; }
 }
 
-// ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
-// Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
-// reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
-// RIEN sur Vinted : Julien relit, choisit, adapte et envoie LUI-MÊME (assistance
-// stricte, conforme). La clé de l'IA reste côté serveur (Vercel), jamais ici.
+// L'adresse de l'app (routes `/api/*` : détourage). Gardée quand l'assistant de
+// réponse a été retiré (15 octobre) — il n'en était pas le seul lecteur.
 const VRM_APP_API = 'https://vrm.center';
-async function aiReply(message, article, price) {
-  try {
-    // La clé de l'IA est celle du serveur : il exige la session du vendeur
-    // (sinon n'importe qui la dépenserait — audit de sécurité, 4 octobre).
-    let s = null; try { s = await authToken(); } catch (_) {}
-    const r = await fetch(`${VRM_APP_API}/api/ai`, {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, s && s.access_token ? { Authorization: `Bearer ${s.access_token}` } : {}),
-      body: JSON.stringify({ mode: 'reply', message: String(message || '').slice(0, 1000), article: String(article || '').slice(0, 160), price }),
-    });
-    const j = await r.json().catch(() => ({}));
-    return (j && typeof j === 'object') ? j : { ok: false, reason: 'network' };
-  } catch (e) { return { ok: false, reason: 'network', detail: String(e) }; }
-}
-
 async function sbGet(query) {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: await sbHeaders() });
@@ -7012,7 +6846,7 @@ const qMain = (cles) => `app_data?id=eq.main&select=${cles.map((k) => `${k}:data
 //    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
 //    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
 const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
-  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
 async function lireMain(cles) {
@@ -7148,7 +6982,10 @@ function lbcCategory(det, raw) {
 // C'est le même principe qu'`URL_PAS_UN_QR` : on ÉCARTE ce qui n'est pas la
 // chose, sans jamais rien supprimer en base (la capture reste, c'est la
 // PUBLICATION qui refuse).
-const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application/i;
+// ⚠️ (15 octobre) 5 sur 150, pas 4 : la protection acheteur de Vinted (« Pour
+// chaque achat effectué, tu bénéficies de notre Politique de remboursement… »)
+// passait. La MÊME expression que `PAS_UNE_DESCRIPTION` d'App.jsx (§11).
+const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application|pour chaque achat effectu[ée].{0,120}politique de rembours|thousands of brands.{0,80}second.?hand/i;
 function lbcDescription(brut) {
   let t = String(brut || '').trim();
   if (!t) return '';
@@ -7182,6 +7019,9 @@ function lbcTitre(brand, base, size, max) {
   let vue = null;
   t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       // Une taille LETTRE écrite dans son titre (« taille M ») sort aussi : elle
+       // revient en suffixe, une seule fois — sinon « … taille M taille M ».
+       .replace(/\btailles?\s*:?\s*(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|TU)\b/i, (m, n) => { if (!vue) vue = n; return ''; })
        .replace(/\s+/g, ' ').trim();
   const taille = String(size || vue || '').replace(/^t(?=\d)/i, '').trim();
   // 3. La marque une seule fois.
@@ -7190,11 +7030,14 @@ function lbcTitre(brand, base, size, max) {
   t = t.replace(/\s+/g, ' ').trim();
   // 4. Une majuscule : un titre tout en minuscules se lit « bricolé ».
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  // ⚠️ Le « T » n'est une POINTURE que pour un nombre (chaussures) : une taille
-  //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
-  //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
-  const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
-  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
+  // ⚠️⚠️ 15 OCTOBRE — JULIEN TRANCHE : « taille 43 », PAS « T43 ». « Au lieu
+  //    de mettre taille 43 il a mis T43 » : la taille s'écrit EN TOUTES
+  //    LETTRES, pour une pointure (« taille 43 ») comme pour une taille lettre
+  //    (« taille M »). Ça remplace le « T43 » choisi en septembre pour gagner
+  //    six caractères. Elle reste en SUFFIXE et n'est JAMAIS rognée : si le
+  //    titre ne tient pas dans le plafond, c'est un mot du MODÈLE qui part
+  //    (étape 5), jamais la taille. eBay (80 caractères) suit la même règle.
+  const suff = taille ? ' taille ' + taille : '';
   // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
@@ -7206,13 +7049,35 @@ function lbcTitre(brand, base, size, max) {
 }
 
 function firstDefined(...v) { for (const x of v) if (x !== undefined && x !== null && x !== '') return x; return ''; }
+// ── LE PRIX D'UNE ANNONCE VINTED, EN EUROS (§11 : la MÊME règle dans l'app,
+//    `prixVinted` ; `audit-places.cjs` compare leurs sorties) ───────────────
+// Vinted le donne en OBJET `{ amount: "49.0", currency_code: "EUR" }` (mesuré
+// sur son dressing du 15 octobre) ; une capture ancienne peut le porter en
+// nombre ou en chaîne. Une autre devise, un montant illisible, nul ou négatif
+// ⇒ `null` : « pas su », jamais un nombre deviné.
+function prixVinted(p) {
+  if (p === undefined || p === null || p === '') return null;
+  let v = p, dev = '';
+  if (typeof p === 'object') { v = p.amount; dev = String(p.currency_code || p.currency || '').toUpperCase(); }
+  if (dev && dev !== 'EUR') return null;
+  const n = typeof v === 'number' ? v : Number(String(v === undefined || v === null ? '' : v).replace(/[\s  €]/g, '').replace(',', '.'));
+  return (Number.isFinite(n) && n > 0) ? Math.round(n * 100) / 100 : null;
+}
 function buildLbcAd(raw, det, num, account) {
   const brand = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
   const base = String(firstDefined(det.title, raw.title)).trim();
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
   const cond = String(firstDefined(det.status, raw.status)).trim();
   const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
-  const price = String(firstDefined(det.price && det.price.amount, raw.price && raw.price.amount, raw.price, det.price)).replace(',', '.');
+  // ⚠️⚠️ 15 OCTOBRE — « UN PRIX AU PIF ». Le prix vient de l'annonce EN LIGNE
+  //    (`raw` : le dressing, la lecture la plus récente — celle qui décide
+  //    qu'elle est en ligne), relue au clic « Publier ». Avant, le DÉTAIL
+  //    (`det`, capturé une fois, parfois des semaines plus tôt) passait devant :
+  //    une baisse de prix faite depuis sur Vinted repartait à l'ancien prix, et
+  //    l'app (qui lit le dressing) en montrait un autre (§11). Le détail ne sert
+  //    plus qu'en repli, quand le dressing n'en porte aucun. Inconnu ⇒ `null`,
+  //    et la page de dépôt laisse le champ vide et le DIT.
+  const price = prixVinted(raw.price) !== null ? prixVinted(raw.price) : prixVinted(det.price);
   const desc0 = lbcDescription(firstDefined(det.description, ''));
   // Photos HD
   let photos = [];
@@ -7671,8 +7536,26 @@ async function buildEbayData() {
   return { queue, retirees, vendues, aConfirmer, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LE LIEU D'UNE ANNONCE LEBONCOIN = CE QUE LE VENDEUR A REMPLI DANS VRM
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 15 octobre : « pour la localisation il doit mettre ce que le vendeur a
+// rempli dans VRM ». MESURÉ sur sa base le jour même : la seule localisation
+// remplie est `vrm_ville` (« Vannes », ligne `main`, synchronisée) ; l'entité
+// des factures (`vrm_pro_facture`) a ville, code postal et adresse VIDES.
+// ⇒ UNE source, un propriétaire (§11) : `vrm_ville`, qu'il tape dans VRM →
+//   Réglages → « Ta ville ». L'entité de facturation n'est PAS un repli : c'est
+//   l'adresse qui facture, pas forcément celle où est la paire.
+// Rend `{ lieu, lieuEtat }` : `ok` (une valeur) · `vide` (rien de rempli : on ne
+// devine rien, le bandeau dit où le remplir) · `pasSu` (la base n'a pas répondu).
+function lieuVendeur(main) {
+  if (!main) return { lieu: '', lieuEtat: 'pasSu' };
+  const v = String(main.vrm_ville || '').replace(/\s+/g, ' ').trim();
+  return v ? { lieu: v.slice(0, 80), lieuEtat: 'ok' } : { lieu: '', lieuEtat: 'vide' };
+}
 async function buildLbcData() {
-  const main = (await lireMain(MAIN_FILE)) || {};
+  const mainLu = await lireMain(MAIN_FILE);
+  const main = mainLu || {};
   const numeros = main.vinted_annonce_numeros || {};
   const lost = main.vinted_pairs_lost || {};
   const liens = main.vrm_lbc_liens || {};
@@ -7843,7 +7726,8 @@ async function buildLbcData() {
     let hit = null;
     for (const k of vintedKeys(o, num)) { if (lbcByRef.has(k)) { hit = lbcByRef.get(k); break; } }
     if (hit) { autoMatched.set(o.id, hit); continue; }
-    queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
+    // Le LIEU du dépôt : ce que le vendeur a rempli dans VRM (`lieuVendeur`).
+    queue.push(Object.assign(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]), lieuVendeur(mainLu)));
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   // À RETIRER de Leboncoin : une paire publiée sur LBC qui n'est PLUS en ligne
@@ -8328,6 +8212,13 @@ function extraireVentesLbc(url, body) {
       prixListe: (t.item && t.item.price != null) ? t.item.price : (t.price != null ? t.price : null),
       dateVente: dateVenteLbc(t),
       stepStatus: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
+      // ⚠️ (15 octobre) LA PHOTO EST DANS LA LISTE AUSSI : mesuré dans
+      //    `lbc_recon.schemas`, la liste v3 porte `[].item.thumbnail_url`. Elle
+      //    était jetée : seul le DÉTAIL (ouvert transaction par transaction)
+      //    donnait une image — 1 transaction sur 16 en avait une. La même
+      //    lecture que le détail (`imageDeVente`) ; rien trouvé ⇒ '' (un vide
+      //    n'écrase jamais une image connue, `rangerLbcVentes`).
+      image: imageDeVente(t),
     }).filter((x) => x && x.txId);
   }
   // Détail : une transaction (v2 API, ou page Next enveloppée).

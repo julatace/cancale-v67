@@ -1,0 +1,1425 @@
+From b39ea8c8a2a342594796e435760456150a0c0b67 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:39:52 +0000
+Subject: [PATCH] =?UTF-8?q?Retour=20en=20litige=20arriv=C3=A9=20au=20point?=
+ =?UTF-8?q?=20relais=20:=20plus=20de=20=C2=AB=20Imprimer=20le=20bordereau?=
+ =?UTF-8?q?=20=C2=BB,=20le=20retour=20dans=20=C2=AB=20colis=20=C3=A0=20ret?=
+ =?UTF-8?q?irer=20=C2=BB=20(3=20commits=20de=20p1-retours,=20construits=20?=
+ =?UTF-8?q?NON=20relus,=20r=C3=A9solus=20sur=20la=20branche=20int=C3=A9gr?=
+ =?UTF-8?q?=C3=A9e=20le=2016=20octobre)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Les 3 relectures adverses (règle, écrans, extension) n'ont jamais eu lieu : à faire avant la mise en production.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ CLAUDE.md                           |  57 +++++
+ api/widget.js                       |   8 +-
+ scripts/audit-preuve-vente.cjs      |  10 +-
+ scripts/audit-retours-vente.cjs     | 221 ++++++++++++++++++++
+ scripts/audit-statuts.cjs           |  79 ++++---
+ scripts/bancs/retours-vente.cjs     | 256 +++++++++++++++++++++++
+ src/App.jsx                         | 314 +++++++++++++++++++++++++---
+ vinted-sync-extension/background.js |  95 ++++++++-
+ 8 files changed, 978 insertions(+), 62 deletions(-)
+ create mode 100644 scripts/audit-retours-vente.cjs
+ create mode 100644 scripts/bancs/retours-vente.cjs
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index c57d923..7efae61 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -10558,6 +10558,63 @@ seule) : aucune facture émise chez personne (`vinted_invoices` absente),
+   facturée), versement libératoire oui/non, coordonnées. Sans ça, aucune facture
+   ne s'émet — ni dans l'app, ni pour une vente Pro.
+ 
++### ⚠️⚠️ LE COLIS DE RETOUR D'UNE VENTE N'EST PAS UN COLIS À POSTER (15 octobre, p1-retours)
++Julien : « une vente sur laquelle j'ai eu un litige me propose d'imprimer le
++bordereau, ça ne sert à rien, il est arrivé en point relais ». **Mesuré**
++(tx 22592792923) : la LISTE dit « colis déposé… point relais » avec
++`needs_action` — c'est le colis de RETOUR, arrivé au relais POUR LUI (détail
++440 « Retour initié »). Le même texte avec `waiting` (témoin 23052006117) est
++une vraie vente en route : sur la liste, seul le couple distingue. Sur 1 515
++lignes, la règle ne change QUE celle-là.
++- **La règle, les trois lecteurs (§11)** : `needs_action` ne vaut « à poster »
++  que si le colis n'est pas déjà parti (`DEJA_PARTI`, la MÊME expression dans
++  `aExpedier` app, `A_EXPEDIER` extension, `aExpedier` widget) ; et une vente
++  dont le DÉTAIL connu dit 440 (`_retour`, posé par `marquerRetours` depuis
++  `lireRetoursVente`, lecture `meta->>status=eq.440` en scalaires) n'est JAMAIS
++  à expédier — un retour ne se défait pas, un détail plus ancien que la liste
++  ne trompe donc pas. **« Pas su » (détail illisible) ne cache aucune vraie
++  vente** : la règle de la liste reste seule. Suivent tout seuls : bouton
++  bordereau (Ventes, Colis), Tout générer, le bandeau « Tamponner en 1 clic »
++  (il revenait à la vraie vente), Ma journée, la cloche, le widget,
++  ship-reminders, et côté extension la recherche/génération de bordereaux —
++  plus aucune requête de bordereau pour un retour.
++- **Le retour devient un COLIS À RETIRER** (`retourAuRelais`, §11) : même liste
++  (`pickupUnion.retours`), même publication `vrm_colis_retirer` (+ `retours`),
++  même nombre sur Achats, Ma journée, tableau de bord. Bloc « Retour de ta
++  vente » : la paire (N°, titre, photo), le compte, le lieu lu dans la
++  conversation, et LE geste — retirer puis « Bien reçu » sur Vinted. **VRM ne
++  confirme JAMAIS la réception** (§3). Étiquette « Retour au relais » ; la
++  vente suspendue ne s'affiche plus « Remboursée ».
++- **Extension (pas de bump ici — à monter à l'intégration)** :
++  `retraitDeConversation` accepte le côté VENDEUR uniquement quand la
++  transaction est en 440 (mesuré : le lieu y est, AUCUN code — on n'en promet
++  pas, entrée `retour:true` sous le n° de transaction de la vente, voie
++  passive mesurée à 6 min) ; pas d'appel actif par l'UUID de conversation de la
++  liste (forme d'URL jamais mesurée). `renvoiDeConversation` relève LA DATE de
++  « Retourne la commande d'ici le … » (achat en litige, `renvoiLimite`, jamais
++  le corps) : l'app l'affiche sur « à renvoyer » (Achats + Ma journée, rouge si
++  dépassée — passé le délai, le paiement part au vendeur). Aucune entrée
++  d'`EXT_CAPACITES` : l'app ne promet rien — elle affiche ce qui est capté.
++- **Colis à retirer, au passage** : Ma journée charge les e-mails de suivi
++  (`journee` manquait à l'effet → « Retirer 2 » contre « 6 » sur Achats au même
++  instant) ; un comptoir dont la conversation est LUE SANS code ne dit plus
++  « Voir mon code de retrait » — il dit la vérité (ligne visible du groupe,
++  bouton « Ouvrir la conversation »).
++- Preuves : `audit-retours-vente.cjs` (les 3 règles + parseurs dans un vm) —
++  **14 rouges sur p1-achats** (remesurés le 16 octobre depuis la copie
++  `git archive`, §6.1), 0 après, **6 rouges** en `--prouve`
++  (réaffaibli) ; `audit-statuts.cjs` porte le cas mesuré (attendu EXPLICITE par
++  cas) — **4 rouges sur p1-achats** ; banc `bancs/retours-vente.cjs` (port
++  6110, données inventées, 390/1512 px + un passage sombre) — **60 rouges sur
++  le build de p1-achats**, 0 après, **9** et **39 rouges** sous deux mutations.
++  ⚠️ La mutation « needs_action ⇒ toujours à poster » SEULE reste verte : le
++  détail 440 la rattrape — c'est la défense en profondeur, les deux couches se
++  réaffaiblissent ensemble pour la prouver.
++- ⚠️ **Non fait, à savoir** : fusionner les blocs e-mail/conversation d'un même
++  commerce (Kusmi Tea ×2) et « une relance n'est pas une arrivée » (MESURE 2,
++  priorité moyenne) ; le widget ne lit pas le détail 440 (la règle de liste
++  suffit au cas mesuré, et le résumé posé par l'extension est corrigé).
++
+ ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
+ Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
+ ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
+diff --git a/api/widget.js b/api/widget.js
+index 32ad106..1ac4f35 100644
+--- a/api/widget.js
++++ b/api/widget.js
+@@ -203,12 +203,18 @@ function besoinBordereauTexte(status) {
+   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false;
+   return true;
+ }
++// ⚠️ LE COLIS DE RETOUR N'EST PAS UN COLIS À POSTER (15 octobre). Mesuré (tx
++// 22592792923) : la liste dit « colis déposé en bureau de Poste ou point
++// relais » avec `needs_action` — c'est le colis de RETOUR, arrivé au relais
++// pour LUI. Le widget comptait 6 colis à expédier pour 5 réels. MÊME
++// EXPRESSION que `DEJA_PARTI` (src/App.jsx) et l'extension (§11).
++const DEJA_PARTI = /colis\s+d[ée]pos[ée]|livraison\s+n.a\s+pas\s+encore\s+eu\s+lieu|livr[ée]e?(?![a-zà-ÿ])|achemin|exp[ée]di[ée]e?(?![a-zà-ÿ])|non\s+r[ée]clam/i;
+ export function aExpedier(o) {
+   if (!o) return false;
+   const s = String(o.status || '');
+   if (PAS_UN_ENVOI.test(s)) return false;
+   const t = String(o.transaction_user_status || '').toLowerCase();
+-  if (t === 'needs_action') return true;
++  if (t === 'needs_action') return awaitingShip(s) || !DEJA_PARTI.test(s);
+   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+   return besoinBordereauTexte(s);
+ }
+diff --git a/scripts/audit-preuve-vente.cjs b/scripts/audit-preuve-vente.cjs
+index 65f3be3..7b290d9 100644
+--- a/scripts/audit-preuve-vente.cjs
++++ b/scripts/audit-preuve-vente.cjs
+@@ -307,8 +307,14 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
+       });
+       return out;
+     };
+-    const fa = fautes(APP, ['lirePreuvesVenteVinted']), fe = fautes(EXT, ['lireVentesProuvees', 'capterPreuvesVente']);
+-    dit(!fa.length, 'dans l\'app, seul `lirePreuvesVenteVinted` lit l\'état des transactions pour dire « vendue »', fa.join(' · '));
++    // ⚠️ (15 octobre) `lireRetoursVente` lit la MÊME famille, mais pour dire
++    //    « RETOUR » (statut 440), jamais « vendue » : elle est permise, et on
++    //    vérifie qu'elle reste bornée au 440 — sinon elle deviendrait une
++    //    seconde règle de preuve, exactement ce que ce contrôle interdit.
++    const fa = fautes(APP, ['lirePreuvesVenteVinted', 'lireRetoursVente']), fe = fautes(EXT, ['lireVentesProuvees', 'capterPreuvesVente']);
++    dit(!fa.length, 'dans l\'app, seuls `lirePreuvesVenteVinted` (vendue) et `lireRetoursVente` (retour, 440) lisent l\'état des transactions', fa.join(' · '));
++    { const i = APP.indexOf('const lireRetoursVente'); const corps = i >= 0 ? APP.slice(i, APP.indexOf('\n};', i)) : '';
++      dit(i < 0 || (/status=eq\.440/.test(corps) && /=== '440'/.test(corps)), '`lireRetoursVente` ne lit QUE les transactions en retour (filtre 440, revérifié ligne à ligne) — jamais une preuve de vente', i < 0 ? 'absente' : 'filtre 440 introuvable'); }
+     dit(!fe.length, 'dans l\'extension, seuls `lireVentesProuvees` et `capterPreuvesVente` le lisent', fe.join(' · '));
+   });
+ 
+diff --git a/scripts/audit-retours-vente.cjs b/scripts/audit-retours-vente.cjs
+new file mode 100644
+index 0000000..5915fa9
+--- /dev/null
++++ b/scripts/audit-retours-vente.cjs
+@@ -0,0 +1,221 @@
++// ⚠️⚠️ CONTRÔLE PERMANENT — LE COLIS DE RETOUR D'UNE VENTE N'EST PAS UN COLIS À POSTER.
++//
++// Plainte de Julien (15 octobre) : « il y a une vente sur laquelle j'ai eu un
++// litige et ça me propose d'imprimer le bordereau, cela ne sert à rien car il
++// est arrivé en point relais ». MESURÉ (lecture seule, base de production) :
++//   · tx 22592792923 (tomj606) — la LISTE dit « La livraison n'a pas encore eu
++//     lieu - colis déposé en bureau de Poste ou point relais » avec
++//     `needs_action` ; le DÉTAIL dit 440 « Retour initié », expédition 310.
++//   · le TÉMOIN 23052006117 (angeled92) — MÊME texte, mais `waiting` et un
++//     détail 230 : c'est le colis de l'acheteur, une vraie vente en route.
++//   · la CONVERSATION du retour (25325126937, côté vendeur, transaction 440) :
++//     « Ton colis est arrivé ! Rends-toi au point relais Consigne Pickup
++//     Super U Cancale, RUE DE LA BRETONNIERE, 35260 CANCALE pour le
++//     récupérer. » — AUCUN code, AUCUN QR.
++//   · l'achat en litige (conv 25211546616) : « Retourne la commande d'ici le
++//     14 oct. … Sinon, tu devras garder l'article et ton paiement sera
++//     transféré au vendeur. »
++//
++// Ce contrôle EXÉCUTE les vraies règles (extraites par Babel, jamais
++// recopiées) : `aExpedier` (src/App.jsx), `A_EXPEDIER` (background.js),
++// `aExpedier` (api/widget.js), `retourAuRelais`, `venteStage`, et côté
++// extension `retraitDeConversation` / `renvoiDeConversation`.
++// `--prouve` RÉAFFAIBLIT les règles (needs_action ⇒ toujours à expédier, côté
++// vendeur jamais lu) : les contrôles doivent repasser au ROUGE — « la fonction
++// n'existait pas avant » n'est pas une preuve (§6.1).
++// Aucune donnée réelle : des libellés SYSTÈME de Vinted, aucun acheteur.
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const R = path.join(__dirname, '..');
++const PROUVE = process.argv.includes('--prouve');
++let ko = 0;
++const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}${d ? ' — ' + d : ''}`); };
++const essaie = (m, f) => { try { f(); } catch (e) { dit(false, m, String(e && e.message || e).slice(0, 200)); } };
++
++let parser;
++try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
++catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); process.exit(1); }
++
++// Les RÉAFFAIBLISSEMENTS de `--prouve` : la règle d'avant le 15 octobre
++// (needs_action ⇒ toujours à expédier) et le côté vendeur jamais lu.
++const MUTS = {
++  'src/App.jsx': [
++    [/if \(t === 'needs_action'\) return isAwaitingShipStatus\(s\) \|\| !DEJA_PARTI\.test\(s\);/, "if (t === 'needs_action') return true;"],
++    [/if \(estRetourVente\(o\)\) return false;/, ''],
++  ],
++  'vinted-sync-extension/background.js': [
++    [/if \(t === 'needs_action'\) return AWAITING_SHIP\(s\) \|\| !DEJA_PARTI\.test\(s\);/, "if (t === 'needs_action') return true;"],
++    [/const retourVendeur = String\(t\.current_user_side \|\| ''\) === 'seller' && Number\(t\.status\) === 440;/, "const retourVendeur = false;"],
++  ],
++  'api/widget.js': [
++    [/if \(t === 'needs_action'\) return awaitingShip\(s\) \|\| !DEJA_PARTI\.test\(s\);/, "if (t === 'needs_action') return true;"],
++  ],
++};
++
++function sources(fichier, noms, opts) {
++  let src = fs.readFileSync(path.join(R, fichier), 'utf8');
++  if (PROUVE && MUTS[fichier]) for (const [re, rep] of MUTS[fichier]) src = src.replace(re, rep);
++  const ast = parser.parse(src, Object.assign({ sourceType: 'module', plugins: ['jsx'], errorRecovery: true }, opts || {}));
++  const trouve = {};
++  const visite = (n) => {
++    if (!n || typeof n !== 'object') return;
++    if (Array.isArray(n)) { n.forEach(visite); return; }
++    if (n.type === 'VariableDeclaration') {
++      for (const d of n.declarations) {
++        const nom = d.id && d.id.name;
++        if (nom && noms.includes(nom) && !trouve[nom]) trouve[nom] = 'const ' + src.slice(d.start, d.end) + ';';
++      }
++    }
++    if (n.type === 'FunctionDeclaration' && n.id && noms.includes(n.id.name) && !trouve[n.id.name]) trouve[n.id.name] = src.slice(n.start, n.end);
++    for (const k of Object.keys(n)) { if (k === 'loc' || k === 'start' || k === 'end') continue; const v = n[k]; if (v && typeof v === 'object') visite(v); }
++  };
++  visite(ast.program);
++  return trouve;
++}
++function charge(fichier, noms, base, opts) {
++  const t = sources(fichier, noms, opts);
++  const ctx = Object.assign({}, base || {});
++  vm.createContext(ctx);
++  for (const nom of noms) {
++    if (!t[nom]) continue;
++    try { vm.runInContext(t[nom].replace(/^export\s+/, '') + `\nthis.${nom} = ${nom};`, ctx); } catch (_) { /* dépendance absente : le contrôle le dira */ }
++  }
++  return ctx;
++}
++
++const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
++const app = charge('src/App.jsx', ['classifyOrderStatus', 'isAtRelayStatus', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'DEJA_PARTI', 'VENTE_TERMINEE', 'estRetourVente', 'venteQuiRevient', 'aExpedier', 'retourAuRelais', 'marquerRetours']);
++const appComp = charge('src/App.jsx', ['venteStage', 'saleOutcome'], Object.assign({}, app, {
++  C, INV_STATUS: { online: { color: '#f' } },
++  venteExpediee: () => false, isShipDone: () => false,
++}));
++const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'DEJA_PARTI', 'besoinBordereauTexte', 'A_EXPEDIER', 'sansBalises', 'CODE_APRES', 'CONV_SORTANT', 'CONV_ARRIVE', 'retraitDeConversation', 'MOIS_FR', 'renvoiDeConversation'], {}, { sourceType: 'script', plugins: [] });
++const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'DEJA_PARTI', 'besoinBordereauTexte', 'aExpedier'], {});
++
++// Les trois lecteurs ; sur un code qui n'a pas la règle unique, on mesure ce
++// que l'écran faisait vraiment (comme audit-statuts).
++const appA = (o) => app.aExpedier ? app.aExpedier(o) : app.needsBordereau(o.status);
++const extA = (o) => ext.A_EXPEDIER ? ext.A_EXPEDIER(o) : ext.AWAITING_SHIP(o.status);
++const widA = (o) => wid.aExpedier ? wid.aExpedier(o) : wid.awaitingShip(o.status);
++
++// ── LE CORPUS (libellés SYSTÈME mesurés) ─────────────────────────────────────
++const T_RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
++const RETOUR = { transaction_id: '22592792923', status: T_RELAIS, transaction_user_status: 'needs_action' };           // le cas de Julien
++const TEMOIN = { transaction_id: '23052006117', status: T_RELAIS, transaction_user_status: 'waiting' };                // vraie vente en route
++const A_POSTER = { transaction_id: '23220410615', status: 'Le paiement a été validé', transaction_user_status: 'needs_action' }; // vraie vente à poster
++
++essaie('(0) les règles se chargent', () => {
++  dit(typeof app.aExpedier === 'function' && typeof ext.A_EXPEDIER === 'function' && typeof wid.aExpedier === 'function', 'aExpedier (app), A_EXPEDIER (extension) et aExpedier (widget) sont lues dans leurs fichiers');
++  dit(typeof app.retourAuRelais === 'function', 'retourAuRelais (app) est lue', typeof app.retourAuRelais);
++  dit(String(app.DEJA_PARTI) === String(ext.DEJA_PARTI) && String(ext.DEJA_PARTI) === String(wid.DEJA_PARTI), 'DEJA_PARTI est la MÊME expression dans l\'app, l\'extension et le widget (§11)', `${app.DEJA_PARTI} · ${ext.DEJA_PARTI} · ${wid.DEJA_PARTI}`);
++});
++
++// (1) Le cas mesuré : le retour au relais n'est À EXPÉDIER nulle part.
++essaie('(1) le retour au relais', () => {
++  const r = { app: appA(RETOUR), ext: extA(RETOUR), widget: widA(RETOUR) };
++  dit(!r.app && !r.ext && !r.widget, 'tx 22592792923 (needs_action + « colis déposé… ») n\'est à expédier NI dans l\'app, NI dans l\'extension, NI dans le widget', JSON.stringify(r));
++  dit(app.retourAuRelais(RETOUR) === true, '… et c\'est un COLIS À RETIRER (`retourAuRelais` = true)', String(app.retourAuRelais(RETOUR)));
++});
++
++// (2) Les deux sens : le témoin et la vraie vente à poster ne bougent pas.
++essaie('(2) les deux sens', () => {
++  const t = { app: appA(TEMOIN), ext: extA(TEMOIN), widget: widA(TEMOIN) };
++  dit(!t.app && !t.ext && !t.widget, 'le témoin 23052006117 (MÊME texte, waiting) reste « en route », pas à expédier', JSON.stringify(t));
++  dit(app.retourAuRelais(TEMOIN) === false, '… et il n\'est PAS un colis à retirer (c\'est le colis de l\'ACHETEUR)', String(app.retourAuRelais(TEMOIN)));
++  const p = { app: appA(A_POSTER), ext: extA(A_POSTER), widget: widA(A_POSTER) };
++  dit(p.app && p.ext && p.widget, 'la vraie vente à poster (needs_action + « paiement validé ») reste à expédier PARTOUT — « pas su » ne cache pas une vente', JSON.stringify(p));
++  dit(app.retourAuRelais(A_POSTER) === false, '… et elle n\'est pas « à retirer »', String(app.retourAuRelais(A_POSTER)));
++  // Les textes needs_action qui attendent VRAIMENT l'envoi restent à poster.
++  for (const s of ['Bordereau envoyé au vendeur', "Bordereau d'envoi commandé", '']) {
++    const o = { status: s, transaction_user_status: 'needs_action' };
++    dit(appA(o) && extA(o) && widA(o), `needs_action + « ${s || '(statut vide — pas su)'} » reste à expédier partout`, JSON.stringify([appA(o), extA(o), widA(o)]));
++  }
++});
++
++// (3) Le DÉTAIL de transaction (440) gagne, et seulement quand il est CONNU.
++essaie('(3) le détail 440', () => {
++  const avecDetail = { status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', _retour: { ship: 'Bordereau envoyé au vendeur' } };
++  dit(appA(avecDetail) === false, 'une vente dont le détail dit « retour » (440, `_retour`) n\'est JAMAIS à expédier, même sur « Bordereau envoyé au vendeur »', String(appA(avecDetail)));
++  dit(appA({ status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' }) === true, '… mais « pas su » (pas de `_retour`) ne fait pas disparaître la vraie vente', 'true attendu');
++  // `marquerRetours` pose `_retour` par IDENTITÉ (n° de transaction), jamais ailleurs.
++  const items = [{ transaction_id: 111, status: 'Retour initié' }, { transaction_id: 222, status: 'Le paiement a été validé', transaction_user_status: 'needs_action' }];
++  const m = app.marquerRetours(items, { '111': { ship: T_RELAIS, at: '2026-10-15' } });
++  dit(!!(m[0]._retour) && !m[1]._retour, '`marquerRetours` marque par n° de transaction, et ne touche pas les autres ventes', JSON.stringify(m.map(o => !!o._retour)));
++  dit(app.retourAuRelais(m[0]) === true, 'détail 440 + expédition « déposé… relais » ⇒ colis à retirer, même quand la liste dit encore « Retour initié »', String(app.retourAuRelais(m[0])));
++  dit(app.retourAuRelais({ status: 'Retour initié' }) === false, 'un « Retour initié » SANS détail au relais n\'est pas encore à retirer (le colis n\'est pas arrivé)', '');
++  dit(app.retourAuRelais({ status: 'Remboursement effectué', _retour: { ship: T_RELAIS } }) === false, 'une vente FINIE (remboursée) n\'attend plus rien au relais', '');
++  dit(app.venteQuiRevient(m[0]) === true, 'la paire « qui te revient » compte aussi le retour vu par le détail', '');
++});
++
++// (4) L'étiquette et l'issue suivent : « Retour au relais », jamais « À expédier ».
++essaie('(4) étiquette et issue', () => {
++  if (typeof appComp.venteStage !== 'function') { dit(false, 'venteStage introuvable'); return; }
++  const st = appComp.venteStage(RETOUR);
++  dit(st.label === 'Retour au relais' && st.retourRelais === true, 'la carte de la vente dit « Retour au relais » (le geste : retirer puis confirmer), jamais « À expédier »', JSON.stringify(st));
++  dit(/retirer|point relais/i.test(String(st.aide || '')) && /confirme/i.test(String(st.aide || '')), '… et son aide dit LE geste : retirer, puis confirmer la réception sur Vinted', String(st.aide || ''));
++  if (typeof appComp.saleOutcome === 'function') {
++    dit(appComp.saleOutcome(RETOUR) === 'retour', 'la paire entre dans « paires qui te reviennent » (saleOutcome = retour)', String(appComp.saleOutcome(RETOUR)));
++  } else dit(false, 'saleOutcome introuvable');
++});
++
++// (5) L'extension lit le LIEU du retour dans la conversation côté VENDEUR —
++//     uniquement sur le statut machine 440, jamais sur le texte seul.
++const CONV_RETOUR = {
++  conversation: {
++    id: 25325126937,
++    transaction: { id: 22592792923, item_id: 777, item_title: 'nike air max 1 blanc noir et rouge taille 42', current_user_side: 'seller', status: 440 },
++    messages: [{ entity_type: 'action_message', entity: {
++      title: 'Ton colis est arrivé !',
++      subtitle: 'Rends-toi au point relais Consigne Pickup Super U Cancale, RUE DE LA BRETONNIERE, 35260 CANCALE pour le récupérer.',
++      actions: [{ action: 'track_shipment' }, { action: 'mark_as_delivered' }],
++    } }],
++  },
++};
++essaie('(5) la conversation du retour (côté vendeur, 440)', () => {
++  if (typeof ext.retraitDeConversation !== 'function') { dit(false, 'retraitDeConversation introuvable'); return; }
++  const r = ext.retraitDeConversation(CONV_RETOUR);
++  dit(!!r && /Consigne Pickup Super U Cancale/i.test(String(r.lieu || '')), 'le LIEU du retour est lu dans la conversation côté vendeur (transaction 440)', JSON.stringify(r && { lieu: r.lieu, code: r.code }));
++  dit(!!r && r.retour === true && String(r.tx) === '22592792923', '… l\'entrée est marquée `retour` et rangée sous le n° de transaction de la VENTE', JSON.stringify(r && { retour: r.retour, tx: r.tx }));
++  dit(!!r && !r.code, '… et AUCUN code n\'est inventé (le message n\'en porte pas, mesuré)', JSON.stringify(r && r.code));
++  // Côté vendeur SANS 440 : « la commande est arrivée » = l'acheteur l'a reçue.
++  const normal = JSON.parse(JSON.stringify(CONV_RETOUR)); normal.conversation.transaction.status = 230;
++  dit(ext.retraitDeConversation(normal) === null, 'côté vendeur SANS retour (statut 230), rien n\'est pris : « arrivé » = chez l\'acheteur', '');
++  // Côté acheteur : comportement INCHANGÉ (le code Vinted Go se lit toujours).
++  const achat = { conversation: { id: 1, transaction: { id: 9, current_user_side: 'buyer', status: 230 }, messages: [{ entity_type: 'action_message', entity: { title: 'Ton colis est arrivé !', subtitle: "Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes. Scanne ton code de retrait ou saisis le code C65735 pour le récupérer." } }] } };
++  const ra = ext.retraitDeConversation(achat);
++  dit(!!ra && ra.code === 'C65735' && !ra.retour, 'côté acheteur, rien ne change : le code Vinted Go est toujours lu, sans marque `retour`', JSON.stringify(ra && { code: ra.code, retour: ra.retour }));
++});
++
++// (6) La date limite du renvoi (achat en litige) — la date SEULE, jamais le corps.
++essaie('(6) la date limite du renvoi', () => {
++  if (typeof ext.renvoiDeConversation !== 'function') { dit(false, 'renvoiDeConversation introuvable (code d\'avant)'); return; }
++  const conv = { conversation: { id: 25211546616, transaction: { id: 22454289425, current_user_side: 'buyer', status: 430 }, messages: [{ entity_type: 'action_message', created_at: '2026-10-07T10:00:00Z', entity: {
++    title: 'Retourne la commande d’ici le 14 oct.',
++    subtitle: "Si le vendeur ne reçoit pas la commande d'ici le 28 oct., nous te rembourserons. Sinon, tu devras garder l'article et ton paiement sera transféré au vendeur.",
++  } }] } };
++  const r = ext.renvoiDeConversation(conv);
++  dit(!!r && String(r.renvoiLimite).slice(0, 10) === '2026-10-14', 'la date que Vinted écrit (« d\'ici le 14 oct. ») est relevée, rattachée au n° de transaction', JSON.stringify(r));
++  dit(!!r && Object.keys(r).sort().join(',') === 'renvoiLimite,tx', '… et RIEN d\'autre ne sort du message (jamais le corps)', r && Object.keys(r).join(','));
++  // Décembre → janvier : l'année du message ne ment pas.
++  const dec = JSON.parse(JSON.stringify(conv));
++  dec.conversation.messages[0].created_at = '2026-12-28T10:00:00Z';
++  dec.conversation.messages[0].entity.title = 'Retourne la commande d’ici le 3 janvier';
++  const rd = ext.renvoiDeConversation(dec);
++  dit(!!rd && String(rd.renvoiLimite).slice(0, 10) === '2027-01-03', 'une limite en janvier d\'un message de décembre tombe l\'année SUIVANTE', JSON.stringify(rd && rd.renvoiLimite));
++  // Un message d'arrivée n'est pas une limite de renvoi ; côté vendeur non plus.
++  dit(ext.renvoiDeConversation(CONV_RETOUR) === null, 'le message d\'arrivée du retour (côté vendeur) ne fabrique aucune date de renvoi', '');
++  const illisible = JSON.parse(JSON.stringify(conv)); illisible.conversation.messages[0].entity.title = 'Retourne la commande d’ici le 45 brumaire';
++  dit(ext.renvoiDeConversation(illisible) === null, 'une date illisible ne donne RIEN (mieux vaut un blanc qu\'un faux)', '');
++});
++
++// (7) Le résumé posé pour le widget (extension) exclut le retour.
++essaie('(7) le résumé du widget', () => {
++  const src = fs.readFileSync(path.join(R, 'vinted-sync-extension/background.js'), 'utf8');
++  const extR = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'DEJA_PARTI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
++  if (typeof extR.resumeCommandes !== 'function') { dit(false, 'resumeCommandes introuvable'); return; }
++  const r = extR.resumeCommandes('orders_sold', { my_orders: [RETOUR, A_POSTER] });
++  dit(!!r && JSON.stringify(r.txns) === JSON.stringify(['23220410615']), 'le résumé « à expédier » posé pour le widget ne compte plus le retour (6 colis pour 5 réels, mesuré)', JSON.stringify(r && r.txns));
++  dit(/recupererLabelInsiste|label/.test(src), '(repère) la recherche de bordereaux de l\'extension passe par A_EXPEDIER — plus aucune requête de bordereau pour un retour', '');
++});
++
++console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'}${PROUVE ? ' (règles réaffaiblies — le rouge est attendu)' : ''}`);
++process.exit(ko ? 1 : 0);
+diff --git a/scripts/audit-statuts.cjs b/scripts/audit-statuts.cjs
+index 5644128..c5ead5a 100644
+--- a/scripts/audit-statuts.cjs
++++ b/scripts/audit-statuts.cjs
+@@ -58,28 +58,42 @@ function charge(fichier, noms, base, opts) {
+   return ctx;
+ }
+ 
+-// ── LE CORPUS MESURÉ (libellés exacts, 4 octobre) ─────────────────────────────
+-// Ventes (`harvest_*_orders_sold`) : (transaction_user_status, status) → n.
++// ── LE CORPUS MESURÉ (libellés exacts, 4 octobre, complété le 15) ─────────────
++// Ventes (`harvest_*_orders_sold`) : (transaction_user_status, status, attendu).
++// ⚠️ (15 octobre) `needs_action` ne vaut PLUS toujours « à expédier » : mesuré
++// (tx 22592792923), le colis de RETOUR d'une vente arrive au relais avec
++// `needs_action` et un texte « colis déposé… » — Vinted attend que le VENDEUR
++// le retire, pas qu'il poste quoi que ce soit. L'attendu est donc EXPLICITE
++// par cas, plus déduit du champ machine seul.
+ const VENTES = [
+-  ['completed', "Commande finalisée - l'acheteur a validé la commande"],
+-  ['failed', 'Remboursement effectué'],
+-  ['needs_action', 'Bordereau envoyé au vendeur'],
+-  ['needs_action', "Bordereau d'envoi commandé"],
+-  ['needs_action', 'Le paiement a été validé'],
+-  ['waiting', "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais"],
+-  ['waiting', "Commande expédiée et en cours d'acheminement ! "],
+-  ['waiting', 'Retour initié'],
+-  ['waiting', "Commande non réclamée - Retournée à l'expéditeur.rice"],
++  ['completed', "Commande finalisée - l'acheteur a validé la commande", false],
++  ['failed', 'Remboursement effectué', false],
++  ['needs_action', 'Bordereau envoyé au vendeur', true],
++  ['needs_action', "Bordereau d'envoi commandé", true],
++  ['needs_action', 'Le paiement a été validé', true],
++  ['waiting', "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", false],
++  ['waiting', "Commande expédiée et en cours d'acheminement ! ", false],
++  ['waiting', 'Retour initié', false],
++  ['waiting', "Commande non réclamée - Retournée à l'expéditeur.rice", false],
+   // Vus ailleurs : l'ancienne tournure du 1er septembre, et le statut 220 des
+   // détails de transaction (le champ machine y vaudrait `failed`).
+-  ['needs_action', "Commande du bordereau d'envoi validée"],
+-  ['failed', 'Le paiement a échoué'],
++  ['needs_action', "Commande du bordereau d'envoi validée", true],
++  ['failed', 'Le paiement a échoué', false],
++  // ⚠️ LE CAS MESURÉ DU 15 OCTOBRE (la plainte de Julien) : le colis de RETOUR
++  //    arrivé au relais — même texte qu'une vraie vente en route (ligne
++  //    `waiting` ci-dessus, le témoin 23052006117), mais `needs_action`.
++  //    JAMAIS à expédier : il n'y a rien à poster, il y a un colis à RETIRER.
++  ['needs_action', "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", false],
++  ['needs_action', 'Commande livrée !', false],
+ ];
++// Le RETOUR, tel que le détail de transaction le dit (440) : marqué `_retour`
++// par l'app (`marquerRetours`). Jamais à expédier, quel que soit le texte.
++const VENTE_RETOUR_DETAIL = { status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', _retour: { ship: 'Bordereau envoyé au vendeur' } };
+ // Achats (`harvest_*_orders_purchased`) au relais : `needs_action` = « va retirer ».
+ const ACHAT_RELAIS = { status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action' };
+ 
+ const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
+-const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
++const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'DEJA_PARTI', 'VENTE_TERMINEE', 'estRetourVente', 'venteQuiRevient', 'aExpedier', 'retourAuRelais', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
+ const app = charge('src/App.jsx', APP_NOMS);
+ // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
+ const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {
+@@ -90,8 +104,8 @@ const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhas
+   isShipDone: () => false,
+   shippedSuivis: new Set(), soldByTxn: {},
+ }));
+-const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
+-const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'aExpedier'], {});
++const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'DEJA_PARTI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
++const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'DEJA_PARTI', 'besoinBordereauTexte', 'aExpedier'], {});
+ 
+ // La réponse « à expédier ? » de chacun. Sur le code d'avant, la règle unique
+ // n'existe pas : on mesure alors ce que chaque écran faisait vraiment.
+@@ -104,29 +118,38 @@ essaie('les règles se chargent', () => {
+   dit(typeof app.needsBordereau === 'function' && typeof ext.AWAITING_SHIP === 'function' && typeof wid.awaitingShip === 'function', 'les règles de l\'app, de l\'extension et du widget sont lues dans leurs fichiers');
+ });
+ 
+-// (a) Avec le champ machine : needs_action ⇔ à expédier, partout, et partout pareil.
++// (a) Avec le champ machine : l'attendu MESURÉ, partout, et partout pareil.
+ essaie('(a) champ machine', () => {
+   const faux = [];
+-  for (const [tus, status] of VENTES) {
++  for (const [tus, status, attendu] of VENTES) {
+     const o = { status, transaction_user_status: tus };
+-    const attendu = tus === 'needs_action';
+     const r = { app: appA(o), colis: colisA(o), ext: extA(o), widget: widA(o) };
+-    for (const [qui, v] of Object.entries(r)) if (v !== attendu) faux.push(`${qui} : « ${status.trim()} » → ${v}`);
++    for (const [qui, v] of Object.entries(r)) if (v !== attendu) faux.push(`${qui} : « ${status.trim()} » (${tus}) → ${v}`);
+   }
+-  dit(faux.length === 0, '« à expédier » = les ventes que Vinted marque `needs_action`, dans l\'app, Colis, l\'extension ET le widget', faux.slice(0, 6).join(' · '));  // Une tournure que personne n'a encore vue : c'est le champ machine qui
++  dit(faux.length === 0, '« à expédier » = l\'attendu mesuré de chaque cas (retour au relais compris), dans l\'app, Colis, l\'extension ET le widget', faux.slice(0, 6).join(' · '));  // Une tournure que personne n'a encore vue : c'est le champ machine qui
+   // décide, pas une ressemblance de texte (le défaut de « commandé »).
+   const neufs = [{ status: 'Colis pris en charge par le relais de départ', transaction_user_status: 'waiting', attendu: false },
+     { status: 'Étiquette disponible pour ton envoi', transaction_user_status: 'needs_action', attendu: true }];
+   const fauxNeufs = neufs.filter((o) => [appA(o), colisA(o), extA(o), widA(o)].some((v) => v !== o.attendu)).map((o) => `« ${o.status} » (${o.transaction_user_status}) → ${JSON.stringify([appA(o), colisA(o), extA(o), widA(o)])}`);
+   dit(fauxNeufs.length === 0, 'une tournure jamais vue : c\'est le champ machine qui décide, partout', fauxNeufs.join(' · '));
++  // ⚠️ (15 octobre) Le DÉTAIL de transaction connu dit « retour » (440) ⇒ JAMAIS
++  //    à expédier, même sur un texte qui attend l'envoi (le bordereau du RETOUR,
++  //    pas le sien). « Pas su » (pas de `_retour`) ne cache rien : la même ligne
++  //    sans `_retour` reste à expédier.
++  dit(appA(VENTE_RETOUR_DETAIL) === false, 'le détail 440 connu (`_retour`) gagne : « Bordereau envoyé au vendeur » d\'un RETOUR n\'est pas à expédier', String(appA(VENTE_RETOUR_DETAIL)));
++  const sansDetail = { status: VENTE_RETOUR_DETAIL.status, transaction_user_status: 'needs_action' };
++  dit(appA(sansDetail) === true, '… et « pas su » (détail illisible) ne fait pas disparaître la vraie vente à poster', String(appA(sansDetail)));
+ });
+ 
+ // (a2) Sans le champ (vieille capture) : la même réponse aux trois endroits, et juste sur les libellés connus.
+ essaie('(a2) sans champ machine', () => {
+   const faux = [];
+-  for (const [tus, status] of VENTES) {
++  for (const [tus, status, attendu] of VENTES) {
++    // Sans le champ machine, le cas « retour » du 15 octobre a le même texte que
++    // la ligne `waiting` : l'attendu du TEXTE seul est celui de la ligne waiting
++    // (false) — déjà couvert ; on saute le doublon.
++    if (tus === 'needs_action' && /colis déposé|livrée/i.test(status)) continue;
+     const o = { status };
+-    const attendu = tus === 'needs_action';
+     const r = { app: appA(o), colis: colisA(o), ext: extA(o), widget: widA(o) };
+     for (const [qui, v] of Object.entries(r)) if (v !== attendu) faux.push(`${qui} : « ${status.trim()} » → ${v}`);
+   }
+@@ -160,6 +183,11 @@ essaie('(b) étiquettes des ventes', () => {
+   dit(nr !== 'Remboursée' && nr !== 'Annulée', '« Commande non réclamée - Retournée… » n\'est ni « Remboursée » ni « Annulée » (le remboursement n\'est pas établi)', nr);
+   const echec = lab('Le paiement a échoué', 'failed');
+   dit(echec !== 'À expédier', '« Le paiement a échoué » n\'est pas « À expédier »', echec);
++  // ⚠️ (15 octobre) Le RETOUR au relais : son étiquette dit le vrai geste (le
++  //    retirer), jamais « À expédier » ni « Au relais » (qui se lit « l'acheteur
++  //    va le chercher ») ni « Livrée ».
++  const retourLab = lab("La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", 'needs_action');
++  dit(retourLab === 'Retour au relais', 'le colis de RETOUR au relais (needs_action + « déposé ») s\'affiche « Retour au relais », jamais « À expédier »', retourLab);
+   // Toute vente à expédier selon la règle porte l'étiquette « À expédier ».
+   const desaccords = VENTES.filter(([tus, s]) => appA({ status: s, transaction_user_status: tus }) !== (lab(s, tus) === 'À expédier')).map(([, s]) => s.trim());
+   dit(desaccords.length === 0, 'sur tout le corpus, l\'étiquette « À expédier » ⇔ la règle', desaccords.join(' · '));
+@@ -186,8 +214,9 @@ essaie('(e) Colis', () => {
+ essaie('(f) résumé de l\'extension', () => {
+   const my_orders = VENTES.map(([tus, status], i) => ({ transaction_id: 100 + i, status, transaction_user_status: tus }));
+   const r = ext.resumeCommandes('orders_sold', { my_orders });
+-  const attendu = my_orders.filter((o) => o.transaction_user_status === 'needs_action').map((o) => String(o.transaction_id));
+-  dit(r && JSON.stringify(r.txns) === JSON.stringify(attendu), 'le résumé « à expédier » posé pour le widget = exactement les ventes `needs_action`', JSON.stringify(r && r.txns));
++  // L'attendu MESURÉ du corpus (le retour au relais n'y est pas, 15 octobre).
++  const attendu = VENTES.map(([, , att], i) => (att ? String(100 + i) : null)).filter(Boolean);
++  dit(r && JSON.stringify(r.txns) === JSON.stringify(attendu), 'le résumé « à expédier » posé pour le widget = exactement les ventes à poster (jamais un retour)', JSON.stringify(r && r.txns));
+   const ra = ext.resumeCommandes('orders_purchased', { my_orders: [Object.assign({ transaction_id: 7 }, ACHAT_RELAIS)] });
+   dit(ra && ra.txns.length === 1, 'côté achats, le résumé « à retirer » garde le colis au relais', JSON.stringify(ra && ra.txns));
+ });
+diff --git a/scripts/bancs/retours-vente.cjs b/scripts/bancs/retours-vente.cjs
+new file mode 100644
+index 0000000..5f11d53
+--- /dev/null
++++ b/scripts/bancs/retours-vente.cjs
+@@ -0,0 +1,256 @@
++// ═══════════════════════════════════════════════════════════════════════════
++// BANC : LE RETOUR D'UNE VENTE ARRIVÉ AU POINT RELAIS (15 octobre)
++//        (node scripts/bancs/retours-vente.cjs — après `npm run build`)
++// ═══════════════════════════════════════════════════════════════════════════
++// Plainte de Julien : « il y a une vente sur laquelle j'ai eu un litige et ça
++// me propose d'imprimer le bordereau, cela ne sert à rien car il est arrivé en
++// point relais ». Mesuré (tx 22592792923) : liste `needs_action` + « colis
++// déposé… point relais », détail 440 « Retour initié » — le colis de RETOUR,
++// à retirer PAR LUI. Ce banc rend l'app sur des données INVENTÉES (il vit dans
++// le dépôt, qui est public), aux deux tailles + un passage en SOMBRE :
++//   8101  VENTE, needs_action + « colis déposé… » + détail 440   ⇒ RETOUR
++//   8102  VENTE, needs_action + « Le paiement a été validé »     ⇒ à expédier
++//   8103  VENTE, MÊME texte que 8101 mais `waiting` (le témoin)  ⇒ en route
++//   8201  ACHAT au relais, conversation LUE SANS code (comptoir)
++//   8202  ACHAT en litige à renvoyer, date limite de Vinted DÉPASSÉE
++//   8301  COLIS d'email transporteur, avec son code
++// Il exige :
++//   1. Ventes : 8101 sans bouton bordereau, avec « Retour au relais » et le
++//      lien « Retour — au point relais, à retirer » ; 8102 garde son bouton ;
++//   2. Colis : 8101 n'est plus « à envoyer » (1 colis à envoyer, pas 2) ;
++//   3. Ma journée : « Retirer 3 colis » (email + achat + retour, §11) et la
++//      ligne « Renvoyer 1 paire » dit la date limite dépassée ;
++//   4. la publication `vrm_colis_retirer` porte {total:3, retours:1} ;
++//   5. Achats : le bloc « Retour de ta vente » (N°, compte, lieu, geste,
++//      jamais de code promis), le comptoir lu SANS code ne dit plus « Voir mon
++//      code de retrait », la date limite du renvoi est écrite ;
++//   6. « ✓ J'ai retiré » sort le retour du total (3 → 2), annulable ;
++//   7. aucun débordement, aucune erreur, aucun écran tombé — clair ET sombre.
++// On juge les ATTRIBUTS (`data-retour-relais`, `data-groupe-retrait`,
++// `data-colis-retrait`, `data-bouton-bord`, `data-job`, `data-n`,
++// `data-renvoi-limite`) et les nombres rendus, jamais une formulation.
++const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
++const { metaVersData } = require('./_meta.cjs');
++const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
++const DIST = path.join(__dirname, '..', '..', 'dist');
++const PORT = 6110;
++
++const MAINTENANT = Date.now();
++const H = 3600000, J = 24 * H;
++const ilYa = (ms) => new Date(MAINTENANT - ms).toISOString();
++const T_RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
++
++const ACCOUNTS = [
++  { id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYa(0) },
++  { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: ilYa(0) },
++];
++const VENTES_111 = [
++  { transaction_id: 8101, title: 'Nike Air Max 1 blanc taille 42', price: { amount: '59.0', currency_code: 'EUR' }, status: T_RELAIS, transaction_user_status: 'needs_action', date: ilYa(18 * J), conversation_id: '01a0d785-aaaa-bbbb-cccc-000000000000' },
++  { transaction_id: 8102, title: 'Adidas Samba noir taille 41', price: { amount: '110.0', currency_code: 'EUR' }, status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: ilYa(1 * J), conversation_id: '01a0d785-aaaa-bbbb-cccc-000000000001' },
++];
++const VENTES_222 = [
++  { transaction_id: 8103, title: 'Salomon XT-6 blanc taille 40', price: { amount: '99.0', currency_code: 'EUR' }, status: T_RELAIS, transaction_user_status: 'waiting', date: ilYa(3 * J), conversation_id: '01a0d785-aaaa-bbbb-cccc-000000000002' },
++];
++const ACHATS_111 = [
++  { transaction_id: 8201, title: 'Nike Dunk low taille 43', price: { amount: '34.0', currency_code: 'EUR' }, status: T_RELAIS, transaction_user_status: 'needs_action', date: ilYa(5 * J), conversation_id: '666001' },
++  { transaction_id: 8202, title: 'Salomon XT-6 noir taille 44', price: { amount: '34.15', currency_code: 'EUR' }, status: 'Retour initié', transaction_user_status: 'needs_action', date: ilYa(9 * J), conversation_id: '666002' },
++];
++const HIER = new Date(MAINTENANT - 1 * J); // date limite de renvoi DÉPASSÉE
++const RELAIS = {
++  // Le RETOUR de la vente 8101 : lieu lu dans la conversation (jamais de code).
++  8101: { tx: '8101', retour: true, lieu: 'point relais Consigne Pickup Super U Cancale, RUE DE LA BRETONNIERE, 35260 CANCALE', code: '', qr: '', conv: '25325126937', url: 'https://www.vinted.fr/inbox/25325126937', at: ilYa(2 * H), titre: 'Nike Air Max 1 blanc taille 42' },
++  // L'achat 8201 : conversation LUE, lieu présent, PAS de code (un comptoir).
++  8201: { tx: '8201', lieu: 'Point relais TABAVAP, 12 RUE HOCHE, 56000 VANNES', code: '', qr: '', conv: '666001', url: 'https://www.vinted.fr/inbox/666001', at: ilYa(3 * H), titre: 'Nike Dunk low taille 43' },
++  // L'achat 8202 : la date limite du renvoi, relevée dans la conversation.
++  8202: { tx: '8202', renvoiLimite: HIER.toISOString(), at: ilYa(3 * H) },
++};
++const ROWS = [
++  { id: 'main', data: { vinted_sale_overrides: { 8101: { numero: '546' } } } },
++  { id: 'harvest_111_orders_sold', data: { capturedAt: ilYa(0.3 * H), payload: { my_orders: VENTES_111 } } },
++  { id: 'harvest_222_orders_sold', data: { capturedAt: ilYa(0.4 * H), payload: { my_orders: VENTES_222 } } },
++  { id: 'harvest_111_orders_purchased', data: { capturedAt: ilYa(0.3 * H), payload: { my_orders: ACHATS_111 } } },
++  { id: 'harvest_222_orders_purchased', data: { capturedAt: ilYa(0.4 * H), payload: { my_orders: [] } } },
++  // Le DÉTAIL de la transaction 8101 : 440 « Retour initié » (la preuve).
++  { id: 'harvest_111_txn_8101', data: { capturedAt: ilYa(1 * H), payload: { transaction: { id: 8101, status: 440, status_title: 'Retour initié', shipment: { status: 310, status_title: T_RELAIS } } } } },
++  { id: 'panel_colis_relais', data: RELAIS },
++  // Un colis d'EMAIL transporteur avec son code (la 3e source du total).
++  { id: 'email_track_mondialrelay_MR123', data: { carrier: 'mondial_relay', status: 'available', code: '12345678', lieu: 'Maison de la Presse, 40 RUE DU PORT, 35260 CANCALE', suivi: 'MR123', receivedAt: ilYa(1 * J) } },
++];
++
++let ko = 0;
++const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
++const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 140)); } };
++
++const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
++const srv = http.createServer((q, r) => {
++  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
++  const p = path.join(DIST, f);
++  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
++  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
++});
++srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
++srv.listen(PORT);
++
++const projette = (row, sel) => {
++  if (!sel || sel === '*') return row;
++  const out = {};
++  for (const part of sel.split(',')) {
++    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
++    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
++    if (src === 'id') { out[alias] = row.id; continue; }
++    if (src === 'data') { out[alias] = row.data; continue; }
++    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
++    out[alias] = v == null ? null : v;
++  }
++  return out;
++};
++// Les FILTRES sur un chemin de `data` (ex. la lecture des retours :
++// `meta->>status=eq.440` → `data->payload->transaction->>status=eq.440`).
++// Un banc qui les ignorerait servirait des lignes que l'app ne verrait jamais (§6.3).
++const filtresData = (u) => {
++  const fs2 = [];
++  for (const m of u.matchAll(/[?&](data(?:->>?[A-Za-z_]+)+)=eq\.([^&]*)/g)) fs2.push([m[1], m[2]]);
++  return fs2;
++};
++const passeFiltres = (row, fl) => fl.every(([chemin, val]) => {
++  let v = row.data; for (const seg of chemin.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
++  return String(v) === String(val);
++});
++
++async function preparer(b, vp, sombre) {
++  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
++  const pg = await ctx.newPage();
++  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
++  await pg.addInitScript((dk) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (dk) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre ? 1 : 0);
++  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
++  await pg.route('**/rest/v1/**', (route) => {
++    const u = decodeURIComponent(metaVersData(route.request().url()));
++    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
++    if (route.request().method() !== 'GET') return j([]);
++    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
++    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
++    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
++    const fl = filtresData(u);
++    const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: r.data.capturedAt || ilYa(0), cap: r.data.capturedAt });
++    const eq = /id=eq\.([^&]*)/.exec(u);
++    if (eq) return j(ROWS.filter((r) => r.id === eq[1] && passeFiltres(r, fl)).map(forme));
++    const lk = /id=like\.([^&]*)/.exec(u);
++    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id) && passeFiltres(r, fl)).map(forme)); }
++    return j([]);
++  });
++  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
++  return { ctx, pg, errs };
++}
++async function sain(pg, ecran) {
++  const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, t: document.body.innerText }));
++  dit(r.sw <= r.cw + 1, `${ecran} : aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
++  const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
++  dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
++}
++const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer/.exec(document.body.innerText); return m ? Number(m[1]) : 0; });
++
++(async () => {
++  let b;
++  try {
++    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
++    for (const passe of [{ vp: { width: 390, height: 844 }, sombre: false }, { vp: { width: 1512, height: 950 }, sombre: false }, { vp: { width: 390, height: 844 }, sombre: true }]) {
++      const { vp, sombre } = passe;
++      console.log(`── ${vp.width} px${sombre ? ' · sombre' : ''}`);
++      const { ctx, pg, errs } = await preparer(b, vp, sombre);
++      await essaie('Ventes', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(5000);
++        const r = await pg.evaluate(() => {
++          const lien = document.querySelector('[data-retour-relais="8101"]');
++          const carte = lien && lien.closest('.vrm-sale-card, [class*="sale"], div');
++          const bordRetour = !!document.querySelector('[data-bouton-bord][data-tx="8101"]');
++          const bordVraie = !!document.querySelector('[data-bouton-bord][data-tx="8102"]');
++          return { lien: !!lien, href: lien ? (lien.querySelector('a') || {}).href || '' : '', bordRetour, bordVraie, texte: document.body.innerText };
++        });
++        dit(r.lien, 'la vente 8101 porte « Retour — au point relais, à retirer » (data-retour-relais)', r.lien ? '' : 'absent');
++        dit(/inbox\/25325126937/.test(r.href), '… et son lien ouvre la conversation RÉELLE captée (jamais l’UUID de la liste)', r.href);
++        dit(!r.bordRetour, 'la vente 8101 n’a PLUS de bouton bordereau (rien à imprimer pour un retour)', r.bordRetour ? 'bouton présent' : '');
++        dit(r.bordVraie, 'la vraie vente à poster (8102) garde son bouton bordereau', r.bordVraie ? '' : 'bouton absent');
++        dit(/Retour au relais/.test(r.texte), 'l’étiquette « Retour au relais » est rendue', '');
++        await pg.screenshot({ path: path.join(os.tmpdir(), `retours-vente-ventes-${vp.width}${sombre ? '-sombre' : ''}.png`), fullPage: true }).catch(() => {});
++        await sain(pg, 'Ventes');
++      });
++      let nColis = null;
++      await essaie('Colis', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(5000);
++        nColis = await aEnvoyer(pg);
++        dit(nColis === 1, 'Colis : le retour n’est plus « à envoyer » (1 colis à envoyer — la vraie vente — pas 2)', String(nColis));
++        const bordRetour = await pg.evaluate(() => !!document.querySelector('[data-bouton-bord][data-tx="8101"]'));
++        dit(!bordRetour, 'Colis : aucun bouton bordereau pour le retour', '');
++        await sain(pg, 'Colis');
++      });
++      let pub = null;
++      await essaie('Ma journée', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(5200);
++        const r = await pg.evaluate(() => {
++          const job = document.querySelector('[data-job="colis-retirer"]');
++          const renv = document.querySelector('[data-job="a-renvoyer"]');
++          let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer')); } catch (_) {}
++          return { n: job ? Number(job.getAttribute('data-n')) : null, jobTxt: job ? job.innerText : '',
++                   renvN: renv ? Number(renv.getAttribute('data-n')) : null, renvTxt: renv ? renv.innerText : '', pub };
++        });
++        dit(r.n === 3, 'Ma journée : « Retirer 3 colis » (email + achat + RETOUR — le même compte qu’Achats, §11)', `n=${r.n}`);
++        dit(/retour de ta vente/i.test(r.jobTxt), '… et la ligne nomme le retour de la vente', r.jobTxt.slice(0, 120));
++        dit(r.renvN === 1 && /dépassée depuis/i.test(r.renvTxt), 'la ligne « Renvoyer 1 paire (litige) » dit la date limite de Vinted DÉPASSÉE', r.renvTxt.slice(0, 140));
++        pub = r.pub;
++        dit(!!pub && pub.total === 3 && pub.retours === 1, 'la publication `vrm_colis_retirer` porte {total:3, retours:1} — le tableau de bord consomme, il ne recalcule pas', JSON.stringify(pub));
++        await sain(pg, 'Ma journée');
++      });
++      await essaie('Achats — à retirer', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(5200);
++        const r = await pg.evaluate(() => {
++          const g = document.querySelector('[data-groupe-retrait="retour"]');
++          const carte = document.querySelector('[data-colis-retrait="retour"][data-tx="8101"]');
++          const conv = document.querySelector('[data-groupe-retrait="conversation"]');
++          const renvoi = document.querySelector('[data-renvoi-limite]');
++          const t = document.body.innerText;
++          const m = /(\d+)\s*colis à retirer/.exec(t);
++          return {
++            groupe: !!g, gTxt: g ? g.innerText : '', carte: !!carte, cTxt: carte ? carte.innerText : '',
++            lienCarte: carte ? [...carte.querySelectorAll('a')].map((a) => a.href + '|' + a.innerText).join(' ; ') : '',
++            convTxt: conv ? conv.innerText : '', total: m ? Number(m[1]) : null,
++            renvoi: renvoi ? renvoi.getAttribute('data-renvoi-limite') : null, renvoiTxt: renvoi ? renvoi.innerText : '',
++            texte: t,
++          };
++        });
++        dit(r.groupe && /Retour de ta vente/i.test(r.gTxt), 'le bloc « Retour de ta vente » est rendu dans « À retirer »', r.groupe ? '' : 'absent');
++        dit(r.carte && /N°546/.test(r.cTxt) && /Air Max 1/i.test(r.cTxt), '… la carte porte la PAIRE (N°546, titre)', r.cTxt.slice(0, 100));
++        dit(/compte_a/.test(r.cTxt), '… et le compte est nommé', '');
++        dit(/Super U Cancale/i.test(r.cTxt), '… et le lieu lu dans la conversation', '');
++        dit(/confirme la réception|Bien reçu/i.test(r.gTxt), '… et LE geste : retirer puis confirmer la réception sur Vinted (jamais confirmé par VRM)', '');
++        dit(!/code de retrait/i.test(r.cTxt) || /ne donne pas de code/i.test(r.cTxt), '… sans promettre un code (aucun n’existe pour un retour)', r.cTxt.slice(0, 160));
++        dit(r.total === 3 && /1 retour de ta vente/i.test(r.texte), 'l’en-tête dit « 3 colis à retirer · 1 retour de ta vente » — le même nombre que Ma journée', `total=${r.total}`);
++        dit(/ne donne pas de code/i.test(r.convTxt), 'le comptoir LU SANS code le dit (« la conversation ne donne pas de code »), au lieu de promettre', r.convTxt.slice(0, 120));
++        dit(!/Voir mon code de retrait/i.test(r.convTxt) && /Ouvrir la conversation/i.test(r.convTxt), '… et le bouton dit ce qu’il ouvre (« Ouvrir la conversation »), plus « Voir mon code de retrait »', '');
++        dit(!!r.renvoi && /dépassée depuis 1 j/i.test(r.renvoiTxt), 'l’achat à renvoyer porte la date limite de Vinted, dépassée depuis 1 j, avec la conséquence', r.renvoiTxt.slice(0, 140));
++        // §6.2 : regarder la capture fait partie du test.
++        await pg.screenshot({ path: path.join(os.tmpdir(), `retours-vente-achats-${vp.width}${sombre ? '-sombre' : ''}.png`), fullPage: true }).catch(() => {});
++        await sain(pg, 'Achats');
++      });
++      await essaie('✓ J’ai retiré (le retour)', async () => {
++        await pg.click('[data-colis-retrait="retour"][data-tx="8101"] .vrm-pickup-collect', { timeout: 5000 });
++        await pg.waitForTimeout(900);
++        const r = await pg.evaluate(() => {
++          const m = /(\d+)\s*colis à retirer/.exec(document.body.innerText);
++          const g = document.querySelector('[data-groupe-retrait="retour"]');
++          return { total: m ? Number(m[1]) : null, attente: g ? /pas encore retiré/i.test(g.innerText) : false };
++        });
++        dit(r.total === 2, '« ✓ J’ai retiré » sort le retour du total (3 → 2)', `total=${r.total}`);
++        dit(r.attente, '… et il reste visible EN GRIS, annulable (« ↩︎ pas encore retiré »)', '');
++      });
++      dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
++      await ctx.close();
++    }
++  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
++  finally { if (b) await b.close(); srv.close(); }
++  console.log(ko ? `\n❌ retours de ventes : ${ko} rouge(s)` : '\n✅ retours de ventes : tout est vert');
++  process.exit(ko ? 1 : 0);
++})();
+diff --git a/src/App.jsx b/src/App.jsx
+index 47cc20c..96184fe 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -4527,16 +4527,90 @@ const tusDe = (o) => String((o && o.transaction_user_status) || '').toLowerCase(
+ // (`classifyOrderStatus` : aucun CA), mais c'est un colis en route qu'il faut
+ // surveiller — pas une vente qui n'a pas eu lieu. Même partition que les
+ // étiquettes « Retournée » / « Retour en cours » (`venteStage`).
+-const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(String((o && o.status) || ''));
++// ── LE COLIS DE RETOUR D'UNE VENTE N'EST PAS UN COLIS À POSTER (15 octobre) ──
++// Julien : « une vente sur laquelle j'ai eu un litige me propose d'imprimer le
++// bordereau, ça ne sert à rien, il est arrivé en point relais ». MESURÉ (tx
++// 22592792923, tomj606) : la LISTE dit « La livraison n'a pas encore eu lieu -
++// colis déposé en bureau de Poste ou point relais » avec `needs_action` ; le
++// DÉTAIL de la transaction dit 440 « Retour initié », expédition 310. C'est le
++// colis de RETOUR, arrivé au relais POUR LUI : Vinted attend qu'il le retire et
++// confirme la réception. Le même texte avec `waiting` est une vraie vente en
++// route vers l'acheteur (23052006117) : sur la liste, seul le couple
++// « needs_action + colis déjà parti » distingue le retour. Sur 1 515 lignes de
++// ventes, cette règle ne change QUE celle-là.
++// ⇒ `needs_action` ne vaut « à poster » que si le colis n'est pas déjà parti
++//   (« Bordereau envoyé au vendeur » reste à poster : `isAwaitingShipStatus`
++//   passe d'abord) ; et une transaction dont le DÉTAIL connu est en retour
++//   (440 — `_retour`, posé par `marquerRetours`) ne l'est JAMAIS : un retour ne
++//   se défait pas, un détail plus ancien que la liste ne peut donc pas tromper.
++//   « Pas su » (détail illisible) : la règle de la liste reste seule — elle ne
++//   fait disparaître aucune vraie vente à poster.
++// MÊME RÈGLE dans l'extension (`A_EXPEDIER`) et le widget (`aExpedier`) —
++// `scripts/audit-statuts.cjs` et `scripts/audit-retours-vente.cjs` les exécutent.
++const DEJA_PARTI = /colis\s+d[ée]pos[ée]|livraison\s+n.a\s+pas\s+encore\s+eu\s+lieu|livr[ée]e?(?![a-zà-ÿ])|achemin|exp[ée]di[ée]e?(?![a-zà-ÿ])|non\s+r[ée]clam/i;
++const VENTE_TERMINEE = /finalis|rembours|annul|cancel|refus|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
++const estRetourVente = (o) => !!(o && o._retour);
++const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(String((o && o.status) || ''))
++  || (estRetourVente(o) && !VENTE_TERMINEE.test(String((o && o.status) || '')));
+ const aExpedier = (o) => {
+   if (!o) return false;
++  if (estRetourVente(o)) return false;
+   const s = String(o.status || '');
+   if (PAS_UN_ENVOI.test(s)) return false;
+   const t = tusDe(o);
+-  if (t === 'needs_action') return true;
++  if (t === 'needs_action') return isAwaitingShipStatus(s) || !DEJA_PARTI.test(s);
+   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+   return needsBordereau(s);
+ };
++// Le colis de RETOUR d'une vente attend AU POINT RELAIS, pour lui. Identité :
++// la vente elle-même (son n° de transaction), jamais un titre. Deux preuves :
++//   · la liste dit « au relais » ET Vinted attend son geste (`needs_action`) —
++//     ou le détail connu dit que c'est un retour (440) ;
++//   · la liste n'a pas encore bougé (« Retour initié ») mais le détail, lu
++//     depuis, dit le colis au relais.
++// Une vente finie (finalisée, remboursée, annulée) n'attend plus rien.
++const retourAuRelais = (o) => {
++  if (!o) return false;
++  const s = String(o.status || '');
++  if (VENTE_TERMINEE.test(s)) return false;
++  if (isAtRelayStatus(s) && !isAwaitingShipStatus(s)) return tusDe(o) === 'needs_action' || estRetourVente(o);
++  const r = o._retour;
++  return !!(r && /retour/i.test(s) && isAtRelayStatus(String(r.ship || '')));
++};
++// ── LES VENTES EN RETOUR, LUES DANS LE DÉTAIL DE TRANSACTION (440) ──────────
++// Quelques octets par ligne (`meta`, §4.4), seulement les transactions en retour.
++// Trois états : un objet (lu) · la DERNIÈRE valeur connue quand la lecture
++// échoue (un retour ne se défait pas : une valeur ancienne ne cache jamais une
++// vente à poster) · `null` (jamais lu : la règle de la liste reste seule).
++let _retoursVente = null, _retoursVenteAt = 0, _retoursVenteVol = null;
++const lireRetoursVente = ({ force = false } = {}) => {
++  if (!force && _retoursVente && Date.now() - _retoursVenteAt < 60000) return Promise.resolve(_retoursVente);
++  if (_retoursVenteVol) return _retoursVenteVol;
++  _retoursVenteVol = (async () => {
++    try {
++      const rows = await lireTout('id=like.harvest_%25_txn_%25&meta->>status=eq.440&select=tx:meta->>id,s:meta->>status,ship:meta->>ship_status_title,at:meta->>capturedAt', { strict: true });
++      if (!Array.isArray(rows)) return _retoursVente;
++      const map = {};
++      // Le filtre est revérifié ici : une base (ou un banc) qui l'ignorerait ne
++      // ferait jamais passer une vente ordinaire pour un retour.
++      for (const r of rows) if (r && r.tx && String(r.s) === '440') map[String(r.tx)] = { ship: String(r.ship || ''), at: r.at || '' };
++      _retoursVente = map; _retoursVenteAt = Date.now();
++      return map;
++    } catch (_) { return _retoursVente; } finally { _retoursVenteVol = null; }
++  })();
++  return _retoursVenteVol;
++};
++// Pose `_retour` sur les ventes que le détail dit en retour (par transaction).
++const marquerRetours = (items, map) => {
++  if (!Array.isArray(items) || !map) return items;
++  let change = false;
++  const out = items.map((o) => {
++    const r = o && o.transaction_id != null ? map[String(o.transaction_id)] : null;
++    if (!r || (o._retour && o._retour.ship === r.ship)) return o;
++    change = true; return { ...o, _retour: r };
++  });
++  return change ? out : items;
++};
+ // Délai d'expédition d'une date limite Vinted (« JJ/MM/AAAA ») : jours restants
+ // jusqu'à la fin de ce jour-là (négatif = dépassé). Partagé par la carte du
+ // bordereau et le rappel de Ma journée (§11).
+@@ -26530,6 +26604,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
+       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;
+     });
++    // ── LES RETOURS DE SES VENTES, ARRIVÉS AU RELAIS (15 octobre) ────────────
++    // Plainte de Julien : « ça me propose d'imprimer le bordereau, ça ne sert à
++    // rien, il est arrivé en point relais ». Le colis de RETOUR d'une vente
++    // (`retourAuRelais`) est un colis À RETIRER : il entre dans la MÊME liste,
++    // le même total publié (`vrm_colis_retirer`) et le même nombre sur Achats,
++    // Ma journée et le tableau de bord (§11). Identité : le n° de transaction
++    // de la VENTE ; le lieu vient de `panel_colis_relais` quand l'extension a
++    // lu la conversation (AUCUN code n'existe pour un retour — mesuré, on n'en
++    // promet pas). Comme `vintedToShip` : seul un ✕ posé à la main sur la vente
++    // le sort de la liste — un compte masqué ne cache pas un colis (§5.43).
++    const retours = (sales.items || []).filter(o => o && o.transaction_id != null
++      && !hiddenSales.has(String(o.transaction_id)) && retourAuRelais(o) && !pickupDone[String(o.transaction_id)]);
++    // Cochés « récupéré » mais Vinted dit encore « au relais » : en gris,
++    // comme les achats (`attente`), jamais comptés dans le total.
++    const attenteRetours = (sales.items || []).filter(o => {
++      if (!o || o.transaction_id == null || !retourAuRelais(o)) return false;
++      const quand = pickupDone[String(o.transaction_id)]; if (!quand) return false;
++      const j = (Date.now() - new Date(quand).getTime()) / 86400000;
++      return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;
++    });
+     // ── ⚠️ LES COLIS QUI DISPARAISSAIENT EN SILENCE ──────────────────────────
+     // « Je dois passer à côté de rien » (Julien). Mesuré sur la vraie base :
+     // 18 lignes « colis disponible », l'app en affichait 3. Sur les 15 écartés,
+@@ -26595,22 +26689,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
+     //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
+     const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
+-    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode, lieux,
+-             prets: emailList.length + (extra.length - sansCode),
+-             total: emailList.length + extra.length };
++    return { emailList, extra, retours, attenteRetours, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode, lieux,
++             // Un retour est RETIRABLE (aucun code n'est requis, mesuré) : il
++             // compte dans « prêts », jamais dans « en attente de leur code ».
++             prets: emailList.length + (extra.length - sansCode) + retours.length,
++             total: emailList.length + extra.length + retours.length };
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
++  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, sales.items, hiddenSales]);
+   useEffect(() => {
+     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
+     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
+     // seule, les emails de suivi n'étaient pas encore chargés — `pickupUnion`
+     // valait alors « 0 prêt · 5 en attente » au lieu de « 1 · 5 », et c'est ce
+     // faux qui partait au tableau de bord. Les DEUX sources doivent être là.
+-    if (!Array.isArray(tracking) || !Array.isArray(buys.items)) return;
++    // ⚠️ (15 octobre) Les VENTES sont une 3e source (les retours au relais) :
++    //    on ne publie que complet, comme pour les deux autres.
++    if (!Array.isArray(tracking) || !Array.isArray(buys.items) || !Array.isArray(sales.items)) return;
+     try {
+-      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, at: Date.now() };
++      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, retours: pickupUnion.retours.length, at: Date.now() };
+       const avant = load('vrm_colis_retirer', null);
+-      const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode;
++      const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode && avant.retours === v.retours;
+       if (!memeChose) {
+         save('vrm_colis_retirer', v);
+         // ⚠️ ET ON PRÉVIENT. Le centre de notifications lit cette ligne UNE
+@@ -26643,7 +26741,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes)) save('vrm_codes_hors_ligne', { at: Date.now(), codes });
+       }
+     } catch (_) {}
+-  }, [pickupUnion, tracking, buys.items]);
++  }, [pickupUnion, tracking, buys.items, sales.items]);
+ 
+   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
+   // à poster (seule une vente masquée à la main sort de la liste).
+@@ -28050,6 +28148,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   const saleOutcome = (o) => {
+     const s = String(o && o.status || '');
+     if (/retour\s*initi|retour\s*en\s*cours/i.test(s)) return 'retour';
++    // ⚠️ (15 octobre) Le colis de retour AU RELAIS : la liste ne dit plus
++    //    « retour » (« colis déposé en point relais »), le détail si (440). La
++    //    paire revient — elle a sa place ici, avec SON numéro.
++    if (retourAuRelais(o) || (estRetourVente(o) && !VENTE_TERMINEE.test(s))) return 'retour';
+     if (/rembours/i.test(s)) return 'rembourse';
+     if (/suspend|v[ée]rification/i.test(s)) return 'suspendue';
+     return null;
+@@ -28728,16 +28830,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     // résultat (état ET cache), pour qu'un lecteur sache ce qu'elle couvre.
+     const demandes = cleComptesVinted(accounts);
+     const cached = !force && entreeCache(type);
+-    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
++    // ⚠️ (15 octobre) Les ventes en RETOUR portent `_retour` (détail 440) : une
++    //    liste resservie du cache le reçoit aussi, depuis la dernière lecture
++    //    connue — sans quoi le colis de retour redevenait « à expédier ».
++    if (cached) { setter({ loading:false, items: type === 'sold' ? marquerRetours(cached.items, _retoursVente) : cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
+     if (!silencieux) setter({ loading:true, items:null, error:false });
+     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
+     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
+     // moisson Supabase, donc paralléliser est sûr et bien plus rapide.
+-    const results = await Promise.all(accounts.map(async acc => {
++    const [results, retoursLus] = await Promise.all([Promise.all(accounts.map(async acc => {
+       const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
+       noteAcctLive(acc.vinted_user_id, res, force);
+       return { acc, res };
+-    }));
++    })), type === 'sold' ? lireRetoursVente() : null]);
+     // ⚠️ TRANSFERTS ENTRE TES PROPRES COMPTES (vérifié en base) : tu vends une
+     // paire depuis un compte et tu la rachètes avec un autre. Vinted la compte
+     // comme un ACHAT, mais c'est TA paire (elle porte ton numéro « nXXXX » et/ou
+@@ -28774,6 +28879,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     // vide si l'extension n'a pas encore moissonné : « Synchroniser » force, et
+     // il suffit de repasser sur vinted.fr avec l'extension.
+     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
++    // Une vente dont le détail dit « retour » (440) n'est jamais à poster.
++    if (type === 'sold' && retoursLus) { const m = marquerRetours(out, retoursLus); if (m !== out) out.splice(0, out.length, ...m); }
+     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
+     const error = out.length===0 && anyErr && !anyOk;
+     if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
+@@ -29524,8 +29631,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     // « Commande non réclamée - Retournée à l'expéditeur » n'est PAS un
+     // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
+     // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
+-    if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
+-    if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
++    // ⚠️ (15 octobre) « Vinted règle souvent le remboursement tout seul » était
++    //    FAUX : le message système mesuré dit que le remboursement se fait
++    //    « lorsque tu auras indiqué que le colis a bien été reçu ».
++    if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Quand tu l'as récupéré, indique-le sur Vinted — c'est ce qui déclenche la suite." };
++    // ⚠️ (15 octobre) LE COLIS DE RETOUR AU RELAIS : c'est à LUI d'aller le
++    //    chercher. Il s'affichait « À expédier » avec un bouton « Imprimer » (le
++    //    bordereau d'origine, déjà utilisé) — voir `retourAuRelais`.
++    if (retourAuRelais(o)) return { label: 'Retour au relais', color: C.warn, step: 0, retourRelais: true, aide: "Le colis de retour t'attend au point relais : va le retirer, puis confirme la réception sur Vinted. Il n'y a rien à poster." };
++    if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s) || (estRetourVente(o) && !VENTE_TERMINEE.test(s))) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement. Il n'y a rien à poster." };
++    // ⚠️ (15 octobre) Une vente SUSPENDUE s'affichait « Remboursée » (« la
++    //    chaussure et l'argent sont partis ») : mesuré sur 23068767268, Vinted
++    //    vérifie la transaction, aucun remboursement n'est constaté.
++    if (/suspend/i.test(s)) return { label: 'Suspendue', color: C.warn, step: 0, aide: "Vinted vérifie cette transaction : rien n'est remboursé pour l'instant. Attends sa décision avant de toucher à la paire." };
+     if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
+       ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+       : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
+@@ -31987,7 +32105,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
+         let retraitTitre = 'Aucun colis à retirer';
+         if(pickupCount){
+-          const hd=pickupUnion.horsDelai.length, pr=pickupUnion.prets, sc=pickupUnion.sansCode;
++          const hd=pickupUnion.horsDelai.length, sc=pickupUnion.sansCode;
++          const rt=(pickupUnion.retours||[]).length;
++          // ⚠️ (15 octobre) Les RETOURS de ventes comptent dans le total, mais
++          //    « tu as le code » ne doit pas se dire d'un retour (aucun code
++          //    n'existe pour un retour — mesuré) : la phrase les nomme à part.
++          const pr=pickupUnion.prets - rt;
+           const lx=pickupUnion.lieux||[];
+           // « chez X » quand tous les colis retirables sont au MÊME relais ;
+           // sinon le nombre de relais (jamais un seul nom qui en cacherait
+@@ -31995,7 +32118,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+           const ou = lx.length===1 ? ` chez ${lx[0]}` : lx.length>1 ? ` dans ${lx.length} points relais` : '';
+           const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
+           const qui = cs.length===1 ? ` — sur ${cs[0]}` : cs.length>1 ? ` — sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : '';
+-          retraitTitre = `${pickupCount} colis à retirer${hd>0?` · ${hd} hors délai`:''}${pr>0?` · ${pr} avec ton code${ou}`:''}${sc>0?` · ${sc} en attente de leur code${qui}`:''}`;
++          retraitTitre = `${pickupCount} colis à retirer${hd>0?` · ${hd} hors délai`:''}${pr>0?` · ${pr} avec ton code${ou}`:''}${rt>0?` · ${rt>1?`${rt} retours de tes ventes`:'1 retour de ta vente'} à récupérer`:''}${sc>0?` · ${sc} en attente de leur code${qui}`:''}`;
+         }
+         // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
+         //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
+@@ -32003,8 +32126,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         //    (le bordereau de retour se fait sur CELUI-LÀ).
+         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
+-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
+-              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
++            // ⚠️ (15 octobre) LA DATE LIMITE QUE VINTED ÉCRIT (« Retourne la
++            //    commande d'ici le 14 oct. … sinon ton paiement sera transféré
++            //    au vendeur ») — relevée par l'extension dans la conversation
++            //    (`renvoiLimite`, par n° de transaction, §5). Dépassée, c'est de
++            //    l'argent perdu : la ligne le dit et passe en rouge. Pas de date
++            //    connue ⇒ rien d'inventé (mieux vaut un blanc qu'un faux).
++            const jl = ar.map(o=>{ const r=relaisDe(o); return r&&r.renvoiLimite?joursAvant(String(r.renvoiLimite).slice(0,10)):null; }).filter(v=>v!=null);
++            const pire = jl.length?Math.min(...jl):null;
++            const quand = pire==null?'':pire<0?` · date limite dépassée depuis ${-pire} j — Vinted peut transférer le paiement au vendeur`:pire===0?` · dernier jour (date limite de Vinted)`:` · avant ${pire} j (date limite de Vinted)`;
++            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:(pire!=null&&pire<=0)?C.danger:C.warn,urgent:pire!=null&&pire<=0,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
++              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}${quand}`,tab:'cat_achats',prio:(pire!=null&&pire<=0)?0.3:0.8}); } }
+         // ⚠️ LE RAPPEL MENSUEL DES ABONNEMENTS (revue du 15 octobre). Julien :
+         //    « ça nous rappelle tous les mois combien on dépense ». Il était
+         //    promis « dans la cloche » — un panneau que rien n'ouvre — et ne
+@@ -32650,6 +32782,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                         onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
+                     </div>
+                   )}
++                  {/* ⚠️ (15 octobre) LE RETOUR AU RELAIS N'A PLUS DE BOUTON
++                      BORDEREAU (plainte de Julien : « ça me propose d'imprimer le
++                      bordereau, ça ne sert à rien, il est arrivé en point
++                      relais ») : à la place, LE geste — le retirer, puis
++                      confirmer la réception sur Vinted. VRM ne confirme jamais à
++                      sa place (§3). */}
++                  {!hidden && retourAuRelais(o) && o.transaction_id!=null && (()=>{ const rel = relaisDe(o);
++                    const href = (rel && rel.url) || `https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`;
++                    return (
++                    <div className="vrm-sale-action" data-retour-relais={String(o.transaction_id)} style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
++                      <a href={href} target="_blank" rel="noreferrer"
++                        title={`Le colis de retour t'attend${rel && rel.lieu ? ` au point relais ${lieuRelais(rel.lieu).nom || rel.lieu}` : ' au point relais'} : va le retirer, puis confirme la réception sur Vinted (« Bien reçu »). VRM ne confirme jamais à ta place.`}
++                        style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 11px',fontSize:12,fontWeight:700,textDecoration:'none',flexShrink:0}}>↩ Retour — au point relais, à retirer</a>
++                    </div>
++                  ); })()}
+                 </div>
+                </div>
+                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
+@@ -33287,6 +33434,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   <div style={{flex:'1 1 160px',minWidth:0}}>
+                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
+                     {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
++                    {/* ⚠️ (15 octobre) LA DATE LIMITE QUE VINTED ÉCRIT dans la
++                        conversation (« Retourne la commande d'ici le … sinon tu
++                        devras garder l'article et ton paiement sera transféré au
++                        vendeur ») — mesurée dépassée sans que l'écran le dise.
++                        Relevée par l'extension (`renvoiLimite`, par n° de
++                        transaction) ; pas de date relevée ⇒ rien d'inventé. */}
++                    {(()=>{ const r=relaisDe(o); const lim=r&&r.renvoiLimite?String(r.renvoiLimite).slice(0,10):'';
++                      const j=lim?joursAvant(lim):null; if(j==null) return null;
++                      const dt=new Date(lim+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
++                      return <div data-renvoi-limite={lim} style={{fontSize:11.5,fontWeight:700,color:j<=0?C.danger:C.warn}}>
++                        {j<0?`Date limite de Vinted dépassée depuis ${-j} j (le ${dt}) — passé ce délai, le paiement peut être transféré au vendeur`
++                          :j===0?`Dernier jour : Vinted demande le renvoi d'ici le ${dt}`
++                          :`Vinted demande le renvoi d'ici le ${dt} (${j} j)`}
++                      </div>; })()}
+                   </div>
+                   <a data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
+                     style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>↩ Bordereau de retour sur Vinted</a>
+@@ -33370,9 +33531,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+         {(()=>{
+           const avail = pickupUnion.emailList;   // colis avec CODE/lieu (email transporteur)
+           const extra = pickupUnion.extra;       // colis « déposé » (statut Vinted) sans code encore
++          const retoursV = pickupUnion.retours || [];       // retours de VENTES au relais (15 octobre)
+           // (la règle « un code de retrait est numérique » vit au niveau module :
+           //  `codeRetrait`. Trois copies traînaient, c'est le doublon que §11 interdit.)
+-          if (!avail.length && !extra.length) return null;
++          if (!avail.length && !extra.length && !retoursV.length && !(pickupUnion.attenteRetours||[]).length) return null;
+           // ⚠️ UNE ÉTAPE = UN ÉCRAN. Les destinations sont le contenu de l'étape
+           // « À retirer » : les afficher aussi au-dessus de « En route » ou de
+           // « Reçus », c'était le même bloc répété sur trois onglets. La pastille
+@@ -33436,11 +33598,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                       Le nombre NE BOUGE PAS (un colis caché est un colis perdu) :
+                       c'est la phrase qui dit ce qu'on peut en faire — exactement
+                       ce que §5.83 a fait pour la tuile de Ma journée. */}
+-                  {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
++                  {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode, rt = (pickupUnion.retours||[]).length;   // §11 : calculés UNE fois, dans pickupUnion
+                     return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
+                       {pickupUnion.total} colis à retirer
+                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
+                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
++                      {rt>0 && <span style={{color:C.warn,fontWeight:700}}> · {rt>1?`${rt} retours de tes ventes`:'1 retour de ta vente'}</span>}
+                     </div>); })()}
+                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
+                       reçoit » (Julien). On compte les colis dont on SAIT nommer
+@@ -33462,6 +33625,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   </div></details>
+                 </div>
+               </div>
++              {/* ── RETOUR DE TA VENTE, ARRIVÉ AU POINT RELAIS (15 octobre) ─────
++                  Plainte de Julien : « ça me propose d'imprimer le bordereau, ça
++                  ne sert à rien, il est arrivé en point relais ». Le colis de
++                  RETOUR d'une vente est un colis à retirer : il vit ICI, marqué
++                  « Retour de ta vente », avec la paire (titre, N°, photo), le
++                  compte, et le lieu quand la conversation a été lue (AUCUN code
++                  n'existe pour un retour — mesuré, on n'en promet pas). LE
++                  geste : le retirer, puis confirmer la réception sur Vinted.
++                  VRM ne confirme JAMAIS la réception tout seul (§3). */}
++              {(retoursV.length>0 || (pickupUnion.attenteRetours||[]).length>0) && (
++                <div className="vrm-pickup-point" data-groupe-retrait="retour" style={{marginBottom:14,border:`1.5px solid ${C.warn}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
++                  <div style={{display:'flex',alignItems:'flex-start',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
++                    <div style={{flex:1,minWidth:0}}>
++                      <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>↩ {retoursV.length>1?`${retoursV.length} retours de tes ventes`:'Retour de ta vente'} — à retirer au point relais</div>
++                      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>L'acheteur a renvoyé la paire et le colis est arrivé : va le retirer, puis confirme la réception sur Vinted (« Bien reçu ») — c'est toi qui confirmes, jamais VRM. Il n'y a rien à imprimer ni à poster.</div>
++                    </div>
++                  </div>
++                  {retoursV.length>0 && <div style={{padding:'10px 12px 4px',display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:7,alignItems:'start'}}>
++                  {retoursV.map((o,i)=>{
++                    const rel = relaisDe(o);
++                    const en = effEntry(o); const nume = en && en.numero ? String(en.numero) : '';
++                    const lr = lieuRelais(rel && rel.lieu);
++                    // Le lien : la conversation captée quand on l'a (`rel.url`,
++                    // identifiant RÉEL), sinon la page de la transaction — jamais
++                    // l'identifiant de conversation de la LISTE (un UUID dont la
++                    // forme d'URL n'a pas été mesurée).
++                    const href = (rel && rel.url) || `https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`;
++                    const lignes = (<>
++                      <div style={{fontSize:11.5,color:C.warn,fontWeight:700,marginTop:2}}>Retour de ta vente</div>
++                      {lr.nom
++                        ? <div style={{fontSize:11.5,color:C.text,marginTop:2}}>au point relais <b>{lr.nom}</b>{lr.adresse?<span style={{color:C.muted}}> · {lr.adresse}</span>:null}</div>
++                        : <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>Le lieu exact est écrit dans la conversation Vinted de la vente.</div>}
++                      {o._acc && <div style={{fontSize:11,color:C.muted,marginTop:2}}>compte <b style={{color:C.text,fontWeight:600}}>{accNameOf(o._acc)}</b></div>}
++                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>Une fois le colis retiré : « Bien reçu » sur Vinted — c'est ce qui déclenche la suite (remboursement de l'acheteur, clôture).</div>
++                    </>);
++                    return (
++                      <CarteRetrait key={'r'+i} titre={`${nume?`N°${nume} · `:''}${o.title||'Ta vente'}`} lignes={lignes}
++                        attrs={{'data-colis-retrait':'retour','data-tx':String(o.transaction_id||'')}}
++                        photo={thumb(orderPhoto(o)||(rel&&rel.photo)||'')}
++                        codes={[]} bord={`${C.warn}66`}
++                        lien={{ href, primaire: false, texte: 'Confirmer la réception sur Vinted ↗' }}
++                        onRetire={()=>markPickupDone(o)}/>
++                    );
++                  })}
++                  </div>}
++                  {/* Retours cochés « retiré » que Vinted n'a pas encore confirmés :
++                      en gris, annulables — jamais comptés (même règle qu'`attente`). */}
++                  {(pickupUnion.attenteRetours||[]).length>0 && (
++                    <div style={{padding:'6px 12px 10px'}}>
++                      <div style={{fontSize:12,fontWeight:700,color:C.muted,margin:'4px 0 6px'}}>✓ {(pickupUnion.attenteRetours||[]).length} retiré{(pickupUnion.attenteRetours||[]).length>1?'s':''} — Vinted n'a pas encore enregistré</div>
++                      {(pickupUnion.attenteRetours||[]).map((o,i)=>(
++                        <div key={'ar'+i} style={{display:'flex',gap:10,alignItems:'center',opacity:.55,marginBottom:5}}>
++                          <span style={{fontSize:12.5,color:C.text,flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={o.title}>{o.title}</span>
++                          <button type="button" onClick={()=>unmarkPickupDone(o)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11.5,fontWeight:600,padding:'4px 9px',fontFamily:'inherit',flexShrink:0}}>↩︎ pas encore retiré</button>
++                        </div>
++                      ))}
++                    </div>
++                  )}
++                </div>
++              )}
+               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
+                   transporteur a sa façon de remettre le colis (§28) : Chronopost
+                   au QR, Mondial Relay au code. Les mélanger obligeait à relire le
+@@ -33624,6 +33847,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   const aCode = (o) => { const r = relaisDe(o); return !!(r && codeRetrait(r.code)); };
+                   const avecCode = pt.colis.some(aCode);
+                   const melange  = avecCode && pt.colis.some(o => !aCode(o));
++                  // ⚠️ (15 octobre) LA CONVERSATION A ÉTÉ LUE, ET ELLE NE DONNE PAS
++                  //    DE CODE. Mesuré : les 4 entrées sans code de
++                  //    `panel_colis_relais` sont les 4 COMPTOIRS (Tabavap, Phone
++                  //    Cash ×2, Maison de la Presse) — le message d'arrivée de
++                  //    Vinted n'y écrit AUCUN code. Promettre « le code est dans
++                  //    la conversation » envoyait chercher quelque chose qui n'y
++                  //    est pas. On le dit, et où un code arriverait s'il en faut
++                  //    un (l'e-mail du transporteur) — sans inventer de procédure.
++                  const luSansCode = (o) => { const r = relaisDe(o); return !!r && !codeRetrait(r.code); };
++                  const tousLusSansCode = pt.colis.length > 0 && pt.colis.every(luSansCode);
+                   // ⚠️ LE COMPTE AUSSI EST UNE PHRASE DE GROUPE QUAND IL EST LE
+                   //    MÊME. Vu en capture le 8 septembre : « compte
+                   //    julatace3535 » écrit CINQ fois, sous cinq titres
+@@ -33668,6 +33901,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
+                       {avecCode
+                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
++                        : tousLusSansCode
++                        ? ''   // la ligne VISIBLE du groupe le dit déjà (§7)
+                         : (()=>{ const e = extSaitLireCodes();
+                             if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
+                             if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
+@@ -33678,9 +33913,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                             //    version récente — ne pas en faire la promesse
+                             //    principale, sinon « j'ai attendu et rien n'est venu ».
+                             return `Le code (et le QR) est dans la conversation Vinted de chaque colis — ouvre-la avec le bouton sous le colis, il y est tout de suite. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
+-                      {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
++                      {memeCompte && !avecCode && !tousLusSansCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
+                     </span>
+                   </div></details>
++                  {/* ⚠️ VISIBLE, pas derrière le « i » : c'est ce qui remplace la
++                      promesse « Voir mon code de retrait » — il doit le lire
++                      AVANT de partir au comptoir. Une fois par groupe (§7). */}
++                  {tousLusSansCode && (
++                    <div data-sans-code-lu style={{padding:'7px 12px',borderBottom:`1px solid ${C.border}`,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
++                      La conversation Vinted de ces colis ne donne pas de code pour ce point relais. Si un code existe, il arrive par l'e-mail du transporteur, sur l'adresse e-mail de ce compte Vinted.
++                    </div>
++                  )}
+                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
+                       Une ligne de colis tient sur UNE ligne de texte et s'étirait
+                       sur 1 080 px : le bouton « ✓ retiré » se retrouvait à un
+@@ -33706,11 +33949,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                       //    il reste discret.
+                       const href = (rel && (rel.qr || rel.url)) || lienConv(o);
+                       const qr = !!(rel && rel.qr);
+-                      const lien = href ? { href, primaire: !cd, texte: qr ? 'Voir le QR de retrait ↗' : cd ? 'Ouvrir la conversation ↗' : 'Voir mon code de retrait ↗' } : null;
++                      // ⚠️ (15 octobre) « Voir mon code de retrait ↗ » ne se dit
++                      //    QUE d'une conversation pas encore lue. Lue SANS code
++                      //    (un comptoir), le bouton promettait un code qui n'y
++                      //    est pas : il dit ce qu'il ouvre.
++                      const lien = href ? { href, primaire: !cd, texte: qr ? 'Voir le QR de retrait ↗' : cd ? 'Ouvrir la conversation ↗' : (rel ? 'Ouvrir la conversation ↗' : 'Voir mon code de retrait ↗') } : null;
+                       const lignes = (<>
+                         {/* Seulement quand le groupe est MIXTE (§7) : sinon
+-                            l'en-tête l'a déjà dit. */}
+-                        {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
++                            l'en-tête l'a déjà dit. Et « pas encore reçu » ne se
++                            dit QUE d'une conversation pas encore lue : lue sans
++                            code (les comptoirs, mesuré), on dit la vérité. */}
++                        {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{luSansCode(o) ? 'La conversation ne donne pas de code pour ce point relais' : 'Code de retrait pas encore reçu'}</div>}
+                         {/* LE COMPTE, parce qu'il en a neuf : l'extension ne lit
+                             les codes que pour le compte connecté dans l'onglet. */}
+                         {o && o._acc && !memeCompte && <div style={{fontSize:11,color:C.muted,marginTop:2}}>compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b></div>}
+@@ -43635,11 +43884,18 @@ function AppCoeur() {
+         const total = (pub && Number.isFinite(pub.total)) ? pub.total : colisCount;
+         const prets = (pub && Number.isFinite(pub.prets)) ? pub.prets : colisCount;
+         const sans  = Math.max(0, total - prets);
++        // ⚠️ (15 octobre) Les RETOURS de ventes comptent dans le total publié
++        //    (§11) et se NOMMENT : « tu as le code » ne se dit pas d'un retour
++        //    (aucun code n'existe pour un retour, mesuré).
++        const rt = (pub && Number.isFinite(pub.retours)) ? pub.retours : 0;
++        const dontRt = rt > 0 ? ` · dont ${rt > 1 ? `${rt} retours de tes ventes` : '1 retour de ta vente'}` : '';
+         if (total > 0) {
+-          const text = prets > 0 && sans > 0
+-            ? `${prets} colis à retirer — tu as le code · ${sans} attendent le leur`
+-            : prets > 0
+-              ? `${prets} colis à retirer — tu as le code ou l'adresse`
++          const text = prets > rt && sans > 0
++            ? `${prets} colis à retirer — tu as le code · ${sans} attendent le leur${dontRt}`
++            : prets > rt
++              ? `${prets} colis à retirer — tu as le code ou l'adresse${dontRt}`
++              : rt > 0
++                ? `${rt > 1 ? `${rt} retours de tes ventes` : 'Le retour de ta vente'} à retirer au point relais — puis confirme la réception sur Vinted${sans > 0 ? ` · ${sans} autre${sans > 1 ? 's' : ''} en attente de leur code` : ''}`
+               : extSaitLireCodes() === 'retard'
+                 ? `${sans} colis à retirer — mets ton extension à jour pour qu'elle lise les codes`
+                 : `${sans} colis à retirer — l'extension va chercher leur code`;
+diff --git a/vinted-sync-extension/background.js b/vinted-sync-extension/background.js
+index 59a0d31..5aacd00 100644
+--- a/vinted-sync-extension/background.js
++++ b/vinted-sync-extension/background.js
+@@ -1479,6 +1479,10 @@ async function storeHarvest(domain, type, id, body) {
+   // pour Vinted Go (aucun email ne les porte).
+   if (type === 'conversation') {
+     try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r, uid); } catch (_) {}
++    // Un achat en litige : Vinted écrit « Retourne la commande d'ici le … »
++    // dans la conversation — on relève LA DATE (jamais le corps), l'app
++    // l'affiche sur « à renvoyer » (dépassée, le paiement part au vendeur).
++    try { const rv = renvoiDeConversation(parsed); if (rv) await noterRenvoi(rv, uid); } catch (_) {}
+   }
+ 
+   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
+@@ -3643,6 +3647,16 @@ const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+
+ // (`needsBordereau`) — un statut inconnu compte comme à expédier : mieux vaut
+ // proposer un colis que le cacher.
+ const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
++// ⚠️ LE COLIS DE RETOUR N'EST PAS UN COLIS À POSTER (15 octobre). Mesuré (tx
++// 22592792923) : la liste dit « La livraison n'a pas encore eu lieu - colis
++// déposé en bureau de Poste ou point relais » avec `needs_action` — c'est le
++// colis de RETOUR, arrivé au relais pour LUI (détail 440 « Retour initié »).
++// `needs_action` ne vaut « à poster » que si le colis n'est pas déjà parti.
++// Sans cette garde, l'extension CHERCHAIT et GÉNÉRAIT des bordereaux pour un
++// retour (recupererLabelInsiste, resumeCommandes → widget). MÊME EXPRESSION que
++// `DEJA_PARTI` (src/App.jsx) et api/widget.js (§11) — `audit-statuts.cjs` et
++// `audit-retours-vente.cjs` comparent les trois.
++const DEJA_PARTI = /colis\s+d[ée]pos[ée]|livraison\s+n.a\s+pas\s+encore\s+eu\s+lieu|livr[ée]e?(?![a-zà-ÿ])|achemin|exp[ée]di[ée]e?(?![a-zà-ÿ])|non\s+r[ée]clam/i;
+ function besoinBordereauTexte(status) {
+   const s = String(status || '').toLowerCase();
+   if (!s) return true;
+@@ -3658,7 +3672,7 @@ function A_EXPEDIER(o) {
+   const s = String(o.status || '');
+   if (PAS_UN_ENVOI.test(s)) return false;
+   const t = String(o.transaction_user_status || '').toLowerCase();
+-  if (t === 'needs_action') return true;
++  if (t === 'needs_action') return AWAITING_SHIP(s) || !DEJA_PARTI.test(s);
+   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+   return besoinBordereauTexte(s);
+ }
+@@ -3717,9 +3731,17 @@ function retraitDeConversation(conv) {
+   try {
+     const c = (conv && conv.conversation) || conv || {};
+     const t = c.transaction || {};
+-    // ⚠️ CÔTÉ ACHETEUR UNIQUEMENT. Côté vendeur, « la commande est arrivée »
+-    // veut dire que l'ACHETEUR l'a reçue — ce n'est pas un colis pour nous.
+-    if (String(t.current_user_side || '') === 'seller') return null;
++    // ⚠️ CÔTÉ ACHETEUR — SAUF LE RETOUR (15 octobre). Côté vendeur, « la
++    // commande est arrivée » veut dire que l'ACHETEUR l'a reçue… sauf quand la
++    // transaction est en RETOUR (statut machine 440, « Retour initié ») : le
++    // colis REVIENT, et c'est LUI qui va le chercher. Mesuré (conv 25325126937,
++    // tx 22592792923) : « Ton colis est arrivé ! Rends-toi au point relais
++    // Consigne Pickup Super U Cancale… », actions mark_as_received — AUCUN
++    // code, AUCUN QR (on range le lieu, on n'invente pas le reste). On
++    // n'accepte le côté vendeur QUE sur ce statut-là : une identité (le champ
++    // machine de Vinted), jamais le texte.
++    const retourVendeur = String(t.current_user_side || '') === 'seller' && Number(t.status) === 440;
++    if (String(t.current_user_side || '') === 'seller' && !retourVendeur) return null;
+     let trouve = null;
+     for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+       if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
+@@ -3777,6 +3799,9 @@ function retraitDeConversation(conv) {
+       titre: String(t.item_title || c.subtitle || c.description || ''),
+       photo: (t.item_photo && t.item_photo.url) || null,
+       lieu, code, qr, conv: cid,
++      // Le colis de retour d'une VENTE, marqué comme tel : l'app le range dans
++      // « Retour de ta vente », jamais parmi les achats.
++      ...(retourVendeur ? { retour: true } : {}),
+       url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+       at: new Date().toISOString(),
+     };
+@@ -3813,7 +3838,10 @@ async function noterRetrait(r, uid) {
+     const limite = Date.now() - RETRAIT_MAX_J * 86400000;
+     const out = {};
+     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
+-    out[r.tx] = r;
++    // On FUSIONNE avec l'entrée existante (15 octobre) : une date limite de
++    // renvoi notée par `noterRenvoi` sur la même transaction ne doit pas être
++    // effacée par l'arrivée du lieu/code.
++    out[r.tx] = Object.assign({}, cur[r.tx] || {}, r);
+     const ok = await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
+     if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return null; }
+     noterDiag('retrait_conv_ecrit');
+@@ -3822,6 +3850,63 @@ async function noterRetrait(r, uid) {
+   } catch (_) { return null; }
+ }
+ 
++// ── LA DATE LIMITE D'UN RENVOI (achat en litige, 15 octobre) ─────────────────
++// Mesuré (conv 25211546616, achat 22454289425) : le message système de Vinted
++// dit « Retourne la commande d'ici le 14 oct. … Sinon, tu devras garder
++// l'article et ton paiement sera transféré au vendeur ». L'app affichait
++// « génère l'étiquette de retour » SANS cette date — dépassée, il garde la
++// paire et perd l'argent. On relève LA DATE seulement (jamais le corps du
++// message), rattachée au n° de TRANSACTION (une identité, §5).
++const MOIS_FR = { jan: 0, 'fév': 1, fev: 1, mar: 2, avr: 3, mai: 4, juin: 5, juil: 6, 'aoû': 7, aou: 7, sep: 8, oct: 9, nov: 10, 'déc': 11, dec: 11 };
++function renvoiDeConversation(conv) {
++  try {
++    const c = (conv && conv.conversation) || conv || {};
++    const t = c.transaction || {};
++    // Le renvoi est un geste d'ACHETEUR : côté vendeur, rien à relever.
++    if (String(t.current_user_side || '') === 'seller') return null;
++    for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
++      if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
++      const e = m.entity || {};
++      const brut = sansBalises(e.title) + ' ' + sansBalises(e.subtitle);
++      const g = brut.match(/retourne\s+la\s+commande\s+d['’]ici\s+le\s+(\d{1,2})(?:er)?\s+([a-zéû]{3,10})\.?\s*(\d{4})?/i);
++      if (!g) continue;
++      const jour = Number(g[1]);
++      const bas = g[2].toLowerCase();
++      const mois = MOIS_FR[bas.startsWith('jui') ? bas.slice(0, 4) : bas.slice(0, 3)];
++      if (!isFinite(jour) || jour < 1 || jour > 31 || mois == null) continue;  // date illisible : on n'invente pas
++      // L'année n'est pas écrite : celle du message ; si la date tombe plus de
++      // 30 j AVANT le message, c'est l'année suivante (décembre → janvier).
++      const ref = m.created_at ? new Date(m.created_at) : new Date();
++      const base = isNaN(ref.getTime()) ? new Date() : ref;
++      let d = new Date(Number(g[3]) || base.getFullYear(), mois, jour, 23, 59, 0);
++      if (!g[3] && d.getTime() < base.getTime() - 30 * 86400000) d = new Date(base.getFullYear() + 1, mois, jour, 23, 59, 0);
++      return { tx: String(t.id || ''), renvoiLimite: d.toISOString() };
++    }
++    return null;
++  } catch (_) { return null; }
++}
++// Range la date limite dans `panel_colis_relais` (la même ligne que les codes
++// de retrait, la même identité : le n° de transaction), en FUSIONNANT avec
++// l'entrée existante. Lecture ratée ⇒ on n'écrit rien (famille audit-fusion).
++async function noterRenvoi(r, uid) {
++  if (!r || !r.tx || !r.renvoiLimite) return false;
++  try {
++    const rows = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
++    if (rows === null) return null;                       // pas su : on n'écrase rien
++    const cur = (rows[0] && rows[0].data) || {};
++    const avant = cur[r.tx];
++    if (avant && avant.renvoiLimite === r.renvoiLimite) return false;  // rien de neuf
++    const limite = Date.now() - RETRAIT_MAX_J * 86400000;
++    const out = {};
++    for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
++    out[r.tx] = Object.assign({}, avant || {}, r, { at: new Date().toISOString() });
++    const ok = await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
++    if (ok === false) return null;
++    if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
++    return true;
++  } catch (_) { return null; }
++}
++
+ function resumeCommandes(type, payload) {
+   // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
+   // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
+-- 
+2.43.0
+

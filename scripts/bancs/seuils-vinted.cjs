@@ -39,7 +39,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4802;
+const PORT = Number(process.env.BANC_PORT) || 4802;
 
 const maintenant = Date.now();
 const AN = new Date(maintenant).getFullYear();
@@ -172,8 +172,12 @@ const page = async (b, vp, etat, main) => {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   return { ctx, pg, errs };
 };
+// (15 octobre) Le registre et le rapport vivent dans Déclarations : on y va
+// PAR L'APP (Ventes → Outils → « Déclarations URSSAF »), sans recharger.
 const ouvreRegistre = async (pg) => {
   await pg.getByText('Outils', { exact: false }).first().click({ timeout: 8000 });
+  await pg.getByText('Déclarations URSSAF', { exact: true }).first().click({ timeout: 8000 });
+  await pg.waitForTimeout(1200);
   await pg.getByText('Registre annuel', { exact: true }).first().click({ timeout: 8000 });
   await pg.waitForTimeout(1500);
 };
@@ -198,12 +202,17 @@ const lit = (pg) => pg.evaluate(() => {
     }
   }
   const bt = document.body.innerText;
-  const iCA = bt.search(/CA des ventes finalis/i);
+  // (15 octobre) Le registre s'ouvre maintenant au-dessus de l'écran
+  // Déclarations, dont le choix du régime dit aussi « CA des ventes finalisées » :
+  // la phrase du CA se lit DANS la fenêtre du registre, jamais sur la page dessous.
+  let fen = reg; while (fen && fen !== document.body && getComputedStyle(fen).position !== 'fixed') fen = fen.parentElement;
+  const btReg = fen && fen !== document.body ? fen.innerText : bt;
+  const iCA = btReg.search(/CA des ventes finalis/i);
   return {
     annee: carte ? carte.dataset.seuilsVinted : null, aCeJour: carte ? carte.dataset.aCeJour : null, txt: carte ? carte.innerText : '', lignes,
     total: tot ? ligne(tot) : null,
     reg: regParUid, regN: reg ? reg.dataset.registreVintedN : null, regEur: reg ? reg.dataset.registreVintedEur : null,
-    caRegistre: iCA >= 0 ? bt.slice(iCA, iCA + 110).replace(/\n/g, ' | ') : '',
+    caRegistre: iCA >= 0 ? btReg.slice(iCA, iCA + 110).replace(/\n/g, ' | ') : '',
     nPanne: carte ? carte.querySelectorAll('[data-seuils-panne]').length : 0,
     relire: !!(carte && carte.querySelector('[data-relire-ventes]')),
     alertes, mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(bt), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -483,9 +492,28 @@ const communs = (r, errs, quoi) => {
         dit(!!(al && al.etat === 'pasSu'), `${q} compte_alpha, qui n'a pas répondu, est « pas su » sur la carte`, al ? al.etat : 'absent');
         dit(!!(r.reg && !r.reg['9101'] && /ventes de compte_alpha pas lues/.test(r.caRegistre)), `${q} le registre ne compte PAS les ventes d'avant de compte_alpha, et dit qu'elles ne sont pas lues — la phrase vient du même calcul que le chiffre`, `registre alpha ${JSON.stringify(r.reg && r.reg['9101'])} · «${r.caRegistre}»`);
         egalRegistre(r, TOUS.filter((u) => u !== '9101'), q + ' après le signal,');
-        const listeGarde = await pg.evaluate(() => /Paire inventée/.test(document.body.innerText));
-        dit(listeGarde, `${q} la liste des ventes reste affichée derrière (rien ne disparaît sur un hoquet)`);
         communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+    // ── G bis. (15 octobre) Le registre s'ouvre au-dessus de Déclarations : la
+    //    liste des ventes n'est plus « derrière ». La même relecture discrète
+    //    ratée se joue donc SUR l'écran Ventes, et la liste doit y rester.
+    {
+      const q = '[G bis liste 1512]';
+      console.log('── G bis · relecture discrète ratée sur l\'écran Ventes, 1512 px');
+      const etat = {};
+      const { ctx, pg, errs } = await page(b, { width: 1512, height: 950 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3500);
+        const avant = await pg.evaluate(() => (document.body.innerText.match(/Paire inventée/g) || []).length);
+        etat.panne9101 = true;
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes' } })));
+        await pg.waitForTimeout(4000);
+        const apres = await pg.evaluate(() => (document.body.innerText.match(/Paire inventée/g) || []).length);
+        dit(avant > 0 && apres > 0, `${q} la liste des ventes reste affichée (rien ne disparaît sur un hoquet)`, `${avant} → ${apres}`);
+        dit(errs.length === 0, `${q} aucune erreur d'app`, errs.slice(0, 2).join(' | '));
       } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
       await ctx.close();
     }

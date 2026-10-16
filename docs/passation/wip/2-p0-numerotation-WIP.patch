@@ -1,0 +1,189 @@
+From 02bbf47b1f81ce53ab77486ae4a556e633c206c0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:35:13 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p0-numerotation)=20?=
+ =?UTF-8?q?=E2=80=94=20fig=C3=A9=20pour=20la=20passation=20du=2016=20octob?=
+ =?UTF-8?q?re=20(agent=20coup=C3=A9=20par=20la=20limite=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ scripts/bancs/numeros-republication.cjs | 134 ++++++++++++++++++++++++
+ src/App.jsx                             |   3 +
+ 2 files changed, 137 insertions(+)
+ create mode 100644 scripts/bancs/numeros-republication.cjs
+
+diff --git a/scripts/bancs/numeros-republication.cjs b/scripts/bancs/numeros-republication.cjs
+new file mode 100644
+index 0000000..9a50d46
+--- /dev/null
++++ b/scripts/bancs/numeros-republication.cjs
+@@ -0,0 +1,134 @@
++// ════════════════════════════════════════════════════════════════════════════
++//  REPRO « LES NOUVELLES ANNONCES NE REÇOIVENT PAS DE NUMÉRO » (15 oct.)
++//  Depuis la remise à zéro (coupure 9 oct., marqueur version 2, archive B),
++//  des dizaines d'annonces mises en ligne APRÈS n'ont AUCUNE fiche dans
++//  main.vinted_annonce_numeros. Shape PRODUCTION : items SANS created_at_ts,
++//  seulement photo.high_resolution.timestamp (un NOMBRE), dressing frais.
++//  Instrumenté : on observe quelle porte bloque (version, sales/txn, items).
++//  Aucune fixture — tout inventé à l'image de sa base.
++// ════════════════════════════════════════════════════════════════════════════
++const { chromium } = require('playwright');
++const { metaVersData } = require('./_meta.cjs');
++const http = require('http'), fs = require('fs'), path = require('path');
++const DIST = path.join(__dirname, '..', '..', 'dist');
++const PORT = 6160;
++const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
++const JETON = 'jeton-de-banc';
++const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' } };
++const UID = '900000001';          // compte connecté dans Chrome
++const UID2 = '900000002';         // autre compte (lecture publique)
++const COMPTES = [
++  { vinted_user_id: UID, login: 'cptA', access_token: 'x', refresh_token: 'x', csrf_token: 'x', updated_at: new Date().toISOString() },
++  { vinted_user_id: UID2, login: 'cptB', access_token: 'x', refresh_token: 'x', csrf_token: 'x', updated_at: new Date().toISOString() },
++];
++const T = '2026-10-09T00:00:00.000Z';
++const MK = { version: 2, coupure: T, appliqueLe: '2026-10-11T13:00:00.000Z', archive: 'B', nouvelles: 24, renum: {}, lbcAnnonces: {}, ebayAnnonces: {} };
++const now = Date.now();
++// Pool : 582 B-entrées + 24 entiers (comme la prod).
++const POOL = [...Array.from({ length: 582 }, (_, i) => 'B' + (i + 1)), ...Array.from({ length: 24 }, (_, i) => i + 1)];
++const FICHES = {};
++for (let i = 1; i <= 401; i++) FICHES['90' + i] = { numero: 'B' + i, title: 'Archive ' + i, auto: true };
++for (let i = 1; i <= 24; i++) FICHES['80' + i] = { numero: String(i), title: 'Neuve ' + i, auto: true, numberedAt: '2026-10-11T13:36:00.000Z' };
++const mainDe = () => ({ vrm_numerotation: MK, vrm_num_prefixe: '',
++  vinted_used_numeros: [...POOL], vinted_annonce_numeros: { ...FICHES }, vinted_accounts_hidden: [] });
++// Item PRODUCTION : PAS de created_at_ts ; photo.high_resolution.timestamp NOMBRE (secondes).
++const tsSec = (d) => Math.round(Date.parse(d) / 1000);
++const item = (id, dateIso, closed=false, hidden=false) => ({ id, title: 'Paire ' + id, price: { amount: '40.0', currency_code: 'EUR' },
++  is_closed: closed, is_hidden: hidden, is_draft: false, brand: 'Nike', size: '42',
++  photo: { url: `https://images1.vinted.net/t/01_${id}/f800/x.jpeg`, high_resolution: { timestamp: tsSec(dateIso) } } });
++// Dressing du compte connecté : 3 nouvelles annonces en ligne (après le 11 oct), fraîches.
++const ITEMS_A = [
++  item('10347001', '2026-10-12T12:00:00Z'),
++  item('10362001', '2026-10-13T13:00:00Z'),
++  item('10383001', '2026-10-15T06:00:00Z'),
++  item('9050', '2026-09-01T10:00:00Z', true, false),   // une fermée d'avant (archive), reste fermée
++];
++const DRESSING_A = { id: `harvest_${UID}_listings`, data: { uid: UID, capturedAt: new Date(now - 60000).toISOString(), payload: { items: ITEMS_A, pagination: { total_entries: ITEMS_A.length } } } };
++// Autre compte : lecture publique (enligne) plus récente que son dressing (ancien).
++const ITEMS_B_PUB = [ item('10389001', '2026-10-14T09:00:00Z'), item('10389002', '2026-10-15T07:00:00Z') ];
++const DRESSING_B = { id: `harvest_${UID2}_listings`, data: { uid: UID2, capturedAt: new Date(now - 5*86400000).toISOString(), payload: { items: [], pagination: { total_entries: 0 } } } };
++const ENLIGNE_B = { id: `harvest_${UID2}_enligne`, data: { type:'enligne', uid: UID2, source:'public', complet:true,
++  capturedAt: new Date(now - 90000).toISOString(), n: ITEMS_B_PUB.length, ids: ITEMS_B_PUB.map(x=>String(x.id)), items: ITEMS_B_PUB } };
++
++let ko = 0;
++const dit = (bon, quoi, detail) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
++
++const projette = (row, sel) => {
++  const out = {};
++  for (const part of sel.split(',')) {
++    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
++    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
++    if (src === 'id') { out[alias] = row.id; continue; }
++    if (src === 'data') { out[alias] = row.data; continue; }
++    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
++    out[alias] = v == null ? null : (/->>[^>]*$/.test(src) && typeof v === 'object' ? JSON.stringify(v) : (/->>[^>]*$/.test(src) ? String(v) : v));
++  }
++  return out;
++};
++
++const srv = http.createServer((q, r) => {
++  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
++  const p = path.join(DIST, f);
++  if (!fs.existsSync(p)) { r.writeHead(404); return r.end('nope'); }
++  r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
++});
++const ecouter = () => new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance ce banc seul`) : e)); srv.listen(PORT, () => res()); });
++
++const LIGNES = [DRESSING_A, DRESSING_B, ENLIGNE_B];
++
++async function page(ctx, etat) {
++  const pg = await ctx.newPage();
++  await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
++  await pg.route('**/rest/v1/**', (r) => {
++    const req = r.request();
++    const u = decodeURIComponent(metaVersData(req.url()));
++    const json = (d, s = 200) => r.fulfill({ status: s, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
++    if (/select=owner/.test(u)) return json([]);
++    if (req.method() !== 'GET') {
++      let rows = []; try { const b = JSON.parse(req.postData() || '[]'); rows = Array.isArray(b) ? b : [b]; } catch (_) {}
++      const m = rows.find((x) => x && x.id === 'main' && x.data);
++      if (m) { etat.ecrits.push(m.data); etat.main = { ...m.data, vrm_numerotation: etat.main.vrm_numerotation }; }
++      return json([]);
++    }
++    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json(COMPTES);
++    if (/id=eq\.main/.test(u) && /select=v:data->vrm_numerotation->>version/.test(u)) return json([{ v: etat.main.vrm_numerotation ? String(etat.main.vrm_numerotation.version) : null }]);
++    if (/id=eq\.main/.test(u)) return json([{ id: 'main', data: etat.main }]);
++    // Lignes harvest (dressing + enligne), avec projection select= honorée (§6.3).
++    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
++    const forme = (x) => (sel && !/^id,data|^data,updated_at|^data$/.test(sel)) ? projette(x, sel) : ({ ...x, updated_at: new Date().toISOString(), cap: x.data.capturedAt });
++    const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return json(LIGNES.filter((x) => x.id === eq[1]).map(forme));
++    const like = /id=like\.([^&]*)/.exec(u);
++    if (like) { const re = new RegExp('^' + like[1].replace(/[.]/g, '\\.').replace(/[%*]/g, '.*') + '$'); return json(LIGNES.filter((x) => re.test(x.id)).map(forme)); }
++    return json([]);
++  });
++  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
++  await pg.route('**://*.vinted.net/**', (r) => r.abort());
++  pg.__erreurs = []; pg.__logs = [];
++  pg.on('pageerror', (e) => pg.__erreurs.push(String(e).slice(0, 200)));
++  pg.on('console', (m) => pg.__logs.push(m.text()));
++  return pg;
++}
++const numerosLocaux = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); } catch (_) { return null; } });
++
++(async () => {
++  try { await ecouter(); } catch (e) { console.log('  ❌ ' + e.message); process.exit(1); }
++  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
++  try {
++    console.log('\n── Les 5 nouvelles annonces (3 cpt A dressing + 2 cpt B public) doivent recevoir 25, 26, …');
++    const etat = { main: mainDe(), ecrits: [] };
++    const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
++    await ctx.addInitScript((s) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
++    const pg = await page(ctx, etat);
++    await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' });
++    await pg.waitForTimeout(12000);
++    const n = (await numerosLocaux(pg)) || {};
++    const ids = ['10347001','10362001','10383001','10389001','10389002'];
++    const got = ids.map(id => `${id}:${(n[id]&&n[id].numero)||'—'}`).join('  ');
++    const nNew = ids.filter(id => n[id] && String(n[id].numero||'').trim()).length;
++    dit(nNew === ids.length, `les 5 nouvelles annonces ont un numéro`, got);
++    dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
++    await ctx.close();
++    console.log('\nRÉSULTAT :', ko === 0 ? 'VERT' : ko + ' ÉCHEC(S)');
++  } finally { await nav.close(); srv.close(); }
++  process.exit(ko ? 1 : 0);
++})();
+diff --git a/src/App.jsx b/src/App.jsx
+index 075923f..c5f253e 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -26613,6 +26613,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   //  • Un numéro n'est jamais réattribué à une autre paire (vinted_used_numeros).
+   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
+   useEffect(() => {
++    try { window.__numDiag = { entre:true, cloudReady, permise:numerotationPermise(), ver:JSON.parse(JSON.stringify(etatVersionNumerotation())), coupure:coupureNumerotation(), nItems:(listings.items||[]).length, salesNull:sales.items===null, txnPret, nAConfirmer:(listings.aConfirmer||[]).length }; } catch(_){}
+     if (!cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
+     // ⛔ Ni sur une version de la numérotation qu'on n'a pas relue récemment :
+     //    un écran chargé avant la remise à zéro donnerait « 553 » (migration 013).
+@@ -26678,6 +26679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       // repartirait sur un numéro neuf alors que sa boîte en porte déjà un.
+       // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
+       // n'est pas numérotée toute seule — seules les annonces republiées le sont.
++      try { (window.__numDiag.sansNum=window.__numDiag.sansNum||[]).push({ id:it.id, numerotable:annonceNumerotable(it, listingDates), createdTs:it.createdTs, dMs:dateMiseEnLigneMs(it, listingDates) }); } catch(_){}
+       if (!annonceNumerotable(it, listingDates)) continue;
+       let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
+              || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
+@@ -26699,6 +26701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     Object.values(saleOv).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
+     Object.values(nextNum).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
+     if (nextUsed.size !== beforeSize) changed = true;
++    try { window.__numDiag.changed = changed; window.__numDiag.nFiches = Object.keys(nextNum).length; } catch(_){}
+     if (changed) {
+       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
+       const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+-- 
+2.43.0
+

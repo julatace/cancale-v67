@@ -36,7 +36,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4801;
+const PORT = Number(process.env.BANC_PORT) || 4801;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '22222222-2222-2222-2222-222222222222', email: 'vendeuse@exemple.test' } };
@@ -115,7 +115,9 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
 }
 // Le panneau « Mes adresses de réception », lu sur ce qui est RENDU.
 const panneau = (pg) => pg.evaluate(() => {
-  const t = [...document.querySelectorAll('div')].find((d) => d.firstElementChild && /^Mes adresses de réception$/.test((d.firstElementChild.innerText || '').trim()));
+  // Trouvé par ce qu'il EST (`data-reglage-adresses`), pas par son titre :
+  // le titre a été reformulé le 15 octobre (« Adresses email de réception »).
+  const t = document.querySelector('[data-reglage-adresses]');
   if (!t) return null;
   const pers = t.querySelector('[data-personne]');
   const vide = t.querySelector('[data-adresses-vide]');
@@ -157,7 +159,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(!!p, 'le panneau « Mes adresses de réception » est rendu', p ? '' : 'introuvable');
         // Regarder la capture fait partie du test (§6.2) : CAPTURE_DIR=… pour l'écrire.
         if (process.env.CAPTURE_DIR) {
-          const el = pg.locator('div', { hasText: /^Mes adresses de réception/ }).last();
+          const el = pg.locator('[data-reglage-adresses]').first();
           await el.scrollIntoViewIfNeeded().catch(() => {});
           await pg.screenshot({ path: path.join(process.env.CAPTURE_DIR, `mis-de-cote-${viewport.width}.png`) }).catch(() => {});
         }
@@ -244,6 +246,19 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
       if (await b.count()) { await b.click(); await pg.waitForTimeout(2500); }
       const vu = await pg.evaluate(() => { const el = document.querySelector('[data-reglage-adresses]'); if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), h: innerHeight }; });
       dit(!!vu && vu.top < vu.h, 'et le geste mène au panneau des adresses de réception, à l’écran', JSON.stringify(vu));
+      dit(erreurs.length === 0, 'aucune erreur d’app', erreurs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+    // ⚠️ (revue du 15 octobre) Sur téléphone, le TITRE de cette ligne était
+    //    coupé (« …que personne ne pe… ») : `innerText` le rend entier même
+    //    coupé à l'écran, d'où le contrôle sur la LARGEUR dessinée.
+    await essaie('journée, propriétaire, 390 px', async () => {
+      const { ctx, pg, erreurs } = await ouvrir(nav, { reponse: corpsProprio(), registre: {}, vues: VUES, tab: 'journee', viewport: { width: 390, height: 844 } });
+      const t = await pg.evaluate(() => { const el = document.querySelector('[data-job="emails-personne"] .vrm-day-task-title'); if (!el) return null; const cs = getComputedStyle(el); return { sw: el.scrollWidth, cw: el.clientWidth, ws: cs.whiteSpace, to: cs.textOverflow, h: Math.round(el.getBoundingClientRect().height) }; });
+      if (process.env.CAPTURE_DIR) await pg.screenshot({ path: path.join(process.env.CAPTURE_DIR, 'journee-personne-390.png') }).catch(() => {});
+      dit(!!t && t.sw <= t.cw + 1 && t.ws !== 'nowrap' && t.to !== 'ellipsis', '390 px : le titre de la ligne passe à la ligne, il n’est pas coupé', JSON.stringify(t));
+      const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(r.sw <= r.cw + 1, '390 px : aucun débordement horizontal', `${r.sw} > ${r.cw}`);
       dit(erreurs.length === 0, 'aucune erreur d’app', erreurs.join(' | ').slice(0, 160));
       await ctx.close();
     });

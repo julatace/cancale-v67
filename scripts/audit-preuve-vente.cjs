@@ -217,7 +217,10 @@ function chargeApp(lignes, ko = () => false) {
   let src = ['PAGE_SB', 'lireTout', 'PAS_UNE_VENTE'].map((n) => extraire(APP, n)).join('\n');
   const bloc = BLOC_RE.exec(APP);
   if (bloc) src += '\n' + bloc[1];
-  for (const n of ['lirePreuvesVenteVinted', 'lireVentesVintedProuvees']) { try { src += '\n' + extraire(APP, n); } catch (_) {} }
+  // (15 octobre) Le lecteur unique s'appuie sur des fonctions PURES posées à
+  // côté du bloc (le détail du retrait automatique) : on les charge aussi —
+  // absentes du code d'avant, elles sont sautées.
+  for (const n of ['PAS_UN_RETOUR', 'etatRevient', 'capturesParCompte', 'detailPreuvesVinted', 'uidsDeComptes', 'lirePreuvesVenteVinted', 'lireVentesVintedProuvees']) { try { src += '\n' + extraire(APP, n); } catch (_) {} }
   src += '\n;this.R = { lirePreuves: typeof lirePreuvesVenteVinted === "function" ? lirePreuvesVenteVinted : null, lireVendus: typeof lireVentesVintedProuvees === "function" ? lireVentesVintedProuvees : null };';
   vm.runInContext(src, ctx);
   const R = ctx.R;

@@ -600,8 +600,11 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
           if (/(deux|2) minutes/i.test(c)) faux.push(`« deux minutes » dans ${f}`);
         });
         dit(faux.length === 0, 'aucune promesse fausse (rien ne part sans ton clic, deux minutes, publier sur Leboncoin) — ni affichée, ni écrite dans la page', faux.join(', '));
-        const auto = await pg.evaluate(() => { const c = document.querySelector('[data-confiance]'); return c ? c.querySelectorAll('[data-automatisme]').length : -1; });
-        dit(auto === 2, 'la confiance nomme les DEUX automatismes, éteints tant qu’on ne les allume pas', `${auto}`);
+        // (15 octobre) La réponse automatique aux messages est RETIRÉE (§3) : il ne
+        // reste qu'UN automatisme (retirer d'eBay une annonce vendue ailleurs), et
+        // aucun ne parle de répondre aux acheteurs.
+        const auto = await pg.evaluate(() => { const c = document.querySelector('[data-confiance]'); return c ? [...c.querySelectorAll('[data-automatisme]')].map((x) => x.innerText) : null; });
+        dit(!!auto && auto.length === 1 && !auto.some((x) => /r[ée]pon/i.test(x)), 'la confiance nomme le SEUL automatisme (retirer d’eBay), éteint tant qu’on ne l’allume pas — aucun ne répond aux acheteurs', JSON.stringify(auto));
         // 20. Vestiaire seulement dans la FAQ ; détourage absent tant qu'il n'est pas ouvert à tous.
         const v = await pg.evaluate(() => { const tout = (document.body.innerText.match(/Vestiaire/g) || []).length; const faq = ((document.querySelector('[data-faq]') || {}).innerText || '').match(/Vestiaire/g) || []; return { tout, faq: faq.length }; });
         dit(v.tout === v.faq, '« Vestiaire » n’apparaît que dans la FAQ (pas encore branché)', JSON.stringify(v));

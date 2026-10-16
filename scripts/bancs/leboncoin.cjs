@@ -21,17 +21,87 @@
 //     perdre une vente sur une paire qu'il a encore.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path');
-const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'lbc.js'), 'utf8');
+const SRC = fs.readFileSync(process.env.LBC_SRC || path.join(__dirname, '..', '..', 'vinted-sync-extension', 'lbc.js'), 'utf8');
+// Port libre au choix (plusieurs bancs tournent en même temps) : LBC_PORT=5811.
+// `LBC_SRC=<chemin>` lance le banc sur un lbc.js muté (preuve par réaffaiblissement).
+const PORT = Number(process.env.LBC_PORT || 4491);
 
 // ⚠️ LA VRAIE STRUCTURE, pas une invention : la page de dépôt de Leboncoin ne
 // porte qu'UN champ (`name="subject"`, « Que proposez-vous aujourd'hui ? ») —
 // c'est ce que SON navigateur a rapporté dans `lbc_recon` le 2 août, et c'est un
 // formulaire en ÉTAPES. L'en-tête, lui, porte une barre de recherche sur TOUTES
 // les pages : c'est le piège que la garde `DANS_ENTETE` écarte.
+// ══════════════════════════════════════════════════════════════════════════
+// L'ÉTAPE « PRIX · LIEU » — LA VRAIE FORME, MESURÉE SUR SON DÉPÔT DU 15 OCTOBRE
+// (`lbc_recon.etapes`, `lbc_recon.envois`) :
+//   · `price_cents` (« Prix de vente souhaité* ») est PRÉ-REMPLI par Leboncoin
+//     avec SA recommandation (`attributes.price_reco`), 3 caractères — et une
+//     recommandation peut arriver en RETARD, après que l'extension a posé ;
+//   · le champ s'écrit en EUROS (il l'a corrigé à la main : 2 caractères, « 49 ») ;
+//   · `location` est un `role="combobox"` (« Adresse ») + une liste
+//     `role="listbox"` dont les options s'écrivent « Vannes (56000) »,
+//     « Rocade de Vannes, Vannes (56000) », « Vannes-sur-Cosson (45510) »… ;
+//     choisir une option écrit « Vannes (56000) » dans le champ ;
+//   · l'interrupteur de livraison (`button role="checkbox"`, « Activer / 
+//     Désactiver la livraison ») n'apparaît QU'APRÈS le choix du lieu ;
+//   · « Continuer » reste grisé tant que le prix et le lieu manquent.
+// `?suite=boost|basdepage` : « Continuer » remplace l'étape SUR PLACE par
+// l'étape des options (une SPA, comme Leboncoin) — le parcours jusqu'à
+// « Publier ».
+// ══════════════════════════════════════════════════════════════════════════
+const PRIXLIEU_JS = String(function () {
+  var p = document.getElementById('price_cents'), loc = document.getElementById('loc'), menu = document.getElementById('loc-menu'), cont = document.getElementById('continuer'), livbox = document.getElementById('livbox');
+  window.__cont = 0; window.__recos = 0; var choisi = '';
+  function maj() { cont.disabled = !(String(p.value).trim() && choisi); }
+  // Leboncoin pose SA recommandation de prix…
+  setTimeout(function () { p.value = '120'; window.__recos++; maj(); }, 200);
+  // … et peut la réécrire en retard, une fois l'extension passée.
+  setTimeout(function () { if (!window.__pasDeRetard) { p.value = '120'; window.__recos++; maj(); } }, 2600);
+  var VILLES = ['Vannes (56000)', 'Rocade de Vannes, Vannes (56000)', 'Vannes-sur-Cosson (45510)', 'Vannes-le-Châtel (54112)', 'Saint-Martin (65360)', 'Saint-Martin (32300)'];
+  function norm(x) { return String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+  p.addEventListener('input', maj);
+  loc.addEventListener('input', function () {
+    choisi = ''; maj(); menu.innerHTML = '';
+    var q = norm(loc.value); if (!q) return;
+    setTimeout(function () {
+      menu.innerHTML = '';
+      VILLES.filter(function (v) { return norm(v).indexOf(q) >= 0; }).slice(0, 5).forEach(function (v, i) {
+        var li = document.createElement('li'); li.setAttribute('role', 'option'); li.id = 'loc-item-' + i; li.textContent = v;
+        li.addEventListener('click', function () { loc.value = v; choisi = v; menu.innerHTML = ''; afficherLivraison(); maj(); });
+        menu.appendChild(li);
+      });
+    }, 400);
+  });
+  function afficherLivraison() {
+    if (document.getElementById('liv')) return;
+    livbox.innerHTML = '<button type="button" id="liv" role="checkbox" aria-checked="false" aria-label="Activer la livraison">Livraison</button>';
+    var b = document.getElementById('liv');
+    b.addEventListener('click', function () { var on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.setAttribute('aria-label', on ? 'Désactiver la livraison' : 'Activer la livraison'); });
+  }
+  cont.addEventListener('click', function () {
+    window.__cont++;
+    var l = document.getElementById('liv');
+    window.__snap = { prix: p.value, lieu: loc.value, liv: l ? l.getAttribute('aria-checked') : 'absente' };
+    var suite = new URLSearchParams(location.search).get('suite');
+    if (suite) fetch('/frag/' + suite).then(function (r) { return r.json(); }).then(function (f) {
+      document.querySelector('main').innerHTML = f.html;
+      f.js.forEach(function (j) { var sc = document.createElement('script'); sc.textContent = j; document.body.appendChild(sc); });
+    });
+  });
+});
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'basdepage'
+  <main>${depot === 'prixlieu'
+    ? '<label for="subject">Titre de l’annonce*</label><input id="subject" name="subject" type="text" value="Titre déjà posé à la première étape">'
+      + '<label for="body">Description de l’annonce*</label><textarea id="body" name="body"></textarea>'
+      + '<label for="price_cents">Prix de vente souhaité*</label><input id="price_cents" name="price_cents" type="text">'
+      + '<div><label for="loc">Location</label><input id="loc" name="location" type="text" role="combobox" aria-label="Location" placeholder="Adresse" aria-controls="loc-menu" autocomplete="off">'
+      + '<ul id="loc-menu" role="listbox" aria-label="À quelle adresse se trouve le bien ?*"></ul></div>'
+      + '<div id="livbox"></div>'
+      + '<button type="button" id="continuer" disabled>Continuer</button>'
+      + '<scr' + 'ipt>(' + PRIXLIEU_JS + ')();</scr' + 'ipt>'
+    : depot === 'basdepage'
     // ⚠️ Étape publication SANS libellé « Publier » reconnaissable : le bouton
     //    gratuit s'appelle « Terminer » (tout en bas), au-dessus un bouton à PRIX,
     //    un « Annuler » et un « Continuer ». Prouve que la garde argent tient même
@@ -115,7 +185,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
     : depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
-      + '<label for="p2">Prix</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : le champ est en CENTIMES (lbc_recon.etapes, 19 sept.)
+      + '<label for="p2">Prix de vente souhaité*</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : `price_cents`, qui s'écrit en EUROS (15 oct.)
       + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="1">Vêtements</option><option value="2">Chaussures</option><option value="3">Sacs à main</option></select>'
       + '<label for="e2">État</label><select id="e2" name="condition"><option value=""></option><option value="1">Neuf</option><option value="2">Très bon état</option><option value="3">Satisfaisant</option></select>'
       + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple accept="image/*">'
@@ -151,8 +221,14 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
-  await new Promise((res) => srv.listen(4491, res));
+  const fragment = (nom) => {
+    const main = (/<main>([\s\S]*)<\/main>/.exec(PAGE(nom)) || [])[1] || '';
+    return { html: main.replace(/<script>[\s\S]*?<\/script>/g, ''), js: [...main.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]) };
+  };
+  const srv = http.createServer((q, r) => {
+    if (/^\/frag\//.test(q.url)) { r.writeHead(200, { 'content-type': 'application/json' }); r.end(JSON.stringify(fragment(q.url.split('/')[2]))); return; }
+    r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/prixlieu/.test(q.url) ? 'prixlieu' : /basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  await new Promise((res) => srv.listen(PORT, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -178,7 +254,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     };
   }, { queue: QUEUE, removals: REMOVALS, ventes: VENTES });
 
-  await pg.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+  await pg.goto('http://localhost:' + PORT + '/', { waitUntil: 'domcontentloaded' });
   await pg.addScriptTag({ content: SRC });
   await pg.waitForTimeout(1200);
 
@@ -222,7 +298,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });   // ⚠️ auto : plus de bouton « Pré-remplir »
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p2.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2.goto('http://localhost:' + PORT + '/depot', { waitUntil: 'domcontentloaded' });
     await p2.addScriptTag({ content: SRC });
     // ⚠️ L'extension fait tout TOUTE SEULE (Julien, 20 sept.) : plus de « Pré-remplir »
     //    à cliquer. Sur une page de dépôt, `autoPrefill` lit la paire en attente
@@ -262,7 +338,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
         return rep({ ok: true }); }, onMessage: { addListener(fn) { window.__ecouteurs.push(fn); } } } };
     }, { queue: QUEUE });
-    await p2b.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2b.goto('http://localhost:' + PORT + '/depot', { waitUntil: 'domcontentloaded' });
     await p2b.addScriptTag({ content: SRC });
     await p2b.waitForTimeout(2500);
     const id = String(QUEUE[0].id);
@@ -310,7 +386,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p3.goto('http://localhost:4491/recherche', { waitUntil: 'domcontentloaded' });
+    await p3.goto('http://localhost:' + PORT + '/recherche', { waitUntil: 'domcontentloaded' });
     await p3.addScriptTag({ content: SRC });
     await p3.waitForTimeout(2500);
     const filtres = await p3.evaluate(() => ({
@@ -358,7 +434,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0, lbcJamaisLu: true } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p4.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+    await p4.goto('http://localhost:' + PORT + '/', { waitUntil: 'domcontentloaded' });
     await p4.addScriptTag({ content: SRC });
     await p4.waitForTimeout(1100);
     dit(!e4.length, 'aucune erreur sur une page au nouveau format', e4[0] || '');
@@ -410,7 +486,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await p6.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await p6.goto('http://localhost:' + PORT + '/depot/etape2', { waitUntil: 'domcontentloaded' });
     await p6.addScriptTag({ content: SRC });
     await p6.waitForTimeout(4200);           // surveillance à la seconde + pose 1re photo (700ms) puis groupée (900ms)
     const etat = await p6.evaluate(() => ({
@@ -436,16 +512,93 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(/état/i.test(etat.etatSel || ''), 'et l\'état aussi', 'choisi : « ' + etat.etatSel + ' »');
     dit(etat.titre === QUEUE[0].title && !!etat.prix && !!etat.desc, 'titre, prix et description sont remplis',
       'titre « ' + etat.titre.slice(0, 24) + ' » · prix ' + etat.prix);
-    // ⚠️⚠️ LE CHAMP `price_cents` ATTEND DES CENTIMES. Mesuré le 19 septembre :
-    //    l'ancien code posait 99 → Leboncoin affichait 0,99 €. Le prix (99,00 €)
-    //    doit devenir 9900, en ENTIER. C'est le nom du champ qui porte l'unité.
-    const attenduCents = String(Math.round(Number(QUEUE[0].price) * 100));
-    dit(etat.prix === attenduCents, 'le prix est posé en CENTIMES (99,00 € → 9900), pas en euros dans un champ _cents',
-      'champ price_cents = « ' + etat.prix +' » (attendu ' + attenduCents + ')');
+    // ⚠️⚠️ 15 OCTOBRE : `price_cents` S'ÉCRIT EN EUROS. La règle « centimes »
+    //    (5.82) venait du NOM du champ, jamais d'une page vue. Mesuré sur SON
+    //    dépôt : il a corrigé le prix à la main en « 49 » (2 caractères) — un
+    //    humain tape des euros. 99,00 € → « 99 », jamais « 9900 » (9 900 €).
+    dit(etat.prix === '99', 'le prix est posé en EUROS, comme il le tape (99,00 € → « 99 », jamais « 9900 »)',
+      'champ price_cents = « ' + etat.prix + ' » (attendu 99)');
     // Le bandeau écrit le CHIFFRE, jamais « c'est prêt ».
     dit(/3 photos attachées/.test(etat.bandeau), 'le bandeau écrit combien de photos ont été attachées',
       (etat.bandeau || '').replace(/\n/g, ' ').slice(0, 90));
     await p6.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  15 OCTOBRE — « UN PRIX AU PIF », LA LOCALISATION, LA LIVRAISON, PUIS
+  //  CONTINUER — sur la VRAIE forme de l'étape (voir PRIXLIEU_JS)
+  // ══════════════════════════════════════════════════════════════════════════
+  const montePrixLieu = async (ad, opts = {}) => {
+    const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await pg.addInitScript((d) => {
+      if (d.sansRetard) window.__pasDeRetard = true;
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: [] });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad, sansRetard: !!opts.sansRetard });
+    await pg.goto('http://localhost:' + PORT + '/depot/prixlieu', { waitUntil: 'domcontentloaded' });
+    await pg.addScriptTag({ content: opts.src || SRC });
+    if (opts.pendant) await opts.pendant(pg);
+    await pg.waitForTimeout(opts.attente || 7000);
+    const r = await pg.evaluate(() => ({
+      prix: document.getElementById('price_cents').value, lieu: document.getElementById('loc').value,
+      liv: document.getElementById('liv') ? document.getElementById('liv').getAttribute('aria-checked') : 'absente',
+      cont: window.__cont || 0, snap: window.__snap || null, recos: window.__recos || 0,
+      bandeau: ((document.getElementById('vrm-lbc-banner') || {}).innerText || '').replace(/\s+/g, ' '),
+    }));
+    r.errs = errs; await pg.close(); return r;
+  };
+  {
+    const adOk = { ...QUEUE[0], price: 99, lieu: 'Vannes', lieuEtat: 'ok' };
+    const r = await montePrixLieu(adOk);
+    dit(!r.errs.length, 'aucune erreur sur l’étape prix · lieu', r.errs[0] || '');
+    dit(r.recos >= 2 && r.prix === '99', 'le prix est celui de VINTED (99), posé PAR-DESSUS la recommandation de Leboncoin — même réécrite en retard',
+      `champ « ${r.prix} » · recommandations de Leboncoin posées : ${r.recos} (« 120 »)`);
+    dit(r.lieu === 'Vannes (56000)', 'le LIEU est celui rempli dans VRM, choisi dans la liste sur correspondance EXACTE (pas « Rocade de Vannes », pas « Vannes-sur-Cosson »)', `champ « ${r.lieu} »`);
+    dit(r.liv === 'true', 'la LIVRAISON est activée (l’interrupteur apparu après le lieu)', 'aria-checked = ' + r.liv);
+    dit(r.cont >= 1 && r.snap && r.snap.prix === '99' && r.snap.lieu === 'Vannes (56000)' && r.snap.liv === 'true',
+      'puis « Continuer » — cliqué SEULEMENT quand prix, lieu et livraison sont posés', 'au clic : ' + JSON.stringify(r.snap) + ' · clics ' + r.cont);
+    dit(/Prix 99 € \(celui de Vinted\)/.test(r.bandeau) && /Lieu Vannes \(56000\)/.test(r.bandeau) && /Livraison activée/.test(r.bandeau),
+      'le bandeau DIT le prix, le lieu et la livraison posés', r.bandeau.slice(0, 220));
+  }
+  {
+    // Rien de rempli dans VRM : on ne devine pas une ville, on le DIT, et on dit OÙ.
+    const r = await montePrixLieu({ ...QUEUE[0], price: 99, lieu: '', lieuEtat: 'vide' });
+    dit(r.lieu === '' && r.cont === 0, 'aucune ville remplie dans VRM ⇒ aucun lieu deviné, et pas de « Continuer »', `champ « ${r.lieu} » · clics ${r.cont}`);
+    dit(/Ta ville/.test(r.bandeau) && /Réglages/.test(r.bandeau), 'et le bandeau dit où la remplir (VRM → Réglages → Ta ville)', r.bandeau.slice(0, 220));
+  }
+  {
+    // Deux villes homonymes : JAMAIS « la première de la liste ».
+    const r = await montePrixLieu({ ...QUEUE[0], price: 99, lieu: 'Saint-Martin', lieuEtat: 'ok' });
+    dit(!/\(\d{5}\)/.test(r.lieu) && r.cont === 0, 'deux villes du même nom ⇒ aucune n’est choisie au hasard', `champ « ${r.lieu} »`);
+    dit(/plusieurs/i.test(r.bandeau), 'et le bandeau demande de choisir la bonne', r.bandeau.slice(0, 200));
+    // Le code postal donné départage : une seule correspond, elle est choisie.
+    const r2 = await montePrixLieu({ ...QUEUE[0], price: 99, lieu: 'Saint-Martin 32300', lieuEtat: 'ok' });
+    dit(r2.lieu === 'Saint-Martin (32300)', 'avec son code postal, la bonne est choisie', `champ « ${r2.lieu} »`);
+    // Un code postal qui ne correspond à aucune suggestion : rien n'est choisi.
+    const r3 = await montePrixLieu({ ...QUEUE[0], price: 99, lieu: 'Vannes 44000', lieuEtat: 'ok' }, { attente: 9000 });
+    dit(!/\(\d{5}\)/.test(r3.lieu), 'un code postal qui ne correspond à aucune suggestion ⇒ rien n’est choisi', `champ « ${r3.lieu} »`);
+    dit(/aucune suggestion exacte/i.test(r3.bandeau), 'et le bandeau le dit', r3.bandeau.slice(0, 200));
+  }
+  {
+    // Prix Vinted inconnu : la recommandation de Leboncoin est un nombre deviné.
+    const r = await montePrixLieu({ ...QUEUE[0], price: null, lieu: 'Vannes', lieuEtat: 'ok' });
+    dit(r.prix === '' && r.cont === 0, 'prix Vinted inconnu ⇒ le champ reste VIDE (la recommandation « 120 » est retirée) et on ne continue pas',
+      `champ « ${r.prix} » · clics ${r.cont}`);
+    dit(/Prix Vinted inconnu/.test(r.bandeau), 'et le bandeau le dit', r.bandeau.slice(0, 200));
+  }
+  {
+    // Ce qu'il TAPE lui-même n'est jamais écrasé (frappe réelle, isTrusted).
+    const r = await montePrixLieu({ ...QUEUE[0], price: 99, lieu: 'Vannes', lieuEtat: 'ok' }, {
+      sansRetard: true, attente: 3500,
+      pendant: async (pg) => { await pg.waitForTimeout(3000); await pg.click('#price_cents', { clickCount: 3 }); await pg.keyboard.type('85'); },
+    });
+    dit(r.prix === '85', 'un prix qu’il tape lui-même n’est JAMAIS réécrit', `champ « ${r.prix} »`);
+    dit(/Prix : le tien/.test(r.bandeau), 'et le bandeau dit que c’est le sien', r.bandeau.slice(0, 160));
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -481,7 +634,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad });
-    await pg.goto('http://localhost:4491/depot/etape3', { waitUntil: 'domcontentloaded' });
+    await pg.goto('http://localhost:' + PORT + '/depot/etape3', { waitUntil: 'domcontentloaded' });
     await pg.addScriptTag({ content: SRC });
     await pg.waitForTimeout(3200);   // surveillance à la seconde + ouverture des menus
     const r = await lireCombos(pg); r.errs = errs;
@@ -512,7 +665,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await pg.goto('http://localhost:4491/depot/photoscont', { waitUntil: 'domcontentloaded' });
+    await pg.goto('http://localhost:' + PORT + '/depot/photoscont', { waitUntil: 'domcontentloaded' });
     await pg.addScriptTag({ content: SRC });
     await pg.waitForTimeout(8000);
     const r = await pg.evaluate(() => ({ cont: window.__contAt || [], photos: window.__photoAt || [],
@@ -570,7 +723,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    uploader (c'est ce que Julien voit). On le prouve à la main.
     const pbulk = await b.newPage({ viewport: { width: 1200, height: 900 } });
     await pbulk.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
-    await pbulk.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    await pbulk.goto('http://localhost:' + PORT + '/depot/photos1', { waitUntil: 'domcontentloaded' });
     const nBulk = await pbulk.evaluate(() => {
       const uf = document.getElementById('uf');
       const dt = new DataTransfer();
@@ -586,7 +739,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const eseq = []; pseq.on('pageerror', (e) => eseq.push(e.message));
     await pseq.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await pseq.addInitScript(initChrome, { ad: adPhotos });
-    await pseq.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    await pseq.goto('http://localhost:' + PORT + '/depot/photos1', { waitUntil: 'domcontentloaded' });
     await pseq.addScriptTag({ content: SRC });
     await pseq.waitForTimeout(5000);   // pose séquentielle + attentes entre photos
     const nSeq = await pseq.evaluate(() => document.querySelectorAll('#previews img').length);
@@ -603,7 +756,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const ereel = []; preel.on('pageerror', (e) => ereel.push(e.message));
     await preel.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await preel.addInitScript(initChrome, { ad: adPhotos });
-    await preel.goto('http://localhost:4491/depot/photosreel', { waitUntil: 'domcontentloaded' });
+    await preel.goto('http://localhost:' + PORT + '/depot/photosreel', { waitUntil: 'domcontentloaded' });
     await preel.addScriptTag({ content: SRC });
     await preel.waitForTimeout(6000);
     const reel = await preel.evaluate(() => ({
@@ -624,15 +777,18 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    sur publier sans booster »). L'étape options ne porte que des cases de
     //    boost PAYANTES : on les décoche TOUTES, on clique le dépôt GRATUIT,
     //    JAMAIS le payant. §6.1 par réaffaiblissement (retirer la garde « prix »).
-    const adPub = { ...QUEUE[0], publier: true, photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'] };
-    const lancerBoost = async (srcJs) => {
+    // ⚠️ 15 octobre : on ne publie JAMAIS sans un prix vérifié. Le parcours part
+    //    donc de l'étape « prix · lieu » (la vraie forme, ci-dessus) et
+    //    « Continuer » mène, SUR PLACE, à l'étape des options.
+    const adPub = { ...QUEUE[0], publier: true, lieu: 'Vannes', lieuEtat: 'ok', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'] };
+    const lancerBoost = async (srcJs, url) => {
       const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad: adPub });
-      await pg.goto('http://localhost:4491/depot/boost', { waitUntil: 'domcontentloaded' });
+      await pg.goto('http://localhost:' + PORT + (url || '/depot/prixlieu?suite=boost'), { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: srcJs });
-      await pg.waitForTimeout(9000);
+      await pg.waitForTimeout(url ? 9000 : 15000);
       const r = await pg.evaluate(() => ({
         pub: window.__pub, paid: window.__paid,
         coches: [...document.querySelectorAll('fieldset input[type=checkbox]')].filter((c) => c.checked).map((c) => c.name),
@@ -653,6 +809,15 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       if (faible === SRC) dit(false, 'la garde « prix » attendue est introuvable — l\'audit ne prouve rien');
       else { const { r } = await lancerBoost(faible); dit(r.paid >= 1, '§6.1 — sans la garde « prix », le bouton PAYANT EST cliqué (donc la garde protège de la dépense)', '__paid=' + r.paid + ' __pub=' + r.pub); }
     }
+    {
+      // ⚠️⚠️ 15 octobre — « PAS SU » NE VAUT PAS « OUI » : l'étape des options
+      //    atteinte SANS que le prix ait été vu sur cette page ⇒ rien n'est
+      //    publié, et le bandeau dit pourquoi.
+      const { r, errs } = await lancerBoost(SRC, '/depot/boost');
+      dit(!errs.length, 'aucune erreur sur une étape d’options atteinte sans prix vu', errs[0] || '');
+      dit(r.pub === 0 && r.paid === 0, 'prix jamais vu sur la page ⇒ « Publier » n’est PAS cliqué (ni gratuit ni payant)', '__pub=' + r.pub + ' __paid=' + r.paid);
+      dit(/pas vu le prix/i.test(r.bandeau), 'et le bandeau le dit', (r.bandeau || '').replace(/\n/g, ' ').slice(-110));
+    }
     // 5) ⚠️ DEVINER LE BOUTON DU BAS (Julien, 20 sept. : « il est tout en bas ; même
     //    si tu ne l'as pas, essaie de le deviner »). Sur une étape SANS libellé
     //    « Publier », on clique le bouton le PLUS BAS qui n'est ni à prix, ni
@@ -662,9 +827,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad: adPub });
-      await pg.goto('http://localhost:4491/depot/basdepage', { waitUntil: 'domcontentloaded' });
+      await pg.goto('http://localhost:' + PORT + '/depot/prixlieu?suite=basdepage', { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: SRC });
-      await pg.waitForTimeout(9000);
+      await pg.waitForTimeout(15000);
       const r = await pg.evaluate(() => ({ fin: window.__fin, paidx: window.__paidx, annx: window.__annx, prev: document.querySelectorAll('#previews img').length, gallery: !!document.querySelector('input[name=gallery]:checked'), banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
       await pg.close();
       dit(r.fin === 1, 'sans libellé « Publier », le bouton le PLUS BAS (« Terminer ») est cliqué', '__fin=' + r.fin + ' prev=' + r.prev + ' gallery_encore_cochee=' + r.gallery + ' | ' + (r.banner || '').replace(/\n/g, ' ').slice(0, 70));
@@ -695,7 +860,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await pd.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await pd.goto('http://localhost:' + PORT + '/depot/etape2', { waitUntil: 'domcontentloaded' });
     const AUTO = 'Superbe paire, taille 40, portée deux fois. Envoi rapide et soigné.';
     await pd.evaluate((txt) => {
       const el = document.querySelector('textarea[name="body"]');
@@ -739,7 +904,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         return rep({ ok: true });
       }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p7.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p7.goto('http://localhost:' + PORT + '/depot', { waitUntil: 'domcontentloaded' });
     await p7.addScriptTag({ content: SRC });
     await p7.waitForTimeout(1400);
     const apres1 = await p7.evaluate(() => window.__formes.length);

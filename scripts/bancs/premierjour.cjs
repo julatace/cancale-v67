@@ -140,6 +140,19 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     }
     if (baseKO) return r.fulfill({ status: 522, contentType: 'text/html', body: '<html>error 522</html>' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comptes) });
+    // (15 octobre) Un compte lié dont l'extension a LU une boutique vide : des
+    // captures présentes et vides (ventes, achats, boîte, dressing lu en entier
+    // à 0). Sans elles, rien n'est lu — et « Tout est à jour » serait la fête
+    // sur une lecture ratée, le mensonge que ce banc existe pour attraper.
+    const dec = decodeURIComponent(u);
+    const cap = new Date().toISOString();
+    const ligne = (id, payload) => ({ id, data: { capturedAt: cap, payload }, updated_at: cap, cap });
+    for (const c of comptes) {
+      const uid = c.vinted_user_id;
+      if (dec.includes(`harvest_${uid}_orders_`)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([ligne(`harvest_${uid}_orders_sold`, { my_orders: [] }), ligne(`harvest_${uid}_orders_purchased`, { my_orders: [] })]) });
+      if (dec.includes(`id=eq.harvest_${uid}_inbox`)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([ligne(`harvest_${uid}_inbox`, { conversations: [] })]) });
+      if (dec.includes(`id=eq.harvest_${uid}_listings`)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([ligne(`harvest_${uid}_listings`, { items: [], pagination: { total_entries: 0 } })]) });
+    }
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
   await pg.route('**/api/**', (r) => (/mode=session-extension/.test(r.request().url())

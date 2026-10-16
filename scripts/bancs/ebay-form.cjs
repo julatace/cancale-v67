@@ -239,7 +239,20 @@ const envoisEbay = []; let avertir = false;
   const nPub = envoisEbay.filter((x) => x.action === 'publish').length;
   const pubBtn = pg.getByRole('button', { name: /^Publier sur eBay/ }).last();
   const pubActif = await pubBtn.isEnabled().catch(() => false);
-  if (pubActif) await pubBtn.click();
+  // (15 octobre) La paire N°401 n'a que 3 de ses 9 photos captées : « Publier »
+  // DEMANDE d'abord s'il faut partir avec 3 photos sur 9 (jamais en silence —
+  // `ebay-photos-clic.cjs` le prouve). On passe cette feuille-là pour juger
+  // celle de la règle d'offre, qui est le sujet de ce bloc.
+  const passerFeuillePhotos = async () => {
+    const f = pg.locator('div[style*="z-index: 2000"]');
+    const vu = await f.waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+    if (!vu || !/photos? sur 9/.test(await f.innerText().catch(() => ''))) return false;
+    await pg.waitForFunction(() => !document.getAnimations().some((a) => /cancale(FadeIn|Sheet)/.test(a.animationName || '') && a.playState === 'running'), null, { timeout: 6000 }).catch(() => {});
+    await f.getByRole('button', { name: 'Publier quand même' }).click({ force: true, timeout: 6000 });
+    await f.first().waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
+    return true;
+  };
+  if (pubActif) { await pubBtn.click(); await passerFeuillePhotos(); }
   const feuilleV = await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
   const feuilleT = feuilleV ? await pg.locator('div[style*="z-index: 2000"]').innerText() : '';
   if (feuilleV) { await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(600); }
@@ -250,7 +263,7 @@ const envoisEbay = []; let avertir = false;
   // la règle doit le dire comme la carte (`resultatRegleOffre`, §11) — jamais
   // « pas encore relue » sur un seuil relu.
   if (pubActif) {
-    await pubBtn.click(); await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 });
+    await pubBtn.click(); await passerFeuillePhotos(); await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 });
     await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Oui, publier' }).click();
   }
   const po = await pg.waitForSelector('[data-publie-offre]', { timeout: 8000 }).then(() => pg.$eval('[data-publie-offre]', (e) => [e.getAttribute('data-publie-offre'), e.getAttribute('data-publie-offre-issue'), e.innerText])).catch(() => [null, null, '']);

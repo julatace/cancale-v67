@@ -25,6 +25,13 @@ import { aExpedier } from './widget.js';
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+// (15 octobre) La veille d'achat : les recherches où l'alerte est allumée, le matin.
+import { veilleDuMatin } from './_lib/veille.js';
+import { accesVendeur } from './_lib/abonnement.js';
+// Le régime fiscal du vendeur (profil « Mon entreprise ») : le rappel URSSAF du
+// 1er parle d'autoentrepreneur.urssaf.fr — il n'a de sens qu'en micro (§11, la
+// même règle que l'app : `regimeEffectif`).
+import { regimeEffectif } from './_lib/facturation.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -299,16 +306,27 @@ async function traiterVendeur() {
     try {
       const mois = today.slice(0, 7);
       if (today.endsWith('-01')) {
+        // ⚠️ « Déclare ton CA sur autoentrepreneur.urssaf.fr » n'a de sens que
+        // pour une MICRO-entreprise : une société ou une EI au réel recevait ce
+        // rappel quand même (16 octobre). Le régime se lit dans `main` (déjà
+        // lu ci-dessus) ; `main` illisible = pas su ⇒ on se tait — envoyer le
+        // MAUVAIS geste à une société coûte plus qu'un rappel manqué un mois.
+        // Pas de profil déclaré ⇒ micro (le comportement d'avant, inchangé).
+        const regime = mLu === undefined ? null : regimeEffectif(m.vrm_profil_entreprise, m.vinted_regime);
+        if (regime === null) urssaf = 'profil pas lu — rien envoyé';
+        else if (regime !== 'micro') urssaf = 'pas une micro-entreprise — rien envoyé';
+        else {
         const deja = (await getRow('urssaf_reminder_dedup')) || {};
         if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
           await sendPushToAll({
             title: '🧾 Déclaration URSSAF',
             body: 'Nouveau mois : pense à déclarer ton chiffre d\'affaires sur autoentrepreneur.urssaf.fr.',
             tag: 'urssaf-' + mois,
-            url: '/?tab=dashboard',
+            url: '/?tab=fiscal',
           });
           await ecrireDedup('urssaf_reminder_dedup', { mois });
           urssaf = 'envoyé';
+        }
         }
       }
     } catch (_) { urssaf = 'échec'; }
@@ -319,6 +337,13 @@ async function traiterVendeur() {
     // n'empêche jamais le rappel d'expédition.
     let bilan = null;
     try { bilan = await bilanDeLaSemaine(); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
+    // VEILLE D'ACHAT (15 octobre) — même place et même garde que le bilan : un
+    // échec de la veille n'empêche jamais le rappel d'expédition. Rien ne part
+    // si aucune recherche n'a son alerte allumée (aucun appel à eBay).
+    let veille = null;
+    try { veille = await veilleDuMatin({ owner: proprietaireCourant() || '', envoyer: sendPushToAll, categorieActive: pushCategorieActive, acces: accesVendeur }); }
+    catch (e) { veille = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
@@ -344,11 +369,11 @@ async function traiterVendeur() {
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) return { urssaf, bilan, skipped: 'resume absent — aucune notification envoyee' };
+    if (!attente) return { urssaf, bilan, veille, skipped: 'resume absent — aucune notification envoyee' };
     // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
     //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
     //    et la notification annoncerait des colis déjà partis. On se tait.
-    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, skipped: 'réglages illisibles — aucune notification envoyée' };
+    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, veille, skipped: 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
@@ -367,7 +392,7 @@ async function traiterVendeur() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, veille, skipped: 'déjà notifié', total };
 
     if (total > 0 && await pushCategorieActive('expedier')) {
       const parts = [];
@@ -382,7 +407,7 @@ async function traiterVendeur() {
       });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total });
-    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total };
+    return { urssaf, bilan, veille, overdue, dueToday, dueTomorrow, total };
 }
 
 export default async function handler(req, res) {

@@ -1,0 +1,155 @@
+From 1b0904cbbc04ea98a0a2342da107d7c410e22686 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:35:14 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p1-fiscal)=20=E2=80=94=20fi?=
+ =?UTF-8?q?g=C3=A9=20pour=20la=20passation=20du=2016=20octobre=20(agent=20?=
+ =?UTF-8?q?coup=C3=A9=20par=20la=20limite=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ CLAUDE.md                | 99 ++++++++++++++++++++++++++++++++++++++++
+ scripts/bancs/fiscal.cjs | 14 ++++++
+ 2 files changed, 113 insertions(+)
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index d8a8e3a..ee31358 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -10677,6 +10677,105 @@ lignes, la règle ne change QUE celle-là.
+   priorité moyenne) ; le widget ne lit pas le détail 440 (la règle de liste
+   suffit au cas mesuré, et le résumé posé par l'extension est corrigé).
+ 
++### ⚠️⚠️ RELECTURE DU LOT FISCAL : NEUF DÉFAUTS REPRODUITS, NEUF CORRIGÉS (16 octobre)
++Relecture adverse du lot ci-dessus (ab3e057), chaque défaut REPRODUIT avant
++d'être corrigé (rendu + routes exécutées), puis prouvé : **rouge sur ab3e057,
++vert après, rouge sous mutation** (7 mutations node + 2 builds mutés).
++1. ⚠️⚠️ **Le tableau de bord parlait micro à tout le monde.** Société ou EI au
++   réel : « À payer (13,5 %) 135,00 € », « Déclarer sur l'URSSAF → »,
++   « (versement libératoire) », « Prochaine déclaration URSSAF » — à côté d'un
++   profil qui dit « tes cotisations ne sont pas un % du CA » (§11, deux verdicts).
++   Et le **rappel du 1ᵉʳ** (`api/ship-reminders`) partait chez une société.
++   ⇒ **`FACT.regimeEffectif(profil, vinted_regime)`** — UNE règle, lue par le
++   tableau de bord ET le serveur : pas de profil déclaré ⇒ `micro` (rien ne
++   change en silence) ; `reel`/`marge` ⇒ tuile « Cotisations — · au réel : pas
++   un % du CA » (les mots du rapport), aucune échéance URSSAF, et le récap
++   mensuel (tableau + CSV) écrit « — ». Le rappel du 1ᵉʳ ne part qu'en micro ;
++   profil **illisible ⇒ on se tait** (le MAUVAIS geste à une société coûte plus
++   qu'un rappel manqué). Micro sans VL : la phrase ne dit plus « (versement
++   libératoire) » — elle suit `p.vl`, pas une formule. Le « pas fait (4) » du
++   lot est donc réglé ici même.
++2. ⚠️⚠️ **Au réel, l'écran disait « Cotisations — » et les QUATRE exports
++   (CSV + PDF, rapport mensuel + bilan annuel) écrivaient encore « Estimation
++   cotisations (13,5%) »** avec un montant — le document du comptable portait un
++   chiffre que l'écran refuse. Les quatre testent `'reel'` et écrivent
++   « Cotisations : au reel : pas un % du CA - non estimees ». L'autre sens est
++   au banc : en micro, l'estimation RESTE.
++3. **Après « la base n'a pas confirmé l'écriture », un second clic émettait une
++   2ᵉ facture** (chaque clic tirait un jeton neuf). ⇒ Le jeton est celui du
++   FORMULAIRE, et `FACT.emettre({ jeton })` vérifie ce jeton **à chaque tour** :
++   un document déjà écrit sous ce jeton EST l'émission (`deja`), jeton illisible
++   ⇒ rien n'est émis. Et l'app vérifie la **source** avant d'émettre
++   (`factureVivanteParSource`) : « cette vente a déjà sa facture n° X » — sauf
++   si elle est entièrement annulée par ses avoirs.
++4. **Une facture s'émettait sans AUCUNE identité de client** et le document
++   imprimait « Client » à la place du nom (« Client Client » sur l'avoir).
++   ⇒ `construireDocument` exige nom OU email pour une facture (l'avoir copie sa
++   facture), le formulaire exige le NOM, et un vieux document sans client
++   affiche « (non renseigné) », jamais le titre de rubrique répété.
++5. **La nouvelle suite repartait à 2026-000001 par-dessus une ancienne facture
++   `vinted_invoices` du même numéro.** ⇒ `rangsReserves(anciennes, annee)` :
++   les rangs des anciens numéros « AAAA-NNNNNN » ne se redonnent jamais — app
++   ET serveur (qui lit `vinted_invoices` dans sa projection de `main`).
++6. ⚠️ **Deux traitements SIMULTANÉS du même email de vente Pro = deux factures**
++   (le contrôle par sourceId ne protège que des rejeux successifs). ⇒ Une
++   **réclamation atomique** (`source_facture_{key}`, insérée en
++   `ignore-duplicates`, hors du motif `facture_*`) : le premier émet avec SON
++   jeton, le second lit ce jeton et retrouve la facture — ou répond 503 (rejoué).
++   Réclamation orpheline (> 10 min sans document) : reprise avec le MÊME jeton —
++   le contrôle par jeton de `emettre` rend la reprise idempotente.
++7. **Une vente Pro arrivée profil incomplet n'était JAMAIS facturée**, et la
++   notification laissait croire le contraire. ⇒ La vente est **GARDÉE** dans sa
++   ligne d'envoi (`status: 'profil'`, la vente, aucun numéro) ; Factures la
++   liste « en attente de ton profil » avec **« Émettre sa facture »** (un clic,
++   même boucle, sourceId ⇒ jamais deux) ; un rejeu de l'email l'émet aussi et
++   remplace la ligne. La notification dit la suite réelle. Écriture de la ligne
++   ratée ⇒ 503 (perdre cette ligne = perdre la facture).
++8. **« Julie Exemple (EI) EI »** : la regex de `nomVendeur` ne reconnaissait
++   « EI » qu'entre espaces — « (EI) » et « EI. » doublaient le suffixe, sur
++   l'aperçu ET figé dans la facture.
++9. **« Mon entreprise »** : placeholder = seul libellé (rempli, plus rien ne
++   disait que « Saint-Malo » est la ville du RCS), « Code posta » coupé à
++   390 px, « 4 à compléter » qui comptait « ton régime de TVA » (pas une
++   coordonnée), et l'avoir disait deux fois sa facture (badge + désignation,
++   §7). ⇒ Libellé VISIBLE au-dessus de chaque champ (placeholder = exemple),
++   `manquePourFacturerDetaille` sépare coordonnées et choix de régime, et la
++   désignation d'un avoir est l'ARTICLE (le document cite déjà son origine).
++- Preuves : `audit-facturation.cjs` **85 contrôles — 14 rouges sur ab3e057**
++  (le script copié DANS la copie d'ab3e057 et lancé depuis elle, §6.1) ;
++  `bancs/fiscal.cjs` sections G/I/J/K/L — **12 rouges sur le build d'ab3e057** ;
++  `bancs/fiscal-rapports.cjs` (nouveau : les 4 exports téléchargés et LUS, PDF
++  décompressés) — **5 rouges**. Mutations node, chacune rouge SEULE à l'audit :
++  contrôle jeton d'`emettre` retiré · réserves retirées · regex EI d'avant ·
++  client non exigé (`construireDocument`) · réclamation retirée (B8) · vente
++  non gardée (B9) · gate du rappel retirée (C). Builds mutés : (1) quatre
++  mutations app à la fois, chaque section n'étant touchée que par la sienne —
++  gate du tableau de bord ⇒ **G rouge** (6 KO), nom du client non exigé au
++  formulaire ⇒ **J rouge**, `reserves: []` ⇒ **K rouge** ; (2) le contrôle
++  jeton d'`emettre` retiré du build ⇒ **I rouge** (« facture_2026_000001,
++  facture_2026_000002 », le défaut d'origine). Les exports : la mutation EST le
++  code d'avant (les 5 rouges ci-dessus).
++- ⚠️ **Mesuré et dit tel quel : « jeton par clic » SEUL laisse I vert.** Dans
++  le build muté (1), la section I reste verte : quand le jeton ne se relit pas,
++  `emettre` refuse d'écrire (`raison: 'lecture'`) — rien ne part au premier
++  clic, donc rien à dédoubler au second. C'est de la défense en profondeur
++  (trois couches : jeton stable du formulaire · refus « pas su » d'`emettre` ·
++  vérification de la source), pas un contrôle vacant : retirer la couche
++  d'`emettre` (build muté 2) rend bien les DEUX documents du défaut d'origine.
++  Un contrôle de banc ne tombe que quand TOUTES les couches qui le couvrent
++  tombent — le prouver couche par couche se fait à l'audit (les 7 node).
++- ⚠️ **Vingt-huitième cri au loup évité de justesse, dans l'autre sens** :
++  `audit-urssaf.cjs` (« aucun 13,5 % en dur ») s'est déclenché sur MON
++  commentaire JSX qui cite le libellé d'avant — il ne neutralisait que les
++  lignes commençant par `//`. Les blocs `/* … */` sont maintenant blanchis en
++  gardant les retours à la ligne (la règle du dossier, § balayage des sondes).
++- **Tranché (Julien ne veut pas de questions)** : le régime `'marge'` (société
++  au régime de la marge) est traité comme « pas micro » sur le tableau de bord
++  (pas d'estimation URSSAF, renvoi au rapport comptable) — une société ne
++  déclare pas sur autoentrepreneur.urssaf.fr, marge ou pas. L'adresse du client
++  reste facultative (sur-bloquer ferait rater des factures légitimes) ; seul le
++  NOM est exigé au formulaire, nom OU email dans la règle partagée.
++
+ ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
+ Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
+ ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
+diff --git a/scripts/bancs/fiscal.cjs b/scripts/bancs/fiscal.cjs
+index 9342038..304ce22 100644
+--- a/scripts/bancs/fiscal.cjs
++++ b/scripts/bancs/fiscal.cjs
+@@ -221,6 +221,20 @@ const confirmer = async (pg) => {
+     await pg.locator('[data-coordonnees]').click();
+     await pg.waitForTimeout(200);
+     dit(await pg.locator('input[data-champ="capital"]').count() === 1 && await pg.locator('input[data-champ="rcs"]').count() === 1, 'société : forme, capital et RCS sont demandés pour les factures');
++    // (16 octobre) Un LIBELLÉ visible au-dessus de chaque champ : rempli, le
++    // placeholder disparaissait et plus rien ne disait que « Saint-Malo » est
++    // la ville du RCS ni que « 1000 » est le capital (« Code posta » coupé à
++    // 390 px en prime). Le placeholder est redevenu un EXEMPLE.
++    await pg.locator('input[data-champ="ville"]').fill('Cancale').catch(() => {});
++    await pg.locator('input[data-champ="rcs"]').fill('Saint-Malo').catch(() => {});
++    const libs = await pg.$$eval('[data-libelle-champ]', (els) => els.map((e) => ({ cle: e.dataset.libelleChamp, lib: (e.querySelector('span') || {}).innerText || '' })));
++    dit(libs.length >= 6 && libs.every((x) => x.lib.trim().length > 0),
++      'chaque champ de coordonnées porte un LIBELLÉ visible (pas le placeholder seul)', JSON.stringify(libs.slice(0, 3)));
++    const parCle = Object.fromEntries(libs.map((x) => [x.cle, x.lib.trim()]));
++    dit(parCle.cp === 'Code postal' && parCle.ville === 'Ville' && /RCS/.test(parCle.rcs || '') && /[Cc]apital/.test(parCle.capital || ''),
++      'les deux villes et le capital se distinguent une fois remplis (« Ville » / « Ville du RCS » / « Capital »)', JSON.stringify({ cp: parCle.cp, ville: parCle.ville, rcs: parCle.rcs, capital: parCle.capital }));
++    dit((await pg.locator('input[data-champ="cp"]').getAttribute('placeholder') || '').startsWith('ex :'),
++      'le placeholder du code postal est un EXEMPLE (le libellé ne dépend plus de lui)');
+     const regles2 = await pg.$$eval('[data-regle]', (els) => els.map((e) => e.dataset.regle));
+     dit(!regles2.includes('urssaf') && regles2.includes('reel'), 'société : aucune règle URSSAF de micro-entreprise', regles2.join(','));
+     await pg.screenshot({ path: SC + '/z-fiscal-profil-1512.png', fullPage: true });
+-- 
+2.43.0
+
