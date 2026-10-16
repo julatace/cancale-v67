@@ -114,6 +114,24 @@ async function verifier(mod) {
     await Promise.all([lp.fetch(U, { ...H('A'), ...ac }), lp.fetch(U, { ...H('A'), ...ac })]);
     dit(F.appels.length === 4, '8. une lecture annulable (`signal`) passe telle quelle', F.appels.length);
   });
+  // 9. Nos routes serveur (`/api/…`) écrivent en base côté serveur : un POST vers
+  //    elles vaut une écriture (banc revendeurs, 16 octobre : « Lire davantage de
+  //    commandes » restait affiché sous « Lecture terminée », la relecture de
+  //    `ebay_orders` rendait la ligne d'avant). Une lecture GET d'une route, elle,
+  //    ne vide rien.
+  await essaie('9. route serveur', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant, origine: 'https://vrm.center' });
+    await lp.fetch(U, H('A'));
+    await lp.fetch('/api/ebay', { method: 'POST', body: '{}' });
+    await lp.fetch(U, H('A'));
+    dit(F.appels.filter((x) => x.url === U).length === 2, '9. un POST vers /api/ (relatif) vide tout : la lecture d’après relit', F.appels.length);
+    await lp.fetch('https://vrm.center/api/ebay', { method: 'POST', body: '{}' });
+    await lp.fetch(U, H('A'));
+    dit(F.appels.filter((x) => x.url === U).length === 3, '9. un POST vers https://vrm.center/api/ vide tout aussi', F.appels.length);
+    await lp.fetch('/api/sante');
+    await lp.fetch(U, H('A'));
+    dit(F.appels.filter((x) => x.url === U).length === 3, '9. une lecture GET d’une route ne vide rien', F.appels.length);
+  });
   return { ko, echecs };
 }
 
@@ -126,6 +144,7 @@ async function verifier(mod) {
     const MUT = {
       'echec-garde': [/if \(!r \|\| !r\.ok \|\| monGen !== gen\) \{ cache\.delete\(cle\); return; \}/, 'if (monGen !== gen) { cache.delete(cle); return; }'],
       'sans-session': [/const cle = url \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
+      'route-ignoree': [/const versRoute = [^;]+;/, 'const versRoute = false;'],
       'ecriture-ignoree': [/      invalider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(invalider, invalider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {

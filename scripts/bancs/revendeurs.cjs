@@ -115,7 +115,7 @@ async function brancher(p){
    await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
-   check(await p.locator('.vrm-market-heading img').evaluate(e=>e.complete && e.naturalWidth>0),'logo local chargé '+nom);
+   check(await p.waitForFunction(()=>{const e=document.querySelector('.vrm-market-heading img');return !!e && e.complete && e.naturalWidth>0;},null,{timeout:8000}).then(()=>true,()=>false),'logo local chargé '+nom);
    const summary=p.locator('.vrm-platform-summary');check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
    for(const width of [320,390,1512]){
@@ -131,7 +131,9 @@ async function brancher(p){
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
     if(width===1512){
-      check(await p.locator('.vrm-main').evaluate(e=>innerWidth-e.getBoundingClientRect().right<60),'contenu utilise la largeur jusqu’au bord droit '+nom);
+      // ⚠️ Jugé sur un ÉTAT observé (la mise en page après le redimensionnement), borné à 5 s — une mesure
+      //    prise à l'instant du redimensionnement tombait sous charge (45) sur un code intact.
+      check(await p.waitForFunction(()=>{const m=document.querySelector('.vrm-main');return !!m && innerWidth-m.getBoundingClientRect().right<60;},null,{timeout:5000}).then(()=>true,()=>false),'contenu utilise la largeur jusqu’au bord droit '+nom);
       if(nom==='eBay')check(await p.locator('.vrm-ebay-sales').evaluate(e=>document.querySelector('.vrm-main').getBoundingClientRect().right-e.getBoundingClientRect().right<60),'ventes eBay utilisent également la largeur disponible');
       const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
       check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);
@@ -315,7 +317,7 @@ async function brancher(p){
 
   await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
   check(await p.getByText('Autre offre eBay',{exact:true}).count()===0,'raccourci ouvre uniquement l’offre visée');
-  await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).isVisible(),'retour à toutes les offres');
+  await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).waitFor({timeout:5000}).then(()=>true,()=>false),'retour à toutes les offres');
   await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('button',{name:/Message de la paire/}).click();await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).waitFor();
   check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','raccourci ouvre le bon message et retrouve le brouillon refusé');
