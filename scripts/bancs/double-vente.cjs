@@ -126,12 +126,24 @@ const projette = (row, sel) => {
         aRelier: Number((document.querySelector('[data-lbc-ventes-a-relier]') || { getAttribute: () => 0 }).getAttribute('data-lbc-ventes-a-relier')),
         sugg: [...document.querySelectorAll('[data-lbc-suggestions="lbc2"] [data-suggestion]')].map((e) => e.getAttribute('data-suggestion')),
         relier: [...document.querySelectorAll('[data-lbc-relier]')].map((e) => e.getAttribute('data-lbc-relier')),
+        // (16 oct., capture de Julien) Le champ N° et « Relier » sortaient de
+        // l'écran sur téléphone. Le contrôle de page entière ne le voyait pas
+        // (la carte coupe). On mesure CHAQUE élément d'une ligne « relier » :
+        // rien ne doit dépasser le bord droit de la ligne.
+        // (16 oct., capture de Julien) L'app ROGNE ce qui dépasse (overflow clip) :
+        // le contrôle de défilement de page ne voit rien. On cherche tout bouton
+        // ou champ visible dont le bord droit sort de l'écran.
+        deborde: [...document.querySelectorAll('button,input')].filter((e) => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1;
+        }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14) || e.tagName)),
       }));
       const v1 = await lire();
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'double-vente-' + vp.width + '.png'), fullPage: true });
       dit(v1.doublons.length === 1 && v1.doublons[0].num === '12', 'vendue sur Leboncoin, encore sur Vinted ⇒ alerte pour la N°12, et elle seule', JSON.stringify(v1.doublons.map((d) => d.num)));
       dit(v1.doublons[0] && /vinted\.fr\/items\/5001$/.test(v1.doublons[0].href), 'l’alerte mène à L’annonce Vinted de cette paire', v1.doublons[0] && v1.doublons[0].href);
       dit(v1.aRelier === 1, 'la vente non reliée demande « quelle paire ? »', String(v1.aRelier));
+      dit(v1.relier.length > 0 && v1.deborde.length === 0, 'aucun bouton ni champ rogné par le bord de l’écran (N°, Relier, Actualiser…)', v1.deborde.join(', ') || (v1.relier.length ? '' : 'aucune ligne'));
       dit(v1.sugg.includes('14') && v1.sugg.includes('15'), 'et PROPOSE les deux paires identiques — sans en choisir une', JSON.stringify(v1.sugg));
       dit(v1.relier.includes('lbc3'), 'son annonce jamais reliée (compte prouvé par une vente) est listée', JSON.stringify(v1.relier));
       dit(!v1.relier.includes('lbc4'), 'l’annonce d’un inconnu ne l’est pas');
@@ -149,12 +161,14 @@ const projette = (row, sel) => {
       dit(v2.aRelier === 0, 'plus rien à relier');
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
-      // Le tableau de bord : la MÊME règle, la même conclusion (§11).
-      await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+      // Ma journée : la MÊME règle, la même conclusion (§11). (16 oct.) Le tableau
+      // de bord a été refondu en « Statistiques » et n'affiche plus les actions :
+      // l'alerte vit sur l'écran qu'il ouvre le matin — et c'est là qu'on la juge.
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForFunction(() => /vendues? sur Leboncoin, encore en vente sur Vinted/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
       const txt = await pg.evaluate(() => document.body.innerText);
       const m = /(\d+) paires? vendues? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
-      dit(m && m[1] === '2', 'le tableau de bord annonce les mêmes 2 paires', m ? m[0] : 'absent');
+      dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 paires', m ? m[0] : 'absent');
       dit(!/vendues? sur Vinted\)/.test(txt), 'et ne dit « vendue sur Vinted » d’aucune paire non prouvée vendue');
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
