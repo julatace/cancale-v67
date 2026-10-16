@@ -23787,7 +23787,7 @@ const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JS
 // avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
 // compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
 // pas la rangée (§7, pas de bruit).
-function SelecteurCompte({ accounts, sel, setSel, connecte }) {
+function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) {
   const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
   const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
   const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
@@ -23813,8 +23813,15 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   // Un compte choisi (par lui ou d'office) estompe les autres : on le dit UNE
   // fois, ici, avec le geste — sinon des lignes floues et inertes apparaissent
   // sans raison dès que l'extension est allumée (§7).
-  const note = val !== '*' ? <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
-    {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
+  // ⚠️ Messages (16 octobre) : le compte de l'extension n'y filtre plus rien —
+  //    ses conversations passent en tête, les autres restent lisibles en
+  //    lecture seule (la raison est dite au-dessus d'elles, pas ici : §7). La
+  //    note ne dit donc plus « estompés » là où rien ne l'est. Même condition
+  //    que l'écran (`msgCompteActif`) : sinon le filtre d'avant reste, et la
+  //    phrase d'avant avec lui.
+  const prioMessages = messages && val === coVu && String(sel || '') !== coVu && extSait('messagerie') === 'ok' && !__vmrPlusieurs;
+  const note = val !== '*' ? <span data-sel-compte-note={prioMessages ? 'extension-messages' : val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
+    {prioMessages ? "compte de l'extension · ses conversations passent en tête" : <>{val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir</>}
   </span> : null;
   return <ListeComptes id="vrm-sel-compte" valeur={val} onChange={setSel}
     options={tri.map(a => { const uid = String(a.vinted_user_id); return { val: uid, nom: (uid === co ? '📍 ' : '') + nom(a) }; })}
@@ -29939,6 +29946,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
         action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
+  // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
+  // L'extension n'agit qu'au nom du compte connecté dans l'onglet Vinted de ce
+  // Chrome (`gardeStricte`, §3). Répondre ou faire une offre sur un AUTRE
+  // compte échouerait au clic : ses conversations restent lisibles, mais en
+  // LECTURE SEULE (boutons grisés, la raison dite une fois au-dessus d'elles).
+  // ⚠️ « Pas su » (état de l'extension inconnu, cookie pas lu, deux copies,
+  //    extension en retard) ⇒ `msgCompteActif` vide : rien n'est affirmé, le
+  //    comportement d'avant reste (« pas su » ne vaut pas oui).
+  const msgCompteActif = (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const msgLectureSeule = (acc) => !!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif;
+  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : ''; };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -29982,8 +30000,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (
-              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); return (
+              <div data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
+                    distingue) — la raison générale est dite une fois au-dessus
+                    de la liste (§7). */}
+                {ro && (
+                  <div data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12,color:C.text,lineHeight:1.45,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',marginBottom:8}}>
+                    <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
+                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
+                  </div>
+                )}
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
                     une. Par l'extension, sur le compte connecté dans Chrome. */}
                 {(()=>{
@@ -29999,20 +30026,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                   return (
-                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
+                    <div data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8,opacity:ro?0.55:1}}>
                       {off && (
                         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
                           <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
                       {tx && (
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          <input inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
                             style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                          <button type="button" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${ro?C.border:C.accent}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div>
                       )}
                       {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
@@ -30022,21 +30049,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
+                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch',opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
+                    <button key={i} type="button" disabled={ro} onClick={()=>setReplyText(q.t)} title={q.t}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
                 {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
               </div>
-            )}
+            ); })()}
           </div>
         </div></ResponsiveChatPortal>
   );
@@ -33092,7 +33119,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!selEff || uidC(c)===selEff) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          // ⚠️ (16 octobre) Quand l'extension peut AGIR (`msgCompteActif`), le
+          //    compte de Chrome n'est plus un filtre : toutes les conversations
+          //    restent, les siennes EN TÊTE et actionnables, celles des autres
+          //    comptes en lecture seule. Seul un choix EXPLICITE dans la liste
+          //    « Compte » filtre encore ; « pas su » garde le comportement d'avant.
+          const choixExplicite = !!compteSel && compteSel!=='*' && String(compteSel)===selEff;
+          const filtreMsg = choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
+          const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
+          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -33103,14 +33138,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
-          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          const nonLusAilleurs = filtreMsg ? liste.filter(c=>c.unread && uidC(c)!==filtreMsg).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
-          const coMsg = selEff;
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+          // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
+          // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
+          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
+          const nonLusRo = roListe.filter(c=>c.unread).length;
+          const nomActif = prioMsg ? msgNomActif() : '';
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
@@ -33182,9 +33221,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                  const ro = !!prioMsg && uidC(c)!==prioMsg;
+                  // Les deux groupes se nomment UNE fois, en tête de chacun : la
+                  // raison de la lecture seule vit dans l'en-tête de son groupe,
+                  // jamais sur chaque ligne (§7).
+                  const debutActif = !!prioMsg && !ro && i===0;
+                  const debutRo = ro && (i===0 || uidC(affiches[i-1])===prioMsg);
                   return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
+                    <React.Fragment key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id}>
+                    {debutActif && (
+                      <div data-msg-groupe-actif={prioMsg} style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px 7px',fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted,background:C.bg,borderBottom:`1px solid ${C.border}`}}>
+                        <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.accent,flexShrink:0}}/>
+                        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert dans Chrome</span>
+                      </div>
+                    )}
+                    {debutRo && (
+                      <div data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{padding:'10px 12px 9px',background:C.bg,borderTop:i?`1px solid ${C.border}`:'none',borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted}}>
+                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo}\u00a0non\u00a0lu${nonLusRo>1?'s':''}`:''}</span>
+                        </div>
+                        <div style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginTop:4}}>
+                          Chrome est connecté sur <b>{nomActif}</b> : VRM ne peut répondre et faire une offre qu'au nom de ce compte. Pour répondre à un autre, bascule Chrome sur ce compte (ouvre vinted.fr connecté dessus) — ses conversations remonteront ici.
+                        </div>
+                      </div>
+                    )}
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} onClick={()=>openConversation(c)}
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i&&!debutRo)?`1px solid ${C.border}`:'none',background:'transparent',color:ro?C.muted:C.text,cursor:'pointer',fontFamily:'inherit',...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
                       {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
@@ -33194,8 +33256,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </span>
                         <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
                       </span>
-                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
+                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:ro?C.muted:C.accent,flexShrink:0}}/>}
                     </button>
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -39237,8 +39300,31 @@ function EmailsSetting() {
   return (
     <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et il t'est proposé ici dès que l'adresse où il est arrivé figure dans ta liste.
+      {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
+          paragraphe d'avant disait la RÈGLE (« l'adresse d'arrivée décide »)
+          sans dire l'USAGE. Trois lignes visibles — à quoi ça sert, un exemple,
+          ce qui se passe si une adresse manque — et le pas-à-pas replié. */}
+      <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',margin:'6px 0 12px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:12.5,lineHeight:1.45,color:C.text}}>
+          <span aria-hidden="true" style={{color:C.accent,marginTop:2}}><Icon name="mail" size={14}/></span>
+          <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
+          <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
+          <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
+        </div>
+        <details style={{marginTop:8}}>
+          <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.accent,listStyle:'revert'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
+            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
+            <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
+            <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
+            <li>Ajoute ici l'adresse sur laquelle Vinted t'écrit — une par compte Vinted si elles sont différentes.</li>
+          </ol>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
+            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
+          </div>
+        </details>
       </div>
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
@@ -41819,7 +41905,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={platSub==='messages'}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
