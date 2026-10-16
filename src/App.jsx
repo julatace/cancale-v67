@@ -7262,6 +7262,275 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
     />
   );
 }
+// ── ACHATS HORS PLATEFORME (brocante, fournisseur, main propre…) ────────────
+// Julien : « des achats hors plateforme faciles ». C'est de la SAISIE au doigt,
+// souvent debout à la brocante : un titre, le prix payé, la date (aujourd'hui
+// par défaut), où, et une photo si on veut. RIEN n'oblige à relier une paire —
+// le N° reste possible, replié (« Relier à une paire »), parce qu'un N° faux ne
+// se voit pas (§5) et qu'il saisit lui-même ses prix (§2.5).
+// ⚠️ UNE SEULE RÈGLE, UN SEUL PROPRIÉTAIRE (§11) : les achats vivent dans
+//    `vinted_offvinted_buys` (synchronisé), la même clé que le « dépensé »
+//    (`treasury`) lit déjà. On ne crée pas de seconde liste.
+// ⚠️ L'ancien formulaire déclarait son `Field` DANS le rendu : un composant neuf
+//    à chaque frappe, donc le champ perdait le focus après chaque lettre — sur
+//    téléphone on ne pouvait taper qu'un caractère. Ici les champs sont des
+//    éléments, jamais un composant redéclaré.
+// ⚠️ LA PHOTO NE VA PAS DANS `main` (§4.4 : la ligne la plus lue pèse déjà
+//    ~200 Ko). Elle a SA ligne (`achat_hors_photo_{id}`, ~20 Ko), lue seulement
+//    quand la liste est ouverte. L'achat ne porte `photo:true` que si
+//    l'écriture a RÉUSSI ; sinon on le dit et l'achat est gardé sans photo.
+const SOURCES_ACHAT_HORS = ['Brocante', 'Vide-grenier', 'Fournisseur', 'Leboncoin (main propre)', 'Particulier'];
+const SOURCE_ANCIENNE = { brocante: 'Brocante', fournisseur: 'Fournisseur', particulier: 'Particulier', 'vide-grenier': 'Vide-grenier', autre: 'Autre' };
+const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
+const dateLocaleISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const idPhotoAchatHors = (id) => 'achat_hors_photo_' + String(id).replace(/[^\w-]/g, '');
+// Écrit la photo dans sa ligne. Rend true seulement si la base l'a acceptée.
+// (Un DELETE sur app_data ne supprime rien : on VIDE la ligne à la place.)
+const ecrirePhotoAchatHors = async (id, b64) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: idPhotoAchatHors(id), data: b64 ? { b64, at: new Date().toISOString() } : { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// Trois états : `null` = la base n'a pas répondu (pas su), sinon { id → dataURL }.
+const lirePhotosAchatsHors = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.achat_hors_photo_*&select=id,b:data->>b64`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const m = {};
+    for (const x of rows) if (x && x.id && typeof x.b === 'string' && x.b.startsWith('data:image/')) m[x.id] = x.b;
+    return m;
+  } catch (_) { return null; }
+};
+// Le prix tapé, relu en centimes (« 12,5 » → « 12,50 »). `undefined` = vide,
+// `null` = illisible (on refuse, on ne devine pas).
+const prixAchatSaisi = (v) => {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return undefined;
+  const c = centimes(t.replace(/\s|€/g, ''));
+  return (c == null || c < 0) ? null : (c / 100).toFixed(2).replace('.', ',');
+};
+const prixAchatHorsNombre = (b) => { const p = parseFloat(String(b && b.price != null ? b.price : '').replace(',', '.')); return isNaN(p) ? null : p; };
+
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero }) {
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', photo: null, photoAvant: false });
+  const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
+  const [editId, setEditId] = useState(null);
+  const [erreur, setErreur] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const [photos, setPhotos] = useState(undefined); // undefined en cours · null pas su · objet lu
+  const fichierRef = useRef(null);
+  const liste = Array.isArray(achats) ? achats : [];
+  const total = liste.reduce((s, b) => s + (prixAchatHorsNombre(b) || 0), 0);
+  const avecPhoto = liste.some(b => b && b.photo);
+  useEffect(() => {
+    if (!ouvert || !avecPhoto) return;
+    let vivant = true;
+    lirePhotosAchatsHors().then(m => { if (vivant) setPhotos(p => (m == null ? (p || null) : { ...(p || {}), ...m })); });
+    return () => { vivant = false; };
+  }, [ouvert, avecPhoto]);
+  const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  const ouvrirEdition = (b) => {
+    setEditId(b.id); setErreur('');
+    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', photo: null, photoAvant: !!b.photo });
+  };
+  const fermer = () => { setForm(null); setEditId(null); setErreur(''); };
+  const choisirPhoto = async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    const b64 = await compressImage(f, 480, 0.62);
+    if (!b64) { setErreur("Cette photo n'a pas pu être lue — essaie une autre, ou enregistre sans photo."); return; }
+    setForm(d => d && ({ ...d, photo: b64 }));
+  };
+  const enregistrer = async () => {
+    if (!form || envoi) return;
+    const titre = form.title.trim();
+    if (!titre) { setErreur('Donne un nom à cet achat (ex : Nike P-6000 argent 38).'); return; }
+    const prix = prixAchatSaisi(form.price);
+    if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
+    setEnvoi(true);
+    const id = editId || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    let photoOk = form.photoAvant;
+    let photoRatee = false;
+    if (form.photo) {
+      const ok = await ecrirePhotoAchatHors(id, form.photo);
+      if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
+      else photoRatee = true;
+    }
+    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), photo: photoOk || undefined };
+    if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
+    if (rec.numero && rec.price && onPrixParNumero) onPrixParNumero(rec.numero, rec.price);
+    setEnvoi(false);
+    if (!ouvert) onBasculer(true);
+    if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
+    else toast(editId ? 'Achat modifié' : 'Achat ajouté');
+    fermer();
+  };
+  const supprimer = async () => {
+    const b = liste.find(x => x.id === editId); if (!b) return;
+    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price} €)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    onSupprimer(b.id);
+    if (b.photo) ecrirePhotoAchatHors(b.id, null);
+    fermer();
+  };
+  const lab = { fontSize: 11.5, color: C.muted, fontWeight: 600 };
+  const inp = { border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 12px', height: 46, fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0, WebkitAppearance: 'none', appearance: 'none' };
+  const champ = (label, enfant) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}><span style={lab}>{label}</span>{enfant}</label>
+  );
+  const sousTitre = liste.length
+    ? `${liste.length} achat${liste.length > 1 ? 's' : ''} · ${total.toFixed(2).replace('.', ',')} € payés`
+    : 'Brocante, fournisseur, main propre…';
+  const photoForm = form ? (form.photo || (form.photoAvant && photos ? photos[idPhotoAchatHors(editId)] : null)) : null;
+  return (
+    <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
+        <button type="button" data-achats-hors-entete onClick={() => onBasculer(!ouvert)} aria-expanded={ouvert}
+          style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: '6px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Achats hors plateforme</span>
+            <span data-achats-hors-resume style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sousTitre}</span>
+          </span>
+          {liste.length > 0 && <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0, padding: '0 4px' }}>›</span>}
+        </button>
+        <button type="button" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label="Ajouter un achat hors plateforme"
+          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card2 || C.bg, color: C.text, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, color: C.accent, fontWeight: 500 }}>+</span> Ajouter
+        </button>
+      </div>
+      {form && (
+        <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
+          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            {champ('Prix payé', <div style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" placeholder="0,00" autoComplete="off" style={{ ...inp, paddingRight: 30 }} /><span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span></div>)}
+            {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {champ('Où (facultatif)', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante de Cancale, fournisseur…" autoComplete="off" style={inp} />)}
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {SOURCES_ACHAT_HORS.map(s => {
+                const actif = form.source.trim().toLowerCase() === s.toLowerCase();
+                return <button key={s} type="button" data-source={s} onClick={() => setForm(d => ({ ...d, source: s }))} aria-pressed={actif}
+                  style={{ flexShrink: 0, height: 36, padding: '0 13px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{s}</button>;
+              })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
+            <button type="button" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 14px', border: `1px dashed ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Icon name="camera" size={17} /> {form.photo || form.photoAvant ? 'Changer la photo' : 'Photo (facultatif)'}
+            </button>
+            {form.photo && <button type="button" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ height: 44, padding: '0 8px', border: 'none', background: 'transparent', color: C.muted, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>retirer</button>}
+            <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
+          </div>
+          <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
+            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à une paire (facultatif)</summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
+              {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
+                <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
+                  <option value="">— choisir —</option>
+                  {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
+                </select>)}
+              {champ('N° de la paire', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de la paire : quand elle se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
+            </div>
+          </details>
+          {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
+              style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
+            <button type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+          </div>
+          {editId && <button type="button" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start', height: 44, padding: '0 4px', border: 'none', background: 'transparent', color: C.danger, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="trash" size={15} /> Supprimer cet achat</button>}
+        </div></div>
+      )}
+      {ouvert && liste.length > 0 && (
+        <div data-achats-hors-liste style={{ borderTop: `1px solid ${C.border}` }}>
+          {photos === null && avecPhoto && <div style={{ fontSize: 11.5, color: C.muted, padding: '8px 14px 0' }}>Les photos n'ont pas pu être lues (la base n'a pas répondu) — elles reviendront à la prochaine ouverture.</div>}
+          {liste.map((b, i) => {
+            const src = b.photo && photos ? photos[idPhotoAchatHors(b.id)] : null;
+            const p = prixAchatHorsNombre(b);
+            const d = b.date ? new Date(String(b.date).length === 10 ? b.date + 'T12:00:00' : b.date) : null;
+            const meta = [libelleSourceAchat(b.source), d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' · ');
+            return (
+              <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title="Modifier ou supprimer"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 64, border: 'none', borderTop: i > 0 ? `1px solid ${C.border}` : 'none', borderRadius: 0, background: editId === b.id ? (C.card2 || C.bg) : 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+                <span style={{ width: 44, height: 44, borderRadius: 10, background: C.card2 || C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 14.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
+                    {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 5, padding: '1px 6px' }}>N°{b.numero}</span>}
+                  </span>
+                </span>
+                <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15.5, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')} €` : '—'}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// ── LE COÛT D'UNE VENTE, SANS OBLIGATION DE RELIER (écran Ventes) ───────────
+// Julien : « enregistrer un prix d'achat sans relier ». Le champ existait, mais
+// caché derrière « Modifier », et le seul geste visible était « Relier
+// l'achat » — qui exige un achat VINTED (une paire de brocante n'en a pas).
+// Les deux gestes sont maintenant côte à côte, visibles tant que le coût
+// manque : « Saisir le prix » écrit `saleOv[tx].buyPrice` — la MÊME écriture
+// que le champ de « Modifier », déjà lue par `effEntry` → `beneficePaire` (§11).
+// Un montant illisible n'est jamais enregistré : on le dit (§2.5, on ne devine pas).
+function CoutAchatVente({ onSaisir, onRelier }) {
+  const [edit, setEdit] = useState(false);
+  const [txt, setTxt] = useState('');
+  const [err, setErr] = useState('');
+  const valider = () => {
+    const p = prixAchatSaisi(txt);
+    if (p === undefined) { setEdit(false); setErr(''); return; }
+    if (p === null) { setErr('Un montant en euros (ex : 25 ou 25,50).'); return; }
+    onSaisir(p); setEdit(false); setTxt(''); setErr('');
+  };
+  const bouton = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, padding: '0 13px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' };
+  return (
+    <div data-cout-vente style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
+        {edit ? (
+          <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cette paire"
+                onKeyDown={e => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(''); } }}
+                style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+              <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
+            </div>
+            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: '#fff' }}>OK</button>
+          </form>
+        ) : (
+          <>
+            <button type="button" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat"
+              style={{ ...bouton, border: `1px solid ${C.border}`, background: C.card, color: C.text }}><Icon name="pencil" size={14} /> Saisir le prix</button>
+            <button type="button" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût"
+              style={{ ...bouton, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}><Icon name="link" size={14} /> Relier un achat</button>
+          </>
+        )}
+      </div>
+      {err && <div role="alert" style={{ fontSize: 12, color: C.warn }}>{err}</div>}
+    </div>
+  );
+}
 // ── NOTICE : UN ENCADRÉ QUI INFORME SANS CRIER ───────────────────────────────
 // ⚠️ Avant, chaque information importante était un bloc ENTIÈREMENT TEINTÉ,
 // bordé de sa couleur, avec un emoji de 20 px et un paragraphe d'explication
@@ -27246,10 +27515,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
   const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
-  const [offOpen, setOffOpen] = useState(false);
-  const OFF_DRAFT0 = { title:'', price:'', numero:'', source:'brocante', date: new Date().toISOString().slice(0,10) };
-  const [offDraft, setOffDraft] = useState(OFF_DRAFT0);
-  const [offEditId, setOffEditId] = useState(null);
+  // (le formulaire d'ajout vit dans `AchatsHorsPlateforme`, avec son état)
   // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
   // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
   // → le même N° apparaît côté Annonces, Ventes ET Achats : lien achat↔vente.
@@ -29737,7 +30003,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
@@ -29755,6 +30021,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
+               {/* Coût inconnu : les deux gestes, VISIBLES (pas derrière « Modifier »). */}
+               {!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId) && (
+                 <CoutAchatVente onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
+               )}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
                <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
                {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
@@ -29824,12 +30095,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
                    </div>
                  );
-                 if (buy==null) return (
-                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
-                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
-                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
-                   </button>
-                 );
+                 // (coût inconnu : « Saisir le prix » et « Relier un achat » sont
+                 //  visibles au-dessus, `CoutAchatVente` — pas une 2ᵉ fois ici, §7)
                  return null;
                })()}
                </details></div>
@@ -31122,101 +31389,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* ACHATS HORS VINTED : c'est de la SAISIE occasionnelle (brocante,
-            fournisseur…), pas une info à consulter tous les jours. Replié
-            derrière un bouton qui garde le total visible — la compta reste
-            juste, l'écran reste léger. */}
-        {(()=>{
-          const tot = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
-          return (
-            <button type="button" onClick={()=>setOffSecOpen(v=>!v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="tag" size={18}/></span>
-              <span style={{flex:1,textAlign:'left',minWidth:0}}>
-                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Achats hors Vinted</span>
-                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
-                  {offBuys.length ? `${offBuys.length} achat${offBuys.length>1?'s':''} · ${tot.toFixed(0)} € — brocante, fournisseur, particulier` : 'Ajoute une paire achetée ailleurs (brocante, fournisseur…)'}
-                </span>
-              </span>
-              <span style={{fontSize:13,color:C.muted,transform:offSecOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
-            </button>
-          );
-        })()}
-        {offSecOpen && (<>
-        {/* ── ACHATS HORS VINTED (brocante, fournisseur, particulier…) ────── */}
-        {(()=>{
-          const SRC = { brocante:{e:'🏷️',l:'Brocante'}, fournisseur:{e:'🏭',l:'Fournisseur'}, particulier:{e:'👤',l:'Particulier'}, 'vide-grenier':{e:'🎪',l:'Vide-grenier'}, autre:{e:'📦',l:'Autre'} };
-          const srcOf = s => SRC[s] || SRC.autre;
-          const offTotal = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
-          const saveOff = () => {
-            const rec = { title:offDraft.title.trim(), price:offDraft.price, numero:offDraft.numero, source:offDraft.source, date:offDraft.date };
-            if (offEditId) updOffBuy(offEditId, rec); else addOffBuy(rec);
-            // Lien compta : le N° + prix nourrit le prix d'achat PAR NUMÉRO → quand
-            // cette paire se vend, son bénéfice utilise ce coût automatiquement.
-            const nm = String(rec.numero||'').trim(); const pr = String(rec.price||'').trim();
-            if (nm && pr) setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; });
-            setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false);
-          };
-          const Field = ({label,children}) => (<label style={{display:'flex',flexDirection:'column',gap:3,flex:1,minWidth:0}}><span style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>{children}</label>);
-          const inp = {border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
-          return (
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 13px',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:38,height:38,borderRadius:10,background:`${C.accent}14`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏷️</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>Achats hors Vinted</div>
-              <div style={{fontSize:11,color:C.muted}}>{offBuys.length>0 ? `${offBuys.length} paire${offBuys.length>1?'s':''} · ${Math.round(offTotal)} € dépensés` : 'Brocante, fournisseur, particulier…'}</div>
-            </div>
-            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:8,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{offOpen?'✕ Fermer':'➕ Ajouter'}</button>
-          </div>
-          {offOpen && (
-            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:10,padding:'12px',border:`1px solid ${C.border}`}}>
-              <Field label="Désignation"><input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="ex : Nike P-6000 argenté 38" style={inp} autoFocus/></Field>
-              {/* Relier directement à une annonce EN LIGNE : remplit son N° tout
-                  seul → plus besoin de le retenir, et le prix payé arrive au bon
-                  endroit dans le calcul de bénéfice (utile pour un vrai pro qui
-                  source ailleurs mais revend sur Vinted). */}
-              {(()=>{ const opts = annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).sort((a,b)=>Number((numeros[a.id]||{}).numero)-Number((numeros[b.id]||{}).numero)); return opts.length>0 ? (
-                <Field label="Relier à une annonce en ligne (remplit le N°)">
-                  <select value="" onChange={e=>{ const it=annBase.find(x=>String(x.id)===e.target.value); if(!it) return; const nn=String((numeros[it.id]||{}).numero||''); setOffDraft(d=>({...d, numero:nn||d.numero, title:d.title.trim()?d.title:(it.title||'')})); }} style={inp}>
-                    <option value="">— optionnel : choisir une de tes annonces —</option>
-                    {opts.map(it=>{ const nn=(numeros[it.id]||{}).numero; return <option key={it.id} value={String(it.id)}>N°{nn} · {(it.title||'').slice(0,40)}</option>; })}
-                  </select>
-                </Field>
-              ) : null; })()}
-              <div style={{display:'flex',gap:9}}>
-                <Field label="Prix payé €"><input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="0" style={inp}/></Field>
-                <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,9)}))} inputMode={clavierNum()} placeholder={String(nextNumero)} style={inp}/></Field>
-              </div>
-              <div style={{display:'flex',gap:9}}>
-                <Field label="Provenance"><select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={inp}>{Object.entries(SRC).map(([k,v])=><option key={k} value={k}>{v.e} {v.l}</option>)}</select></Field>
-                <Field label="Date"><input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={inp}/></Field>
-              </div>
-              <button type="button" disabled={!offDraft.title.trim()} onClick={saveOff} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:8,padding:'11px',fontSize:13,fontWeight:600,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit',marginTop:2}}>{offEditId?'💾 Enregistrer':'➕ Ajouter cet achat'}</button>
-              <div style={{fontSize:11,color:C.muted,textAlign:'center',lineHeight:1.4}}>💡 Le N° relie l'achat à la vente : quand la paire se vend, son bénéfice utilise ce prix tout seul.</div>
-            </div>
-          )}
-          {offBuys.length>0 && (
-            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:11}}>
-              {offBuys.map(b=>{ const sc=srcOf(b.source); return (
-                <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 10px',background:C.bg}}>
-                  <div style={{width:32,height:32,borderRadius:8,background:`${C.accent}0e`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,flexShrink:0}} title={sc.l}>{sc.e}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
-                    <div style={{fontSize:11,color:C.muted,marginTop:1}}>{[sc.l,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
-                  </div>
-                  {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'2px 7px'}}>N°{b.numero}</span>}
-                  <span style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
-                  <button className="vrm-icon-control" type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="pencil" size={15}/></button>
-                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="trash" size={16}/></button>
-                </div>
-              );})}
-            </div>
-          )}
-        </div>
-          );
-        })()}
-        </>)}
+        {/* ACHATS HORS PLATEFORME (brocante, fournisseur, main propre…) : la
+            liste se replie (saisie occasionnelle, l'écran reste léger), mais
+            « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
+            règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
+        <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
+          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
+          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
+          prochainNumero={nextNumero}
+          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
