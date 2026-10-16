@@ -390,7 +390,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
     dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
-    const reglage = corps('function NumerosSetting() {', '\n}\n');
+    const reglage = corps('function NumerosSetting(', '\n}\n');
     dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
     dit(/const choix = \(m\) => \{ setMode\(m\); setRefusee\(''\); if \(m === 'chiffres'\) poser\(''\); \};/.test(reglage), '« Avec une lettre » n\'enregistre RIEN tout seul : la série ne change qu\'à la lettre tapée et acceptée');
     dit(/const lettreEx = arch \? \(arch === 'C' \? 'D' : 'C'\) : 'B';/.test(reglage) && /Les anciens numéros/.test(reglage), 'ses exemples ne citent pas la lettre des anciens (et disent qu\'ils ne se redonnent pas)');

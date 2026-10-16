@@ -96,7 +96,7 @@ async function exporter(nav, opts) {
   const { ctx, pg, erreurs } = await monter(nav, opts);
   let fichier = null;
   try {
-    const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 15000 }), pg.getByText('Sauvegarde complète (1 clic)').first().click()]);
+    const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 15000 }), pg.locator('[data-reglage-sauvegarde]').first().click()]);
     fichier = fs.readFileSync(await dl.path(), 'utf8');
   } catch (e) { erreurs.push('téléchargement : ' + e.message); }
   await pg.waitForTimeout(600);

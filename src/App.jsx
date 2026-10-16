@@ -15,6 +15,7 @@ import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, ph
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
+import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
@@ -53,7 +54,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.181.0';
+const EXT_ATTENDUE = '5.182.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -156,6 +157,100 @@ const lbcTitre = (brand, base, size, max) => {
   return (t + suff).trim();
 };
 
+// <annonce-lbc-regle> — LA MÊME RÈGLE DANS L'APP ET L'EXTENSION, §11 ; texte
+// identique, comparé (et exécuté des deux côtés) par scripts/audit-lbc-fiche.cjs.
+// (16 oct., Julien : « je veux que le poste d'annonce sur leboncoin se fasse
+// comme pour eBay, pour tout gérer depuis VRM ».) La fiche de l'app montre et
+// laisse corriger titre, description, prix, état et photos ; l'extension les
+// REVÉRIFIE avant de les poser — elle ne croit pas la page sur parole :
+//   · le titre tient en 50 caractères, la description en 4 000, le prix est un
+//     nombre en euros (> 0, deux décimales au plus) ;
+//   · la référence VRM-{n°} reste DANS la description (c'est elle qui relie
+//     l'annonce à la paire sans rapprochement par titre, §5) — retirée, elle
+//     est remise à la fin ;
+//   · une photo n'est acceptée que si c'est une photo CAPTÉE de cette annonce
+//     (même chemin chez vinted.net) : on choisit et on ordonne, on n'ajoute rien
+//     venu d'ailleurs ;
+//   · l'état est un libellé MESURÉ du dépôt Leboncoin (`lbc_recon.etapes`), ou
+//     l'état Vinted d'origine (le remplissage ne clique qu'une option au texte
+//     exactement égal), ou vide (Leboncoin le laisse à choisir).
+const LBC_DESC_MAX = 4000;
+const LBC_PRIX_MAX = 100000;
+const LBC_PHOTOS_MAX = 15;
+const LBC_ETATS = ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'];
+function refLbcPresente(texte, ref) {
+  if (!ref) return false;
+  return new RegExp(String(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(String(texte || ''));
+}
+function clePhotoLbc(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol !== 'https:' || !/(^|\.)vinted\.net$/i.test(x.hostname)) return '';
+    return x.pathname.replace(/\/(f\d+(?:x\d+)?|tc)\//, '/');
+  } catch (_) { return ''; }
+}
+function categorieLbcDe(titre, description, taille) {
+  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
+  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
+  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
+  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
+  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
+  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
+  const p = parseFloat(String(taille || '').replace(',', '.'));
+  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+  return '';
+}
+function descriptionLbcDe(o) {
+  const ref = String(o.ref || '');
+  const specs = [];
+  if (o.marque) specs.push('Marque : ' + o.marque);
+  if (o.taille) specs.push('Taille : ' + o.taille);
+  if (o.etat) specs.push('État : ' + o.etat);
+  if (o.couleur) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
+  parts.push('');
+  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  parts.push('Réf. ' + ref);
+  return parts.join('\n');
+}
+// `base` = ce que la file de l'extension sait de CETTE paire : { ref, photos
+// (captées), etat (Vinted d'origine) }. Rend { ok, annonce } ou { ok:false,
+// erreurs:[{champ, raison}] } — jamais une annonce à moitié vérifiée.
+function valideAnnonceLbc(saisie, base) {
+  const s = saisie && typeof saisie === 'object' ? saisie : {};
+  const b = base && typeof base === 'object' ? base : {};
+  const err = [];
+  const titre = String(s.title == null ? '' : s.title).replace(/\s+/g, ' ').trim();
+  if (!titre) err.push({ champ: 'title', raison: 'le titre est vide' });
+  else if (titre.length > LBC_TITRE_MAX) err.push({ champ: 'title', raison: 'le titre dépasse ' + LBC_TITRE_MAX + ' caractères (' + titre.length + ')' });
+  let desc = String(s.description == null ? '' : s.description).replace(/\r\n?/g, '\n').trim();
+  if (!desc) err.push({ champ: 'description', raison: 'la description est vide' });
+  else if (b.ref && !refLbcPresente(desc, b.ref)) desc = desc + '\n\nRéf. ' + b.ref;
+  if (desc.length > LBC_DESC_MAX) err.push({ champ: 'description', raison: 'la description dépasse ' + LBC_DESC_MAX + ' caractères (' + desc.length + ')' });
+  const brut = String(s.price == null ? '' : s.price).replace(/[\s€]/g, '').replace(',', '.');
+  const p = /^\d+(?:\.\d{1,2})?$/.test(brut) ? Number(brut) : NaN;
+  if (!(isFinite(p) && p > 0 && p <= LBC_PRIX_MAX)) err.push({ champ: 'price', raison: 'le prix doit être un nombre en euros, plus grand que 0' });
+  const parCle = new Map();
+  for (const u of (Array.isArray(b.photos) ? b.photos : [])) { const k = clePhotoLbc(u); if (k && !parCle.has(k)) parCle.set(k, String(u)); }
+  const photos = []; const vues = new Set();
+  if (!Array.isArray(s.photos)) err.push({ champ: 'photos', raison: 'aucune photo choisie' });
+  else {
+    for (const u of s.photos) {
+      const k = clePhotoLbc(u);
+      if (!k || !parCle.has(k)) { err.push({ champ: 'photos', raison: 'une photo n\'est pas une photo captée de cette annonce' }); break; }
+      if (!vues.has(k)) { vues.add(k); photos.push(parCle.get(k)); }
+    }
+    if (!photos.length && !err.some((e) => e.champ === 'photos')) err.push({ champ: 'photos', raison: 'choisis au moins une photo — Leboncoin refuse une annonce sans photo' });
+    if (photos.length > LBC_PHOTOS_MAX) err.push({ champ: 'photos', raison: 'au plus ' + LBC_PHOTOS_MAX + ' photos' });
+  }
+  const etat = String(s.etat == null ? '' : s.etat).trim();
+  if (etat && LBC_ETATS.indexOf(etat) < 0 && etat !== String(b.etat || '').trim()) err.push({ champ: 'etat', raison: 'état inconnu de Leboncoin' });
+  if (err.length) return { ok: false, erreurs: err };
+  return { ok: true, annonce: { title: titre, description: desc, price: String(Math.round(p * 100) / 100), photos, etat } };
+}
+// </annonce-lbc-regle>
+
 const MP_DEFAUT = MP_PLACES.reduce((a, p) => (a[p.cle] = p.defaut, a), {});
 // `undefined` (jamais touché) ≠ `false` (retiré exprès) : le premier suit le
 // défaut, le second est un choix. Le même piège que partout ailleurs.
@@ -219,7 +314,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -240,6 +335,7 @@ const CAPACITES_DITES = [
   ['commande', 'générer un bordereau depuis VRM'],
   ['messagerie', 'répondre et faire une offre depuis VRM'],
   ['publication', 'publier une annonce sur Leboncoin depuis VRM'],
+  ['lbcfiche', 'publier sur Leboncoin l\'annonce corrigée dans la fiche de VRM'],
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['detourage', 'détourer tes photos'],
@@ -309,6 +405,10 @@ const THEMES = {
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#0A0D12", onChrome:"#F2F5FA", chromeMuted:"#7D8798", chromeLine:"#1C222C",
     s1:"#2458E6", s2:"#7C9CFF",
+    // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
+    // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
+    // filet fin (`hair`) et le verre des barres de la coque (`bar`).
+    faint:"#8A93A6", hair:"rgba(18,27,44,.09)", bar:"rgba(255,255,255,.84)",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
@@ -338,6 +438,7 @@ const THEMES = {
     glass:"rgba(16,20,27,.90)",
     chrome:"#030406", onChrome:"#F2F5FA", chromeMuted:"#6D7788", chromeLine:"#161B24",
     s1:"#3D7BFF", s2:"#8AB4FF",
+    faint:"#5F6878", hair:"rgba(255,255,255,.08)", bar:"rgba(3,4,6,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
   },
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
@@ -1088,10 +1189,10 @@ function sheetTexte(q, defaut) {
 }
 
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
-function SheetShell({ onClose, children }) {
+function SheetShell({ onClose, children, maxWidth = 460 }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
-      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
+      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
         {children}
       </div>
@@ -8459,6 +8560,7 @@ const ICON_PATHS = {
   // ce genre de détail qui fait « page web bricolée » plutôt qu'application.
   trash:  <><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"/><path d="M6.5 6.5 7.4 19a1.6 1.6 0 0 0 1.6 1.5h6a1.6 1.6 0 0 0 1.6-1.5l.9-12.5"/><path d="M10.5 10v6.5M13.5 10v6.5"/></>,
   close:  <><path d="m6 6 12 12M18 6 6 18"/></>,
+  chevron: <><path d="m9.5 6 6 6-6 6"/></>,
   pencil: <><path d="M4 20.2h4l10-10a2.8 2.8 0 0 0-4-4l-10 10v4Z"/><path d="m14.5 5.5 4 4"/></>,
   // Atelier de republication (« ✨ ») : une étincelle + une petite touche.
   spark:  <><path d="M12 3.2 13.7 9l5.8 1.7L13.7 12.4 12 18.2l-1.7-5.8L4.5 10.7 10.3 9 12 3.2Z"/><path d="M18.5 4v3M20 5.5h-3"/></>,
@@ -8613,6 +8715,15 @@ const BAR_GROUPE={
   cat_msg:'plat_vinted', cat_expedition:'cat_bord',
   leboncoin:'plat_leboncoin',
 };
+// Le nom COURT d'un écran, pour l'en-tête de la coque (titre qui apparaît au
+// défilement). Une source : les listes de navigation elles-mêmes (§11).
+function titreEcran(tab) {
+  if (tab === 'journee') return 'Ma journée';
+  if (tab === 'settings') return 'Paramètres';   // le grand titre de l'écran (le menu, lui, dit « Réglages »)
+  const t = [...BOTTOM_TABS, ...PLUS_TABS, ...VINTED_TABS].find(x => x.id === tab);
+  if (t) return t.label;
+  return { cat_msg: 'Messages', cat_expedition: 'Colis', leboncoin: 'Leboncoin', masques: 'Masqués', catalog: 'Catalogue', stockvinted: 'Stock Vinted', vintedaccounts: 'Comptes liés', sales: 'Ventes', inventory: 'Inventaire' }[tab] || 'VRM';
+}
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
   /* ⚠️ Colis descend ici (barre du bas = les plateformes, demande du 27 sept.).
@@ -8950,7 +9061,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   // ── QUAND TOUT VA BIEN : une ligne, pas un tableau. Le détail reste à un clic.
   return (
     <details style={{marginBottom:10}}>
-      <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
+      <summary className="vrm-reception-sum" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
         {/* ⚠️ Ni triangle ambre (rien ne cloche), ni coche verte (rien n'est
             confirmé non plus) : gris, comme une sonde qui n'a pas encore de
             quoi répondre. */}
@@ -9044,18 +9155,21 @@ function ScreenHead({ icon, title, desc, right }) {
        tous les jours. L'icône rejoint le titre sur sa ligne (elle nomme déjà
        l'écran dans la barre de navigation) et le filet redevient une simple
        séparation. Mesuré : 40 px rendus au contenu, en haut de chaque page. */
-    <div className="vrm-screen-head" style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
+    /* (16 oct.) GRAND TITRE : l'échelle typographique de l'app est posée une
+       fois (index.html, `--vrm-t-*`) ; taille, graisse et marges vivent dans
+       `.vrm-screen-head` (styles-coque.css). Plus de filet sous le titre. */
+    <div className="vrm-screen-head">
       {/* ⚠️ LA RANGÉE DU TITRE RÉSERVE LA PLACE DE L'ÎLE D'ACTIONS. Depuis
           qu'elle flotte en haut à droite (fixe), les boutons qu'un écran pose
           sur sa propre ligne de titre passaient DESSOUS : sur Factures,
           « ⚙ Réglages » disparaissait derrière (vu en capture). Le filet de
           séparation, lui, garde toute la largeur. */}
-      <div className="vrm-tete-row" style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:10}}>
+      <div className="vrm-tete-row">
+        <div className="vrm-screen-head-titre">
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
             : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
-          <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(21px, 3vw, 27px)',fontWeight:700,color:C.text,lineHeight:1.05,letterSpacing:'-0.02em'}}>{title}</h2>
+          <h2 className="vrm-display" style={{color:C.text}}>{title}</h2>
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -9306,54 +9420,46 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
     ...(!bottom?[{ titre: 'Dans Vinted', items: VINTED_TABS }]:[]),
     { titre: 'Autres outils', items: NAV_OUTILS },
   ];
+  // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
+  // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
+  // L'écran courant porte la teinte d'accent et une coche — plus d'aplat bleu.
+  // Le dessin vit dans `.vrm-sheet` (styles-coque.css).
+  const rangee = (t, on, onClick) => (
+    <button key={t.id} type="button" role="menuitem" className="vrm-sheet-row" onClick={onClick} aria-current={on?'page':undefined}>
+      <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
+      <span className="vrm-sheet-lib">{t.label}</span>
+      {t.bientot && <span data-bientot="" className="vrm-sheet-badge">Bientôt</span>}
+      <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
+    </button>
+  );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-nav-more":undefined} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}
-        style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
-          borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
-          color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
-        {bottom?<span aria-hidden="true"><Icon name={open?'close':'menu'} size={19}/></span>:<Icon name={open?'close':'menu'} size={19}/>} {bottom && <span className="vrm-nav-label">Gestion</span>}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}>
+        <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex'}}><Icon name={open&&!bottom?'close':'menu'} size={bottom?24:22} style={{strokeWidth:1.6}}/></span>{bottom && <span className="vrm-nav-label">Gestion</span>}
       </button>
       {open && (
-        <div data-noswipe onClick={()=>setOpen(false)}
-          style={{position:'fixed',inset:0,zIndex:80,background:'rgba(21,17,16,.42)',
-            backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)'}}>
-          {/* Le panneau descend DU HAUT, sous le bouton qui l'a ouvert : une
-              feuille qui monte du bas pour un bouton du haut, le geste et le
-              mouvement se contredisent. */}
-          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-menu-bottom":"vrm-mobile-menu"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
-            style={{position:'absolute',left:0,right:0,top:0,background:C.chrome,color:C.onChrome,
-              borderBottom:`1px solid ${C.chromeLine}`,boxShadow:'0 14px 40px rgba(21,17,16,.28)',
-              padding:'calc(8px + env(safe-area-inset-top)) 10px 12px',
-              animation:'cancaleSheet .2s cubic-bezier(.32,.72,0,1)',maxHeight:'86vh',overflowY:'auto'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 8px'}}>
-              <span style={{fontSize:19,fontWeight:600}}>Ton espace</span>
-              <button className="vrm-icon-control" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)} style={{border:0,background:'transparent',color:C.onChrome,cursor:'pointer',padding:8}}><Icon name="close" size={20}/></button>
+        <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
+          {/* Depuis la barre du bas, la feuille MONTE du bas ; depuis l'en-tête,
+              elle descend du haut : le geste et le mouvement vont dans le même sens. */}
+          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom":"vrm-mobile-menu vrm-sheet vrm-sheet-haut"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+            {bottom && <div aria-hidden="true" className="vrm-sheet-poignee"/>}
+            <div className="vrm-sheet-tete">
+              <span className="vrm-sheet-titre">Ton espace</span>
+              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
             {groupes.map(g => (
-              <div className="vrm-menu-group" key={g.titre} style={{marginBottom:4}}>
-                <div className="vrm-label" style={{color:C.chromeMuted,padding:'9px 8px 5px'}}>{g.titre}</div>
-                {g.items.map(t => { const on = tab === t.id; return (
-                  <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setOpen(false); }}
-                    aria-current={on?'page':undefined}
-                    style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                      padding:'11px 10px',marginBottom:2,borderRadius:8,border:'none',cursor:'pointer',fontFamily:'inherit',
-                      background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
-                      fontSize:15,fontWeight:on?600:500}}>
-                    <NavigationIcon item={t} size={20} style={{opacity:on?1:.7,flexShrink:0}}/>
-                    <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
-                    {t.bientot && <span data-bientot="" style={{marginLeft:'auto',flexShrink:0,fontSize:10,fontWeight:600,padding:'2px 6px',borderRadius:5,border:`1px solid ${C.chromeLine}`,color:C.chromeMuted}}>Bientôt</span>}
-                  </button>
-                );})}
+              <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre}>
+                <div className="vrm-sheet-label">{g.titre}</div>
+                <div className="vrm-sheet-carte">
+                  {g.items.map(t => rangee(t, tab === t.id, ()=>{ setTab(t.id); setOpen(false); }))}
+                </div>
               </div>
             ))}
-            <button type="button" role="menuitem" onClick={()=>{ setTab('settings'); setOpen(false); }}
-              aria-current={tab==='settings'?'page':undefined}
-              style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',marginTop:6,
-                padding:'11px 10px',borderRadius:8,border:`1px solid ${C.chromeLine}`,cursor:'pointer',fontFamily:'inherit',
-                background:tab==='settings'?C.chromeLine:'transparent',color:C.chromeMuted,fontSize:14,fontWeight:500}}>
-              <Icon name="gear" size={19}/><span>Réglages</span>
-            </button>
+            <div className="vrm-sheet-groupe">
+              <div className="vrm-sheet-carte">
+                {rangee({id:'settings',icon:'gear',label:'Réglages'}, tab==='settings', ()=>{ setTab('settings'); setOpen(false); })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -9402,36 +9508,22 @@ function BottomBar({tab,setTab}) {
     return ()=>{ window.removeEventListener('focusin',onIn); window.removeEventListener('focusout',onOut); };
   },[]);
   return (
-    // Barre en VERRE DÉPOLI (comme iOS) : le contenu défile derrière au lieu
-    // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
-    // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <>
-    <nav className="vrm-mobile-nav" aria-label="Navigation principale" style={{flexShrink:0,zIndex:60,display:kbOpen?'none':'flex',overflowX:'hidden',
-      /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
-         signature, comme la barre latérale sur ordinateur. */
-      background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
-      paddingBottom:'env(safe-area-inset-bottom)',
-      // ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PLUS `position:fixed`.
-      // Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
-      // c'est `<main>` qui défile. Une barre qui ne participe pas au défilement
-      // ne peut pas « flotter au milieu de l'écran » pendant l'inertie iOS, ni
-      // être décalée par le `zoom` de densité. On la masque au clavier avec
-      // `display:none` (elle est dans le flux, un translate laisserait un vide).
-      }}>
+    {/* ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PAS `position:fixed`.
+       Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
+       c'est `<main>` qui défile — elle ne peut donc pas « flotter au milieu de
+       l'écran » pendant l'inertie iOS. Masquée au clavier par `display:none`.
+       (16 oct.) BARRE D'ONGLETS NATIVE : icônes fines, libellé 11 px, l'onglet
+       actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
+       seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
+       `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
+    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex'}}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab;
         const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
-        <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
-          flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
-          background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-          color:on?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
-          <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
-            width:38,height:26,transition:'transform .2s cubic-bezier(.32,.72,0,1), opacity .2s ease',
-            transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
-            <Icon name={t.icon} size={23} style={{strokeWidth:on?2:1.7}}/>
-          </span>
-          <span className="vrm-nav-label" style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
-            overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
+        <button key={t.id} type="button" className="vrm-tab" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined}>
+          <span aria-hidden="true" className="vrm-tab-ic"><Icon name={t.icon} size={24} style={{strokeWidth:on?2:1.6}}/></span>
+          <span className="vrm-nav-label">{t.label}</span>
         </button>
       );}); })()}
       <MenuEcrans tab={tab} setTab={setTab} bottom/>
@@ -10518,7 +10610,7 @@ const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sa
 //    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
 //    demande une confirmation (l'extension l'exige aussi, `confirme`).
 const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
-function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) {
+function BoutonPublier({ place, id, croitVendue, photos = null, total = null, onFiche = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -10533,6 +10625,11 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
   const abandonne = job && job.etape === 'abandonne';
   const lancer = async () => {
     if (envoi) return;                       // la demande précédente est en vol : son résultat arrive
+    // 5.182 : sur Leboncoin, le bouton OUVRE LA FICHE (voir `FicheLbc`) — c'est
+    // elle qui montre ce qui partira, laisse corriger, puis publie (les gardes y
+    // vivent aussi). Grisé ou déjà publiée : on le dit ici, comme avant — une
+    // fiche qu'on ne pourrait pas publier ne s'ouvre pas pour rien.
+    if (lbc && onFiche && !glob && !fait) { setRefus(null); onFiche(); return; }
     // ⚠️ Un clic refusé dit TOUJOURS pourquoi (11 octobre) : avant, ces trois
     //    cas faisaient `return` en silence — « je ne peux pas poster ».
     if (glob) { setRefus(glob.texte); return; }
@@ -10585,6 +10682,260 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
       </button>
       {refus && <span data-refus-publier="" style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
+  );
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// LA FICHE « PUBLIER SUR LEBONCOIN » (5.182, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux que le poste d'annonce sur leboncoin se fasse comme pour
+// eBay, pour tout gérer depuis VRM ». Leboncoin n'a pas d'API : c'est
+// l'extension qui remplit le dépôt dans son Chrome. La fiche lui montre AVANT
+// ce qui partira — titre (50 car.), description avec sa référence VRM-{n°},
+// prix, état, les photos captées (choisies et ordonnées), la catégorie et le
+// compte — et le laisse corriger. Puis UN bouton : l'app envoie l'annonce
+// corrigée, l'extension la REVÉRIFIE (`valideAnnonceLbc`, la même règle des
+// deux côtés, §11), ouvre le dépôt, remplit, publie sans option payante, et
+// raconte l'avancement que la fiche affiche en direct.
+// ⚠️ Ce qui ne bouge pas : une paire vendue, décochée ou déjà publiée est
+//    refusée par l'extension (elle relit SA file) ; un dépôt en cours n'est pas
+//    relancé ; un dépôt dont VRM n'a pas vu la fin ne repart qu'avec sa
+//    confirmation (il a pu le finir à la main) ; jamais un bouton payant.
+// ⚠️ Une extension plus ancienne que la 5.182 ne sait pas recevoir la fiche :
+//    publier « tel quel » reste possible (elle publie SA version, comme avant),
+//    mais une fiche CORRIGÉE ne part pas — le bouton le dit, il ne promet rien.
+const ETAPES_FICHE_LBC = [
+  ['ouverture', 'Dépôt ouvert sur Leboncoin'],
+  ['remplissage', 'Titre, description, prix'],
+  ['photos', 'Photos'],
+  ['publication', 'Publication, sans option payante'],
+];
+const RANG_PROGRES_LBC = { ouverture: 0, remplissage: 1, 'champ-manquant': 1, photos: 2, etapes: 2, publication: 3, 'publication-refusee': 3 };
+function defautsFicheLbc(q) {
+  const etat = String(q.etat || '').trim();
+  return {
+    title: q.title || '',
+    price: q.prix != null && isFinite(Number(q.prix)) ? Number(q.prix).toFixed(2).replace('.', ',') : '',
+    etat,
+    description: descriptionLbcDe({ ref: 'VRM-' + q.numero, texte: q.texte, base: q.base || q.vinted, marque: q.marque, taille: q.taille, etat, couleur: q.couleur }),
+    photos: Array.isArray(q.photosAll) ? q.photosAll.slice(0, LBC_PHOTOS_MAX) : [],
+  };
+}
+function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
+  const { jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const jobId = 'lbc:' + q.id;
+  const job = jobs[jobId] || null;
+  const defauts = React.useMemo(() => defautsFicheLbc(q), [q]);
+  const [titre, setTitre] = React.useState(defauts.title);
+  const [prix, setPrix] = React.useState(defauts.price);
+  const [etat, setEtat] = React.useState(defauts.etat);
+  const [desc, setDesc] = React.useState(defauts.description);
+  const [photos, setPhotos] = React.useState(defauts.photos);
+  const [envoi, setEnvoi] = React.useState(false);
+  const [refus, setRefus] = React.useState(null);
+  const [aConfirmer, setAConfirmer] = React.useState(false);
+  const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
+  const ref = 'VRM-' + q.numero;
+  const saisie = { title: titre, description: desc, price: prix, etat, photos };
+  const v = valideAnnonceLbc(saisie, { ref, photos: toutes, etat: q.etat });
+  const errDe = (champ) => (!v.ok && v.erreurs.find((e) => e.champ === champ)) || null;
+  const corrigee = titre !== defauts.title || desc !== defauts.description || prix !== defauts.price || etat !== defauts.etat
+    || photos.length !== defauts.photos.length || photos.some((u, i) => u !== defauts.photos[i]);
+  const saitFiche = extSait('lbcfiche');
+  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+    || (q.croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
+  const fait = !!(job && job.etape === 'fait');
+  const enCours = !!(job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000));
+  const abandonne = !!(job && job.etape === 'abandonne');
+  const progres = (job && job.progres) || null;
+  // Ce qui empêche de publier, une seule raison à la fois (la plus en amont).
+  const bloque = fait ? null
+    : glob ? { code: glob.code, texte: glob.texte }
+    : (corrigee && saitFiche !== 'ok') ? { code: 'fiche-retard', texte: `Tes corrections ne partiraient pas : ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la fiche de VRM. Mets-la à jour (${EXT_CAPACITES.lbcfiche}), ou publie la version d'origine.` }
+    // La fiche n'est jugée que si elle PART : une extension plus ancienne publie
+    // sa propre version (l'identifiant seul), la fiche ne la contraint pas.
+    : (!v.ok && saitFiche === 'ok') ? { code: 'fiche', texte: 'À corriger : ' + v.erreurs[0].raison + '.' }
+    : null;
+  const envoyer = (confirme) => vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(q.id) },
+    saitFiche === 'ok' ? { annonce: v.annonce } : {}, confirme ? { confirme: true } : {}), 30000);
+  const publier = async (confirme) => {
+    if (envoi || fait) return;
+    if (bloque && !enCours) { setRefus(bloque.texte); return; }
+    if (abandonne && !confirme) { setAConfirmer(true); return; }
+    setRefus(null); setAConfirmer(false); setEnvoi(true);
+    let r = await envoyer(!!confirme);
+    setEnvoi(false);
+    if (r && !r.accepte && r.code === 'confirmer') {
+      __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
+      setAConfirmer(true); return;
+    }
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r.accepte) { setRefus(r.raison ? (r.raison.charAt(0).toUpperCase() + r.raison.slice(1) + '.') : "Refusé par l'extension."); return; }
+    __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() });
+    __vmrNotifier();
+  };
+  const basculerPhoto = (u) => setPhotos((l) => (l.includes(u) ? l.filter((x) => x !== u) : (l.length >= LBC_PHOTOS_MAX ? l : [...l, u])));
+  const categorie = categorieLbcDe(titre, desc, q.taille);
+  const etatsProposes = [...LBC_ETATS];
+  if (q.etat && !etatsProposes.includes(q.etat)) etatsProposes.push(q.etat);
+  const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' };
+  const Etiquette = ({ children, droite, err }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, margin: '14px 0 6px' }}>
+      <span className="vrm-label" style={{ fontSize: 12, fontWeight: 700, color: err ? C.warn : C.muted, letterSpacing: '.02em' }}>{children}</span>
+      {droite != null && <span style={{ fontSize: 11.5, color: err ? C.warn : C.muted, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>}
+    </div>
+  );
+  // L'étape où en est le dépôt : -1 avant le clic, puis 0 à 3 ; 4 = publiée.
+  const rang = fait ? 4 : progres ? (RANG_PROGRES_LBC[progres.etape] != null ? RANG_PROGRES_LBC[progres.etape] : 1) : (enCours ? 0 : -1);
+  const ph = progres && progres.photos;
+  const textePhotosProgres = ph && ph.total != null
+    ? (ph.confirmees != null ? `${ph.confirmees}/${ph.total} confirmées` : `${ph.posees || 0}/${ph.total} envoyées — vérifie sur la page qu'elles y sont toutes`) + (ph.rates ? ` · ${ph.rates} illisible${ph.rates > 1 ? 's' : ''}` : '')
+    : `${photos.length} à poser`;
+  const etatFiche = fait ? 'publiee' : abandonne ? 'abandonne' : enCours ? 'encours' : bloque ? 'bloque' : 'pret';
+  const libelle = envoi ? 'Envoi…' : fait ? 'Publiée sur Leboncoin ✓' : enCours ? 'Remettre le dépôt devant' : abandonne ? 'Relancer le dépôt' : 'Publier sur Leboncoin';
+  const grise = !!bloque && !enCours;
+  // Le dépôt démarre : on remonte la fiche jusqu'à l'avancement (le bouton est
+  // en bas, l'avancement en haut — sinon on publie sans rien voir bouger).
+  const refProgres = React.useRef(null);
+  const actif = rang >= 0 || abandonne;
+  React.useEffect(() => { if (actif && refProgres.current && refProgres.current.scrollIntoView) { try { refProgres.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {} } }, [actif]);
+  return (
+    <SheetShell onClose={onClose} maxWidth={560}>
+      <div data-fiche-lbc={q.id} data-fiche-etat={etatFiche} data-fiche-corrigee={corrigee ? '1' : '0'}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {photos[0]
+            ? <PhotoVinted src={photos[0]} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 || C.border }}/>
+            : <span style={{ width: 56, height: 56, borderRadius: 12, flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/></span>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>Publier sur Leboncoin</div>
+            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              N°{q.numero}{q.compte ? ` · depuis ${q.compte}` : ''}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ flexShrink: 0, width: 34, height: 34, minHeight: 0, borderRadius: 999, border: 'none', background: C.card2 || C.card, color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* L'avancement EN HAUT : c'est ce qu'on regarde une fois le dépôt lancé. */}
+        {(rang >= 0 || abandonne) && (
+          <div ref={refProgres} data-fiche-progres={fait ? 'publiee' : abandonne ? 'abandonne' : (progres ? progres.etape : 'ouverture')} style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px', scrollMarginTop: 12 }}>
+            {ETAPES_FICHE_LBC.map(([k, lib], i) => {
+              const fini = rang > i; const ici = rang === i && !abandonne;
+              return (
+                <div key={k} data-fiche-etape={k} data-fini={fini ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 13, color: fini || ici ? C.text : C.muted }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
+                    background: fini ? C.accent : 'transparent', color: fini ? '#fff' : C.muted, border: fini ? 'none' : `1.5px solid ${ici ? C.accent : C.border}` }}>{fini ? '✓' : ''}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: ici ? 700 : 500 }}>{lib}</span>
+                  {k === 'photos' && (ph || (rang >= 2 && !fait)) && <span data-fiche-photos-progres="" style={{ fontSize: 11.5, color: C.muted, textAlign: 'right' }}>{textePhotosProgres}</span>}
+                </div>
+              );
+            })}
+            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — la paire est maintenant marquée <b>« sur Leboncoin »</b> dans VRM.</div>}
+            {!fait && progres && progres.etape === 'champ-manquant' && (
+              <div data-fiche-manque={(progres.manque || []).join('|')} style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
+                {(progres.manque && progres.manque.length) ? `${progres.manque.map((m) => `« ${m} »`).join(', ')} ${progres.manque.length > 1 ? 'restent' : 'reste'} à choisir` : 'Un champ obligatoire reste à choisir'} sur la page Leboncoin : fais-le, VRM continue tout seul.
+              </div>
+            )}
+            {!fait && progres && progres.etape === 'publication-refusee' && (
+              <div data-fiche-fin="refusee" style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>VRM n'a pas publié — {progres.raison || 'à faire sur la page'}.</div>
+            )}
+            {abandonne && (
+              <div data-fiche-fin="abandonne" style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
+                {RAISON_ABANDON[job.raison] ? RAISON_ABANDON[job.raison].charAt(0).toUpperCase() + RAISON_ABANDON[job.raison].slice(1) : "VRM n'a pas vu la fin du dépôt"}. Si tu l'as publiée toi-même, choisis « Déjà publiée » ; sinon relance.
+              </div>
+            )}
+          </div>
+        )}
+
+        <Etiquette droite={`${titre.replace(/\s+/g, ' ').trim().length}/${LBC_TITRE_MAX}`} err={errDe('title')}>Titre</Etiquette>
+        <input data-fiche-champ="titre" value={titre} onChange={(e) => setTitre(e.target.value)} maxLength={80} disabled={enCours || fait}
+          style={{ ...champ, borderColor: errDe('title') ? C.warn : C.border }}/>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+            <Etiquette err={errDe('price')}>Prix</Etiquette>
+            <div style={{ position: 'relative' }}>
+              <input data-fiche-champ="prix" value={prix} onChange={(e) => setPrix(e.target.value)} inputMode="decimal" disabled={enCours || fait}
+                style={{ ...champ, paddingRight: 30, borderColor: errDe('price') ? C.warn : C.border }}/>
+              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span>
+            </div>
+          </div>
+          <div style={{ flex: '1.3 1 0', minWidth: 0 }}>
+            <Etiquette err={errDe('etat')}>État</Etiquette>
+            <select data-fiche-champ="etat" value={etat} onChange={(e) => setEtat(e.target.value)} disabled={enCours || fait}
+              style={{ ...champ, appearance: 'auto', paddingRight: 8 }}>
+              <option value="">Laisser Leboncoin le demander</option>
+              {etatsProposes.map((x) => <option key={x} value={x}>{LBC_ETATS.includes(x) ? x : `${x} (état Vinted)`}</option>)}
+            </select>
+          </div>
+        </div>
+        {etat && !LBC_ETATS.includes(etat) && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>« {etat} » n'est pas un libellé de Leboncoin : l'état restera à choisir sur la page.</div>}
+
+        <Etiquette droite={`${photos.length} sur ${toutes.length}${q.nReelles != null && q.nReelles > toutes.length ? ` captées (${q.nReelles} sur Vinted)` : ''}`} err={errDe('photos')}>Photos</Etiquette>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: -2, marginBottom: 8, lineHeight: 1.4 }}>Touche-les dans l'ordre voulu — la n°1 est la couverture.</div>
+        <div data-fiche-photos={photos.length} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
+          {toutes.map((u) => {
+            const i = photos.indexOf(u);
+            const pris = i >= 0;
+            return (
+              <button type="button" key={u} data-fiche-photo={pris ? i + 1 : 0} onClick={() => !(enCours || fait) && basculerPhoto(u)} aria-pressed={pris}
+                style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
+                  border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
+                <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
+                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
+                {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
+              </button>
+            );
+          })}
+        </div>
+        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Aucune photo captée pour cette annonce : ouvre-la sur Vinted, l'extension lit ses photos au passage. Leboncoin refuse une annonce sans photo.</div>}
+
+        <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
+        <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
+          style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
+          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cette paire{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
+        </div>
+
+        <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
+          {[
+            ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
+            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (dernier vu : ${compteLbc.name})` : ''}`],
+            ['Options payantes', 'aucune — VRM publie sans booster'],
+          ].map(([k, val], i) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
+              <span style={{ color: C.muted, flexShrink: 0 }}>{k}</span>
+              <span data-fiche-info={k} style={{ color: C.text, textAlign: 'right', minWidth: 0 }}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {aConfirmer && (
+          <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
+              <button type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ position: 'sticky', bottom: 'calc(-18px - env(safe-area-inset-bottom))', background: C.bg, margin: '14px -18px 0', padding: '12px 18px calc(20px + env(safe-area-inset-bottom))', borderTop: `1px solid ${C.border}` }}>
+          {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}</div>}
+          {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version de l'annonce : pour envoyer cette fiche, mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
+          {refus && <div data-fiche-refus="" style={{ fontSize: 12, color: C.warn, lineHeight: 1.45, marginBottom: 8, fontWeight: 600 }}>{refus}</div>}
+          <button type="button" data-fiche-publier={grise ? 'grise' : etatFiche} onClick={() => publier(false)} aria-disabled={grise || fait ? 'true' : undefined}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: grise || fait ? 'default' : 'pointer',
+              background: grise ? (C.card2 || C.border) : fait ? 'transparent' : C.accent, color: grise ? C.muted : fait ? C.accent : '#fff',
+              boxShadow: grise || fait ? 'none' : C.shadow, opacity: envoi ? 0.75 : 1 }}>
+            {libelle}
+          </button>
+          {!fait && (
+            <button type="button" data-fiche-deja="" onClick={() => { onMarquer(q.id); onClose(); }}
+              style={{ display: 'block', margin: '8px auto 0', border: 'none', background: 'transparent', minHeight: 0, padding: '6px 8px', color: C.muted, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>Déjà publiée sur Leboncoin</button>
+          )}
+        </div>
+      </div>
+    </SheetShell>
   );
 }
 function LbcCroitVendue({ n }) {
@@ -11257,23 +11608,32 @@ function EntetePlateforme({nom,plateforme}) {
   return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
 }
 function PlatSubNav({ sub, setSub, sections, dark }) {
-  const icones={ventes:'cash',achats:'bag',annonces:'tag',messages:'chat',offres:'tag',colis:'truck',compte:'gear'};
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
+  // (16 oct.) CONTRÔLE SEGMENTÉ : une piste neutre, le segment actif posé dessus
+  // (fond carte + ombre fine), le texte des autres en secondaire. Plus de rangée
+  // de boutons encadrés ni d'aplat bleu (§7). Défile au doigt quand les sections
+  // ne tiennent pas (eBay en a six). Les couleurs viennent du thème (`T`) par des
+  // variables : le dessin vit dans `.vrm-seg` (styles-coque.css).
+  const refPiste = React.useRef(null);
+  React.useEffect(() => {
+    const el = refPiste.current && refPiste.current.querySelector('[aria-current="page"]');
+    if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {} }
+  }, [sub]);
   return (
-    <nav aria-label="Sections de la plateforme" className="vrm-rangee vrm-platform-tabs" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
-      {sections.map(([id,label,point])=>{ const on = sub===id; return (
-        <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id}
-          style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
-            color:on?(T.onAccent||'#fff'):T.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
-            fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6}}>
-          <span className="vrm-section-icon"><Icon name={icones[id] || 'more'} size={17}/></span><span>{label}</span>
-          {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
-              comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
-              ici pourrait contredire celui de l'écran juste en dessous (§11). */}
-          {point && !on ? <span data-point="" aria-label="nouveau" style={{width:7,height:7,borderRadius:999,background:T.accent,flexShrink:0}}/> : null}
-        </button>
-      );})}
-    </nav>
+    <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
+      <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
+        style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent }}>
+        {sections.map(([id,label,point])=>{ const on = sub===id; return (
+          <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
+            <span>{label}</span>
+            {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
+                comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
+                ici pourrait contredire celui de l'écran juste en dessous (§11). */}
+            {point && !on ? <span data-point="" aria-label="nouveau" className="vrm-seg-point"/> : null}
+          </button>
+        );})}
+      </nav>
+    </div>
   );
 }
 // Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
@@ -11739,7 +12099,9 @@ function ebayTitre(base, taille, max) {
   // (il la relit dans le titre) : on retire ce « T44 » final et on réécrit.
   if (!estNum) return lbcTitre('', base, taille, M);
   const suff = ' taille ' + t;
-  let core = lbcTitre('', base, '', M).replace(/\s+T\d{1,2}(?:[.,]\d)?$/i, '').trim();
+  // (16 oct.) lbcTitre écrit maintenant lui-même « taille 36 » (plus « T36 ») :
+  // on retire les DEUX formes, sinon le titre portait « taille 36 taille 36 ».
+  let core = lbcTitre('', base, '', M).replace(/\s+(?:T|tailles?\s*)\d{1,2}(?:[.,]\d)?$/i, '').trim();
   if ((core + suff).length > M) {
     const c = core.slice(0, M - suff.length); const e = c.lastIndexOf(' ');
     core = (e > 12 ? c.slice(0, e) : c).replace(/[\s,;:/-]+$/, '');
@@ -14017,11 +14379,11 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
   const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
   return (
-    <div data-regle-envoi={envoiRegle || undefined} style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
+    <div className="vrm-ebay-carte" data-regle-envoi={envoiRegle || undefined} style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
       <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0} data-ebay-carte-ouvrir={it.itemId}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
-        style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', cursor: 'pointer' }}>
-        <PhotoVente src={it.photo} size={56} />
+        className="vrm-ebay-carte-tete" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}>
+        <PhotoVente src={it.photo} size={64} />
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
@@ -15701,8 +16063,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     } else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est retirée. Regarde sur eBay avant de recommencer.' }));
     else setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay a refusé le retrait.' }));
   };
-  const wrap = (kids) => <div style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>{kids}</div>;
-  const head = (n) => <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Annonces eBay{n != null ? ` (${n})` : ''}</div>;
+  const wrap = (kids) => <div className="vrm-ebay-annonces" style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>{kids}</div>;
+  const head = (n) => <ScreenHead icon="tag" title={`Annonces eBay${n != null ? ` (${n})` : ''}`}/>;
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
   // compte, jamais un bouton mort.
@@ -15736,8 +16098,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // d'envoi au prochain essai : l'ancien a déjà servi chez eBay).
   const remettreBrouillon = (itemId) => modifierBrouillonsEbay((items0) => { for (const id in items0) { const d = items0[id]; if (d && d.programme && String(d.programme.itemId) === String(itemId)) items0[id] = { ...d, etatBrouillon: 'brouillon', programme: null, uuid: null, verif: null }; } return items0; })
     .then((w) => { if (w.ok) setBrouillons(w.items); return w; });
-  const outils = (<>
-    {publier}
+  // (16 oct., « premium » au téléphone) La LISTE des annonces est l'information
+  // principale de l'écran : la mise en vente reste en haut, les brouillons et les
+  // programmées passent SOUS la liste (`outilsSuite`), les notes aussi.
+  const outilsSuite = (<>
     <EbayBrouillons brouillons={brouillons} connected={connected} paires={paires} vue={vueSeule ? vue : '*'} comptesPub={comptesPub}
       onModifier={(d) => setOuvrirBrouillon({ ...d })}
       onPlanifier={(ids) => setPlanif(ids)}
@@ -15759,6 +16123,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         remettreBrouillon(itemId);
       }} />
   </>);
+  const outils = (<>{publier}{outilsSuite}</>);
   // Annuler la programmation d'une paire vendue sur Vinted : la réponse d'eBay
   // est dite telle quelle (l'annulation par l'API n'est pas garantie).
   const annulerVendue = async (d) => {
@@ -16207,23 +16572,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   );
   return wrap(<>
     {head(itemsVue.length)}
-    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
+    <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
     {alertes}
     {ligneComptesIllisibles}
     {lignePasSu}
     {ligneSansPreuve}
-    {outils}
-    <div style={{ height: 12 }} />
-    {nSans > 0 && (
-      <div data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
-        Offre aux observateurs : {nElig ? `possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} ; pour ${nSans === 1 ? "l'autre" : `les ${nSans} autres`}, ` : ''}pas d'observateur à qui l'envoyer pour l'instant.
-      </div>
-    )}
-    {dvVue.nonReliees.length > 0 && (
-      <div data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'}{nonRelieesPeutEtre ? ' (peut-être)' : ''} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
-      </div>
-    )}
+    {publier}
     {blocEngagement}
     {lignePasSuRegle}
     {!blocEngagement && !lignePasSuRegle && porteToutes && <div style={{ margin: '0 2px 10px' }}>{porteToutes}</div>}
@@ -16248,7 +16602,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         onDebut={() => { setLotInterrompu(null); try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} }}
         onFini={async () => { if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); } }} />
     )}
-    <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {itemsVue.map((it, i) => {
         const n = numEbayLu(it.sku,it.itemId);
         const cle = cleAnnonce(it);
@@ -16266,6 +16620,19 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           </div>
         );
       })}
+    </div>
+    <div className="vrm-ebay-suite">
+    {nSans > 0 && (
+      <div className="vrm-plat-note" data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
+        Offre aux observateurs : {nElig ? `possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} ; pour ${nSans === 1 ? "l'autre" : `les ${nSans} autres`}, ` : ''}pas d'observateur à qui l'envoyer pour l'instant.
+      </div>
+    )}
+    {dvVue.nonReliees.length > 0 && (
+      <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'}{nonRelieesPeutEtre ? ' (peut-être)' : ''} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
+      </div>
+    )}
+      {outilsSuite}
     </div>
   </>);
 }
@@ -23392,6 +23759,35 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const [ym, setYm] = React.useState(mois[0]);
   const [msg, setMsg] = React.useState('');
   const [enCours, setEnCours] = React.useState('');
+  // ── SUPER PDP : SA connexion (le navigateur ne relit jamais ses identifiants)
+  // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
+  const [spdp, setSpdp] = React.useState(undefined);
+  const relireSpdp = React.useCallback(() => lireSuperPdp(enTeteSession()).then((j) => setSpdp(j)), []);
+  React.useEffect(() => { let mort = false; lireSuperPdp(enTeteSession()).then((j) => { if (!mort) setSpdp(j); }); return () => { mort = true; }; }, []);
+  const [spEnv, setSpEnv] = React.useState('sandbox');
+  const [spId, setSpId] = React.useState('');
+  const [spSecret, setSpSecret] = React.useState('');
+  const [spOccupe, setSpOccupe] = React.useState('');
+  const [spMsg, setSpMsg] = React.useState('');
+  const connecterSpdp = async () => {
+    setSpMsg(''); setSpOccupe('connexion');
+    const corps = { action: 'connecter', environnement: spEnv, client_id: spId, client_secret: spSecret };
+    // Les identifiants quittent le champ DÈS l'envoi : ils ne restent pas dans la page.
+    setSpId(''); setSpSecret('');
+    const { code, j } = await appelSuperPdp(enTeteSession(), corps);
+    setSpOccupe('');
+    if (code === 200 && j.ok) { setSpMsg(`Compte Super PDP connecté (${ENV_LIBELLE[j.env] || j.env}). Tes identifiants sont rangés sur le serveur — VRM ne te les remontrera plus.`); relireSpdp(); }
+    else setSpMsg(j.message || (code === 0 ? "Le serveur n'a pas répondu : je ne sais pas si la connexion a été rangée. Rouvre cet écran." : 'La connexion a échoué.'));
+  };
+  const deconnecterSpdp = async () => {
+    setSpMsg(''); setSpOccupe('deconnexion');
+    const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'deconnecter' });
+    setSpOccupe('');
+    if (code === 200 && j.ok) { setSpMsg('Compte Super PDP déconnecté : VRM a effacé tes identifiants.'); relireSpdp(); }
+    else setSpMsg(j.message || "Le serveur n'a pas répondu : la connexion est peut-être toujours rangée.");
+  };
+  const envoiDe = (num) => (spdp && spdp.envois && num && spdp.envois[num.numero]) || null;
+  const noterEnvoiLocal = (numero, envoi) => { if (!envoi) return; setSpdp((cur) => (cur && cur.envois ? { ...cur, envois: { ...cur.envois, [numero]: envoi } } : cur)); };
 
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
@@ -23416,24 +23812,55 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
   const fx = (data && data.facturx) || {};
   const numeroDe = (id) => (fx.parVente && fx.parVente[id]) || null;
+  // Le numéro et les octets d'UNE vente : le même chemin pour « Facture »
+  // (téléchargement) et « Envoyer à Super PDP » — une vente garde son numéro.
+  const preparerFacture = async (l) => {
+    let deja = numeroDe(l.id);
+    let next = data;
+    if (!deja) {
+      const emiseLe = Date.now(), an = String(new Date(emiseLe).getFullYear());
+      const compteur = { ...(fx.compteur || {}) }; const n = (Number(compteur[an]) || 0) + 1; compteur[an] = n;
+      deja = { numero: `FX-${an}-${String(n).padStart(4, '0')}`, emiseLe };
+      next = { ...data, facturx: { ...fx, compteur, parVente: { ...(fx.parVente || {}), [l.id]: deja } } };
+    }
+    const f = factureDepuisVente(l, { numero: deja.numero, emiseLe: deja.emiseLe });
+    if (!isFinite(f.centimes)) throw new Error('montant illisible');
+    const octets = await pdfFacturX(f, etat.vendeur);
+    if (next !== data) maj(next);
+    return { f, octets };
+  };
+  const envoyerSpdp = async (l, relireSeulement) => {
+    setMsg('');
+    if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
+    if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
+    setEnCours(l.id);
+    try {
+      if (relireSeulement) {
+        const numero = numeroDe(l.id) && numeroDe(l.id).numero;
+        const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'relire', numero });
+        if (j.envoi) noterEnvoiLocal(numero, j.envoi);
+        setMsg(code === 200 ? `Statut relu chez Super PDP pour ${numero}.` : (j.message || "Super PDP n'a pas répondu : statut pas relu."));
+        return;
+      }
+      const { f, octets } = await preparerFacture(l);
+      noterEnvoiLocal(f.numero, { etat: 'en-cours' });
+      const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'envoyer', numero: f.numero, pdf: enBase64(octets) });
+      if (j.envoi) noterEnvoiLocal(f.numero, j.envoi);
+      // La réponse n'est pas arrivée : INCERTAIN, jamais « refusé ».
+      else if (code === 0) noterEnvoiLocal(f.numero, { etat: 'incertain' });
+      if (code === 200) setMsg(j.deja ? `Facture ${f.numero} : déjà chez Super PDP — rien n'a été renvoyé.` : `Facture ${f.numero} envoyée à Super PDP.`);
+      else setMsg(j.message || (code === 0 ? "La réponse du serveur n'est pas arrivée : je ne sais pas si la facture est partie. « Relire » la cherchera chez Super PDP." : "L'envoi a échoué."));
+      relireSpdp();
+    } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
+    finally { setEnCours(''); }
+  };
   const genererFacture = async (l) => {
     setMsg('');
     if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
     if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
     setEnCours(l.id);
     try {
-      let deja = numeroDe(l.id);
-      let next = data;
-      if (!deja) {
-        const emiseLe = Date.now(), an = String(new Date(emiseLe).getFullYear());
-        const compteur = { ...(fx.compteur || {}) }; const n = (Number(compteur[an]) || 0) + 1; compteur[an] = n;
-        deja = { numero: `FX-${an}-${String(n).padStart(4, '0')}`, emiseLe };
-        next = { ...data, facturx: { ...fx, compteur, parVente: { ...(fx.parVente || {}), [l.id]: deja } } };
-      }
-      const f = factureDepuisVente(l, { numero: deja.numero, emiseLe: deja.emiseLe });
-      if (!isFinite(f.centimes)) throw new Error('montant illisible');
-      const octets = await pdfFacturX(f, etat.vendeur);
-      if (next !== data) maj(next);
+      const { f, octets } = await preparerFacture(l);
       telechargerFichier(new Blob([octets], { type: 'application/pdf' }), nomFichierFacture(f.numero), 'application/pdf');
       setMsg(`Facture ${f.numero} téléchargée — à déposer sur ta plateforme agréée.`);
     } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
@@ -23458,7 +23885,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers, gratuitement. C'est toi qui les envoies.</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
           </div>
           <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
@@ -23469,7 +23896,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
             ['Ce que VRM prépare', 'Une facture Factur-X (PDF + données lisibles par machine) par vente, et le récapitulatif mensuel de tes ventes aux particuliers (e-reporting).'],
-            ["Où l'envoyer", 'Depuis ta plateforme agréée gratuite (Indy, Pennylane, Tiime…) : dépose-y les fichiers. VRM ne se connecte à aucune plateforme.'],
+            ["Où l'envoyer", "Super PDP (plateforme agréée) : connecte TON compte ci-dessous, les factures partent d'ici. Ailleurs (Indy, Pennylane, Tiime…) : dépose les fichiers toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
             <div key={t} data-fe-explique={i} style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
@@ -23477,6 +23904,39 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginTop: 4 }}>{d}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── SUPER PDP : SON compte ── */}
+        <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
+          {spdp === undefined && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
+          {spdp === null && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+            <div style={{ flex: '1 1 220px', fontSize: 12.5, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
+              <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
+              <div style={{ fontSize: 11, color: C.muted }}>Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement. Tes identifiants restent sur le serveur, chiffrés.</div>
+            </div>
+            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
+          </div>}
+          {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
+            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
+            {spdp.coffre === false && <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
+            <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
+                <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
+                  style={{ ...btn2(true), borderColor: spEnv === k ? C.accent : C.border, color: spEnv === k ? C.accent : C.text }}>{t}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              <input data-spdp-id value={spId} onChange={(e) => setSpId(e.target.value)} placeholder="Identifiant client (client_id)" autoComplete="off" spellCheck={false}
+                style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+              <input data-spdp-secret type="password" value={spSecret} onChange={(e) => setSpSecret(e.target.value)} placeholder="Secret client (client_secret)" autoComplete="new-password" spellCheck={false}
+                style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? 'Vérification…' : 'Connecter'}</button>
+            </div>
+          </div>}
+          {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
         </div>
 
         {/* ── RÉCAP E-REPORTING ── */}
@@ -23504,6 +23964,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)}><Icon name="save" size={14} />Récap CSV</button>
               <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)}><Icon name="save" size={14} />Récap JSON</button>
             </div>
+            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas encore tout seul vers Super PDP : la forme de son envoi par l'API n'a pas pu être vérifiée dans leur documentation officielle. Dépose ces fichiers toi-même d'ici là.</div>}
           </div>)}
         </div>
 
@@ -23518,17 +23979,25 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {recap && recap.lignes.length > 0 && <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
             {recap.lignes.map((l, i) => {
               const num = numeroDe(l.id);
+              const env = envoiDe(num), lib = libelleEnvoi(env);
+              const peutEnvoyer = peutFacturer && spdp && spdp.connecte && enCours !== l.id && !(env && (env.etat === 'envoye' || env.etat === 'en-cours'));
+              const peutRelire = spdp && spdp.connecte && enCours !== l.id && env && (env.etat === 'incertain' || env.etat === 'envoye');
               return (
-                <div key={l.id} data-fe-vente={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                <div key={l.id} data-fe-vente={l.id} data-spdp-ligne={env ? env.etat : ''} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Article'}</div>
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? 'versée' : l.plateforme === 'eBay' ? 'payée' : 'vendue'} le {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
+                    {lib && <div data-spdp-statut={env.etat} style={{ fontSize: 11, marginTop: 2, lineHeight: 1.45, color: lib.ton === 'attention' ? C.warn : C.muted, overflowWrap: 'anywhere' }}>{lib.texte}</div>}
                   </div>
                   <span className="vrm-display" style={{ fontSize: 13.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
                   <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || 'Télécharger la facture Factur-X (PDF + XML)'}
                     onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
                     <Icon name="receipt" size={14} />{enCours === l.id ? '…' : 'Facture'}
                   </button>
+                  {spdp && spdp.connecte && (peutRelire
+                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} style={btn2(true)}>Relire</button>
+                    : <button type="button" data-spdp-envoyer={l.id} disabled={!peutEnvoyer} title={!peutFacturer ? raisonGrise : 'Envoyer la facture Factur-X à Super PDP'}
+                        onClick={() => envoyerSpdp(l, false)} style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : 'Envoyer à Super PDP'}</button>)}
                 </div>
               );
             })}
@@ -24072,16 +24541,20 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) 
 // un élément déjà formé (la note du sélecteur Vinted porte son attribut).
 function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   const K = skin || C;
+  // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
+  // en liste native à droite (sans cadre lourd), chevron discret. La note, s'il y
+  // en a une, passe dessous en légende.
   return (
-    <div {...(attrs || {})} style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap', background: skin ? K.bg : 'transparent' }}>
-      <label htmlFor={id} style={{ fontSize: 12, color: K.muted, fontWeight: 600 }}>Compte</label>
-      <select id={id} value={valeur} onChange={(e) => onChange(e.target.value)}
-        style={{ flex: '0 1 280px', maxWidth: '100%', padding: '8px 11px', borderRadius: 8, border: `1px solid ${K.border}`,
-          background: K.card, color: K.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
-        <option value="*">Tous les comptes</option>
-        {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
-      </select>
-      {note ? (typeof note === 'string' ? <span style={{ fontSize: 11.5, color: K.muted }}>{note}</span> : note) : null}
+    <div {...(attrs || {})} className="vrm-compte-choix" style={{ background: skin ? K.bg : 'transparent' }}>
+      <div className="vrm-compte-ligne" style={{ background: skin ? 'rgba(255,255,255,.06)' : K.card2, color: K.text }}>
+        <label htmlFor={id} style={{ color: K.muted }}>Compte</label>
+        <select id={id} value={valeur} onChange={(e) => onChange(e.target.value)} style={{ color: K.text }}>
+          <option value="*">Tous les comptes</option>
+          {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
+        </select>
+        <span aria-hidden="true" className="vrm-compte-chevron" style={{ color: K.muted }}><Icon name="chevron" size={15}/></span>
+      </div>
+      {note ? (typeof note === 'string' ? <span className="vrm-compte-note" style={{ color: K.muted }}>{note}</span> : <span className="vrm-compte-note">{note}</span>) : null}
     </div>
   );
 }
@@ -30197,13 +30670,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
-                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
+            {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
+                là qu'on le cherche), la personne et la paire, l'actualisation à
+                droite. La source (« lu sur Vinted ») passe dans l'infobulle. */}
+            <div className="vrm-chat-head" style={{borderBottom:`1px solid ${C.border}`,background:C.card}} title={`${accName(openConv.acc)} · ${openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}`}>
+              <button type="button" className="vrm-chat-back" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{color:C.accent}}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
+              <div className="vrm-chat-head-t">
+                <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
+                <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
               </div>
-              <button className="vrm-icon-control" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
@@ -30219,31 +30698,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : null; })()}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
                 m.kind==='event'
-                  ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
-                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'8px 12px',textAlign:'center'}}>
-                          <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
-                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
-                          {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
+                  // Un évènement sans aucun texte lisible ne donne que son type
+                  // technique (« offer_request_message ») : ce n'est pas un message
+                  // pour lui. L'offre, elle, a sa carte sous le fil.
+                  ? (/^[a-z]+(_[a-z]+)+$/.test(String(m.body||'').trim()) && !(m.links||[]).length ? null
+                    : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
+                      ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
+                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis · retrait</div>
+                          <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
-                  : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
-                      {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
-                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
-                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
-                      {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
+                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                  : <div key={i} className={m.mine?'vrm-bulle-l vrm-bulle-moi':'vrm-bulle-l'}>
+                      <div className="vrm-bulle" style={m.mine?{background:C.accent,color:C.onAccent||'#fff'}:{background:C.card,color:C.text,border:`1px solid ${C.border}`}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
+                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
+                      {(m.ts || (!m.mine && m.body)) && <div className="vrm-bulle-pied">
+                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                        {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
+                      </div>}
                     </div>
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); return (
-              <div data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); const sansExt = !vmrExtPresent(); const lienVinted = `https://www.vinted.fr/inbox/${openConv.convId}`; return (
+              <div className="vrm-chat-foot" data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{borderTop:`1px solid ${C.border}`,background:C.card}}>
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
                 {ro && (
-                  <div data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12,color:C.text,lineHeight:1.45,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',marginBottom:8}}>
+                  <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
                     <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
                   </div>
@@ -30256,49 +30741,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (!off && !tx) return null;
                   const etat = extSait('messagerie');
                   if (etat !== 'ok' || __vmrPlusieurs) return (
-                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
-                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
-                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
+                    <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+                      {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
+                      <div className="vrm-chat-offre-p" style={{color:C.muted}}>
+                        {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le Chrome où l'extension est installée."}
+                        {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a></>}
+                      </div>
                     </div>
                   );
                   return (
-                    <div data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8,opacity:ro?0.55:1}}>
+                    <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
                       {off && (
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
-                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                        <div className="vrm-chat-offre-l">
+                          <span className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b></span>
+                          <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
                       {tx && (
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
-                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${ro?C.border:C.accent}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                        <div className="vrm-chat-offre-l">
+                          <span className="vrm-chat-offre-k" style={{color:C.muted}}>{off?'Contre-offre':'Faire une offre'}</span>
+                          <input className="vrm-chat-prix" inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                            style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div>
                       )}
-                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                      {offreMsg && <div style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
                     </div>
                   );
                 })()}
-                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
-                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+                {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {replyErr && <div style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
+                {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
+                    envoyer : un champ de saisie inutilisable n'y a pas sa place.
+                    Le seul geste qui marche — répondre sur Vinted — prend la
+                    place du champ, une fois. */}
+                {sansExt ? (
+                  <a className="vrm-chat-vinted" href={lienVinted} target="_blank" rel="noreferrer" style={{background:C.accent,color:C.onAccent||'#fff'}}>Répondre sur Vinted ↗</a>
+                ) : (<>
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch',opacity:ro?0.5:1}}>
+                <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
                     <button key={i} type="button" disabled={ro} onClick={()=>setReplyText(q.t)} title={q.t}
-                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
-                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                <div className="vrm-chat-compose">
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
+                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
-                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
+                </>)}
               </div>
             ); })()}
           </div>
@@ -31600,7 +32094,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
 
-      {curSub==='achats' && (<>
+      {curSub==='achats' && (<div className="vrm-achats">
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
@@ -31616,7 +32110,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        <div className="vrm-seg" role="group" aria-label="Étapes de tes achats" style={{background:C.bg,border:`1px solid ${C.border}`}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque paire entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -31629,7 +32123,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
             return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
+            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{color:aFilter===id?C.text:C.muted,background:aFilter===id?C.card:'transparent'}}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -31647,9 +32141,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
           const unSeul = comptes.length===1;
           return (
-            <div data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:10,padding:'10px 13px',marginBottom:12}}>
-              <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>↩ {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
-              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
+            <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
                   {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
@@ -31675,8 +32169,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Tous, où ils filtrent vraiment quelque chose. */}
         {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && aFilter!=='attente' && (
-          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
-            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
+            style={{color:C.text}}/></label>
         )}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
@@ -31704,11 +32198,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const prix = vrais.map(M).filter(v=>v>0).sort((a,b)=>a-b);
           const med = prix.length ? prix[Math.floor(prix.length/2)] : 0;
           return (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(150px, 100%), 1fr))',gap:8,marginBottom:12}}>
-              <StatBox label="Dépensé" value={fmtE0(somme(vrais))} sub={`${vrais.length} paire${vrais.length>1?'s':''}`}/>
-              <StatBox label="Prix médian" value={fmtE0(med)} sub="par paire achetée"/>
-              <StatBox label="En route" value={fmtE0(somme(rte))} color={rte.length?C.warn:C.muted} sub={`${rte.length} paire${rte.length>1?'s':''} en chemin`}/>
-              <StatBox label="Annulés" value={fmtE0(somme(ann))} color={tauxAnn>=20?C.danger:C.muted} sub={`${ann.length} sur ${dans.length} · ${tauxAnn} %`}/>
+            // (16 oct.) Une seule surface, quatre cellules — plus quatre cartes de
+            // même poids. La couleur ne reste que sur le taux d'annulation quand
+            // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
+            <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              {[
+                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} paire${vrais.length>1?'s':''}`, null],
+                ['Prix médian', fmtE0(med), 'par paire', null],
+                ['En route', fmtE0(somme(rte)), `${rte.length} paire${rte.length>1?'s':''}`, null],
+                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.danger:null],
+              ].map(([k,v,sub,col])=>(
+                <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
+                  <div className="vrm-achats-kpi-k" style={{color:C.muted}}>{k}</div>
+                  <div className="vrm-achats-kpi-v" data-montant="" style={{color:col||C.text}}>{v}</div>
+                  <div className="vrm-achats-kpi-s" style={{color:col||C.muted}}>{sub}</div>
+                </div>
+              ))}
             </div>
           );
         })()}
@@ -31747,8 +32252,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // ce qui fait « pas fini » (vu en capture sur « Salomon sneakers »).
           const thumb = (src) => src && !imgMortes.has(src)
             ? <PhotoVinted src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
-                style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
-            : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
+                className="vrm-pickup-thumb" style={{width:48,height:48,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
+            : <span className="vrm-pickup-thumb" style={{flexShrink:0,color:C.muted,background:C.card2||C.bg,width:48,height:48,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="bag" size={20}/></span>;
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
           // compte la localisation, seulement les informations du mail »).
           // Avant, un email sans adresse de relais héritait du relais le plus
@@ -31773,8 +32278,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const groups = {};
           avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
-            <div className="vrm-pickup-board" style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
+            <div className="vrm-pickup-board">
+              <div className="vrm-pickup-head">
                 <div style={{flex:1,minWidth:0}}>
                   {/* ⚠️ UN TOTAL QUI NE DIT PAS LE HORS-DÉLAI EST TROMPEUR : sur
                       les 4 colis affichés, 3 avaient leur date limite passée.
@@ -31788,7 +32293,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       c'est la phrase qui dit ce qu'on peut en faire — exactement
                       ce que §5.83 a fait pour la tuile de Ma journée. */}
                   {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
-                    return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
+                    return (<div className="vrm-pickup-title" style={{color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
@@ -31845,7 +32350,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Le nom du lieu en premier (c'est là qu'on va), l'adresse
                       dessous, et LE GESTE à faire une fois sur place — chaque
                       transporteur remet le colis à sa façon (§28). */}
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div className="vrm-pickup-dest" style={{borderBottom:`1px solid ${C.border}`}}>
                     {g.carrier&&<CarrierBadge carrier={g.carrier} size={24}/>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* ⚠️ « NE PRENDS PLUS EN COMPTE LA LOCALISATION, JUSTE LES
@@ -31991,7 +32496,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             )}
                           </div>
                         )}
-                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                       </div>
                     );
                   })}
@@ -32046,7 +32551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const adresseSuite = pt.adresse && pt.nom && pt.adresse.length > pt.nom.length ? pt.adresse.slice(pt.nom.length).replace(/^\s*[,—-]\s*/, '') : '';
                   return (
                 <div className="vrm-pickup-point" key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div className="vrm-pickup-dest" style={{borderBottom:`1px solid ${C.border}`}}>
                     {transpUn ? <CarrierBadge carrier={transpUn} size={24}/> : <span aria-hidden="true" style={{display:'inline-flex',width:24,height:24,alignItems:'center',justifyContent:'center',color:C.muted}}><Icon name="box" size={18}/></span>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* Nom du relais quand la conversation Vinted le donne (une
@@ -32165,11 +32670,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             : cd ? 'Ouvrir la conversation ↗'
                             : 'Voir mon code de retrait ↗';
                           return primaire ? (
-                            <a href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:5,border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                            <a className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:8,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
                               {quoi}
                             </a>
                           ) : (
-                            <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
+                            <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{fontSize:12.5,color:C.accent,fontWeight:600,textDecoration:'none'}}>
                               {quoi}
                             </a>
                           );
@@ -32178,7 +32683,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'8px 13px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                     </div>
                     );
                   })}
@@ -32262,7 +32767,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                 </div>
               )}
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — il passe en gris le temps que Vinted l'enregistre, puis disparaît tout seul. <b>Son QR et son code restent accessibles</b> tant que ce n'est pas confirmé.</div>
+              <div className="vrm-pickup-foot" style={{color:C.muted}}>Coche <b>✓</b> quand tu l'as récupéré : il reste en gris, avec son code, jusqu'à ce que Vinted confirme.</div>
             </div>
           );
         })()}
@@ -32358,33 +32863,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!rendus.length) return null;
           const tot = rendus.reduce((t,o) => t + montantCommande(o), 0);
           return (
-            <div style={{position:'relative',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,padding:'13px 15px 11px 17px',marginBottom:12,overflow:'hidden'}}>
-              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.warn}}/>
-              <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${C.warn}0e, transparent 42%)`,pointerEvents:'none'}}/>
-              <div style={{display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap'}}>
-                <span aria-hidden="true" style={{flexShrink:0,color:C.warn,marginTop:1,display:'flex'}}><Icon name="alert" size={18}/></span>
-                <div style={{flex:'1 1 190px',minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>
-                    {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'} — {tot.toFixed(2).replace('.',',')} € à vérifier
-                  </div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-                    Vinted dit « commande non réclamée ». La paire ne viendra pas : ouvre chaque conversation et vérifie que le remboursement est bien arrivé.
-                  </div>
-                </div>
+            <div className="vrm-achats-bloc" style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}>
+                <span aria-hidden="true" style={{color:C.warn,display:'inline-flex',verticalAlign:'-3px',marginRight:6}}><Icon name="alert" size={16}/></span>
+                {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'} — <span data-montant="" style={{whiteSpace:'nowrap'}}>{tot.toFixed(2).replace('.',',')} €</span> à vérifier
               </div>
-              <div style={{marginTop:9,display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(360px,100%), 1fr))',gap:7}}>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
+                Commande non réclamée : la paire ne viendra pas. Vérifie le remboursement dans la conversation.
+              </div>
+              <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map(o=>{
                   const j = Math.round((Date.now() - new Date(o.date||0).getTime())/86400000);
                   const href = lienConv(o);
                   return (
-                    <div key={'nr'+o.transaction_id} style={{display:'flex',gap:9,alignItems:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',background:C.card2||C.card}}>
+                    <div key={'nr'+o.transaction_id} className="vrm-achats-bloc-ligne" style={{borderColor:C.border}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+                        <div style={{fontSize:14,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
+                        <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                           {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}
                         </div>
                       </div>
-                      {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:11.5,fontWeight:700,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
+                      {href && <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
                     </div>
                   );
                 })}
@@ -32423,30 +32922,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Liste blanche groupée (style démo iOS) : une seule surface, des lignes
             séparées par un filet fin, beaucoup d'air — plus de cartes encadrées
             séparées. La couleur ne sert qu'au point de statut ; les actions sont
-            de petites icônes discrètes à droite. */}
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          {achatsAffiches.slice(0, achatsMax).map(({o,tk,st},i)=>{
+            de petites icônes discrètes à droite.
+            (16 oct.) Ligne dense alignée : vignette · titre · statut · montant,
+            et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
+            dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
+            quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
+        {(()=>{ const tranche = achatsAffiches.slice(0, achatsMax);
+          const cptes = [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
+          const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
+          return (<>
+        {unCompte && tranche.length>1 && <div className="vrm-buy-compte" style={{color:C.muted}}>Tous sur <AcctTag acc={unCompte} name={accNameOf(unCompte)}/></div>}
+        <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
+          {tranche.map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} data-achat-tx={String(o.transaction_id)} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
-              <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div key={o.transaction_id} className="vrm-buy-row" data-achat-tx={String(o.transaction_id)} style={{opacity:cancelled?0.55:1,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <div className="vrm-buy-ph" style={{background:C.card2||C.bg}}>
                 {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5,flexShrink:0,fontSize:11.5,fontWeight:600,color:C.text,background:C.card2,borderRadius:5,padding:'3px 9px'}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
-                  <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                  <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+              <div className="vrm-buy-main">
+                <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
+                <div className="vrm-buy-meta" style={{color:C.muted}}>
+                  <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
+                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                  <span style={{whiteSpace:'nowrap'}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
-                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
+                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.danger:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
-                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
-                  {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
+                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
+                  {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
                     bordereau de retour. VRM ne le crée PAS à sa place : la route
@@ -32457,19 +32965,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     et on dit clairement ce que VRM fait et ne fait pas. Le lien
                     de commande est celui déjà utilisé par le bouton bordereau. */}
                 {st.retour && (
-                  <div style={{marginTop:7}}>
+                  <div className="vrm-buy-retour">
                     <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
-                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
                       ↩ Bordereau de retour sur Vinted
                     </a>
-                    <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : la paire doit repartir. Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
+                    <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>
+                      Litige : la paire doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
                     </div>
                   </div>
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toFixed(2).replace('.',',')}{' '}{cur(o.price?.currency_code)}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
@@ -32483,21 +32991,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // RIEN automatiquement (§5) : il la renumérote/rephotographie.
                 const arrive = st.step>=3 && !cancelled && !st.retour;
                 const prixPaye = montantCommande(o).toFixed(2).replace('.',',');
-                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit' };
+                const peutSuivre = !!(suivi && (st.step===2||st.step===3));
+                const peutCode = !!(st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)));
+                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:14,fontWeight:500,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
                 return (
-              <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,position:'relative'}}>
-                {note && <button className="vrm-icon-control" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={14}/></button>}
-                {suivi && (st.step===2||st.step===3) && (
-                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,color:C.blue||C.accent,textDecoration:'none'}}><Icon name="truck" size={15}/></a>
+              <div className="vrm-buy-act">
+                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{color:C.accent}}><Icon name="doc" size={15}/></button>}
+                {peutSuivre && (
+                  <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{color:C.muted}}><Icon name="truck" size={16}/></a>
                 )}
-                {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
-                  <button className="vrm-icon-control" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
+                {peutCode && (
+                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{color:C.warn}}><Icon name="key" size={16}/></button>
                 )}
-                <button className="vrm-icon-control" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${achatMenu===tid?C.accent:C.border}`,background:achatMenu===tid?`${C.accent}12`:'transparent',color:achatMenu===tid?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:17,lineHeight:1}}>⋯</button>
+                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
-                  <div role="menu" style={{position:'absolute',top:34,right:0,zIndex:41,minWidth:226,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow||'0 8px 24px rgba(0,0,0,.18)',overflow:'hidden',padding:'4px 0'}}>
+                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                    {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>Code de retrait</button>}
+                    {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>Suivre le colis</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye} € — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?'Reçu d\'achat (Vinted)':'Attestation d\'achat'}</button>
@@ -32513,6 +33025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );})}
         </div>
+          </>); })()}
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
             porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
@@ -32522,7 +33035,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
           </button>
         )}
-      </>)}
+      </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
@@ -33350,7 +33863,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
-        <input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher une conversation…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{width:'100%',padding:'10px 12px',marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text}}/>
+        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -33433,15 +33946,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const jourCourt = (t)=> new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
           return (
             <div data-messagerie style={{marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+              {/* (16 oct.) UNE barre : le filtre en contrôle segmenté, le nombre
+                  (déjà dans « Toutes N ») lu par les lecteurs d'écran seulement,
+                  et l'actualisation en icône — plus deux rangées de commandes. */}
+              <div className="vrm-msg-bar">
+                <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
+                  <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
+                  <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                </div>
+                <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
-                <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
-              </div>
-              <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
-                <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
-                <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
@@ -33471,7 +33987,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {liste.length===0 && messageSearch.trim() && <p style={{fontSize:12,color:C.muted}}>Aucune conversation trouvée.</p>}
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
-              <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
+              <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   const ro = !!prioMsg && uidC(c)!==prioMsg;
@@ -33483,39 +33999,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <React.Fragment key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id}>
                     {debutActif && (
-                      <div data-msg-groupe-actif={prioMsg} style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px 7px',fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted,background:C.bg,borderBottom:`1px solid ${C.border}`}}>
+                      <div className="vrm-msg-section" data-msg-groupe-actif={prioMsg} style={{color:C.muted,background:C.bg}}>
                         <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.accent,flexShrink:0}}/>
                         <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert dans Chrome</span>
                       </div>
                     )}
                     {debutRo && (
-                      <div data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{padding:'10px 12px 9px',background:C.bg,borderTop:i?`1px solid ${C.border}`:'none',borderBottom:`1px solid ${C.border}`}}>
-                        <div style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted}}>
-                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo}\u00a0non\u00a0lu${nonLusRo>1?'s':''}`:''}</span>
+                      <div className="vrm-msg-section vrm-msg-section-ro" data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{color:C.muted,background:C.bg}}>
+                        <div className="vrm-msg-section-t">
+                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo} non lu${nonLusRo>1?'s':''}`:''}</span>
                         </div>
-                        <div style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginTop:4}}>
-                          Chrome est connecté sur <b>{nomActif}</b> : VRM ne peut répondre et faire une offre qu'au nom de ce compte. Pour répondre à un autre, bascule Chrome sur ce compte (ouvre vinted.fr connecté dessus) — ses conversations remonteront ici.
+                        <div className="vrm-msg-section-p" style={{color:C.text}}>
+                          Chrome est sur <b>{nomActif}</b> : VRM ne répond qu'au nom de ce compte. Pour répondre aux autres, bascule Chrome sur leur compte.
                         </div>
                       </div>
                     )}
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i&&!debutRo)?`1px solid ${C.border}`:'none',background:'transparent',color:ro?C.muted:C.text,cursor:'pointer',fontFamily:'inherit',...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
-                      {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
-                      <span style={{flex:1,minWidth:0}}>
-                        <span style={{display:'flex',alignItems:'baseline',gap:6}}>
-                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><span className="vrm-sensible">{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span></span>
-                          {plusieurs && c._acc && <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>· {accName(c._acc)}</span>}
-                          <span style={{marginLeft:'auto',fontSize:11,color:C.muted,flexShrink:0}}>{quand(c.updated_at)}</span>
-                        </span>
-                        <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
+                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined} onClick={()=>openConversation(c)}
+                      style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
+                      <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
+                        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className="vrm-msg-ini vrm-sensible" style={{color:C.muted}}>{String(nom).trim().charAt(0).toUpperCase()||'·'}</span>}
                       </span>
-                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:ro?C.muted:C.accent,flexShrink:0}}/>}
+                      <span className="vrm-msg-body">
+                        <span className="vrm-msg-l1">
+                          <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
+                          {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
+                          <span className="vrm-msg-time" style={{color:c.unread&&!ro?C.accent:C.muted}}>{quand(c.updated_at)}</span>
+                        </span>
+                        <span className="vrm-msg-l2">
+                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{c.description||''}</span>
+                          {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
+                        </span>
+                      </span>
                     </button>
+                    ); })()}
                     </React.Fragment>
                   );
                 })}
               </div>
-              {tri.length>convMax && <button type="button" onClick={()=>setConvMax(m=>m+40)} style={{display:'block',margin:'8px auto 0',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'7px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
+              {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>setConvMax(m=>m+40)} style={{color:C.text}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
             </div>
           );
         })()}
@@ -36762,7 +37284,7 @@ function LeboncoinScreen() {
           : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
         if (it.is_closed || it.is_hidden || it.is_draft) continue;
         onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid);
-        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
+        online.push({ id: oid, uid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', status: it.status || '', color: [it.color1, it.color2].filter(Boolean).join(' '), price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
       }
     }
     // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
@@ -36778,6 +37300,11 @@ function LeboncoinScreen() {
     const prep = prepRows === null ? null : ((prepRows[0] && prepRows[0].data) || {});
 
     // Comptes Leboncoin réellement vus dans le navigateur (captés par l'extension).
+    // Le compte Vinted d'où vient chaque paire (la fiche le nomme) : login, ou
+    // le nom qu'il lui a donné. Lecture ratée ⇒ aucun nom, jamais un faux.
+    const vaRows = await sbGet('vinted_accounts?select=vinted_user_id,login');
+    const labelsComptes = load('vinted_account_labels', {}) || {};
+    const nomCompteDe = (u) => { const a = (vaRows || []).find((x) => String(x.vinted_user_id) === String(u)); return labelsComptes[String(u)] || (a && a.login) || ''; };
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
       .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
@@ -36872,6 +37399,11 @@ function LeboncoinScreen() {
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
         croitVendue: ancienne.has(String(o.id)),
+        // 5.182 : ce que la fiche « Publier sur Leboncoin » montre et laisse
+        // corriger — les mêmes entrées que `buildLbcAd` dans l'extension (§11).
+        base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
+        etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
+        compte: nomCompteDe(o.uid),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -36949,6 +37481,8 @@ function LeboncoinScreen() {
     /* eslint-disable-next-line */
   }, []);
   const marquer = async (id) => { const r = await vmrCmd({ cmd: 'lbcMarque', id: String(id), etat: 'posted' }); if (r && r.accepte) reload(); };
+  // 5.182 : la fiche « Publier sur Leboncoin » ouverte (une paire de la file).
+  const [fiche, setFiche] = useState(null);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
   const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
@@ -36956,13 +37490,14 @@ function LeboncoinScreen() {
   // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
   // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
   // 600 px et tout s'empilait en pavés).
-  const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
+  const Card = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
   const Titre = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
   const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
   return (
-    <div style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
+    <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
+      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcAccounts && data.lbcAccounts[0]} onClose={() => setFiche(null)} onMarquer={marquer}/>}
+      <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0, minWidth: 0 }}>Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
@@ -37039,7 +37574,7 @@ function LeboncoinScreen() {
       })()}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
-        <Card>
+        <Card className="vrm-lbc-compteur">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
@@ -37111,7 +37646,7 @@ function LeboncoinScreen() {
         {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
             présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
         {data.unlinked && data.unlinked.length > 0 && (
-          <Card>
+          <Card className="vrm-lbc-non-reliees">
             <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Clique la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
             {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
@@ -37136,7 +37671,7 @@ function LeboncoinScreen() {
           );
         })()}
         {/* À publier */}
-        <Card>
+        <Card className="vrm-lbc-a-publier">
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.echecLecture ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
               Sans cette ligne, désélectionner faisait fondre la file sans que
@@ -37247,7 +37782,7 @@ function LeboncoinScreen() {
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles}/>}
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
                     <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
                       style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>
@@ -37469,7 +38004,7 @@ const PUSH_CATS = [
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
-function PushPrefsSetting({ comptes }) {
+function PushPrefsSetting({ comptes, onMuets }) {
   // ⚠️ TROIS ÉTATS : `undefined` = en cours de lecture · `null` = la base n'a
   //    pas répondu · un objet = lu. Confondre les deux premiers ferait dire
   //    « Chargement… » pour toujours à un panneau qui a ÉCHOUÉ.
@@ -37481,6 +38016,10 @@ function PushPrefsSetting({ comptes }) {
   // Rien tant qu'on ne sait pas : jamais une accusation sur une lecture ratée.
   const etatComptes = useEtatEmailsComptes(comptes);
   const muets = etatComptes.etat === 'lu' ? etatComptes.muets : null;
+  // Au téléphone ce panneau vit dans un sous-écran : la ligne qui y mène dit
+  // combien de comptes sont muets — le MÊME nombre, remonté d'ici (§11).
+  const nMuets = muets ? muets.length : null;
+  useEffect(() => { if (onMuets) onMuets(nMuets); }, [nMuets]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { let mort = false;
     (async () => {
       try {
@@ -37513,7 +38052,7 @@ function PushPrefsSetting({ comptes }) {
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
@@ -37540,11 +38079,7 @@ function PushPrefsSetting({ comptes }) {
                 <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{c.titre}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
               </div>
-              <button type="button" onClick={()=>bascule(c)} disabled={!prefs||busy} aria-label={`${c.titre} : ${on?'activé':'désactivé'}`}
-                style={{flexShrink:0,padding:'5px 13px',borderRadius:8,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',opacity:pasLu?0.45:1,
-                  background:on?C.accent:'transparent',color:on?'#fff':C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>
-                {on?'ON':'OFF'}
-              </button>
+              <Interrupteur on={on} onClick={()=>bascule(c)} disabled={!prefs||busy} label={`${c.titre} : ${on?'activé':'désactivé'}`}/>
             </div>
           );
         })}
@@ -37558,18 +38093,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
   // exactement ce qui fait « page web bricolée » au lieu d'« application ».
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
-  const Row = ({icon,title,desc,onClick,color}) => (
-    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-      {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
-          retombe sur l'emoji (les écrans pas encore repris). */}
-      {ICON_PATHS[icon] ? <IconTile name={icon} color={color||C.accent}/> : <span style={{fontSize:22,flexShrink:0}}>{icon}</span>}
-      <span style={{flex:1,minWidth:0}}>
-        <span style={{display:'block',fontSize:15,fontWeight:600,color:color||C.text}}>{title}</span>
-        {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>{desc}</span>}
-      </span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,opacity:.55}}><path d="m9 6 6 6-6 6"/></svg>
-    </button>
-  );
   // Fenêtre d'action sur le compte (email / mot de passe / déconnexion).
   const AcctSheet = () => {
     if (!acct) return null;
@@ -37643,258 +38166,363 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     if (RETOUR_ABONNEMENT || RETOUR_VUE === 'compte') return 'compte';
     try { return localStorage.getItem('vrm_reglages_vue') === 'compte' ? 'compte' : 'reglages'; } catch (_) { return 'reglages'; }
   });
-  const setVue = (v) => { setVueBrute(v); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
   const voirCompte = !ongletsCompte || vue === 'compte';
   const voirReglages = !ongletsCompte || vue === 'reglages';
-  return (
-    <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
-      <AcctSheet/>
-      <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
-      <ReglagesPasLus/>
 
-      {ongletsCompte && (
-        <div role="tablist" aria-label="Paramètres" data-onglets-reglages=""
-          style={{display:'flex',gap:4,padding:4,borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,margin:'0 0 16px',maxWidth:380}}>
-          {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
-            <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
-              style={{flex:1,border:'none',borderRadius:8,padding:'9px 10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-                background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?(C.shadow||'none'):'none'}}>
-              {l}
-            </button>
-          ))}
+  // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
+  // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
+  // long n'est plus déplié dans une page interminable : sur TÉLÉPHONE il
+  // s'ouvre dans un SOUS-ÉCRAN (chevron, puis « ‹ Réglages »). Sur ordinateur
+  // la place ne manque pas : tout reste déplié, avec un sommaire collant.
+  // ⚠️ Les panneaux restent MONTÉS même fermés (`hidden`) : chacun lit sa ligne
+  //    au montage (`lireReglage`), et le bloc « N réglages n'ont pas pu être
+  //    lus » (ReglagesPasLus) nomme ceux qui ont échoué — un panneau jamais
+  //    monté ne lirait rien et ce bloc se tairait. Aucune règle de lecture ni
+  //    d'écriture ne change : c'est le même composant, rangé ailleurs.
+  const etroit = useEtroitReglages();
+  const [nMuetsPush, setNMuetsPush] = React.useState(null);
+  const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
+  const racine = React.useRef(null);
+  const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) l.scrollIntoView({ block: 'center' }); } catch (_) {} }, 0); };
+  const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  React.useEffect(() => { if (!etroit) setSous(null); }, [etroit]);
+
+  // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
+  //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
+  const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
+  const valDetourage = (DETOURAGE_MODES.find(([k]) => k === modeDetourageLu()) || [, ''])[1];
+  const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
+  const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
+  const tokWidget = load('vrm_widget_token', '');
+  const urlWidget = tokWidget ? `https://vrm.center/api/widget?k=${tokWidget}` : '';
+
+  // ── Les morceaux de rendu (des FONCTIONS appelées, pas des composants : un
+  //    composant défini ici serait recréé à chaque rendu, et ce qu'il contient
+  //    — un panneau en cours de saisie — remonterait à neuf).
+  const chevron = <svg className="vrm-set-chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>;
+  const ligne = (it) => {
+    if (it.type === 'el') return <React.Fragment key={it.id}>{it.el}</React.Fragment>;
+    const ouvre = it.type === 'panneau';
+    const corps = (<>
+      {it.ic && <IconeReglage name={it.ic}/>}
+      <span className="vrm-set-lib">
+        <b style={{color: it.danger ? C.danger : C.text}}>{it.lib}</b>
+        {it.desc && <small style={{color:C.muted}}>{it.desc}</small>}
+      </span>
+      {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
+      {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
+      {(ouvre || it.type === 'nav') && chevron}
+    </>);
+    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne">{corps}</div>;
+    return (
+      <button key={it.id} type="button" className="vrm-set-ligne"
+        onClick={ouvre ? () => ouvrirSous(it.id) : it.onClick}
+        {...(ouvre ? { 'data-sous-ouvrir': it.id, 'aria-haspopup': 'true' } : {})} {...(it.data || {})}>
+        {corps}
+      </button>
+    );
+  };
+  const contenuPanneau = (it, avecTete) => it.nu
+    ? (<div className="vrm-set-carte" style={{background:C.card,border:`1px solid ${C.border}`}}>
+        {avecTete && <div className="vrm-set-carte-tete"><IconeReglage name={it.ic}/><b style={{color:C.text}}>{it.lib}</b></div>}
+        {it.el}
+      </div>)
+    : <div className="vrm-set-panneau">{it.el}</div>;
+  const liste = (items) => items.length ? (
+    <div className="vrm-set-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>{items.map(ligne)}</div>
+  ) : null;
+  const groupe = (g) => {
+    if (!g || !g.items.some(Boolean)) return null;
+    const items = g.items.filter(Boolean);
+    // Téléphone : tout en lignes. Ordinateur : les lignes, puis les panneaux dépliés.
+    let corps;
+    if (etroit) corps = liste(items);
+    else {
+      const blocs = []; let courant = [];
+      items.forEach((it) => {
+        if (it.type === 'panneau') { if (courant.length) { blocs.push(liste(courant)); courant = []; } blocs.push(<React.Fragment key={it.id}>{contenuPanneau(it, true)}</React.Fragment>); }
+        else courant.push(it);
+      });
+      if (courant.length) blocs.push(liste(courant));
+      corps = blocs.map((b, i) => <React.Fragment key={i}>{b}</React.Fragment>);
+    }
+    return (
+      <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
+        {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
+        {corps}
+        {g.pied && <div className="vrm-set-pied" style={{color:C.muted}}>{g.pied}</div>}
+      </section>
+    );
+  };
+
+  // ── MOYENS DE CONNEXION — l'état RÉEL de chacun, pas une liste décorative.
+  //    Un bouton Google qui mène à une page d'erreur ne rend service à
+  //    personne : tant que le fournisseur n'est pas branché dans Supabase, on
+  //    le dit.
+  const moyensConnexion = (
+    <div>
+      <div className="vrm-set-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>
+        <div className="vrm-set-ligne">
+          <IconeReglage name="mail"/>
+          <span className="vrm-set-lib"><b style={{color:C.text}}>Email et mot de passe</b></span>
+          <span className="vrm-set-val" style={{color:C.muted}}>Actif</span>
         </div>
-      )}
-
-      {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
-          Toujours présent en multi-vendeurs, y compris quand on est entré par la
-          porte de secours : sans ça, une fois passé par « Entrer sans compte »
-          il n'y avait AUCUN moyen de revenir à l'écran de connexion. */}
-      {MULTI_USER && voirCompte && (<>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
-
-        {AUTH.user ? (
-          <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-            <span style={{width:38,height:38,borderRadius:8,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-              {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
-            </span>
-            <span style={{flex:1,minWidth:0}}>
-              <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{AUTH.user.email}</span>
-              <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>
-                {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
-              </span>
-            </span>
-          </div>
-        ) : (
-          <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
-            <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-              Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+        {OAUTH_PROVIDERS.map(pr => {
+          const on = providerEnabled(pr.id);
+          return (
+            <div key={pr.id} className="vrm-set-ligne">
+              <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`}}><BrandMark id={pr.id}/></span>
+              <span className="vrm-set-lib"><b style={{color:C.text}}>{pr.label}</b></span>
+              {on
+                ? (AUTH.user
+                    ? <span className="vrm-set-val" style={{color:C.muted}}>Disponible</span>
+                    : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 14px',minHeight:36,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
+                : <span className="vrm-set-val" style={{color:C.muted}}>Pas activé</span>}
             </div>
-            <button type="button"
-              onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
-              style={{marginTop:10,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Aller à l'écran de connexion
-            </button>
-          </div>
-        )}
-
-        <PrenomSetting/>
-        {AUTH.user && <MonAbonnement/>}
-
-        {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
-            décorative. Un bouton Google qui mène à une page d'erreur ne rend
-            service à personne : tant que le fournisseur n'est pas branché dans
-            Supabase, on le dit. */}
-        <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}>Moyens de connexion</div>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0'}}>
-            <span style={{fontSize:15,width:20,textAlign:'center'}}>✉️</span>
-            <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>Email + mot de passe</span>
-            <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>actif</span>
-          </div>
-          {OAUTH_PROVIDERS.map(pr=>{
-            const on = providerEnabled(pr.id);
-            return (
-              <div key={pr.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
-                <span style={{width:20,display:'flex',justifyContent:'center'}}><BrandMark id={pr.id}/></span>
-                <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>{pr.label}</span>
-                {on
-                  ? (AUTH.user
-                      ? <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>disponible</span>
-                      : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'4px 11px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
-                  : <span style={{fontSize:11,fontWeight:500,color:C.muted}}>à activer dans Supabase</span>}
-              </div>
-            );
-          })}
-          <div style={{fontSize:10.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-            Ces deux boutons apparaîtront tout seuls dès que tu auras créé l'application chez Google / Discord et collé les clés dans Supabase. Tant que ce n'est pas fait, on ne les affiche pas : un bouton qui mène à une page d'erreur ne sert à rien.
-          </div>
-        </div>
-
-        {AUTH.user && (<>
-          <Row icon="mail" title="Changer mon email"
-            desc="L'adresse avec laquelle tu te connectes."
-            onClick={()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); }}/>
-          <Row icon="key" title="Changer mon mot de passe"
-            desc="Choisis-en un nouveau, tu restes connecté."
-            onClick={()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); }}/>
-          <Row icon="door" title="Se déconnecter" color={C.danger}
-            desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
-            onClick={()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); }}/>
-          <FermerCompte/>
-        </>)}
-      </>)}
-
-      {voirCompte && (<>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
-          Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte » ci-dessus</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
-          <LigneContact/>
-          <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
-            {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
-          </div>
-        </div>
-      </>)}
-
-      {voirReglages && (<>
-      {MULTI_USER && (<>
-        <NumerosSetting/>
-        {/* ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision). */}
-        <DetourageSetting/>
-      </>)}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
-      <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
-      <div style={{height:8}}/>
-      <ConnexionsSetting/>
-      <div style={{height:8}}/>
-      <EmailsSetting/>
-      <div style={{height:8}}/>
-      <SecuriteSetting/>
-
-      {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
-      <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-        <div style={{display:'flex',alignItems:'center',gap:14}}>
-          <div style={{width:56,height:56,borderRadius:10,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            {customLogo ? <img src={customLogo} alt="" style={{width:56,height:56,objectFit:'cover'}}/> : <VrmLogo size={56}/>}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text}}>{customLogo ? 'Ton icône' : 'Icône VRM'}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.45}}>Celle qui s'affiche sur ton écran d'accueil et dans l'onglet du navigateur.</div>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
-          <button type="button" onClick={onPickLogo}
-            style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            Choisir une image
-          </button>
-          {customLogo && (
-            <button type="button" onClick={onResetLogo}
-              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Remettre celle de VRM
-            </button>
-          )}
-        </div>
-        <div style={{fontSize:10.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Prends une image <b>carrée</b> (512 × 512 idéalement). Sur iPhone, l'icône déjà posée sur l'écran d'accueil ne change pas toute seule : <b>supprime le raccourci et refais « Ajouter à l'écran d'accueil »</b> pour qu'il prenne la nouvelle.
-        </div>
+          );
+        })}
       </div>
-
-      {/* WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
-          adresse était publique : n'importe qui pouvait lire ton chiffre
-          d'affaires en la connaissant. Recopie la nouvelle dans Scriptable. */}
-      {(()=>{ const tok=load('vrm_widget_token',''); if(!tok) return null;
-        const url=`https://vrm.center/api/widget?k=${tok}`;
-        return (<>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Widget iPhone</div>
-          <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:3}}>Adresse de ton widget</div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-              Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
-            </div>
-            <div style={{fontSize:11,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
-              border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',wordBreak:'break-all',lineHeight:1.5,marginBottom:9}}>{url}</div>
-            <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(url); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}
-              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Copier l'adresse
-            </button>
-          </div>
-        </>);
-      })()}
-
-      {/* ⚠️ « Leboncoin » RETIRÉ des Réglages (demande de Julien, 24 sept. :
-          « les annonces à publier sur le bon coin, pas la peine de mettre ça dans
-          les paramètres — fais un onglet à part »). L'atelier a désormais sa
-          propre entrée « À publier » dans le menu (PLUS_TABS → leboncoin). */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
-      <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge une copie de tes réglages, numéros, garage, saisies ET de tout ce que l'extension a capté (ventes, achats, messages, annonces). Sans les PDF de bordereau ni tes connexions Vinted." onClick={onExport}/>
-      <Row icon="restore" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
-      {(()=>{ const t=Number(load('vinted_last_backup',0))||0; const days=t?Math.floor((Date.now()-t)/86400000):null;
-        const old = days===null || days>=30;
-        return (
-          <div style={{fontSize:12,fontWeight:500,color:old?C.warn:C.muted,margin:'-4px 2px 2px',display:'flex',alignItems:'center',gap:6}}>
-            <span>{old?'⚠️':'✅'}</span>
-            <span>{t? `Dernière sauvegarde : ${days===0?"aujourd'hui":days===1?'hier':`il y a ${days} j`}${old?' — pense à en refaire une !':''}` : 'Jamais sauvegardé — fais-en une maintenant pour protéger tes données.'}</span>
-          </div>
-        );
-      })()}
-
-      {/* ⚠️ « Ancienne application » RETIRÉE (demande de Julien, 24 sept. :
-          « enlève ancien stock, ancienne compta, ancien catalogue »). On retire
-          seulement les LIENS d'accès — les DONNÉES (vinted_catalog / vinted_sales)
-          restent en base et TOUJOURS comptées dans les stats (§ rien n'est
-          supprimé du nuage au passage d'un écran). Les écrans catalog/sales/
-          stockvinted restent montés mais deviennent injoignables, comme
-          comptabilite/inventory (§4.11) : aucun n'est requis au banc. */}
-
-      {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
-      {/* Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
-          paramètres, pas sous Factures — ça prend de la place pour rien ». Retiré
-          de PLUS_TABS (le menu) ; l'écran reste monté et joignable par ce Row. */}
-      <Row icon="eyeOff" title="Ventes et achats masqués" desc="Ce que tu as retiré de la compta (réversible)." onClick={()=>setTab('masques')}/>
-      <div style={{height:10}}/>
-      <RegimeSetting/>
-      <Row icon="cash" title="Compléter les prix d'achat" desc="Saisie par paire, pour calculer ton bénéfice." onClick={()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');}}/>
-      <div style={{height:10}}/>
-      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
-      <PushSetting/>
-      <div style={{height:10}}/>
-      <PushPrefsSetting comptes={comptes}/>
-      <div style={{height:10}}/>
-      {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
-          notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}
-      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🛎 Alertes dans l'app</div>
-          <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications téléphone ci-dessus couvrent le reste, app fermée.</div>
-        </div>
-        <button type="button" onClick={onToggleNotif} style={{
-          flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-          background:notifEnabled?C.accent:'transparent',color:notifEnabled?'#fff':C.muted,
-          border:`1.5px solid ${notifEnabled?C.accent:C.border}`,
-        }}>{notifEnabled?'ON':'OFF'}</button>
+      <div className="vrm-set-pied" style={{color:C.muted}}>
+        Google et Discord apparaîtront ici dès que leurs clés seront collées dans Supabase. Tant que ce n'est pas fait, on ne les propose pas : un bouton qui mène à une page d'erreur ne sert à rien.
       </div>
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
-      <EmailStartSetting/>
-
-      {/* « Facturation Pro » déménagée dans l'onglet Factures (30 sept.). */}
-
-      {/* « Tes données et les conditions » vit dans l'onglet « Mon compte ». */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
-      <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
-      <StreamSetting/>
-      <ZoomSetting/>
-      </>)}
     </div>
   );
+
+  // ── TES DONNÉES ET LES CONDITIONS
+  const donnees = (
+    <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
+      Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte »</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+      <LigneContact/>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
+        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
+      </div>
+    </div>
+  );
+
+  // ── ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne.
+  const bouton = (primaire) => ({border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
+    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit'});
+  const iconeApp = (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{width:60,height:60,borderRadius:12,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          {customLogo ? <img src={customLogo} alt="" style={{width:60,height:60,objectFit:'cover'}}/> : <VrmLogo size={60}/>}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:600,color:C.text}}>{customLogo ? 'Ton icône' : 'Icône VRM'}</div>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:2,lineHeight:1.45}}>Sur ton écran d'accueil et dans l'onglet du navigateur.</div>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14,flexWrap:'wrap'}}>
+        <button type="button" onClick={onPickLogo} style={bouton(true)}>Choisir une image</button>
+        {customLogo && <button type="button" onClick={onResetLogo} style={bouton(false)}>Remettre celle de VRM</button>}
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>
+        Une image <b>carrée</b> (512 × 512 idéalement). Sur iPhone, l'icône déjà posée ne change pas toute seule : <b>supprime le raccourci et refais « Ajouter à l'écran d'accueil »</b>.
+      </div>
+    </div>
+  );
+
+  // ── WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
+  //    adresse était publique : n'importe qui pouvait lire ton chiffre
+  //    d'affaires en la connaissant. Recopie la nouvelle dans Scriptable.
+  const widget = urlWidget ? (
+    <div>
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+        Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
+      </div>
+      <div style={{fontSize:11.5,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
+        border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',wordBreak:'break-all',lineHeight:1.5,marginBottom:12}}>{urlWidget}</div>
+      <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }} style={bouton(true)}>
+        Copier l'adresse
+      </button>
+    </div>
+  ) : null;
+
+  // ── LES GROUPES ────────────────────────────────────────────────────────────
+  // Réglages de l'APP.
+  const GROUPES_REGLAGES = [
+    { id:'comptes', titre:'Comptes Vinted', items:[
+      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', titreInterne:true, el:<ConnexionsSetting/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Adresses de réception', titreInterne:true, el:<EmailsSetting/> },
+      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', el:<SecuriteSetting/> },
+    ]},
+    MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', val:valNumeros, el:<NumerosSetting nu/> },
+      // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
+      { id:'detourage', type:'panneau', nu:true, ic:'image', lib:'Détourage des photos', val:valDetourage, el:<DetourageSetting nu/> },
+    ]},
+    { id:'notifications', titre:'Notifications', items:[
+      { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
+        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/></> },
+      // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
+      // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
+      { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+    ]},
+    { id:'compta', titre:'Comptabilité', items:[
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', el:<RegimeSetting nu/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', el:<EmailStartSetting nu/> },
+      // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
+      // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
+      { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
+      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');} },
+      { id:'tampons', type:'action', ic:'doc', lib:'Position du N° tamponné', val:'Réinitialiser', onClick:async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } } },
+    ]},
+    { id:'affichage', titre:'Affichage', items:[
+      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
+      { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
+      { id:'icone', type:'panneau', nu:true, ic:'image', lib:"Icône de l'application", el:iconeApp },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
+    ]},
+    { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
+    ], pied: (
+      <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
+        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' — pense à en refaire une.':'.'}` : 'Jamais sauvegardé — fais-en une pour protéger tes données.'}
+        {' '}<span style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
+      </span>
+    )},
+  ];
+  // « Mon compte » : la PERSONNE.
+  const GROUPES_COMPTE = MULTI_USER ? [
+    { id:'profil', titre:null, items:[
+      { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
+    ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
+    AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
+      { id:'abonnement', type:'panneau', ic:'wallet', lib:'Abonnement et factures', el:<MonAbonnement/> },
+    ]},
+    { id:'connexion', titre:'Connexion', items:[
+      { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
+      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
+    ]},
+    AUTH.user && { id:'sortir', titre:null, items:[
+      { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
+    ], pied:'Efface aussi les données de ce navigateur — elles restent dans ton compte.' },
+    { id:'donnees', titre:'Tes données', items:[
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+      AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
+    ]},
+  ] : [
+    { id:'donnees', titre:'Tes données', items:[
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+    ]},
+  ];
+  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : [])].filter(Boolean)
+    .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
+  const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
+  const ouvert = etroit && sous ? panneaux.find((it) => it.id === sous) : null;
+  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : 'Réglages';
+
+  // ── TON COMPTE VRM ──────────────────────────────────────────────────────
+  // Toujours présent en multi-vendeurs, y compris quand on est entré par la
+  // porte de secours : sans ça, une fois passé par « Entrer sans compte » il
+  // n'y avait AUCUN moyen de revenir à l'écran de connexion.
+  const profil = MULTI_USER && voirCompte && (AUTH.user ? (
+    <div className="vrm-set-profil" data-profil-compte="" style={{background:C.card,border:`1px solid ${C.border}`}}>
+      <span className="vrm-set-avatar" aria-hidden="true" style={{background:`${C.text}0f`,color:C.text}}>
+        {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+      </span>
+      <span>
+        <span style={{display:'block',fontSize:16,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>
+        <span style={{display:'block',fontSize:12.5,color:C.muted,marginTop:3}}>
+          {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
+        </span>
+      </span>
+    </div>
+  ) : (
+    <div className="vrm-set-carte" style={{border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:32}}>
+      <div style={{fontSize:16,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
+      <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>
+        Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+      </div>
+      <button type="button"
+        onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+        style={{...bouton(true),marginTop:12}}>
+        Aller à l'écran de connexion
+      </button>
+    </div>
+  ));
+
+  return (
+    <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
+      style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
+      <AcctSheet/>
+      {ouvert ? (
+        // ── SOUS-ÉCRAN (téléphone) ──
+        <div className="vrm-set-nav">
+          <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accent}}>
+            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
+            {titreRetour}
+          </button>
+        </div>
+      ) : (<>
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
+        <ReglagesPasLus/>
+        {ongletsCompte && (
+          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
+            {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
+              <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
+                style={{background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?'0 1px 2px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04)':'none'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+      </>)}
+
+      {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
+
+      {etroit ? (<>
+        {!ouvert && profil}
+        {!ouvert && groupes.map(groupe)}
+        {/* Les panneaux, tous montés ; seul celui du sous-écran se voit. */}
+        {panneaux.map((it) => (
+          // Le titre du sous-écran dit déjà celui de la carte : celle-ci le tait
+          // (CSS seulement — le texte reste dans la page, les bancs le lisent).
+          <div key={it.id} hidden={!ouvert || ouvert.id !== it.id} data-sous-ecran={it.id} className={it.titreInterne ? 'vrm-set-sans-titre' : undefined}>
+            {contenuPanneau(it, false)}
+          </div>
+        ))}
+      </>) : (
+        <div className="vrm-set-cols">
+          <nav className="vrm-set-sommaire" aria-label="Sommaire des paramètres">
+            {groupes.filter((g) => g.titre).map((g) => (
+              <a key={g.id} href={`#reglages-${g.id}`} style={{color:C.muted}}
+                onClick={(e)=>{ e.preventDefault(); try { document.getElementById(`reglages-${g.id}`).scrollIntoView({ behavior:'smooth', block:'start' }); } catch (_) {} }}>
+                {g.titre}
+              </a>
+            ))}
+          </nav>
+          <div className="vrm-set-corps">
+            {profil}
+            {groupes.map(groupe)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Téléphone (< 768 px) : les panneaux longs passent dans un sous-écran.
+// `matchMedia` qui lève ⇒ « pas su » ⇒ la disposition d'ordinateur, où tout
+// reste déplié (rien n'est caché sur une mesure ratée).
+function useEtroitReglages() {
+  const q = '(max-width: 767px)';
+  const lire = () => { try { return window.matchMedia(q).matches; } catch (_) { return false; } };
+  const [v, setV] = React.useState(lire);
+  React.useEffect(() => {
+    let mq; try { mq = window.matchMedia(q); } catch (_) { return undefined; }
+    const maj = () => setV(mq.matches);
+    try { mq.addEventListener('change', maj); } catch (_) { return undefined; }
+    return () => { try { mq.removeEventListener('change', maj); } catch (_) {} };
+  }, []);
+  return v;
 }
 
 // ── DENSITÉ D'AFFICHAGE ────────────────────────────────────────────────────
@@ -38309,7 +38937,7 @@ function FacturesAbonnement({ fx }) {
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
               {lien
-                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 34, textAlign: 'right' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
                 : <span style={{ minWidth: 34 }}/>}
             </div>
           );
@@ -38410,15 +39038,15 @@ function PrenomSetting() {
     setV((p) => p || String(load('vrm_prenom', '') || ''));
   }), []);
   const ecrire = (t) => { touche.current = true; const n = t.slice(0, 24); setV(n); save('vrm_prenom', n.trim()); };
+  // Une ligne de réglage (libellé à gauche, champ à droite) ; l'explication
+  // vit sous le groupe, dans les Paramètres (§7 : une phrase, une fois).
   return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ton prénom</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-        Il sert uniquement à te dire bonjour sur l'écran d'accueil. Laisse vide et l'app dira simplement «&nbsp;Bonjour&nbsp;».
-      </div>
-      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
-        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
-    </div>
+    <label className="vrm-set-ligne" data-reglage-prenom="">
+      <IconeReglage name="pencil"/>
+      <span className="vrm-set-lib"><b style={{color:C.text}}>Prénom</b></span>
+      <input className="vrm-set-champ" value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Facultatif" autoComplete="given-name" aria-label="Ton prénom"
+        style={{color:C.text}}/>
+    </label>
   );
 }
 
@@ -38430,7 +39058,7 @@ function PrenomSetting() {
 // porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
 // carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
 // tapé à la main peut toujours être « 125 » ou « C40 ».
-function NumerosSetting() {
+function NumerosSetting({ nu = false }) {
   const [p, setP] = React.useState(() => prefixeNumeros());
   const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
   const touche = React.useRef(false);
@@ -38470,9 +39098,9 @@ function NumerosSetting() {
   const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';
   const lettreEx2 = ['C', 'D', 'E'].find((x) => x !== arch && x !== lettreEx);
   return (
-    <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+    <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Comment tu écris le numéro sur tes cartons. Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
@@ -38520,7 +39148,7 @@ function NumerosSetting() {
 // marche pas.
 const DETOURAGE_MODES = [['eteint', 'Éteint'], ['couverture', 'Photo de couverture'], ['toutes', 'Toutes les photos']];
 const modeDetourageLu = () => { const v = load('vrm_detourage', 'eteint'); return DETOURAGE_MODES.some(([k]) => k === v) ? v : 'eteint'; };
-function DetourageSetting() {
+function DetourageSetting({ nu = false }) {
   const [mode, setMode] = React.useState(modeDetourageLu);
   const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
   const touche = React.useRef(false);
@@ -38551,9 +39179,9 @@ function DetourageSetting() {
   const etat = usage === undefined ? 'attente' : usage === null ? (raisonPasSu === 'compteur' ? 'compteur' : 'pasSu') : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
   const actif = mode !== 'eteint';
   return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+    <div style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Quand l’extension attache tes photos à une annonce <b>Leboncoin</b>, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas. Sur eBay, la mise en vente passe par eBay directement, sans l’extension : ses photos ne sont pas détourées.
         {/* ⚠️ « Leboncoin ou eBay » était FAUX (revue adverse, 4 octobre) : la seule
             voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
@@ -38608,19 +39236,33 @@ function PastilleStream() {
     style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
     <span aria-hidden="true" style={{width:7,height:7,borderRadius:99,background:C.danger}}/>Stream</button>;
 }
+// L'interrupteur des Paramètres — UNE forme pour tous (16 octobre : les
+// « ON / OFF » en boutons pleins faisaient « page bricolée »). Un vrai
+// `role="switch"` : les bancs le cherchent ainsi, et un lecteur d'écran le dit.
+function Interrupteur({ on, onClick, label, disabled, ...rest }) {
+  return (
+    <button type="button" role="switch" aria-checked={!!on} aria-label={label} onClick={onClick} disabled={disabled}
+      className="vrm-switch" style={{'--vrm-sw': on ? C.accent : `${C.text}26`}} {...rest}/>
+  );
+}
+// Une icône de ligne de réglage : neutre, au trait (l'accent reste rare, §7).
+function IconeReglage({ name }) {
+  return <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`,color:C.text}}><Icon name={name} size={17}/></span>;
+}
 function StreamSetting() {
   const on = useStream();
   return (
-    <div data-stream-reglage={on ? 'on' : 'off'} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,marginBottom:8}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:14,fontWeight:600,color:C.text}}>Mode stream</div>
-        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Floute les pseudos des acheteurs, les noms de tes comptes, les emails, les téléphones et les codes de retrait — pour filmer ou partager ton écran. Seulement sur cet appareil.</div>
-      </div>
-      <button type="button" role="switch" aria-checked={on} onClick={() => poserStream(!on)} style={{flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>{on ? 'ON' : 'OFF'}</button>
+    <div className="vrm-set-ligne" data-stream-reglage={on ? 'on' : 'off'}>
+      <IconeReglage name="eyeOff"/>
+      <span className="vrm-set-lib">
+        <b style={{color:C.text}}>Mode stream</b>
+        <small style={{color:C.muted}}>Floute pseudos, emails et codes pour filmer ton écran.</small>
+      </span>
+      <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
     </div>
   );
 }
-function ZoomSetting() {
+function ZoomSetting({ nu = false }) {
   const [z, setZ] = React.useState(readZoom);
   const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
   React.useEffect(() => {
@@ -38633,9 +39275,9 @@ function ZoomSetting() {
   const choix = telephone ? ZOOMS.filter(([v]) => Number(v) >= 1) : ZOOMS;
   const selection = telephone && Number(z) < 1 ? '1' : z;
   return (
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
-      <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>
-      <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
+    <div style={nu ? {} : {background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
+      {!nu && <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.45}}>
         {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
       </div>
       <div role="group" aria-label="Taille de l'affichage"
@@ -38819,7 +39461,7 @@ function ReglagesPasLus() {
     </div>
   );
 }
-function EmailStartSetting() {
+function EmailStartSetting({ nu = false }) {
   const [date, setDate] = useState('');
   const [status, setStatus] = useState('load'); // load | ok | saving | err | pasLu
   const HEADERS = sbAuth();
@@ -38855,9 +39497,9 @@ function EmailStartSetting() {
   };
 
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>📬 Import des emails</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
+    <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Import des emails</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -38997,7 +39639,7 @@ function PushSetting() {
 
   return (
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>🔔 Notifications téléphone</div>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Notifications téléphone</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
@@ -39570,7 +40212,7 @@ function EmailsSetting() {
           <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
         </div>
         <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.accent,listStyle:'revert'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,listStyle:'revert',padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
             <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
@@ -39790,7 +40432,7 @@ function ConnexionsSetting() {
           zip livré porte bien la version du manifeste. */}
       <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
         <a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
-          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'8px 13px',fontFamily:'inherit'}}>
+          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'0 14px',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center',fontFamily:'inherit'}}>
           Télécharger l'extension {EXT_ATTENDUE}
         </a>
         <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
@@ -39921,7 +40563,7 @@ function EcranMasques({ comptes, ordi }) {
 // Réglage du régime fiscal : détermine comment le rapport comptable présente les
 // chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
 // régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
-function RegimeSetting() {
+function RegimeSetting({ nu = false }) {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
   // lue au montage. Scalaire à défaut non vide : remplacer SEULEMENT s'il est
@@ -39943,9 +40585,9 @@ function RegimeSetting() {
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
+    <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
           ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
@@ -40379,6 +41021,24 @@ function AppCoeur() {
     const ro = new ResizeObserver(poser); ro.observe(el);
     return () => ro.disconnect();
   }, [ordi]);
+  // (16 oct.) GRAND TITRE FAÇON iOS. Le titre large vit dans l'écran (son
+  // `ScreenHead`, l'en-tête de plateforme) ; dès qu'on a défilé au-delà, l'en-tête
+  // de la coque prend son matériau (verre + filet) et affiche le titre COURT de
+  // l'écran, centré. En haut de page il reste transparent, sans filet : le titre
+  // n'est jamais écrit deux fois à l'écran. On lit `.vrm-main` (c'est lui qui
+  // défile, pas le document) ; un seuil, pas une animation pilotée au pixel.
+  const [defile, setDefile] = useState(false);
+  React.useEffect(() => {
+    const main = document.querySelector('.vrm-main');
+    if (!main) return undefined;
+    let raf = 0;
+    const lire = () => { raf = 0; setDefile(main.scrollTop > 44); };
+    const surDefilement = () => { if (!raf) raf = requestAnimationFrame(lire); };
+    lire();
+    main.addEventListener('scroll', surDefilement, { passive: true });
+    return () => { main.removeEventListener('scroll', surDefilement); if (raf) cancelAnimationFrame(raf); };
+  }, [tab]);
+  const titreCourant = titreEcran(tab);
   const handleLogoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if(!file) return;
@@ -41585,7 +42245,7 @@ function AppCoeur() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-faint':C.faint,'--vrm-hair':C.hair,'--vrm-bar':C.bar,'--vrm-accent':C.accent,'--vrm-card2':C.card2,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -41662,92 +42322,48 @@ function AppCoeur() {
           en `fixed`, le titre de l'écran remonte et partage la ligne avec les
           actions, comme dans une vraie application. Sur téléphone il porte le
           menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      <header className="vrm-app-header" ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
-        padding: ordi ? '7px 10px' : '11px 16px',
-        // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
-        // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
-        // illisible dès qu'il passait dessous (vu en capture). Réduit à la
-        // largeur de ses quatre icônes et posé en haut à droite, il ne recouvre
-        // plus rien et le titre remonte de 56 px.
-        right: ordi ? 24 : undefined,
-        borderRadius: ordi ? 12 : undefined,
-        border: ordi ? `1px solid ${C.border}` : undefined,
-        boxShadow: ordi ? (C.shadowMd||'none') : undefined,
-        /* ⚠️ SUR ORDINATEUR C'ÉTAIT UNE BANDE BLANCHE VIDE de 62 px : la moitié
-           gauche est masquée (la barre latérale porte déjà la marque et la
-           navigation), donc il ne restait qu'un bandeau plein largeur avec
-           quatre icônes collées à droite. Il prend maintenant la couleur du
-           FOND et perd sa bordure : les icônes flottent au-dessus de la page,
-           il n'y a plus de barre à regarder. Sur téléphone, rien ne change —
-           le bandeau y porte le menu, le logo et la synchro. */
-        // ⚠️ Sur l'onglet eBay (téléphone), la barre du haut passe au NOIR eBay
-        // pour que l'écran soit d'un seul tenant (Julien : « améliore tout » —
-        // plus de barre claire au-dessus d'un contenu noir). Fond + bordure
-        // seulement : les puces/icônes restent lisibles sur noir.
-        background: C.glass||C.surface,
-        backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom: ordi ? undefined : `1px solid ${C.border}`}}>
+      {/* (16 oct.) Le dessin de l'en-tête vit dans `.vrm-app-header`
+          (styles-coque.css) : téléphone = barre transparente qui prend son verre
+          et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
+          haut à droite. Ici seulement la structure et la position. */}
+      <header className={`vrm-app-header${defile ? ' is-defile' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,right: ordi ? 24 : undefined,zIndex:50}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div className="vrm-header-brand" style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
+        <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
           {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark}/>}
-          {/* Logo Cancale Shoes Store - cliquable pour le changer */}
+          {/* Logo : cliquable pour le changer (appui long = remettre celui de VRM). */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div className="vrm-header-logo"
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
-            title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
-            style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:10,cursor:'pointer'}}>
-            {/* Logo VRM par défaut ; remplacé par ton image si tu en as chargé une.
-                `key={tab}` remonte le logo à chaque changement d'écran → la petite
-                rotation 3D se rejoue « quand VRM charge une page » (demande de
-                Julien). `prefers-reduced-motion` la neutralise. */}
+            title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)">
+            {/* `key={tab}` rejoue la petite rotation 3D au changement d'écran
+                (demande de Julien) ; `prefers-reduced-motion` la neutralise. */}
             {customLogo
-              ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim" style={{width:40,height:40,objectFit:'cover',borderRadius:10}}/>
-              : <VrmLogo key={tab} size={40}/>}
-            {/* Repère « modifiable » : une pastille discrète en coin, et non plus
-                un bandeau noir en travers du logo — il masquait le bas du V. */}
-            {/* ⚠️ La pastille « modifiable » ne colle plus en permanence sur la
-                marque : un produit fini ne porte pas un crayon sur son logo.
-                Elle apparaît au SURVOL (ordinateur) ; le changement d'icône
-                reste accessible dans Réglages sur téléphone. */}
-            <div className="vrm-logo-edit" style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1,opacity:0,transition:'opacity .15s ease'}}>✎</div>
-          </div>
-          {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
-              passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
-          {/* ⚠️ LE LOGO ÉTAIT ÉCRIT DEUX FOIS : l'icône carrée porte déjà les
-              lettres « VRM », et le mot était posé juste à côté. Sur téléphone
-              ça mangeait un tiers de la barre pour ne rien dire de plus. Le mot
-              seul reste dans la barre latérale, sur ordinateur. */}
-          <div style={{minWidth:0,display:'none'}}>
-            <VrmWord height={19} color={C.text} accent={C.accent} style={{display:'block'}}/>
-            {/* ⚠️ Le numéro de version ne s'affiche PLUS dans l'en-tête. Il y
-                apparaissait tronqué (« v83/00 · Rafraîchisse… ») sur TOUS les
-                écrans : c'est de la information de développeur, et c'est
-                exactement ce qui fait « outil bricolé » plutôt que produit.
-                Il reste consultable dans Réglages, à côté de la version de
-                l'extension — c'est là qu'on le cherche quand on en a besoin. */}
+              ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim"/>
+              : <VrmLogo key={tab} size={30}/>}
           </div>
         </div>
-        <div className="vrm-header-actions" style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
-          <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
+        {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
+        <div className="vrm-header-actions">
+          <div style={{display:'flex',alignItems:'center'}}>
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
             <span style={{position:'relative',display:'inline-flex'}}>
-            <button type="button" className="vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
+            <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
               syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
               syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
-            } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
-              {/* Icône au trait plutôt qu'emoji : elle prend la couleur de l'état
-                  (vert synchronisé, orange en cours, rouge hors ligne), ce qu'un
-                  emoji ne sait pas faire. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
-                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
+            }>
+              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
+                  rouge seulement si la base refuse ou ne répond pas. */}
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
@@ -41758,7 +42374,7 @@ function AppCoeur() {
             </span>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
-          <div style={{display:'flex',gap:6}}>
+          <div style={{display:'flex',alignItems:'center'}}>
             {false&&<button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
@@ -41781,14 +42397,13 @@ function AppCoeur() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
-            {(() => { const eD = dark; const ink = C.text; const bd = C.border; return (<>
+            {(() => { const eD = dark; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
-            <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
-              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              <Icon name="search" size={17}/>
+            <button className="vrm-hbtn" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire" aria-pressed={gsOpen}>
+              <Icon name="search" size={21}/>
             </button>
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}

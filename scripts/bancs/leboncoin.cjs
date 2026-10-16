@@ -31,7 +31,13 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'basdepage'
+  <main>${depot === 'obligatoire'
+    // 5.182 : une étape dont un champ OBLIGATOIRE ne se devine pas (« Univers* »),
+    //    et un « Continuer » grisé tant qu'il est vide — la fiche de l'app doit
+    //    apprendre LEQUEL manque (son libellé, jamais un contenu).
+    ? '<label for="u1">Univers*</label><input id="u1" name="univers" type="text" required>'
+      + '<button type="button" id="continuer" disabled>Continuer</button>'
+    : depot === 'basdepage'
     // ⚠️ Étape publication SANS libellé « Publier » reconnaissable : le bouton
     //    gratuit s'appelle « Terminer » (tout en bas), au-dessus un bouton à PRIX,
     //    un « Annuler » et un « Continuer ». Prouve que la garde argent tient même
@@ -155,7 +161,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/obligatoire/.test(q.url) ? 'obligatoire' : /basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -718,6 +724,76 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       /VRM-401/.test(desc) ? '' : 'la réf a disparu : « vendue → retire-la » ne reconnaîtra plus l\'annonce');
     dit(!ed.length, 'aucune erreur sur ce cas', ed[0] || '');
     await pd.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  5.182 — LA FICHE DE L'APP : ce qu'il a corrigé dans VRM est POSÉ, et la page
+  //  raconte son avancement à l'app (`depotProgres`)
+  // ══════════════════════════════════════════════════════════════════════════
+  // La paire arrive avec `titreEdite` / `descriptionEditee` / `prixEdite` (posés
+  // par le fond après avoir revérifié la fiche). Sa description CORRIGÉE passe
+  // devant celle que Leboncoin a écrite (c'est son choix explicite, fait dans la
+  // fiche) ; sans fiche, la règle d'avant tient (bloc juste au-dessus).
+  {
+    const pf = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const ef = []; pf.on('pageerror', (e) => ef.push(e.message));
+    await pf.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    const AD_FICHE = { ...QUEUE[0], title: 'Salomon XT-6 Wings blanc taille 40', description: 'Ma description à moi.\n\nRéf. VRM-401', price: '87.5', edite: true, titreEdite: true, descriptionEditee: true, prixEdite: true, publier: true };
+    await pf.addInitScript((d) => {
+      window.__envoyes = [];
+      window.chrome = { runtime: { id: 'banc', lastError: null, getManifest: () => ({ version: '9.9.9' }), sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        window.__envoyes.push(JSON.parse(JSON.stringify(m || {})));
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: [] });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: AD_FICHE });
+    await pf.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await pf.evaluate(() => {
+      const fixe = (sel, txt) => { const el = document.querySelector(sel); const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, txt); el.dispatchEvent(new Event('input', { bubbles: true })); };
+      fixe('textarea[name="body"]', 'Texte écrit par Leboncoin tout seul.');
+      fixe('input[name="price_cents"]', '120');
+    });
+    await pf.addScriptTag({ content: SRC });
+    await pf.waitForTimeout(2600);
+    const v = await pf.evaluate(() => ({
+      titre: document.querySelector('input[name="subject"]').value,
+      desc: document.querySelector('textarea[name="body"]').value,
+      prix: document.querySelector('input[name="price_cents"]').value,
+      progres: window.__envoyes.filter((m) => m.action === 'depotProgres'),
+    }));
+    dit(v.titre === AD_FICHE.title, 'fiche : le TITRE corrigé dans VRM est posé', v.titre);
+    dit(v.desc === AD_FICHE.description, 'fiche : la DESCRIPTION corrigée passe devant celle que Leboncoin a écrite (son choix, fait dans la fiche)', v.desc.replace(/\n/g, ' ').slice(0, 60));
+    dit(/^87[,.]5/.test(v.prix), 'fiche : le PRIX corrigé remplace celui que Leboncoin proposait', v.prix);
+    dit(v.progres.length >= 1 && v.progres.every((m) => String(m.id) === '1001' && m.progres && m.progres.etape), 'la page RACONTE son avancement à l’app (`depotProgres`, pour CETTE paire)', JSON.stringify(v.progres.map((m) => m.progres.etape)));
+    dit(!JSON.stringify(v.progres).includes('Ma description'), 'et l’avancement ne transporte aucun contenu saisi');
+    // Il corrige lui-même sur la page : on ne lutte pas (au plus 3 poses).
+    for (let i = 0; i < 5; i++) {
+      await pf.evaluate(() => { const el = document.querySelector('textarea[name="body"]'); Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(el, 'Corrigé sur la page.'); el.dispatchEvent(new Event('input', { bubbles: true })); });
+      await pf.waitForTimeout(1100);
+    }
+    const garde = await pf.evaluate(() => document.querySelector('textarea[name="body"]').value);
+    dit(/^Corrigé sur la page\./.test(garde), 'une correction faite SUR la page finit par être respectée (VRM ne lutte pas sans fin)', garde.replace(/\n/g, ' ').slice(0, 60));
+    dit(!ef.length, 'aucune erreur de page (fiche)', ef[0] || '');
+    await pf.close();
+  }
+  {
+    const po = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    await po.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await po.addInitScript((d) => {
+      window.__envoyes = [];
+      window.chrome = { runtime: { id: 'banc', lastError: null, getManifest: () => ({ version: '9.9.9' }), sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        window.__envoyes.push(JSON.parse(JSON.stringify(m || {})));
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: { ...QUEUE[0], photos: [] } });
+    await po.goto('http://localhost:4491/depot/obligatoire', { waitUntil: 'domcontentloaded' });
+    await po.addScriptTag({ content: SRC });
+    await po.waitForTimeout(9000);
+    const manque = await po.evaluate(() => window.__envoyes.filter((m) => m.action === 'depotProgres' && m.progres && m.progres.etape === 'champ-manquant').map((m) => m.progres.manque));
+    dit(manque.length >= 1 && JSON.stringify(manque[manque.length - 1]) === '["Univers"]', 'un champ obligatoire que VRM ne devine pas : l’app apprend LEQUEL (« Univers »)', JSON.stringify(manque));
+    await po.close();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
