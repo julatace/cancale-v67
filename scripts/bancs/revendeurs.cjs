@@ -109,6 +109,10 @@ async function brancher(p){
       const gestion=rail.getByRole('button',{name:'Gestion',exact:true});
       await gestion.click();
       check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion accessible dans le panneau de gauche');
+      check(await rail.locator('.vrm-rail-panel').evaluate(e=>{
+        const lum=color=>{const c=color.match(/[\d.]+/g).slice(0,3).map(v=>{const n=Number(v)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;});return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+        const css=getComputedStyle(e),a=lum(css.color),b=lum(css.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;
+      }),'texte Gestion contrasté sur le panneau clair');
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'gestion-desktop.png')});}
       check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures conservés dans Gestion');
       await p.keyboard.press('Escape');
@@ -220,7 +224,7 @@ async function brancher(p){
   check(droite.x>=gauche.x+gauche.width-1, 'messagerie ordinateur : liste à gauche, fil à droite');
   check(await p.locator('.vrm-chat-column .vrm-chat-panel').count()===1, 'fil intégré dans le panneau de droite');
   await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
-  const send=p.getByRole('button',{name:'Envoyer',exact:true});check(await send.isDisabled(),'conversation sans réponse autorisée bloquée');
+  const send=p.getByRole('button',{name:'Envoyer',exact:true});check((await send.count()===0 || await send.isDisabled()) && await p.getByText('Vinted ne permet pas de répondre dans cette conversation.',{exact:true}).isVisible(),'conversation sans réponse autorisée bloquée et expliquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
   await p.goto(base+'/?tab=dashboard');await p.locator('.vrm-finance-overview').waitFor();check(await p.locator('.vrm-finance-overview').isVisible(),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();

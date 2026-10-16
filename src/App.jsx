@@ -9360,7 +9360,7 @@ function SideBar({ tab, setTab }) {
       <button ref={declencheur} type="button" className="vrm-rail-button" aria-label="Gestion" title="Gestion" aria-expanded={gestion} aria-controls="vrm-gestion-laterale" onClick={()=>setGestion(v=>!v)} data-active={outils.some(t=>t.id===actif)||undefined}><Icon name="grid" size={23}/></button>
       <button type="button" className="vrm-rail-button" aria-label="Paramètres" title="Paramètres" onClick={()=>ouvrir('settings')} aria-current={tab==='settings'?'page':undefined}><Icon name="gear" size={23}/></button>
     </div>
-    {gestion && <section ref={panneau} id="vrm-gestion-laterale" className="vrm-rail-panel" aria-label="Gestion">
+    {gestion && <section ref={panneau} id="vrm-gestion-laterale" className="vrm-rail-panel" aria-label="Gestion" style={{'--vrm-ink':C.text,'--vrm-muted':C.muted,'--vrm-line':C.border,'--vrm-surface':C.card}}>
       <div className="vrm-rail-panel-title"><span>Gestion</span><button type="button" aria-label="Fermer la gestion" onClick={()=>{setGestion(false);declencheur.current?.focus();}}><Icon name="close" size={18}/></button></div>
       {outils.map(t=><button key={t.id} type="button" className="vrm-sidebar-link" aria-current={tab===t.id?'page':undefined} onClick={()=>ouvrir(t.id)}><NavigationIcon item={t} size={19}/><span>{t.label}</span>{t.bientot && <span className="vrm-rail-soon">Bientôt</span>}</button>)}
     </section>}

@@ -1,4 +1,4 @@
-/* Atelier : rail anthracite, surfaces bleu grisé, filets fins. */
+/* Rail compact : reprend les couleurs de la coque existante. */
 .vrm-atelier-rail { padding:24px 12px 18px; overflow:visible; box-sizing:border-box; }
 .vrm-atelier-rail .vrm-sidebar-brand { padding:4px 0 28px; display:flex; justify-content:center; }
 .vrm-rail-platforms { display:flex; flex-direction:column; align-items:center; gap:12px; overflow-y:auto; min-height:0; scrollbar-width:none; }
@@ -21,3 +21,5 @@
 .vrm-atelier-rail { --vrm-brand-filter:invert(1); }
 
 .vrm-rail-soon { margin-left:auto; font-size:10px; color:var(--vrm-muted); }
+
+.vrm-atelier-rail .vrm-rail-panel .vrm-sidebar-link[aria-current="page"] { background:var(--vrm-bg); color:var(--vrm-ink); }
