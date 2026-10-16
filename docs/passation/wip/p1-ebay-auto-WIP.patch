@@ -1,0 +1,1086 @@
+From 22c091b72cb033a1a4dd6551034ff8efe182adaf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:35:13 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p1-ebay-auto)=20=E2=80=94?=
+ =?UTF-8?q?=20fig=C3=A9=20pour=20la=20passation=20du=2016=20octobre=20(age?=
+ =?UTF-8?q?nt=20coup=C3=A9=20par=20la=20limite=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ CLAUDE.md                          |  62 ++++++
+ api/ebay.js                        |  82 +++++++-
+ scripts/audit-ebay-publication.cjs | 163 ++++++++++++++-
+ scripts/bancs/ebay-comptes.cjs     |   4 +-
+ scripts/bancs/ebay-form.cjs        |   7 +-
+ scripts/bancs/ebay-prep.cjs        |  83 +++++++-
+ src/App.jsx                        | 306 ++++++++++++++++++++++-------
+ 7 files changed, 620 insertions(+), 87 deletions(-)
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 4180dba..2befc16 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -10150,6 +10150,68 @@ de 7 jours), puis rouge sur 4c1e3cb, vert après, rouge sous mutation.
+   `messagerie` 16 et `filtre-compte` 8 : les MÊMES rouges que sur 4c1e3cb
+   (vérifié ligne à ligne), chantier `p1-messages`. Les bancs lancés acceptent
+   `BANC_PORT`.
++### eBay : « je ne dois rien avoir à remplir, juste marquer publier » (15 octobre, lot p1-ebay-auto)
++Décision de Julien (il commence à publier sur eBay) : marque, style, catégorie,
++état — rien à remplir ; le remplissage « au plus proche » parmi les valeurs
++d'eBay est AUTORISÉ quand l'exact ne colle pas, à condition de DIRE ce qui a
++été choisi. Ce qui ne bouge pas : son clic « Publier » reste le déclencheur,
++jamais une option payante, « demandé » n'est jamais affiché « publié » (la
++relecture GetItem d'ebay-prep reste), et le résultat écrit ce qui a été rempli
++automatiquement.
++- **Serveur (`publish` ET `pubverify`, même payload §11)** : catégorie absente
++  ⇒ `completerPublication` demande à eBay (le chemin REST déjà prouvé de
++  `pubinfo` : get_default_category_tree_id → get_category_suggestions?q={titre
++  RÉEL — jamais le titre d'exemple de pubinfo ; titre vide = 400 inchangé}),
++  prend la PREMIÈRE suggestion (c'est eBay qui propose, jamais nous) et la
++  réponse la NOMME (`categorieChoisie {categoryId, categoryName,
++  par:'ebay-suggestion'}`). Aucune suggestion, arbre illisible, appel raté ⇒
++  **502 `categorie-pas-su` AVANT tout AddFixedPriceItem** ; une suggestion
++  non-feuille ⇒ le Ack=Failure d'eBay remonte tel quel (filet existant). État
++  absent ⇒ déduit de `b.item.etatVinted` par la table EXACTE
++  (`<etat-vinted-ebay>` : Neuf avec étiquette→1000 · Neuf sans étiquette→1500 ·
++  Très bon état/Bon état/Satisfaisant→3000), recalé sur
++  `get_item_condition_policies` quand on les a (`par:'recale'`, dit — liste
++  illisible ⇒ on garde la table, eBay reste juge) ; **hors table ⇒ 400
++  `etat-pas-su` qui NOMME le libellé Vinted — « Occasion » n'est plus jamais
++  posé en silence** (sauf état CHOISI dans le formulaire : il gagne).
++- **App** : la paire porte `etatVinted` (le `status` du dressing, mesuré 57/57
++  en ligne) ; au choix de la paire **`analyser()` part tout seul** (le bouton
++  « Trouver la catégorie eBay » ne reste qu'en FILET quand l'analyse a échoué —
++  et « Publier » marche quand même, la route laisse eBay choisir :
++  `itemDeBrouillon` n'exige plus la catégorie, mais le PLANIFICATEUR si,
++  `sansCategorie`). L'état est prérempli par LA MÊME table (copie App.jsx,
++  comparée texte + sorties par l'audit, comme `PAS_UNE_DESCRIPTION`) et marqué
++  « repris de Vinted » ; il le change ⇒ sa saisie, plus jamais touchée (même
++  logique que `repriseVinted`, `condAuto`/'sien'). Les caractéristiques :
++  exact d'abord, sinon **`valeurLaPlusProche`** (casse/accents → inclusion de
++  MOTS → distance d'édition bornée 1-2, ambigu ⇒ null) — TOUJOURS une valeur
++  de la liste d'eBay, jamais inventée ; « choisi au plus proche : X » écrit
++  sous le champ, un REQUIS sans correspondance reste VIDE et la ligne le dit
++  (son seul geste). La confirmation ne s'ouvre QUE s'il y a un écart (prix ≠
++  Vinted, règle d'offre, plusieurs comptes — ebay-prep). L'écran de résultat
++  liste **« Rempli automatiquement : catégorie choisie par eBay (« X ») · état
++  repris de Vinted (« Y ») · N caractéristiques dont M au plus proche »**
++  (`data-publie-rempli-auto`).
++- **Preuves (§6.1, sur la copie `git archive` d'integ15)** :
++  `audit-ebay-publication.cjs` **78 contrôles, 23 rouges sur integ15** (dont
++  « publier SANS catégorie ⇒ HTTP 400 » et « état hors table ⇒ HTTP 200,
++  AddFixedPriceItem ×1 » — le 3000 silencieux), 0 après ; mutations rouges :
++  suggestion ignorée (8) · 3000 posé en silence (2) · « plus proche » qui
++  invente hors liste (2). Banc `ebay-prep.cjs` sections 14-15 (catégorie/état/
++  marque/pointure SANS clic, publication en un clic, récap, requis vide qui
++  bloque — 180 contrôles sur 4 combos) : **60 rouges sur le build d'integ15**
++  (15 par combo : sans l'analyse automatique, la catégorie n'arrive jamais et
++  les blocs 3-5 ne se montent pas), 0 après (2 instables « case à cocher » du
++  13 sous charge, verts rejoués seuls) ; build muté « analyse auto retirée » ⇒
++  **16 rouges** (COMBO=0).
++- ⚠️ **Non mesuré** (aucun appel réel à eBay) : la forme/le tri réels de
++  `categorySuggestions` sur EBAY_FR pour SES titres ; si la 1ʳᵉ suggestion est
++  toujours une catégorie FEUILLE (le 422 d'eBay reste le filet) ; les
++  ConditionID réellement admis par la catégorie sneakers ; la latence des 2
++  appels Taxonomy ajoutés au publish. Le PLANIFICATEUR n'a pas ce repli
++  (programmer exige toujours catégorie + état) : un lot à une heure où il ne
++  regarde pas ne part pas sur une catégorie choisie après coup.
++
+ ### eBay : description et prix repris de Vinted, l'écart montré, et l'annonce RELUE après publication (15 octobre, lot p1-ebay-prep)
+ Prompt maître du 15 octobre : reprendre la description et le prix de Vinted
+ « sans écraser une personnalisation volontaire », montrer les différences, et
+diff --git a/api/ebay.js b/api/ebay.js
+index 65c3711..e029e12 100644
+--- a/api/ebay.js
++++ b/api/ebay.js
+@@ -863,18 +863,83 @@ function numerotationRefus(b, num) {
+   if (v != null && Number(b.numerotation) !== v) return { status: 409, body: { ok: false, reason: 'numerotation-perimee', error: 'Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le — rien n\'a été envoyé à eBay.' } };
+   return null;
+ }
++// ── « JE NE DOIS RIEN AVOIR À REMPLIR » (15 octobre, décision de Julien) ─────
++// Quand le formulaire n'envoie PAS de catégorie, c'est eBay qui la propose pour
++// CE titre — le chemin REST déjà prouvé de `pubinfo` (Taxonomy
++// get_category_suggestions), jamais un appel Trading inédit. La PREMIÈRE
++// suggestion est prise (c'est eBay qui propose, jamais nous) et la réponse la
++// NOMME (`categorieChoisie`). Aucune suggestion, arbre illisible, appel raté ⇒
++// refus PROPRE avant tout AddFixedPriceItem (502 `categorie-pas-su`) : rien
++// n'est publié sur une catégorie devinée. Une suggestion non-feuille ⇒ eBay
++// répondra Ack=Failure, remonté tel quel (le filet existant).
++// ⚠️ JAMAIS le titre d'exemple de `pubinfo` : un titre vide reste un 400.
++async function categorieSuggeree(token, titre) {
++  const H = { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' };
++  const tree = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=EBAY_FR`, token, H);
++  const treeId = (tree.data && tree.data.categoryTreeId) || '';
++  if (!treeId) return null;
++  const sugg = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_category_suggestions?q=${encodeURIComponent(String(titre).slice(0, 80))}`, token, H);
++  const c = sugg.data && Array.isArray(sugg.data.categorySuggestions) && sugg.data.categorySuggestions[0] && sugg.data.categorySuggestions[0].category;
++  if (!(c && c.categoryId)) return null;
++  return { categoryId: String(c.categoryId), categoryName: c.categoryName || String(c.categoryId), par: 'ebay-suggestion' };
++}
++// L'ÉTAT déduit de l'annonce Vinted quand le formulaire n'en envoie pas : la
++// table EXACTE, LA MÊME que dans l'app (§11 — `audit-ebay-publication.cjs`
++// compare les deux copies, texte et sorties). Hors table ⇒ « Occasion » (3000)
++// N'EST PAS posé en silence : refus `etat-pas-su` qui NOMME le libellé Vinted.
++// <etat-vinted-ebay>
++const ETAT_VINTED_EBAY = { 'Neuf avec étiquette': '1000', 'Neuf sans étiquette': '1500', 'Très bon état': '3000', 'Bon état': '3000', 'Satisfaisant': '3000' };
++const conditionDeVinted = (etat) => ETAT_VINTED_EBAY[String(etat == null ? '' : etat).trim()] || '';
++// </etat-vinted-ebay>
++// Complète l'item AVANT tout appel qui écrit : la catégorie par eBay, l'état
++// par la table — chacun rendu dans la réponse (`categorieChoisie`,
++// `etatChoisi`) pour que l'écran DISE ce qui a été rempli automatiquement.
++// Rend `{ it, categorieChoisie?, etatChoisi? }` ou `{ err }` (rien ne part).
++async function completerPublication(it, token, verbe) {
++  const out = { it: { ...it } };
++  if (!out.it.categoryId) {
++    const c = await categorieSuggeree(token, out.it.title);
++    if (!c) return { err: { status: 502, body: { ok: false, reason: 'categorie-pas-su', error: `eBay n'a pas proposé de catégorie pour ce titre — rien n'a été ${verbe}. Choisis la catégorie dans le formulaire.` } } };
++    out.it.categoryId = c.categoryId;
++    out.categorieChoisie = c;
++  }
++  if (!out.it.conditionId) {
++    const etat = String(out.it.etatVinted == null ? '' : out.it.etatVinted).trim();
++    const id = conditionDeVinted(etat);
++    if (!id) return { err: { status: 400, body: { ok: false, reason: 'etat-pas-su', error: (etat ? `Je ne sais pas traduire l'état Vinted « ${etat} » en état eBay` : `L'état de l'objet manque (et l'état Vinted de la paire n'est pas connu)`) + ` — choisis l'état dans le formulaire. Rien n'a été ${verbe}.` } } };
++    out.it.conditionId = id;
++    out.etatChoisi = { conditionId: id, etatVinted: etat, par: 'vinted' };
++    // Recalé sur les états PERMIS par la catégorie, quand on les a (le même
++    // Sell Metadata que `pubinfo`) — et c'est DIT (`par: 'recale'`), jamais en
++    // silence. Lecture ratée ⇒ on garde la table : eBay reste juge (Ack).
++    const cp = await ebayJson(`${EBAY_API}/sell/metadata/v1/marketplace/EBAY_FR/get_item_condition_policies?filter=categoryIds:%7B${out.it.categoryId}%7D`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' });
++    const p0 = cp.data && Array.isArray(cp.data.itemConditionPolicies) && cp.data.itemConditionPolicies[0];
++    const permis = (p0 && Array.isArray(p0.itemConditions) ? p0.itemConditions : []).map((x) => String(x.conditionId)).filter(Boolean);
++    if (permis.length && !permis.includes(id)) {
++      const choisi = permis.includes('3000') ? '3000' : permis[0];
++      out.it.conditionId = choisi;
++      out.etatChoisi = { conditionId: choisi, etatVinted: etat, par: 'recale' };
++    }
++  }
++  return out;
++}
+ async function handlePublish(b, ctx) {
+   const it0 = b.item || {};
+-  if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
++  if (!it0.title || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre et prix requis' } };
+   const s = avecSku(it0);
+   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
+   const ro = regleDeItem(it0);
+   if (ro.err) return { status: 400, body: { ok: false, reason: ro.reason || 'offre', error: ro.err } };
+-  const it = { ...s.item, regleOffre: ro.regle };
++  let it = { ...s.item, regleOffre: ro.regle };
+   let num={ok:true,mk:null};
+   if(it.sku){num=await numerotationVendeur(ctx.owner);const ref=numerotationRefus(b,num);if(ref)return ref;}
+   const at = await jetonDe(ctx);
+   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
++  // (15 octobre) Catégorie absente ⇒ eBay la propose ; état absent ⇒ la table
++  // Vinted→eBay — ou un refus PROPRE, toujours AVANT le moindre appel qui écrit.
++  const comp = await completerPublication(it, at.token, 'publié');
++  if (comp.err) return comp.err;
++  it = comp.it;
+   // ── UNE PAIRE, UNE ANNONCE (la règle de `programmer`, 6 octobre). Publier
+   // n'avait AUCUNE garde : une paire déjà en vente, ou programmée pour ce
+   // soir, repartait en seconde annonce (prouvé : deux annonces VRM-30). Relue
+@@ -915,7 +980,7 @@ async function handlePublish(b, ctx) {
+   // `compte` : le vendeur qu'eBay montre quand il est prouvé être CE compte (un
+   // fait lu chez eBay — à jour même si le pseudo a changé), sinon le pseudo
+   // mémorisé de CE compte (`compteANommer`, jamais deviné).
+-  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: compteANommer(verification, pseudoPub), avertissements: r.avertissements, verification, ...(offre ? { offre } : {}) } };
++  return { status: 200, body: { ok: true, plateforme: 'ebay', itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: compteANommer(verification, pseudoPub), avertissements: r.avertissements, verification, ...(comp.categorieChoisie ? { categorieChoisie: comp.categorieChoisie } : {}), ...(comp.etatChoisi ? { etatChoisi: comp.etatChoisi } : {}), ...(offre ? { offre } : {}) } };
+ }
+ 
+ // ── RELIRE UNE ANNONCE QU'ON VIENT DE PUBLIER (15 octobre) ──────────────────
+@@ -973,7 +1038,7 @@ const ETAT_OK = /^\d{3,5}$/;
+ // annonce alors le frais de programmation.
+ async function handleVerify(b, ctx) {
+   const it0 = b.item || {};
+-  if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
++  if (!it0.title || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre et prix requis' } };
+   // Le MÊME payload que la publication (§11) : SKU compris.
+   const s = avecSku(it0);
+   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
+@@ -984,13 +1049,18 @@ async function handleVerify(b, ctx) {
+     quand = heureProgrammation(b.scheduleTime);
+     if (!quand) return { status: 400, body: { ok: false, reason: 'heure', error: 'Heure de mise en ligne refusée : entre 15 minutes et 3 semaines à l\'avance.' } };
+   }
+-  const it = { ...s.item, regleOffre: ro.regle, scheduleTime: quand };
++  let it = { ...s.item, regleOffre: ro.regle, scheduleTime: quand };
+   const at = await jetonDe(ctx);
+   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
++  // (15 octobre) Le MÊME repli que `publish` (§11 : même payload, même règle) :
++  // catégorie proposée par eBay, état déduit de la table — ou refus propre.
++  const comp = await completerPublication(it, at.token, 'vérifié');
++  if (comp.err) return comp.err;
++  it = comp.it;
+   const r = await tradingVerifyAddFixedPriceItem(at.token, it);
+   if (r.status === 0) return { status: 503, body: { ok: false, error: r.error || 'eBay injoignable' } };
+   if (!r.ok) return { status: 200, body: { ok: false, error: r.err || 'eBay refuserait cette annonce', ack: r.ack, erreurs: r.erreurs } };
+-  return { status: 200, body: { ok: true, fees: r.frais.total, frais: r.frais, programme: quand || null, avertissements: r.avertissements } };
++  return { status: 200, body: { ok: true, fees: r.frais.total, frais: r.frais, programme: quand || null, avertissements: r.avertissements, ...(comp.categorieChoisie ? { categorieChoisie: comp.categorieChoisie } : {}), ...(comp.etatChoisi ? { etatChoisi: comp.etatChoisi } : {}) } };
+ }
+ 
+ // ── PROGRAMMER UNE ANNONCE (Trading AddFixedPriceItem + ScheduleTime) ────────
+diff --git a/scripts/audit-ebay-publication.cjs b/scripts/audit-ebay-publication.cjs
+index 6d39175..98f087a 100644
+--- a/scripts/audit-ebay-publication.cjs
++++ b/scripts/audit-ebay-publication.cjs
+@@ -104,8 +104,25 @@ global.fetch = async (url, opts = {}) => {
+   if (u.includes('ebay.com')) {
+     const appel = h['X-EBAY-API-CALL-NAME'] || '';
+     const corps = String(opts.body || '');
+-    journal.push({ ou: 'ebay', appel, u: u.replace(/\?.*$/, ''), corps });
++    journal.push({ ou: 'ebay', appel, u: u.replace(/\?.*$/, ''), q: u, corps });
+     if (u.includes('/identity/v1/oauth2/token')) return rep({ access_token: 'at-J', expires_in: 7200 });
++    // ── Le faux Taxonomy / Sell Metadata (REST) : la catégorie au publish ─────
++    // `mode.tree` : ko (arbre illisible) · `mode.sugg` : aucune | ko ·
++    // `mode.condpol` : restreint (3000 interdit) | ko.
++    if (u.includes('/commerce/taxonomy/v1/get_default_category_tree_id')) {
++      if (mode.tree === 'ko') return rep('passerelle indisponible', 500);
++      return rep({ categoryTreeId: '3' });
++    }
++    if (u.includes('/get_category_suggestions')) {
++      if (mode.sugg === 'ko') return rep('passerelle indisponible', 500);
++      if (mode.sugg === 'aucune') return rep({ categorySuggestions: [] });
++      return rep({ categorySuggestions: [{ category: { categoryId: '15709', categoryName: 'Baskets pour hommes' } }, { category: { categoryId: '95672', categoryName: 'Baskets pour femmes' } }] });
++    }
++    if (u.includes('/get_item_condition_policies')) {
++      if (mode.condpol === 'ko') return rep('passerelle indisponible', 500);
++      const ids = mode.condpol === 'restreint' ? ['1000', '1500'] : ['1000', '1500', '3000'];
++      return rep({ itemConditionPolicies: [{ categoryId: '15709', itemConditions: ids.map((id) => ({ conditionId: id, conditionDescription: 'état ' + id })) }] });
++    }
+     if (appel === 'GetUser') {
+       if (mode.getuser === 'ko') return xmlRep(ECHEC(appel, 'Erreur interne au système (message inventé).'));
+       return xmlRep(OK(appel, `<User><UserID>${mode.getuser === 'autre' ? 'pas_ce_compte' : (mode.vendeur || 'julien_part')}</UserID><EIASToken>EIAS-JULIEN-PART-000000001</EIASToken></User>`));
+@@ -166,7 +183,7 @@ const APP = lire('src/App.jsx');
+ const EXT = lire('vinted-sync-extension/background.js');
+ const RA = {};
+ {
+-  const noms = ['montantSaisi', 'eurEbay', 'prixVinted', 'PAS_UNE_DESCRIPTION', 'lbcDescription', 'prixChampEbay', 'memePrixEbay', 'normDescEbay', 'repriseVinted', 'ecartsVintedEbay', 'ecartsBrouillonVinted', 'texteEcartsBrouillon', 'etatPublicationEbay', 'NOMS_POINTS_PUB', 'textePointPub'];
++  const noms = ['montantSaisi', 'eurEbay', 'prixVinted', 'PAS_UNE_DESCRIPTION', 'lbcDescription', 'prixChampEbay', 'memePrixEbay', 'normDescEbay', 'repriseVinted', 'ecartsVintedEbay', 'ecartsBrouillonVinted', 'texteEcartsBrouillon', 'etatPublicationEbay', 'NOMS_POINTS_PUB', 'textePointPub', 'ETAT_VINTED_EBAY', 'conditionDeVinted', 'normProche', 'distanceEdition', 'valeurLaPlusProche', 'autoRemplirAttributs'];
+   const srcs = noms.map((n) => [n, extraire(APP, n)]);
+   const manque = srcs.filter(([, s]) => !s).map(([n]) => n);
+   RA._manque = manque;
+@@ -415,6 +432,148 @@ const lignePas = (src) => { const m = /^const PAS_UNE_DESCRIPTION = (\/.*\/[a-z]
+     dit(!ebayPub, '[C-desc] la liste eBay n\'a plus SA règle (`PUB`) : une notion, une règle');
+   });
+ 
++  // ── D. « JE NE DOIS RIEN AVOIR À REMPLIR » (15 octobre) ─────────────────────
++  // Publier SANS catégorie : eBay la propose (le chemin REST de pubinfo), la
++  // première suggestion part, la réponse la NOMME ; aucune suggestion ⇒ refus
++  // AVANT tout AddFixedPriceItem. SANS état : la table Vinted→eBay, hors table
++  // ⇒ refus qui nomme le libellé — « Occasion » jamais posé en silence.
++  console.log('\n— D. Publier sans catégorie ni état : eBay propose, la table traduit —');
++  const itemSans = { title: 'Salomon XT-6 noir taille 42', price: '62', quantity: '1', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: {}, ebayGere: true, numero: '402' };
++  const adds = (j) => j.filter((x) => x.appel === 'AddFixedPriceItem');
++  await essaie('[D-cat] la suggestion d\'eBay au publish', async () => {
++    remettre();
++    const it = { ...itemSans };   // PAS de categoryId
++    const o = await app({ action: 'publish', item: it });
++    const sugg = o.journal.find((x) => /get_category_suggestions/.test(x.q || ''));
++    const add = adds(o.journal)[0];
++    dit(o.code === 200 && o.corps.ok === true, '[D-cat] publier SANS catégorie aboutit — c\'est eBay qui la choisit', `HTTP ${o.code} · ${JSON.stringify(o.corps.error || '')}`);
++    dit(!!sugg && decodeURIComponent(String(sugg.q)).includes('q=' + itemSans.title), '[D-cat] la suggestion est demandée avec le TITRE réel (jamais le titre d\'exemple de pubinfo)', sugg ? decodeURIComponent(String(sugg.q)).slice(-60) : 'aucun appel');
++    dit(!!add && /<CategoryID>15709<\/CategoryID>/.test(add.corps), '[D-cat] la PREMIÈRE suggestion part dans AddFixedPriceItem (jamais la seconde, jamais la nôtre)', add ? (/<CategoryID>([^<]*)</.exec(add.corps) || [])[1] : 'aucun ajout');
++    const cc = o.corps.categorieChoisie;
++    dit(!!cc && cc.categoryId === '15709' && cc.categoryName === 'Baskets pour hommes' && cc.par === 'ebay-suggestion', '[D-cat] la réponse NOMME la catégorie choisie par eBay (`categorieChoisie`)', JSON.stringify(cc));
++  });
++  for (const [prep, quoi] of [[() => { mode.sugg = 'aucune'; }, 'aucune suggestion'], [() => { mode.sugg = 'ko'; }, 'lecture des suggestions ratée'], [() => { mode.tree = 'ko'; }, 'arbre de catégories illisible']]) {
++    await essaie(`[D-cat-refus] ${quoi}`, async () => {
++      remettre(); prep();
++      const o = await app({ action: 'publish', item: { ...itemSans } });
++      dit(o.code === 502 && o.corps.reason === 'categorie-pas-su' && adds(o.journal).length === 0 && /rien n'a été publié/i.test(String(o.corps.error)),
++        `[D-cat-refus] ${quoi} ⇒ 502 « categorie-pas-su », AUCUN AddFixedPriceItem — rien n'est publié sur une catégorie devinée`, `HTTP ${o.code} · ${o.corps.reason} · ajouts ×${adds(o.journal).length}`);
++    });
++  }
++  await essaie('[D-cat] titre vide', async () => {
++    remettre();
++    const o = await app({ action: 'publish', item: { ...itemSans, title: '' } });
++    const exemple = o.journal.some((x) => /Nike(%20|\+| )Air(%20|\+| )Max/i.test(String(x.q || '')));
++    dit(o.code === 400 && chezEbay(o.journal).length === 0 && !exemple, '[D-cat] titre vide ⇒ 400 inchangé, aucun appel eBay — et JAMAIS le titre d\'exemple de pubinfo', `HTTP ${o.code} · ebay ×${chezEbay(o.journal).length}`);
++  });
++  await essaie('[D-etat] la table Vinted→eBay', async () => {
++    for (const [etat, attendu] of [['Très bon état', '3000'], ['Neuf avec étiquette', '1000'], ['Neuf sans étiquette', '1500'], ['Bon état', '3000'], ['Satisfaisant', '3000']]) {
++      remettre();
++      const it = { ...itemSans, categoryId: '15709', etatVinted: etat }; delete it.conditionId;
++      const o = await app({ action: 'publish', item: it });
++      const add = adds(o.journal)[0];
++      dit(o.code === 200 && !!add && new RegExp('<ConditionID>' + attendu + '</ConditionID>').test(add.corps) && o.corps.etatChoisi && o.corps.etatChoisi.conditionId === attendu && o.corps.etatChoisi.par === 'vinted',
++        `[D-etat] « ${etat} » ⇒ ConditionID ${attendu}, dit dans la réponse (etatChoisi, par « vinted »)`, `HTTP ${o.code} · ${JSON.stringify(o.corps.etatChoisi || o.corps.error)}`);
++    }
++  });
++  await essaie('[D-etat] hors table ⇒ refus, jamais « Occasion » en silence', async () => {
++    remettre();
++    const it = { ...itemSans, categoryId: '15709', etatVinted: 'Comme neuf (jamais vu)' }; delete it.conditionId;
++    const o = await app({ action: 'publish', item: it });
++    dit(o.code === 400 && o.corps.reason === 'etat-pas-su' && /Comme neuf \(jamais vu\)/.test(String(o.corps.error)) && adds(o.journal).length === 0,
++      '[D-etat] un état Vinted hors table ⇒ refus « etat-pas-su » qui NOMME le libellé, AUCUN AddFixedPriceItem', `HTTP ${o.code} · ${o.corps.reason} · ajouts ×${adds(o.journal).length}`);
++    const it2 = { ...itemSans, categoryId: '15709' }; delete it2.conditionId;
++    const o2 = await app({ action: 'publish', item: it2 });
++    dit(o2.code === 400 && o2.corps.reason === 'etat-pas-su' && adds(o2.journal).length === 0,
++      '[D-etat] ni état choisi, ni état Vinted ⇒ refus aussi (3000 n\'est plus un défaut silencieux du publish)', `HTTP ${o2.code} · ${o2.corps.reason}`);
++  });
++  await essaie('[D-etat] recalé sur les états permis par la catégorie', async () => {
++    remettre(); mode.condpol = 'restreint';   // 3000 interdit ici
++    const it = { ...itemSans, categoryId: '15709', etatVinted: 'Très bon état' }; delete it.conditionId;
++    const o = await app({ action: 'publish', item: it });
++    const add = adds(o.journal)[0];
++    dit(o.code === 200 && !!add && /<ConditionID>1000<\/ConditionID>/.test(add.corps) && o.corps.etatChoisi && o.corps.etatChoisi.par === 'recale',
++      '[D-etat] 3000 interdit par la catégorie ⇒ recalé sur un état PERMIS, et c\'est dit (par « recale »), jamais en silence', JSON.stringify(o.corps.etatChoisi || o.corps.error));
++    remettre(); mode.condpol = 'ko';
++    const o2 = await app({ action: 'publish', item: { ...it } });
++    const add2 = adds(o2.journal)[0];
++    dit(o2.code === 200 && !!add2 && /<ConditionID>3000<\/ConditionID>/.test(add2.corps) && o2.corps.etatChoisi && o2.corps.etatChoisi.par === 'vinted',
++      '[D-etat] la liste des états permis illisible ⇒ on garde la table (eBay reste juge), jamais un refus de trop', JSON.stringify(o2.corps.etatChoisi || o2.corps.error));
++  });
++  await essaie('[D-etat] le formulaire gagne', async () => {
++    remettre();
++    const o = await app({ action: 'publish', item: { ...itemSans, categoryId: '15709', conditionId: '1750', etatVinted: 'Comme neuf (jamais vu)' } });
++    const add = adds(o.journal)[0];
++    dit(o.code === 200 && !!add && /<ConditionID>1750<\/ConditionID>/.test(add.corps) && !o.corps.etatChoisi,
++      '[D-etat] un état CHOISI dans le formulaire part tel quel, même avec un état Vinted hors table (aucun refus, rien de « choisi » à annoncer)', `HTTP ${o.code}`);
++  });
++  await essaie('[D-verify] pubverify suit le même repli (§11)', async () => {
++    remettre();
++    const it = { ...itemSans }; delete it.conditionId; it.etatVinted = 'Neuf sans étiquette';
++    const o = await app({ action: 'pubverify', item: it });
++    const ver = o.journal.find((x) => x.appel === 'VerifyAddFixedPriceItem');
++    dit(o.code === 200 && o.corps.ok === true && !!ver && /<CategoryID>15709<\/CategoryID>/.test(ver.corps) && /<ConditionID>1500<\/ConditionID>/.test(ver.corps)
++      && o.corps.categorieChoisie && o.corps.categorieChoisie.categoryId === '15709' && o.corps.etatChoisi && o.corps.etatChoisi.conditionId === '1500',
++      '[D-verify] « Vérifier sans publier » : même payload, même repli — catégorie d\'eBay et état de la table dans le XML, nommés dans la réponse', `HTTP ${o.code} · ${JSON.stringify({ c: o.corps.categorieChoisie, e: o.corps.etatChoisi })}`);
++    remettre(); mode.sugg = 'aucune';
++    const o2 = await app({ action: 'pubverify', item: { ...itemSans } });
++    dit(o2.code === 502 && o2.corps.reason === 'categorie-pas-su' && !o2.journal.some((x) => x.appel === 'VerifyAddFixedPriceItem'),
++      '[D-verify] aucune suggestion ⇒ le même refus propre, rien ne part chez eBay', `HTTP ${o2.code}`);
++  });
++  await essaie('[D-table] §11 : la même table dans l\'app et la route', async () => {
++    const blocDe = (src) => { const m = /\/\/ <etat-vinted-ebay>\n([\s\S]*?)\/\/ <\/etat-vinted-ebay>/.exec(src || ''); return m ? m[1] : ''; };
++    const SRV = lire('api/ebay.js');
++    const bApp = blocDe(APP), bSrv = blocDe(SRV);
++    dit(!!bApp && bApp === bSrv, '[D-table] le bloc <etat-vinted-ebay> est IDENTIQUE au caractère près (App.jsx ↔ api/ebay.js)', bApp === bSrv ? 'identiques' : `app ${bApp.length} car. · route ${bSrv.length} car.`);
++    const C2 = RA.conditionDeVinted;
++    if (typeof C2 !== 'function') throw new Error('conditionDeVinted absente de l\'app');
++    const cas = [['Neuf avec étiquette', '1000'], ['Neuf sans étiquette', '1500'], ['Très bon état', '3000'], ['Bon état', '3000'], ['Satisfaisant', '3000'], [' Très bon état ', '3000'], ['Comme neuf (jamais vu)', ''], ['', ''], [null, '']];
++    const faux = cas.filter(([e, v]) => C2(e) !== v);
++    dit(faux.length === 0, '[D-table] la copie de l\'app rend les mêmes sorties (5 libellés, blancs, hors table, vide)', faux.map(([e]) => JSON.stringify(e)).join(' '));
++  });
++
++  // ── E. L'APP : « LA PLUS PROCHE » PARMI LES VALEURS D'eBAY, JAMAIS INVENTÉE ──
++  console.log('\n— E. L\'app : au plus proche, jamais hors des valeurs d\'eBay —');
++  await essaie('[E-proche] valeurLaPlusProche', async () => {
++    const P = RA.valeurLaPlusProche;
++    if (typeof P !== 'function') throw new Error('valeurLaPlusProche absente');
++    const cas = [
++      ['casse et accents', P('edition limitee', ['Édition limitée', 'Standard']), { valeur: 'Édition limitée', cran: 'normalise' }],
++      ['inclusion de mots (une seule)', P('44', ['44 EU', '45 EU']), { valeur: '44 EU', cran: 'mots' }],
++      ['distance d\'édition bornée', P('Adiddas', ['Adidas', 'Asics']), { valeur: 'Adidas', cran: 'distance' }],
++      ['rien d\'assez proche ⇒ null', P('Vert pomme', ['Bleu', 'Rouge', 'Noir']), null],
++      ['ambigu (deux candidates) ⇒ null', P('bleu', ['Bleu clair', 'Bleu foncé']), null],
++      ['donnée vide ⇒ null', P('', ['Bleu']), null],
++    ];
++    const faux = cas.filter(([, x, y]) => JSON.stringify(x) !== JSON.stringify(y));
++    dit(faux.length === 0, '[E-proche] exact normalisé · mots · distance bornée · ambigu/vide ⇒ rien (6 cas)', faux.map(([n, x]) => `${n} → ${JSON.stringify(x)}`).join(' · '));
++    // JAMAIS une valeur hors de la liste d'eBay — quelle que soit l'entrée.
++    const listes = [['Bleu', 'Rouge'], ['44', '44.5', '45'], ['Nike', 'Adidas', 'New Balance'], ['Cuir'], []];
++    const entrees = ['Nike', 'nikee', 'bleu marine', '44,5', 'xx', 'Vert', 'Très bon état', '  ', 'New balance', '44 EU', 'Adiddas', 'çàéü'];
++    let hors = 0;
++    for (const L of listes) for (const e of entrees) { const r = P(e, L); if (r && !L.includes(r.valeur)) hors++; }
++    dit(hors === 0, '[E-proche] sur 60 entrées × listes, la valeur rendue est TOUJOURS une valeur d\'eBay (ou null) — rien n\'est inventé', `hors liste ×${hors}`);
++  });
++  await essaie('[E-attrs] autoRemplirAttributs', async () => {
++    const A = RA.autoRemplirAttributs;
++    if (typeof A !== 'function') throw new Error('autoRemplirAttributs absente');
++    const attributs = [
++      { nom: 'Pointure', requis: true, mode: 'SELECTION_ONLY', valeurs: ['44 EU', '45 EU'] },
++      { nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas'] },
++      { nom: 'Couleur', requis: false, mode: 'SELECTION_ONLY', valeurs: ['Bleu', 'Noir'] },
++      { nom: 'Matière', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Cuir', 'Textile'] },
++      { nom: 'Modèle', requis: false, mode: 'FREE_TEXT', valeurs: [] },
++    ];
++    const r = A(attributs, { titre: 'Nike Air Max 1 bleu taille 44', marque: 'Nike', taille: '44' });
++    dit(r && r.valeurs && r.valeurs.Pointure === '44 EU' && r.origine.Pointure === 'proche', '[E-attrs] pointure « 44 » sans « 44 » exact chez eBay ⇒ « 44 EU » AU PLUS PROCHE, marqué `proche`', JSON.stringify([r.valeurs.Pointure, r.origine.Pointure]));
++    dit(r.valeurs.Marque === 'Nike' && r.origine.Marque === 'exact' && r.valeurs.Couleur === 'Bleu', '[E-attrs] marque exacte ; couleur « Bleu » lue du titre (un seul mot qui colle)', JSON.stringify([r.valeurs.Marque, r.valeurs.Couleur]));
++    dit(!('Matière' in r.valeurs) && !('Modèle' in r.valeurs), '[E-attrs] un requis SANS correspondance reste VIDE (l\'écran le dit) ; un texte libre n\'est jamais deviné', JSON.stringify(Object.keys(r.valeurs)));
++    const amb = A([{ nom: 'Couleur', requis: true, valeurs: ['Bleu', 'Clair'] }], { titre: 'Nike bleu clair 44', marque: '', taille: '' });
++    dit(!('Couleur' in amb.valeurs), '[E-attrs] deux valeurs d\'eBay collent au titre ⇒ AMBIGU, rien n\'est posé (mieux vaut un blanc qu\'un faux)', JSON.stringify(amb.valeurs));
++    const toutes = Object.entries(r.valeurs).every(([n, v]) => (attributs.find((a) => a.nom === n).valeurs).includes(v));
++    dit(toutes, '[E-attrs] chaque valeur posée est une valeur d\'eBay — jamais du texte inventé', JSON.stringify(r.valeurs));
++  });
++
+   console.log(`\n${ok} ✅ · ${ko} ❌`);
+   process.exit(ko ? 1 : 0);
+ })();
+diff --git a/scripts/bancs/ebay-comptes.cjs b/scripts/bancs/ebay-comptes.cjs
+index cdda8e6..e170f6e 100644
+--- a/scripts/bancs/ebay-comptes.cjs
++++ b/scripts/bancs/ebay-comptes.cjs
+@@ -210,7 +210,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
+         // N°30 : en vente sur le COMPTE 1. La vue est sur le compte 2 : elle
+         // reste bloquée (la garde regarde TOUS les comptes).
+         await pg.locator('button', { hasText: 'N°30' }).first().click({ timeout: 8000 });
+-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
++        // (15 octobre) l'analyse part toute seule au choix de la paire.
+         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+         await pg.fill('input[placeholder="ex. 74"]', '125');
+         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
+@@ -226,7 +226,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
+         await pg.waitForSelector('[data-poster="ebay"]', { timeout: 8000 });
+         await pg.click('[data-poster="ebay"]');
+         await pg.locator('button', { hasText: 'N°60' }).first().click({ timeout: 8000 });
+-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
++        // (15 octobre) l'analyse part toute seule au choix de la paire.
+         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+         await pg.fill('input[placeholder="ex. 74"]', '92');
+         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
+diff --git a/scripts/bancs/ebay-form.cjs b/scripts/bancs/ebay-form.cjs
+index 7b29483..3f6767e 100644
+--- a/scripts/bancs/ebay-form.cjs
++++ b/scripts/bancs/ebay-form.cjs
+@@ -141,9 +141,10 @@ const envoisEbay = []; let avertir = false;
+   const aiBtn = await pg.$('text=Optimiser le titre avec l\'IA');
+   dit(!aiBtn, 'aucun bouton « Optimiser le titre avec l\'IA » (rédaction IA abandonnée le 30 sept.)');
+ 
+-  // Analyser la catégorie → sections + pointure pré-remplie depuis la paire
+-  await (await pg.$('text=Trouver la catégorie eBay')).click();
+-  await pg.waitForTimeout(900);
++  // (15 octobre) L'analyse part TOUTE SEULE au choix de la paire : plus de
++  // bouton « Trouver la catégorie eBay » à cliquer — on attend la catégorie.
++  await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
++  await pg.waitForTimeout(400);
+   txt = await T();
+   dit(/Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
+   // eBay propose d'autres catégories : on peut en choisir une autre (comme eBay).
+diff --git a/scripts/bancs/ebay-prep.cjs b/scripts/bancs/ebay-prep.cjs
+index 6b7c6ea..f5fc350 100644
+--- a/scripts/bancs/ebay-prep.cjs
++++ b/scripts/bancs/ebay-prep.cjs
+@@ -26,6 +26,15 @@
+ //      refuse (les champs obligatoires ne sont pas contournés) ; texte de
+ //      Vinted ⇒ jamais repris comme description ;
+ //  10. un brouillon rouvert garde SES valeurs, l'écart avec Vinted se voit.
++// (15 octobre, « je ne dois rien avoir à remplir, juste marquer publier »)
++//  14. choisir une paire remplit TOUT sans un clic de plus : la catégorie
++//      (proposée par eBay, l'analyse part toute seule), l'état (repris de
++//      l'état Vinted de la paire, la table §11), la marque (exacte) et la
++//      pointure (« au plus proche », DIT sous le champ) ; « Publier » part en
++//      un clic (aucune feuille sans écart) et l'écran de résultat LISTE ce qui
++//      a été rempli automatiquement ;
++//  15. un attribut REQUIS sans correspondance raisonnable reste VIDE, la ligne
++//      le dit, et « Publier » refuse (« À compléter ») — rien ne part.
+ // (revue du 15 octobre)
+ //  11. une relecture qu'eBay REFUSE ne fait pas oublier ce qui a été relu
+ //      (« à vérifier » reste, l'écart de prix reste) ;
+@@ -51,15 +60,15 @@ const idDe = (n) => 7000 + n;
+ const DESC_41 = 'Très bon état, portées 3 fois. Boîte d\'origine.';
+ const DESC_42 = 'Salomon XT-6, semelle comme neuve.';
+ const PUB_VINTED = 'Pour chaque achat effectué, tu bénéficies de notre Politique de remboursement, de transactions sécurisées et d\'un service client.';
+-// [N°, titre, prix Vinted, devise]
+-const PAIRES = [[41, 'Nike Air Max 1 bleu taille 44', '49.0', 'EUR'], [42, 'Salomon XT-6 noir taille 41', '62.5', 'EUR'], [43, 'Adidas Samba blanc taille 40', '40.0', 'USD'], [44, 'Vans Old Skool noir taille 42', '30.0', 'EUR']];
+-const LISTINGS = { capturedAt: new Date(MAINTENANT).toISOString(), payload: { items: PAIRES.map(([n, t, p, d]) => ({ id: idDe(n), title: t, price: { amount: p, currency_code: d }, brand_title: t.split(' ')[0], is_closed: false, is_hidden: false, is_draft: false, nPhotos: 2, photo: { url: `https://img.test/v${idDe(n)}.jpg` } })) } };
++// [N°, titre, prix Vinted, devise, état Vinted]
++const PAIRES = [[41, 'Nike Air Max 1 bleu taille 44', '49.0', 'EUR', 'Très bon état'], [42, 'Salomon XT-6 noir taille 41', '62.5', 'EUR', 'Neuf sans étiquette'], [43, 'Adidas Samba blanc taille 40', '40.0', 'USD', 'Bon état'], [44, 'Vans Old Skool noir taille 42', '30.0', 'EUR', 'Très bon état']];
++const LISTINGS = { capturedAt: new Date(MAINTENANT).toISOString(), payload: { items: PAIRES.map(([n, t, p, d, et]) => ({ id: idDe(n), title: t, price: { amount: p, currency_code: d }, brand_title: t.split(' ')[0], status: et, is_closed: false, is_hidden: false, is_draft: false, nPhotos: 2, photo: { url: `https://img.test/v${idDe(n)}.jpg` } })) } };
+ const FICHES = Object.fromEntries(PAIRES.map(([n, t]) => [String(idDe(n)), { numero: String(n), title: t, photo: `https://img.test/v${idDe(n)}.jpg` }]));
+ const ph = (n) => [`https://img.test/v${idDe(n)}.jpg`, `https://img.test/v${idDe(n)}b.jpg`];
+ const DETAILS = { [idDe(41)]: { description: DESC_41, photos: ph(41) }, [idDe(42)]: { description: DESC_42, photos: ph(42) }, [idDe(43)]: { photos: ph(43) }, [idDe(44)]: { description: PUB_VINTED, photos: ph(44) } };
+ const BROUILLONS = () => ({ 'b-41': { id: 'b-41', creeLe: MAINTENANT - 60000, majLe: MAINTENANT - 60000, pairId: String(idDe(41)), numero: '41', titre: 'Nike Air Max 1 bleu taille 44', prix: '59', quantite: '1', etat: '3000', description: 'Mon texte de brouillon', photos: ph(41), categorie: { id: '15709', nom: 'Baskets', requis: ['Marque'] }, aspects: { Marque: 'Nike' }, etatBrouillon: 'brouillon' } });
+ 
+-let rows = [], envois = [], pubMode = 'demandee', relireMode = 'verifiee';
++let rows = [], envois = [], pubMode = 'demandee', relireMode = 'verifiee', pubinfoMode = 'riche';
+ // `vinted_dark` est un réglage SYNCHRONISÉ : le nuage (`main`) le remplace au
+ // démarrage — servi là aussi ; et la bascule « Minéral » (une fois par
+ // appareil) le remet en clair si `vrm_bascule_mineral_v1` n'est pas posé.
+@@ -73,7 +82,7 @@ const remettre = (sombre) => {
+     { id: 'ebay_programmees', data: { items: [], enLigne: [], complet: true, capturedAt: MAINTENANT } },
+     { id: 'ebay_brouillons', data: { items: BROUILLONS(), majAt: MAINTENANT } },
+   ];
+-  envois = []; pubMode = 'demandee'; relireMode = 'verifiee';
++  envois = []; pubMode = 'demandee'; relireMode = 'verifiee'; pubinfoMode = 'riche';
+ };
+ 
+ let ko = 0, okN = 0;
+@@ -158,7 +167,16 @@ async function ouvrir(b, vp, sombre) {
+     if (body.action === 'finances') return j({ ok: false, reason: 'scope' });
+     if (body.action === 'limites') return j({ ok: true, quantite: 10, montant: 500, devise: 'EUR', inscrit: true });
+     if (body.action === 'programmees') return j({ ok: true, items: [], enLigne: [], complet: true, capturedAt: MAINTENANT });
+-    if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }], attributs: [{ nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas', 'Salomon', 'Vans'] }], attributsObligatoires: ['Marque'] });
++    // (15 octobre) La forme de `pubinfo` : des états PAR catégorie (1500 et
++    // 1000 compris — l'état repris de Vinted doit pouvoir s'y poser), une
++    // pointure en « 41 EU » (jamais « 41 » exact : c'est le cas « au plus
++    // proche »), et — en mode `matiere` — un requis SANS correspondance.
++    if (body.action === 'pubinfo') return j({ ok: true, categorie: { categoryId: '15709', suggeree: { categoryId: '15709', categoryName: 'Baskets' } }, categories: [{ categoryId: '15709', categoryName: 'Baskets' }], conditions: [{ id: '3000', label: "D'occasion" }, { id: '1500', label: 'Neuf sans boîte' }, { id: '1000', label: 'Neuf avec boîte' }], attributs: [
++      { nom: 'Marque', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Nike', 'Adidas', 'Salomon', 'Vans'] },
++      { nom: 'Pointure', requis: true, mode: 'SELECTION_ONLY', valeurs: ['40 EU', '41 EU', '42 EU', '44 EU'] },
++      { nom: 'Couleur', requis: false, mode: 'SELECTION_ONLY', valeurs: ['Bleu', 'Noir'] },
++      ...(pubinfoMode === 'matiere' ? [{ nom: 'Matière', requis: true, mode: 'SELECTION_ONLY', valeurs: ['Cuir', 'Textile'] }] : []),
++    ], attributsObligatoires: ['Marque', 'Pointure', ...(pubinfoMode === 'matiere' ? ['Matière'] : [])] });
+     if (body.action === 'pubverify') return j({ ok: true, fees: 0, frais: { total: 0, insertion: 0, programmation: null, remises: null, devise: 'EUR', lignes: [] } });
+     if (body.action === 'publish') return j({ ok: true, plateforme: 'ebay', itemId: '110000000555', url: 'https://www.ebay.fr/itm/110000000555', sku: 'VRM-' + body.item.numero, compte: 'julien_part', avertissements: [], verification: verifDe(body, pubMode) });
+     // `relireMode = 'refus'` : ce que rend la VRAIE route quand eBay répond Ack
+@@ -183,7 +201,8 @@ const choisir = async (pg, n) => {
+   const changer = pg.getByRole('button', { name: 'Changer', exact: true });
+   if (await changer.count()) await changer.first().click();
+   await pg.locator('button', { hasText: 'N°' + n }).first().click({ timeout: 8000 });
+-  await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
++  // (15 octobre) L'analyse part TOUTE SEULE au choix de la paire : plus aucun
++  // clic « Trouver la catégorie eBay » — on attend que la catégorie arrive.
+   await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+   await pg.waitForTimeout(200);
+ };
+@@ -419,6 +438,56 @@ const sansCasse = (pg, T) => pg.evaluate(() => !/n'a pas pu s'afficher|Cannot ac
+         const b41 = (rows.find((r) => r.id === 'ebay_brouillons') || { data: { items: {} } }).data.items['b-41'] || {};
+         dit(b41.prix === '49' && b41.description === 'Mon texte de brouillon' && b41.etatBrouillon === 'brouillon', `${T} 13. « Reprendre le prix » écrit 49 dans CE brouillon (sa description reste la sienne), et l'écart de prix disparaît`, JSON.stringify({ prix: b41.prix, desc: b41.description }));
+       });
++      // ── 14. « JE NE DOIS RIEN AVOIR À REMPLIR » : TOUT ARRIVE TOUT SEUL ─────
++      await essaie(`${T} 14. rien à remplir`, async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(1500);
++        await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
++        await pg.waitForSelector('[data-ebay-brouillons="lu"]', { timeout: 15000 });
++        await pg.click('[data-poster="ebay"]');
++        await choisir(pg, 42);   // Salomon XT-6 noir taille 41 · « Neuf sans étiquette »
++        const catPar = await attr(pg, '[data-ebay-cat-par]', 'data-ebay-cat-par');
++        const nBtn = await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).count();
++        dit(catPar === 'ebay-suggestion' && nBtn === 0 && /proposée par eBay/.test(await pg.$eval('[data-ebay-cat-par]', (e) => e.innerText)),
++          `${T} 14. la catégorie arrive TOUTE SEULE au choix de la paire — « proposée par eBay », plus aucun bouton à cliquer`, `par=${catPar} · bouton ×${nBtn}`);
++        const etat = await pg.evaluate(() => { const l = [...document.querySelectorAll('label')].find((x) => /^État$/.test(x.textContent.trim())); const s = l && l.parentElement.querySelector('select'); return s ? s.value : null; });
++        const etatLigne = await pg.$eval('[data-ebay-etat-vinted]', (e) => [e.getAttribute('data-ebay-etat-vinted'), e.innerText]).catch(() => [null, '']);
++        dit(etat === '1500' && etatLigne[0] === 'repris' && /Neuf sans étiquette/.test(etatLigne[1]),
++          `${T} 14. l'état est REPRIS de Vinted sans un clic (« Neuf sans étiquette » ⇒ 1500), et la ligne le dit`, `etat=${etat} · ${etatLigne[1]}`);
++        const marque = await pg.evaluate(() => { const l = [...document.querySelectorAll('label')].find((x) => /^Marque/.test(x.textContent.trim())); const c = l && l.parentElement.querySelector('select,input'); return c ? c.value : null; });
++        const proche = await pg.$eval('[data-ebay-aspect-proche="Pointure"]', (e) => e.innerText).catch(() => '');
++        dit(marque === 'Salomon' && /au plus proche/.test(proche) && /41 EU/.test(proche),
++          `${T} 14. marque exacte (« Salomon »), pointure « 41 EU » choisie AU PLUS PROCHE — et c'est DIT sous le champ`, `marque=${marque} · ${proche}`);
++        await photo(pg, '[data-ebay-aspect-proche="Pointure"]', `${tag}-14-auto`);
++        // « Publier » part en UN clic : prix et description repris ⇒ aucun
++        // écart, donc AUCUNE feuille de confirmation.
++        pubMode = 'verifiee';
++        const n0 = envois.filter((x) => x.action === 'publish').length;
++        await publierClic(pg);
++        await pg.waitForSelector('[data-publie-etat]', { timeout: 8000 });
++        const p = envois.filter((x) => x.action === 'publish').pop();
++        dit(envois.filter((x) => x.action === 'publish').length === n0 + 1 && !!p && p.item.price === '62.50' && p.item.conditionId === '1500' && p.item.etatVinted === 'Neuf sans étiquette' && p.item.aspects && p.item.aspects.Pointure === '41 EU' && p.item.aspects.Marque === 'Salomon',
++          `${T} 14. UN clic ⇒ l'annonce part, complète (prix Vinted, état 1500, pointure 41 EU, marque) — aucune feuille sans écart`, p ? JSON.stringify({ prix: p.item.price, etat: p.item.conditionId, asp: p.item.aspects }) : 'rien');
++        const recap = await pg.$eval('[data-publie-rempli-auto]', (e) => [e.getAttribute('data-publie-rempli-auto'), e.innerText]).catch(() => [null, '']);
++        dit(/categorie/.test(recap[0] || '') && /etat/.test(recap[0] || '') && /aspects/.test(recap[0] || '') && /choisie par eBay/.test(recap[1]) && /repris de Vinted/.test(recap[1]) && /au plus proche/.test(recap[1]) && /41 EU/.test(recap[1]),
++          `${T} 14. l'écran de résultat LISTE ce qui a été rempli automatiquement (catégorie par eBay, état de Vinted, « au plus proche » nommé)`, (recap[1] || '').replace(/\s+/g, ' ').slice(0, 180));
++        await photo(pg, '[data-publie-rempli-auto]', `${tag}-14-recap`);
++        await pg.getByRole('button', { name: 'Terminé', exact: true }).click();
++      });
++      // ── 15. UN REQUIS SANS CORRESPONDANCE RESTE VIDE, ET BLOQUE ─────────────
++      await essaie(`${T} 15. requis sans correspondance`, async () => {
++        pubinfoMode = 'matiere';
++        await pg.click('[data-poster="ebay"]');
++        await choisir(pg, 41);
++        const vide = await pg.$eval('[data-ebay-aspect-vide="Matière"]', (e) => e.innerText).catch(() => '');
++        dit(/rien d'assez proche/.test(vide), `${T} 15. « Matière » (requis, aucune donnée Vinted) reste VIDE et la ligne le dit — le seul geste qui lui reste`, vide);
++        const n0 = envois.filter((x) => x.action === 'publish').length;
++        await publierClic(pg);
++        await pg.waitForTimeout(400);
++        dit(envois.filter((x) => x.action === 'publish').length === n0 && /À compléter : Matière/.test(await pg.evaluate(() => document.body.innerText)),
++          `${T} 15. « Publier » refuse (« À compléter : Matière ») — rien ne part avec un requis vide`);
++        pubinfoMode = 'riche';
++      });
+       await essaie(`${T} rendu`, async () => {
+         const fond = await pg.evaluate(() => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(getComputedStyle(document.body).backgroundColor) || [0, 255, 255, 255]; return (Number(m[1]) + Number(m[2]) + Number(m[3])) / 3; });
+         dit(sombre ? fond < 80 : fond > 170, `${T} le thème demandé est bien celui rendu (fond ${Math.round(fond)})`);
+diff --git a/src/App.jsx b/src/App.jsx
+index b39c6eb..8d4e74a 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -11987,6 +11987,15 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
+ // qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
+ // l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
+ const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
++// L'ÉTAT eBAY DÉDUIT DE L'ÉTAT VINTED (15 octobre, décision de Julien : « je ne
++// dois rien avoir à remplir »). La table EXACTE, LA MÊME que dans la route
++// (§11 — `audit-ebay-publication.cjs` compare les deux copies, texte et
++// sorties). Hors table ⇒ rien n'est posé (le select garde son état, jamais un
++// faux « repris de Vinted »).
++// <etat-vinted-ebay>
++const ETAT_VINTED_EBAY = { 'Neuf avec étiquette': '1000', 'Neuf sans étiquette': '1500', 'Très bon état': '3000', 'Bon état': '3000', 'Satisfaisant': '3000' };
++const conditionDeVinted = (etat) => ETAT_VINTED_EBAY[String(etat == null ? '' : etat).trim()] || '';
++// </etat-vinted-ebay>
+ // ⚠️ LA LIVRAISON EST GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
+ // choisis le prix, c'est eBay qui me propose »). MESURÉ à blanc
+ // (VerifyAddFixedPriceItem) : son compte est en livraison gérée par eBay, qui
+@@ -12035,34 +12044,81 @@ function BlocEbay({ n, titre: t, right, children }) {
+     </div>
+   );
+ }
+-// Remplit les caractéristiques eBay à partir de la paire — SANS JAMAIS DEVINER
+-// (§5). On ne pose qu'une valeur AUTORISÉE par eBay (a.valeurs) : la pointure
+-// exacte, la marque exacte, ou une valeur qui apparaît SANS AMBIGUÏTÉ (une
+-// seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
+-// vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
+-// jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
++// ── « LA PLUS PROCHE » PARMI LES VALEURS D'eBAY (15 octobre, décision de
++// Julien : le remplissage « au plus proche » est autorisé, à condition de DIRE
++// ce qui a été choisi). On ne rend JAMAIS une valeur hors de la liste d'eBay
++// (§5 : on choisit parmi SES valeurs, on n'invente rien). Trois crans, dans
++// l'ordre : égalité une fois casse et accents retirés · inclusion de MOTS (les
++// mots de l'un sont tous dans l'autre), si UNE seule valeur colle · distance
++// d'édition bornée (1 faute jusqu'à 4 lettres, 2 au-delà), sans ex æquo.
++// Rien d'assez proche, ou plusieurs aussi proches ⇒ null (mieux vaut un blanc
++// qu'un faux).
++// <plus-proche>
++const normProche = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
++function distanceEdition(a, b) {
++  if (a === b) return 0;
++  const m = a.length, n = b.length;
++  if (!m || !n) return Math.max(m, n);
++  let prev = Array.from({ length: n + 1 }, (_, j) => j);
++  for (let i = 1; i <= m; i++) {
++    const cur = [i];
++    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
++    prev = cur;
++  }
++  return prev[n];
++}
++function valeurLaPlusProche(donnee, valeurs) {
++  const d = normProche(donnee);
++  if (!d || !Array.isArray(valeurs) || !valeurs.length) return null;
++  for (const v of valeurs) if (normProche(v) === d) return { valeur: v, cran: 'normalise' };
++  const motsD = d.split(' ');
++  const parMots = valeurs.filter((v) => { const mv = normProche(v).split(' ').filter(Boolean); return mv.length && (mv.every((m) => motsD.includes(m)) || motsD.every((m) => mv.includes(m))); });
++  if (parMots.length === 1) return { valeur: parMots[0], cran: 'mots' };
++  if (parMots.length > 1) return null;   // ambigu : on ne tranche pas
++  let mieux = null, dist = Infinity, exaequo = false;
++  for (const v of valeurs) {
++    const n = normProche(v);
++    if (!n) continue;
++    const borne = Math.min(d.length, n.length) <= 4 ? 1 : 2;
++    const e = distanceEdition(d, n);
++    if (e > borne) continue;
++    if (e < dist) { mieux = v; dist = e; exaequo = false; }
++    else if (e === dist) exaequo = true;
++  }
++  return mieux && !exaequo ? { valeur: mieux, cran: 'distance' } : null;
++}
++// </plus-proche>
++// Remplit les caractéristiques eBay à partir de la paire — toujours parmi les
++// valeurs qu'eBay AUTORISE (a.valeurs), jamais une invention (§5) :
++//   · pointure / marque : la correspondance EXACTE d'abord, sinon LA PLUS
++//     PROCHE (`valeurLaPlusProche`) — marquée `proche`, l'écran le DIT ;
++//   · générique : une valeur eBay présente SANS AMBIGUÏTÉ (une seule) comme
++//     mot(s) du titre, casse et accents ignorés.
++// Zéro ou plusieurs correspondances ⇒ on laisse vide (« mieux vaut un blanc
++// qu'un faux »). Un attribut en texte libre sans donnée dédiée n'est jamais
++// rempli (on ne connaît pas ses valeurs valides).
++// Rend `{ valeurs, origine }` : `origine[nom]` = 'exact' | 'proche'.
+ function autoRemplirAttributs(attributs, { titre, marque, taille }) {
+-  const out = {};
+-  const hay = ' ' + String(titre || '').toLowerCase() + ' ';
+-  const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++  const out = {}, origine = {};
++  const motsTitre = new Set(normProche(titre).split(' ').filter(Boolean));
+   for (const a of attributs || []) {
+     if (!a || !Array.isArray(a.valeurs) || !a.valeurs.length) continue;   // texte libre : jamais deviné
+     const nl = String(a.nom || '').toLowerCase();
+-    if (/pointure|taille|size/.test(nl) && taille) {
+-      const t = String(taille).replace(',', '.');
+-      const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
+-      if (m) { out[a.nom] = m; continue; }
++    const dediee = /pointure|taille|size/.test(nl) ? taille : /marque|brand/.test(nl) ? marque : '';
++    if (dediee) {
++      const t = String(dediee).replace(',', '.');
++      const m = a.valeurs.find((v) => String(v).replace(',', '.') === t) || a.valeurs.find((v) => String(v).toLowerCase() === String(dediee).toLowerCase());
++      if (m) { out[a.nom] = m; origine[a.nom] = 'exact'; continue; }
++      const p = valeurLaPlusProche(dediee, a.valeurs);
++      if (p) { out[a.nom] = p.valeur; origine[a.nom] = 'proche'; continue; }
++      continue;   // rien d'assez proche : on laisse vide, l'écran le dit
+     }
+-    if (/marque|brand/.test(nl) && marque) {
+-      const m = a.valeurs.find(v => String(v).toLowerCase() === String(marque).toLowerCase());
+-      if (m) { out[a.nom] = m; continue; }
+-    }
+-    // Générique : une valeur eBay (≥ 3 lettres) présente comme MOT du titre, et
+-    // une seule — sinon on ne tranche pas.
+-    const hits = a.valeurs.filter(v => { const w = echap(v); return String(v).length >= 3 && new RegExp('(^|[^a-z0-9])' + w + '([^a-z0-9]|$)').test(hay); });
+-    if (hits.length === 1) out[a.nom] = hits[0];
++    // Générique : une valeur eBay (≥ 3 lettres utiles) dont TOUS les mots sont
++    // dans le titre, et une seule — sinon on ne tranche pas.
++    const hits = a.valeurs.filter((v) => { const mv = normProche(v).split(' ').filter(Boolean); return mv.join('').length >= 3 && mv.length && mv.every((m) => motsTitre.has(m)); });
++    if (hits.length === 1) { out[a.nom] = hits[0]; origine[a.nom] = 'exact'; }
+   }
+-  return out;
++  return { valeurs: out, origine };
+ }
+ // ════════════════════════════════════════════════════════════════════════════
+ // eBay — BROUILLONS ET PLANIFICATEUR (5 octobre)
+@@ -12274,9 +12330,11 @@ const PRIX_ILLISIBLE_EBAY = 'Prix illisible : tape un montant comme 74 ou 74,50.
+ function itemDeBrouillon(d) {
+   if (!d) return { err: 'Brouillon introuvable.' };
+   const cat = d.categorie || {};
+-  if (!cat.id) return { err: 'Choisis la catégorie eBay.' };
++  // (15 octobre) SANS catégorie, l'annonce part quand même : c'est eBay qui la
++  // propose au moment de publier (`completerPublication`, côté route), et la
++  // réponse la NOMME. `sansCategorie` reste porté : programmer, lui, l'exige.
+   const asp = d.aspects || {};
+-  const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
++  const manquants = cat.id ? (cat.requis || []).filter((n) => !String(asp[n] || '').trim()) : [];
+   if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
+   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
+   if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
+@@ -12310,7 +12368,7 @@ function itemDeBrouillon(d) {
+       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
+     }
+   }
+-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
++  return { item: { title: d.titre, ...(cat.id ? { categoryId: cat.id } : {}), price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', ...(d.etatVinted ? { etatVinted: d.etatVinted } : {}), description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) }, ...(cat.id ? {} : { sansCategorie: true }) };
+ }
+ // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
+ const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
+@@ -12959,40 +13017,71 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+   const [descAvant, setDescAvant] = React.useState(null);     // la description remplacée par « Reprendre » (pour « Annuler »)
+   const [voirDescVinted, setVoirDescVinted] = React.useState(false);
+   const [relecture, setRelecture] = React.useState('');       // « Relire chez eBay » : '' · 'en-cours' · message d'échec
+-  const vintedDeLaPaire = pairSel ? JSON.stringify([pairSel.id, pairSel.prixVinted == null ? null : pairSel.prixVinted, pairSel.desc || '']) : '';
++  // ── L'ÉTAT REPRIS DE VINTED (15 octobre, « je ne dois rien avoir à
++  // remplir ») ── même logique que `repriseVinted` : le select n'est remplacé
++  // que s'il porte encore ce que VRM y a posé (le défaut « Occasion » compris) ;
++  // dès qu'il le change, c'est SA saisie ('sien'). `condDe` : '' · 'vinted'
++  // (repris, dit à l'écran) · 'recale' (eBay ne le permet pas pour cette
++  // catégorie — dit aussi, jamais en silence).
++  const condAuto = React.useRef(null);                        // null = défaut '3000' jamais touché · '<id>' posé par VRM · 'sien'
++  const [condDe, setCondDe] = React.useState('');
++  const condRef = React.useRef(cond); React.useEffect(() => { condRef.current = cond; }, [cond]);
++  // ── LES CARACTÉRISTIQUES POSÉES PAR VRM ── `aspAuto[nom]` = 'exact' |
++  // 'proche' (« au plus proche », dit sous le champ et dans le résultat) ;
++  // effacé dès qu'il touche le champ. `aspRef` : miroir pour les fusions.
++  const [aspAuto, setAspAuto] = React.useState({});
++  const aspRef = React.useRef(asp); React.useEffect(() => { aspRef.current = asp; }, [asp]);
++  const analyseSeq = React.useRef(0);                         // deux paires choisies vite : seule la DERNIÈRE analyse s'applique
++  const vintedDeLaPaire = pairSel ? JSON.stringify([pairSel.id, pairSel.prixVinted == null ? null : pairSel.prixVinted, pairSel.desc || '', pairSel.etatVinted || '']) : '';
+   React.useEffect(() => {
+     if (!pairSel) return;
+     const rd = repriseVinted(desc, descAuto.current, pairSel.desc || '');
+     if (rd.poser) { descAuto.current = rd.valeur; if (rd.valeur !== desc) { setDesc(rd.valeur); setCheck(null); } }
+     const rp = repriseVinted(prix, prixAuto.current, prixChampEbay(pairSel.prixVinted) || null);
+     if (rp.poser) { prixAuto.current = rp.valeur; if (rp.valeur !== prix) { setPrix(rp.valeur); setCheck(null); setOffreBasOk(false); } }
++    // L'état : la table Vinted→eBay (§11, la même que la route). Jamais
++    // par-dessus un état qu'il a choisi lui-même.
++    const ce = conditionDeVinted(pairSel.etatVinted || '');
++    if (condAuto.current !== 'sien' && cond === (condAuto.current == null ? '3000' : condAuto.current)) {
++      const prochain = ce || '3000';
++      condAuto.current = prochain;
++      setCondDe(ce ? 'vinted' : '');
++      if (prochain !== cond) { setCond(prochain); setCheck(null); }
++    }
+     setDescAvant(null); setVoirDescVinted(false);
+   }, [vintedDeLaPaire]);
+   const ecartsVinted = ecartsVintedEbay(pairSel, prix, desc);
+   // Un champ de caractéristique rendu comme eBay : liste déroulante quand eBay
+   // fournit ses valeurs, texte libre sinon. On ne propose QUE les valeurs d'eBay.
++  // Toucher un champ efface sa marque « posé par VRM » : c'est SA saisie.
++  const poserAttr = (nom, v) => { setAsp((x) => ({ ...x, [nom]: v })); setAspAuto((m) => { if (!(nom in m)) return m; const c = { ...m }; delete c[nom]; return c; }); setCheck(null); };
+   const champAttr = (a) => {
+     const n = (a.valeurs || []).length;
++    const rempli = String(asp[a.nom] || '').trim();
+     // Liste COURTE (≤ 12) → menu déroulant. Liste LONGUE (marques : des
+     // centaines) → champ avec SUGGESTIONS (datalist) : on tape « aut » et « Autry »
+     // apparaît, comme les sites de marques. Les suggestions restent les valeurs
+     // d'eBay ; « Vérifier » refuse ce qui n'en est pas.
+-    if (n === 0) return (
+-      <input value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(a.nom) ? 'ex. 44' : /marque|brand/i.test(a.nom) ? 'ex. Nike' : /couleur|color/i.test(a.nom) ? 'ex. Bleu' : ''} style={inp} />
+-    );
+-    if (n > 12) {
+-      const dlId = 'dl-' + a.nom.replace(/[^a-z0-9]/gi, '');
+-      return (<>
+-        <input list={dlId} value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder="tape pour chercher…" style={inp} />
++    const dlId = 'dl-' + a.nom.replace(/[^a-z0-9]/gi, '');
++    const champ = n === 0 ? (
++      <input value={asp[a.nom] || ''} onChange={e => poserAttr(a.nom, e.target.value)} placeholder={/pointure|taille|size/i.test(a.nom) ? 'ex. 44' : /marque|brand/i.test(a.nom) ? 'ex. Nike' : /couleur|color/i.test(a.nom) ? 'ex. Bleu' : ''} style={inp} />
++    ) : n > 12 ? (<>
++        <input list={dlId} value={asp[a.nom] || ''} onChange={e => poserAttr(a.nom, e.target.value)} placeholder="tape pour chercher…" style={inp} />
+         <datalist id={dlId}>{a.valeurs.map(v => <option key={v} value={v} />)}</datalist>
+-      </>);
+-    }
+-    return (
+-      <select value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} style={inp}>
++      </>) : (
++      <select value={asp[a.nom] || ''} onChange={e => poserAttr(a.nom, e.target.value)} style={inp}>
+         <option value="">— choisir —</option>
+         {a.valeurs.map(v => <option key={v} value={v}>{v}</option>)}
+       </select>
+     );
++    // (15 octobre) Ce que VRM a choisi « au plus proche » se DIT sous le champ
++    // (décision de Julien : le plus proche est permis, à condition de le dire) ;
++    // un REQUIS resté vide le dit aussi — c'est le seul geste qui lui reste.
++    return (<>
++      {champ}
++      {rempli && aspAuto[a.nom] === 'proche' && <div data-ebay-aspect-proche={a.nom} style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>choisi au plus proche : « {asp[a.nom]} »</div>}
++      {!rempli && a.requis && <div data-ebay-aspect-vide={a.nom} style={{ fontSize: 11.5, color: C.warn, marginTop: 4, lineHeight: 1.4 }}>{n ? 'à choisir — rien d\'assez proche dans les valeurs d\'eBay' : 'à remplir — pas de donnée Vinted pour ce champ'}</div>}
++    </>);
+   };
+   // L'IA de rédaction (api/ai) est-elle disponible ? On ne montre le bouton que
+   // si oui — jamais un bouton mort (§ « une clé perso reste sur l'appareil »).
+@@ -13021,12 +13110,19 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+   // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
+   const choisirPaire = (p) => {
+     setPairId(p.id); setPickerOpen(false); setPairQ('');
+-    setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
++    const t = ebayTitre(p.title || '', p.taille || '');   // « taille 36 », pas « T36 »
++    setTitre(t);
+     setPhotos((p.photos || []).join('\n'));
+     // (15 octobre) La description ET le prix de l'annonce Vinted arrivent par
+     // `repriseVinted` (l'effet ci-dessus) : posés si le champ est vide ou encore
+     // celui de VRM, jamais par-dessus ce qu'il a tapé.
+     setCat(null); setCheck(null);
++    // (15 octobre, décision de Julien : « je ne dois rien avoir à remplir,
++    // juste marquer publier ») — l'analyse part TOUTE SEULE : eBay propose la
++    // catégorie, VRM remplit ce qu'il peut (exact, sinon au plus proche, dit).
++    // Si elle échoue, le bouton « Trouver la catégorie eBay » reste en filet —
++    // et « Publier » marche quand même : la route laisse eBay choisir.
++    analyser(undefined, undefined, { titre: t, paire: p, silencieux: true });
+   };
+   // Applique une réponse pubinfo → catégorie + caractéristiques eBay + pré-
+   // remplissage prouvé. `nomForce` sert quand on CHOISIT une autre catégorie
+@@ -13043,34 +13139,54 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+     const conditions = Array.isArray(j.conditions) && j.conditions.length ? j.conditions : null;
+     return { categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions };
+   };
+-  const appliquerPubinfo = (j, nomForce, fresh) => {
++  const appliquerPubinfo = (j, nomForce, fresh, opts) => {
+     const c = catDepuisPubinfo(j, nomForce);
+-    if (!c) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
++    // Une analyse AUTOMATIQUE qui n'aboutit pas se tait (le bouton reste en
++    // filet, et « Publier » laisse la route faire choisir eBay) ; une analyse
++    // demandée d'un clic, elle, dit pourquoi.
++    if (!c) { if (!(opts && opts.silencieux)) setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
+     const { attributs, conditions } = c;
+-    setCat(c);
++    // `par` : d'où vient la catégorie — la suggestion d'eBay (auto ou bouton),
++    // ou son clic parmi les 5 (`choix`). L'écran et le résultat le disent.
++    setCat({ ...c, par: fresh ? 'choix' : 'ebay-suggestion' });
+     // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
+-    // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
+-    if (conditions && !conditions.some(c => c.id === cond)) {
++    // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier —
++    // et c'est DIT (`condDe = 'recale'`), jamais en silence.
++    if (conditions && !conditions.some(c => c.id === condRef.current)) {
+       const occ = conditions.find(c => c.id === '3000');
+-      setCond((occ || conditions[0]).id);
++      const choisi = (occ || conditions[0]).id;
++      if (condAuto.current !== 'sien') condAuto.current = choisi;
++      setCondDe('recale');
++      setCond(choisi);
+     }
+     // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
+-    const src = pairSel ? pairSel.title : titre;
+-    const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
++    const paire = opts && opts.paire !== undefined ? opts.paire : pairSel;
++    const src = opts && opts.titre != null ? opts.titre : (paire ? paire.title : titre);
++    const auto = autoRemplirAttributs(attributs, { titre: (paire && paire.title) || src, marque: extractBrand(src) || '', taille: (paire && paire.taille) || extractSize(src) || '' });
+     // Changement de catégorie ⇒ on repart des valeurs prouvées (les anciennes
+     // caractéristiques n'ont pas de sens dans la nouvelle catégorie).
+-    if (fresh) setAsp(auto); else if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
++    if (fresh) { setAsp(auto.valeurs); setAspAuto(auto.origine); }
++    else if (Object.keys(auto.valeurs).length) {
++      // On ne marque « posé par VRM » que ce qui n'était pas déjà rempli.
++      const avant = aspRef.current || {};
++      const poses = Object.keys(auto.valeurs).filter((n) => !String(avant[n] || '').trim());
++      setAsp(a => ({ ...auto.valeurs, ...a }));
++      if (poses.length) setAspAuto((m) => ({ ...Object.fromEntries(poses.map((n) => [n, auto.origine[n]])), ...m }));
++    }
+   };
+-  const analyser = async (categoryId, nomForce) => {
+-    if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
+-    setAnalyse(true); setRes(null); setCheck(null);
++  const analyser = async (categoryId, nomForce, opts) => {
++    const t = opts && opts.titre != null ? opts.titre : titre;
++    if (!t.trim()) { if (!(opts && opts.silencieux)) setRes({ err: 'Mets d\'abord un titre.' }); return; }
++    const seq = ++analyseSeq.current;   // deux analyses en vol : seule la dernière s'applique
++    setAnalyse(true); if (!(opts && opts.silencieux)) setRes(null); setCheck(null);
+     try {
+-      const body = { action: 'pubinfo', title: titre, ...corpsCompteEbay(comptePub) };
++      const body = { action: 'pubinfo', title: t, ...corpsCompteEbay(comptePub) };
+       if (categoryId) body.categoryId = categoryId;   // choisir une autre catégorie → ses caractéristiques
+       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(body) });
+-      appliquerPubinfo(await r.json(), nomForce, !!categoryId);
+-    } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
+-    setAnalyse(false);
++      const j = await r.json();
++      if (seq === analyseSeq.current) appliquerPubinfo(j, nomForce, !!categoryId, opts);
++    } catch (_) { if (seq === analyseSeq.current && !(opts && opts.silencieux)) setRes({ err: 'Analyse impossible (réseau).' }); }
++    if (seq === analyseSeq.current) setAnalyse(false);
+   };
+   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
+   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
+@@ -13079,6 +13195,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+   const brouillonCourant = () => ({
+     pairId: pairId || null,
+     numero: pairSel ? pairSel.num : numeroBrouillon,
++    // L'état Vinted de la paire part avec l'item : si un payload arrive sans
++    // état choisi, la route le déduit par la MÊME table (§11).
++    etatVinted: (pairSel && pairSel.etatVinted) || undefined,
+     titre, prix, quantite: qty, etat: cond, description: desc,
+     photos: photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s)),
+     categorie: cat ? { id: cat.categoryId, nom: cat.categoryName, requis: cat.required || [] } : null,
+@@ -13131,6 +13250,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+     setTitre(String(d.titre || '')); setPrix(String(d.prix == null ? '' : d.prix)); setQty(String(d.quantite || '1'));
+     setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
+     descAuto.current = null; prixAuto.current = null;      // ses valeurs à lui : jamais remplacées d'office
++    condAuto.current = 'sien'; setCondDe(''); setAspAuto({});   // l'état et les caractéristiques d'un brouillon sont les siens
+     setAsp(d.aspects || {}); setRes(null); setCheck(null); setBrouillonMsg('');
+     setCompteChoisi(d.compte ? String(d.compte) : null);
+     setOffreA(String(d.offreAccepte || '')); setOffreR(String(d.offreRefuse || '')); setOffreBasOk(d.offreSousMoitie === true);
+@@ -13261,7 +13381,20 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+       // dont le jeton a publié, ce qu'eBay montre de l'annonce) — jamais de
+       // l'écran. `attendu` sert à « Relire chez eBay ».
+       const pseudoChoisi = ((comptesPub.find((c) => c && c.ref === comptePub) || {}).pseudo) || '';
+-      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: j.compte || pseudoChoisi, compteRef: comptePub, verification: j.verification || null,
++      // (15 octobre) CE QUI A ÉTÉ REMPLI AUTOMATIQUEMENT se dit dans le
++      // résultat : la catégorie (proposée par eBay ici, ou choisie par eBay au
++      // moment de publier — `categorieChoisie` de la route), l'état repris de
++      // Vinted, et les caractéristiques posées par VRM, « au plus proche »
++      // nommées une à une. Le fait, jamais la promesse.
++      const libelleEtat = (id) => (((cat && cat.conditions) || []).find((x) => x.id === id) || {}).label || ((EBAY_CONDITIONS.find(([v]) => v === id) || [])[1]) || id;
++      const aspAutoActifs = Object.keys(aspAuto).filter((n) => String(asp[n] || '').trim());
++      const rempliAuto = {
++        categorie: j.categorieChoisie ? { nom: j.categorieChoisie.categoryName || j.categorieChoisie.categoryId } : (cat && cat.par === 'ebay-suggestion' ? { nom: cat.categoryName } : null),
++        etat: j.etatChoisi ? { libelle: (j.etatChoisi.etatVinted && j.etatChoisi.par === 'vinted') ? j.etatChoisi.etatVinted : libelleEtat(String(j.etatChoisi.conditionId)), recale: j.etatChoisi.par === 'recale' } : (condDe === 'vinted' ? { libelle: (pairSel && pairSel.etatVinted) || libelleEtat(cond) } : condDe === 'recale' ? { libelle: libelleEtat(cond), recale: true } : null),
++        aspects: aspAutoActifs.length,
++        proches: aspAutoActifs.filter((n) => aspAuto[n] === 'proche').map((n) => `${n} « ${asp[n]} »`),
++      };
++      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: j.compte || pseudoChoisi, compteRef: comptePub, verification: j.verification || null, rempliAuto,
+         attendu: { sku: j.sku || '', prix: prixPub, titre: b.item.title, quantite: parseInt(b.item.quantity || 1, 10) || 1, photos: (b.item.photos || []).length },
+         offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert }); if (onPublie) onPublie(comptePub);
+       // Publiée depuis un brouillon : il sort de la liste des brouillons.
+@@ -13301,7 +13434,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
+   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
+   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
+-  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); descAuto.current = null; prixAuto.current = null; setDescAvant(null); setVoirDescVinted(false); setRelecture(''); };
++  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); descAuto.current = null; prixAuto.current = null; setDescAvant(null); setVoirDescVinted(false); setRelecture(''); setCond('3000'); condAuto.current = null; setCondDe(''); setAspAuto({}); };
+   const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
+   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
+   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
+@@ -13350,6 +13483,19 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+           {pasLuP.length > 0 && <div data-publie-pas-lu={pasLuP.map((p) => p.cle).join(',')} style={{ fontSize: 12, color: C.muted, marginBottom: 6, lineHeight: 1.5 }}>Pas vérifié chez eBay : {pasLuP.map((p) => NOMS_POINTS_PUB[p.cle] || p.cle).join(', ')}.</div>}
+           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
+               sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
++          {/* (15 octobre) CE QUI A ÉTÉ REMPLI AUTOMATIQUEMENT : la catégorie
++              choisie par eBay, l'état repris de Vinted, les caractéristiques —
++              « au plus proche » nommées (décision de Julien : le plus proche
++              est permis, à condition de le DIRE). */}
++          {res.rempliAuto && (res.rempliAuto.categorie || res.rempliAuto.etat || res.rempliAuto.aspects > 0) && (
++            <div data-publie-rempli-auto={[res.rempliAuto.categorie ? 'categorie' : '', res.rempliAuto.etat ? 'etat' : '', res.rempliAuto.aspects ? 'aspects' + res.rempliAuto.aspects : ''].filter(Boolean).join(',')} style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
++              Rempli automatiquement : {[
++                res.rempliAuto.categorie && <React.Fragment key="c">catégorie choisie par eBay (« <b style={{ color: C.text }}>{res.rempliAuto.categorie.nom}</b> »)</React.Fragment>,
++                res.rempliAuto.etat && <React.Fragment key="e">{res.rempliAuto.etat.recale ? <>état « {res.rempliAuto.etat.libelle} » (recalé sur ceux qu'eBay permet ici)</> : <>état repris de Vinted (« {res.rempliAuto.etat.libelle} »)</>}</React.Fragment>,
++                res.rempliAuto.aspects > 0 && <React.Fragment key="a">{res.rempliAuto.aspects} caractéristique{res.rempliAuto.aspects > 1 ? 's' : ''}{res.rempliAuto.proches.length ? <> dont {res.rempliAuto.proches.length} au plus proche ({res.rempliAuto.proches.join(' · ')})</> : null}</React.Fragment>,
++              ].filter(Boolean).reduce((acc, x, i) => (i ? [...acc, ' · ', x] : [x]), [])}.
++            </div>
++          )}
+           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, margin: '8px 0 14px', lineHeight: 1.5 }}>{res.sku
+             ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b>{refOk ? ' (relue chez eBay)' : ''} : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
+             : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
+@@ -13460,11 +13606,20 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+             {aiWhy && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>✨ {aiWhy}</div>}
+             <div style={{ marginTop: 10 }}>
+               {!cat ? (
+-                <button type="button" onClick={() => analyser()} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
++                // (15 octobre) L'analyse part TOUTE SEULE au choix de la paire :
++                // ici, l'ÉTAT de cette recherche — « eBay cherche… », puis la
++                // catégorie retenue. Le bouton ne reste qu'en FILET quand elle
++                // a échoué (et « Publier » marche quand même : la route laisse
++                // eBay choisir, et le résultat le dit).
++                analyse ? (
++                  <div data-ebay-cat-cherche="1" style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.card2, color: C.muted, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 600 }}>eBay cherche la catégorie…</div>
++                ) : (
++                  <button type="button" onClick={() => analyser()} disabled={!titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: !titre.trim() ? 'default' : 'pointer', fontFamily: 'inherit', opacity: !titre.trim() ? 0.5 : 1 }}>Trouver la catégorie eBay</button>
++                )
+               ) : (<>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: `${C.accent}0d`, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px' }}>
+                   <Icon name="check" size={15} />
+-                  <span style={{ fontSize: 12.5, color: C.text }}>Catégorie eBay : <b>{cat.categoryName}</b> <span style={{ color: C.muted }}>({cat.categoryId})</span></span>
++                  <span data-ebay-cat-par={cat.par || ''} style={{ fontSize: 12.5, color: C.text }}>Catégorie eBay : <b>{cat.categoryName}</b> <span style={{ color: C.muted }}>({cat.categoryId}){cat.par === 'ebay-suggestion' ? ' — proposée par eBay' : ''}</span></span>
+                 </div>
+                 {/* Les autres catégories proposées par eBay — si la 1ʳᵉ n'est pas
+                     la bonne, on en choisit une autre (ses caractéristiques se
+@@ -13491,7 +13646,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+             <BlocEbay n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
+               <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire. VRM a pré-rempli ce qu'il pouvait prouver ; complète le reste.</div>
+               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
+-                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
++                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); condAuto.current = 'sien'; setCondDe(''); setCheck(null); }} style={inp}>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
++                  {/* (15 octobre) D'où vient l'état : repris de Vinted (la table
++                      §11), ou recalé sur ceux qu'eBay permet ici — jamais en
++                      silence. Il le change ⇒ la ligne disparaît (sa saisie). */}
++                  {condDe === 'vinted' && pairSel && pairSel.etatVinted && <div data-ebay-etat-vinted="repris" style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>repris de Vinted (« {pairSel.etatVinted} »)</div>}
++                  {condDe === 'recale' && <div data-ebay-etat-vinted="recale" style={{ fontSize: 11.5, color: C.warn, marginTop: 4, lineHeight: 1.4 }}>eBay ne permet pas l'état de Vinted pour cette catégorie — vérifie celui-ci.</div>}
++                </div>
+                 {(cat.attributs || []).filter(a => a.requis).map(a => (
+                   <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accent }}>✳</span></label>{champAttr(a)}</div>
+                 ))}
+@@ -13670,22 +13831,29 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
+ // C'est le prix que le formulaire eBay propose (« le même prix d'une plateforme
+ // à l'autre », Julien) : celui de la lecture qui fait foi pour « en ligne »
+ // (dressing ou relecture publique, `dressingEnLigne`), jamais un second calcul.
++// (15 octobre) `etat` : l'état Vinted de chaque annonce en vente (`status` du
++// dressing — « Très bon état », « Neuf sans étiquette »… ; mesuré : 57/57 en
++// ligne le portent). C'est lui que la table `conditionDeVinted` traduit en
++// état eBay — absent ⇒ pas de clé (rien n'est deviné).
+ const lireAnnoncesVintedEnLigne = async (comptes) => {
+-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {} };
+-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {} };
++  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, etat: {} };
++  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, etat: {} };
+   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
+-  const enLigne = new Set(), nPhotos = {}, prix = {};
++  const enLigne = new Set(), nPhotos = {}, prix = {}, etat = {};
+   let okAny = false, toutes = true;
+   for (const L of lus) {
+     if (!(L && Array.isArray(L.items))) { toutes = false; continue; }
+     okAny = true;
+     for (const it of L.items) {
+       if (!it) continue;
+-      if (isOnlineListing(it)) { enLigne.add(String(it.id)); prix[String(it.id)] = prixVinted(it.price); }
++      if (isOnlineListing(it)) {
++        enLigne.add(String(it.id)); prix[String(it.id)] = prixVinted(it.price);
++        if (typeof it.status === 'string' && it.status.trim()) etat[String(it.id)] = it.status.trim();
++      }
+       if (Number.isFinite(it.nPhotos)) nPhotos[String(it.id)] = it.nPhotos;
+     }
+   }
+-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix };
++  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, etat };
+ };
+ function useEbayPaires(comptes) {
+   const [paires, setPaires] = React.useState([]);
+@@ -13706,8 +13874,8 @@ function useEbayPaires(comptes) {
+       // paires déjà vendues »). Aucune annonce lisible ⇒ `online` reste `null` :
+       // on ne filtre pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
+       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
+-      const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {}, prix: {} };
+-      const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {}; const prixMap = lu.prix || {};
++      const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {}, prix: {}, etat: {} };
++      const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {}; const prixMap = lu.prix || {}; const etatMap = lu.etat || {};
+       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
+       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
+       // (15 octobre) La description passe par LA règle de Leboncoin
+@@ -13734,7 +13902,7 @@ function useEbayPaires(comptes) {
+         const desc = lbcDescription(details[id] && details[id].description);   // sa vraie description Vinted, jamais le texte de Vinted
+         // `prixVinted` : le prix de l'annonce en vente (`undefined` ⇒ `null`, pas su).
+         const pv = Object.prototype.hasOwnProperty.call(prixMap, String(id)) ? prixMap[String(id)] : null;
+-        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prixVinted: pv, descPasSu });
++        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prixVinted: pv, etatVinted: etatMap[String(id)] || '', descPasSu });
+       }
+       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
+       if (!stop) setPaires(out);
+@@ -14872,6 +15040,10 @@ function EbayPlanificateur({ brouillons = [], paires = [], annoncesEbay, program
+   const analyse = React.useMemo(() => { const dansLeLot = new Set(); return brouillons.map((d) => {
+     const b = itemDeBrouillon(d);
+     if (b.err) return { d, raison: b.err };
++    // (15 octobre) « Publier » laisse eBay proposer la catégorie ; PROGRAMMER,
++    // lui, l'exige (la route refuse sans elle — un lot à une heure où il ne
++    // regarde pas ne part pas sur une catégorie choisie après coup).
++    if (b.sansCategorie) return { d, raison: 'pas de catégorie eBay : rouvre le brouillon (eBay la propose), puis reviens programmer' };
+     const sku = d.numero ? skuEbayDe(d.numero) : '';
+     if (!sku) return { d, raison: 'pas de N° : sans lui, VRM ne la retrouverait pas si elle se vendait ailleurs avant l\'heure' };
+     if (skusEnLigne.has(sku)) return { d, raison: 'déjà en vente sur eBay' };
+-- 
+2.43.0
+

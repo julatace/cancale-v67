@@ -1,0 +1,876 @@
+From 6a572cb6302aa020f91ad14aa489db6698e8c464 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 05:35:13 +0000
+Subject: [PATCH] =?UTF-8?q?WIP=20NON=20RELU=20(p0-imprimer)=20=E2=80=94=20?=
+ =?UTF-8?q?fig=C3=A9=20pour=20la=20passation=20du=2016=20octobre=20(agent?=
+ =?UTF-8?q?=20coup=C3=A9=20par=20la=20limite=20de=20session)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012UsEbcF3XbBnmXpwYyNnbn
+---
+ scripts/bancs/imprimer.cjs | 314 +++++++++++++++++++++++++++++
+ src/App.jsx                | 399 +++++++++++++++++++++++++++++++------
+ 2 files changed, 649 insertions(+), 64 deletions(-)
+ create mode 100644 scripts/bancs/imprimer.cjs
+
+diff --git a/scripts/bancs/imprimer.cjs b/scripts/bancs/imprimer.cjs
+new file mode 100644
+index 0000000..33aa5f7
+--- /dev/null
++++ b/scripts/bancs/imprimer.cjs
+@@ -0,0 +1,314 @@
++// ═══════════════════════════════════════════════════════════════════════════
++// BANC : « TOUT IMPRIMER » — APERÇU, VIEUX BORDEREAUX, TRI PAR DATE DE VENTE
++//        (node scripts/bancs/imprimer.cjs — après `npm run build` · port 5851)
++// ═══════════════════════════════════════════════════════════════════════════
++// Julien, 15 octobre : « le bouton tout imprimer m'a donné des bordereaux
++// d'anciennes ventes qui datent d'il y a un mois » · « les bordereaux triés par
++// date de vente, plus récent en haut, on ne trie pas par compte » · « tout
++// imprimer à la suite, sans erreur ». REMESURÉ le 16 octobre sur sa base : la
++// capture du compte 3168505556 est figée au 20 septembre, la vente 22403756745
++// du 18 septembre y est restée « needs_action » avec son PDF en base → elle
++// entrait dans le lot, en silence.
++//
++// Ce banc rend l'app sur des ventes INVENTÉES (il vit dans le dépôt, public) :
++//   9105 « Echec »  compte_a, vendue il y a 12 h, bordereau SANS PDF réel
++//                   (témoin filename présent) → retenue, ÉCHOUE à l'impression ;
++//   9102 « Bravo »  compte_b, 1 j, PDF email          → retenue ;
++//        (⚠️ servie AUSSI sous compte_a : le dédoublonnage par commande doit
++//         n'en imprimer qu'UNE) ;
++//   L1   « Charlie » Leboncoin, 1,5 j, voucher        → dans l'aperçu, mise de
++//                   côté (extension absente ici) — DEUX plateformes mélangées ;
++//   9101 « Alpha »  compte_a, 2 j, PDF capté          → retenue ;
++//   9104 « Deja »   compte_b, 3 j, PDF email, MARQUÉE IMPRIMÉE → mise de côté
++//                   par défaut, la case la réinclut ;
++//   L2   « Delta »  Leboncoin, 5 j, voucher           → aperçu, mise de côté ;
++//   9103 « Vieux »  compte_a, 40 j, needs_action figé, PDF email → ANCIENNE :
++//                   mise de côté par défaut, la case la réinclut ;
++//   9106 « Finalisee » compte_a, 35 j, vente FINALISÉE avec un email de
++//                   bordereau → n'apparaît NULLE PART (ni liste, ni aperçu).
++// Il exige :
++//   1. la liste des colis est triée par date de VENTE décroissante (la vieille
++//      vente est EN BAS, la plus récente EN HAUT — jamais l'ordre des comptes) ;
++//   2. « Tout imprimer » ouvre un APERÇU (data-lot-apercu) — jamais une
++//      impression à l'aveugle — trié date décroissante, DEUX plateformes
++//      confondues, chaque ligne retenue ou mise de côté avec sa raison ;
++//   3. l'ancienne (9103) et la déjà imprimée (9104) sont HORS du lot par
++//      défaut ; les cases les réincluent ; la doublonnée ne compte qu'une fois ;
++//   4. l'impression dit ses échecs PAR bordereau (data-lot-echecs) et
++//      « ↻ Réimprimer les échecs » ne relit QUE les échecs ;
++//   5. ce qui est parti est marqué imprimé : le lot suivant le met de côté ;
++//   6. l'autre sens : la vente finalisée n'apparaît nulle part, et aucun
++//      débordement, aucune erreur, aucun écran tombé (390 et 1512 px).
++// On juge les ATTRIBUTS (`data-lot-*`, `data-retenu`, `data-plateforme`) et
++// l'ORDRE rendu, jamais une formulation (§6.5).
++const path = require('path');
++let chromium;
++try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
++catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
++const { metaVersData } = require('./_meta.cjs');
++const fs = require('fs'), http = require('http'), os = require('os');
++const DIST = path.join(__dirname, '..', '..', 'dist');
++const PORT = Number(process.env.PORT || 5851);
++
++const MAINTENANT = Date.now();
++const H = 3600000;
++const ilYaH = (h) => new Date(MAINTENANT - h * H).toISOString();
++const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
++
++// tx → { compte(s), titre, vendue il y a N h, statut }
++const vente = (tx, titre, h, st) => ({ transaction_id: tx, title: titre, price: { amount: '50.0', currency_code: 'EUR' },
++  status: st || 'Le paiement a été validé', transaction_user_status: st ? 'completed' : 'needs_action', date: ilYaH(h) });
++const V9105 = vente(9105, 'Echec Lot taille 39', 12);
++const V9102 = vente(9102, 'Bravo Lot taille 41', 24);
++const V9101 = vente(9101, 'Alpha Lot taille 42', 48);
++const V9104 = vente(9104, 'Deja Lot taille 40', 72);
++const V9103 = vente(9103, 'Vieux Lot taille 43', 40 * 24);
++const V9106 = vente(9106, 'Finalisee Lot taille 38', 35 * 24, 'Vente finalisée');
++const ACCOUNTS = [
++  { id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYaH(0) },
++  { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: ilYaH(0) },
++];
++// ⚠️ 9102 est servie sous les DEUX comptes : c'est le cas que le dédoublonnage
++//    par (plateforme, commande) doit attraper — une commande, UN bordereau.
++const VENTES_111 = [V9105, V9101, V9103, V9106, V9102];
++const VENTES_222 = [V9102, V9104];
++const bordEmail = (tx, titre, pdf) => ({ id: 'email_bord_' + tx, data: { transaction: String(tx), uid: '111', filename: 'bordereau-' + tx + '.pdf', modele: titre, article: titre, receivedAt: ilYaH(2), pdfB64: pdf } });
++const lbcVente = (txId, titre, h) => ({ txId, itemId: 'it-' + txId, title: titre, price: 4400, isSeller: true,
++  dateVente: ilYaH(h), stepStatus: '', stepLabel: 'À expédier', label: { voucherUrl: 'https://api.leboncoin.fr/x/' + txId, reference: 'REF-' + txId } });
++const ROWS = [
++  { id: 'main', data: { vinted_bords_printed: { 9104: ilYaH(20) } } },
++  { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: VENTES_111 } } },
++  { id: 'harvest_222_orders_sold', data: { capturedAt: ilYaH(0.4), payload: { my_orders: VENTES_222 } } },
++  { id: 'harvest_111_label_9101', data: { tx: '9101', item: '', capturedAt: ilYaH(30), pdfB64: PDF_B64 } },
++  bordEmail(9102, 'Bravo Lot taille 41', PDF_B64),
++  bordEmail(9103, 'Vieux Lot taille 43', PDF_B64),
++  bordEmail(9104, 'Deja Lot taille 40', PDF_B64),
++  bordEmail(9105, 'Echec Lot taille 39', null),       // témoin présent, PDF jamais arrivé
++  bordEmail(9106, 'Finalisee Lot taille 38', PDF_B64), // vente finalisée : NE DOIT apparaître nulle part
++  { id: 'lbc_ventes', data: { ventes: {
++    // ⚠️ L2 AVANT L1 exprès : l'ordre d'insertion est l'ordre « avant » — le
++    //    tri par date doit remettre L1 (1,5 j) devant L2 (5 j).
++    'lbc-tx-2': lbcVente('lbc-tx-2', 'Delta LBC taille 45', 5 * 24),
++    'lbc-tx-1': lbcVente('lbc-tx-1', 'Charlie LBC taille 44', 36),
++  } } },
++];
++
++let ko = 0;
++const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
++const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
++
++const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
++const srv = http.createServer((q, r) => {
++  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
++  const p = path.join(DIST, f);
++  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
++  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
++});
++srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
++srv.listen(PORT);
++const projette = (row, sel) => {
++  if (!sel || sel === '*') return row;
++  const out = {};
++  for (const part of sel.split(',')) {
++    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
++    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
++    if (src === 'id') { out[alias] = row.id; continue; }
++    if (src === 'data') { out[alias] = row.data; continue; }
++    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
++    out[alias] = v == null ? null : v;
++  }
++  return out;
++};
++
++// Ce que la page lit comme octets de PDF (pour « Réimprimer ne relit QUE les échecs »).
++const LECTURES_PDF = { n: 0 };
++async function preparer(b, vp) {
++  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
++  // L'onglet d'impression réservé au clic : on le referme, le banc n'imprime pas.
++  ctx.on('page', (p) => { if (p !== ctx.pages()[0]) p.close().catch(() => {}); });
++  const pg = await ctx.newPage();
++  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
++  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
++  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
++  await pg.route('**/rest/v1/**', (route) => {
++    const u = decodeURIComponent(metaVersData(route.request().url()));
++    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
++    if (route.request().method() !== 'GET') return j([]);
++    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
++    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
++    if (/select=b:data->>pdfB64/.test(u)) LECTURES_PDF.n++;
++    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
++    // Filtres PostgREST `data->>x=(not.)is.null` (§6.3 : le filtre compte autant
++    // que la projection — une ligne sans PDF ne passe pas `not.is.null`).
++    const filtres = [...u.matchAll(/[?&]data->>(\w+)=(not\.)?is\.null/g)].map((x) => ({ champ: x[1], nul: !x[2] }));
++    const passe = (r) => filtres.every((f) => { const v = (r.data || {})[f.champ]; const estNul = (v === null || v === undefined || v === ''); return f.nul ? estNul : !estNul; });
++    const forme = (r) => (sel && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: r.data.capturedAt || ilYaH(0), cap: r.data.capturedAt });
++    const eq = /id=eq\.([^&]*)/.exec(u);
++    if (eq) return j(ROWS.filter((r) => r.id === eq[1]).filter(passe).map(forme));
++    const lk = /id=like\.([^&]*)/.exec(u);
++    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).filter(passe).map(forme)); }
++    return j([]);
++  });
++  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
++  return { ctx, pg, errs };
++}
++async function sain(pg, ecran) {
++  const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, t: document.body.innerText }));
++  dit(r.sw <= r.cw + 1, `${ecran} : aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
++  const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
++  dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
++}
++// L'ordre des cartes de colis, lu par leur TITRE (chaque titre est unique).
++const ordreCartes = (pg) => pg.$$eval('[data-bord-card]', (els) => els.map((e) => {
++  const m = /(Echec|Bravo|Alpha|Deja|Vieux|Finalisee|Charlie|Delta) (?:Lot|LBC)/.exec(e.innerText || ''); return m ? m[1] : '?';
++}));
++const lireApercu = (pg) => pg.evaluate(() => {
++  const ap = document.querySelector('[data-lot-apercu]');
++  if (!ap) return null;
++  return {
++    n: Number(ap.getAttribute('data-lot-apercu')),
++    lignes: [...ap.querySelectorAll('[data-lot-ligne]')].map((l) => ({
++      cle: l.getAttribute('data-lot-ligne'), retenu: l.getAttribute('data-retenu'),
++      plateforme: l.getAttribute('data-plateforme'), txt: l.innerText,
++    })),
++    imprimer: (document.querySelector('[data-lot-imprimer]') || {}).getAttribute ? Number(document.querySelector('[data-lot-imprimer]').getAttribute('data-lot-imprimer')) : null,
++  };
++});
++
++(async () => {
++  let b;
++  try {
++    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
++
++    // ── 1512 px : le scénario complet ──────────────────────────────────────
++    {
++      console.log('── 1512 px');
++      const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 });
++      await essaie('liste des colis', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForFunction(() => /pr[êe]ts?\s+[àa]\s+imprimer|colis à envoyer/i.test(document.body.innerText || ''), null, { timeout: 25000, polling: 250 }).catch(() => {});
++        await pg.waitForTimeout(2500);
++        const ordre = await ordreCartes(pg);
++        console.log('    cartes : ' + ordre.join(' → '));
++        dit(ordre.length >= 5, 'les colis à envoyer sont rendus', ordre.join(','));
++        dit(ordre[0] === 'Echec', 'la vente la plus RÉCENTE est en haut (12 h)', 'premier = ' + ordre[0]);
++        dit(ordre.filter((x) => x !== '?').pop() === 'Vieux', 'la vente d\'il y a 40 jours est EN BAS — plus jamais en tête de liste', 'dernier = ' + ordre.filter((x) => x !== '?').pop());
++        const iB = ordre.indexOf('Bravo'), iA = ordre.indexOf('Alpha'), iD = ordre.indexOf('Deja');
++        dit(iB >= 0 && iA > iB && iD > iA, 'date de vente décroissante, jamais l\'ordre des comptes (Bravo b · Alpha a · Deja b)', ordre.join(' → '));
++        dit(!ordre.includes('Finalisee'), 'la vente FINALISÉE n\'est pas un colis — son vieil email de bordereau ne la ressuscite pas', ordre.join(','));
++        await sain(pg, 'Colis');
++      });
++      let apres = null;
++      await essaie('aperçu du lot', async () => {
++        const btn = await pg.$('[data-lot-defaut]');
++        dit(!!btn, 'le bouton « Tout imprimer » est là');
++        dit(btn && (await btn.getAttribute('data-lot-defaut')) === '3', 'le bouton compte la sélection PAR DÉFAUT (3 : sans l\'ancienne, la déjà imprimée, les Leboncoin sans extension, le doublon)', btn && (await btn.getAttribute('data-lot-defaut')));
++        await btn.click();
++        await pg.waitForSelector('[data-lot-apercu]', { timeout: 8000 });
++        const a = await lireApercu(pg);
++        dit(!!a, 'le clic ouvre un APERÇU — il n\'imprime plus à l\'aveugle');
++        dit(a && a.n === 3, 'l\'aperçu retient 3 bordereaux par défaut', a && String(a.n));
++        const cles = a.lignes.map((l) => l.cle);
++        console.log('    aperçu : ' + a.lignes.map((l) => `${l.cle}:${l.retenu}`).join(' · '));
++        // Ordre attendu, toutes plateformes confondues : 12 h · 1 j (·doublon) · 1,5 j LBC · 2 j · 3 j · 5 j LBC · 40 j
++        const sansDouble = cles.filter((c, i) => cles.indexOf(c) === i);
++        dit(JSON.stringify(sansDouble) === JSON.stringify(['v9105', 'v9102', 'lbc:lbc-tx-1', 'v9101', 'v9104', 'lbc:lbc-tx-2', 'v9103']),
++          'l\'aperçu est trié par date de vente décroissante, DEUX plateformes confondues', sansDouble.join(' → '));
++        dit(a.lignes.some((l) => l.plateforme === 'Leboncoin') && a.lignes.some((l) => l.plateforme === 'Vinted'),
++          'les deux plateformes sont dans la même liste', [...new Set(a.lignes.map((l) => l.plateforme))].join(','));
++        const l9103 = a.lignes.find((l) => l.cle === 'v9103'), l9104 = a.lignes.find((l) => l.cle === 'v9104');
++        dit(l9103 && l9103.retenu === '0' && /40\s*j/.test(l9103.txt), 'l\'ancienne (40 j) est mise de côté AVEC son âge', l9103 && l9103.txt.replace(/\n/g, ' · ').slice(0, 120));
++        dit(l9104 && l9104.retenu === '0' && /imprim/i.test(l9104.txt), 'la déjà imprimée est mise de côté et le dit', l9104 && l9104.txt.replace(/\n/g, ' · ').slice(0, 120));
++        const lbc1 = a.lignes.find((l) => l.cle === 'lbc:lbc-tx-1');
++        dit(lbc1 && lbc1.retenu === '0' && /extension/i.test(lbc1.txt), 'le colis Leboncoin est montré, mis de côté avec le geste (extension absente ici)', lbc1 && lbc1.txt.replace(/\n/g, ' · ').slice(0, 120));
++        // ⚠️ ON JUGE LA SORTIE, PAS L'ÉTAGE QUI DÉDOUBLONNE (§6.5) : 9102 est
++        //    servie sous DEUX comptes — qu'elle soit dédoublonnée en amont
++        //    (`loadOrders`, le cas aujourd'hui) ou par la garde du lot, le
++        //    résultat exigé est le même : UNE seule ligne retenue par commande.
++        dit(new Set(cles).size === 7, 'les 7 colis sont dans l\'aperçu, chacun une fois', `${a.lignes.length} ligne(s) · ${new Set(cles).size} commande(s)`);
++        const nDouble = a.lignes.filter((l) => l.cle === 'v9102' && l.retenu === '1').length;
++        dit(nDouble === 1, 'la commande 9102, servie sous DEUX comptes, n\'est retenue qu\'UNE fois (dédoublonnage par commande)', `${nDouble} retenue(s)`);
++        // Les cases réincluent — et le nombre du bouton suit.
++        await pg.click('[data-lot-inclure-imprimes]');
++        await pg.waitForTimeout(250);
++        let a2 = await lireApercu(pg);
++        dit(a2 && a2.n === 4 && (a2.lignes.find((l) => l.cle === 'v9104') || {}).retenu === '1', 'la case « déjà imprimés » réinclut la déjà imprimée', a2 && String(a2.n));
++        await pg.click('[data-lot-inclure-anciens]');
++        await pg.waitForTimeout(250);
++        a2 = await lireApercu(pg);
++        dit(a2 && a2.n === 5 && (a2.lignes.find((l) => l.cle === 'v9103') || {}).retenu === '1', 'la case « anciens » réinclut la vente de 40 j — rien n\'est caché', a2 && String(a2.n));
++        // On referme et on rouvre : le lot PAR DÉFAUT repart propre.
++        await pg.click('[data-lot-apercu] button:has-text("Annuler")');
++        await pg.waitForTimeout(250);
++      });
++      await essaie('impression, échecs, reprise', async () => {
++        await pg.click('[data-lot-defaut]');
++        await pg.waitForSelector('[data-lot-imprimer]', { timeout: 8000 });
++        await pg.click('[data-lot-imprimer]');
++        const msg = await pg.waitForFunction(() => { const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(document.body.innerText || ''); return m ? m[0] : null; }, null, { timeout: 25000 }).then((h) => h.jsonValue()).catch(() => null);
++        dit(!!msg && /^2 sur 3/.test(msg), 'le lot dit le nombre RÉELLEMENT imprimé (2 sur 3 — Echec n\'a pas son PDF)', msg || '(aucun message)');
++        await pg.waitForSelector('[data-lot-echecs]', { timeout: 8000 });
++        const ech = await pg.evaluate(() => { const e = document.querySelector('[data-lot-echecs]'); return e ? { n: Number(e.getAttribute('data-lot-echecs')), cles: [...e.querySelectorAll('[data-lot-echec]')].map((x) => x.getAttribute('data-lot-echec')), txt: e.innerText } : null; });
++        dit(!!ech && ech.n === 1 && ech.cles.join(',') === 'v9105', 'l\'échec est nommé PAR bordereau (Echec, sans PDF)', ech && ech.cles.join(','));
++        dit(!!ech && /PDF absent/i.test(ech.txt), 'avec sa raison et le geste', ech && ech.txt.replace(/\n/g, ' · ').slice(0, 140));
++        // La modale « bordereaux prêts » recouvre l'écran : on la ferme avant
++        // de recliquer (le banc teste la reprise, pas la modale de résultat).
++        await pg.click('button:has-text("Fermer")');
++        await pg.waitForTimeout(300);
++        // « Réimprimer les échecs » ne relit QUE les échecs.
++        LECTURES_PDF.n = 0;
++        await pg.click('[data-lot-reimprimer]');
++        await pg.waitForTimeout(2500);
++        dit(LECTURES_PDF.n === 1, '« Réimprimer les échecs » ne relit QUE l\'échec (1 lecture de PDF, pas tout le lot)', `${LECTURES_PDF.n} lecture(s)`);
++        const ech2 = await pg.evaluate(() => { const e = document.querySelector('[data-lot-echecs]'); return e ? Number(e.getAttribute('data-lot-echecs')) : null; });
++        dit(ech2 === 1, 'l\'échec persistant reste nommé — jamais passé sous silence', String(ech2));
++        // Ce qui est parti est MARQUÉ : le lot suivant le met de côté.
++        await pg.click('[data-lot-defaut]');
++        await pg.waitForSelector('[data-lot-apercu]', { timeout: 8000 });
++        const a3 = await lireApercu(pg);
++        dit(a3 && a3.n === 1, 'le lot suivant met de côté ce qui vient d\'être imprimé (il ne reste que l\'échec)', a3 && String(a3.n));
++        const l9101 = a3 && a3.lignes.find((l) => l.cle === 'v9101');
++        dit(!!l9101 && l9101.retenu === '0' && /imprim/i.test(l9101.txt), 'Alpha, imprimée à l\'instant, est mise de côté et le dit', l9101 && l9101.txt.replace(/\n/g, ' · ').slice(0, 120));
++        await pg.click('[data-lot-apercu] button:has-text("Annuler")');
++        await pg.screenshot({ path: path.join(os.tmpdir(), 'imprimer-1512.png'), fullPage: true }).catch(() => {});
++      });
++      await essaie('colis Leboncoin triés', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForTimeout(1500);
++        await pg.click('button:has-text("Colis")');
++        await pg.waitForTimeout(1200);
++        const ordre = await ordreCartes(pg);
++        console.log('    cartes LBC : ' + ordre.join(' → '));
++        const iC = ordre.indexOf('Charlie'), iD = ordre.indexOf('Delta');
++        dit(iC >= 0 && iD >= 0 && iC < iD, 'les colis Leboncoin aussi vont du plus récent au plus ancien (Charlie 1,5 j avant Delta 5 j)', ordre.join(' → '));
++        await sain(pg, 'Colis Leboncoin');
++      });
++      dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
++      await ctx.close();
++    }
++
++    // ── 390 px : l'aperçu tient sur un téléphone ───────────────────────────
++    {
++      console.log('── 390 px');
++      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 });
++      await essaie('aperçu au téléphone', async () => {
++        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
++        await pg.waitForFunction(() => !!document.querySelector('[data-lot-defaut]'), null, { timeout: 25000, polling: 250 }).catch(() => {});
++        await pg.waitForTimeout(1500);
++        const ordre = await ordreCartes(pg);
++        dit(ordre[0] === 'Echec' && ordre.filter((x) => x !== '?').pop() === 'Vieux', 'la liste va du plus récent au plus ancien aussi à 390 px', ordre.join(' → '));
++        await pg.click('[data-lot-defaut]');
++        await pg.waitForSelector('[data-lot-apercu]', { timeout: 8000 });
++        const a = await lireApercu(pg);
++        dit(!!a && a.n === 3 && new Set(a.lignes.map((l) => l.cle)).size === 7, 'l\'aperçu montre les 7 colis, 3 retenus', a && `${a.n} retenues · ${a.lignes.length} lignes`);
++        await sain(pg, 'Aperçu 390 px');
++        await pg.screenshot({ path: path.join(os.tmpdir(), 'imprimer-390.png'), fullPage: false }).catch(() => {});
++      });
++      dit(errs.length === 0, 'aucune erreur de page (390)', errs.join(' | ').slice(0, 200));
++      await ctx.close();
++    }
++  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 180)); }
++  finally { if (b) await b.close(); srv.close(); }
++  console.log(ko ? `\n❌ Tout imprimer : ${ko} rouge(s)` : '\n✅ Tout imprimer : tout est vert');
++  process.exit(ko ? 1 : 0);
++})();
+diff --git a/src/App.jsx b/src/App.jsx
+index 075923f..fae4e3a 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -4264,6 +4264,32 @@ const joursAvantLimiteFr = (dateLimite) => {
+ // n'est qu'un repli : la date limite écrite dans l'email du bordereau passe
+ // devant quand on l'a.
+ const DELAI_EXPEDITION_J = 7;
++// ── « PLUS RÉCENT EN HAUT, JAMAIS PAR COMPTE » (Julien, 15 octobre) ──────────
++// « Les bordereaux triés par date de vente, plus récent en haut, on ne trie pas
++// par compte. » Avant, la liste des colis se triait par date limite puis, à
++// égalité, gardait l'ordre de chargement — c'est-à-dire l'ordre DES COMPTES :
++// elle se lisait « par compte ». UNE règle (§11), consommée par la liste Vinted
++// (`expeditions`), la liste Leboncoin (`LeboncoinColis`) et l'aperçu du lot
++// « Tout imprimer » : date de vente décroissante, toutes plateformes confondues.
++// Une date inconnue va EN DERNIER (« pas su » ne passe devant rien).
++const cmpVenteRecenteDabord = (ta, tb) => ((tb == null ? -8.64e15 : tb) - (ta == null ? -8.64e15 : ta));
++// ── UN COLIS « ANCIEN » NE PART PAS À L'IMPRESSION EN DOUCE (15 octobre) ─────
++// Julien : « le bouton tout imprimer m'a donné des bordereaux d'anciennes
++// ventes qui datent d'il y a un mois ». REMESURÉ le 16 octobre sur sa base :
++// la capture des ventes du compte 3168505556 est figée au 20 septembre ; la
++// vente tx 22403756745 du 18 septembre y est restée « needs_action » avec son
++// PDF de bordereau en base (email_bord) → elle entrait dans le lot, en silence.
++// Vinted annule une vente non expédiée après sa date limite (7 à 10 j après la
++// vente, mesuré §DELAI_EXPEDITION_J) : une vente « à expédier » de plus de
++// 21 jours est presque toujours une capture figée, pas un colis — mais pas
++// toujours (mesuré le même jour : tx 22592792923, vendue le 27 septembre,
++// encore « needs_action » dans une capture FRAÎCHE du 16 octobre). Donc rien
++// n'est caché : elle reste VISIBLE dans la liste, le lot « Tout imprimer »
++// l'écarte PAR DÉFAUT, l'aperçu le dit avec son âge, et une case la réinclut.
++const LOT_ANCIEN_J = 21;
++// Date de vente en millisecondes, ou `null` quand on ne la connaît pas — le
++// comparateur ci-dessus la met alors EN DERNIER, jamais au hasard.
++const tsVenteMs = (d) => { const t = Date.parse(d || ''); return t > 0 ? t : null; };
+ // La date limite d'envoi d'une vente : celle de l'email du bordereau quand on
+ // l'a, sinon vente + `DELAI_EXPEDITION_J`. UNE règle (§11) pour la carte
+ // « Expédier N colis » (`toShip`) et l'alerte « coché posté, jamais vu partir ».
+@@ -6526,6 +6552,11 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+   const thermique = imprMode(opts.imprimante) === 'thermique';
+   let count = 0, nInv = 0, isoles = 0;
+   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
++  // Erreurs PAR BORDEREAU (15 octobre) : un PDF que pdf-lib refuse (abîmé,
++  // chiffré) était écarté en silence — `count` baissait, mais personne ne
++  // savait LEQUEL avait raté, donc « Réimprimer les échecs » était impossible.
++  const rates = [];     // [{ cle, titre }] — ceux que la fusion a dû écarter
++  const clesOk = [];    // les clés réellement entrées dans le PDF groupé
+   for (const it of items) {
+     try {
+       const src = await PDFDocument.load(it.pdfBuf);
+@@ -6551,11 +6582,12 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+       const pages = await out.copyPages(src, src.getPageIndices());
+       pages.forEach(p => out.addPage(p));
+       count++;
++      clesOk.push(it.cle == null ? '' : String(it.cle));
+       // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
+       if (it.invBytes) {
+         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
+       }
+-    } catch (_) {}
++    } catch (_) { rates.push({ cle: it.cle == null ? '' : String(it.cle), titre: it.title || '' }); }
+   }
+   if (!count) throw new Error('Aucun bordereau exploitable.');
+   posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
+@@ -6565,7 +6597,7 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
+   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
+   const printed = ouvrirPdfOnglet(url);
+-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, entiers };
++  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, entiers, rates, clesOk };
+ };
+ 
+ // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
+@@ -10876,15 +10908,19 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+   };
+   const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
+   const ventes = lbcVentes.ventes || [];
+-  const aLabel = (o) => !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
+   // Un COLIS vendeur : vente prouvée (isSeller) OU un bordereau existe (un
+   // bordereau n'existe que pour le vendeur). On exclut les achats / côté inconnu.
+-  const estVendeur = (o) => o.isSeller!==false && (o.isSeller===true || aLabel(o));
+-  const colis=ventes.filter(o=>estVendeur(o) && !lbcAnnulee(o) && !lbcFinalisee(o));
+-  const aExpedier=colis.filter(o=>!lbcExpediee(o) && !estFait(o));
+-  const prets = aExpedier.filter(o => o.label && o.label.voucherUrl);   // bordereau prêt
+-  const aGenerer = aExpedier.filter(o => !(o.label && o.label.voucherUrl)); // bordereau à générer
+-  const postes = colis.filter(o => lbcExpediee(o) || estFait(o));
++  // La règle « colis vendeur à envoyer » vit au niveau module (§11) : le lot
++  // « Tout imprimer » (toutes plateformes) décide avec la MÊME fonction.
++  const colis=ventes.filter(o=>lbcEstColisVendeur(o) && !lbcAnnulee(o) && !lbcFinalisee(o));
++  const aExpedier=lbcColisAEnvoyer(ventes, estFait);
++  // « Plus récent en haut, jamais par compte » (Julien, 15 octobre) : chaque
++  // groupe se trie par date de VENTE décroissante — même règle que la liste
++  // Vinted (`cmpVenteRecenteDabord`). Une date inconnue va en dernier.
++  const parVente = (a, b) => cmpVenteRecenteDabord(tsVenteMs(a.dateVente), tsVenteMs(b.dateVente));
++  const prets = aExpedier.filter(o => o.label && o.label.voucherUrl).sort(parVente);   // bordereau prêt
++  const aGenerer = aExpedier.filter(o => !(o.label && o.label.voucherUrl)).sort(parVente); // bordereau à générer
++  const postes = colis.filter(o => lbcExpediee(o) || estFait(o)).sort(parVente);
+   const lbcUrl = (o) => `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`;
+   const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+   // ── LE N° (SKU) D'UN COLIS LEBONCOIN ──────────────────────────────────────
+@@ -11042,6 +11078,17 @@ const lbcExpediee = o => {
+   return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
+ };
+ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
++// ── LES COLIS LEBONCOIN À ENVOYER : UNE RÈGLE, DEUX LECTEURS (§11) ──────────
++// L'écran « Colis Leboncoin » ET le lot « Tout imprimer » (aperçu toutes
++// plateformes) décident avec CETTE fonction — deux copies divergeraient comme
++// « l'app annonçait 39, le panneau 40 ». Un COLIS vendeur : vente prouvée
++// (`isSeller === true`) OU un bordereau existe (un bordereau n'existe que pour
++// le vendeur) ; jamais un achat ni un côté inconnu.
++const lbcEstColisVendeur = (o) => !!o && o.isSeller !== false
++  && (o.isSeller === true || !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference)));
++const lbcColisAEnvoyer = (ventes, estFait) => (ventes || [])
++  .filter((o) => lbcEstColisVendeur(o) && !lbcAnnulee(o) && !lbcFinalisee(o))
++  .filter((o) => !lbcExpediee(o) && !(estFait && estFait(o)));
+ // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
+ // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
+ function CarteLbc({ o }) {
+@@ -23935,7 +23982,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+       .filter(o => aExpedier(o))
+       .map(o => {
+         const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
+-        return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
++        // `ts` = la date de VENTE, portée par la ligne : le tri et le lot
++        // « Tout imprimer » la LISENT, ils ne la recalculent pas (§11).
++        return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || ''), ts: tsVenteMs(o.date) };
+       })
+       .filter(e => !(e.b && isBordDone(e.b)));            // colis déjà parti : il sort tout seul
+     // 2) ⚠️ IL NE PEUT PAS Y AVOIR DE BORDEREAU SANS VENTE (règle posée par
+@@ -23973,6 +24022,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     //    le bandeau le lisent. Ils ne peuvent plus se contredire.
+     const estPret = (e) => !!((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]));
+     tout.forEach(e => { e.pret = estPret(e); });
++    // ⚠️ « PLUS RÉCENT EN HAUT, JAMAIS PAR COMPTE » (Julien, 15 octobre).
++    // Avant, à l'intérieur de chaque groupe, le tri était la date LIMITE puis,
++    // à égalité, l'ordre de chargement — c'est-à-dire l'ordre DES COMPTES : la
++    // liste se lisait « par compte ». À l'intérieur de chaque groupe, le tri
++    // est désormais la date de VENTE décroissante (même règle que la liste
++    // Leboncoin, `cmpVenteRecenteDabord`). L'urgence reste ÉCRITE sur chaque
++    // carte et comptée dans l'en-tête ; le bandeau dit OÙ sont les pressés
++    // (`ouSontLesPresses`) — avec ce tri, les plus urgents (les ventes les plus
++    // anciennes) sont en BAS de leur groupe, et il le dit.
+     tout.sort((a, b) => {
+       const pa = a.o && isShipDone(a.o) ? 1 : 0, pb = b.o && isShipDone(b.o) ? 1 : 0;
+       if (pa !== pb) return pa - pb;                       // les postés tout en bas
+@@ -27658,13 +27716,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+   // La phrase du bandeau d'urgence — elle DÉCRIT la liste, elle ne la promet
+   // pas. Trois cas, parce qu'il y a trois situations réelles.
+   const ouSontLesPresses = (u) => {
+-    if (!u.presseAttente) return 'les plus urgents sont en haut de la liste.';
++    // ⚠️ La liste va de la vente la plus RÉCENTE à la plus ancienne (Julien,
++    //    15 octobre) : les pressés — les ventes les plus anciennes — sont donc
++    //    en BAS de leur groupe. La phrase DÉCRIT la liste, elle ne promet
++    //    jamais « en haut » (banc `colis.cjs` : la position déclenche, §6.5).
++    if (!u.presseAttente) return 'ils sont en bas de la liste — elle va de la vente la plus récente à la plus ancienne.';
+     // ⚠️ La phrase est déjà introduite par un tiret (« 1 demain — … ») : une
+     //    seconde incise entre tirets la rendait illisible. Une virgule suffit.
+     if (!u.pressePret) return u.presseAttente > 1
+       ? `ils attendent encore leur bordereau, plus bas dans « En attente de leur bordereau ».`
+       : `il attend encore son bordereau, plus bas dans « En attente de leur bordereau ».`;
+-    return `${u.pressePret} en haut de la liste, ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
++    return `${u.pressePret} en bas de « Prêts à imprimer », ${u.presseAttente} dans « En attente de leur bordereau ».`;
+   };
+ 
+   const setBuyForKey = (key, val) => {
+@@ -28363,67 +28425,169 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+     const level = days <= 1 ? 'danger' : days <= 2 ? 'warn' : 'muted';
+     return { text, level, days };
+   };
+-  // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
+-  // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
++  // « À la suite » : tamponne les bordereaux RETENUS et les regroupe dans UN
++  // seul PDF (une page chacun) → une seule impression.
+   const [batchBusy, setBatchBusy] = useState(false);
+-  const batchBordereaux = async () => {
++  // ── « TOUT IMPRIMER » : UN APERÇU D'ABORD, PUIS EXACTEMENT LA SÉLECTION ────
++  // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
++  // n'existent pas ou plus » ; 15 oct. : « il m'a donné des bordereaux
++  // d'anciennes ventes qui datent d'il y a un mois ». REMESURÉ le 16 octobre
++  // (§LOT_ANCIEN_J) : une capture FIGÉE garde une vente morte en
++  // « needs_action », son PDF est en base → elle entrait dans le lot en
++  // silence, et rien ne montrait la liste avant d'imprimer.
++  // ⇒ UNE règle, UN propriétaire (`lotImprimerCandidats`) : le bouton compte,
++  //   l'aperçu montre, l'impression prend — la MÊME liste.
++  //   · chaque ligne : date de vente, plateforme, compte, commande, statut,
++  //     retenue ou mise de côté AVEC sa raison ;
++  //   · triée par date de vente DÉCROISSANTE, toutes plateformes confondues
++  //     (Vinted + Leboncoin — eBay n'émet aucun bordereau dans VRM), jamais
++  //     par compte ;
++  //   · les DÉJÀ IMPRIMÉS et les ANCIENS (> LOT_ANCIEN_J j) sont mis de côté
++  //     par défaut, une case les réinclut — rien n'est caché ;
++  //   · dédoublonnée par (plateforme, commande) : une commande, un bordereau.
++  const lotCleCommande = (plateforme, commande) => (plateforme === 'Vinted' ? String(commande) : 'lbc:' + String(commande));
++  const lotImprimerCandidats = (exDeja) => {
++    const rows = [];
++    for (const e of (exDeja || expeditions())) {
++      if (e.o && isShipDone(e.o)) continue;                 // déjà posté : plus un candidat
++      const capte = e.txn ? labelsCaptes[e.txn] : null;
++      const pdf = !!((e.b && e.b.hasPdf) || capte);
++      rows.push({
++        cle: e.key, plateforme: 'Vinted', commande: e.txn, ts: e.ts,
++        compte: accNameOf(e.o && e.o._acc) || '',
++        statut: (e.o && e.o.status) || '',
++        titre: e.o ? (e.o.title || '') : ((e.b && (e.b.modele || e.b.article)) || ''),
++        // Numéro et titre : même dérivation que la carte (identité Vinted,
++        // jamais le titre — §5). Numéro du bordereau si on l'a, sinon la vente.
++        numero: (e.b ? numForBord(e.b) : '') || (e.o ? (effEntry(e.o)?.numero || '') : ''),
++        pdfOk: pdf,
++        raisonBloque: pdf ? null : 'sans bordereau — « Générer le bordereau » d\'abord',
++        srcCapteRow: capte ? capte.row : null,
++        srcEmailRow: e.b && e.b.hasPdf ? e.b._row : null,
++        invB: e.b || null,
++      });
++    }
++    // Leboncoin : les colis à envoyer — la MÊME règle que l'écran Colis
++    // Leboncoin (`lbcColisAEnvoyer`, §11). Leur PDF est derrière SA session
++    // Leboncoin : seule l'extension à jour peut le lire — sinon la ligne est
++    // montrée, mise de côté, avec le geste (trois états, jamais deux).
++    const lbcFaits = load('vrm_lbc_colis_done', {}) || {};
++    const extLbc = extSait('lbcpdf');
++    for (const o of lbcColisAEnvoyer((lbcVentes && lbcVentes.ventes) || [], (x) => !!lbcFaits[x.txId])) {
++      const voucher = (o.label && o.label.voucherUrl) || null;
++      const eNum = o.itemId != null ? numeros[o.itemId] : null;
++      rows.push({
++        cle: 'lbc:' + o.txId, plateforme: 'Leboncoin', commande: String(o.txId || ''), ts: tsVenteMs(o.dateVente),
++        compte: o.account || '', statut: o.stepLabel || o.stepStatus || o.parcelStatus || '',
++        titre: o.title || '',
++        numero: (eNum && eNum.numero != null && String(eNum.numero).trim()) || '',
++        pdfOk: !!voucher && extLbc === 'ok',
++        raisonBloque: !voucher ? 'sans bordereau — génère-le sur Leboncoin'
++          : extLbc === 'ok' ? null
++          : extLbc === 'retard' ? `bordereau Leboncoin — mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour l'imprimer dans le lot`
++          : 'bordereau Leboncoin — il faut l\'extension, sur l\'ordinateur où elle est installée',
++        srcVoucher: voucher,
++      });
++    }
++    // Tri : vente la plus récente d'abord, toutes plateformes confondues —
++    // jamais par compte (Julien, 15 oct.). Une date inconnue va en dernier.
++    rows.sort((a, b) => cmpVenteRecenteDabord(a.ts, b.ts));
++    // Dédoublonnage PAR COMMANDE (une identité, §5) : une même transaction vue
++    // deux fois n'imprime qu'UN bordereau — la seconde ligne le dit.
++    const vues = new Set();
++    for (const r of rows) {
++      const k = r.plateforme + ':' + r.commande;
++      if (r.commande && vues.has(k)) { r.double = true; r.pdfOk = false; r.raisonBloque = 'en double — même commande, déjà dans le lot'; }
++      else if (r.commande) vues.add(k);
++      r.cleImprime = lotCleCommande(r.plateforme, r.commande);
++      r.dejaImprime = !!bordsPrinted[r.cleImprime];
++      r.ageJours = r.ts == null ? null : Math.floor((Date.now() - r.ts) / 86400000);
++      r.ancien = r.ageJours != null && r.ageJours > LOT_ANCIEN_J;
++    }
++    return rows;
++  };
++  // Une ligne est RETENUE : imprimable, pas en double, et pas mise de côté
++  // (déjà imprimée / ancienne) — sauf si sa case la réinclut.
++  const lotRetenu = (r, inclImprimes, inclAnciens) => !!(r.pdfOk && !r.double && (!r.dejaImprime || inclImprimes) && (!r.ancien || inclAnciens));
++  const [lotApercu, setLotApercu] = useState(null);            // [rows] | null
++  const [lotInclImprimes, setLotInclImprimes] = useState(false);
++  const [lotInclAnciens, setLotInclAnciens] = useState(false);
++  const [lotEchecs, setLotEchecs] = useState(null);            // [{...row, erreur}] | null
++  // Ce qui est parti dans le lot est MARQUÉ imprimé (`vinted_bords_printed`,
++  // par commande — la même clé que le bouton « ✓ Imprimé » des cartes) : le
++  // prochain lot le met de côté par défaut. ⚠️ Imprimer ne retire RIEN de la
++  // liste (règle du 21 sept. : seuls « posté » et la confirmation Vinted
++  // sortent un colis).
++  const marquerLotImprime = (rows) => {
++    if (!rows.length) return;
++    setBordsPrinted(prev => {
++      const u = { ...prev }; const now = new Date().toISOString();
++      rows.forEach(r => { if (r.cleImprime) u[r.cleImprime] = now; });
++      save('vinted_bords_printed', u); return u;
++    });
++  };
++  // Le bouton OUVRE L'APERÇU — il n'imprime plus à l'aveugle. Le deep-link
++  // `?print=bord` de l'extension ouvre donc l'aperçu aussi : il montre la
++  // liste, l'impression part sur SON clic (§3).
++  const batchBordereaux = () => {
+     if (batchBusy) return;
+-    // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
+-    // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
+-    // n'existent pas ou plus, et ne prend pas en compte ceux qui sont déjà là ».
+-    // Cause mesurée, un pur écart §11 — DEUX règles pour « quoi imprimer » :
+-    //  · le compteur du bouton (`avecPdf`) part de `expeditions()` : une entrée
+-    //    par VENTE encore à expédier (`!isShipDone`), qui a un PDF — email
+-    //    (`b.hasPdf`) OU capté par l'extension (`labelsCaptes[txn]`) ;
+-    //  · l'ancien `batchBordereaux` partait de `emailBords.filter(hasPdf &&
+-    //    !isBordDone)` — donc (a) il IGNORAIT les bordereaux captés par
+-    //    l'extension (« ceux qui sont déjà là »), et (b) il jugeait sur
+-    //    `isBordDone` (marqué imprimé) au lieu de `isShipDone` (colis parti) :
+-    //    un colis déjà expédié mais non coché « imprimé » repartait à
+-    //    l'impression — « un bordereau qui n'existe plus ».
+-    // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
+-    //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
+-    const ex = expeditions();
+-    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
+-    if (!aImprimer.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
++    const rows = lotImprimerCandidats();
++    if (!rows.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
++    setLotInclImprimes(false); setLotInclAnciens(false); setLotEchecs(null);
++    setLotApercu(rows);
++  };
++  // Impression du lot RETENU. Les erreurs sont gardées PAR bordereau
++  // (`lotEchecs`) : l'écran les nomme, et « ↻ Réimprimer les échecs » ne
++  // reprend QUE les échecs — jamais tout le lot une seconde fois.
++  const imprimerLot = async (aImprimer) => {
++    if (batchBusy || !aImprimer.length) return;
+     setBatchBusy(true);
++    const echecs = [];
+     try {
+       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
+       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
+       const items = [];
+       let pasLus = 0, sansPdf = 0;
+-      for (const e of aImprimer) {
+-        const o = e.o, b = e.b;
+-        // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
+-        //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
+-        //    par n° de transaction ; l'email n'est qu'un secours.
+-        const capte = e.txn ? labelsCaptes[e.txn] : null;
+-        const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+-        if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+-        const buf = lu && lu.octets ? lu.octets : null;
+-        if (!buf) continue;   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+-        // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
+-        // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
+-        const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+-        const title = o ? o.title : (b ? (b.modele || b.article || '') : '');
+-        // Compte pro (une facture existe pour cette vente) → on joint la facture
+-        // juste après son bordereau dans le PDF groupé (§41).
+-        let invBytes = null;
+-        const inv = b ? invForBord(b) : null;
+-        if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+-        items.push({ numero, title, pdfBuf: buf, invBytes });
++      for (const r of aImprimer) {
++        let buf = null, invBytes = null;
++        if (r.plateforme === 'Leboncoin') {
++          const r0 = await vmrPdfLbc(r.srcVoucher);
++          if (!r0 || !r0.dataUrl) { echecs.push({ ...r, erreur: `bordereau Leboncoin illisible${r0 && r0.error ? ' — ' + r0.error : ''}` }); continue; }
++          try { const b2 = b64ToBytes(r0.dataUrl.split(',')[1] || ''); if (estOctetsPdf(b2)) buf = b2; } catch (_) {}
++          if (!buf) { echecs.push({ ...r, erreur: 'la réponse de Leboncoin n\'est pas un PDF — ouvre la vente sur Leboncoin' }); continue; }
++        } else {
++          // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
++          //    carte) : l'étiquette prise chez Vinted, rattachée par n° de
++          //    transaction ; l'email n'est qu'un secours.
++          const lu = await octetsBordereau(r.srcCapteRow, r.srcEmailRow);
++          if (lu === null) { pasLus++; echecs.push({ ...r, erreur: 'la base n\'a pas répondu — « Réimprimer les échecs » réessaie' }); continue; }
++          if (!lu.octets) { sansPdf++; echecs.push({ ...r, erreur: 'PDF absent de la base — retélécharge-le depuis la vente sur Vinted' }); continue; }
++          buf = lu.octets;
++          // Compte pro (une facture existe pour cette vente) → la facture
++          // juste après son bordereau dans le PDF groupé (§41).
++          const inv = r.invB ? invForBord(r.invB) : null;
++          if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch (_) {} } }
++        }
++        items.push({ cle: r.cle, numero: r.numero, title: r.titre, pdfBuf: buf, invBytes });
++      }
++      if (!items.length) {
++        libererOngletPdf(); setLotEchecs(echecs.length ? echecs : null);
++        toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Aucun de ces bordereaux n'a son PDF — le détail est écrit sur l'écran.");
++        setBatchBusy(false); return;
+       }
+-      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
+       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
++      // Les PDF que la fusion a dû écarter (abîmés, chiffrés) — nommés un par un.
++      for (const x of (r.rates || [])) { const r0 = aImprimer.find((y) => y.cle === x.cle); if (r0) echecs.push({ ...r0, erreur: 'PDF illisible (abîmé ou chiffré) — retélécharge-le depuis la vente sur Vinted' }); }
++      const okSet = new Set(r.clesOk || []);
++      marquerLotImprime(aImprimer.filter((y) => okSet.has(y.cle)));
+       setBordResult({ ...r, batch: true });
+       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
+-      // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
+-      // un PDF qui commence par %PDF mais que pdf-lib refuse (chiffré, abîmé)
+-      // est écarté par la fusion, et il doit être compté ici aussi.
++      // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`).
+       const imprimes = Number(r && r.count) || 0;
+-      const illisibles = Math.max(0, items.length - imprimes);
++      const illisibles = (r.rates || []).length;
+       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
+     } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
++    setLotEchecs(echecs.length ? echecs : null);
+     setBatchBusy(false);
+   };
+   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
+@@ -31850,6 +32014,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
+           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
+           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
++          // Le lot « Tout imprimer » : la MÊME liste que l'aperçu et que
++          // l'impression (§11). Le bouton compte la sélection PAR DÉFAUT ;
++          // ce qui est mis de côté (déjà imprimé, ancien) est DIT à côté.
++          const lotRows = lotImprimerCandidats(ex);
++          const lotDefaut = lotRows.filter(r => lotRetenu(r, false, false)).length;
++          const lotMisDeCote = lotRows.filter(r => r.pdfOk && !r.double && !lotRetenu(r, false, false)).length;
++          const lotPossible = lotRows.some(r => r.pdfOk);
+           // « À générer » = colis à poster SANS bordereau (ni PDF capté, ni email).
+           // Chacun a son bouton « Générer » ; le bouton d'ensemble les commande
+           // sur son clic (§3). Offert seulement si la lecture est complète, pour
+@@ -31878,7 +32049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+                     {aPoster.length>0
+                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
+-                      : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
++                      : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete && lotMisDeCote>0?` · ${lotMisDeCote} mis de côté par « Tout imprimer » (déjà imprimé${lotMisDeCote>1?'s':''} ou ancien${lotMisDeCote>1?'s':''} — l'aperçu les montre)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
+                       : 'Vinted ne te demande aucun envoi en ce moment.'}
+                   </div>
+                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
+@@ -31892,11 +32063,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
+                     return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
+                 </div>
+-                {avecPdf.length>0 && (
+-                  <button type="button" data-imprime="1" onClick={batchBordereaux} disabled={batchBusy}
+-                    title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
++                {/* ⚠️ Pas de `data-imprime` sur ce bouton : il ouvre l'APERÇU,
++                    pas l'impression — réserver l'onglet PDF maintenant
++                    ouvrirait une page blanche pendant qu'il lit la liste.
++                    C'est le bouton « Imprimer » de l'aperçu qui le porte. */}
++                {lotPossible && (
++                  <button type="button" data-lot-defaut={lotDefaut} onClick={batchBordereaux} disabled={batchBusy}
++                    title="Montre d'abord la liste (date de vente, plateforme, compte, statut), puis tamponne les bordereaux retenus (numéro + titre) à la suite dans un seul PDF"
+                     style={{flexShrink:0,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
+-                    {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
++                    {batchBusy?'Préparation…':lotDefaut===1?'🖨 Imprimer':`🖨 Tout imprimer${lotDefaut?` (${lotDefaut})`:'…'}`}
+                   </button>
+                 )}
+                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
+@@ -31913,7 +32088,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+                   code-barres coupé, donc un colis qui ne part pas.
+                   ⚠️ UNE SEULE phrase sous les deux pastilles (§7) : ce qui
+                   distingue, c'est la pastille active, pas un texte par ligne. */}
+-              {avecPdf.length>0 && (
++              {lotPossible && (
+                 <div style={{marginTop:12,paddingTop:11,borderTop:`1px solid ${C.border}`}}>
+                   <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                     <span style={{fontSize:11.5,color:C.muted,fontWeight:500}}>Imprimante</span>
+@@ -31935,6 +32110,102 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
+             </div>
+           );
+         })()}
++        {/* ── L'APERÇU DU LOT « TOUT IMPRIMER » (15 octobre) ──────────────────
++            La liste EXACTE de ce qui partira à l'impression, AVANT d'imprimer :
++            date de vente, plateforme, compte, commande, statut — triée de la
++            vente la plus récente à la plus ancienne, toutes plateformes
++            confondues, jamais par compte. Une ligne mise de côté dit POURQUOI
++            (déjà imprimée, ancienne, sans PDF, en double) ; les cases
++            réincluent les deux premières. Rien n'est caché : un bordereau
++            écarté en silence, c'était le bordereau d'il y a un mois imprimé en
++            silence. */}
++        {lotApercu && (()=>{
++          const rows = lotApercu;
++          const retenus = rows.filter(r => lotRetenu(r, lotInclImprimes, lotInclAnciens));
++          const nImp = rows.filter(r => r.pdfOk && !r.double && r.dejaImprime).length;
++          const nAnc = rows.filter(r => r.pdfOk && !r.double && !r.dejaImprime && r.ancien).length;
++          const plats = [...new Set(rows.map(r => r.plateforme))];
++          const comptes = [...new Set(rows.map(r => r.compte).filter(Boolean))];
++          const dateTxt = (r) => r.ts == null ? 'date de vente inconnue' : `vendu le ${new Date(r.ts).toLocaleDateString('fr-FR')}`;
++          const ferme = () => setLotApercu(null);
++          return (
++            <div data-lot-apercu={retenus.length} onClick={ferme} style={{position:'fixed',inset:0,zIndex:420,background:'rgba(3,6,12,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:'14px 12px'}}>
++              <div onClick={(e)=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:'0 1px 2px rgba(0,0,0,0.25), 0 18px 50px rgba(0,0,0,0.35)',width:'min(680px, 100%)',maxHeight:'min(84vh, 760px)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
++                <div style={{padding:'13px 15px 9px'}}>
++                  <div style={{fontSize:14.5,fontWeight:700,color:C.text}}>Tout imprimer — {retenus.length} bordereau{retenus.length>1?'x':''} dans le lot</div>
++                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
++                    Du plus récent au plus ancien (date de vente), toutes plateformes confondues
++                    {plats.length===1 ? ` — tout est sur ${plats[0]}` : ''}{comptes.length===1 && comptes[0] ? `, compte ${comptes[0]}` : ''}.
++                  </div>
++                </div>
++                <div style={{overflowY:'auto',padding:'0 15px',borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`,flex:1}}>
++                  {rows.map((r, ri)=>{
++                    const retenu = lotRetenu(r, lotInclImprimes, lotInclAnciens);
++                    const motif = retenu ? '' : (r.raisonBloque || (r.dejaImprime ? `déjà imprimé${r.ancien?' · ancien':''}` : r.ancien ? `vendu il y a ${r.ageJours} j — vérifie que la vente existe encore (capture peut-être figée)` : ''));
++                    return (
++                      // ⚠️ La clé porte l'INDEX : une commande en double a la même
++                      //    `cle`, et deux clés identiques feraient DISPARAÎTRE la
++                      //    ligne doublonnée du rendu — l'aperçu doit la montrer.
++                      <div key={r.cle + '_' + ri} data-lot-ligne={r.cle} data-retenu={retenu?'1':'0'} data-plateforme={r.plateforme} style={{display:'flex',gap:8,alignItems:'baseline',flexWrap:'wrap',padding:'8px 0',borderBottom:`1px solid ${C.border}`,opacity:retenu?1:0.6}}>
++                        <span style={{flexShrink:0,fontSize:11.5,fontWeight:600,color:C.text,fontVariantNumeric:'tabular-nums'}}>{dateTxt(r)}</span>
++                        {plats.length>1 && <span style={{flexShrink:0,fontSize:10.5,fontWeight:700,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 7px'}}>{r.plateforme}</span>}
++                        <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.numero?`N°${r.numero} · `:''}{r.titre||'(sans titre)'}</span>
++                        {comptes.length>1 && r.compte && <span style={{flexShrink:0,fontSize:11,color:C.muted}}>{r.compte}</span>}
++                        <span style={{flexShrink:0,fontSize:10.5,color:C.muted}}>cmde {r.commande||'—'}</span>
++                        {r.statut && <span style={{flexShrink:0,fontSize:10.5,color:C.muted,maxWidth:170,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.statut}>{r.statut}</span>}
++                        <span data-lot-motif={retenu?'':'1'} style={{flexBasis:'100%',marginTop:-4,fontSize:10.5,color:retenu?INV_STATUS.online.color:C.warn,fontWeight:600}}>{retenu?'✓ dans le lot':motif}</span>
++                      </div>
++                    );
++                  })}
++                </div>
++                <div style={{padding:'10px 15px 13px',display:'flex',flexDirection:'column',gap:8}}>
++                  {nImp>0 && <label style={{display:'flex',gap:7,alignItems:'flex-start',fontSize:11.5,color:C.text,cursor:'pointer'}}>
++                    <input type="checkbox" data-lot-inclure-imprimes checked={lotInclImprimes} onChange={(e)=>setLotInclImprimes(e.target.checked)} style={{marginTop:1}}/>
++                    <span>Inclure les {nImp} déjà imprimé{nImp>1?'s':''}</span>
++                  </label>}
++                  {nAnc>0 && <label style={{display:'flex',gap:7,alignItems:'flex-start',fontSize:11.5,color:C.text,cursor:'pointer'}}>
++                    <input type="checkbox" data-lot-inclure-anciens checked={lotInclAnciens} onChange={(e)=>setLotInclAnciens(e.target.checked)} style={{marginTop:1}}/>
++                    <span>Inclure les {nAnc} ancien{nAnc>1?'s':''} (vendu{nAnc>1?'s':''} il y a plus de {LOT_ANCIEN_J} jours — vérifie d'abord que ces ventes existent encore)</span>
++                  </label>}
++                  <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap'}}>
++                    <button type="button" onClick={ferme} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
++                    <button type="button" data-imprime="1" data-lot-imprimer={retenus.length} disabled={batchBusy || !retenus.length}
++                      onClick={()=>{ const sel=retenus; setLotApercu(null); imprimerLot(sel); }}
++                      style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:600,cursor:(batchBusy||!retenus.length)?'default':'pointer',fontFamily:'inherit',opacity:(batchBusy||!retenus.length)?0.55:1}}>
++                      🖨 Imprimer {retenus.length} bordereau{retenus.length>1?'x':''}
++                    </button>
++                  </div>
++                </div>
++              </div>
++            </div>
++          );
++        })()}
++        {/* ── LES ÉCHECS DU LOT, BORDEREAU PAR BORDEREAU (15 octobre) ─────────
++            Chaque erreur est nommée (quelle vente, pourquoi), et « Réimprimer
++            les échecs » ne reprend QUE les échecs — jamais tout le lot une
++            seconde fois (un bordereau réimprimé en double, c'est deux
++            étiquettes pour un carton). */}
++        {lotEchecs && lotEchecs.length>0 && (
++          <div data-lot-echecs={lotEchecs.length} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
++            <div style={{display:'flex',gap:9,alignItems:'flex-start',flexWrap:'wrap'}}>
++              <div style={{flex:'1 1 220px',minWidth:0}}>
++                <div style={{fontSize:13,fontWeight:700,color:C.text}}>{lotEchecs.length} bordereau{lotEchecs.length>1?'x':''} du lot n'{lotEchecs.length>1?'ont':'a'} pas pu être imprimé{lotEchecs.length>1?'s':''}</div>
++                <div style={{display:'grid',gap:3,marginTop:6}}>
++                  {lotEchecs.map((r)=>(
++                    <div key={r.cle} data-lot-echec={r.cle} style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>
++                      <b style={{color:C.text}}>{r.numero?`N°${r.numero} · `:''}{r.titre||r.commande}</b>{r.plateforme==='Leboncoin'?' (Leboncoin)':''} — {r.erreur}
++                    </div>
++                  ))}
++                </div>
++              </div>
++              <div style={{display:'flex',gap:8,flexShrink:0}}>
++                <button type="button" data-imprime="1" data-lot-reimprimer={lotEchecs.length} disabled={batchBusy} onClick={()=>imprimerLot(lotEchecs)}
++                  style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'9px 13px',fontSize:12.5,fontWeight:600,cursor:batchBusy?'default':'pointer',fontFamily:'inherit',opacity:batchBusy?0.6:1}}>↻ Réimprimer les échecs</button>
++                <button type="button" onClick={()=>setLotEchecs(null)} title="Fermer ce rappel" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
++              </div>
++            </div>
++          </div>
++        )}
+         {/* ── « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) ───────
+             La liste vient de `cochesNonPartis` (la règle `posteSansDepart`, une
+             seule — Ma journée lit la même). Le geste est dit UNE fois en tête ;
+-- 
+2.43.0
+
