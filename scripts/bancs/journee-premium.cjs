@@ -77,7 +77,7 @@ srv.listen(PORT);
 const teintes = ['#d9d4cc', '#c9ced6', '#e2ddd4', '#cfd6cf', '#d8d0d6', '#d3d8de', '#ddd8cc', '#cdd2d8', '#d6d1c8'];
 const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="${teintes[k % teintes.length]}"/><ellipse cx="200" cy="300" rx="150" ry="22" fill="rgba(0,0,0,.08)"/><path d="M70 250 C90 190 150 180 190 200 C230 220 280 205 320 230 C345 245 340 280 300 282 L90 282 C70 282 62 268 70 250 Z" fill="rgba(30,34,40,.55)"/></svg>`;
 
-const ouvrir = async (b, vp, prenom) => {
+const ouvrir = async (b, vp, prenom, ventesKO = false) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -101,6 +101,7 @@ const ouvrir = async (b, vp, prenom) => {
       }
       return { ...r, updated_at: cap, cap: r.data.capturedAt };
     };
+    if (ventesKO && /orders_(sold|%)/.test(u)) return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
@@ -165,6 +166,14 @@ const lire = (pg) => pg.evaluate(() => {
         await ctx.close();
       });
     }
+    console.log('\n── Ventes illisibles : « — », jamais « 0 € » (§5)');
+    await essaie('ventes illisibles', async () => {
+      const { ctx, pg } = await ouvrir(b, { width: 390, height: 844 }, 'Julien', true);
+      await pg.waitForTimeout(1500);
+      const r = await pg.evaluate(() => { const e = document.querySelector('[data-vendu-mois]'); return { v: e ? e.getAttribute('data-vendu-mois') : null, t: e ? e.innerText : '', m: (document.querySelector('[data-vendu-manque]') || {}).innerText || '' }; });
+      dit(r.v === null || (r.v === '' && /—/.test(r.t) && /pas pu être lues/.test(r.m)), 'aucun compte lu ⇒ le vendu du mois n’affiche pas « 0 € »', JSON.stringify(r));
+      await ctx.close();
+    });
     console.log('\n── L’autre sens : un vrai prénom est dit');
     await essaie('prénom', async () => {
       const { ctx, pg } = await ouvrir(b, { width: 390, height: 844 }, 'Julien');
