@@ -108,11 +108,8 @@ async function brancher(p){
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
       const gestion=rail.getByRole('button',{name:'Gestion',exact:true});
       await gestion.click();
-      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion accessible dans le panneau de gauche');
-      check(await rail.locator('.vrm-rail-panel').evaluate(e=>{
-        const lum=color=>{const c=color.match(/[\d.]+/g).slice(0,3).map(v=>{const n=Number(v)/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;});return .2126*c[0]+.7152*c[1]+.0722*c[2];};
-        const css=getComputedStyle(e),a=lum(css.color),b=lum(css.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;
-      }),'texte Gestion contrasté sur le panneau clair');
+      check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion accessible directement dans le rail');
+      check(await rail.locator('.vrm-rail-management').evaluate(e=>{const r=e.getBoundingClientRect(),n=e.closest('nav').getBoundingClientRect();return r.left>=n.left && r.right<=n.right;}),'Gestion intégrée dans le rail sans panneau flottant');
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'gestion-desktop.png')});}
       check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures conservés dans Gestion');
       await p.keyboard.press('Escape');
@@ -120,6 +117,8 @@ async function brancher(p){
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
     if(width===1512){
+      check(await p.locator('.vrm-main').evaluate(e=>innerWidth-e.getBoundingClientRect().right<60),'contenu utilise la largeur jusqu’au bord droit '+nom);
+      if(nom==='eBay')check(await p.locator('.vrm-ebay-sales').evaluate(e=>document.querySelector('.vrm-main').getBoundingClientRect().right-e.getBoundingClientRect().right<60),'ventes eBay utilisent également la largeur disponible');
       const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
       check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);
     }
