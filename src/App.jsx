@@ -14,6 +14,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
+import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
@@ -23223,6 +23224,7 @@ function ProfilFiscalCarte({ onNav }) {
   const ecrire = (next) => {
     if (!cfg) return;                                      // pas lu : on n'écrit rien
     setCfg(next); setStatut('enregistrement…');
+    try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
       try {
@@ -23289,6 +23291,198 @@ function ProfilFiscalCarte({ onNav }) {
               <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Réglages</button>.</div>
             )}
           </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── FACTURATION ÉLECTRONIQUE — Factur-X et récap e-reporting (16 octobre) ────
+// VRM PRÉPARE, le vendeur ENVOIE depuis sa plateforme agréée gratuite : aucune
+// connexion à une plateforme, aucune fonction payante (§2.9). Les règles vivent
+// dans `src/facturationElectronique.js` ; les ventes viennent de
+// `ventesDeclarables` (datées au versement, comme le CA déclaré) — AUCUNE règle
+// de vente n'est écrite ici (§11). Le numéro de facture : une série par année
+// (`FX-AAAA-0001`), rangée dans `vrm_compta.facturx` (synchronisé), donnée UNE
+// fois par vente (regénérer la même vente redonne le même numéro et la même
+// date). ⚠️ Tant que le nuage n'est pas arrivé, on ne numérote pas : un appareil
+// neuf repartirait de 0001 et doublerait un numéro déjà donné.
+const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
+const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
+const telechargerFichier = (contenu, nom, type) => {
+  const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { ventes, ko } = useVentesCoque();
+  const [versements, setVersements] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
+  // Le profil fiscal : relu à l'ouverture, et suivi quand la carte « Profil
+  // fiscal » juste au-dessus l'écrit (même ligne, §11).
+  const [cfg, setCfg] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); });
+    const f = (e) => { if (e && e.detail && typeof e.detail === 'object') setCfg({ ...e.detail }); };
+    window.addEventListener('vrm:profil-fiscal', f);
+    return () => { mort = true; window.removeEventListener('vrm:profil-fiscal', f); };
+  }, []);
+  // Le régime BRUT : jamais choisi ⇒ null (on ne retombe pas sur « micro »).
+  const [regime, setRegime] = React.useState(() => load('vinted_regime', null));
+  const [nuage, setNuage] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => { setNuage(true); setRegime(load('vinted_regime', null)); }), []);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_regime') setRegime(load('vinted_regime', null)); if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const etat = etatFacturation({ cfg, regime, verifier: verifierSiren });
+  const mois = React.useMemo(() => ymListe(12), []);
+  const [ym, setYm] = React.useState(mois[0]);
+  const [msg, setMsg] = React.useState('');
+  const [enCours, setEnCours] = React.useState('');
+
+  const calc = React.useMemo(() => {
+    if (ventes === undefined) return { etat: 'encours' };
+    if (!Array.isArray(ventes)) return { etat: 'passu' };
+    const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
+    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
+    const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
+    const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
+    const manque = [
+      ...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe),
+      ...(lbcCoqueLu === null ? ['Leboncoin'] : []),
+      ...(ebayCommandes === null ? ['eBay'] : []),
+    ];
+    return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  const recap = calc.etat === 'lu' ? recapEReporting({ lignes: calc.decl.lignes, aDater: versements ? calc.decl.aDater : [], ym, ymDe: ymDeTs, manque: calc.manque, attente: calc.attente, versementsLus: versements !== null }) : null;
+
+  const fx = (data && data.facturx) || {};
+  const numeroDe = (id) => (fx.parVente && fx.parVente[id]) || null;
+  const genererFacture = async (l) => {
+    setMsg('');
+    if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
+    if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
+    setEnCours(l.id);
+    try {
+      let deja = numeroDe(l.id);
+      let next = data;
+      if (!deja) {
+        const emiseLe = Date.now(), an = String(new Date(emiseLe).getFullYear());
+        const compteur = { ...(fx.compteur || {}) }; const n = (Number(compteur[an]) || 0) + 1; compteur[an] = n;
+        deja = { numero: `FX-${an}-${String(n).padStart(4, '0')}`, emiseLe };
+        next = { ...data, facturx: { ...fx, compteur, parVente: { ...(fx.parVente || {}), [l.id]: deja } } };
+      }
+      const f = factureDepuisVente(l, { numero: deja.numero, emiseLe: deja.emiseLe });
+      if (!isFinite(f.centimes)) throw new Error('montant illisible');
+      const octets = await pdfFacturX(f, etat.vendeur);
+      if (next !== data) maj(next);
+      telechargerFichier(new Blob([octets], { type: 'application/pdf' }), nomFichierFacture(f.numero), 'application/pdf');
+      setMsg(`Facture ${f.numero} téléchargée — à déposer sur ta plateforme agréée.`);
+    } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
+    finally { setEnCours(''); }
+  };
+  const exporter = (format) => {
+    if (!recap) return;
+    const v = etat.ok ? etat.vendeur : null;
+    if (format === 'csv') telechargerFichier(recapCsv(recap, v), `e-reporting-${ym}.csv`, 'text/csv;charset=utf-8');
+    else telechargerFichier(recapJson(recap, v), `e-reporting-${ym}.json`, 'application/json');
+  };
+
+  const chip = (icon) => <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>;
+  const btn2 = (actif) => ({ border: `1px solid ${C.border}`, background: C.card, color: actif ? C.text : C.muted, borderRadius: 8, padding: '8px 13px', fontSize: 12.5, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, opacity: actif ? 1 : 0.6 });
+  const peutFacturer = etat.ok && nuage;
+  const raisonGrise = !etat.ok ? etat.raison : !nuage ? "Je relis d'abord les numéros de facture déjà donnés." : '';
+  const parPlat = recap ? Object.entries(recap.parPlateforme) : [];
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-fe-carte data-fe-etat={etat.etat} data-fe-nuage={nuage ? '1' : '0'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
+          {chip('doc')}
+          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Facturation électronique</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers, gratuitement. C'est toi qui les envoies.</div>
+          </div>
+          <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
+            style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
+            {mois.map((m) => <option key={m} value={m}>{libelleYm(m)}</option>)}
+          </select>
+        </div>
+
+        <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
+          {[
+            ['Ce que VRM prépare', 'Une facture Factur-X (PDF + données lisibles par machine) par vente, et le récapitulatif mensuel de tes ventes aux particuliers (e-reporting).'],
+            ["Où l'envoyer", 'Depuis ta plateforme agréée gratuite (Indy, Pennylane, Tiime…) : dépose-y les fichiers. VRM ne se connecte à aucune plateforme.'],
+            ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
+          ].map(([t, d], i) => (
+            <div key={t} data-fe-explique={i} style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
+              <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{t}</div>
+              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginTop: 4 }}>{d}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── RÉCAP E-REPORTING ── */}
+        <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
+          {!recap ? (
+            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
+              {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+            </div>
+          ) : (<div data-fe-recap data-recap-ym={ym} data-recap-total={eurDe(recap.centimes)} data-recap-n={recap.n} data-recap-partiel={recap.partiel ? '1' : '0'}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 750, color: C.text, letterSpacing: -0.6 }}>
+                {recap.partiel && <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span>}{fmt(recap.centimes / 100)}
+              </div>
+              <div style={{ fontSize: 12.5, color: C.muted }}>{recap.n} vente{recap.n > 1 ? 's' : ''} · datées comme ton CA déclaré (au versement pour Vinted)</div>
+            </div>
+            {parPlat.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {parPlat.map(([p, x]) => <span key={p} data-recap-plateforme={p} style={{ fontSize: 11.5, color: C.text, border: `1px solid ${C.border}`, borderRadius: 999, padding: '3px 10px' }}>{p} · {fmt(x.centimes / 100)} · {x.n}</span>)}
+            </div>}
+            {recap.partiel && <div data-fe-manque style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
+              Total partiel — il manque : {recap.manques.join(' ; ')}. Le fichier le dit aussi.
+            </div>}
+            <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>VRM ne sait pas si un acheteur est une entreprise : toutes tes ventes du mois y figurent. Retire celles faites à une entreprise (elles demandent une facture).</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)}><Icon name="save" size={14} />Récap CSV</button>
+              <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)}><Icon name="save" size={14} />Récap JSON</button>
+            </div>
+          </div>)}
+        </div>
+
+        {/* ── FACTURES FACTUR-X ── */}
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
+          {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 12.5, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
+            {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
+          </div>}
+          {etat.ok && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Vendeur : {etat.vendeur.nom} · SIREN {etat.vendeur.siren} · « {etat.vendeur.mention} ». Acheteur : le nom porté par la vente, sinon « Particulier ».</div>}
+          {recap && recap.lignes.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Aucune vente datée sur ce mois{recap.partiel ? ' (avec ce qui a pu être lu)' : ''}.</div>}
+          {recap && recap.lignes.length > 0 && <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
+            {recap.lignes.map((l, i) => {
+              const num = numeroDe(l.id);
+              return (
+                <div key={l.id} data-fe-vente={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Article'}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? 'versée' : l.plateforme === 'eBay' ? 'payée' : 'vendue'} le {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
+                  </div>
+                  <span className="vrm-display" style={{ fontSize: 13.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
+                  <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || 'Télécharger la facture Factur-X (PDF + XML)'}
+                    onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
+                    <Icon name="receipt" size={14} />{enCours === l.id ? '…' : 'Facture'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>}
+          {msg && <div data-fe-msg role="status" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{msg}</div>}
+          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numérotation continue par année (FX-AAAA-0001) ; une vente garde toujours le même numéro. La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</div>
         </div>
       </div>
     </Card>
@@ -23607,17 +23801,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <span style={{ fontSize: 20, color: C.muted }}>›</span>
       </button>
 
-      {/* BANQUE & FACTURATION ÉLECTRONIQUE — un geste qui t'appartient. */}
-      <Card style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 8 }}>
-          {chip('wallet')}
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Banque & facturation électronique</div>
-        </div>
-        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
-          La loi impose la <b>facturation électronique</b> aux entreprises à partir de 2026, via une plateforme agréée (PDP). Connecter ta banque ou une plateforme pour émettre et recevoir ces factures demande <b>tes identifiants</b> : c'est un geste qui n'appartient qu'à toi, l'app ne peut pas le faire à ta place.
-          <br />Quand tu auras choisi ta plateforme, dis-le-moi : je câble la réception des factures ici (comme les reçus Vinted arrivent déjà par email). D'ici là, <b>rien n'est connecté</b> — je ne fais pas semblant.
-        </div>
-      </Card>
+      {/* FACTURATION ÉLECTRONIQUE — Factur-X par vente + récap e-reporting du mois. */}
+      <FacturationElectroniqueCarte data={data} maj={maj} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
     </div>
   );
 }
