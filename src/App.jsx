@@ -81,6 +81,22 @@ const EXT_ATTENDUE = '5.177.0';
 //    promettait une préparation que rien ne déclenche. Mesuré : 0 des 401 fiches
 //    avait coché eBay — rien n'est perdu. L'entrée reste (la règle `mpChoisi`,
 //    les audits et l'extension la lisent encore) ; elle ne s'affiche plus.
+// Un geste qui commence sur un bouton, un lien, un champ ou dans une zone qui
+// défile de côté (photos, rangées de pastilles) n'est JAMAIS un changement
+// d'onglet : il appartient à ce qu'il touche (voir `slideTab`).
+function gesteHorsNavigation(cible) {
+  let n = cible;
+  for (let k = 0; n && n !== document.body && k < 40; k++, n = n.parentElement) {
+    try {
+      const tag = n.tagName;
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' || n.isContentEditable) return true;
+      const role = n.getAttribute && n.getAttribute('role');
+      if (role === 'button' || role === 'tab' || role === 'link' || role === 'slider') return true;
+      if (n.scrollWidth > n.clientWidth + 2) { const ox = getComputedStyle(n).overflowX; if (ox === 'auto' || ox === 'scroll') return true; }
+    } catch (_) { return false; }
+  }
+  return false;
+}
 const MP_PLACES = [
   { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places', capPhotos: 'photoslbc' },
   { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay', ui: false },
@@ -38600,12 +38616,21 @@ function AppCoeur() {
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
   // clavier : une seule règle, sinon les trois finissent par diverger.
+  // ⚠️⚠️ (16 oct., Julien : « quand je publie sur eBay et que j'appuie sur
+  //    n'importe quel bouton, des fois ça m'a publié sur Vestiaire Collective »).
+  //    Mesuré : VRM n'a AUCUN code qui publie sur Vestiaire. C'était ce geste :
+  //    l'onglet voisin d'eBay est Vestiaire, et un clic à peine glissé (souris)
+  //    ou un défilement horizontal des photos (doigt) y menait. ⇒ On ne glisse
+  //    qu'entre les onglets de la barre du bas (Vestiaire n'y est pas), et un
+  //    geste parti d'un bouton, d'un lien ou d'une zone qui défile de côté n'est
+  //    jamais un changement d'onglet (`gesteHorsNavigation`).
   const slideTab=React.useCallback((dx,dy,seuil)=>{
     if(Math.abs(dx)<=seuil || Math.abs(dx)<=Math.abs(dy)*2) return;
     setTab(t=>{
-      const i=BOTTOM_TABS.findIndex(x=>x.id===t); if(i<0) return t;
-      const ni=dx<0?Math.min(BOTTOM_TABS.length-1,i+1):Math.max(0,i-1);
-      return BOTTOM_TABS[ni].id;
+      const ordre=BOTTOM_TABS.filter(x=>x.id!=='plat_vestiaire');
+      const i=ordre.findIndex(x=>x.id===t); if(i<0) return t;
+      const ni=dx<0?Math.min(ordre.length-1,i+1):Math.max(0,i-1);
+      return ordre[ni].id;
     });
   },[]);
   // La largeur rendue au zoom est calculée en pixels : il faut la recalculer
@@ -38625,6 +38650,7 @@ function AppCoeur() {
       if(e.metaKey||e.ctrlKey||e.altKey) return;
       const a=document.activeElement, tag=a&&a.tagName;
       if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;
+      if(a && a!==document.body && gesteHorsNavigation(a)) return;
       slideTab(e.key==='ArrowRight'?-999:999, 0, 1);
     };
     window.addEventListener('keydown',onKey);
@@ -39892,7 +39918,7 @@ function AppCoeur() {
       // sinon glisser le tampon changeait d'onglet et perdait le réglage !
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay){ swipeStart.current=null; return; }
+      if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
       const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
       }}
       onTouchEnd={e=>{
@@ -39913,7 +39939,7 @@ function AppCoeur() {
       if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) { swipeStart.current=null; return; }
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay){ swipeStart.current=null; return; }
+      if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
       swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
       // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
