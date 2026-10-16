@@ -26,7 +26,7 @@ const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // Un dressing capté porte TOUJOURS sa date (`storeHarvest` la pose) : sans elle,
 // la règle « en ligne » (11 octobre) ne peut pas dire de quand date la lecture,
 // et la paire passe « à confirmer » (§6.3 : servir la forme réelle).
-const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
+const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9, price:{ amount:'87.0', currency_code:'EUR' } }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 // Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
 const envoisEbay = []; let avertir = false;
@@ -86,14 +86,20 @@ const envoisEbay = []; let avertir = false;
   //    quatre sous-onglets (jamais un libellé, §6.5) : il en faut UN, dans
   //    « Annonces ». Sur le build d'avant : 2 (et aucun ne portait l'attribut).
   const parOnglet = {};
-  for (const nom of ['Ventes', 'Achats', 'Annonces', 'Compte eBay']) {
-    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+  // (16 oct.) Les sous-onglets eBay sont devenus Ventes · Annonces · Messages ·
+  //  Offres · À traiter · Compte. Un onglet qu'on ne trouve pas laissait le banc
+  //  sur « Annonces » : il y comptait le même bouton deux fois (faux rouge).
+  //  Un onglet introuvable est maintenant un contrôle rouge, pas un silence.
+  const introuvables = [];
+  for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
+    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) { introuvables.push(nom); }
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre une paire sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
   const total = Object.values(parOnglet).reduce((a, x) => a + x.vendre, 0);
+  dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
   dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre une paire en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
-  dit(parOnglet['Compte eBay'].vendre === 0 && !parOnglet['Compte eBay'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
+  dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
   try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
@@ -152,6 +158,11 @@ const envoisEbay = []; let avertir = false;
   if (autreCat) { await autreCat.click(); await pg.waitForTimeout(700);
     dit(/Catégorie eBay\s*:?\s*Chaussures de sport/i.test((await T()).replace(/\s+/g,' ')), 'changer de catégorie met à jour la catégorie retenue'); }
   dit(/Prix & livraison/.test(txt), 'section « Prix & livraison » présente');
+  // (16 oct., Julien : « le même prix d'une plateforme à l'autre ») — le prix de
+  // l'annonce Vinted EN LIGNE remplit le champ prix (s'il est vide).
+  const prixVals = await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/^Prix \(€\)/.test(x.textContent.trim())); const i=l&&l.parentElement&&l.parentElement.querySelector('input'); return i?[i.value]:[]; });
+  dit(prixVals.includes('87'), 'choisir la paire reprend son prix Vinted (87 €)', JSON.stringify(prixVals));
+
   // L'ÉTAT vient de la liste d'eBay pour la catégorie (Sell Metadata), pas d'une liste en dur.
   const etats = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/^état/i.test(x.textContent.trim())); if(!l)return ''; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?[...s.options].map(o=>o.textContent).join('|'):''; });
   dit(/occasion/i.test(etats) && /Neuf sans emballage/i.test(etats), 'la liste d\'états vient d\'eBay pour la catégorie', etats.slice(0,60));

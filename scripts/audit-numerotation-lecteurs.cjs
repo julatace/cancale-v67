@@ -256,7 +256,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     const cas = [[ad, {}], [ad, { 2900000001: '7' }], [{ id: '2900000099', ref: '230', subject: 'Nike n230' }, {}], [{ id: '2900000001', customRef: 'VRM-B12', subject: 'x' }, {}]];
     const ecarts = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
     dit(!ecarts.length, 'l\'extension (file Leboncoin) lit les mêmes clés que l\'app, marqueur compris (§11)', ecarts.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
-    dit(/'vrm_lbc_liens', 'vrm_numerotation'\];/.test(EXT) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
+    dit(/'vrm_lbc_liens', 'vrm_numerotation'[,\]]/.test(EXT) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
     cas.push([{ id: '2900000553', ref: '553', subject: 'Autry n553' }, {}], [{ id: '2900000553', ref: '7', subject: 'Autry' }, {}]);
     const ecarts2 = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
     dit(!ecarts2.length, 'et l\'extension lit pareil le numéro provisoire et la référence réécrite (§11)', ecarts2.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));

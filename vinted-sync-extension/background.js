@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.177.0';
+const CODE_VERSION = '5.178.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5364,6 +5364,24 @@ async function executerCommande(msg) {
     }).catch(() => {});
     return { accepte: true, jobId, etape: 'file' };
   }
+  // (16 oct., Julien : « j'ai publié une paire sur Vinted et 2 min après je
+  // voulais la mettre sur eBay, mais VRM n'avait pas capté les photos »). Sur
+  // SON clic (choisir la paire dans « Vendre sur eBay »), on lit TOUT DE SUITE
+  // la page de cette annonce : 1 lecture, sous garde de LECTURE, dans la file
+  // Vinted — la forme de `completerPhotos` au clic « Publier » (3 octobre).
+  // Uniquement pour le compte connecté dans ce Chrome (la session qui lit).
+  if (msg && msg.cmd === 'photos') {
+    const uid = String(msg.uid || ''), id = String(msg.id || '');
+    if (!/^\d+$/.test(uid) || !/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
+    const connecte = await compteConnecte('www.vinted.fr');
+    if (!connecte) return { accepte: false, code: 'vinted-absent', raison: 'aucun compte Vinted connecté dans ce Chrome' };
+    if (String(connecte) !== uid) return { accepte: false, code: 'autre-compte', raison: 'cette annonce est sur un autre compte Vinted que celui ouvert dans Chrome' };
+    const pause = await pauseVinted();
+    if (pause) return { accepte: false, code: 'vinted-pause', raison: raisonPauseVinted(pause) };
+    let ok = false;
+    try { ok = await avecVinted(() => completerPhotos(uid, id)); } catch (_) { ok = false; }
+    return ok ? { accepte: true, etape: 'fait' } : { accepte: true, etape: 'echec', raison: "Vinted n'a pas rendu ses photos pour l'instant" };
+  }
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
@@ -7012,7 +7030,7 @@ const qMain = (cles) => `app_data?id=eq.main&select=${cles.map((k) => `${k}:data
 //    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
 //    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
 const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
-  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
 async function lireMain(cles) {
@@ -7194,7 +7212,9 @@ function lbcTitre(brand, base, size, max) {
   //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
   //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
   const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
-  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
+  // (16 oct., Julien : « au lieu de mettre taille 43 il a mis T43 ») : en
+  //    toutes lettres, comme sur Vinted — c'est ce qu'un acheteur tape.
+  const suff = taille ? (estPointure ? ' taille ' + taille : ' ' + taille) : '';
   // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
@@ -7212,7 +7232,11 @@ function buildLbcAd(raw, det, num, account) {
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
   const cond = String(firstDefined(det.status, raw.status)).trim();
   const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
-  const price = String(firstDefined(det.price && det.price.amount, raw.price && raw.price.amount, raw.price, det.price)).replace(',', '.');
+  // (16 oct., « il a mis un prix au pif, je veux le même que sur Vinted ») :
+  // le prix de l'annonce EN LIGNE (le dressing, relu à chaque visite) d'abord ;
+  // le détail capté à l'ouverture de la page peut dater d'avant une baisse.
+  const prixDe = (p) => (p && typeof p === 'object') ? p.amount : p;
+  const price = String(firstDefined(prixDe(raw.price), prixDe(det.price))).replace(',', '.');
   const desc0 = lbcDescription(firstDefined(det.description, ''));
   // Photos HD
   let photos = [];
@@ -7843,7 +7867,8 @@ async function buildLbcData() {
     let hit = null;
     for (const k of vintedKeys(o, num)) { if (lbcByRef.has(k)) { hit = lbcByRef.get(k); break; } }
     if (hit) { autoMatched.set(o.id, hit); continue; }
-    queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
+    // La localisation que le vendeur a renseignée dans VRM (Réglages → ville).
+    queue.push({ ...buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]), ville: String(main.vrm_ville || '').trim() });
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   // À RETIRER de Leboncoin : une paire publiée sur LBC qui n'est PLUS en ligne

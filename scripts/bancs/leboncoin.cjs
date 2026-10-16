@@ -115,7 +115,11 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
     : depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
-      + '<label for="p2">Prix</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : le champ est en CENTIMES (lbc_recon.etapes, 19 sept.)
+      + '<label for="p2">Prix de vente souhaité*</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : il y tape des EUROS (lbc_recon.etapes, 15 oct.)
+      // La localisation, VRAIE forme mesurée (15 oct.) : une liste à choisir, les
+      // propositions « Ville (code postal) » n'apparaissent qu'après la frappe.
+      + '<label for="loc">Location</label><input id="loc" name="location" role="combobox" aria-label="Location" type="text"><div id="locmenu" role="listbox"></div>'
+      + '<scr'+'ipt>(function(){var b=document.getElementById("loc"),m=document.getElementById("locmenu");window.__villeChoisie="";b.addEventListener("input",function(){var v=b.value.toLowerCase();m.innerHTML="";if(v.indexOf("canc")<0)return;setTimeout(function(){["Route de Cancale, Saint-Malo (35400)","Cancale (35260)"].forEach(function(t){var o=document.createElement("div");o.setAttribute("role","option");o.textContent=t;o.addEventListener("click",function(){window.__villeChoisie=t;b.value=t;m.innerHTML="";});m.appendChild(o);});},250);});})();</scr'+'ipt>'
       + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="1">Vêtements</option><option value="2">Chaussures</option><option value="3">Sacs à main</option></select>'
       + '<label for="e2">État</label><select id="e2" name="condition"><option value=""></option><option value="1">Neuf</option><option value="2">Très bon état</option><option value="3">Satisfaisant</option></select>'
       + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple accept="image/*">'
@@ -127,7 +131,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
 
 // La file servie au panneau : les trois cas de photo, et les trois preuves.
 const QUEUE = [
-  { id: '1001', numero: '401', account: 'julatace3535', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
+  { id: '1001', numero: '401', account: 'julatace3535', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', ville: 'Cancale', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
   { id: '1002', numero: '402', account: 'julatace3535', title: 'Nike air max 1 clear jade T44', description: 'Réf. VRM-402\n\nBon état.', price: '44.00', category: 'Chaussures', photos: ['https://ex/b1.jpg'], ref: 'VRM-402', vintedUrl: 'https://www.vinted.fr/items/1002' },
   { id: '1003', numero: '403', account: 'llloollllaa', title: 'Autry medalist blanc T36', description: 'Réf. VRM-403', price: '24.00', category: 'Chaussures', photos: [], ref: 'VRM-403', vintedUrl: 'https://www.vinted.fr/items/1003' },
 ];
@@ -423,6 +427,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       prix: (document.querySelector('input[name="price_cents"]') || {}).value || '',
       desc: (document.querySelector('textarea[name="body"]') || {}).value || '',
       dl: window.__dl,
+      ville: window.__villeChoisie || '',
       bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '',
     }));
     dit(!e6.length, 'aucune erreur sur la page de dépôt', e6[0] || '');
@@ -436,12 +441,14 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(/état/i.test(etat.etatSel || ''), 'et l\'état aussi', 'choisi : « ' + etat.etatSel + ' »');
     dit(etat.titre === QUEUE[0].title && !!etat.prix && !!etat.desc, 'titre, prix et description sont remplis',
       'titre « ' + etat.titre.slice(0, 24) + ' » · prix ' + etat.prix);
-    // ⚠️⚠️ LE CHAMP `price_cents` ATTEND DES CENTIMES. Mesuré le 19 septembre :
-    //    l'ancien code posait 99 → Leboncoin affichait 0,99 €. Le prix (99,00 €)
-    //    doit devenir 9900, en ENTIER. C'est le nom du champ qui porte l'unité.
-    const attenduCents = String(Math.round(Number(QUEUE[0].price) * 100));
-    dit(etat.prix === attenduCents, 'le prix est posé en CENTIMES (99,00 € → 9900), pas en euros dans un champ _cents',
-      'champ price_cents = « ' + etat.prix +' » (attendu ' + attenduCents + ')');
+    // ⚠️⚠️ (16 oct.) LE CHAMP `price_cents` PREND DES EUROS : mesuré sur son
+    //    dépôt du 15 octobre, il y tape lui-même 2 ou 3 caractères. Nos « 9900 »
+    //    affichaient 9 900 € — « un prix au pif ». Le prix Vinted (99,00 €) part
+    //    tel quel : « 99 ».
+    dit(etat.prix === '99', 'le prix est le MÊME que sur Vinted (99,00 € → « 99 »), pas des centimes',
+      'champ price_cents = « ' + etat.prix + ' » (attendu 99)');
+    dit(etat.ville === 'Cancale (35260)', 'la localisation est SA ville (Réglages VRM), la commune exacte — pas « Route de Cancale, Saint-Malo »',
+      'choisi : « ' + etat.ville + ' »');
     // Le bandeau écrit le CHIFFRE, jamais « c'est prêt ».
     dit(/3 photos attachées/.test(etat.bandeau), 'le bandeau écrit combien de photos ont été attachées',
       (etat.bandeau || '').replace(/\n/g, ' ').slice(0, 90));

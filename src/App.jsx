@@ -52,7 +52,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.177.0';
+const EXT_ATTENDUE = '5.178.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -143,7 +143,9 @@ const lbcTitre = (brand, base, size, max) => {
   //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
   //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
   const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
-  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
+  // (16 oct., Julien : « au lieu de mettre taille 43 il a mis T43 ») : en
+  //    toutes lettres, comme sur Vinted — c'est ce qu'un acheteur tape.
+  const suff = taille ? (estPointure ? ' taille ' + taille : ' ' + taille) : '';
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);
@@ -12105,12 +12107,43 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // Choisir une paire remplit le titre (règle §11 partagée), sa pointure et
   // TOUTES ses photos captées — plus aucun lien à coller. Le titre reste
   // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
+  // (16 oct.) Le PRIX Vinted aussi (« je veux le même prix d'une plateforme à
+  // l'autre ») — seulement si le champ est vide : un prix tapé n'est jamais
+  // écrasé. Et si la paire a moins de photos captées que Vinted n'en annonce
+  // (publiée il y a deux minutes : rien n'est encore capté), on demande à
+  // l'extension de lire sa page TOUT DE SUITE (`cmd: 'photos'`, sur ce clic).
+  const [photosEtat, setPhotosEtat] = React.useState(null);   // null · 'cherche' · 'fait' · {raison}
+  const pairCourante = React.useRef(null);
   const choisirPaire = (p) => {
+    pairCourante.current = p.id;
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
     setDesc(p.desc || '');                                 // sa description Vinted, reprise automatiquement
+    if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
     setCat(null); setCheck(null);
+    setPhotosEtat(null);
+    const manque = (p.photos || []).length < Math.max(2, Number(p.nPhotos) || 0);
+    if (manque && p.uid && vmrExtPresent()) {
+      setPhotosEtat('cherche');
+      vmrCmd({ cmd: 'photos', uid: p.uid, id: p.id }, 30000).then(async (r) => {
+        if (pairCourante.current !== p.id) return;
+        if (!(r && r.accepte && r.etape === 'fait')) { setPhotosEtat({ raison: (r && r.raison) || "l'extension n'a pas répondu" }); return; }
+        try {
+          const rq = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=d:data->${encodeURIComponent(String(p.id))}`, { headers: sbAuth() });
+          const rows = rq.ok ? await rq.json() : null;
+          const d = rows && rows[0] && rows[0].d;
+          const lues = Array.isArray(d && d.photos) ? d.photos.map((x) => typeof x === 'string' ? x : (x && (x.url || x.full_size_url)) || '').filter(Boolean) : [];
+          if (lues.length) {
+            // Seulement si c'est toujours CETTE paire, et sans écraser des photos retirées à la main.
+            if (pairCourante.current !== p.id) return;
+            setPhotos((old) => (old.split(/\s+/).filter(Boolean).length <= (p.photos || []).length ? lues.join('\n') : old));
+            if (!String(p.desc || '').trim() && d.description) setDesc((old) => old.trim() ? old : String(d.description));
+            setPhotosEtat('fait');
+          } else setPhotosEtat({ raison: "Vinted n'a rendu aucune photo" });
+        } catch (_) { setPhotosEtat({ raison: 'la base ne répond pas' }); }
+      });
+    }
   };
   // Applique une réponse pubinfo → catégorie + caractéristiques eBay + pré-
   // remplissage prouvé. `nomForce` sert quand on CHOISIT une autre catégorie
@@ -12443,12 +12476,16 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens.</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
                   pas passée), on le DIT et on envoie rouvrir l'annonce. */}
-              {pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
+              {photosEtat === 'cherche' && urls.length > 0 ? (
+                <div data-ebay-photos="cherche" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Je récupère ses autres photos sur Vinted…</div>
+              ) : photosEtat && photosEtat.raison ? (
+                <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis la paire.</div>
+              ) : pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
                 <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>Seulement {urls.length} photo{urls.length > 1 ? 's' : ''} captée{urls.length > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
               ) : (
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
@@ -12621,21 +12658,30 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
-  const enLigne = new Set(), nPhotos = {};
+  // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
+  // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
+  // et sa couverture — la même lecture, rien de plus n'est lu.
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {};
   let okAny = false, toutes = true;
-  for (const L of lus) {
-    if (!(L && Array.isArray(L.items))) { toutes = false; continue; }
+  lus.forEach((L, k) => {
+    if (!(L && Array.isArray(L.items))) { toutes = false; return; }
     okAny = true;
+    const uid = String((comptes[k] && comptes[k].vinted_user_id) || '');
     for (const it of L.items) {
       if (!it) continue;
-      if (isOnlineListing(it)) enLigne.add(String(it.id));
-      if (Number.isFinite(it.nPhotos)) nPhotos[String(it.id)] = it.nPhotos;
+      const id = String(it.id);
+      if (isOnlineListing(it)) enLigne.add(id);
+      if (Number.isFinite(it.nPhotos)) nPhotos[id] = it.nPhotos;
+      const p = Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
+      if (Number.isFinite(p) && p > 0) prix[id] = p;
+      if (uid) compte[id] = uid;
+      if (it.photo && it.photo.url) couv[id] = it.photo.url;
     }
-  }
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos };
+  });
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv };
 };
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
@@ -12658,6 +12704,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -12674,12 +12721,12 @@ function useEbayPaires(comptes) {
         if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
         if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
-        const cover = f.photo || null;
+        const cover = f.photo || couvMap[String(id)] || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
         const dsc = String((details[id] && details[id].description) || '').trim();
         const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
-        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)] });
+        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
