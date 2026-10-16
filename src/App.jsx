@@ -21160,7 +21160,7 @@ function ventesParCompteDe(lignes, uids) {
 const PREUVE_PAR_VISITE = 3;
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title', { strict: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
@@ -21206,7 +21206,18 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
         }
       }
     }
-    return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
+    // (16 octobre, §11) La preuve STRICTE du retrait automatique (`strict`, avec
+    // `.preuves` et `.revenues`) se calcule sur les MÊMES lectures : un seul
+    // lecteur de l'état des transactions dans l'app.
+    let strict = null;
+    if (Array.isArray(opts.detail)) {
+      const det = await detailRetraitAuto(rows, bords, opts.detail);
+      if (det === null) return null;
+      strict = det.vendus;
+      strict.preuves = det.preuves;
+      strict.revenues = det.revenues;
+    }
+    return { vendus, strict, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
   } catch (_) { return null; }
 };
 // La preuve stricte pour le retrait automatique exige aussi la fraîcheur et la provenance.
@@ -21260,16 +21271,19 @@ const capListeVentes = (uid) => {
 // Rend le Set des annonces vendues (ce que lisent tous les appelants), qui porte
 // aussi `.preuves` et `.revenues` (le détail, pour le retrait automatique).
 const lireVentesVintedProuvees = async (comptes) => {
+  const p = await lirePreuvesVenteVinted({ detail: Array.isArray(comptes) ? comptes : [] });
+  return p ? p.strict : null;
+};
+// Le détail strict (preuves confirmées par la liste des ventes, paires revenues)
+// calculé sur des lectures déjà faites — il ne lit AUCUNE transaction lui-même.
+// `comptes` : objets `{vinted_user_id}` ou uids.
+async function detailRetraitAuto(rows, bords, comptes) {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
-    if (rows === null) return null;
-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
-    if (bords === null) return null;
     const fraisParCompte = new Map();
     let frais = null;
     if (Array.isArray(comptes) && comptes.length) {
       const lus = await Promise.all(comptes.map(async (a) => {
-        const uid = a && a.vinted_user_id;
+        const uid = a && typeof a === 'object' ? a.vinted_user_id : a;
         const p = await fetchHarvestOrders(uid, 'sold').catch(() => undefined);
         const m = etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid), uid);
         fraisParCompte.set(String(uid), m);
@@ -21291,11 +21305,9 @@ const lireVentesVintedProuvees = async (comptes) => {
       if (!preuves.has(it)) preuves.set(it, []);
       preuves.get(it).push({ tx: m[2], etat: f.etat, frais: true, date: f.date, cap: f.cap, compte: m[1] });
     }
-    vendus.preuves = preuves;
-    vendus.revenues = revenues;
-    return vendus;
+    return { vendus, preuves, revenues };
   }catch(_){return null;}
-};
+}
 
 
 // ══════════════════════════════════════════════════════════════════════════════
