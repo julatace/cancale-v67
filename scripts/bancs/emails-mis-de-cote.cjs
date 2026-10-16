@@ -115,7 +115,9 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
 }
 // Le panneau « Mes adresses de réception », lu sur ce qui est RENDU.
 const panneau = (pg) => pg.evaluate(() => {
-  const t = [...document.querySelectorAll('div')].find((d) => d.firstElementChild && /^Mes adresses de réception$/.test((d.firstElementChild.innerText || '').trim()));
+  // Trouvé par ce qu'il EST (`data-reglage-adresses`), pas par son titre :
+  // le titre a été reformulé le 15 octobre (« Adresses email de réception »).
+  const t = document.querySelector('[data-reglage-adresses]');
   if (!t) return null;
   const pers = t.querySelector('[data-personne]');
   const vide = t.querySelector('[data-adresses-vide]');
@@ -157,7 +159,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(!!p, 'le panneau « Mes adresses de réception » est rendu', p ? '' : 'introuvable');
         // Regarder la capture fait partie du test (§6.2) : CAPTURE_DIR=… pour l'écrire.
         if (process.env.CAPTURE_DIR) {
-          const el = pg.locator('div', { hasText: /^Mes adresses de réception/ }).last();
+          const el = pg.locator('[data-reglage-adresses]').first();
           await el.scrollIntoViewIfNeeded().catch(() => {});
           await pg.screenshot({ path: path.join(process.env.CAPTURE_DIR, `mis-de-cote-${viewport.width}.png`) }).catch(() => {});
         }

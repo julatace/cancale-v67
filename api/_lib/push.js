@@ -322,6 +322,46 @@ const cleSansRapport = (e) => {
       || (/vapid/.test(txt) && /(do not correspond|mismatch|invalid)/.test(txt));
 };
 
+// ── MODE STREAM (15 octobre) ──────────────────────────────────────────────────
+// Le vendeur a allumé le mode stream dans l'app (`vrm_mode_stream`, ligne `main`,
+// synchronisée) : il filme ou partage son écran, et son téléphone est souvent
+// posé à côté. Ses notifications ne portent alors ni montant, ni nom (acheteur,
+// compte), ni code de retrait, ni texte de message — seulement ce qui s'est
+// passé (« 💸 Vendu ! », « 💬 Nouveau message ») et « Ouvre VRM ». C'est
+// l'APP qui possède le réglage (§11) ; le serveur le LIT, en scalaire (§4.4).
+// Trois états : allumé · coupé · PAS SU ⇒ on TAIT le détail. Une notification
+// sans détail coûte peu ; un chiffre d'affaires à l'écran pendant un live, non.
+// ⚠️ AUCUN « DERNIER ÉTAT CONNU » (relecture du 15 octobre) : une mémoire par
+//    instance rendait « coupé » sur une lecture RATÉE — il pouvait l'avoir
+//    allumé entre-temps, et la vente partait avec son montant et son login. Une
+//    lecture ratée vaut « pas su », à chaque envoi.
+export async function streamDuVendeur() {
+  for (let i = 0; i < 2; i++) {                     // un hoquet : on relit une fois
+    try {
+      const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=s:data->vrm_mode_stream`);
+      if (!url) break;
+      const res = await fetch(url, { headers: HEADERS });
+      if (!res.ok) continue;
+      const rows = await res.json();
+      if (!Array.isArray(rows)) continue;            // 522 : du HTML, pas du JSON
+      const v = rows[0] ? rows[0].s : null;
+      return v === true || !!(v && typeof v === 'object' && v.on === true);
+    } catch (_) { /* relire */ }
+  }
+  return null;
+}
+const MONTANT_SRV = /[+\-−]?\d[\d\s.,\u00a0\u202f]*\s*(?:€|EUR\b|euros?\b)/gi;
+// Le titre garde ce qui s'est passé, jamais qui ni combien ; le corps, rien.
+export function notifStream(payload) {
+  const p = payload || {};
+  let t = String(p.title || '');
+  if (/^💬/u.test(t)) t = '💬 Nouveau message';
+  else if (/^💰\s*Offre/iu.test(t)) t = '💰 Nouvelle offre';
+  else if (/^📊/u.test(t)) t = '📊 Ton bilan de la semaine';
+  else if (new RegExp(MONTANT_SRV.source, 'i').test(t)) t = t.replace(MONTANT_SRV, '').replace(/\s{2,}/g, ' ').replace(/[\s—–-]+$/u, '').trim();
+  return { ...p, title: t || 'VRM', body: 'Ouvre VRM pour voir le détail.' };
+}
+
 // Envoie la notification à tous les appareils abonnés.
 // Les abonnements morts (appli désinstallée, permission retirée) sont purgés,
 // ainsi que ceux scellés sur une clé qui n'est plus la nôtre (voir ci-dessus).
@@ -352,7 +392,9 @@ export async function sendPushToAll(payload) {
   const subs = await loadSubs();
   if (subs === null) return { sent: 0, total: null, erreur: 'base-injoignable' };
   if (!subs.length) return { sent: 0, total: 0 };
-  const body = JSON.stringify(payload);
+  // Mode stream : allumé OU pas su ⇒ sans détail (voir `notifStream`).
+  const stream = await streamDuVendeur();
+  const body = JSON.stringify(stream === false ? payload : notifStream(payload));
   const alive = [];
   let sent = 0, perimes = 0;
   for (const s of subs) {

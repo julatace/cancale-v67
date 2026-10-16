@@ -87,6 +87,10 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display:none; }
   .vrm-app-header [data-etat-actions] > span[aria-hidden] { display:none; }
   .vrm-app-header [data-etat-actions]::after { content:'i'; display:grid; place-items:center; width:18px; height:18px; border:1.5px solid currentColor; border-radius:50%; font-size:12px; font-weight:600; }
+  .vrm-header-settings { display:none; }
+  /* Mode stream : sur téléphone, la pastille garde l'œil barré, sans le mot. */
+  .vrm-app-header [data-pastille-stream] { width:44px; justify-content:center; padding:8px !important; }
+  .vrm-app-header [data-pastille-stream] .vrm-stream-mot { display:none; }
   .vrm-mobile-nav { padding-inline:4px; }
   .vrm-mobile-nav button { min-height:64px; }
   .vrm-mobile-nav .vrm-nav-label { font-size:11px !important; letter-spacing:0 !important; }

@@ -8,6 +8,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
+import { activerStream, streamActif, abonnerStream, definirNoms, noterValeurSensible, textePublic, CLE_STREAM } from "./modeStream.js";
 import * as photosVinted from "./photosVinted.js";
 import * as photosLbc from "./photosLeboncoin.js";
 import { MINERAL } from "./themeMineral.js";
@@ -1054,6 +1055,10 @@ const SYNC_KEYS = [
   // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
   // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
   'vrm_paires_dorment',
+  // Le MODE STREAM (15 octobre) : `{ on, at }`. Synchronisé — allumé sur
+  // l'ordinateur du live, il l'est aussi sur le téléphone posé à côté. Le
+  // serveur le LIT pour taire les détails des notifications (api/_lib/push.js).
+  'vrm_mode_stream',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -1407,6 +1412,100 @@ const save = (k,v) => {
 // d'autre.
 const eteindreReponseAuto = () => { try { if (load('vinted_repond_auto', false) === true) save('vinted_repond_auto', false); } catch (_) {} };
 onCloudReady(eteindreReponseAuto);
+
+// ── LE MODE STREAM : sa valeur, avant le premier rendu, puis celle du nuage ──
+// La valeur de CET appareil est lue au chargement du module (avant que la coque
+// ne rende la moindre donnée) ; le nuage arrive ~500 ms plus tard (§5.49).
+// ⚠️ La plus RÉCENTE des deux gagne (`at`), jamais le nuage par principe : une
+//    écriture du nuage ratée pendant qu'il l'allumait ferait sinon RÉAFFICHER
+//    ses données au rechargement suivant, en plein live. La valeur locale plus
+//    récente est renvoyée au nuage.
+const lireStream = (v) => (v === true ? { on: true, at: 0 } : (v && typeof v === 'object') ? { on: v.on === true, at: Number(v.at) || 0 } : null);
+let STREAM_LOCAL = lireStream(load(CLE_STREAM, null));
+activerStream(!!(STREAM_LOCAL && STREAM_LOCAL.on));
+// ⚠️⚠️ « PAS SU » NE VAUT PAS « COUPÉ » (relecture du 15 octobre). Il l'allume
+//    sur l'ordinateur du live ; son téléphone, resté sur « coupé » d'il y a une
+//    heure (ou neuf), montrait ses vrais montants et ses logins jusqu'à
+//    l'arrivée du nuage — 9 s mesurées sur un nuage lent, et POUR TOUJOURS si la
+//    ligne `main` ne répond pas (le nuage se relit sans fin, §cloudLoad). Le
+//    serveur appliquait déjà la règle inverse à ses notifications (« pas su ⇒
+//    on tait »). Dès qu'une session est ouverte (`AppCoeur`), tant que le
+//    réglage du nuage n'est pas lu, l'écran est masqué ; il se démasque dès que
+//    le nuage dit « coupé » (ou ne dit rien). Avant la session (porte de
+//    connexion), rien n'est masqué : il n'y a pas de données.
+let _streamPasSu = false;
+const _pasSuAbonnes = new Set();
+const poserStreamPasSu = (v) => { if (_streamPasSu === v) return; _streamPasSu = v; _pasSuAbonnes.forEach((f) => { try { f(v); } catch (_) {} }); };
+function streamEnAttenteDuNuage() {
+  if (isCloudReady() || streamActif()) return;
+  poserStreamPasSu(true);
+  activerStream(true);
+}
+// « Afficher sur cet appareil » pendant l'attente : un geste LOCAL, jamais écrit
+// au nuage (l'écrire couperait le mode sur l'ordinateur du live — la valeur la
+// plus récente gagne). Si le nuage dit ensuite « allumé », l'écran se remasque.
+const streamAfficherIci = () => { poserStreamPasSu(false); activerStream(false); };
+onCloudReady(() => {
+  const nuage = lireStream(load(CLE_STREAM, null));
+  const local = lireStream(STREAM_LOCAL);
+  const gagnant = (local && (!nuage || local.at > nuage.at)) ? local : nuage;
+  if (gagnant && gagnant === local && (!nuage || nuage.on !== local.on)) save(CLE_STREAM, local);
+  const enAttente = _streamPasSu;
+  poserStreamPasSu(false);
+  if (gagnant) activerStream(gagnant.on);
+  else if (enAttente) activerStream(false);   // jamais réglé nulle part : coupé
+});
+// Le dictionnaire du mode stream : SES noms → un alias stable. Les comptes Vinted
+// sont numérotés dans l'ordre de leur identifiant (« Compte 1 », « Compte 2 »…) :
+// le même compte garde le même alias sur tous les écrans et d'une ouverture à
+// l'autre — il sait toujours sur lequel agir sans que son login s'affiche.
+const CLES_STREAM_NOMS = ['vinted_account_labels','vinted_account_emails','vinted_account_phones','vinted_ca_keep_removed','vinted_entreprises','vrm_prenom','vrm_ville'];
+function nourrirStream(comptes) {
+  const labels = load('vinted_account_labels', {}), emails = load('vinted_account_emails', {}), tels = load('vinted_account_phones', {});
+  const tri = (Array.isArray(comptes) ? comptes : []).filter((a) => a && a.vinted_user_id != null)
+    .sort((a, b) => String(a.vinted_user_id).localeCompare(String(b.vinted_user_id), 'fr', { numeric: true }));
+  definirNoms('vinted', tri.map((a, i) => { const u = String(a.vinted_user_id); return { alias: `Compte ${i + 1}`, valeurs: [a.login, labels[u], emails[u], tels[u], `#${u}`, u] }; }));
+  const retires = (load('vinted_ca_keep_removed', []) || []).map(String);
+  definirNoms('retires', retires.length ? [{ alias: 'Compte retiré', valeurs: retires }] : []);
+  const ents = load('vinted_entreprises', []);
+  const moi = [load('vrm_prenom', ''), load('vrm_ville', ''), AUTH.user && AUTH.user.email,
+    ...(Array.isArray(ents) ? ents.flatMap((e) => (e ? [e.companyName, e.companyAddress, e.siret] : [])) : [])];
+  definirNoms('moi', [{ alias: '•••', valeurs: moi.filter((v) => typeof v === 'string' && v.trim()) }]);
+}
+// ⚠️ SES COMPTES LEBONCOIN AUSSI (relecture du 15 octobre) : Leboncoin →
+//    Messages et « Comptes Leboncoin détectés » écrivent leur nom (`name`,
+//    capté par l'extension), et le dictionnaire n'avait que Vinted, eBay et
+//    lui. UN registre pour les deux lecteurs (la réunion de ce qu'ils ont lu,
+//    numérotée dans l'ordre des identifiants) : le même compte garde le même
+//    alias sur les deux écrans.
+const _lbcNoms = new Map();   // id → Set(noms)
+function noterComptesLbc(entrees) {
+  let neuf = false;
+  for (const e of entrees || []) {
+    if (!e || e.id == null) continue;
+    const id = String(e.id);
+    if (!_lbcNoms.has(id)) { _lbcNoms.set(id, new Set()); neuf = true; }
+    const noms = _lbcNoms.get(id);
+    for (const v of [e.name, e.nom]) { const t = typeof v === 'string' ? v.trim() : ''; if (t && !noms.has(t)) { noms.add(t); neuf = true; } }
+  }
+  if (!neuf) return;
+  const ids = [..._lbcNoms.keys()].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+  definirNoms('lbc', ids.map((id, i) => ({ alias: `Compte Leboncoin ${i + 1}`, valeurs: [..._lbcNoms.get(id)] })));
+}
+const basculerStream = (on) => { STREAM_LOCAL = { on: !!on, at: Date.now() }; poserStreamPasSu(false); activerStream(on); save(CLE_STREAM, STREAM_LOCAL); };
+function useModeStream() {
+  const [on, setOn] = React.useState(() => streamActif());
+  // ⚠️ L'état a pu changer ENTRE le rendu et l'abonnement (l'attente du nuage
+  //    est posée par `AppCoeur` juste avant que l'écran ne se peigne) : on
+  //    relit la valeur courante en s'abonnant.
+  React.useEffect(() => { setOn(streamActif()); return abonnerStream(setOn); }, []);
+  return on;
+}
+function useStreamPasSu() {
+  const [v, setV] = React.useState(() => _streamPasSu);
+  React.useEffect(() => { setV(_streamPasSu); _pasSuAbonnes.add(setV); return () => { _pasSuAbonnes.delete(setV); }; }, []);
+  return v;
+}
 
 // ============ COMPTES VINTED CONNECTES DIRECTEMENT (API interne) ============
 // Un compte Vinted est capture par l'extension Chrome "Shop Cancale35 - Vinted
@@ -3121,7 +3220,10 @@ const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banni
 // récupérer » — une lettre puis cinq chiffres. On accepte donc au plus deux
 // lettres majuscules devant 3 à 10 chiffres ; « suivant » n'a aucun chiffre, il
 // reste écarté.
-const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
+// ⚠️ Mode stream : un code VU par l'app est noté pour être masqué partout où il
+//    s'écrit (il peut s'afficher dans dix écrans, et une notification). Une
+//    seule porte : c'est cette fonction qui décide qu'une chaîne EST un code.
+const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); if (!/^[A-Z]{0,2}\d{3,10}$/.test(c)) return ''; noterValeurSensible(c); return c; };
 // L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
 // URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
 // ⚠️ LE VRAI PICKUP PASS EST SERVI PAR UN GÉNÉRATEUR (22 août).
@@ -7406,7 +7508,7 @@ function askNotifPermission(){
 function pushNotif(title, body){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
-      new Notification(title, { body, icon:'/icon-192.png', badge:'/icon-192.png' });
+      new Notification(textePublic(title), { body: textePublic(body), icon:'/icon-192.png', badge:'/icon-192.png' });
       return true;
     }
   }catch(_){/* ignore */}
@@ -11548,7 +11650,7 @@ function CodeRetraitCopiable({label,code}) {
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
-    <span>{label}</span><strong style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
+    <span>{label}</span><strong data-stream="prive" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
     <small aria-live="polite">{etat || 'Copier'}</small>
   </button>;
 }
@@ -12379,7 +12481,12 @@ function lireComptesEbay(force) {
       } catch (_) { return null; }
     })();
     _comptesEbay = p;
-    p.then((v) => { if (v === null && _comptesEbay === p) _comptesEbay = null; });
+    p.then((v) => {
+      if (v === null && _comptesEbay === p) _comptesEbay = null;
+      // Mode stream : ses pseudos eBay deviennent « Compte eBay 1, 2… » (le
+      // registre est le seul lecteur des comptes eBay de l'app).
+      if (Array.isArray(v)) definirNoms('ebay', v.filter((c) => c && c.pseudo).map((c, i) => ({ alias: `Compte eBay ${i + 1}`, valeurs: [c.pseudo] })));
+    });
   }
   return _comptesEbay;
 }
@@ -12416,7 +12523,13 @@ async function lireEbayParCompte(base, select, comptesDonnes) {
 }
 // Chaque objet d'une liste, marqué de SON compte (l'union n'existe qu'à
 // l'affichage — jamais réécrite en base).
-const marquerEbay = (arr, c) => (Array.isArray(arr) ? arr : []).map((x) => (x && typeof x === 'object') ? { ...x, _compte: c.ref, _pseudo: c.pseudo || '' } : x);
+const marquerEbay = (arr, c) => (Array.isArray(arr) ? arr : []).map((x) => {
+  if (!x || typeof x !== 'object') return x;
+  // Mode stream : le pseudo d'un acheteur eBay est masqué partout où il
+  // s'écrit (ligne de vente, fiche, boîte de confirmation d'un message).
+  if (x.buyer && x.buyer.username) noterValeurSensible(x.buyer.username);
+  return { ...x, _compte: c.ref, _pseudo: c.pseudo || '' };
+});
 // La liste `champ` de tous les comptes : `{ items, illisibles }` (comptes dont
 // la lecture a échoué : nommés, jamais comptés « vides »), ou null (registre
 // illisible).
@@ -14148,7 +14261,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const statut=etat.label;
 
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
-          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
+          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? <> · <span data-stream="prive">{o.buyer.username}</span></> : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>
@@ -19045,7 +19158,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                       {inv.number} <span style={{fontSize:11,fontWeight:600,color:col,marginLeft:4}}>{lbl}</span>
                     </div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260}}>
-                      {inv.designation||'Article'} · {inv.prix} € · {inv.buyerName||inv.buyerEmail}
+                      {inv.designation||'Article'} · {inv.prix} € · <span data-stream="prive">{inv.buyerName||inv.buyerEmail}</span>
                     </div>
                   </div>
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -19134,7 +19247,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
-                  <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
+                  <td data-stream="prive" style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
                     <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
@@ -19220,7 +19333,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>Acheteur</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <Field label="Nom complet"><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Prénom Nom"/></Field>
+              <Field label="Nom complet"><Input data-stream="champ" value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Prénom Nom"/></Field>
               <Field label="Email"><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder="prenom.nom@exemple.fr"/></Field>
               <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="N° et rue, code postal, ville, pays"/></Field>
             </div>
@@ -22292,6 +22405,8 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
    Messages), tous rendus par <Comptabilite/>. On a donc retiré d'ici tout ce
    qui était en doublon (numérotation, sélecteur d'achat, vues, conversations,
    bordereaux) — un seul endroit par chose. */
+// « il y a 3 h », « il y a 2 j » — l'âge d'une capture, lu d'un coup d'œil.
+const agoCourt = (ms) => { const h = (Date.now() - ms) / 3600000; return h < 1 ? 'il y a moins d’1 h' : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`; };
 function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, loading} }
@@ -22368,7 +22483,13 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // Requête LÉGÈRE : on ne lit que la colonne updated_at des lignes harvest_* (pas
   // les gros payloads) → pour chaque compte, la date de dernière capture. Croisé
   // avec updated_at du compte (fraîcheur du token) et la liste des bloqués.
-  const [lastCap, setLastCap] = useState({}); // uid -> ms de la dernière capture
+  // ⚠️ TROIS ÉTATS (15 octobre) : `undefined` lecture en cours · `null` la
+  //    lecture a échoué · objet lu. Il partait à `{}` : pendant la lecture ET sur
+  //    une panne, chaque compte s'affichait « Jamais capté » avec la consigne
+  //    d'ouvrir sa boutique — un « pas su » présenté comme un fait.
+  const [lastCap, setLastCap] = useState(undefined); // uid -> ms de la dernière capture
+  const [details, setDetails] = useState({});         // uid -> panneau « Détails » ouvert
+  const ext = useExtVivante();
   const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
   useEffect(() => { (async () => {
     try {
@@ -22377,7 +22498,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
       // plus rien sur la fraîcheur d'un compte vivant.
       const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
-      if (!rows) return; const by = {};
+      if (!rows) { setLastCap(null); return; } const by = {};
       // ⚠️ Revue de la 5.167 : `harvest_{uid}_enligne` est la lecture PUBLIQUE de
       //    son dressing, faite avec la session d'un AUTRE compte (5.167) — ni ses
       //    ventes, ni sa messagerie, ni son porte-monnaie n'ont été lus. Comptée, elle
@@ -22385,7 +22506,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       //    (c'est l'écran qui dit sur quel compte repasser). `ligneDeSaSession`.
       rows.forEach(r => { const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
       setLastCap(by);
-    } catch (_) {}
+    } catch (_) { setLastCap(null); }
   })(); }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
@@ -22410,13 +22531,19 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
     // normal et se renouvelle automatiquement — on ne le signale pas.)
     if (!acc.refresh_token) return { etat: 'warn', ic: 'key', label: 'À reconnecter', color: C.warn, hint: 'Pas de jeton de renouvellement : ce compte ne restera pas connecté seul. Repasse sur vinted.fr avec l\'extension pour le recapter.' };
+    // « Pas su » n'est pas « jamais capté » (15 octobre) : pendant la lecture,
+    // ou quand elle a échoué, on ne réclame aucune capture.
+    // `capture: true` : la pastille DIT la synchro (son libellé parle de la
+    // dernière capture) — la fiche ne la redit pas (relecture du 15 octobre).
+    if (lastCap === undefined) return { etat: 'encours', capture: true, ic: 'clock', label: '…', color: C.muted, hint: 'Lecture de la dernière capture en cours.' };
+    if (lastCap === null) return { etat: 'passu', capture: true, ic: 'clock', label: 'Pas pu lire', color: C.muted, hint: 'La lecture de la dernière capture a échoué — rien n\'est perdu, rouvre cet écran dans un moment.' };
     const cap = lastCap[uid];
-    if (!cap) return { etat: 'warn', ic: 'cloudOff', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
+    if (!cap) return { etat: 'warn', capture: true, ic: 'cloudOff', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
     const ageH = (Date.now() - cap) / 3600000;
     const ago = ageH < 1 ? 'il y a <1 h' : ageH < 48 ? `il y a ${Math.round(ageH)} h` : `il y a ${Math.round(ageH / 24)} j`;
     if (ageH < 12) return { etat: 'ok', ic: 'check', label: 'À jour', color: INV_STATUS.online.color, hint: `Dernière capture ${ago}.` };
-    if (ageH < 72) return { etat: 'warn', ic: 'clock', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
-    return { etat: 'bad', ic: 'cloudOff', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
+    if (ageH < 72) return { etat: 'warn', capture: true, ic: 'clock', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
+    return { etat: 'bad', capture: true, ic: 'cloudOff', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
@@ -22649,7 +22776,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       ))}
 
       {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
-      {accounts.length > 0 && (()=>{
+      {accounts.length > 0 && lastCap === null && (
+        <div data-etat-comptes="passu" style={{padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:12.5,color:C.muted}}>
+          Je n'ai pas pu lire la dernière capture de tes comptes — rien n'est perdu, rouvre cet écran dans un moment.
+        </div>
+      )}
+      {accounts.length > 0 && lastCap && (()=>{
         const st = accounts.map(acctHealth);
         // ⚠️ ON NE COMPTE QUE LES COMPTES QUI SONT DANS L'APP. Les exclus ont
         //    leur mention à part, en gris : ils ne sont ni « à jour » ni « en
@@ -22666,7 +22798,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
             {warn>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="clock" size={13}/>{warn} à rafraîchir</span>}
             {bad>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="cloudOff" size={13}/>{bad} en panne</span>}
             {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} exclu{exclu>1?'s':''} — ton choix</span>}
-            <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.{exclu>0?` Le${exclu>1?'s':''} compte${exclu>1?'s':''} exclu${exclu>1?'s':''}, ${exclu>1?'eux':'lui'}, n${exclu>1?'\u2019attendent':'\u2019attend'} rien : ${exclu>1?'ils sont':'il est'} hors de l'app tant que tu ${exclu>1?'les':'le'} laisses masqué${exclu>1?'s':''}.`:''}</span>
+            {(warn+bad)>0 && <span style={{color:C.muted,fontWeight:500,flex:'1 1 100%',fontSize:11.5,marginTop:2}}>À rafraîchir ou en panne&nbsp;: ouvre vinted.fr connecté sur ce compte, l'extension le recapte.</span>}
           </div>
         );
       })()}
@@ -22674,87 +22806,109 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       {accounts.length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {accounts.map(acc => {
+            const uid = String(acc.vinted_user_id);
             const tr = testResult[acc.vinted_user_id];
+            const h = acctHealth(acc);
+            const off = hiddenAccts.has(uid);
+            const ouvert = details[uid] === true;
+            // La synchro, en clair : la dernière capture faite AVEC la session de
+            // ce compte (`lastCap`, `ligneDeSaSession`). « pas su » tant que la
+            // lecture n'est pas revenue — jamais « jamais capté » sur une panne.
+            const cap = lastCap ? lastCap[uid] : null;
+            const synchro = lastCap === undefined ? 'lecture…' : lastCap === null ? 'dernière capture : pas pu la lire'
+              : cap ? `capté ${agoCourt(cap)}` : 'jamais capté';
+            // ⚠️ LA SYNCHRO SE DIT UNE FOIS (relecture du 15 octobre). En retard,
+            //    la fiche disait « capté il y a 5 j » ET, dans la pastille,
+            //    « Pas capté (il y a 5 j) » — deux phrases qui se contredisent,
+            //    sur l'écran dont il disait « beaucoup trop d'informations ». Quand
+            //    la pastille parle déjà de la capture (`h.capture`), la ligne se
+            //    tait ; pour un compte exclu, la date ne veut plus rien dire.
+            const synchroDite = !h.capture && h.etat !== 'exclu';
+            const chrome = ext.etat && ext.etat.ok && vintedDeChrome() ? vintedDeChrome() : null;
+            const dansChrome = !!(chrome && chrome.uid === uid);
+            const telN = telNorm(acctPhones[uid]);
+            const telPartage = telN.length >= 9 ? (accounts || []).filter(o => String(o.vinted_user_id) !== uid && telNorm(acctPhones[String(o.vinted_user_id)]) === telN).map(o => labels[String(o.vinted_user_id)] || o.login || `#${o.vinted_user_id}`) : [];
             return (
-              <div key={acc.vinted_user_id} style={{borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-                <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-                  <span style={{width:36,height:36,flexShrink:0,borderRadius:8,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-                    {accountName(acc).slice(0,1).toUpperCase()}
+              <div key={acc.vinted_user_id} data-fiche-compte={uid} style={{borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'12px 14px'}}>
+                {/* ── L'ESSENTIEL : plateforme, nom, statut ── */}
+                <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                  <span title="Vinted" style={{width:34,height:34,flexShrink:0,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <BrandIcon plateforme="vinted" size={20}/>
                   </span>
-                  <div style={{minWidth:0}}>
+                  <div style={{flex:1,minWidth:0}}>
                     {editingLabel === acc.vinted_user_id ? (
                       <div style={{display:'flex',gap:6,alignItems:'center'}}>
                         <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
                           onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
                           placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
-                          style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:170}}/>
+                          style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:170,maxWidth:'100%'}}/>
                         <button type="button" onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
                       </div>
                     ) : (
-                      <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
+                      <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer',minWidth:0}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
                         <div style={{fontWeight:600,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
-                        <span style={{color:C.muted,display:'inline-flex'}}><Icon name="pencil" size={12}/></span>
+                        <span style={{color:C.muted,display:'inline-flex',flexShrink:0}}><Icon name="pencil" size={12}/></span>
                       </div>
                     )}
-                    <div style={{fontSize:11,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
-                      {/* ⚠️ « maj » est de l'abréviation d'informaticien (§7), et
-                          l'heure À LA SECONDE ne sert à rien : on lit cette ligne
-                          pour savoir si c'est frais, pas pour horodater. */}
-                      {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
+                    {/* L'identifiant (s'il diffère du nom), la synchro, et si c'est
+                        le compte ouvert dans Chrome — la seule connexion qui agit. */}
+                    <div data-synchro-compte={lastCap === undefined ? 'encours' : lastCap === null ? 'passu' : cap ? 'lu' : 'jamais'} style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4,overflowWrap:'anywhere'}}>
+                      {(() => { const l = [acc.login && acc.login !== accountName(acc) ? `@${acc.login}` : '', synchroDite ? synchro : ''].filter(Boolean).join(' · '); return <>{l}{dansChrome && <span data-compte-chrome="" style={{color:C.text,fontWeight:600}}>{l ? ' · ' : ''}ouvert dans Chrome</span>}</>; })()}
                     </div>
-                    {(()=>{ const h=acctHealth(acc); return (
-                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
-                    ); })()}
-                    {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
-                      <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
-                        {stars!=null?<>⭐ {stars.toFixed(2)}/5</>:''}
-                        {stars!=null&&r.count!=null?' · ':''}
-                        {r.count!=null?<span style={{color:C.muted,fontWeight:500}}>{r.count} avis</span>:''}
-                        {r.neg>0?<span style={{color:C.danger,fontWeight:500}}> · {r.neg} négatif{r.neg>1?'s':''}</span>:''}
-                      </div>
-                    ); })()}
-                    <input
-                      value={acctEmails[String(acc.vinted_user_id)] || ''}
-                      onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
-                      placeholder="Email du compte"
-                      title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
-                      style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
-                      onFocus={e=>e.target.style.borderColor=C.accent}
-                      onBlur={e=>e.target.style.borderColor=C.border}
-                    />
-                    <input
-                      type="tel" inputMode="tel"
-                      value={acctPhones[String(acc.vinted_user_id)] || ''}
-                      onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)}
-                      placeholder="Téléphone du compte"
-                      title="Le numéro utilisé pour ce compte Vinted. Si tu le mets aussi sur un autre compte, l'app te le signale."
-                      style={{display:'block',marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
-                      onFocus={e=>e.target.style.borderColor=C.accent}
-                      onBlur={e=>e.target.style.borderColor=C.border}
-                    />
-                    {(()=>{ const n=telNorm(acctPhones[String(acc.vinted_user_id)]); if(n.length<9) return null;
-                      const autres=(accounts||[]).filter(o=>String(o.vinted_user_id)!==String(acc.vinted_user_id) && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
-                      return autres.length ? <div style={{fontSize:11,color:C.warn,marginTop:3}}>Ce numéro sert aussi sur {autres.join(', ')}.</div> : null; })()}
                   </div>
+                  {/* ⚠️ LA PLACE DU STATUT (bloqué, déconnecté, à reconnecter…) : le
+                      chantier « comptes bloqués » (p0-bloques) la remplit ; elle
+                      reste ici, à droite du nom. */}
+                  <div data-statut-compte={h.etat} title={h.hint} style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:8,padding:'2px 9px',maxWidth:'45%',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><Icon name={h.ic} size={12}/>{h.label}</div>
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  {tr && !tr.loading && <span style={{fontSize:11,fontWeight:500,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
-                  {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
-                    <button type="button" onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
-                      style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
-                      {off ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eyeOff" size={12}/>Masqué (annonces + compta)</span>
-                           : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
-                    </button>
-                  ); })()}
-                  <button type="button" onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
-                    {tr?.loading ? 'Test…' : 'Tester la connexion'}
+                {telPartage.length > 0 && <div style={{fontSize:11.5,color:C.warn,marginTop:6}}>Même téléphone que {telPartage.join(', ')}.</div>}
+                {/* ── LES ACTIONS : deux, pas plus ── */}
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10}}>
+                  <button type="button" onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
+                    style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:off?C.muted:C.accent}}>
+                    {off ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eyeOff" size={12}/>Masqué (annonces + compta)</span>
+                         : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
                   </button>
-                  <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
-                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
+                  <button type="button" aria-expanded={ouvert} data-details-compte={uid} onClick={()=>setDetails(d=>({...d,[uid]:!ouvert}))}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text,display:'inline-flex',alignItems:'center',gap:4}}>
+                    Détails <span aria-hidden="true" style={{display:'inline-block',transform:ouvert?'rotate(180deg)':'none',transition:'transform .15s'}}>▾</span>
                   </button>
                 </div>
+                {/* ── LE RESTE, REPLIÉ : utile un jour, pas tous les jours (Julien,
+                    15 octobre : « beaucoup trop d'informations qui ne servent à
+                    rien »). Rien n'est retiré — tout est ici. ── */}
+                {ouvert && (
+                  <div data-panneau-compte={uid} style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:8}}>
+                    <label style={{display:'flex',flexDirection:'column',gap:3,fontSize:11.5,color:C.muted}}>
+                      Email du compte Vinted — l'adresse où Vinted lui écrit&nbsp;; Réglages te la propose aussi en adresse de réception
+                      <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="Email du compte"
+                        style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 9px',fontSize:12.5,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}/>
+                    </label>
+                    <label style={{display:'flex',flexDirection:'column',gap:3,fontSize:11.5,color:C.muted}}>
+                      Téléphone du compte — signalé s'il sert aussi sur un autre compte
+                      <input type="tel" inputMode="tel" value={acctPhones[uid] || ''} onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)} placeholder="Téléphone du compte"
+                        style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 9px',fontSize:12.5,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}/>
+                    </label>
+                    <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>
+                      {(()=>{ const r=reput[uid]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
+                        <div title="Note vendeur et nombre d'avis (Vinted)">
+                          Note {stars!=null?<b style={{color:C.text}}>{stars.toFixed(2)}/5</b>:'—'}{r.count!=null?` · ${r.count} avis`:''}{r.neg>0?<span style={{color:C.danger}}> · {r.neg} négatif{r.neg>1?'s':''}</span>:''}
+                        </div>
+                      ); })()}
+                      <div>{acc.updated_at ? `Lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'Date de liaison inconnue'} · n° Vinted {uid}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                      <button type="button" onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
+                        {tr?.loading ? 'Test…' : 'Tester la connexion'}
+                      </button>
+                      {tr && !tr.loading && <span style={{fontSize:11.5,fontWeight:500,color:tr.ok?C.text:C.danger}}>{tr.label}</span>}
+                      <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
+                        style={{marginLeft:'auto',background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.danger}}>
+                        <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -23376,6 +23530,14 @@ const typeDuLieu = (raw) => {
   return { s: seg.join(', '), consigne: false };
 };
 const cleanLieu = (raw) => {
+  const r = cleanLieuBrut(raw);
+  // Mode stream : le point relais dit OÙ il habite. Noté pour être masqué
+  // partout où il s'écrit — une seule porte, comme `codeRetrait`.
+  if (r.nom) noterValeurSensible(r.nom);
+  if (r.adresse) noterValeurSensible(r.adresse);
+  return r;
+};
+const cleanLieuBrut = (raw) => {
   let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return { nom: '', adresse: '', display: '' };
   s = typeDuLieu(s).s; if (!s) return { nom: '', adresse: '', display: '' };
@@ -31168,10 +31330,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
+              {openConv.header?.photo?<span data-stream="prive" style={{display:'flex'}}><PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/></span>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
-                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
+                <div data-stream="prive" style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
+                <div data-stream="prive" style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div><div style={{fontSize:10,color:C.muted}}>{accName(openConv.acc)} · {openConv.source==='extension'?'Lu sur Vinted':'Conversation enregistrée'}</div>
               </div>
               <button className="vrm-icon-control" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{border:0,background:'transparent',color:C.muted,cursor:'pointer',padding:8}}><Icon name="sync" size={16}/></button><button type="button" aria-label="Fermer la conversation" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -31192,15 +31354,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'8px 12px',textAlign:'center'}}>
                           <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
-                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          <div data-stream="prive" style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
                           {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                         </div>
-                      : <div key={i} data-offre-fil={m.offre?(m.mine===true?'moi':m.mine===false?'acheteur':'passu'):undefined} style={{alignSelf:m.offre&&m.mine===true?'flex-end':m.offre&&m.mine===false?'flex-start':'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
+                      : <div key={i} data-stream="prive" data-offre-fil={m.offre?(m.mine===true?'moi':m.mine===false?'acheteur':'passu'):undefined} style={{alignSelf:m.offre&&m.mine===true?'flex-end':m.offre&&m.mine===false?'flex-start':'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      <div data-stream="prive" style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                       {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
-                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
-                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}{m.etat==='envoye' ? <span data-envoye=""> · Envoyé</span> : null}</time>}
+                      {(m.photos||[]).length>0 && <div className="vrm-chat-photos" data-stream="prive">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:8}}/>:null;})}</div>}
+                      {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{display:'block',fontSize:10,color:C.muted,marginTop:3,textAlign:m.mine?'right':'left'}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
                       {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
                     </div>
               ))}
@@ -33149,8 +33311,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div data-stream="prive" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div data-stream="prive" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
                       <button type="button" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
@@ -33190,8 +33352,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div data-stream="prive" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div data-stream="prive" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
                       <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
@@ -33242,7 +33404,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.danger}}>il y a {isFinite(j)?j:'?'} j</b>
                       </div>
                     </div>
-                    {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
+                    {code && <span data-stream="prive" style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
                     {/* ⚠️ CE BLOC CACHAIT DES QR QU'IL POSSÈDE. Mesuré sur la
                         vraie base : sur les 6 colis rangés ici, **3 portent un
                         QR** — dont deux vieux de 15 jours seulement, donc très
@@ -34492,14 +34654,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button className={(openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row')+(flou?' is-estompee':'')} type="button" data-conv={c.id} data-estompee={flou?'':undefined} onClick={()=>openConversation(c)}
                       aria-label={flou ? `${(c.opposite_user&&c.opposite_user.login)||'Conversation'} — ${c._acc?accName(c._acc):'autre compte'}, lecture seule` : undefined}
                       style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i && i!==iSep)?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(flou?STYLE_FLOU_CONSULTABLE:null)}}>
-                      {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
+                      {photo ? <span data-stream={(c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) ? undefined : 'prive'} style={{display:'flex',flexShrink:0}}><PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/></span> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
-                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
+                          <span data-stream="prive" style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
                           {plusieurs && c._acc && <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>· {accName(c._acc)}</span>}
                           <span style={{marginLeft:'auto',fontSize:11,color:C.muted,flexShrink:0}}>{quand(c.updated_at)}</span>
                         </span>
-                        <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
+                        <span data-stream="prive" style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
                       </span>
                       {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
                     </button>
@@ -37627,6 +37789,8 @@ function MessagesLeboncoin() {
       if (!Array.isArray(jm)) { if (!stop) setD(null); return; }
       const m = (jm[0] && jm[0].data) || {};
       const acc = (Array.isArray(ja) && ja[0] && ja[0].data && ja[0].data.accounts) || {};
+      // Mode stream : leurs noms passent au dictionnaire AVANT d'être rendus.
+      noterComptesLbc([...Object.entries(m.comptes || {}), ...Object.entries(acc)].map(([id, c]) => ({ id, name: c && c.name })));
       if (!stop) setD({ compteurs: m.compteurs || {}, comptes: m.comptes || {}, acc });
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, []);
@@ -37811,6 +37975,7 @@ function LeboncoinScreen() {
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
       .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
+    noterComptesLbc(Object.entries(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).map(([id, c]) => ({ id, name: c && c.name })));
     // Annonces Leboncoin réellement captées (par l'extension). On s'en sert pour
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
@@ -38462,7 +38627,7 @@ function LeboncoinScreen() {
             const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
             return (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
-                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                <span data-stream="prive" style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                   {String(a.name || '?').slice(0, 1).toUpperCase()}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -38802,6 +38967,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       </>)}
 
       {voirReglages && (<>
+      <StreamSetting/>
       {MULTI_USER && (<>
         <NumerosSetting/>
         {/* ⛔ « Répondre à mes messages Vinted » (RepondreSetting) est RETIRÉ le
@@ -39482,6 +39648,86 @@ function PrenomSetting() {
 // ne devine rien et le bandeau du dépôt renvoie ici.
 function VilleSetting() {
   const [v, setV] = React.useState(() => String(load('vrm_ville', '') || ''));
+// ── MODE STREAM (15 octobre) ────────────────────────────────────────────────
+// Julien : « un mode stream pour les influenceurs, il faut cacher leurs données
+// sensibles comme leur CA ou leur nom de compte ». Le masquage lui-même vit
+// dans `src/modeStream.js` (UN mécanisme pour tout le document) ; ici, le seul
+// interrupteur. La phrase dit ce qui est caché et ce qui change pour lui — pas
+// plus (§7).
+function StreamSetting() {
+  const vraiOn = useModeStream();
+  const pasSu = useStreamPasSu();
+  // Pendant l'attente du nuage, l'interrupteur ne dit ni oui ni non : basculer
+  // ici écrirait au nuage une valeur choisie sans savoir (« pas su »).
+  const on = vraiOn && !pasSu;
+  return (
+    <div data-reglage-stream={pasSu ? 'pas-su' : on ? 'on' : 'off'} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${on?C.accent:C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Mode stream</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+            Pour filmer ou partager ton écran&nbsp;: cache tes montants (CA, bénéfices, prix), les noms de tes comptes, tes adresses, tes messages et tes codes de retrait.
+          </div>
+        </div>
+        <button className="vrm-setting-switch" aria-label="Mode stream" type="button" role="switch" aria-checked={on} disabled={pasSu} onClick={()=>basculerStream(!on)}
+          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
+          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
+        </button>
+      </div>
+      {pasSu && (
+        <div data-stream-pas-su="" style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          Pas encore lu sur cet appareil&nbsp;: tes données restent cachées en attendant.
+        </div>
+      )}
+      {on && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          Tes comptes s'appellent «&nbsp;Compte&nbsp;1&nbsp;», «&nbsp;Compte&nbsp;2&nbsp;»… sur tous tes appareils. Un bordereau ou une facture demande avant de s'ouvrir (il montre les vraies données), et les notifications du téléphone ne donnent plus le détail.
+        </div>
+      )}
+    </div>
+  );
+}
+// La pastille de l'en-tête, tant que le mode est allumé : il voit qu'il est
+// masqué, et l'éteint en un geste confirmé (le réafficher en direct par
+// mégarde serait le seul vrai dégât).
+function PastilleStream() {
+  const on = useModeStream();
+  const pasSu = useStreamPasSu();
+  // L'attente du nuage dure d'ordinaire moins d'une seconde : la pastille ne se
+  // montre que si elle dure (sinon elle clignoterait à chaque ouverture).
+  const [longue, setLongue] = React.useState(false);
+  React.useEffect(() => { if (!pasSu) { setLongue(false); return undefined; } const t = setTimeout(() => setLongue(true), 2000); return () => clearTimeout(t); }, [pasSu]);
+  if (!on) return null;
+  if (pasSu) {
+    if (!longue) return null;
+    return (
+      <button type="button" className="vrm-icon-control" data-pastille-stream="pas-su" title="Je n'ai pas encore pu lire si le mode stream est allumé : tes données restent cachées en attendant" aria-label="Données cachées en attendant le réglage du mode stream — les afficher ici"
+        onClick={async () => { if (await askConfirm({ title: 'Afficher tes données ici ?', desc: "Je n'ai pas encore pu lire si le mode stream est allumé sur un autre de tes appareils. Afficher ici ne change rien ailleurs ; s'il est allumé, cet écran se recachera dès que je le saurai.", ok: 'Afficher ici' })) streamAfficherIci(); }}
+        style={{display:'inline-flex',alignItems:'center',gap:5,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',color:C.muted,cursor:'pointer',fontSize:12.5,fontWeight:600,fontFamily:'inherit',whiteSpace:'nowrap'}}>
+        <Icon name="eyeOff" size={15}/><span className="vrm-stream-mot">Masqué</span>
+      </button>
+    );
+  }
+  return (
+    <button type="button" className="vrm-icon-control" data-pastille-stream="" title="Mode stream : tes données sensibles sont cachées" aria-label="Mode stream allumé — le couper"
+      onClick={async () => { if (await askConfirm({ title: 'Couper le mode stream ?', desc: 'Tes montants, tes comptes, tes adresses et tes messages redeviennent visibles à l’écran.', ok: 'Couper' })) basculerStream(false); }}
+      style={{display:'inline-flex',alignItems:'center',gap:5,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:8,padding:'6px 10px',color:C.accent,cursor:'pointer',fontSize:12.5,fontWeight:600,fontFamily:'inherit',whiteSpace:'nowrap'}}>
+      <Icon name="eyeOff" size={15}/><span className="vrm-stream-mot">Stream</span>
+    </button>
+  );
+}
+
+// ── TES NUMÉROS DE RANGEMENT : CHIFFRES OU SÉRIE À LETTRE ──────────────────
+// Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
+// des fois elles commencent par B125, C123 ; rends la chose adaptable ».
+// Deux façons de numéroter, au choix de chacun : des chiffres (1, 2, 3… —
+// défaut, rien ne change pour lui) ou une série à lettre (B1, B2…). Le choix ne
+// porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
+// carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
+// tapé à la main peut toujours être « 125 » ou « C40 ».
+function NumerosSetting() {
+  const [p, setP] = React.useState(() => prefixeNumeros());
+  const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
   const touche = React.useRef(false);
   React.useEffect(() => onCloudReady(() => {
     if (touche.current) return;                            // §5.49 : ne remplacer que le vide
@@ -40552,9 +40798,19 @@ function EmailsSetting() {
   const quarantaine = misDeCote ? misDeCote.emails : misDeCote;
   // Les adresses où arrivent déjà SES emails (suggestions) : `null` = pas lu.
   const [vues, setVues] = useState(null);
+  // ⚠️ L'EMAIL DE CHAQUE COMPTE VINTED EST SOUVENT LA MÊME ADRESSE (relecture du
+  //    15 octobre, mesuré : 6 de ses 15 adresses déclarées sont aussi l'« Email
+  //    du compte Vinted » d'une fiche, et 6 de ses 12 emails de comptes ne sont
+  //    pas déclarés). C'est là que Vinted lui écrit — souvent un alias iCloud :
+  //    l'en-tête « À » que la règle d'arrivée lit. Deux saisies pour les mêmes
+  //    adresses, sans le dire : on les relie ici, en suggestion (à SON clic).
+  const [emailsComptes, setEmailsComptes] = useState(() => load('vinted_account_emails', {}) || {});
+  useEffect(() => onCloudReady(() => setEmailsComptes((e) => (e && Object.keys(e).length ? e : (load('vinted_account_emails', {}) || {})))), []);
   const [busy, setBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const racine = useRef(null);
+  // Déplié à la main, ou parce qu'un autre écran (Ma journée) y envoie.
+  const [deplie, setDeplie] = useState(() => !!DEMANDE_ADRESSES.on);
   useEffect(() => {
     if (!DEMANDE_ADRESSES.on) return;
     DEMANDE_ADRESSES.on = false;
@@ -40613,7 +40869,7 @@ function EmailsSetting() {
     if (n) await ecrire(nouv);
   };
   const ajouter = async () => {
-    const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
+    const a = await askText({ desc: "Ton adresse de réception.\n\nL'adresse où arrivent tes emails Vinted (bordereaux, ventes, colis) : l'email d'un de tes comptes Vinted, ou la boîte vers laquelle tu les fais suivre. Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
     const adr = normAdresse(a);
     if (!adr) return;
     if (!ADRESSE_RECEPTION_OK.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
@@ -40690,11 +40946,28 @@ function EmailsSetting() {
       // dessous, c'est lui qui le porte.
       ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un email arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
     : misDeCote
-      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: true }
-      : { t: "Aucune adresse déclarée. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: false };
-  // Les suggestions : SES adresses déjà vues, pas encore déclarées.
+      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute l'adresse où arrivent tes emails Vinted (l'email de tes comptes Vinted).", alerte: true }
+      : { t: "Aucune adresse déclarée. Ajoute l'adresse où arrivent tes emails Vinted (l'email de tes comptes Vinted).", alerte: false };
+  // Les suggestions : SES adresses déjà vues, et les emails de SES comptes
+  // Vinted, pas encore déclarées. Une adresse qui est les deux le dit.
   const declarees = new Set(liste.map(normAdresse));
-  const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
+  const sugg = (() => {
+    const out = new Map();
+    const labels = load('vinted_account_labels', {}) || {}, comptes = load('vinted_accounts', []) || [];
+    const nomDe = (u) => labels[u] || ((Array.isArray(comptes) ? comptes : []).find((a) => a && String(a.vinted_user_id) === String(u)) || {}).login || `#${u}`;
+    for (const [u, e] of Object.entries(emailsComptes || {})) {
+      const a = normAdresse(e);
+      if (!a || !ADRESSE_RECEPTION_OK.test(a) || declarees.has(a)) continue;
+      const v = out.get(a) || { adresse: a, n: 0, dernier: '', comptes: [] };
+      v.comptes.push(nomDe(u)); out.set(a, v);
+    }
+    for (const v of (Array.isArray(vues) ? vues : [])) {
+      if (declarees.has(v.adresse)) continue;
+      out.set(v.adresse, { ...v, comptes: (out.get(v.adresse) || {}).comptes || [] });
+    }
+    // Les emails de comptes d'abord (une identité qu'il a saisie), puis les plus vues.
+    return [...out.values()].sort((a, b) => (b.comptes.length > 0) - (a.comptes.length > 0) || b.n - a.n);
+  })();
   const toutesSugg = async () => {
     const ok = await askConfirm({
       title: `Ajouter ${sugg.length} adresses ?`,
@@ -40703,12 +40976,35 @@ function EmailsSetting() {
     });
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
   };
+  // ── REPLIÉE QUAND ELLE N'A RIEN À FAIRE (Julien, 15 octobre : « mes adresses
+  //    de réception, je ne comprends pas ce que c'est ») ──────────────────────
+  // Elle ne sert qu'à DÉPARTAGER : quand plusieurs vendeurs utilisent VRM, ou
+  // quand il fait suivre plusieurs boîtes. Seul vendeur ici (une seule boutique,
+  // ou le repli « installation » qui lui rend tout), rien de mis de côté, rien
+  // de « pas su » : elle se replie, avec sa raison. ⚠️ Jamais masquée : le jour
+  // où un second vendeur déclare la sienne, le repli s'éteint (§5 « le repli un
+  // seul vendeur ») — la route le dit, et la rubrique se déplie d'elle-même.
+  const seulIci = !!((misDeCote && misDeCote.cloisonnee === false) || (inst && inst.repli === true));
+  const rienAFaire = !!reg && typeof reg === 'object' && Array.isArray(quarantaine) && quarantaine.length === 0
+    && !pers && !(inst && inst.personne === null) && !lot;
+  const replie = seulIci && rienAFaire && !deplie;
   return (
-    <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
+    <div ref={racine} data-reglage-adresses={replie ? 'replie' : ''} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Adresses email de réception</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et il t'est proposé ici dès que l'adresse où il est arrivé figure dans ta liste.
+        Les adresses où arrivent tes emails Vinted (ventes, bordereaux, colis)&nbsp;: l'email de chacun de tes comptes Vinted (souvent un alias iCloud), ou la boîte vers laquelle tu les fais suivre. C'est l'adresse d'arrivée qui dit à VRM qu'un email est à toi. Ce ne sont pas des adresses postales.
       </div>
+      {replie ? (
+        <div data-adresses-repli="">
+          {liste.length === 0
+            ? <div data-adresses-vide="info" style={{fontSize:12,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>{vide.t}</div>
+            : <div style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Tu es le seul vendeur ici&nbsp;: tous les emails reçus te reviennent, rien à faire. {liste.length} adresse{liste.length>1?'s':''} déjà déclarée{liste.length>1?'s':''} — utile le jour où quelqu'un d'autre utilise VRM.</div>}
+          <button type="button" onClick={()=>setDeplie(true)} aria-expanded="false"
+            style={{marginTop:8,border:'none',background:'transparent',color:C.accent,padding:'4px 0',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {liste.length ? `Voir les ${liste.length} adresse${liste.length>1?'s':''}` : 'Ajouter une adresse'} ▾
+          </button>
+        </div>
+      ) : (<>
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
       : liste.length === 0 ? (
@@ -40747,13 +41043,13 @@ function EmailsSetting() {
       {reg && sugg.length > 0 && (
         <div data-suggestions={sugg.length} style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes emails</div>
-          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Lues sur les emails déjà rangés chez toi, et pas encore dans ta liste. Ajoute celles qui sont à toi.</div>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Lues sur tes emails déjà rangés et sur l'email de tes comptes Vinted, pas encore dans ta liste. Ajoute celles qui sont à toi.</div>
           {sugg.slice(0, 8).map((v) => (
             <div key={v.adresse} data-suggestion={v.adresse} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 140px',minWidth:0}}>
                 <span style={{display:'block',fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v.adresse}</span>
-                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
-                  {v.n} email{v.n>1?'s':''}{v.dernier ? ` · dernier le ${new Date(v.dernier).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}
+                <span data-suggestion-source={v.comptes.length ? 'compte' : 'vue'} style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
+                  {[v.comptes.length ? `email du compte ${v.comptes.join(', ')}` : '', v.n ? `${v.n} email${v.n>1?'s':''}${v.dernier ? ` · dernier le ${new Date(v.dernier).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}` : ''].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <button type="button" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
@@ -40800,6 +41096,7 @@ function EmailsSetting() {
           ))}
         </div>
       )}
+      </>)}
     </div>
   );
 }
@@ -41143,6 +41440,9 @@ export default function App() {
 }
 
 function AppCoeur() {
+  // Mode stream : tant que le réglage du nuage n'est pas lu, « pas su » masque
+  // (voir `streamEnAttenteDuNuage`). Avant que l'écran ne se peigne.
+  React.useLayoutEffect(() => { streamEnAttenteDuNuage(); }, []);
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
@@ -41942,6 +42242,15 @@ function AppCoeur() {
   // réglages SYNCHRONISÉS, pas des réglages d'appareil (§5.49).
   const [nuagePret, setNuagePret] = useState(() => isCloudReady());
   useEffect(() => onCloudReady(() => setNuagePret(true)), []);
+  // Mode stream : le dictionnaire de SES noms (comptes, identité), refait quand
+  // la liste des comptes change, quand le nuage arrive, ou quand il renomme un
+  // compte. UN endroit (§11) — les écrans n'ont rien à faire.
+  useEffect(() => {
+    nourrirStream(vintedAccounts);
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (CLES_STREAM_NOMS.includes(k)) nourrirStream(vintedAccounts); };
+    window.addEventListener('vrm:save', f);
+    return () => window.removeEventListener('vrm:save', f);
+  }, [vintedAccounts, nuagePret]);
   // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou un dressing relu) — le tableau
   // de bord recompte, comme l'écran Annonces (la même règle, §11).
   // ⚠️⚠️ Revue de la 5.165 : ce signal relançait TOUT le calcul — ventes, annonces
@@ -42930,6 +43239,7 @@ function AppCoeur() {
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
+            <PastilleStream/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
