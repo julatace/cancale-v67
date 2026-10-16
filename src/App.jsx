@@ -15,6 +15,7 @@ import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, ph
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
+import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
@@ -23385,6 +23386,35 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const [ym, setYm] = React.useState(mois[0]);
   const [msg, setMsg] = React.useState('');
   const [enCours, setEnCours] = React.useState('');
+  // ── SUPER PDP : SA connexion (le navigateur ne relit jamais ses identifiants)
+  // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
+  const [spdp, setSpdp] = React.useState(undefined);
+  const relireSpdp = React.useCallback(() => lireSuperPdp(enTeteSession()).then((j) => setSpdp(j)), []);
+  React.useEffect(() => { let mort = false; lireSuperPdp(enTeteSession()).then((j) => { if (!mort) setSpdp(j); }); return () => { mort = true; }; }, []);
+  const [spEnv, setSpEnv] = React.useState('sandbox');
+  const [spId, setSpId] = React.useState('');
+  const [spSecret, setSpSecret] = React.useState('');
+  const [spOccupe, setSpOccupe] = React.useState('');
+  const [spMsg, setSpMsg] = React.useState('');
+  const connecterSpdp = async () => {
+    setSpMsg(''); setSpOccupe('connexion');
+    const corps = { action: 'connecter', environnement: spEnv, client_id: spId, client_secret: spSecret };
+    // Les identifiants quittent le champ DÈS l'envoi : ils ne restent pas dans la page.
+    setSpId(''); setSpSecret('');
+    const { code, j } = await appelSuperPdp(enTeteSession(), corps);
+    setSpOccupe('');
+    if (code === 200 && j.ok) { setSpMsg(`Compte Super PDP connecté (${ENV_LIBELLE[j.env] || j.env}). Tes identifiants sont rangés sur le serveur — VRM ne te les remontrera plus.`); relireSpdp(); }
+    else setSpMsg(j.message || (code === 0 ? "Le serveur n'a pas répondu : je ne sais pas si la connexion a été rangée. Rouvre cet écran." : 'La connexion a échoué.'));
+  };
+  const deconnecterSpdp = async () => {
+    setSpMsg(''); setSpOccupe('deconnexion');
+    const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'deconnecter' });
+    setSpOccupe('');
+    if (code === 200 && j.ok) { setSpMsg('Compte Super PDP déconnecté : VRM a effacé tes identifiants.'); relireSpdp(); }
+    else setSpMsg(j.message || "Le serveur n'a pas répondu : la connexion est peut-être toujours rangée.");
+  };
+  const envoiDe = (num) => (spdp && spdp.envois && num && spdp.envois[num.numero]) || null;
+  const noterEnvoiLocal = (numero, envoi) => { if (!envoi) return; setSpdp((cur) => (cur && cur.envois ? { ...cur, envois: { ...cur.envois, [numero]: envoi } } : cur)); };
 
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
@@ -23409,24 +23439,55 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
   const fx = (data && data.facturx) || {};
   const numeroDe = (id) => (fx.parVente && fx.parVente[id]) || null;
+  // Le numéro et les octets d'UNE vente : le même chemin pour « Facture »
+  // (téléchargement) et « Envoyer à Super PDP » — une vente garde son numéro.
+  const preparerFacture = async (l) => {
+    let deja = numeroDe(l.id);
+    let next = data;
+    if (!deja) {
+      const emiseLe = Date.now(), an = String(new Date(emiseLe).getFullYear());
+      const compteur = { ...(fx.compteur || {}) }; const n = (Number(compteur[an]) || 0) + 1; compteur[an] = n;
+      deja = { numero: `FX-${an}-${String(n).padStart(4, '0')}`, emiseLe };
+      next = { ...data, facturx: { ...fx, compteur, parVente: { ...(fx.parVente || {}), [l.id]: deja } } };
+    }
+    const f = factureDepuisVente(l, { numero: deja.numero, emiseLe: deja.emiseLe });
+    if (!isFinite(f.centimes)) throw new Error('montant illisible');
+    const octets = await pdfFacturX(f, etat.vendeur);
+    if (next !== data) maj(next);
+    return { f, octets };
+  };
+  const envoyerSpdp = async (l, relireSeulement) => {
+    setMsg('');
+    if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
+    if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
+    setEnCours(l.id);
+    try {
+      if (relireSeulement) {
+        const numero = numeroDe(l.id) && numeroDe(l.id).numero;
+        const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'relire', numero });
+        if (j.envoi) noterEnvoiLocal(numero, j.envoi);
+        setMsg(code === 200 ? `Statut relu chez Super PDP pour ${numero}.` : (j.message || "Super PDP n'a pas répondu : statut pas relu."));
+        return;
+      }
+      const { f, octets } = await preparerFacture(l);
+      noterEnvoiLocal(f.numero, { etat: 'en-cours' });
+      const { code, j } = await appelSuperPdp(enTeteSession(), { action: 'envoyer', numero: f.numero, pdf: enBase64(octets) });
+      if (j.envoi) noterEnvoiLocal(f.numero, j.envoi);
+      // La réponse n'est pas arrivée : INCERTAIN, jamais « refusé ».
+      else if (code === 0) noterEnvoiLocal(f.numero, { etat: 'incertain' });
+      if (code === 200) setMsg(j.deja ? `Facture ${f.numero} : déjà chez Super PDP — rien n'a été renvoyé.` : `Facture ${f.numero} envoyée à Super PDP.`);
+      else setMsg(j.message || (code === 0 ? "La réponse du serveur n'est pas arrivée : je ne sais pas si la facture est partie. « Relire » la cherchera chez Super PDP." : "L'envoi a échoué."));
+      relireSpdp();
+    } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
+    finally { setEnCours(''); }
+  };
   const genererFacture = async (l) => {
     setMsg('');
     if (!etat.ok) { setMsg(etat.raison + ' ' + etat.geste); return; }
     if (!nuage) { setMsg("Je relis d'abord les numéros de facture déjà donnés — réessaie dans un instant."); return; }
     setEnCours(l.id);
     try {
-      let deja = numeroDe(l.id);
-      let next = data;
-      if (!deja) {
-        const emiseLe = Date.now(), an = String(new Date(emiseLe).getFullYear());
-        const compteur = { ...(fx.compteur || {}) }; const n = (Number(compteur[an]) || 0) + 1; compteur[an] = n;
-        deja = { numero: `FX-${an}-${String(n).padStart(4, '0')}`, emiseLe };
-        next = { ...data, facturx: { ...fx, compteur, parVente: { ...(fx.parVente || {}), [l.id]: deja } } };
-      }
-      const f = factureDepuisVente(l, { numero: deja.numero, emiseLe: deja.emiseLe });
-      if (!isFinite(f.centimes)) throw new Error('montant illisible');
-      const octets = await pdfFacturX(f, etat.vendeur);
-      if (next !== data) maj(next);
+      const { f, octets } = await preparerFacture(l);
       telechargerFichier(new Blob([octets], { type: 'application/pdf' }), nomFichierFacture(f.numero), 'application/pdf');
       setMsg(`Facture ${f.numero} téléchargée — à déposer sur ta plateforme agréée.`);
     } catch (e) { setMsg('La facture n’a pas pu être préparée : ' + String((e && e.message) || e).slice(0, 120)); }
@@ -23451,7 +23512,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers, gratuitement. C'est toi qui les envoies.</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
           </div>
           <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
@@ -23462,7 +23523,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
             ['Ce que VRM prépare', 'Une facture Factur-X (PDF + données lisibles par machine) par vente, et le récapitulatif mensuel de tes ventes aux particuliers (e-reporting).'],
-            ["Où l'envoyer", 'Depuis ta plateforme agréée gratuite (Indy, Pennylane, Tiime…) : dépose-y les fichiers. VRM ne se connecte à aucune plateforme.'],
+            ["Où l'envoyer", "Super PDP (plateforme agréée) : connecte TON compte ci-dessous, les factures partent d'ici. Ailleurs (Indy, Pennylane, Tiime…) : dépose les fichiers toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
             <div key={t} data-fe-explique={i} style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
@@ -23470,6 +23531,39 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginTop: 4 }}>{d}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── SUPER PDP : SON compte ── */}
+        <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
+          {spdp === undefined && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
+          {spdp === null && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+            <div style={{ flex: '1 1 220px', fontSize: 12.5, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
+              <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
+              <div style={{ fontSize: 11, color: C.muted }}>Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement. Tes identifiants restent sur le serveur, chiffrés.</div>
+            </div>
+            <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
+          </div>}
+          {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
+            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
+            {spdp.coffre === false && <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
+            <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
+                <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
+                  style={{ ...btn2(true), borderColor: spEnv === k ? C.accent : C.border, color: spEnv === k ? C.accent : C.text }}>{t}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              <input data-spdp-id value={spId} onChange={(e) => setSpId(e.target.value)} placeholder="Identifiant client (client_id)" autoComplete="off" spellCheck={false}
+                style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+              <input data-spdp-secret type="password" value={spSecret} onChange={(e) => setSpSecret(e.target.value)} placeholder="Secret client (client_secret)" autoComplete="new-password" spellCheck={false}
+                style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+              <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? 'Vérification…' : 'Connecter'}</button>
+            </div>
+          </div>}
+          {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
         </div>
 
         {/* ── RÉCAP E-REPORTING ── */}
@@ -23497,6 +23591,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv style={btn2(true)}><Icon name="save" size={14} />Récap CSV</button>
               <button type="button" onClick={() => exporter('json')} data-fe-recap-json style={btn2(true)}><Icon name="save" size={14} />Récap JSON</button>
             </div>
+            {spdp && spdp.connecte && <div data-spdp-recap style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>Le récapitulatif ne part pas encore tout seul vers Super PDP : la forme de son envoi par l'API n'a pas pu être vérifiée dans leur documentation officielle. Dépose ces fichiers toi-même d'ici là.</div>}
           </div>)}
         </div>
 
@@ -23511,17 +23606,25 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
           {recap && recap.lignes.length > 0 && <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
             {recap.lignes.map((l, i) => {
               const num = numeroDe(l.id);
+              const env = envoiDe(num), lib = libelleEnvoi(env);
+              const peutEnvoyer = peutFacturer && spdp && spdp.connecte && enCours !== l.id && !(env && (env.etat === 'envoye' || env.etat === 'en-cours'));
+              const peutRelire = spdp && spdp.connecte && enCours !== l.id && env && (env.etat === 'incertain' || env.etat === 'envoye');
               return (
-                <div key={l.id} data-fe-vente={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                <div key={l.id} data-fe-vente={l.id} data-spdp-ligne={env ? env.etat : ''} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.titre || 'Article'}</div>
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? 'versée' : l.plateforme === 'eBay' ? 'payée' : 'vendue'} le {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
+                    {lib && <div data-spdp-statut={env.etat} style={{ fontSize: 11, marginTop: 2, lineHeight: 1.45, color: lib.ton === 'attention' ? C.warn : C.muted, overflowWrap: 'anywhere' }}>{lib.texte}</div>}
                   </div>
                   <span className="vrm-display" style={{ fontSize: 13.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
                   <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || 'Télécharger la facture Factur-X (PDF + XML)'}
                     onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
                     <Icon name="receipt" size={14} />{enCours === l.id ? '…' : 'Facture'}
                   </button>
+                  {spdp && spdp.connecte && (peutRelire
+                    ? <button type="button" data-spdp-relire={l.id} onClick={() => envoyerSpdp(l, true)} style={btn2(true)}>Relire</button>
+                    : <button type="button" data-spdp-envoyer={l.id} disabled={!peutEnvoyer} title={!peutFacturer ? raisonGrise : 'Envoyer la facture Factur-X à Super PDP'}
+                        onClick={() => envoyerSpdp(l, false)} style={btn2(peutEnvoyer)}>{enCours === l.id ? '…' : 'Envoyer à Super PDP'}</button>)}
                 </div>
               );
             })}
