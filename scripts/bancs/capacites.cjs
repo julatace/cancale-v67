@@ -133,7 +133,10 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     //    que les 4,5 s d'avant — et on le DIT s'il ne l'est jamais : un
     //    « absent » mesure sur un ecran vide ne prouve rien.
     const PRET={
-      cat_annonces: ()=>/\d+\s+en\s+ligne/i.test(document.body.innerText||''),
+      // ⚠️ Annonces « premium » : le résumé « N en ligne sur Vinted » (`data-ann-resume`) vit dans
+      //    « Stock et ajustements », replié — `innerText` ne le voit plus. On lit l'ATTRIBUT (son
+      //    textContent existe dès que la grille est calculée), jamais la mise en page.
+      cat_annonces: ()=>{const r=document.querySelector('[data-ann-resume]');return !!r && /\d+\s+en\s+ligne/i.test(r.textContent||'');},
       // Le paragraphe d'introduction vit dans « Details et reglages » (replie
       // depuis le 4 octobre) : l'ecran est pret quand ce bloc existe.
       leboncoin:    ()=>!!document.querySelector('[data-lbc-details]'),
@@ -147,6 +150,9 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     //    pas. On ouvre « Details et reglages » comme il le ferait d'un clic —
     //    on juge ce qui s'affiche une fois ouvert, pas le source.
     if(onglet==='leboncoin'){ await pg.evaluate(()=>document.querySelectorAll('[data-lbc-details]').forEach(d=>{d.open=true;})); await pg.waitForTimeout(300); }
+    // Même chose pour « Publier aussi ailleurs » (`data-places-wrap`), replié depuis le 13 octobre (« trop de
+    // texte ») : la consigne de chaque place se lit une fois le dépliant ouvert, comme il le ferait.
+    if(!onglet||onglet==='cat_annonces'){ await pg.evaluate(()=>document.querySelectorAll('[data-places-wrap]').forEach(d=>{d.open=true;})); await pg.waitForTimeout(300); }
     const t=await pg.evaluate(()=>document.body.innerText||'');
     // textContent voit AUSSI le contenu des <details> fermés (le « ⋯ » des
     // cartes) : un champ caché dans un menu replié reste un champ proposé.
@@ -209,7 +215,8 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
   };
   for(const c of cas){
     const {t,tc,errs,pret}=await lis(c.pont);
-    const vu=BANDEAU.test(t);
+    // Le bandeau ne doit apparaître NULLE PART — ni à l'écran, ni dans un dépliant replié (textContent).
+    const vu=BANDEAU.test(t)||BANDEAU.test(tc);
     console.log('   '+c.nom.padEnd(40)+' → bandeau '+(vu?'AFFICHE':'absent')+(pret?'':' (GRILLE JAMAIS RENDUE)'));
     dit(pret && vu===c.attendu, 'extension '+c.nom+' : aucun bandeau de prix planchers (l\'acceptation automatique est retiree)',
       !pret?'la grille n\'a jamais ete rendue (20 s) — un ecran vide ne prouve ni la presence ni l\'absence du bandeau'

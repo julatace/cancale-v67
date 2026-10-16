@@ -139,6 +139,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     for(const t of TABS){
       await pg.goto('http://localhost:'+PORT_VV+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
+      // « À faire » du Collectif (`notifItems`) se calcule APRÈS les lectures (ventes eBay comprises) : 2,2 s ne
+      // suffisent pas sous charge (rouge vu chez d'autres agents, vert seul). On attend l'état OBSERVÉ — la ligne
+      // eBay —, borné à 12 s : si elle ne vient jamais, le contrôle plus bas reste rouge.
+      if(t==='collectif') await pg.waitForFunction(()=>/eBay à expédier/.test(document.body.innerText||''),null,{timeout:12000}).catch(()=>{});
       // `SHOTS=dossier` : une capture par écran et par taille (pour REGARDER, §6.2).
       if(process.env.SHOTS){ try{ fs.mkdirSync(process.env.SHOTS,{recursive:true}); await pg.screenshot({path:require('path').join(process.env.SHOTS,`${t}-${W}.png`),fullPage:true}); }catch(_){} }
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
