@@ -12092,7 +12092,9 @@ function ebayTitre(base, taille, max) {
   // (il la relit dans le titre) : on retire ce « T44 » final et on réécrit.
   if (!estNum) return lbcTitre('', base, taille, M);
   const suff = ' taille ' + t;
-  let core = lbcTitre('', base, '', M).replace(/\s+T\d{1,2}(?:[.,]\d)?$/i, '').trim();
+  // (16 oct.) lbcTitre écrit maintenant lui-même « taille 36 » (plus « T36 ») :
+  // on retire les DEUX formes, sinon le titre portait « taille 36 taille 36 ».
+  let core = lbcTitre('', base, '', M).replace(/\s+(?:T|tailles?\s*)\d{1,2}(?:[.,]\d)?$/i, '').trim();
   if ((core + suff).length > M) {
     const c = core.slice(0, M - suff.length); const e = c.lastIndexOf(' ');
     core = (e > 12 ? c.slice(0, e) : c).replace(/[\s,;:/-]+$/, '');
