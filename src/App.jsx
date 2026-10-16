@@ -53,7 +53,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.181.0';
+const EXT_ATTENDUE = '5.183.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -219,7 +219,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', relais: '5.183.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -4868,7 +4868,11 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   });
 }
 
-function vmrExec(q, timeoutMs = 15000) { return sondageConnu().then(() => vmrExecUn(q, timeoutMs)); }
+// 5.183 : un GESTE (jamais une lecture) part par le relais sur le téléphone.
+function vmrExec(q, timeoutMs = 15000) {
+  if (q && String(q.method || 'POST').toUpperCase() !== 'GET' && relaisVivant()) return relaisExec(q);
+  return sondageConnu().then(() => vmrExecUn(q, timeoutMs));
+}
 function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -5009,7 +5013,244 @@ function vmrDemandeUn(type, payload, timeoutMs) {
 //    muette. L'extension 5.160 répond sans réseau ; on laisse quand même le
 //    temps aux versions déjà installées.
 const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
-const vmrCmd = (p, timeoutMs = 9000) => vmrDemande('cmd', p, timeoutMs);
+// 5.183 : sur le téléphone, une commande permise part par le RELAIS (l'extension
+// de l'ordinateur l'exécute) ; ailleurs, par le pont, comme avant.
+const vmrCmd = (p, timeoutMs = 9000) => (p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RELAIS DU TÉLÉPHONE (extension 5.183) — « quand je suis sur mon téléphone
+// et que l'extension est allumée sur mon ordinateur, je veux pouvoir faire des
+// actions » (Julien, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Sur le téléphone il n'y a pas d'extension. Le téléphone DÉPOSE la commande
+// dans sa base (une ligne `cmd_relais_{id}` à lui, RLS) ; l'extension du Chrome
+// de l'ordinateur la prend, l'exécute avec EXACTEMENT les gardes d'un clic sur
+// l'ordinateur (compte du cookie = compte visé, 20 actions/heure, une requête
+// Vinted à la fois, pause quand Vinted freine) et écrit le résultat dans la
+// même ligne. Le téléphone suit la ligne : « envoyé à ton ordinateur… »,
+// « en cours… », puis le résultat — JAMAIS « fait » avant que l'extension
+// l'ait écrit.
+// Le relais existe si l'extension a déposé un signe de vie (`relais_ext`) il y a
+// moins de 3 min, dans une version qui sait relayer. Trois états, jamais deux :
+// vivant · éteint (« pas de signe de vie depuis X ») · pas su (lecture ratée).
+// Uniquement sans souris (téléphone, tablette) et sans extension ici : sur un
+// ordinateur, c'est le pont qui parle, rien ne change.
+const RELAIS_VIVANT_MS = 3 * 60000;
+const RELAIS_EXPIRE_MS = 10 * 60000;
+const RELAIS_CMDS = ['bordereau', 'lbcPublier'];
+// Les durées, réglables par un banc seulement (il ne peut pas attendre 2 min).
+const tempsRelais = () => Object.assign({ prise: 120000, pas: 2500, suivi: 3000, lecture: 30000, pris: 6 * 60000 },
+  (typeof window !== 'undefined' && window.__VRM_RELAIS_TEMPS) || {});
+const lireSansSouris = () => {
+  try { return window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(hover: none)').matches; } catch (_) { return false; }
+};
+// `undefined` pas encore lu · `null` lecture ratée (pas su) · `{absent:true}`
+// aucun signe de vie jamais · objet = le dernier signe de vie.
+let __relais = undefined, __relaisEnVol = null, __relaisMinuteur = null;
+const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user);
+async function lireRelais() {
+  if (__relaisEnVol) return __relaisEnVol;
+  __relaisEnVol = (async () => {
+    let v = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua`, { headers: sbAuth() });
+      if (r.ok) {
+        const rows = await r.json();
+        if (Array.isArray(rows)) v = rows[0] ? { atMs: Number(rows[0].atMs) || 0, ver: String(rows[0].ver || ''), code: String(rows[0].code || ''),
+          vUid: String(rows[0].vUid || ''), vLogin: String(rows[0].vLogin || ''), pauseJusqua: Number(rows[0].pauseJusqua) || 0 } : { absent: true };
+      }
+    } catch (_) { v = null; }
+    __relais = v;
+    __vmrNotifier();
+    return v;
+  })().finally(() => { __relaisEnVol = null; });
+  return __relaisEnVol;
+}
+function demarrerRelais() {
+  if (typeof window === 'undefined' || __relaisMinuteur || !lireSansSouris()) return;
+  const tour = () => { if (typeof document !== 'undefined' && document.hidden) return; if (relaisUtile()) lireRelais(); };
+  __relaisMinuteur = setInterval(tour, tempsRelais().lecture);
+  try { document.addEventListener('visibilitychange', tour); } catch (_) {}
+  tour();
+  // La session peut arriver après le premier rendu : on relit dès qu'elle est là.
+  setTimeout(tour, 1500);
+}
+const dureeRelais = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${Math.max(1, m)} min` : m < 48 * 60 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} j`; };
+function etatRelais() {
+  if (!relaisUtile()) return { niveau: 'hors' };
+  const r = __relais;
+  if (r === undefined) return { niveau: 'verif' };
+  if (r === null) return { niveau: 'passu' };
+  if (r.absent) return { niveau: 'absent' };
+  if (!r.atMs) return { niveau: 'passu' };
+  const age = Date.now() - r.atMs;
+  if (!(age < RELAIS_VIVANT_MS)) return { niveau: 'perime', age };
+  if (!/^\d+\.\d+\.\d+$/.test(r.ver) || cmpVersion(r.ver, EXT_CAPACITES.relais) < 0) return { niveau: 'retard', ver: r.ver };
+  return { niveau: 'vivant', age, at: r.atMs, ver: r.ver, vinted: r.vUid ? { uid: r.vUid, login: r.vLogin } : null, pauseMs: Math.max(0, r.pauseJusqua - Date.now()) };
+}
+const relaisVivant = () => etatRelais().niveau === 'vivant';
+// Le compte Vinted au nom duquel une action PARTIRAIT d'ici : celui du cookie
+// de ce Chrome (le pont), ou — par le relais — celui du Chrome de l'ordinateur.
+function vintedAgissant() {
+  const rl = etatRelais();
+  if (rl.niveau === 'vivant') return rl.vinted;
+  return vintedDeChrome();
+}
+// L'état « comme si l'extension était ici » pour les boutons qui lisent le
+// compte ouvert (`etat.vinted`) : sur le relais, celui de l'ordinateur.
+function etatAgissant() {
+  const rl = etatRelais();
+  if (rl.niveau === 'vivant') return { ok: true, relais: true, vinted: rl.vinted, cmds: {} };
+  return __vmrEtat;
+}
+const viaOrdinateur = (v) => `via ton ordinateur (compte Vinted ouvert : ${(v && (v.login || ('compte ' + v.uid))) || 'aucun'})`;
+const nouvelIdRelais = () => 'cmd_relais_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+const dormirRelais = (ms) => new Promise((r) => setTimeout(r, ms));
+// Dépose la commande. `null` ⇒ la base n'a pas pris la ligne : rien n'est parti.
+async function relaisEnvoyer(cmd, args, extra) {
+  if (!(AUTH.user && AUTH.user.id)) return null;
+  const id = nouvelIdRelais(), t = Date.now();
+  const data = Object.assign({ cmd, args, pour: String(AUTH.user.id), demandeLe: t, expire: t + RELAIS_EXPIRE_MS, etat: 'attente', par: 'telephone' }, extra || {});
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id, data })]) });
+    if (!r.ok) return null;
+  } catch (_) { return null; }
+  return { id, data };
+}
+// La ligne de la commande, en deux scalaires (§4.4). `null` = pas su.
+async function relaisLire(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=etat:meta->>etat,resultat:data->resultat`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    return rows[0] ? { etat: String(rows[0].etat || ''), resultat: rows[0].resultat && typeof rows[0].resultat === 'object' ? rows[0].resultat : {} } : { absente: true };
+  } catch (_) { return null; }
+}
+// Annule une commande pas encore prise — sous condition : si l'extension l'a
+// prise entre-temps, rien n'est touché (`false`). `null` = pas su.
+async function relaisAnnuler(id, data) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&meta->>etat=eq.attente&select=id`, {
+      method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data: Object.assign({}, data, { etat: 'annulee', annuleLe: Date.now() }), updated_at: new Date().toISOString() }) });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows.length > 0 : null;
+  } catch (_) { return null; }
+}
+// Attend la prise puis le résultat. `suivi(etat)` à chaque lecture.
+async function relaisAttendre(id, data, suivi) {
+  const T = tempsRelais(), t0 = Date.now();
+  let prisA = 0;
+  for (;;) {
+    await dormirRelais(T.pas);
+    const r = await relaisLire(id);
+    if (r === null || r.absente) {
+      if (Date.now() - t0 > T.prise + T.pris) return { inconnu: true, pris: !!prisA };
+      continue;
+    }
+    if (suivi) { try { suivi(r.etat, r.resultat); } catch (_) {} }
+    if (r.etat === 'attente') {
+      if (Date.now() - t0 > T.prise) {
+        const a = await relaisAnnuler(id, data);
+        if (a === true) return { pasPris: true };
+      }
+      continue;
+    }
+    if (r.etat === 'pris') { if (!prisA) prisA = Date.now(); if (Date.now() - prisA > T.pris) return { inconnu: true, pris: true }; continue; }
+    return { etat: r.etat, resultat: r.resultat || {} };
+  }
+}
+const RAISON_PAS_PRIS = "Ton ordinateur n'a pas pris la commande en 2 min — je l'ai annulée, rien n'est parti. Vérifie que Chrome y est ouvert, puis réessaie.";
+const RAISON_INCERTAIN = "Ton ordinateur a pris la commande mais n'a pas encore répondu — je ne sais pas si elle est partie : regarde avant de relancer.";
+// Un bordereau accepté avance sur l'ordinateur : la ligne de la commande le
+// dit, le téléphone la relit jusqu'au bout.
+async function relaisSuivreJobTel(id, jobId) {
+  const T = tempsRelais(), t0 = Date.now();
+  while (Date.now() - t0 < 10 * 60000) {
+    await dormirRelais(T.suivi);
+    const r = await relaisLire(id);
+    if (!r || r.absente) continue;
+    const res = r.resultat || {};
+    const fini = r.etat !== 'en-cours' && r.etat !== 'pris';
+    if (res.etape) { __vmrJobs[jobId] = { etape: res.etape, at: Date.now(), vivant: !fini, raison: res.raison || null, relais: id }; __vmrNotifier(); }
+    if (fini) return;
+  }
+}
+async function relaisCmd(p) {
+  const cmd = String(p.cmd);
+  const args = cmd === 'bordereau' ? { uid: String(p.uid || ''), tx: String(p.tx || '') } : Object.assign({ id: String(p.id || '') }, p.confirme === true ? { confirme: true } : {});
+  const jobId = cmd === 'bordereau' ? `bord:${args.uid}:${args.tx}` : `lbc:${args.id}`;
+  const env = await relaisEnvoyer(cmd, args);
+  if (!env) return { accepte: false, code: 'relais-base', relais: true, raison: "La base n'a pas répondu — rien n'est parti vers ton ordinateur. Réessaie dans un instant." };
+  const avant = __vmrJobs[jobId];
+  __vmrJobs[jobId] = { etape: 'relais-attente', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier();
+  const fin = await relaisAttendre(env.id, env.data, (e) => {
+    if (e === 'pris' && __vmrJobs[jobId] && __vmrJobs[jobId].etape === 'relais-attente') { __vmrJobs[jobId] = { etape: 'relais-pris', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier(); }
+  });
+  const rendre = () => { if (avant) __vmrJobs[jobId] = avant; else delete __vmrJobs[jobId]; __vmrNotifier(); };
+  if (fin.pasPris) { rendre(); return { accepte: false, code: 'relais-pas-pris', relais: true, raison: RAISON_PAS_PRIS }; }
+  if (fin.inconnu) { __vmrJobs[jobId] = { etape: 'relais-inconnu', at: Date.now(), raison: RAISON_INCERTAIN }; __vmrNotifier(); return { accepte: false, code: 'relais-incertain', relais: true, raison: RAISON_INCERTAIN }; }
+  const res = fin.resultat || {};
+  if (fin.etat !== 'en-cours' && fin.etat !== 'fait') {
+    rendre();
+    return { accepte: false, code: res.code || fin.etat, relais: true, actifLogin: res.actifLogin || '',
+      raison: res.raison || (fin.etat === 'expiree' ? 'Commande trop ancienne — rien n\'est parti.' : 'Refusé par ton ordinateur.') };
+  }
+  const jid = res.jobId || jobId;
+  const etape = res.etape || (fin.etat === 'fait' ? 'fait' : 'file');
+  if (jid !== jobId) rendre();
+  __vmrJobs[jid] = { etape, at: Date.now(), vivant: fin.etat === 'en-cours', relais: env.id }; __vmrNotifier();
+  if (fin.etat === 'en-cours') relaisSuivreJobTel(env.id, jid);
+  return { accepte: true, jobId: jid, etape, vivant: fin.etat === 'en-cours', relais: true };
+}
+async function relaisExec(q) {
+  const cle = 'exec:' + String(q.endpoint || '');
+  const env = await relaisEnvoyer('exec', { uid: String(q.uid || ''), method: String(q.method || 'POST').toUpperCase(), endpoint: String(q.endpoint || ''), body: q.body == null ? null : q.body },
+    q.confirme === true ? { confirme: true } : null);
+  if (!env) return { ok: false, code: 'relais-base', relais: true, error: "La base n'a pas répondu — rien n'est parti vers ton ordinateur. Réessaie dans un instant." };
+  __vmrJobs[cle] = { etape: 'relais-attente', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier();
+  const fin = await relaisAttendre(env.id, env.data, (e) => {
+    if (e === 'pris' && __vmrJobs[cle]) { __vmrJobs[cle] = { etape: 'relais-pris', at: Date.now(), vivant: true, relais: env.id }; __vmrNotifier(); }
+  });
+  delete __vmrJobs[cle]; __vmrNotifier();
+  if (fin.pasPris) return { ok: false, code: 'relais-pas-pris', relais: true, error: RAISON_PAS_PRIS };
+  if (fin.inconnu) return { ok: false, code: 'relais-incertain', relais: true, incertain: true, error: RAISON_INCERTAIN };
+  const res = fin.resultat || {};
+  if (fin.etat === 'fait' && res.ok) return { ok: true, status: res.status || 200, relais: true };
+  return { ok: false, code: res.code || fin.etat, relais: true, status: res.status || 0, error: res.raison || 'Refusé par ton ordinateur.' };
+}
+// La ligne d'avancement d'un geste relayé (messagerie : une conversation à la
+// fois, donc une seule demande en vol).
+function etapeRelaisExec() {
+  for (const k of Object.keys(__vmrJobs)) if (/^exec:/.test(k) && __vmrJobs[k] && /^relais-/.test(__vmrJobs[k].etape)) return __vmrJobs[k].etape;
+  return null;
+}
+const libelleRelais = (etape) => etape === 'relais-attente' ? 'Envoyé à ton ordinateur…' : etape === 'relais-pris' ? 'En cours sur ton ordinateur…' : '';
+// L'avancement d'un geste de la messagerie passé par le relais (abonné aux
+// évènements : la ligne change sans attendre un autre rendu de l'écran).
+function EtatRelaisConv({ vinted }) {
+  useExtVivante();
+  const et = etapeRelaisExec();
+  return <div data-conv-relais={et || 'pret'} role="status" style={{ fontSize: 11.5, color: et ? C.text : C.muted, marginBottom: 6, lineHeight: 1.35 }}>{et ? libelleRelais(et) : `Répondre et les offres partent ${viaOrdinateur(vinted)}.`}</div>;
+}
+// UNE phrase, au-dessus d'une liste de boutons qui passent par l'ordinateur
+// (§7 : elle n'est pas redite sous chaque bouton ; le bouton la porte en titre).
+function LigneRelais({ quoi }) {
+  useExtVivante();
+  const rl = etatRelais();
+  if (rl.niveau !== 'vivant') return null;
+  return (
+    <div data-relais-info={rl.vinted ? rl.vinted.uid : ''} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+      border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: C.accent, flexShrink: 0, marginTop: 5 }}/>
+      <span style={{ minWidth: 0 }}><b>{quoi} {viaOrdinateur(rl.vinted)}</b>{rl.vinted ? '' : ' — ouvre vinted.fr dans le Chrome de ton ordinateur pour agir.'}</span>
+    </div>
+  );
+}
 let __vmrBattementEnVol = false, __vmrRelance = null;
 // ⚠️ Un pont plus ancien que la 5.129 ne sait pas répondre à « état » : le
 //    questionner le faisait passer pour MUET au bout de 15 s, et l'app disait
@@ -5669,7 +5910,21 @@ const compteEffectif = (sel, connecte, estChoisissable) => {
 function raisonExtGlobale(sansSouris, opt) {
   const cap = (opt && opt.cap) || 'commande';
   const role = (opt && opt.role) || 'génère les bordereaux';
-  if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+  if (sansSouris) {
+    // 5.183 : le RELAIS — l'extension de l'ordinateur agit pour le téléphone.
+    // Trois états, jamais deux : vivant · éteint · pas su.
+    const rl = etatRelais();
+    if (rl.niveau === 'vivant') {
+      if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
+      if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
+      return null;
+    }
+    if (rl.niveau === 'verif') return { code: 'verif', relais: 'verif', texte: "Je regarde si ton ordinateur peut agir pour toi…" };
+    if (rl.niveau === 'perime') return { code: 'telephone', relais: 'perime', texte: `Ton ordinateur n'a pas donné signe de vie depuis ${dureeRelais(rl.age)} — ouvre Chrome sur l'ordinateur où l'extension VRM est installée : c'est elle qui ${role}, et tu pourras le faire d'ici.` };
+    if (rl.niveau === 'retard') return { code: 'telephone', relais: 'retard', texte: `L'extension de ton ordinateur (${rl.ver || 'version ?'}) ne sait pas encore agir pour ton téléphone : mets-la à jour (${EXT_ATTENDUE}) sur l'ordinateur.` };
+    if (rl.niveau === 'passu') return { code: 'telephone', relais: 'passu', texte: `Je n'ai pas pu savoir si ton ordinateur est allumé (la base n'a pas répondu) — c'est l'extension de ton ordinateur qui ${role}.` };
+    return { code: 'telephone', relais: rl.niveau, texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+  }
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
@@ -10221,9 +10476,10 @@ function useEtapePont() {
 function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => onVmrExt(force), []);
-  return { present: vmrExtPresent(), etat: __vmrEtat, jobs: __vmrJobs };
+  React.useEffect(() => { demarrerRelais(); }, []);
+  return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
 }
-const CMD_ACTIVE = ['file', 'generation', 'pdf'];
+const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
 // (`vivant`, depuis la version qui le dit) ; sinon, comme avant, 3 minutes après
 // son dernier évènement. ⚠️ L'âge seul ne suffisait pas (revue du 9 octobre) :
@@ -10244,6 +10500,7 @@ function RaisonBordereauxGrises({ ventes }) {
   // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
   // ne la répète pas (§7, `useVoixExt`).
   useVoixExt(montre && aideOuverte ? r.code : null);
+  if (n && !r && relaisVivant()) return <LigneRelais quoi={`${n} bordereau${n > 1 ? 'x' : ''} à générer :`}/>;
   if (!montre) return null;
   return (
     <details className="vrm-label-help" onToggle={ev=>setAideOuverte(ev.currentTarget.open)}><summary>Bordereaux et impression</summary><div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
@@ -10291,11 +10548,12 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const glob = raisonExtGlobale(sansSouris);
   let raison = glob ? glob.texte : null, distingue = null;
   if (!raison && etat) {
-    if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`; distingue = raison; }
-    else if (String(etat.vinted.uid) !== String(uid)) { raison = `Chrome est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`; distingue = raison; }
+    const ou = etat.relais ? 'dans le Chrome de ton ordinateur' : 'dans ce Chrome';
+    if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} ${ou}.`; distingue = raison; }
+    else if (String(etat.vinted.uid) !== String(uid)) { raison = `${etat.relais ? 'Le Chrome de ton ordinateur' : 'Chrome'} est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr${etat.relais ? ', sur l’ordinateur' : ''}.`; distingue = raison; }
   }
   const enCours = jobEnCours(job);
-  const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf');
+  const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf' || job.etape === 'relais-inconnu');
   const lancer = async () => {
     if (raison || enCours || envoi) return;
     setRefus(null); setEnvoi(true);
@@ -10318,7 +10576,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   // Un évènement de ce colis arrivé APRÈS le refus affiché le rend caduc : la
   // ligne dit ce que l'extension fait vraiment.
   const refusVu = refus && !(job && Number(job.at || 0) >= refusAt - 1000) ? refus : null;
-  const libelle = envoi ? 'Envoi…'
+  const relaisLib = job ? libelleRelais(job.etape) : '';
+  const libelle = relaisLib ? relaisLib
+    : envoi ? 'Envoi…'
     : enCours ? (job.etape === 'pdf' ? 'Récupération du PDF…' : job.etape === 'generation' ? 'Génération chez Vinted…' : 'En file…')
     : ko ? 'Réessayer'
     // Sur téléphone le bouton est forcément grisé (l'extension tourne sur
@@ -10331,9 +10591,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
   const repliVinted = !sansRepli && ((grise && glob && glob.code !== 'verif') || !!refusVu);
   return (
-    <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+    <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-relais={etat && etat.relais ? (job && /^relais-/.test(job.etape) ? job.etape : 'oui') : undefined} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
-        title={raison || (enCours ? "L'extension travaille sur Vinted" : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
+        title={raison || (enCours ? "L'extension travaille sur Vinted" : etat && etat.relais ? `Générer le bordereau ${viaOrdinateur(etat.vinted)}` : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
         style={{ ...base, border: `1px solid ${grise ? C.border : C.accent}`, background: grise ? 'transparent' : `${C.accent}14`,
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
         <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
@@ -10519,7 +10779,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
   const lbc = place === 'lbc';
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   const job = jobs[jobId] || null;
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+  const glob = raisonExtGlobale(sansSouris, { cap: lbc ? 'publication' : 'publication-ebay', role: 'publie tes annonces' })
     || (croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
@@ -10554,7 +10814,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) 
     __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
     __vmrNotifier();
   };
-  const libelle = envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
+  const libelle = job && libelleRelais(job.etape) ? libelleRelais(job.etape) : envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
     : abandonne ? 'Réessayer'
     : (lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay');
@@ -10592,8 +10852,9 @@ function LbcCroitVendue({ n }) {
 function RaisonPublication({ n, place }) {
   const sansSouris = useSansSouris();
   useExtVivante();
-  const r = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  const r = raisonExtGlobale(sansSouris, { cap: place === 'lbc' ? 'publication' : 'publication-ebay', role: 'publie tes annonces' });
   useVoixExt(r && n ? r.code : null);
+  if (!r && n && place === 'lbc' && relaisVivant()) return <LigneRelais quoi="Publier sur Leboncoin :"/>;
   if (!r || !n) return null;
   return (
     <div data-raison-publier={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
@@ -10632,7 +10893,9 @@ function etatActionsExt(sansSouris) {
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
   if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
-  const vinted = vintedDeChrome() || null;
+  const relais = etatRelais().niveau === 'vivant';
+  const vinted = vintedAgissant() || null;
+  if (relais && !vinted) return { niveau: 'lecture', relais, glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans le Chrome de ton ordinateur — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
   // ⚠️ « Publier sur Leboncoin reste possible » ne se dit que si l'extension
   //    installée sait publier depuis l'app (revue du 9 octobre) : avec une 5.143,
   //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
@@ -10644,7 +10907,7 @@ function etatActionsExt(sansSouris) {
   //    reste marche, la pastille DIT l'exception, avec la même raison que le
   //    bouton (une seule règle, `raisonExtGlobale`, §11).
   const pub = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
-  return { niveau: 'ok', glob: null, vinted, exception: pub && pub.code !== 'verif' ? pub : null };
+  return { niveau: 'ok', glob: null, vinted, relais, exception: pub && pub.code !== 'verif' ? pub : null };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
 // inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
@@ -10701,7 +10964,8 @@ function EtatActions({ onNav, ordi, sombre }) {
   // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
-  const libelle = st.niveau === 'ok' ? (st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const rl = etatRelais();
+  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
@@ -10709,7 +10973,11 @@ function EtatActions({ onNav, ordi, sombre }) {
   const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs', 'perime'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
-  const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+  const ligneExt = st.relais ? { s: 'oui', t: `sur ton ordinateur${rl.ver ? ' · ' + rl.ver : ''} · signe de vie ${ilYaCourt(rl.at || Date.now())}` }
+    : code === 'telephone' && rl.niveau === 'perime' ? { s: 'non', t: `sur ton ordinateur — pas de signe de vie depuis ${dureeRelais(rl.age)}` }
+    : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
+    : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
+    : code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
@@ -10720,7 +10988,8 @@ function EtatActions({ onNav, ordi, sombre }) {
     : code === 'perime' ? { s: 'non', t: `elle annonce la ${version || '?'} mais tourne encore sur son ancien code${(codePerime() || {}).code ? ' (' + codePerime().code + ')' : ''}` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
-  const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
+  const ligneVrm = st.relais ? { s: 'oui', t: 'ton compte (c’est sous lui qu’elle donne signe de vie)' }
+    : ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
     : extKo || st.niveau === 'verif' ? { s: '—', t: '' }
     : code === 'vrm' ? { s: 'non', t: __sessExtEnVol ? 'je lui transmets ta connexion…' : 'pas connectée' }
     : code === 'autre-vrm' ? { s: 'non', t: `connectée à ${sonMail || 'un autre compte'}, pas à ${monMail}` }
@@ -10728,14 +10997,17 @@ function EtatActions({ onNav, ordi, sombre }) {
     // Le ✓ n'est mis que sur ce que l'EXTENSION a dit (son adresse), jamais
     // sur la nôtre par défaut (revue du 5 octobre).
     : sonMail ? { s: 'oui', t: sonMail } : { s: 'oui', t: 'connectée' };
-  const ligneVinted = extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' || code === 'vrm-passu' ? { s: '—', t: '' }
+  const ligneVinted = st.relais ? (st.vinted ? { s: 'oui', t: `${loginVinted} (ouvert sur ton ordinateur)` } : { s: 'non', t: 'aucun compte ouvert sur ton ordinateur' })
+    : extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' || code === 'vrm-passu' ? { s: '—', t: '' }
     : st.vinted ? { s: 'oui', t: loginVinted }
     : { s: 'non', t: 'aucun compte ouvert' };
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
   const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
   let geste = null;
-  if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
+  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
+  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
+  else if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier{rl.niveau === 'absent' ? ' — avec l’extension à jour, tu pourras aussi le faire d’ici' : ''}.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
@@ -10780,6 +11052,7 @@ function EtatActions({ onNav, ordi, sombre }) {
         : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
   else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'vinted' && st.relais) geste = <span data-etat-geste="vinted-ordinateur">Sur ton ordinateur, ouvre vinted.fr connecté sur le compte des colis.</span>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
@@ -10792,13 +11065,13 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" aria-label={libelle} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" aria-label={st.relais && loginVinted ? `${libelle} · ${loginVinted}` : libelle} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
-        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
+        title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
           padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
-        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? 'Actions' : libelle}</span>
+        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
         {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
       </button>
       {ouvert && (
@@ -10808,9 +11081,13 @@ function EtatActions({ onNav, ordi, sombre }) {
             borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
           <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
-            {st.niveau === 'ok' ? 'Tu peux agir sur Vinted depuis VRM' : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
           </div>
-          {st.niveau === 'ok' ? (
+          {st.niveau === 'ok' && st.relais ? (
+            <div data-etat-relais-texte="" style={{ color: C.muted, marginBottom: 8 }}>
+              Générer un bordereau, répondre, faire une offre, publier sur Leboncoin : ta demande part dans ta base, l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute au nom de <b style={{ color: C.text }}>{loginVinted}</b>, avec les mêmes garde-fous que là-bas. Rien n'est dit « fait » avant qu'elle l'ait écrit.
+            </div>
+          ) : st.niveau === 'ok' ? (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
@@ -28367,7 +28644,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const sendReply = async () => {
     const oc = openConv; const text = replyText.trim();
     if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
-    if (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
+    if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
     setReplyBusy(true); setReplyErr(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
     if(conversationRequest.current!==oc.request)return;
@@ -28402,7 +28679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(true); setOffreMsg(null);
-    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body });
+    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body, confirme: quoi === 'accept' });
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
     if (r && r.ok) {
@@ -30184,9 +30461,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ « Pas su » (état de l'extension inconnu, cookie pas lu, deux copies,
   //    extension en retard) ⇒ `msgCompteActif` vide : rien n'est affirmé, le
   //    comportement d'avant reste (« pas su » ne vaut pas oui).
-  const msgCompteActif = (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
-  const msgLectureSeule = (acc) => !!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif;
-  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : ''; };
+  // 5.183 : sur le téléphone, le RELAIS — le compte qui agit est celui ouvert
+  // dans le Chrome de l'ordinateur (aucun ⇒ tout reste en lecture seule).
+  const msgRelais = etatRelais().niveau === 'vivant';
+  const msgRelaisVinted = msgRelais ? vintedAgissant() : null;
+  const msgCompteActif = msgRelais ? String((msgRelaisVinted && msgRelaisVinted.uid) || '') : (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
+  const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
+  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -30238,7 +30520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {ro && (
                   <div data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12,color:C.text,lineHeight:1.45,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',marginBottom:8}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
-                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
+                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le Chrome de ton ordinateur' : 'dans Chrome'} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
                   </div>
                 )}
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
@@ -30247,8 +30529,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const off = offreEnAttenteDe(openConv.conversation);
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
-                  const etat = extSait('messagerie');
-                  if (etat !== 'ok' || __vmrPlusieurs) return (
+                  const etat = msgRelais ? 'ok' : extSait('messagerie');
+                  if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
                       {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
                       {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
@@ -30277,6 +30559,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })()}
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
+                {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
                 <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch',opacity:ro?0.5:1}}>
@@ -30288,8 +30571,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ))}
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':(vmrExtPresent()||msgRelais)?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
                 {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
               </div>

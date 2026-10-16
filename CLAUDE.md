@@ -8984,6 +8984,68 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Le relais du téléphone : agir depuis l'iPhone par l'extension de l'ordinateur (16 octobre, 5.183)
+Julien : « quand je suis sur mon téléphone et que l'extension est allumée [sur
+mon ordinateur] je veux pouvoir faire des actions ». Avant, sur le téléphone,
+`raisonExtGlobale` rendait `telephone` et tout geste était grisé.
+- **Le chemin** : le téléphone écrit UNE ligne par commande, `cmd_relais_{id}`
+  (`{cmd, args, pour, demandeLe, expire = +10 min, etat:'attente', par:'telephone',
+  confirme?}`, au nom du vendeur — RLS) ; l'extension (alarme `vrm-relais` de
+  30 s, le minimum de Chrome, et chaque visite sur Vinted) lit
+  `id=like.cmd_relais_*&meta->>etat=eq.attente`, **5 au plus**, la PREND par une
+  écriture conditionnelle (`PATCH …&meta->>etat=eq.attente`), l'exécute par
+  **les mêmes fonctions** qu'un clic sur l'ordinateur (`executerCommande`,
+  `executerPourApp`, `publierDepuisApp` — donc `gardeStricte`, 20 actions/h,
+  `avecVinted`, la pause) et écrit le résultat dans la ligne. Un bordereau
+  accepté avance dans la ligne (`relaisSuivreJob`, branché sur `majCmd`).
+- **L'extension revérifie tout** : liste blanche (`bordereau`, `lbcPublier`,
+  `exec` par `EXEC_PERMIS` **sans les lectures** ; « Préparer sur eBay » ne se
+  relaie pas — le formulaire s'ouvre sur l'ordinateur) ; forme des arguments ;
+  propriétaire de la ligne ET `pour` = le propriétaire de SA session ; échéance
+  (10 min au plus : expirée ⇒ refusée, jamais exécutée en retard) ; annulée ⇒
+  jamais prise ; **une seule fois** (`vrmRelaisVus` dans `chrome.storage.local`,
+  noté AVANT d'agir — un service worker redémarré ne rejoue pas). Accepter une
+  offre exige `confirme` dans la ligne (l'entrée `confirmer: true`
+  d'`EXEC_PERMIS`) : le téléphone ne l'envoie qu'après sa confirmation (§3).
+- **Sans session VRM, la relève ne fait RIEN** — pas même une lecture de notre
+  base (le stockage local d'abord).
+- **Le signe de vie** `relais_ext` (`atMs, ver, code, vUid, vLogin,
+  pauseJusqua`, des scalaires lus par `meta->>`), au plus une écriture par
+  minute. Le téléphone le relit toutes les 30 s (visible, sans souris, sans
+  extension ici, session ouverte) : **vivant** (< 3 min et version ≥
+  `EXT_CAPACITES.relais`) · **éteint** (« pas donné signe de vie depuis X —
+  ouvre Chrome ») · **en retard** · **pas su** (lecture ratée : aucune promesse).
+  ⚠️ L'âge se compare à l'horloge du TÉLÉPHONE : une horloge d'ordinateur très
+  décalée le ferait dire éteint (le sens sûr).
+- **Côté app, aucun écran ne change de règle** : `vmrCmd` / `vmrExec` passent
+  par le relais quand il est vivant (`relaisCmd`, `relaisExec`) et rendent la
+  MÊME forme que le pont ; `raisonExtGlobale(sansSouris)` rend `null` sur relais
+  vivant ; `useExtVivante().etat` devient `etatAgissant()` (le compte Vinted
+  ouvert sur l'ordinateur) — `BoutonBordereau`, « Tout générer »,
+  `BoutonPublier`, la messagerie et la pastille suivent tout seuls (§11). Le
+  compte de la vente ≠ celui de l'ordinateur ⇒ grisé AVANT le clic.
+- **Jamais « fait » avant l'extension** : `relais-attente` (« Envoyé à ton
+  ordinateur… »), `relais-pris` (« En cours sur ton ordinateur… »), puis
+  l'étape écrite par elle. Pas prise en 2 min ⇒ annulée par une écriture
+  conditionnelle (prise entre-temps ⇒ rien n'est touché) et dit ; prise sans
+  résultat après 6 min ⇒ « je ne sais pas si elle est partie ».
+- **Une phrase, une fois** (§7) : « via ton ordinateur (compte Vinted ouvert :
+  X) » au-dessus de la liste (`LigneRelais`) et dans le fil de la messagerie ;
+  sur chaque bouton, en titre. Pastille : « Actions via ton ordinateur ·
+  {compte} » (sur le téléphone, l'en-tête n'affiche que l'icône ⓘ : le libellé
+  est dans `aria-label`, le panneau le détaille).
+- Preuves : `audit-relais.cjs` (le vrai `background.js` dans `_fond-vm`) **27
+  contrôles**, **14 rouges** sur b8d11f2 et **7 mutations sur 7** rouges (vus,
+  échéance, propriétaire, confirmation, prise conditionnelle, session, liste
+  blanche) ; banc `relais-telephone.cjs` (port 4941, 390 px tactile + 1512 px)
+  **41 contrôles**, **28 rouges** sur le build de b8d11f2, et rouge sous deux
+  mutations de l'app (âge ignoré ⇒ 4 ; « fait » avant l'extension ⇒ 7).
+- ⚠️ **Non mesuré** : le `PATCH` conditionnel sur `meta->>etat` contre la vraie
+  PostgREST (grammaire documentée, jamais appelé ici, §2.3) ; le délai réel de
+  l'alarme de 30 s dans son Chrome ; plusieurs ordinateurs relais à la fois (le
+  signe de vie est celui du DERNIER ; la prise conditionnelle empêche une double
+  exécution, mais l'autre ordinateur peut refuser « autre compte »).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9012,6 +9074,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
+| `relais` | `traiterRelais` | **5.183.0** (16 oct. — la 5.181 est servie, la 5.182 réservée par un autre chantier) | « sur le téléphone : actions via ton ordinateur » (le relais lit le signe de vie, pas le pont) |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
