@@ -1,0 +1,271 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LA COQUE DE L'APP — en-tête, barre d'onglets, sous-onglets des plateformes,
+   titres d'écran, feuille « Ton espace ». (16 octobre, Julien : « ça fait
+   encore un peu trop vibe-codé… pas encore optimal surtout sur téléphone ».)
+
+   Chargée APRÈS styles-mineral.css. Une seule feuille pour la coque : avant,
+   ses règles étaient éparpillées en cinq couches d'`!important` qui se
+   contredisaient (la barre du bas avait trois hauteurs selon l'ordre de
+   lecture). Les COULEURS viennent du thème `C` (THEMES, App.jsx) par les
+   variables posées sur `.vrm-app-shell` : --vrm-ink (texte), --vrm-muted
+   (secondaire), --vrm-faint (tertiaire), --vrm-hair (filet fin), --vrm-bar
+   (verre des barres), --vrm-accent, --vrm-card2, --vrm-surface, --vrm-bg.
+   Aucune couleur n'est écrite ici en dur (§7), sauf les ombres d'encre.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── L'ÉCHELLE, posée une fois ─────────────────────────────────────────────
+   28 titre d'écran · 20 titre de section · 15 corps · 13 secondaire · 11 légende.
+   Rayons 8 / 12 / 16. Une seule ombre légère pour ce qui flotte. */
+:root {
+  --vrm-t-title: 28px; --vrm-t-section: 20px; --vrm-t-body: 15px;
+  --vrm-t-secondary: 13px; --vrm-t-caption: 11px;
+  --vrm-r-sm: 8px; --vrm-r-md: 12px; --vrm-r-lg: 16px;
+  --vrm-ombre-flottante: 0 1px 2px rgba(10,14,22,.06), 0 8px 24px rgba(10,14,22,.10);
+}
+@media (min-width: 1024px) { :root { --vrm-t-title: 30px; } }
+
+/* ── TITRE D'ÉCRAN (`ScreenHead`) ──────────────────────────────────────── */
+.vrm-screen-head { margin: 4px 0 18px; padding: 0; border: 0; }
+.vrm-tete-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.vrm-screen-head-titre { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+/* Un grand titre ne porte pas d'icône (elle nomme déjà l'écran dans la
+   navigation) : le style en ligne de l'icône gagnait sur l'ancienne règle. */
+.vrm-screen-head-titre > span[aria-hidden] { display: none !important; }
+/* Ma journée : sur téléphone, le bonjour EST le grand titre — « Ma journée »
+   au-dessus disait la même chose une ligne plus haut. */
+@media (max-width: 767px) { .vrm-day-layout > .vrm-screen-head { display: none; } }
+.vrm-screen-head h2 {
+  margin: 0; font-size: var(--vrm-t-title); font-weight: 700;
+  line-height: 1.12; letter-spacing: -.025em;
+}
+/* Dans un espace de plateforme, l'écran est une SECTION : son titre descend
+   d'un cran. Sur téléphone il disparaît — le segment actif juste au-dessus
+   dit déjà « Ventes » (un mot écrit deux fois à 40 px d'écart, §7). Les
+   actions de la ligne (`right`) restent. */
+.vrm-market-space .vrm-screen-head { margin: 8px 0 12px; }
+.vrm-market-space .vrm-screen-head h2 { font-size: var(--vrm-t-section); letter-spacing: -.015em; }
+@media (max-width: 767px) {
+  .vrm-market-space .vrm-screen-head-titre { display: none; }
+  .vrm-market-space .vrm-screen-head:not(:has(.vrm-tete-row > :nth-child(2))) { display: none; }
+}
+
+/* ── EN-TÊTE D'UNE PLATEFORME (logo + nom) : le grand titre de l'écran ── */
+.vrm-market-heading { display: flex; align-items: center; gap: 10px; padding: 6px 16px 12px; }
+.vrm-market-heading h1 {
+  margin: 0; font-size: var(--vrm-t-title); line-height: 1.12; font-weight: 700;
+  letter-spacing: -.025em; color: var(--vrm-ink);
+}
+.vrm-market-heading .vrm-brand-icon { width: 28px; height: 28px; object-fit: contain; }
+@media (min-width: 1024px) { .vrm-market-heading { padding: 10px 16px 14px; } .vrm-market-heading .vrm-brand-icon { width: 32px; height: 32px; } }
+
+/* ── SOUS-ONGLETS D'UNE PLATEFORME : contrôle segmenté ─────────────────── */
+.vrm-seg-cadre { padding: 0 16px 12px; min-width: 0; }
+.vrm-seg {
+  display: flex; gap: 2px; padding: 3px; margin: 0; border: 0;
+  border-radius: var(--vrm-r-md);
+  /* La piste est un voile NEUTRE tiré du texte secondaire du thème (lisible
+     sur le fond clair comme sur le sombre) ; l'onglet eBay pose la sienne. */
+  background: var(--seg-piste, color-mix(in srgb, var(--vrm-muted) 13%, transparent));
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  scroll-padding-inline: 3px;
+}
+.vrm-seg::-webkit-scrollbar { display: none; }
+.vrm-seg-btn {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--seg-muted);
+  font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; cursor: pointer;
+  transition: background-color .18s var(--vrm-ease-out, ease), color .18s ease, box-shadow .18s ease;
+}
+.vrm-seg-btn[aria-current="page"] {
+  background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
+  box-shadow: 0 1px 2px rgba(10,14,22,.10), 0 0 0 .5px rgba(10,14,22,.05);
+}
+.vrm-seg-btn:active:not(:disabled) { transform: none; }
+:root[data-theme="dark"] .vrm-seg-btn[aria-current="page"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
+.vrm-seg-point { width: 6px; height: 6px; border-radius: 99px; background: var(--seg-point); flex-shrink: 0; }
+@media (max-width: 767px) { .vrm-seg-btn { padding: 0 10px; } }
+@media (min-width: 768px) {
+  .vrm-seg { width: fit-content; max-width: 100%; }
+  .vrm-seg-btn { flex: 0 0 auto; padding: 0 18px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .vrm-seg-btn:not([aria-current]):hover { color: var(--seg-ink); filter: none; }
+}
+
+/* ── LE CHOIX DU COMPTE : une rangée de réglage, pas un formulaire ─────── */
+.vrm-compte-choix { padding: 0 16px 12px; min-width: 0; }
+.vrm-compte-ligne {
+  display: flex; align-items: center; gap: 10px; max-width: 440px; min-height: 44px;
+  padding: 0 12px 0 14px; border-radius: var(--vrm-r-md); position: relative;
+}
+.vrm-compte-ligne > label { font-size: var(--vrm-t-secondary); font-weight: 500; flex-shrink: 0; }
+.vrm-compte-ligne > select {
+  flex: 1; min-width: 0; appearance: none; -webkit-appearance: none;
+  border: 0; background: transparent; padding: 0 22px 0 4px; min-height: 44px;
+  font: 600 14px/1.2 inherit; font-family: inherit; text-align: right; text-align-last: right;
+  cursor: pointer; text-overflow: ellipsis;
+}
+.vrm-compte-ligne > select:focus-visible { outline: none; }
+.vrm-compte-ligne:focus-within { box-shadow: 0 0 0 2px var(--vrm-accent); }
+.vrm-compte-chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%) rotate(90deg); display: flex; pointer-events: none; }
+.vrm-compte-note { display: block; margin: 6px 2px 0; font-size: 12px; line-height: 1.4; }
+
+/* ════ TÉLÉPHONE & TABLETTE ═════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  /* ── EN-TÊTE : transparent en haut de page, verre + filet au défilement ──
+     Trois colonnes : gauche (menu, logo) · titre court centré · actions. */
+  .vrm-app-header {
+    flex-shrink: 0; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+    align-items: center; gap: 4px; min-height: 52px; box-sizing: border-box;
+    padding: env(safe-area-inset-top) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+    background: var(--vrm-bg); border-bottom: 1px solid transparent;
+    transition: background-color .2s ease, border-color .2s ease;
+  }
+  .vrm-app-header.is-defile {
+    background: var(--vrm-bar); border-bottom-color: var(--vrm-hair);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  }
+  .vrm-header-brand { grid-column: 1; display: flex; align-items: center; gap: 2px; min-width: 0; }
+  .vrm-hdr-titre {
+    grid-column: 2; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 17px; font-weight: 600; letter-spacing: -.02em; color: var(--vrm-ink);
+    opacity: 0; transform: translateY(6px); pointer-events: none;
+    transition: opacity .2s ease, transform .25s var(--vrm-ease-out, ease);
+  }
+  .vrm-app-header.is-defile .vrm-hdr-titre { opacity: 1; transform: none; }
+  .vrm-header-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 0; }
+  .vrm-header-logo { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; cursor: pointer; position: relative; }
+  .vrm-header-logo > img, .vrm-header-logo > svg { width: 30px !important; height: 30px !important; border-radius: 8px; object-fit: cover; }
+
+  /* Les commandes de l'en-tête : des ICÔNES, sans boîte. Cible de 44 px. */
+  .vrm-hbtn, .vrm-app-header [data-etat-actions], .vrm-app-header [data-stream-pastille] {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; width: 44px; height: 44px; padding: 0 !important;
+    border: 0 !important; border-radius: var(--vrm-r-md) !important; background: transparent !important;
+    color: var(--vrm-ink) !important; position: relative; cursor: pointer;
+  }
+  .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2) !important; }
+  /* L'état « puis-je agir sur Vinted ? » : un « i » au trait, avec la PASTILLE
+     d'état en coin (comme un badge iOS) — la couleur dit l'état, le texte est
+     dans le panneau qui s'ouvre. */
+  .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display: none; }
+  .vrm-app-header [data-etat-actions] > span[aria-hidden] {
+    position: absolute; top: 11px; right: 10px; width: 8px !important; height: 8px !important;
+    box-shadow: 0 0 0 2px var(--vrm-bg);
+  }
+  .vrm-app-header.is-defile [data-etat-actions] > span[aria-hidden] { box-shadow: 0 0 0 2px var(--vrm-surface); }
+  .vrm-app-header [data-etat-actions]::after {
+    content: 'i'; display: grid; place-items: center; width: 19px; height: 19px;
+    border: 1.6px solid currentColor; border-radius: 50%;
+    font: 600 12px/1 'Inter', system-ui, sans-serif; font-style: normal;
+  }
+  .vrm-app-header [data-stream-pastille] { font-size: 0 !important; gap: 0 !important; }
+  .vrm-app-header [data-stream-pastille] > span { width: 10px !important; height: 10px !important; }
+
+  /* ── BARRE D'ONGLETS (téléphone) ────────────────────────────────────────
+     Dans le flux (frère de <main>), jamais `fixed` : voir BottomBar. */
+  .vrm-tabbar {
+    flex-shrink: 0; z-index: 60; display: flex; align-items: stretch; box-sizing: border-box;
+    background: var(--vrm-bar); border-top: 1px solid var(--vrm-hair);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+  }
+  .vrm-tab {
+    flex: 1 1 0; min-width: 0; min-height: 54px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; padding: 6px 2px 4px;
+    border: 0; border-radius: 0; background: transparent;
+    /* Les onglets au repos sont en gris CLAIR (entre secondaire et tertiaire) :
+       l'onglet actif, à l'accent, se détache sans pastille. */
+    color: color-mix(in srgb, var(--vrm-muted) 72%, var(--vrm-faint));
+    font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .vrm-tab:active:not(:disabled) { transform: none; filter: none; opacity: .6; }
+  .vrm-tab-ic { display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; }
+  .vrm-tab .vrm-nav-label {
+    font-size: 10.5px; font-weight: 500; letter-spacing: .01em; line-height: 1.1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .vrm-tab[aria-current="page"] { color: var(--vrm-accent); }
+  .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 600; }
+
+  /* Le contenu ne réserve plus la zone sûre : la barre la porte déjà. */
+  .vrm-main { padding-bottom: 28px !important; }
+}
+
+/* ════ ORDINATEUR : l'île d'actions, discrète ═══════════════════════════ */
+@media (min-width: 1024px) {
+  .vrm-app-header {
+    position: relative !important; top: auto !important; right: auto !important;
+    align-self: flex-end; flex-shrink: 0; margin: 10px 24px 0 272px;
+    display: flex; align-items: center; gap: 2px; padding: 4px;
+    background: transparent; border: 0; box-shadow: none;
+  }
+  .vrm-header-actions { display: flex; align-items: center; gap: 2px; }
+  .vrm-hbtn {
+    display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+    min-height: 38px; padding: 0; border: 0; border-radius: 10px; background: transparent;
+    color: var(--vrm-muted); cursor: pointer;
+  }
+  .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2); color: var(--vrm-ink); }
+  .vrm-app-header [data-etat-actions] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 7px 12px !important; }
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .vrm-hbtn:hover { background: var(--vrm-card2); color: var(--vrm-ink); filter: none; }
+}
+
+/* ── FEUILLE « TON ESPACE » : liste groupée façon iOS ──────────────────── */
+.vrm-sheet-voile {
+  position: fixed; inset: 0; z-index: 80; background: rgba(6,9,15,.40);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  animation: vrmVoile .2s ease;
+}
+@keyframes vrmVoile { from { opacity: 0 } to { opacity: 1 } }
+@keyframes vrmSheetHaut { from { transform: translateY(-100%) } to { transform: none } }
+.vrm-sheet {
+  position: absolute; left: 0; right: 0; box-sizing: border-box;
+  background: var(--vrm-bg); color: var(--vrm-ink);
+  max-height: calc(100dvh - 44px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px 16px calc(14px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(6,9,15,.22);
+}
+.vrm-sheet-bas { bottom: 0; border-radius: 16px 16px 0 0; animation: cancaleSheet .32s var(--vrm-ease-ios) backwards; }
+.vrm-sheet-haut {
+  top: 0; border-radius: 0 0 16px 16px; padding-top: calc(8px + env(safe-area-inset-top));
+  padding-bottom: 18px; box-shadow: 0 12px 40px rgba(6,9,15,.22);
+  animation: vrmSheetHaut .28s var(--vrm-ease-ios) backwards;
+}
+.vrm-sheet-poignee { width: 36px; height: 5px; border-radius: 3px; margin: 2px auto 4px; background: var(--vrm-faint); opacity: .45; }
+.vrm-sheet-tete { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 10px 4px; }
+.vrm-sheet-titre { font-size: var(--vrm-t-section); font-weight: 700; letter-spacing: -.02em; }
+.vrm-sheet-fermer {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin-right: -8px; padding: 0;
+  border: 0; border-radius: 50%; color: var(--vrm-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle, var(--vrm-card2) 15px, transparent 15.5px);
+}
+.vrm-sheet-groupe { margin-bottom: 18px; }
+.vrm-sheet-groupe:last-child { margin-bottom: 4px; }
+.vrm-sheet-label {
+  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--vrm-muted);
+}
+.vrm-sheet-carte { background: var(--vrm-surface); border-radius: var(--vrm-r-md); overflow: hidden; }
+.vrm-sheet-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; position: relative;
+  padding: 0 12px 0 14px; border: 0; border-radius: 0; background: transparent; color: var(--vrm-ink);
+  font-family: inherit; font-size: 16px; font-weight: 450; letter-spacing: -.01em; text-align: left; cursor: pointer;
+}
+.vrm-sheet-row + .vrm-sheet-row::before { content: ''; position: absolute; top: 0; left: 50px; right: 0; border-top: 1px solid var(--vrm-hair); }
+.vrm-sheet-row:active:not(:disabled) { transform: none; filter: none; background: var(--vrm-card2); }
+.vrm-sheet-ic { width: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--vrm-muted); }
+.vrm-sheet-lib { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-sheet-fin { flex-shrink: 0; display: flex; color: var(--vrm-faint); }
+.vrm-sheet-badge { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: var(--vrm-card2); color: var(--vrm-muted); }
+.vrm-sheet-row[aria-current="page"] { font-weight: 600; }
+.vrm-sheet-row[aria-current="page"] .vrm-sheet-ic,
+.vrm-sheet-row[aria-current="page"] .vrm-sheet-fin { color: var(--vrm-accent); }
+@media (hover: hover) and (pointer: fine) { .vrm-sheet-row:hover { background: var(--vrm-card2); filter: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-sheet, .vrm-sheet-voile, .vrm-hdr-titre { animation: none !important; transition: none !important; }
+}
