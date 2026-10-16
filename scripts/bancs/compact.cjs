@@ -17,7 +17,7 @@ const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
 rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
-{id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_FULFILLED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
+{id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
 {id:'ebay_listings',data:{items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
 const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const server = http.createServer((q,r)=>{
@@ -62,7 +62,7 @@ async function brancher(p){
  let b;
  try{
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
-  b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto(base+'/?tab=journee');await p.locator('main').waitFor();
@@ -70,13 +70,27 @@ async function brancher(p){
   if(await p.locator('.vrm-day-greeting').count())check(await p.locator('.vrm-day-greeting').evaluate(e=>e.getBoundingClientRect().height)<=56,'accueil compact après rétablissement des chiffres');
   for(const tab of ['cat_ventes','plat_leboncoin','plat_ebay']){
     await p.goto(base+'/?tab='+tab);await p.locator('.vrm-sale-row').first().waitFor();
-    const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect();return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height};});
-    check(pos.w===64 && pos.h===84 && pos.right>pos.left,'photo portrait à gauche '+tab);if(pos.row>=200){console.log(pos);await p.screenshot({path:'/tmp/compact-height.png'});}check(pos.row<200,'ligne compacte '+tab);
+    const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
+    // ⚠️ L'écran Ventes de Vinted a sa propre liste depuis le 16 octobre (b8d11f2, « Ventes premium », `.vrm-ventes-liste` : vignette CARRÉE 56 × 56 sur téléphone) ; Leboncoin et eBay gardent la ligne partagée 64 × 84. Chaque liste est jugée sur SA taille exacte, photo à gauche des informations.
+    const attendu=tab==='cat_ventes'?{w:56,h:56,nom:'photo carrée à gauche '}:{w:64,h:84,nom:'photo portrait à gauche '};
+    check(pos.w===attendu.w && pos.h===attendu.h && pos.right>pos.left,attendu.nom+tab+' ('+pos.w+'×'+pos.h+')');
+    // ⚠️ Ventes Vinted (b8d11f2, 16 octobre) : la LIGNE (`.vrm-sale-overview` : vignette, titre, statut, montant,
+    //    bouton du bordereau sous le titre) reste sous 200 px ; les gestes du coût d'achat et « Modifier › »
+    //    sont une rangée À PART, de cibles de 44 px (jugée par ventes-colis-premium.cjs). Leboncoin et eBay
+    //    gardent la ligne partagée : toute la rangée sous 200 px, comme avant.
+    const haut=tab==='cat_ventes'?pos.ligne:pos.row;
+    if(!(haut<200)){console.log(pos);await p.screenshot({path:'/tmp/compact-height.png'});}check(haut!=null&&haut<200,'ligne compacte '+tab+' ('+Math.round(haut)+' px)');
     if(tab!=='cat_ventes')check(!(await p.locator('.vrm-platform-summary').evaluate(e=>e.open)),'chiffres repliés sur téléphone '+tab);
-    if(tab!=='cat_ventes')check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo affichée '+tab);
+    // La vignette est en `loading="lazy"` : on attend qu'elle soit chargée (état observé, borné), jamais un délai fixe.
+    if(tab!=='cat_ventes'){await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete&&e.naturalWidth>0?1:new Promise(ok=>{e.addEventListener('load',ok,{once:true});e.addEventListener('error',ok,{once:true});setTimeout(ok,5000);})).catch(()=>{});
+    check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo affichée '+tab);}
     if(tab==='plat_ebay'){
-      await p.getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'NOT_FULFILLED reste à expédier');
-      await p.getByRole('button',{name:'Finalisées',exact:true}).click();check((await p.locator('.vrm-sale-row').count())===0,'NOT_FULFILLED non finalisée');
+      // ⚠️ Depuis le 14 octobre (b2102c2) la règle eBay ne lit que les VRAIS états d'eBay (Sell Fulfillment :
+      //    NOT_STARTED · IN_PROGRESS · FULFILLED) ; « NOT_FULFILLED » n'en est pas un et vaut « Expédition à
+      //    confirmer ». La commande du banc porte donc NOT_STARTED (la forme réelle, comme revendeurs.cjs), et le
+      //    second filtre d'eBay s'appelle « Expédiées » (doneLabel).
+      await p.getByRole('button',{name:'À expédier',exact:true}).click();await p.getByText('Paire eBay',{exact:true}).waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'NOT_STARTED reste à expédier');
+      await p.getByRole('button',{name:'Expédiées',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())===0,'NOT_STARTED non expédiée');
     }
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-'+tab+'.png')});}
   }
@@ -90,7 +104,10 @@ async function brancher(p){
   check(await p.getByRole('alert').isVisible(),'intervalle inversé refusé');
   await p.getByLabel('Début de la période').fill('2020-01-01');await p.getByLabel('Fin de la période').fill('2020-01-31');await p.getByRole('button',{name:'Appliquer',exact:true}).click();
   check((await p.locator('.vrm-sale-row').count())===0,'dates filtrent réellement les ventes');
-  await p.getByRole('button',{name:'Effacer la période'}).click();check((await p.locator('.vrm-sale-row').count())>0,'effacement restaure les ventes');
+  // ⚠️ Sur téléphone, la croix « Effacer la période » est masquée depuis le 14 octobre (156c95c, la période tient
+  //    dans une case de 140 px) : le geste visible est « Réinitialiser les ventes » (période, recherche et filtre).
+  //    On clique ce que la personne VOIT ; la croix cachée n'est pas un geste.
+  await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())>0,'effacement restaure les ventes');
   rows.splice(rows.findIndex(x=>x.id==='email_invoice_test'),1);
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
   check((await p.locator('.vrm-sale-invoice').count())===0,'pas de bouton sur compte sans preuve Pro');
@@ -108,11 +125,14 @@ async function brancher(p){
   await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(patch===0,'annuler confirmation ne déclenche pas envoi');
   await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Confirmer',exact:true}).click();
   await p.getByText('La facture n’a pas été mise en file. Relis son état dans Factures.',{exact:true}).waitFor();check(patch===1,'refus serveur annoncé sans faux succès');
-  await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
+  await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
   await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Compte eBay relié',{exact:true}).waitFor();
   check(!(await p.getByRole('button',{name:'Autoriser les paiements'}).isVisible()),'paiements repliés, connexion claire');
   await p.getByText('Solde et paramètres du compte',{exact:true}).click();await p.getByRole('button',{name:'Autoriser les paiements'}).waitFor();check(await p.getByText('Compte eBay relié',{exact:true}).isVisible(),'scope paiements distinct de connexion');
-  await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Actualisation indisponible. Les dernières données restent affichées.',{exact:true}).waitFor();check(true,'échec actualisation expliqué');
+  // ⚠️ Depuis le 14 octobre (84c83d3) la synchro eBay va compte par compte : la route « status » rend la liste
+  //    des comptes reliés (la forme réelle, comme revendeurs.cjs — sans elle, aucun compte n'est à relire et rien
+  //    ne part), et l'échec se dit par « Certaines lectures ont échoué… reprendre uniquement le compte concerné ».
+  await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Certaines lectures ont échoué. Tu peux reprendre uniquement le compte concerné.',{exact:true}).waitFor({timeout:10000});check(true,'échec actualisation expliqué');
   await p.setViewportSize({width:1512,height:950});await p.waitForFunction(()=>document.querySelector('.vrm-platform-summary')?.open);check(true,'chiffres visibles sur ordinateur après rotation');
   check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles compacts réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}

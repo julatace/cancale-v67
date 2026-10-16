@@ -72,7 +72,7 @@ async function brancher(p){
    shipped:{txId:11,isSeller:true,title:'Colis en route',parcelStatus:'in_transit',label:{voucherUrl:'https://example.test/old.pdf'}},
    finished:{txId:12,isSeller:true,title:'Colis finalisé',stepStatus:'done',stepLabel:'Terminé',label:{voucherUrl:'https://example.test/final.pdf'}}};
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
-  b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
@@ -209,7 +209,10 @@ async function brancher(p){
   await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
   const send=p.getByRole('button',{name:'Envoyer',exact:true});check(await send.isDisabled(),'conversation sans réponse autorisée bloquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
-  await p.goto(base+'/?tab=dashboard');await p.locator('.vrm-finance-overview').waitFor();check(await p.locator('.vrm-finance-overview').isVisible(),'indicateurs financiers prioritaires');
+  // ⚠️ Statistiques « premium » (8571f14, 16 octobre) : la rangée `.vrm-finance-overview` est devenue UNE carte
+  //    héros (`data-stats-carte="hero"` : CA finalisé en très gros, bénéfice et marge dessous). La règle jugée
+  //    reste « les indicateurs financiers d'abord » : la carte héros est visible et vient AVANT l'objectif.
+  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible() && await p.locator('[data-stats-carte="hero"]').evaluate(e=>{const g=document.querySelector('.vrm-finance-goal');return !!g && e.getBoundingClientRect().top<g.getBoundingClientRect().top && /CA finalis/i.test(e.innerText);}),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();
   check(await p.getByRole('progressbar',{name:'Progression vers l’objectif du mois'}).getAttribute('aria-valuemax')==='2000','objectif réel saisi avec progression accessible');
   check(await p.locator('.vrm-finance-goal').evaluate(e=>e.getBoundingClientRect().top<document.querySelector('.vrm-finance-stock').getBoundingClientRect().top),'objectif placé avant les détails du stock');
@@ -262,6 +265,9 @@ async function brancher(p){
   await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  // La liste des tâches arrive APRÈS l'en-tête (lecture de l'agent) : on attend la ligne (état observé, borné),
+  // `isVisible` ne patiente pas.
+  await p.getByText('Paire à négocier',{exact:true}).waitFor({timeout:10000}).catch(()=>{});
   check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'agent montre le titre de la paire');
   await p.getByLabel('Rechercher une tâche eBay').fill('absent');check(await p.getByText('Aucune tâche ne correspond à cette recherche.',{exact:true}).isVisible(),'recherche des tâches sans résultat expliquée');
   await p.getByLabel('Rechercher une tâche eBay').fill('négocier');check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'recherche des tâches retrouve la paire');
@@ -353,7 +359,10 @@ async function brancher(p){
    {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}},
    {id:'email_track_pickup4',data:{id:'pickup4',carrier:'mondial',status:'available',lieu:'Relais Nord',artTitle:'Colis sans code',suivi:'TRACK-MISSING',receivedAt:maintenant}});
   await p.goto(base+'/?tab=cat_achats');await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
-  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
+  // Juste après un redimensionnement, la page n'a pas toujours fini de se recomposer (mesuré : 326 px à 320,
+  // puis 320 une fraction de seconde plus tard). On attend qu'elle tienne (borné à 3 s) : une page qui déborde
+  // pour de bon reste rouge.
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});await p.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth,null,{timeout:3000}).catch(()=>{});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
   check(await p.locator('.vrm-pickup-card').count()===4, 'quatre colis à retirer, sans mélange des codes');
   check(await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).isVisible(),'identifiant de consigne visible séparément');
   check(await p.getByRole('button',{name:'Copier code d’ouverture 004567',exact:true}).isVisible(),'code d’ouverture visible séparément');

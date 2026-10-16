@@ -752,7 +752,12 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       await ouvrir(pg, 'plat_vinted', 42000);
       await versPhotos(pg, 1500);
       const repli=await mesurer(pg);
-      dit(repli.phrases===1 && repli.geste==='muette' && /recharge/i.test(repli.texte),'U replié : une aide cachée ne prive pas les photos du geste utile',repli.texte);
+      // ⚠️ Depuis le 16 octobre la raison des bordereaux grisés n'est plus repliée (seule l'aide « sur Vinted »
+      //    l'est) : le bandeau muet est VISIBLE sans rien déplier, avec son « Recharger la page ». La règle jugée ne
+      //    change pas : le geste utile est À L'ÉCRAN sans rien ouvrir — dans la phrase des photos, ou dans le
+      //    bandeau visible (et alors la phrase ne le redit pas, §7).
+      const visibleGeste=await pg.evaluate(()=>{const v=e=>!!e&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden';const bd=document.querySelector('[data-raison-bord="muette"]');return v(bd)&&v(bd.querySelector('[data-recharger]'));});
+      dit(repli.phrases===1 && ((repli.geste==='muette' && /recharge/i.test(repli.texte)) || (visibleGeste && !/recharge/i.test(repli.texte))),'U replié : une aide cachée ne prive pas les photos du geste utile',`${visibleGeste?'bandeau visible · ':''}${repli.geste} · ${repli.texte}`);
       await pg.locator('.vrm-label-help > summary').click();
       await pg.waitForTimeout(500);
       let m = await mesurer(pg);

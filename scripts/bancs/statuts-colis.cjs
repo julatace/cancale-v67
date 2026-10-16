@@ -164,19 +164,24 @@ async function sain(pg, ecran) {
 }
 
 // La cloche : on l'ouvre et on lit le NOMBRE de la ligne « ventes à expédier ».
-async function lireCloche(pg) {
-  await pg.click('[aria-label="Notifications"]', { timeout: 5000 });
-  await pg.waitForTimeout(500);
-  const n = await pg.evaluate(() => {
+// ⚠️ La cloche de l'en-tête a été retirée le 13 octobre (13f6c89, « écrans
+// revendeurs simplifiés ») : son contenu (`notifItems`, le centre de
+// notifications) se lit désormais dans la liste « À faire » de l'écran
+// Collectif — la MÊME source (§11). On lit donc cette liste ; la page doit
+// déjà être sur `?tab=collectif`. On attend un état OBSERVÉ (la ligne affiche
+// le nombre attendu), borné : une ligne restée à 3 (le défaut d'origine) sort
+// rouge au bout du délai.
+async function lireCloche(pg, attendu) {
+  const lire = () => pg.evaluate(() => {
     for (const bt of document.querySelectorAll('button')) {
-      const m = /(\d+)\s+ventes?\s+à\s+expédier/.exec(bt.innerText || '');
+      const m = /^\s*(\d+)\s+ventes?\s+à\s+expédier/.exec(bt.innerText || '');
       if (m && !/eBay/.test(bt.innerText)) return Number(m[1]);
     }
     return 0;      // aucune ligne : zéro colis annoncé
   });
-  await pg.click('[aria-label="Notifications"]', { timeout: 3000 }).catch(() => {});
-  await pg.keyboard.press('Escape').catch(() => {});
-  await pg.waitForTimeout(200);
+  const fin = Date.now() + 12000;
+  let n = await lire();
+  while (n !== attendu && Date.now() < fin) { await pg.waitForTimeout(250); n = await lire(); }
   return n;
 }
 
@@ -236,16 +241,23 @@ async function filtre(pg, nom) {
       // ── 2. MA JOURNÉE + 3a. LA CLOCHE (nombre publié) ─────────────────────
       await essaie('Ma journée', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(4500);
+        // ⚠️ Depuis le 12 octobre (8571f14, « Ma journée premium ») la carte
+        // « Expédier N colis » est une TUILE qui porte son nombre
+        // (`data-tuile="envoyer"`, `data-n`, vide tant que ce n'est pas lu).
+        // On juge l'attribut, pas la phrase ; on attend qu'il soit LU.
+        await pg.waitForFunction(() => { const t = document.querySelector('[data-tuile="envoyer"]'); return t && t.getAttribute('data-n') !== ''; }, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
         const j = await pg.evaluate(() => {
-          const m = /Expédier\s+(\d+)\s+colis/.exec(document.body.innerText);
+          const t = document.querySelector('[data-tuile="envoyer"]');
+          const v = t ? t.getAttribute('data-n') : null;
           let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) {}
-          return { n: m ? Number(m[1]) : 0, pub };
+          return { n: v === null || v === '' ? null : Number(v), pub };
         });
-        dit(j.n === 2, 'Ma journée : « Expédier N colis » vaut 2', 'lu ' + j.n);
+        dit(j.n === 2, 'Ma journée : « Expédier N colis » (tuile « À envoyer ») vaut 2', 'lu ' + j.n);
         dit(!!j.pub && j.pub.total === 2, 'Ma journée publie 2 colis à poster pour la cloche', JSON.stringify(j.pub));
         await sain(pg, 'Ma journée');
-        const n = await lireCloche(pg);
+        await pg.goto(`http://localhost:${PORT}/?tab=collectif`, { waitUntil: 'domcontentloaded' });
+        const n = await lireCloche(pg, 2);
         dit(n === 2, 'la cloche (après Ma journée) annonce 2 ventes à expédier', 'lu ' + n);
       });
 
@@ -319,13 +331,16 @@ async function filtre(pg, nom) {
       // ── 3b. LA CLOCHE SUR UN APPAREIL NEUF (repli, rien de publié) ─────────
       await essaie('cloche (appareil neuf)', async () => {
         const n2 = await preparer(b, vp, { retardMain: 1500 });
-        await n2.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+        // Ouvert directement sur Collectif (sa liste « À faire » = la cloche
+        // d'avant) : recharger après coup remplirait le navigateur et le nuage
+        // n'arriverait plus en dernier — le cas que ce contrôle vise.
+        await n2.pg.goto(`http://localhost:${PORT}/?tab=collectif`, { waitUntil: 'domcontentloaded' });
         await n2.pg.waitForTimeout(5500);
         const pub = await n2.pg.evaluate(() => localStorage.getItem('vrm_colis_aposter'));
         dit(pub == null, 'appareil neuf : aucun nombre publié (la cloche est sur son repli)', String(pub));
-        const n = await lireCloche(n2.pg);
+        const n = await lireCloche(n2.pg, 2);
         dit(n === 2, 'la cloche (appareil neuf, le nuage arrive en dernier) annonce 2 ventes à expédier — le colis coché « posté » n’en est pas', 'lu ' + n);
-        await sain(n2.pg, 'Tableau de bord');
+        await sain(n2.pg, 'Collectif');
         dit(n2.errs.length === 0, 'aucune erreur de page (tableau de bord)', n2.errs.join(' | ').slice(0, 200));
         await n2.ctx.close();
       });
