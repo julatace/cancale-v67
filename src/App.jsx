@@ -5167,7 +5167,7 @@ async function lireRelais() {
   __relaisEnVol = (async () => {
     let v = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.relais_ext&select=atMs:meta->>atMs,ver:meta->>ver,code:meta->>code,vUid:meta->>vUid,vLogin:meta->>vLogin,pauseJusqua:meta->>pauseJusqua`, { headers: sbAuth(), cache: 'no-store' });
       if (r.ok) {
         const rows = await r.json();
         if (Array.isArray(rows)) v = rows[0] ? { atMs: Number(rows[0].atMs) || 0, ver: String(rows[0].ver || ''), code: String(rows[0].code || ''),
@@ -5236,7 +5236,7 @@ async function relaisEnvoyer(cmd, args, extra) {
 // La ligne de la commande, en deux scalaires (§4.4). `null` = pas su.
 async function relaisLire(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=etat:meta->>etat,resultat:data->resultat`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=etat:meta->>etat,resultat:data->resultat`, { headers: sbAuth(), cache: 'no-store' }); // suivi d'une commande : jamais la lecture partagée (2 s de retard)
     if (!r.ok) return null;
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
