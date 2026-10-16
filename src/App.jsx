@@ -7516,9 +7516,9 @@ function CoutAchatVente({ onSaisir, onRelier }) {
   };
   const bouton = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, padding: '0 13px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' };
   return (
-    <div data-cout-vente style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
+    <div data-cout-vente className="vrm-cout-vente" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div className="vrm-cout-rangee" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span className="vrm-cout-label" style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
         {edit ? (
           <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -30816,7 +30816,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-sales-workbar">
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
-            <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, acheteur…"
+            <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
             {ordSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
@@ -30939,7 +30939,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+        <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
@@ -30959,7 +30959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div className="vrm-sale-row" key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <div className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -30969,8 +30969,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div className="vrm-sale-meta" style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
-                    {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                    {(()=>{ const vs=venteStage(o); return <span className="vrm-statut" data-statut-vente={vs.label} title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                    {o._acc && !ventesUnCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
                     {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
@@ -30995,9 +30995,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
-                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
+                  <div className="vrm-display" data-prix-vente={sell!=null?Math.round(sell*100):undefined} style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
-                  {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
+                  {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
                       ou reçu par email en secours), sinon il COMMANDE l'extension.
@@ -31014,7 +31014,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
-               {/* Coût inconnu : les deux gestes, VISIBLES (pas derrière « Modifier »). */}
+               {/* Coût inconnu : les deux gestes, VISIBLES (pas derrière « Modifier »).
+                   (16 oct.) Le coût et « Modifier » partagent UNE rangée sous le
+                   titre (`vrm-sale-bas`) : sur iPhone la carte perd deux étages. */}
+               <div className="vrm-sale-bas">
                {!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId) && (
                  <CoutAchatVente onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                    onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
@@ -31093,6 +31096,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  return null;
                })()}
                </details></div>
+               </div>
               </div>
             );
           })}
@@ -33572,16 +33576,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // pas complète, on écrit « au moins » et on ne dit rien de l'attente.
           const lectureComplete = labelsPrets && emailBords!==null;
           return (
-            <div data-colis-recap={aPoster.length} style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px 11px 15px',marginBottom:12,overflow:'hidden'}}>
-              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:aPoster.length?C.accent:C.border}}/>
-              <span aria-hidden="true" style={{flexShrink:0,color:aPoster.length?C.accent:C.muted,marginTop:1}}><Icon name={aPoster.length?'truck':'check'} size={18}/></span>
-              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
-                <div style={{flex:1,minWidth:150}}>
-                  <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
-                    {aPoster.length>0 && <span style={{fontSize:17,fontWeight:700,color:C.accent,letterSpacing:-0.3}}>{aPoster.length}</span>}
-                    <span style={{fontSize:13,fontWeight:600,color:C.text}}>{aPoster.length>0 ? 'colis à envoyer' : 'Aucun colis à envoyer'}</span>
+            <div data-colis-recap={aPoster.length} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+              <div className="vrm-colis-recap-tete" style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                    {aPoster.length>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{aPoster.length}</span>}
+                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{aPoster.length>0 ? 'colis à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+                  <div style={{fontSize:12.5,color:C.muted,marginTop:8,lineHeight:1.45}}>
                     {aPoster.length>0
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
                       : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
@@ -33601,8 +33603,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {avecPdf.length>0 && (
                   <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    style={{flexShrink:0,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
-                    {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
+                    className="vrm-colis-lot" style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'0 18px',minHeight:44,cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
+                    <Icon name="printer" size={16}/>{batchBusy?'Préparation…':avecPdf.length===1?'Imprimer':`Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
@@ -33665,22 +33667,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ⚠️ UNE SEULE phrase sous les deux pastilles (§7) : ce qui
                   distingue, c'est la pastille active, pas un texte par ligne. */}
               {avecPdf.length>0 && (
-                <div style={{marginTop:12,paddingTop:11,borderTop:`1px solid ${C.border}`}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    <span style={{fontSize:11.5,color:C.muted,fontWeight:500}}>Imprimante</span>
-                    {[['normale','Normale (A4)'],['thermique','Thermique (étiquette)']].map(([v,lib])=>(
+                <div className="vrm-colis-imprimante" style={{flexBasis:'100%',marginTop:4,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase'}}>Imprimante</span>
+                    <div role="group" aria-label="Imprimante" className="vrm-segment" style={{display:'inline-flex',padding:3,gap:2,borderRadius:10,background:C.bg,border:`1px solid ${C.border}`}}>
+                    {[['normale','Normale (A4)'],['thermique','Thermique']].map(([v,lib])=>(
                       <button key={v} type="button" onClick={()=>choisirImprimante(v)}
                         aria-pressed={imprimante===v}
-                        style={{border:`1px solid ${imprimante===v?C.text:C.border}`,borderRadius:999,padding:'5px 11px',
-                                background:imprimante===v?C.text:'transparent',color:imprimante===v?C.bg:C.muted,
-                                cursor:'pointer',fontSize:11.5,fontWeight:600,fontFamily:'inherit'}}>{lib}</button>
+                        style={{border:'none',borderRadius:8,padding:'0 14px',minHeight:32,
+                                background:imprimante===v?C.card:'transparent',color:imprimante===v?C.text:C.muted,
+                                boxShadow:imprimante===v?'0 1px 2px rgba(15,20,30,.08)':'none',
+                                cursor:'pointer',fontSize:12.5,fontWeight:600,fontFamily:'inherit'}}>{lib}</button>
                     ))}
+                    </div>
                   </div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.45}}>
+                  <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
                     {imprimante==='thermique'
                       ? <>L'étiquette seule, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin.</>
                       : <>La page complète, une <b>feuille par bordereau</b>. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d'impression : le PDF le demande, le pilote peut passer outre.</>}
-                  </div>
+                  </div></details>
                 </div>
               )}
             </div>
@@ -33846,7 +33851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div></>
           );
-          const sec = { flexShrink:0, borderRadius:8, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
+          const sec = { flexShrink:0, borderRadius:10, padding:'0 14px', minHeight:44, boxSizing:'border-box', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit' };
           // ⚠️ QUATORZE CARTES QUI PORTENT LA MÊME PHRASE, C'EST UNE PHRASE.
           // Chaque colis sans PDF affichait un bandeau pleine largeur expliquant
           // que l'extension s'en occupe — identique sur les quatorze (vu en
@@ -33899,7 +33904,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:8,alignItems:'start'}}>
+              <div className="vrm-colis-grille" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:10,alignItems:'start'}}>
               {ex.map((e,ix)=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -33912,7 +33917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const cell = num ? garageCellOf(garageGrid, num) : null;
                 const dl = e.dl;
                 const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
-                const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
+                const urgTxt = dl==null ? null : dl<0 ? `${-dl} j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl} j pour poster`;
                 const inv = b ? invForBord(b) : null;
                 // Deux sources de PDF, l'une comme l'autre certaines (le lien se
                 // fait par le n° de transaction) : l'email reçu, ou le bordereau
@@ -33932,37 +33937,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <React.Fragment key={e.key}>
                   {ouvreGrp && (
-                    <div data-groupe={grp} style={{gridColumn:'1 / -1',display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',borderTop:ix===0?'none':`1px solid ${C.border}`,padding:ix===0?'2px 2px 0':'10px 2px 0',marginTop:ix===0?0:4}}>
-                      <span style={{fontSize:12.5,fontWeight:700,color:grp==='retard'?C.danger:C.text}}>{titreGrp} · {nbParGroupe[grp]}</span>
-                      {sousGrp && <span style={{fontSize:11.5,color:C.muted,flex:'1 1 200px',minWidth:0}}>{sousGrp}</span>}
+                    <div data-groupe={grp} className="vrm-colis-groupe" style={{gridColumn:'1 / -1',display:'flex',flexDirection:'column',gap:4,padding:ix===0?'0 2px 2px':'18px 2px 2px'}}>
+                      <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>{titreGrp} <span style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>· {nbParGroupe[grp]}</span></span>
+                      {sousGrp && <span style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
                     </div>
                   )}
-                  <div data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
-                    <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                      <div style={{width:58,height:58,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  <div data-bord-card data-groupe-carte={grp} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                    <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                      <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6}}>
-                          {num
-                            ? <span style={{fontSize:15,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:8,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
-                            : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
-                          <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
+                        <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{titre}</span>
+                          {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
                         </div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                        <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          {num
+                            ? <span className="vrm-colis-num" style={{fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px',flexShrink:0,fontVariantNumeric:'tabular-nums'}}>N°{num}</span>
+                            : <span className="vrm-colis-num" title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
-                          {o && o.date && <span style={{flexShrink:0}}>vendu le {new Date(o.date).toLocaleDateString('fr-FR')}</span>}
-                          {o && o.price && <span style={{flexShrink:0,fontWeight:600,color:C.text}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
-                          {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
+                        </div>
+                        <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                          {o && o.date && <span style={{flexShrink:0}}>vendue le {new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</span>}
+                          {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{o && o.date ? '· ' : ''}{urgTxt}</span>}
                           {cell
-                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>{garageCellLabel(cell)}</button>
+                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
                                sur CHAQUE carte ne dit rien tant que le garage est
                                vide (mesuré : 0 case posée). Dès qu'une paire y est,
                                la mention redevient un écart qui se remarque. */
-                            : ((num && garageUtilise) ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>pas rangée</span> : null)}
-                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
-                          {posted && <span style={{flexShrink:0,color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
+                            : ((num && garageUtilise) ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}>· <Icon name="home" size={12}/>pas rangée</span> : null)}
+                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,color:C.text,fontSize:11.5,fontWeight:600,whiteSpace:'nowrap'}}>· Facture {inv.number||''}</span>}
+                          {posted && <span style={{flexShrink:0,color:C.text,fontWeight:600}}>· ✓ posté</span>}
                         </div>
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
                             celui de la transaction est une identité : quand les deux
@@ -33994,15 +34001,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         ) : null; })()}
                       </div>
-                      <button className="vrm-icon-control" type="button" onClick={async ()=>{
+                      <button type="button" onClick={async ()=>{
                         if (b) { if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }
                         else if (o && o.transaction_id!=null && await askConfirm('Masquer ce colis ? (il disparaît de la liste)')) toggleHidden(o.transaction_id);
-                      }} title="Masquer" aria-label="Masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+                      }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
                         celui qui n'a pas branché sa boîte mail. */}
-                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
+                    <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {pdf ? (
                         <button type="button" data-imprime="1" onClick={async ()=>{
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
@@ -34018,7 +34025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        style={{flex:'1 1 160px',maxWidth:340,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
+                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>Imprimer{inv?' + facture':''}</button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
@@ -34039,9 +34046,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             aGenerer pdf={false} onFait={(u)=>rechargerLabels(u)}/>
                         )}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
-                          style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
+                          className="vrm-colis-sec" style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>J'ai le PDF</button>
                       </>)}
-                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
+                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
                       {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
                           sur cette vente — or c'est lui qu'on tamponne. Le numéro
                           n'est pas deviné (le titre de revente diffère souvent de
@@ -34050,7 +34057,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
                         const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
-                      }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
+                      }} title="Poser le numéro de boîte de cette paire" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
                       {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
                           fait, suivre) vivaient sur une deuxième rangée : sur un
                           colis sans PDF, la première n'avait plus qu'un bouton et
@@ -34058,7 +34065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           à la ligne (`flexWrap`) fait le travail sur téléphone. */}
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
                         title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
-                        style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
+                        className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:isBordPrinted(b)?C.bg:'transparent',color:isBordPrinted(b)?C.text:C.muted}}>
                         {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
                       </button>}
                       {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
@@ -34068,11 +34075,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
                         else { if(o && !isShipDone(o)) toggleShipDone(o); if(b) markBordShipped(b); }
                       }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'}
-                        style={{...sec,border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:posted?`${INV_STATUS.online.color}18`:'transparent',color:posted?INV_STATUS.online.color:C.muted}}>
+                        className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}><Icon name="truck" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Suivre</a>}
-                      {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
+                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
+                      {capte && <span className="vrm-colis-source" style={{fontSize:11.5,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
                           d'attente dit déjà. Retiré : l'absence du bouton
@@ -34109,8 +34116,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const morceaux = [[nb('En transit'), 'en transit'], [nb('Au relais'), 'au relais'], [nb('Livrée'), 'livré' + (nb('Livrée') > 1 ? 's' : '')], [retours, 'retour' + (retours > 1 ? 's' : '') + ' à vérifier']].filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}`);
           const plusieursComptes = (accounts || []).length > 1;
           return (
-            <details data-colis-partis={partis.length} style={{marginTop:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px'}}>
-              <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text,listStyle:'revert'}}>
+            <details data-colis-partis={partis.length} className="vrm-colis-partis" style={{marginTop:18,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'0 14px 4px'}}>
+              <summary style={{cursor:'pointer',fontSize:13.5,fontWeight:600,color:C.text,listStyle:'revert',padding:'14px 0',lineHeight:1.4}}>
                 Partis — Vinted suit le colis · {partis.length}
                 <span style={{fontWeight:500,color:C.muted}}> ({morceaux.join(' · ')})</span>
               </summary>
