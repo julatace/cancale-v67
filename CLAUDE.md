@@ -8984,6 +8984,12 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Leboncoin publié depuis VRM, Super PDP, titre eBay (16 octobre, 5.182)
+- **Fiche Leboncoin dans l'app** (`FicheLbc`, Leboncoin → Annonces) : titre (50 car.), prix, état (4 libellés MESURÉS du dépôt, l'état Vinted, ou « laisser Leboncoin demander »), photos captées choisies et ordonnées, description qui garde `VRM-{n°}`. Un bouton publie ; l'avancement arrive en direct (`depotProgres`, nettoyé par le fond, seulement depuis l'onglet du dépôt en cours). Règle commune `<annonce-lbc-regle>` (texte identique app/extension) ; l'extension **revérifie** tout (`appliquerAnnonceLbc`) et refuse en entier une fiche invalide. Extension < 5.182 : une fiche non corrigée part « tel quel », une fiche corrigée est grisée. Preuves : `audit-lbc-fiche.cjs` (19 rouges sur l'avant), banc `lbc-publier-app.cjs`. ⚠️ **Non mesuré sur le vrai leboncoin.fr.**
+- **Super PDP** (facturation électronique, Comptabilité) : mode `superpdp` de `/api/compte` (toujours 12 fonctions), identifiants du VENDEUR vérifiés chez Super PDP puis rangés **chiffrés** (`superpdp_cle`, clé `VRM_COFFRE_CLE` ou dérivée de `SUPABASE_SERVICE_KEY` ; sans clé de coffre : rien n'est rangé), jamais relus par le navigateur (§2.9). Envoi à trois issues (envoyée · refusée · incertaine), `external_id` = n° FX-AAAA-NNNN, une incertaine est CHERCHÉE avant tout renvoi. E-reporting PAS branché (forme non confirmée). ⚠️ **Formes d'API tirées d'un client open source** (la doc officielle est bloquée d'ici) : à vérifier sur le bac à sable. Preuves : `audit-superpdp-route.cjs` (36 rouges sur l'avant), banc `superpdp.cjs`.
+- **Titre eBay** : `lbcTitre` écrit désormais « taille 36 » (plus « T36 ») ; `ebayTitre` ne retirait que « T36 » ⇒ « taille 36 taille 36 » (capture de Julien). `audit-titre-ebay.cjs` (6 rouges sur l'avant).
+- **Refonte premium** (coque mobile `styles-coque.css`, Réglages iOS `styles-reglages.css`, Achats/Messages, Annonces/Leboncoin/eBay, Ventes/Colis) : bancs `coque-mobile`, `reglages-premium`, `achats-messages-premium`, `plateformes-premium`, `ventes-colis-premium`. ⚠️ Sur téléphone sans extension, le fil de Messages remplace la saisie par « Répondre sur Vinted ↗ ».
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9013,6 +9019,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
+| `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
+| `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
