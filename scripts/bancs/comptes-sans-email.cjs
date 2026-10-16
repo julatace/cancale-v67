@@ -158,6 +158,10 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       const { ctx, pg, errs } = await preparer(b, vp);
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(5500);
+      // Au téléphone (16 octobre), les notifications vivent dans un SOUS-ÉCRAN
+      // (Réglages → Notifications du téléphone) : on l'ouvre, comme lui.
+      const sousPush = pg.locator('[data-sous-ouvrir="push"]').first();
+      if (await sousPush.isVisible().catch(() => false)) { await sousPush.click(); await pg.waitForTimeout(600); }
       const sum = pg.locator('summary', { hasText: 'Ce que tu reçois sur ton téléphone' }).first();
       await sum.scrollIntoViewIfNeeded({ timeout: 5000 });
       const resume = (await sum.innerText()).replace(/\s+/g, ' ');

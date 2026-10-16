@@ -49,7 +49,8 @@ const srv = http.createServer((q, r) => {
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(3500);
     enPanne = true;
-    const bascule = pg.getByText(/Passer en mode (sombre|clair)/).first();
+    // L'interrupteur « Mode sombre » de Réglages (16 oct. : une ligne à interrupteur).
+    const bascule = pg.locator('[data-reglage-sombre]').first();
     await bascule.click().catch(() => {});
     await pg.waitForTimeout(2000);
     const etat1 = await pg.getAttribute('.vrm-sync-status', 'data-sync-etat').catch(() => null);

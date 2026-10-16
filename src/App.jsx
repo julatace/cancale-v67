@@ -37219,7 +37219,7 @@ const PUSH_CATS = [
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
-function PushPrefsSetting({ comptes }) {
+function PushPrefsSetting({ comptes, onMuets }) {
   // ⚠️ TROIS ÉTATS : `undefined` = en cours de lecture · `null` = la base n'a
   //    pas répondu · un objet = lu. Confondre les deux premiers ferait dire
   //    « Chargement… » pour toujours à un panneau qui a ÉCHOUÉ.
@@ -37231,6 +37231,10 @@ function PushPrefsSetting({ comptes }) {
   // Rien tant qu'on ne sait pas : jamais une accusation sur une lecture ratée.
   const etatComptes = useEtatEmailsComptes(comptes);
   const muets = etatComptes.etat === 'lu' ? etatComptes.muets : null;
+  // Au téléphone ce panneau vit dans un sous-écran : la ligne qui y mène dit
+  // combien de comptes sont muets — le MÊME nombre, remonté d'ici (§11).
+  const nMuets = muets ? muets.length : null;
+  useEffect(() => { if (onMuets) onMuets(nMuets); }, [nMuets]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { let mort = false;
     (async () => {
       try {
@@ -37263,7 +37267,7 @@ function PushPrefsSetting({ comptes }) {
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
@@ -37290,11 +37294,7 @@ function PushPrefsSetting({ comptes }) {
                 <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{c.titre}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
               </div>
-              <button type="button" onClick={()=>bascule(c)} disabled={!prefs||busy} aria-label={`${c.titre} : ${on?'activé':'désactivé'}`}
-                style={{flexShrink:0,padding:'5px 13px',borderRadius:8,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',opacity:pasLu?0.45:1,
-                  background:on?C.accent:'transparent',color:on?'#fff':C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>
-                {on?'ON':'OFF'}
-              </button>
+              <Interrupteur on={on} onClick={()=>bascule(c)} disabled={!prefs||busy} label={`${c.titre} : ${on?'activé':'désactivé'}`}/>
             </div>
           );
         })}
@@ -37308,18 +37308,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
   // exactement ce qui fait « page web bricolée » au lieu d'« application ».
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
-  const Row = ({icon,title,desc,onClick,color}) => (
-    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-      {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
-          retombe sur l'emoji (les écrans pas encore repris). */}
-      {ICON_PATHS[icon] ? <IconTile name={icon} color={color||C.accent}/> : <span style={{fontSize:22,flexShrink:0}}>{icon}</span>}
-      <span style={{flex:1,minWidth:0}}>
-        <span style={{display:'block',fontSize:15,fontWeight:600,color:color||C.text}}>{title}</span>
-        {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>{desc}</span>}
-      </span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,opacity:.55}}><path d="m9 6 6 6-6 6"/></svg>
-    </button>
-  );
   // Fenêtre d'action sur le compte (email / mot de passe / déconnexion).
   const AcctSheet = () => {
     if (!acct) return null;
@@ -37393,258 +37381,363 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     if (RETOUR_ABONNEMENT || RETOUR_VUE === 'compte') return 'compte';
     try { return localStorage.getItem('vrm_reglages_vue') === 'compte' ? 'compte' : 'reglages'; } catch (_) { return 'reglages'; }
   });
-  const setVue = (v) => { setVueBrute(v); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
   const voirCompte = !ongletsCompte || vue === 'compte';
   const voirReglages = !ongletsCompte || vue === 'reglages';
-  return (
-    <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
-      <AcctSheet/>
-      <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
-      <ReglagesPasLus/>
 
-      {ongletsCompte && (
-        <div role="tablist" aria-label="Paramètres" data-onglets-reglages=""
-          style={{display:'flex',gap:4,padding:4,borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,margin:'0 0 16px',maxWidth:380}}>
-          {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
-            <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
-              style={{flex:1,border:'none',borderRadius:8,padding:'9px 10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-                background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?(C.shadow||'none'):'none'}}>
-              {l}
-            </button>
-          ))}
+  // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
+  // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
+  // long n'est plus déplié dans une page interminable : sur TÉLÉPHONE il
+  // s'ouvre dans un SOUS-ÉCRAN (chevron, puis « ‹ Réglages »). Sur ordinateur
+  // la place ne manque pas : tout reste déplié, avec un sommaire collant.
+  // ⚠️ Les panneaux restent MONTÉS même fermés (`hidden`) : chacun lit sa ligne
+  //    au montage (`lireReglage`), et le bloc « N réglages n'ont pas pu être
+  //    lus » (ReglagesPasLus) nomme ceux qui ont échoué — un panneau jamais
+  //    monté ne lirait rien et ce bloc se tairait. Aucune règle de lecture ni
+  //    d'écriture ne change : c'est le même composant, rangé ailleurs.
+  const etroit = useEtroitReglages();
+  const [nMuetsPush, setNMuetsPush] = React.useState(null);
+  const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
+  const racine = React.useRef(null);
+  const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) l.scrollIntoView({ block: 'center' }); } catch (_) {} }, 0); };
+  const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  React.useEffect(() => { if (!etroit) setSous(null); }, [etroit]);
+
+  // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
+  //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
+  const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
+  const valDetourage = (DETOURAGE_MODES.find(([k]) => k === modeDetourageLu()) || [, ''])[1];
+  const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
+  const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
+  const tokWidget = load('vrm_widget_token', '');
+  const urlWidget = tokWidget ? `https://vrm.center/api/widget?k=${tokWidget}` : '';
+
+  // ── Les morceaux de rendu (des FONCTIONS appelées, pas des composants : un
+  //    composant défini ici serait recréé à chaque rendu, et ce qu'il contient
+  //    — un panneau en cours de saisie — remonterait à neuf).
+  const chevron = <svg className="vrm-set-chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>;
+  const ligne = (it) => {
+    if (it.type === 'el') return <React.Fragment key={it.id}>{it.el}</React.Fragment>;
+    const ouvre = it.type === 'panneau';
+    const corps = (<>
+      {it.ic && <IconeReglage name={it.ic}/>}
+      <span className="vrm-set-lib">
+        <b style={{color: it.danger ? C.danger : C.text}}>{it.lib}</b>
+        {it.desc && <small style={{color:C.muted}}>{it.desc}</small>}
+      </span>
+      {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
+      {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
+      {(ouvre || it.type === 'nav') && chevron}
+    </>);
+    if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne">{corps}</div>;
+    return (
+      <button key={it.id} type="button" className="vrm-set-ligne"
+        onClick={ouvre ? () => ouvrirSous(it.id) : it.onClick}
+        {...(ouvre ? { 'data-sous-ouvrir': it.id, 'aria-haspopup': 'true' } : {})} {...(it.data || {})}>
+        {corps}
+      </button>
+    );
+  };
+  const contenuPanneau = (it, avecTete) => it.nu
+    ? (<div className="vrm-set-carte" style={{background:C.card,border:`1px solid ${C.border}`}}>
+        {avecTete && <div className="vrm-set-carte-tete"><IconeReglage name={it.ic}/><b style={{color:C.text}}>{it.lib}</b></div>}
+        {it.el}
+      </div>)
+    : <div className="vrm-set-panneau">{it.el}</div>;
+  const liste = (items) => items.length ? (
+    <div className="vrm-set-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>{items.map(ligne)}</div>
+  ) : null;
+  const groupe = (g) => {
+    if (!g || !g.items.some(Boolean)) return null;
+    const items = g.items.filter(Boolean);
+    // Téléphone : tout en lignes. Ordinateur : les lignes, puis les panneaux dépliés.
+    let corps;
+    if (etroit) corps = liste(items);
+    else {
+      const blocs = []; let courant = [];
+      items.forEach((it) => {
+        if (it.type === 'panneau') { if (courant.length) { blocs.push(liste(courant)); courant = []; } blocs.push(<React.Fragment key={it.id}>{contenuPanneau(it, true)}</React.Fragment>); }
+        else courant.push(it);
+      });
+      if (courant.length) blocs.push(liste(courant));
+      corps = blocs.map((b, i) => <React.Fragment key={i}>{b}</React.Fragment>);
+    }
+    return (
+      <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
+        {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
+        {corps}
+        {g.pied && <div className="vrm-set-pied" style={{color:C.muted}}>{g.pied}</div>}
+      </section>
+    );
+  };
+
+  // ── MOYENS DE CONNEXION — l'état RÉEL de chacun, pas une liste décorative.
+  //    Un bouton Google qui mène à une page d'erreur ne rend service à
+  //    personne : tant que le fournisseur n'est pas branché dans Supabase, on
+  //    le dit.
+  const moyensConnexion = (
+    <div>
+      <div className="vrm-set-liste" style={{background:C.card,border:`1px solid ${C.border}`}}>
+        <div className="vrm-set-ligne">
+          <IconeReglage name="mail"/>
+          <span className="vrm-set-lib"><b style={{color:C.text}}>Email et mot de passe</b></span>
+          <span className="vrm-set-val" style={{color:C.muted}}>Actif</span>
         </div>
-      )}
-
-      {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
-          Toujours présent en multi-vendeurs, y compris quand on est entré par la
-          porte de secours : sans ça, une fois passé par « Entrer sans compte »
-          il n'y avait AUCUN moyen de revenir à l'écran de connexion. */}
-      {MULTI_USER && voirCompte && (<>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
-
-        {AUTH.user ? (
-          <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-            <span style={{width:38,height:38,borderRadius:8,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-              {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
-            </span>
-            <span style={{flex:1,minWidth:0}}>
-              <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{AUTH.user.email}</span>
-              <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>
-                {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
-              </span>
-            </span>
-          </div>
-        ) : (
-          <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
-            <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-              Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+        {OAUTH_PROVIDERS.map(pr => {
+          const on = providerEnabled(pr.id);
+          return (
+            <div key={pr.id} className="vrm-set-ligne">
+              <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`}}><BrandMark id={pr.id}/></span>
+              <span className="vrm-set-lib"><b style={{color:C.text}}>{pr.label}</b></span>
+              {on
+                ? (AUTH.user
+                    ? <span className="vrm-set-val" style={{color:C.muted}}>Disponible</span>
+                    : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 14px',minHeight:36,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
+                : <span className="vrm-set-val" style={{color:C.muted}}>Pas activé</span>}
             </div>
-            <button type="button"
-              onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
-              style={{marginTop:10,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Aller à l'écran de connexion
-            </button>
-          </div>
-        )}
-
-        <PrenomSetting/>
-        {AUTH.user && <MonAbonnement/>}
-
-        {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
-            décorative. Un bouton Google qui mène à une page d'erreur ne rend
-            service à personne : tant que le fournisseur n'est pas branché dans
-            Supabase, on le dit. */}
-        <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}>Moyens de connexion</div>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0'}}>
-            <span style={{fontSize:15,width:20,textAlign:'center'}}>✉️</span>
-            <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>Email + mot de passe</span>
-            <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>actif</span>
-          </div>
-          {OAUTH_PROVIDERS.map(pr=>{
-            const on = providerEnabled(pr.id);
-            return (
-              <div key={pr.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
-                <span style={{width:20,display:'flex',justifyContent:'center'}}><BrandMark id={pr.id}/></span>
-                <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>{pr.label}</span>
-                {on
-                  ? (AUTH.user
-                      ? <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>disponible</span>
-                      : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'4px 11px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
-                  : <span style={{fontSize:11,fontWeight:500,color:C.muted}}>à activer dans Supabase</span>}
-              </div>
-            );
-          })}
-          <div style={{fontSize:10.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-            Ces deux boutons apparaîtront tout seuls dès que tu auras créé l'application chez Google / Discord et collé les clés dans Supabase. Tant que ce n'est pas fait, on ne les affiche pas : un bouton qui mène à une page d'erreur ne sert à rien.
-          </div>
-        </div>
-
-        {AUTH.user && (<>
-          <Row icon="mail" title="Changer mon email"
-            desc="L'adresse avec laquelle tu te connectes."
-            onClick={()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); }}/>
-          <Row icon="key" title="Changer mon mot de passe"
-            desc="Choisis-en un nouveau, tu restes connecté."
-            onClick={()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); }}/>
-          <Row icon="door" title="Se déconnecter" color={C.danger}
-            desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
-            onClick={()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); }}/>
-          <FermerCompte/>
-        </>)}
-      </>)}
-
-      {voirCompte && (<>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
-          Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte » ci-dessus</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
-          <LigneContact/>
-          <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
-            {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
-          </div>
-        </div>
-      </>)}
-
-      {voirReglages && (<>
-      {MULTI_USER && (<>
-        <NumerosSetting/>
-        {/* ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision). */}
-        <DetourageSetting/>
-      </>)}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
-      <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
-      <div style={{height:8}}/>
-      <ConnexionsSetting/>
-      <div style={{height:8}}/>
-      <EmailsSetting/>
-      <div style={{height:8}}/>
-      <SecuriteSetting/>
-
-      {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
-      <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-        <div style={{display:'flex',alignItems:'center',gap:14}}>
-          <div style={{width:56,height:56,borderRadius:10,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-            {customLogo ? <img src={customLogo} alt="" style={{width:56,height:56,objectFit:'cover'}}/> : <VrmLogo size={56}/>}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text}}>{customLogo ? 'Ton icône' : 'Icône VRM'}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.45}}>Celle qui s'affiche sur ton écran d'accueil et dans l'onglet du navigateur.</div>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
-          <button type="button" onClick={onPickLogo}
-            style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            Choisir une image
-          </button>
-          {customLogo && (
-            <button type="button" onClick={onResetLogo}
-              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Remettre celle de VRM
-            </button>
-          )}
-        </div>
-        <div style={{fontSize:10.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Prends une image <b>carrée</b> (512 × 512 idéalement). Sur iPhone, l'icône déjà posée sur l'écran d'accueil ne change pas toute seule : <b>supprime le raccourci et refais « Ajouter à l'écran d'accueil »</b> pour qu'il prenne la nouvelle.
-        </div>
+          );
+        })}
       </div>
-
-      {/* WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
-          adresse était publique : n'importe qui pouvait lire ton chiffre
-          d'affaires en la connaissant. Recopie la nouvelle dans Scriptable. */}
-      {(()=>{ const tok=load('vrm_widget_token',''); if(!tok) return null;
-        const url=`https://vrm.center/api/widget?k=${tok}`;
-        return (<>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Widget iPhone</div>
-          <div style={{padding:'15px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:3}}>Adresse de ton widget</div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-              Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
-            </div>
-            <div style={{fontSize:11,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
-              border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',wordBreak:'break-all',lineHeight:1.5,marginBottom:9}}>{url}</div>
-            <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(url); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}
-              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:8,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-              Copier l'adresse
-            </button>
-          </div>
-        </>);
-      })()}
-
-      {/* ⚠️ « Leboncoin » RETIRÉ des Réglages (demande de Julien, 24 sept. :
-          « les annonces à publier sur le bon coin, pas la peine de mettre ça dans
-          les paramètres — fais un onglet à part »). L'atelier a désormais sa
-          propre entrée « À publier » dans le menu (PLUS_TABS → leboncoin). */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
-      <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge une copie de tes réglages, numéros, garage, saisies ET de tout ce que l'extension a capté (ventes, achats, messages, annonces). Sans les PDF de bordereau ni tes connexions Vinted." onClick={onExport}/>
-      <Row icon="restore" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
-      {(()=>{ const t=Number(load('vinted_last_backup',0))||0; const days=t?Math.floor((Date.now()-t)/86400000):null;
-        const old = days===null || days>=30;
-        return (
-          <div style={{fontSize:12,fontWeight:500,color:old?C.warn:C.muted,margin:'-4px 2px 2px',display:'flex',alignItems:'center',gap:6}}>
-            <span>{old?'⚠️':'✅'}</span>
-            <span>{t? `Dernière sauvegarde : ${days===0?"aujourd'hui":days===1?'hier':`il y a ${days} j`}${old?' — pense à en refaire une !':''}` : 'Jamais sauvegardé — fais-en une maintenant pour protéger tes données.'}</span>
-          </div>
-        );
-      })()}
-
-      {/* ⚠️ « Ancienne application » RETIRÉE (demande de Julien, 24 sept. :
-          « enlève ancien stock, ancienne compta, ancien catalogue »). On retire
-          seulement les LIENS d'accès — les DONNÉES (vinted_catalog / vinted_sales)
-          restent en base et TOUJOURS comptées dans les stats (§ rien n'est
-          supprimé du nuage au passage d'un écran). Les écrans catalog/sales/
-          stockvinted restent montés mais deviennent injoignables, comme
-          comptabilite/inventory (§4.11) : aucun n'est requis au banc. */}
-
-      {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
-      {/* Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
-          paramètres, pas sous Factures — ça prend de la place pour rien ». Retiré
-          de PLUS_TABS (le menu) ; l'écran reste monté et joignable par ce Row. */}
-      <Row icon="eyeOff" title="Ventes et achats masqués" desc="Ce que tu as retiré de la compta (réversible)." onClick={()=>setTab('masques')}/>
-      <div style={{height:10}}/>
-      <RegimeSetting/>
-      <Row icon="cash" title="Compléter les prix d'achat" desc="Saisie par paire, pour calculer ton bénéfice." onClick={()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');}}/>
-      <div style={{height:10}}/>
-      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
-      <PushSetting/>
-      <div style={{height:10}}/>
-      <PushPrefsSetting comptes={comptes}/>
-      <div style={{height:10}}/>
-      {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
-          notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}
-      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🛎 Alertes dans l'app</div>
-          <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications téléphone ci-dessus couvrent le reste, app fermée.</div>
-        </div>
-        <button type="button" onClick={onToggleNotif} style={{
-          flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-          background:notifEnabled?C.accent:'transparent',color:notifEnabled?'#fff':C.muted,
-          border:`1.5px solid ${notifEnabled?C.accent:C.border}`,
-        }}>{notifEnabled?'ON':'OFF'}</button>
+      <div className="vrm-set-pied" style={{color:C.muted}}>
+        Google et Discord apparaîtront ici dès que leurs clés seront collées dans Supabase. Tant que ce n'est pas fait, on ne les propose pas : un bouton qui mène à une page d'erreur ne sert à rien.
       </div>
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
-      <EmailStartSetting/>
-
-      {/* « Facturation Pro » déménagée dans l'onglet Factures (30 sept.). */}
-
-      {/* « Tes données et les conditions » vit dans l'onglet « Mon compte ». */}
-
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
-      <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
-      <StreamSetting/>
-      <ZoomSetting/>
-      </>)}
     </div>
   );
+
+  // ── TES DONNÉES ET LES CONDITIONS
+  const donnees = (
+    <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
+      Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte »</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+      <LigneContact/>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
+        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
+      </div>
+    </div>
+  );
+
+  // ── ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne.
+  const bouton = (primaire) => ({border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
+    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit'});
+  const iconeApp = (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{width:60,height:60,borderRadius:12,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          {customLogo ? <img src={customLogo} alt="" style={{width:60,height:60,objectFit:'cover'}}/> : <VrmLogo size={60}/>}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:600,color:C.text}}>{customLogo ? 'Ton icône' : 'Icône VRM'}</div>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:2,lineHeight:1.45}}>Sur ton écran d'accueil et dans l'onglet du navigateur.</div>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14,flexWrap:'wrap'}}>
+        <button type="button" onClick={onPickLogo} style={bouton(true)}>Choisir une image</button>
+        {customLogo && <button type="button" onClick={onResetLogo} style={bouton(false)}>Remettre celle de VRM</button>}
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>
+        Une image <b>carrée</b> (512 × 512 idéalement). Sur iPhone, l'icône déjà posée ne change pas toute seule : <b>supprime le raccourci et refais « Ajouter à l'écran d'accueil »</b>.
+      </div>
+    </div>
+  );
+
+  // ── WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
+  //    adresse était publique : n'importe qui pouvait lire ton chiffre
+  //    d'affaires en la connaissant. Recopie la nouvelle dans Scriptable.
+  const widget = urlWidget ? (
+    <div>
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+        Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
+      </div>
+      <div style={{fontSize:11.5,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
+        border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',wordBreak:'break-all',lineHeight:1.5,marginBottom:12}}>{urlWidget}</div>
+      <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(urlWidget); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }} style={bouton(true)}>
+        Copier l'adresse
+      </button>
+    </div>
+  ) : null;
+
+  // ── LES GROUPES ────────────────────────────────────────────────────────────
+  // Réglages de l'APP.
+  const GROUPES_REGLAGES = [
+    { id:'comptes', titre:'Comptes Vinted', items:[
+      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', titreInterne:true, el:<ConnexionsSetting/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Adresses de réception', titreInterne:true, el:<EmailsSetting/> },
+      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', el:<SecuriteSetting/> },
+    ]},
+    MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', val:valNumeros, el:<NumerosSetting nu/> },
+      // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
+      { id:'detourage', type:'panneau', nu:true, ic:'image', lib:'Détourage des photos', val:valDetourage, el:<DetourageSetting nu/> },
+    ]},
+    { id:'notifications', titre:'Notifications', items:[
+      { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
+        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/></> },
+      // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
+      // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
+      { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+    ]},
+    { id:'compta', titre:'Comptabilité', items:[
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', el:<RegimeSetting nu/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', el:<EmailStartSetting nu/> },
+      // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
+      // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
+      { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
+      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');} },
+      { id:'tampons', type:'action', ic:'doc', lib:'Position du N° tamponné', val:'Réinitialiser', onClick:async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } } },
+    ]},
+    { id:'affichage', titre:'Affichage', items:[
+      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
+      { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
+      { id:'icone', type:'panneau', nu:true, ic:'image', lib:"Icône de l'application", el:iconeApp },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
+    ]},
+    { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
+    ], pied: (
+      <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
+        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' — pense à en refaire une.':'.'}` : 'Jamais sauvegardé — fais-en une pour protéger tes données.'}
+        {' '}<span style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
+      </span>
+    )},
+  ];
+  // « Mon compte » : la PERSONNE.
+  const GROUPES_COMPTE = MULTI_USER ? [
+    { id:'profil', titre:null, items:[
+      { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
+    ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
+    AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
+      { id:'abonnement', type:'panneau', ic:'wallet', lib:'Abonnement et factures', el:<MonAbonnement/> },
+    ]},
+    { id:'connexion', titre:'Connexion', items:[
+      { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
+      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
+    ]},
+    AUTH.user && { id:'sortir', titre:null, items:[
+      { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
+    ], pied:'Efface aussi les données de ce navigateur — elles restent dans ton compte.' },
+    { id:'donnees', titre:'Tes données', items:[
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+      AUTH.user && { id:'fermer', type:'panneau', ic:'trash', lib:'Fermer mon compte', el:<FermerCompte/> },
+    ]},
+  ] : [
+    { id:'donnees', titre:'Tes données', items:[
+      { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
+    ]},
+  ];
+  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : [])].filter(Boolean)
+    .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
+  const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
+  const ouvert = etroit && sous ? panneaux.find((it) => it.id === sous) : null;
+  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : 'Réglages';
+
+  // ── TON COMPTE VRM ──────────────────────────────────────────────────────
+  // Toujours présent en multi-vendeurs, y compris quand on est entré par la
+  // porte de secours : sans ça, une fois passé par « Entrer sans compte » il
+  // n'y avait AUCUN moyen de revenir à l'écran de connexion.
+  const profil = MULTI_USER && voirCompte && (AUTH.user ? (
+    <div className="vrm-set-profil" data-profil-compte="" style={{background:C.card,border:`1px solid ${C.border}`}}>
+      <span className="vrm-set-avatar" aria-hidden="true" style={{background:`${C.text}0f`,color:C.text}}>
+        {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+      </span>
+      <span>
+        <span style={{display:'block',fontSize:16,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>
+        <span style={{display:'block',fontSize:12.5,color:C.muted,marginTop:3}}>
+          {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
+        </span>
+      </span>
+    </div>
+  ) : (
+    <div className="vrm-set-carte" style={{border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:32}}>
+      <div style={{fontSize:16,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
+      <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>
+        Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+      </div>
+      <button type="button"
+        onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+        style={{...bouton(true),marginTop:12}}>
+        Aller à l'écran de connexion
+      </button>
+    </div>
+  ));
+
+  return (
+    <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
+      style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
+      <AcctSheet/>
+      {ouvert ? (
+        // ── SOUS-ÉCRAN (téléphone) ──
+        <div className="vrm-set-nav">
+          <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accent}}>
+            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
+            {titreRetour}
+          </button>
+        </div>
+      ) : (<>
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
+        <ReglagesPasLus/>
+        {ongletsCompte && (
+          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
+            {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
+              <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
+                style={{background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?'0 1px 2px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04)':'none'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+      </>)}
+
+      {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
+
+      {etroit ? (<>
+        {!ouvert && profil}
+        {!ouvert && groupes.map(groupe)}
+        {/* Les panneaux, tous montés ; seul celui du sous-écran se voit. */}
+        {panneaux.map((it) => (
+          // Le titre du sous-écran dit déjà celui de la carte : celle-ci le tait
+          // (CSS seulement — le texte reste dans la page, les bancs le lisent).
+          <div key={it.id} hidden={!ouvert || ouvert.id !== it.id} data-sous-ecran={it.id} className={it.titreInterne ? 'vrm-set-sans-titre' : undefined}>
+            {contenuPanneau(it, false)}
+          </div>
+        ))}
+      </>) : (
+        <div className="vrm-set-cols">
+          <nav className="vrm-set-sommaire" aria-label="Sommaire des paramètres">
+            {groupes.filter((g) => g.titre).map((g) => (
+              <a key={g.id} href={`#reglages-${g.id}`} style={{color:C.muted}}
+                onClick={(e)=>{ e.preventDefault(); try { document.getElementById(`reglages-${g.id}`).scrollIntoView({ behavior:'smooth', block:'start' }); } catch (_) {} }}>
+                {g.titre}
+              </a>
+            ))}
+          </nav>
+          <div className="vrm-set-corps">
+            {profil}
+            {groupes.map(groupe)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Téléphone (< 768 px) : les panneaux longs passent dans un sous-écran.
+// `matchMedia` qui lève ⇒ « pas su » ⇒ la disposition d'ordinateur, où tout
+// reste déplié (rien n'est caché sur une mesure ratée).
+function useEtroitReglages() {
+  const q = '(max-width: 767px)';
+  const lire = () => { try { return window.matchMedia(q).matches; } catch (_) { return false; } };
+  const [v, setV] = React.useState(lire);
+  React.useEffect(() => {
+    let mq; try { mq = window.matchMedia(q); } catch (_) { return undefined; }
+    const maj = () => setV(mq.matches);
+    try { mq.addEventListener('change', maj); } catch (_) { return undefined; }
+    return () => { try { mq.removeEventListener('change', maj); } catch (_) {} };
+  }, []);
+  return v;
 }
 
 // ── DENSITÉ D'AFFICHAGE ────────────────────────────────────────────────────
@@ -38059,7 +38152,7 @@ function FacturesAbonnement({ fx }) {
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
               {lien
-                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 34, textAlign: 'right' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
                 : <span style={{ minWidth: 34 }}/>}
             </div>
           );
@@ -38160,15 +38253,15 @@ function PrenomSetting() {
     setV((p) => p || String(load('vrm_prenom', '') || ''));
   }), []);
   const ecrire = (t) => { touche.current = true; const n = t.slice(0, 24); setV(n); save('vrm_prenom', n.trim()); };
+  // Une ligne de réglage (libellé à gauche, champ à droite) ; l'explication
+  // vit sous le groupe, dans les Paramètres (§7 : une phrase, une fois).
   return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ton prénom</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-        Il sert uniquement à te dire bonjour sur l'écran d'accueil. Laisse vide et l'app dira simplement «&nbsp;Bonjour&nbsp;».
-      </div>
-      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
-        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
-    </div>
+    <label className="vrm-set-ligne" data-reglage-prenom="">
+      <IconeReglage name="pencil"/>
+      <span className="vrm-set-lib"><b style={{color:C.text}}>Prénom</b></span>
+      <input className="vrm-set-champ" value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Facultatif" autoComplete="given-name" aria-label="Ton prénom"
+        style={{color:C.text}}/>
+    </label>
   );
 }
 
@@ -38180,7 +38273,7 @@ function PrenomSetting() {
 // porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
 // carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
 // tapé à la main peut toujours être « 125 » ou « C40 ».
-function NumerosSetting() {
+function NumerosSetting({ nu = false }) {
   const [p, setP] = React.useState(() => prefixeNumeros());
   const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
   const touche = React.useRef(false);
@@ -38220,9 +38313,9 @@ function NumerosSetting() {
   const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';
   const lettreEx2 = ['C', 'D', 'E'].find((x) => x !== arch && x !== lettreEx);
   return (
-    <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+    <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Comment tu écris le numéro sur tes cartons. Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
@@ -38270,7 +38363,7 @@ function NumerosSetting() {
 // marche pas.
 const DETOURAGE_MODES = [['eteint', 'Éteint'], ['couverture', 'Photo de couverture'], ['toutes', 'Toutes les photos']];
 const modeDetourageLu = () => { const v = load('vrm_detourage', 'eteint'); return DETOURAGE_MODES.some(([k]) => k === v) ? v : 'eteint'; };
-function DetourageSetting() {
+function DetourageSetting({ nu = false }) {
   const [mode, setMode] = React.useState(modeDetourageLu);
   const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
   const touche = React.useRef(false);
@@ -38301,9 +38394,9 @@ function DetourageSetting() {
   const etat = usage === undefined ? 'attente' : usage === null ? (raisonPasSu === 'compteur' ? 'compteur' : 'pasSu') : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
   const actif = mode !== 'eteint';
   return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+    <div style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Quand l’extension attache tes photos à une annonce <b>Leboncoin</b>, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas. Sur eBay, la mise en vente passe par eBay directement, sans l’extension : ses photos ne sont pas détourées.
         {/* ⚠️ « Leboncoin ou eBay » était FAUX (revue adverse, 4 octobre) : la seule
             voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
@@ -38358,19 +38451,33 @@ function PastilleStream() {
     style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
     <span aria-hidden="true" style={{width:7,height:7,borderRadius:99,background:C.danger}}/>Stream</button>;
 }
+// L'interrupteur des Paramètres — UNE forme pour tous (16 octobre : les
+// « ON / OFF » en boutons pleins faisaient « page bricolée »). Un vrai
+// `role="switch"` : les bancs le cherchent ainsi, et un lecteur d'écran le dit.
+function Interrupteur({ on, onClick, label, disabled, ...rest }) {
+  return (
+    <button type="button" role="switch" aria-checked={!!on} aria-label={label} onClick={onClick} disabled={disabled}
+      className="vrm-switch" style={{'--vrm-sw': on ? C.accent : `${C.text}26`}} {...rest}/>
+  );
+}
+// Une icône de ligne de réglage : neutre, au trait (l'accent reste rare, §7).
+function IconeReglage({ name }) {
+  return <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`,color:C.text}}><Icon name={name} size={17}/></span>;
+}
 function StreamSetting() {
   const on = useStream();
   return (
-    <div data-stream-reglage={on ? 'on' : 'off'} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,marginBottom:8}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:14,fontWeight:600,color:C.text}}>Mode stream</div>
-        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Floute les pseudos des acheteurs, les noms de tes comptes, les emails, les téléphones et les codes de retrait — pour filmer ou partager ton écran. Seulement sur cet appareil.</div>
-      </div>
-      <button type="button" role="switch" aria-checked={on} onClick={() => poserStream(!on)} style={{flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>{on ? 'ON' : 'OFF'}</button>
+    <div className="vrm-set-ligne" data-stream-reglage={on ? 'on' : 'off'}>
+      <IconeReglage name="eyeOff"/>
+      <span className="vrm-set-lib">
+        <b style={{color:C.text}}>Mode stream</b>
+        <small style={{color:C.muted}}>Floute pseudos, emails et codes pour filmer ton écran.</small>
+      </span>
+      <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
     </div>
   );
 }
-function ZoomSetting() {
+function ZoomSetting({ nu = false }) {
   const [z, setZ] = React.useState(readZoom);
   const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
   React.useEffect(() => {
@@ -38383,9 +38490,9 @@ function ZoomSetting() {
   const choix = telephone ? ZOOMS.filter(([v]) => Number(v) >= 1) : ZOOMS;
   const selection = telephone && Number(z) < 1 ? '1' : z;
   return (
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
-      <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>
-      <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
+    <div style={nu ? {} : {background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
+      {!nu && <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.45}}>
         {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
       </div>
       <div role="group" aria-label="Taille de l'affichage"
@@ -38569,7 +38676,7 @@ function ReglagesPasLus() {
     </div>
   );
 }
-function EmailStartSetting() {
+function EmailStartSetting({ nu = false }) {
   const [date, setDate] = useState('');
   const [status, setStatus] = useState('load'); // load | ok | saving | err | pasLu
   const HEADERS = sbAuth();
@@ -38605,9 +38712,9 @@ function EmailStartSetting() {
   };
 
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>📬 Import des emails</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
+    <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Import des emails</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -38747,7 +38854,7 @@ function PushSetting() {
 
   return (
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>🔔 Notifications téléphone</div>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Notifications téléphone</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
@@ -39320,7 +39427,7 @@ function EmailsSetting() {
           <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
         </div>
         <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.accent,listStyle:'revert'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,listStyle:'revert',padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
             <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
@@ -39540,7 +39647,7 @@ function ConnexionsSetting() {
           zip livré porte bien la version du manifeste. */}
       <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
         <a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
-          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'8px 13px',fontFamily:'inherit'}}>
+          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'0 14px',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center',fontFamily:'inherit'}}>
           Télécharger l'extension {EXT_ATTENDUE}
         </a>
         <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
@@ -39671,7 +39778,7 @@ function EcranMasques({ comptes, ordi }) {
 // Réglage du régime fiscal : détermine comment le rapport comptable présente les
 // chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
 // régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
-function RegimeSetting() {
+function RegimeSetting({ nu = false }) {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
   // lue au montage. Scalaire à défaut non vide : remplacer SEULEMENT s'il est
@@ -39693,9 +39800,9 @@ function RegimeSetting() {
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
+    <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>}
+      <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
           ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
