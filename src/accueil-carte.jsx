@@ -31,7 +31,7 @@ const CSS_CARTE = `
 .cj{position:relative;width:100%;max-width:500px;font-variant-numeric:normal;font-feature-settings:normal;border-radius:12px;background:${K.card};border:1px solid ${K.line2};box-shadow:${REFLET},${OMBRE_CARTE};overflow:hidden;text-align:left;color:${K.text};font-family:'Inter',system-ui,sans-serif}
 .cj-onglets{position:relative;height:36px;background:${K.surface};padding:0 12px;display:flex;align-items:flex-end;border-bottom:1px solid ${K.line}}
 .cj.compact .cj-onglets{height:34px}
-.cj-onglet{position:relative;height:28px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:500;color:${K.muted};background:#0D1117;border:1px solid ${K.line};border-bottom:none;white-space:nowrap;flex-shrink:0}
+.cj-onglet{position:relative;height:28px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:500;color:${K.muted};background:${K.card2};border:1px solid ${K.line};border-bottom:none;white-space:nowrap;flex-shrink:0}
 .cj-onglet + .cj-onglet{margin-left:-6px}
 .cj-onglet.actif{background:${K.card};color:${K.text};border-color:${K.line2};margin-bottom:-1px;height:29px}
 .cj-onglet i{width:6px;height:6px;border-radius:2px;flex-shrink:0}
@@ -54,8 +54,8 @@ const CSS_CARTE = `
 .cj-filet{height:1px;background:${K.line};margin:8px 16px}
 .cj-ligne{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 16px;border:none;background:transparent;color:${K.text};text-align:left;cursor:pointer;font:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;border-radius:0;transition:background-color 160ms ease}
 .cj-ligne:focus-visible{outline:2px solid ${K.accent};outline-offset:-2px;border-radius:8px}
-@media (hover:hover) and (pointer:fine){.cj-ligne:hover{background:rgba(255,255,255,.04)}.cj-ligne:hover .cj-chev{transform:translateX(2px)}}
-.cj-ligne:active{background:rgba(255,255,255,.06)}
+@media (hover:hover) and (pointer:fine){.cj-ligne:hover{background:rgba(18,27,44,.035)}.cj-ligne:hover .cj-chev{transform:translateX(2px)}}
+.cj-ligne:active{background:rgba(18,27,44,.06)}
 .cj-eclair{position:absolute;inset:0;background:${K.accentSoft};pointer-events:none}
 .cj-txt{position:relative;flex:1;min-width:0}
 .cj-txt b{display:block;font-size:15px;font-weight:600;line-height:1.3}
@@ -70,7 +70,7 @@ const CSS_CARTE = `
 .cj-recu .cj-txt b{display:inline;font-size:14px;font-weight:500;color:${K.muted}}
 .cj-recu .cj-txt strong{font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:${K.text}}
 .cj-recu .cj-dec{position:relative;font-size:13px;font-weight:500;color:${K.muted};white-space:nowrap}
-.cj-notif{position:absolute;left:12px;right:12px;top:8px;z-index:3;background:${K.card2};border:1px solid ${K.line2};border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.5),0 12px 32px rgba(0,0,0,.5);padding:9px 12px 10px}
+.cj-notif{position:absolute;left:12px;right:12px;top:8px;z-index:3;background:${K.card2};border:1px solid ${K.line2};border-radius:10px;box-shadow:0 1px 2px rgba(18,27,44,.08),0 12px 30px rgba(18,27,44,.16);padding:9px 12px 10px}
 .cj-notif .l1{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:${K.text}}
 .cj-notif .l1 i{width:7px;height:7px;border-radius:2px;flex-shrink:0}
 .cj-notif .l1 em{margin-left:auto;font-style:normal;font-size:12px;font-weight:500;color:${K.faint};white-space:nowrap}

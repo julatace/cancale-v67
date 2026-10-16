@@ -117,8 +117,8 @@ const CSS = `
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(7,9,13,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(7,9,13,.78);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(244,246,250,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:rgba(244,246,250,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
@@ -131,12 +131,12 @@ const CSS = `
 
 /* Les boutons : une forme, trois poids. */
 .acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(36,88,230,.28)}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(36,88,230,.30)}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.5),0 10px 28px rgba(36,88,230,.36)}
+  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(36,88,230,.38)}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
 .acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
@@ -179,7 +179,7 @@ const CSS = `
      (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
    Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
    Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,.5),0 44px 100px rgba(0,0,0,.58),0 28px 80px rgba(36,88,230,.22)}
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(36,88,230,.16)}
 /* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
    se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
    À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
@@ -257,7 +257,7 @@ const CSS = `
 @media (min-width:1440px){
   .acc-fil{display:block;position:absolute;left:calc(50% - 620px);top:0;bottom:0;width:1px;background:${K.line2};pointer-events:none}
   .acc-fil i{position:absolute;inset:0;background:rgba(238,241,246,.4);transform-origin:top}
-  .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:500;color:${K.muted};line-height:18px}
+  .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:600;color:${K.text};line-height:18px}
   .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(238,241,246,.5)}
 }
 @supports (animation-timeline:view()){
