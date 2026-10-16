@@ -444,7 +444,7 @@ const THEMES = {
 };
 // ── IDENTITÉ CLAIRE (révisée par Julien, 16 octobre — maquette) ──────────────
 // La palette de src/themeMineral.js est appliquée VERBATIM au thème clair :
-// fond clair FROID, encre, un bleu de marque, barre latérale bleu nuit (via le
+// fond clair légèrement crème, encre, un bleu de marque, barre latérale bleu nuit (via le
 // jeton `chrome`). Elle REMPLACE la direction « Minéral » pierre du 13 octobre,
 // que Julien a refusée. Mêmes hex que la page d'accueil (identité commune).
 // Toute clé non couverte garde sa valeur d'avant ; le thème SOMBRE n'est pas
@@ -9331,7 +9331,7 @@ const useOrdinateur = () => {
   return ord;
 };
 
-const NAV_LARGEUR = 120;
+const NAV_LARGEUR = 160;
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.

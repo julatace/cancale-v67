@@ -122,7 +122,7 @@ async function brancher(p){
     await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
     if(width===1512 && nom==='Vinted'){
       const rail=p.locator('.vrm-atelier-rail');
-      check(await rail.evaluate(e=>parseFloat(getComputedStyle(e).width)===120),'bandeau bureau élargi à 120 pixels');
+      check(await rail.evaluate(e=>parseFloat(getComputedStyle(e).width)===160),'bandeau bureau élargi à 160 pixels');
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
       check(await rail.getByRole('button',{name:'Gestion',exact:true}).count()===0,'aucun bouton à déplier pour Gestion');
       check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion visible en permanence dans le rail');

@@ -2,7 +2,7 @@
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
 :root[data-theme="light"] { --vrm-focus:#2458E6; }
-:root[data-theme="light"] body { background:#F4F6FA; }
+:root[data-theme="light"] body { background:#F7F4EE; }
 :root[data-theme="light"] body::before { content:none; }
 :root[data-theme="light"] ::selection { background:rgba(36,88,230,.14); }
 :root[data-theme="light"] :focus-visible { outline:2px solid #2458E6; outline-offset:3px; }
