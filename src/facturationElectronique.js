@@ -3,9 +3,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 // Réforme française : les micro-entreprises devront émettre leurs factures B2B
 // en électronique et transmettre les données de leurs ventes aux particuliers
-// (e-reporting), via une plateforme agréée. VRM ne se connecte à AUCUNE
-// plateforme (payante ou non) : il prépare deux fichiers que le vendeur envoie
-// lui-même depuis la sienne.
+// (e-reporting), via une plateforme agréée. VRM prépare deux fichiers ; le
+// vendeur les dépose sur sa plateforme, OU connecte SON compte Super PDP et la
+// facture part d'ici (src/superpdp.js → api/_lib/superpdp.js : identifiants du
+// vendeur, chiffrés côté serveur, jamais relus par le navigateur — §2.9).
 //   1. une facture Factur-X (PDF + XML CII profil BASIC WL embarqué,
 //      `factur-x.xml`) depuis UNE vente ;
 //   2. un récapitulatif mensuel des ventes (CSV + JSON).
