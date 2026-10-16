@@ -771,20 +771,48 @@
   let photosFaites = false, photosEtat = null, photosEnCours = false;
   const lancerPhotos = () => {
     photosFaites = true; photosEnCours = true;
-    attacherPhotos(pending).then((r) => { photosEtat = r; }, () => {}).finally(() => { photosEnCours = false; banner(); });
+    direProgres();
+    attacherPhotos(pending).then((r) => { photosEtat = r; }, () => {}).finally(() => { photosEnCours = false; banner(); direProgres(); });
   };
   let publieFait = false, publieEtat = null;
+  // ── 5.182 : L'AVANCEMENT, DIT À L'APP ─────────────────────────────────────
+  // La fiche de VRM montre le dépôt en direct : l'étape, les photos POSÉES sur
+  // le total (et confirmées quand on peut les compter), le champ obligatoire qui
+  // manque, le refus de publier. Des nombres et des libellés de Leboncoin —
+  // jamais un contenu saisi. Envoyé seulement quand ça CHANGE.
+  let champManquant = null, _dernierProgres = '';
+  function progresCourant() {
+    const p = { champs: pendingDone };
+    if (photosEtat) p.photos = { posees: photosEtat.envoyees != null ? photosEtat.envoyees : (photosEtat.n || 0), total: photosEtat.total != null ? photosEtat.total : ((pending && pending.photos) || []).length, confirmees: photosEtat.confirmees, rates: photosEtat.rates || 0 };
+    if (publieEtat && !publieEtat.ok) { p.etape = 'publication-refusee'; p.raison = publieEtat.raison || ''; }
+    else if (champManquant) { p.etape = 'champ-manquant'; p.manque = champManquant; }
+    else if (photosEnCours) p.etape = 'photos';
+    else if (estEtapePublication()) p.etape = 'publication';
+    else if (photosEtat) p.etape = 'etapes';
+    else p.etape = 'remplissage';
+    return p;
+  }
+  function direProgres() {
+    if (!pending) return;
+    let p; try { p = progresCourant(); } catch (_) { return; }
+    const cle = JSON.stringify(p);
+    if (cle === _dernierProgres) return;
+    _dernierProgres = cle;
+    send({ action: 'depotProgres', id: pending.id, progres: p });
+  }
   async function autoPrefill() {
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
     const r = await send({ action: 'getPending' });
     pending = (r && r.ok && r.ad) ? r.ad : null;
     if (!pending) return;
     banner();
+    _dernierProgres = ''; direProgres();
     clearInterval(pendingTimer);
     pendingTimer = setInterval(() => {
       pendingTries++;
       const n = fillNow(pending);
       if (n > pendingDone) { pendingDone = n; banner(); }
+      direProgres();
       // Les photos : dès qu'une étape porte un champ fichier, on attache. Une
       // seule fois — ré-attacher écraserait ce qu'il vient d'ajouter lui-même.
       if (!photosFaites && champsFichier().length) lancerPhotos();
@@ -796,7 +824,7 @@
           && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
         publieFait = true;
         publierSansBooster().then((r) => {
-          publieEtat = r; banner();
+          publieEtat = r; banner(); direProgres();
           if (r && r.ok) {
             clearInterval(pendingTimer);
             send({ action: 'markPosted', id: pending.id });   // sort de la file
@@ -962,9 +990,17 @@
     const photosAttendues = () => photosEnCours || (!photosFaites && champsFichier().length > 0);
     if (_avanceEnCours || photosAttendues()) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
     const n = (_avanceEssais[sig] = (_avanceEssais[sig] || 0) + 1);
-    if (n > 4) { if (n === 5) toast('⚠️ Un champ obligatoire reste à choisir (ex. Univers) — fais-le, je continue'); return; }
+    if (n > 4) {
+      if (n === 5) {
+        // 5.182 : l'app le dit AUSSI, en nommant le champ (libellé de Leboncoin).
+        champManquant = champsObligatoiresVides();
+        toast('⚠️ ' + (champManquant.length ? champManquant.join(', ') + ' : à choisir' : 'Un champ obligatoire reste à choisir (ex. Univers)') + ' — fais-le, je continue');
+        direProgres();
+      }
+      return;
+    }
     _avanceEnCours = true;
-    try { await attendre(1100); if (!photosAttendues() && cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
+    try { await attendre(1100); if (!photosAttendues() && cliquerContinuer()) { _avanceFaite.add(sig); champManquant = null; toast('→ étape suivante'); } } catch (_) {}
     _avanceEnCours = false;
   }
   // ══════════════════════════════════════════════════════════════════════════
@@ -1029,9 +1065,12 @@
   const estEtapePublication = () => optionsBoost().length > 0;
   function fillNow(ad) {
     let n = 0;
-    if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
-    { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // jamais d'écrasement ; la réf est garantie
-    if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle, une seule
+    // 5.182 : un champ corrigé dans la fiche de VRM est posé (borné) ; sinon la
+    //    règle d'avant (on ne remplit que le vide).
+    if (ad.titreEdite ? poserFiche('titre', findField([/titre|title|subject|proposez/]), ad.title)
+      : setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
+    { const d = ad.descriptionEditee ? poserDescriptionFiche(ad) : poserDescription(ad); if (d.fait || d.ref) n++; }   // jamais d'écrasement hors fiche ; la réf est garantie
+    if (ad.prixEdite ? poserPrixFiche(ad.price) : poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle, une seule
     poserLocalisation(ad);
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
@@ -1090,6 +1129,57 @@
     if (!el || !val) return false;
     if (String(el.value || '').trim()) return false;
     return setField(el, val);
+  }
+  // ── 5.182 : LA FICHE DE L'APP ─────────────────────────────────────────────
+  // Un champ CORRIGÉ dans VRM (titre, description, prix) est posé même si
+  // Leboncoin y a déjà écrit quelque chose : c'est son choix explicite, fait
+  // dans la fiche. Au plus 3 fois par champ — Leboncoin réécrit parfois sa
+  // description à une étape suivante ; au-delà, c'est quelqu'un qui corrige sur
+  // la page, et on le laisse faire (on n'entre pas en lutte avec lui).
+  const _posesFiche = {};
+  function poserFiche(cle, el, val) {
+    if (!el || val == null || String(val) === '') return false;
+    if (String(el.value || '') === String(val)) return true;      // déjà en place
+    const n = (_posesFiche[cle] = (_posesFiche[cle] || 0) + 1);
+    if (n > 3) return false;
+    return setField(el, String(val));
+  }
+  function poserPrixFiche(euros) {
+    const el = document.querySelector('input[name="price_cents"]') || document.querySelector('input[name="price"]') || findField([/prix|price|montant/]);
+    if (!el) return false;
+    const voulu = Number(String(euros).replace(',', '.'));
+    const garde = Number(String(el.value || '').replace(/\s/g, '').replace(',', '.'));
+    if (isFinite(voulu) && isFinite(garde) && String(el.value || '').trim() && garde === voulu) return true;
+    const n = (_posesFiche.prix = (_posesFiche.prix || 0) + 1);
+    if (n > 3) return false;
+    return poserPrix(euros, false);
+  }
+  // La description corrigée dans la fiche : posée telle quelle (elle porte déjà
+  // la référence — la règle partagée l'y remet si besoin) ; si on a cédé la
+  // place, la règle d'avant garantit au moins la référence.
+  function poserDescriptionFiche(ad) {
+    const el = findField([/description|texte|body|détail|detail/]);
+    if (!el) return { trouve: false, fait: false, garde: false, ref: false };
+    if (poserFiche('description', el, ad.description)) return { trouve: true, fait: true, garde: false, ref: true };
+    return poserDescription(ad);
+  }
+  // Les champs OBLIGATOIRES encore vides de l'étape (libellé marqué « * », ou
+  // `required`/`aria-required`). Des LIBELLÉS de Leboncoin, jamais un contenu
+  // saisi — c'est ce que l'app affiche (« Univers* reste à choisir »).
+  function champsObligatoiresVides() {
+    const out = [];
+    try {
+      for (const el of tousLesNoeuds('input, textarea, select')) {
+        if (!estDuDepot(el) || el.type === 'file' || el.type === 'radio' || el.type === 'checkbox' || el.disabled) continue;
+        const lib = String(libelleDe(el) || el.getAttribute('placeholder') || '').replace(/\s+/g, ' ').trim();
+        const requis = el.required || el.getAttribute('aria-required') === 'true' || /\*\s*$/.test(lib);
+        if (!requis || String(el.value || '').trim()) continue;
+        const nom = lib.replace(/\s*\*\s*$/, '').trim();
+        if (nom && out.indexOf(nom) < 0) out.push(nom);
+        if (out.length >= 5) break;
+      }
+    } catch (_) {}
+    return out;
   }
   // La description : Leboncoin l'écrit PARFOIS lui-même (Julien, 19 sept.). On ne
   // l'écrase JAMAIS — mais la référence VRM-{n°} doit y être : c'est elle qui
@@ -1169,7 +1259,7 @@
   function reprendre() {
     if (!pending) return;
     pendingDone = fillNowForce(pending);
-    pendingArrete = false; pendingTries = 0; publieFait = false;
+    pendingArrete = false; pendingTries = 0; publieFait = false; publieEtat = null; champManquant = null;
     send({ action: 'depotRepris', id: pending.id });
     // « Reprendre » rend ses essais à l'enchaînement des étapes (sinon une étape
     // tentée 4 fois pendant le détourage resterait bloquée pour toujours).
@@ -1179,10 +1269,11 @@
       pendingTries++;
       const n2 = fillNow(pending);
       if (n2 > pendingDone) { pendingDone = n2; banner(); }
+      direProgres();
       if (!photosFaites && champsFichier().length) lancerPhotos();
       if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
         publieFait = true;
-        publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
+        publierSansBooster().then((r) => { publieEtat = r; banner(); direProgres(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
       }
       if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; send({ action: 'depotArrete', id: pending.id, raison: 'arret' }); banner(); }
     }, 1000);
@@ -1191,7 +1282,9 @@
   function fillNowForce(ad) {
     let n = 0;
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
-    { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
+    // « Reprendre » rend ses essais aux champs de la fiche (au cas où on serait revenu en arrière).
+    for (const k of Object.keys(_posesFiche)) delete _posesFiche[k];
+    { const d = ad.descriptionEditee ? poserDescriptionFiche(ad) : poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin (sauf celle corrigée dans la fiche)
     if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
     _villeFaite = ''; poserLocalisation(ad);
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
