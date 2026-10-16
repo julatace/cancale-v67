@@ -7670,44 +7670,82 @@ function BarresVenduRecu({ jours, hauteur = 96 }) {
   );
 }
 
+// Le prénom du bonjour. ⚠️ Un EMAIL n'est jamais un prénom (16 oct., vu sur sa
+// capture iPhone : « Bon après-midi shopcancale35@gmail.com »). Ce qui contient
+// « @ » ne se dit pas — « Bon après-midi » tout court : mieux vaut un blanc
+// qu'un faux (§5). Le réglage n'est pas réécrit : on ne touche pas à SA donnée.
+function prenomLisible(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t.includes('@') ? '' : t;
+}
+
 // Courbe à POINTS RELIÉS de la semaine : en abscisse les jours (lun → dim), en
 // ordonnée le chiffre d'affaires, la valeur écrite au-dessus de chaque point.
 // Vendu (trait plein, accent) et reçu (pointillé, gris) quand il est connu.
-function CourbeSemaine({ jours }) {
-  const W = 340, H = 168, gx = 34, gy = 22, bas = 26;
+// ⚠️ (16 oct., « pas premium sur iPhone ») : dessinée à la LARGEUR MESURÉE et à
+//    une HAUTEUR FIXE — en `viewBox` étiré, elle grossissait avec l'écran
+//    (chiffres de 30 px sur ordinateur, graphique plus haut que l'écran). Plus
+//    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
+//    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
+//    aux repères.
+function CourbeSemaine({ jours, hauteur = 176 }) {
+  const ref = React.useRef(null);
+  const [W, setW] = React.useState(340);
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    mesure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(mesure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
+  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
   const haut = Math.ceil(max / pas) * pas;
-  const X = (i) => gx + (i * (W - gx - 10)) / 6;
+  const col = (W - gx - gd) / 6;
+  const X = (i) => gx + i * col;
   const Y = (v) => gy + (1 - v / haut) * (H - gy - bas);
+  const base = H - bas;
   const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
-  const chemin = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean).map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const points = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean);
+  const chemin = (pts) => pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const pv = points('vendu');
   const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
   const avecRecu = jours.every(j => j.recu);
-  const graduations = []; for (let v = 0; v <= haut; v += pas) graduations.push(v);
+  const iAuj = jours.findIndex(j => j.auj);
+  const bande = Math.min(40, col - 4);
   return (
-    <svg data-courbe-semaine="" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
-      {graduations.map(v => (
-        <g key={v}>
-          <line x1={gx} x2={W - 6} y1={Y(v)} y2={Y(v)} stroke={C.border} strokeWidth="1"/>
-          <text x={gx - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="9.5" fill={C.muted}>{v}</text>
-        </g>
-      ))}
-      {avecRecu && <path d={chemin('recu')} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 3"/>}
-      <path d={chemin('vendu')} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      {jours.map((j, i) => (
-        <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
-          {!j.futur && <>
-            <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
-            {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.6" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
-            <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.2 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
-            {j.vendu.eur > 0 && <text x={X(i)} y={Y(j.vendu.eur) - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.text}>{Math.round(j.vendu.eur)}</text>}
-          </>}
-          <text x={X(i)} y={H - 10} textAnchor="middle" fontSize="10" fontWeight={j.auj ? 700 : 500} fill={j.auj ? C.text : C.muted}>{j.jour} {j.num}</text>
-        </g>
-      ))}
-    </svg>
+    <div ref={ref} style={{width:'100%'}}>
+      <svg data-courbe-semaine="" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
+        <defs>
+          <linearGradient id={`csg${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.16"/>
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {iAuj >= 0 && <rect x={X(iAuj) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg}/>}
+        {[0.5, 1].map(f => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4"/>)}
+        <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1"/>
+        {pv.length > 1 && <path d={`${chemin(pv)} L${pv[pv.length - 1][0].toFixed(1)},${base} L${pv[0][0].toFixed(1)},${base} Z`} fill={`url(#csg${uid})`}/>}
+        {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 4" strokeLinecap="round"/>}
+        <path d={chemin(pv)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>
+        {jours.map((j, i) => (
+          <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
+            {!j.futur && <>
+              <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
+              {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
+              <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.6 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
+              {j.vendu.eur > 0 && <text x={X(i)} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
+            </>}
+            <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
+            <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? C.text : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -24253,11 +24291,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // est vide on dit « Bonjour » tout court — mieux vaut un blanc qu'un faux
   // (§5). On ne le devine PAS depuis l'email : « vinted35260 » n'est pas un
   // prénom, et un prénom inventé est un faux.
-  const [prenom, setPrenom] = useState(() => String(load('vrm_prenom', '') || '').trim());
+  const [prenom, setPrenom] = useState(() => prenomLisible(load('vrm_prenom', '')));
   useEffect(() => onCloudReady(() => {
     // §5.49 : un réglage synchronisé lu au MONTAGE lit du vide au premier
     // écran ouvert. On ne remplace que ce qui est resté vide.
-    setPrenom((p) => p || String(load('vrm_prenom', '') || '').trim());
+    setPrenom((p) => p || prenomLisible(load('vrm_prenom', '')));
   }), []);
   const [imprimante, setImprimante] = useState(() => imprMode(load('vrm_imprimante', 'normale')));
   const imprTouchee = React.useRef(false);
@@ -29086,7 +29124,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Un compte dont les ventes n'ont pas pu être lues n'est pas dans ce
         // reçu (`ventesComptees`) : on le dit à côté du chiffre — un total
         // partiel ne se présente pas comme complet (§5).
-        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
+        // (16 oct.) Au-delà de deux comptes, le nombre : neuf identifiants à la suite
+        // remplissaient la carte sur iPhone. Les noms restent dans `data-recu-sans`
+        // et dans l'infobulle.
+        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.length > 2 ? `${nomsVentesKO.length} comptes` : nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
@@ -29094,19 +29135,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-day-layout">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* ═══ RÉTABLI LE 13 OCTOBRE (retiré par #500) ════════════════════
-                codex avait enlevé de Ma journée le bonjour, VENDU/REÇU du mois et
-                l'argent en attente/à virer — l'info que Julien regarde en premier
-                sur son téléphone. On les remet, en CARTE CLAIRE (cohérent avec le
-                thème actuel, plus l'ancien bloc sombre), en gardant toute la
-                logique §5/§11 (chiffres sûrs, « vendu » ≠ « reçu », escrow ≠
-                dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
-                plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
+            {/* ═══ MA JOURNÉE, REFAITE LE 16 OCTOBRE (« pas premium sur iPhone ») ═══
+                Une hiérarchie au lieu de huit blocs de même poids : le bonjour,
+                la barre des quatre gestes, UN héros (le vendu du mois, le jour
+                dedans, le reçu dessous), la semaine VISIBLE (plus dans un repli),
+                puis l'argent en attente. Les chiffres et leurs phrases gardent
+                leur source (§5) ; seuls la forme et la longueur ont changé.
+                Cartes sobres : bord fin, ombre douce, une seule couleur d'accent
+                (le vendu du jour, la courbe, les liens). */}
             {!baseKO && (
-              <div className="vrm-day-greeting" style={{marginBottom:14}}>
-                <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
-                <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
-                {!loading && jobs.length>0 && <div style={{fontSize:13,color:C.muted,marginTop:3}}><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</div>}
+              <div className="vrm-day-greeting">
+                <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
+                {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
               </div>
             )}
 
@@ -29119,8 +29160,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {/* LA BARRE DU QUOTIDIEN (16 oct., Julien : « juste les logos —
                 colis à envoyer, à retirer, messages, baisser les prix — sans les
-                textes, une barre en largeur »). Le nombre est un fait ; « — »
-                quand il n'a pas pu être lu (jamais un zéro inventé, §5). */}
+                textes, une barre en largeur »). UNE carte, quatre cases séparées
+                d'un filet. Le nombre est un fait ; « — » quand il n'a pas pu être
+                lu (jamais un zéro inventé, §5). */}
             {!baseKO && !premierJour && (()=>{
               const ko = nomsVentesKO.length > 0;
               const T = [
@@ -29130,16 +29172,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];
               return (
-                <div data-barre-jour="" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:8,marginBottom:14}}>
-                  {T.map(x => {
+                <div data-barre-jour="" className="vrm-day-bar" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                  {T.map((x, k) => {
                     const n = x.t ? x.t.n : 0;
                     const vif = !x.pasSu && n > 0;
                     return (
                       <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
-                        style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'12px 6px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',minWidth:0}}>
-                        <span style={{display:'flex',color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
-                        <span className="vrm-display" style={{fontSize:20,fontWeight:700,lineHeight:1.1,color:vif ? C.text : C.muted,fontVariantNumeric:'tabular-nums'}}>{x.pasSu ? '—' : n}</span>
-                        <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{x.l}</span>
+                        style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
+                        <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
+                        <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
+                        <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
                       </button>
                     );
                   })}
@@ -29147,83 +29189,102 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
-            {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
-                claire : le gros chiffre en encre, l'accent réservé au lien. */}
-            {!baseKO && !premierJour && !loading && sales.items && (
-              <button type="button" className="vrm-day-money" onClick={()=>onNav&&onNav('cat_ventes')}
-                style={{width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none',display:'block',padding:'18px 18px 16px'}}>
-                <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Vendu en {moisNom}</div>
-                <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display" style={{fontSize:'clamp(34px, 10vw, 48px)',fontWeight:800,letterSpacing:-1,marginTop:6,lineHeight:1,color:C.text,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={moisEur}/></div>
-                <div style={{fontSize:13,color:C.muted,marginTop:6,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-                  <span><b style={{color:C.text,fontWeight:700}}>{moisN}</b> vente{moisN>1?'s':''} ce mois-ci</span>
-                  <span style={{opacity:.5}}>·</span>
-                  <span style={{color:C.accent,fontWeight:600}}>voir mes ventes ›</span>
-                </div>
-                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Reçu en {moisNom}</span>
-                  <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                  <span style={{fontSize:12,color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré')}</span>
-                </div>
-              </button>
-            )}
+            {/* LE HAUT DE LA JOURNÉE : héros + semaine (+ argent). Sur
+                téléphone : empilés dans cet ordre. Sur ordinateur : le héros et
+                l'argent à gauche, la semaine à droite (`.vrm-day-top`). */}
+            <div className="vrm-day-top">
 
-            {/* Vendu AUJOURD'HUI — le soir, la première chose qu'on veut voir. */}
-            {jourN>0 && (
-              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <div data-vendu-jour={Math.round(jourEur*100)} style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
-                  <span style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
-                  <span style={{fontSize:15,fontWeight:600,color:C.text}}>{jourN} vente{jourN>1?'s':''}</span>
-                </div>
-              </button>
-            )}
-
-            {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
+            {/* LE HÉROS : VENDU ce mois (le gros chiffre), VENDU aujourd'hui
+                dedans (l'accent, rare), REÇU dessous — deux notions, deux mots
+                (§ 4 oct.). Plus de carte bleue à part pour le jour : c'était le
+                bloc criard de la capture. */}
             {!baseKO && !premierJour && !loading && sales.items && (
-              <ResumePlateforme title="Ta semaine" className="vrm-day-history">
-              <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Cette semaine · <span className="vrm-display" data-total-semaine={Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)*100)}>{Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)).toLocaleString('fr-FR')} €</span> vendus</div>
-                  <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
+              <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div className="vrm-day-head">
+                  <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
+                  <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
+                </div>
+                <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display vrm-day-hero-n" style={{color:C.text}}><CountUpEuro value={moisEur}/></div>
+                <div className="vrm-day-meta" style={{color:C.muted}}>
+                  <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
+                  {jourN>0 && <>
+                    <span aria-hidden="true" style={{opacity:.45}}>·</span>
+                    <span data-vendu-jour={Math.round(jourEur*100)} style={{color:C.accent,fontWeight:600}}>+{Math.round(jourEur).toLocaleString('fr-FR')} € aujourd'hui <span style={{fontWeight:500,opacity:.85}}>({jourN} vente{jourN>1?'s':''})</span></span>
+                  </>}
+                </div>
+                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
+                  <div style={{minWidth:0}}>
+                    <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
+                    <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
                   </div>
-                </div>
-                <CourbeSemaine jours={semaine}/>
-                <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
-                  <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
-                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
-                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
+                  <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
                 </div>
               </div>
-              </ResumePlateforme>
             )}
 
+            {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
+                autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
+            {jourN>0 && !(!baseKO && !premierJour && !loading && sales.items) && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
+                style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
+                <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
+                <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.accent,fontVariantNumeric:'tabular-nums'}}>{Math.round(jourEur).toLocaleString('fr-FR')} €</span>
+                <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
+              </button>
+            )}
+
+            {/* LA SEMAINE EN COURS (lundi → dimanche), VISIBLE sans clic (elle
+                était cachée dans « ▸ Ta semaine »). */}
+            {!baseKO && !premierJour && !loading && sales.items && (()=>{
+              const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
+              const geste = extSait('versement');
+              return (
+              <div data-carte-jours="" className="vrm-day-week vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div className="vrm-day-head">
+                  <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
+                  <span className="vrm-day-legende" style={{color:C.muted}}>
+                    <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
+                    <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
+                  </span>
+                </div>
+                <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
+                <CourbeSemaine jours={semaine}/>
+                <div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
+                  Vendu : au jour de la vente · Reçu : au jour du versement.
+                  {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
+                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
+                </div>
+              </div>
+              );
+            })()}
+
             {/* ARGENT EN ATTENTE / DISPONIBLE À VIRER (§5.14 : deux notions,
-                deux montants, jamais confondus ; escrow réel sinon estimation). */}
+                deux montants, jamais confondus ; escrow réel sinon estimation).
+                Deux colonnes au lieu d'une phrase qui passait à la ligne. */}
             {!baseKO && !premierJour && (()=>{
               const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
+              const avecDispo = !!(escrow && escrow.dispo > 0);
               return (
-              <div style={{marginBottom:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:13,color:C.muted,fontWeight:500}}>en attente</span></div>
-                  <div style={{fontSize:12,color:C.muted,marginTop:1}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
-                  {escrow && escrow.dispo > 0 && (
-                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>
-                      et <b style={{color:C.text,fontWeight:700}}>{escrow.dispo.toFixed(2).replace('.',',')} €</b> déjà disponibles à virer
-                      {escrow.accounts>1?` · sur ${escrow.accounts} porte-monnaie`:''}
-                      {escrow.plusVieuxJours>7?` · le plus ancien lu il y a ${escrow.plusVieuxJours} j`:''}
-                    </div>
-                  )}
+              <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
+                <div style={{minWidth:0}}>
+                  <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
+                  <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow?'':'≈ '}{Math.round(val).toLocaleString('fr-FR')} €</div>
+                  <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
                 </div>
-                <span aria-hidden="true" style={{color:C.muted,fontSize:22,fontWeight:700}}>›</span>
+                {avecDispo && (
+                  <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
+                    <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
+                    <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow.dispo.toFixed(2).replace('.',',')} €</div>
+                    <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
+                  </div>
+                )}
               </div>
               );
             })()}
+
+            </div>
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -29261,6 +29322,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
                 grand écran et UNE sur téléphone — la même règle, sans test de
                 largeur dans le JavaScript. */}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
+            )}
             {!loading && jobs.length>0 && (
               <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
@@ -29327,7 +29391,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
                 serait un faux, §5) — le prix de vente, qui est un fait. */}
             {!loading && dernieresVentes.length>0 && (
-              <div style={{marginTop:14}}>
+              <div className="vrm-day-recent" style={{marginTop:24}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                   <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
                   <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
