@@ -22938,39 +22938,396 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
    Stockage : `vrm_compta`, une ligne APP (synchronisée via SYNC_KEYS), jamais
    l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
    sinon une saisie faite pendant le chargement serait écrasée. */
-const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
+const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [], abonnements: [] };
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
 const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length);
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length);
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
 const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// ── ABONNEMENTS RÉCURRENTS (16 octobre) ──────────────────────────────────────
+// Julien : « VRM 12,99 €/mois, Canva, l'appli photo… » — une dépense qui revient
+// toute seule. Rangés dans `vrm_compta.abonnements` (la ligne de cet écran, déjà
+// dans SYNC_KEYS et rattrapée par `onCloudReady` si restée vide, §5.49 — une
+// seconde clé aurait fait deux propriétaires pour « les charges », §11) :
+// `{ id, libelle, montant, periode: 'mois'|'an', debut: 'AAAA-MM-JJ', fin: '' | 'AAAA-MM-JJ' }`.
+// ⚠️ LA RÈGLE (décidée, et dite à l'écran) : un abonnement se paie D'AVANCE, au
+//    début de chaque période. Une échéance compte donc dès que son MOIS civil a
+//    commencé — le mois du début compte, le mois en cours compte, le mois de la
+//    fin compte, rien après. Commencé le 1er juillet, 10 €/mois, vu en octobre :
+//    juillet, août, septembre, octobre ⇒ 40 € cumulés, dont 10 € ce mois-ci.
+//    Annuel : une échéance par an, au mois anniversaire du début.
+//    C'est une CHARGE : elle n'entre jamais dans le CA (aucun lecteur du CA ne
+//    lit `vrm_compta`).
+const ymCompta = (s) => /^\d{4}-\d{2}/.test(String(s || '')) ? String(s).slice(0, 7) : null;
+const ymCourant = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+// Les mois (AAAA-MM) où l'abonnement a une échéance, jusqu'au mois `jusqua` inclus.
+const echeancesAbonnement = (a, jusqua) => {
+  const deb = ymCompta(a && a.debut); if (!deb || !jusqua) return [];
+  const fin = ymCompta(a.fin);
+  const borne = fin && fin < jusqua ? fin : jusqua;
+  const pas = a.periode === 'an' ? 12 : 1;
+  const out = [];
+  let y = Number(deb.slice(0, 4)), m = Number(deb.slice(5, 7));
+  for (let i = 0; i < 2400; i++) {
+    const ym = `${y}-${String(m).padStart(2, '0')}`;
+    if (ym > borne) break;
+    out.push(ym);
+    m += pas; while (m > 12) { m -= 12; y += 1; }
+  }
+  return out;
+};
+// Charge d'un abonnement sur les mois retenus par `filtre` : montant × échéances.
+const chargeAbonnement = (a, filtre, jusqua) => echeancesAbonnement(a, jusqua).filter(filtre).length * (Number(a && a.montant) || 0);
 // Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
 // ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Les coûts
-// fixes sont au tarif ACTUEL × nombre de mois de l'année (12 pour une année
-// passée, le mois courant pour l'année en cours) — on le DIT au libellé, on ne
-// prétend pas connaître leur historique mois par mois.
-const comptaChargesAnnee = (data, annee) => {
+// fixes (l'ancienne forme, sans date de début) sont au tarif ACTUEL × nombre de
+// mois de l'année (12 pour une année passée, le mois courant pour l'année en
+// cours) — on le DIT au libellé, on ne prétend pas connaître leur historique.
+// Les abonnements, eux, ont une date de début : leurs échéances sont exactes.
+const comptaChargesAnnee = (data, annee, maintenant = Date.now()) => {
   const d = (data && typeof data === 'object') ? data : {};
-  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [];
-  const now = new Date(), thisY = now.getFullYear();
+  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [], abonnements = d.abonnements || [];
+  const now = new Date(maintenant), thisY = now.getFullYear();
   const mois = annee < thisY ? 12 : (annee > thisY ? 0 : now.getMonth() + 1);
+  const jusqua = mois ? `${annee}-${String(mois).padStart(2, '0')}` : null;
   const estAnnee = (x) => String(x || '').slice(0, 4) === String(annee);
   const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
   const fixesParMois = sum(fixes, x => x.montant);
   const depTotal = sum(depenses.filter(x => estAnnee(x.date)), x => x.montant);
   const packTotal = sum(packs.filter(x => estAnnee(x.date)), x => x.montant);
   const fixesTotal = fixesParMois * mois;
+  const aboLignes = abonnements.map(a => ({ a, n: echeancesAbonnement(a, jusqua).filter(estAnnee).length }))
+    .map(x => ({ ...x, total: x.n * (Number(x.a.montant) || 0) })).filter(x => x.n > 0);
+  const aboTotal = sum(aboLignes, x => x.total);
   return {
-    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal,
-    total: fixesTotal + depTotal + packTotal,
+    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal, aboTotal,
+    total: fixesTotal + depTotal + packTotal + aboTotal,
     depLignes: depenses.filter(x => estAnnee(x.date)),
     packLignes: packs.filter(x => estAnnee(x.date)),
+    aboLignes,
     fixes,
   };
 };
+// Charges d'un MOIS (AAAA-MM), même règle : fixes + dépenses + packs du mois +
+// échéances d'abonnement du mois.
+const comptaChargesMois = (data, ym) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const duMois = (x) => String(x || '').slice(0, 7) === ym;
+  const abo = sum(d.abonnements || [], a => chargeAbonnement(a, (m) => m === ym, ym));
+  return { abo, total: sum(d.fixes || [], x => x.montant) + sum((d.depenses || []).filter(x => duMois(x.date)), x => x.montant) + sum((d.packs || []).filter(x => duMois(x.date)), x => x.montant) + abo };
+};
+// ── PROFIL FISCAL : le SIREN se vérifie, il ne se bloque pas (16 octobre) ────
+// SIREN = 9 chiffres, SIRET = SIREN + 5 chiffres ; les deux portent une clé de
+// Luhn. On DIT qu'il est invalide (une faute de frappe part sur chaque reçu
+// envoyé au comptable, §5), on n'empêche jamais d'enregistrer : lui seul sait.
+// Exception connue : La Poste (SIREN 356000000) — ses SIRET ne suivent pas Luhn
+// mais une somme de chiffres multiple de 5.
+const luhnOk = (ch) => { let s = 0; for (let i = 0; i < ch.length; i++) { let n = Number(ch[ch.length - 1 - i]); if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; } s += n; } return s % 10 === 0; };
+const verifierSiren = (brut) => {
+  const ch = String(brut || '').replace(/[\s.-]/g, '');
+  if (!ch) return { etat: 'vide' };
+  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: 'il ne doit contenir que des chiffres' };
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: `${ch.length} chiffre${ch.length > 1 ? 's' : ''} — un SIREN en a 9, un SIRET 14` };
+  const type = ch.length === 9 ? 'SIREN' : 'SIRET';
+  const siren = ch.slice(0, 9);
+  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIREN ne correspond pas (faute de frappe ?)' };
+  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIRET ne correspond pas (faute de frappe ?)' };
+  return { etat: 'ok', type, siren };
+};
+// ── CA PAR PÉRIODE (16 octobre) : AUCUNE règle de vente n'est écrite ici ─────
+// Les lignes viennent de `ventesFaites` (VENDU) et `ventesDeclarables`
+// (FINALISÉ / REÇU) ; ces fonctions ne font que découper le temps.
+// Semaine = du lundi 00:00 au lundi suivant (heure de l'appareil, comme Ma journée).
+const debutPeriode = (t, p) => {
+  const d = new Date(t); d.setHours(0, 0, 0, 0);
+  if (p === 'semaine') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  else if (p === 'mois') d.setDate(1);
+  else if (p === 'trimestre') { d.setDate(1); d.setMonth(Math.floor(d.getMonth() / 3) * 3); }
+  else { d.setDate(1); d.setMonth(0); }
+  return d;
+};
+const decalerPeriode = (d, p, k) => {
+  const x = new Date(d);
+  if (p === 'semaine') x.setDate(x.getDate() + 7 * k);
+  else if (p === 'mois') x.setMonth(x.getMonth() + k);
+  else if (p === 'trimestre') x.setMonth(x.getMonth() + 3 * k);
+  else x.setFullYear(x.getFullYear() + k);
+  return x;
+};
+const MOIS_COMPTA = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const libellePeriodeCa = (d, p) => p === 'semaine' ? `sem. du ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+  : p === 'mois' ? `${MOIS_COMPTA[d.getMonth()]} ${d.getFullYear()}`
+  : p === 'trimestre' ? `T${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}` : String(d.getFullYear());
+// `series` = { vendu, finalise, recu } — chacune une liste `{ts, eur}` ou `null`
+// (« pas su » ⇒ la colonne vaut `null`, jamais 0).
+const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
+  const s0 = debutPeriode(maintenant, p);
+  const somme = (liste, a, b) => {
+    if (!Array.isArray(liste)) return null;
+    let eur = 0, nb = 0;
+    for (const l of liste) if (l && l.ts >= a && l.ts < b) { eur += Number(l.eur) || 0; nb += 1; }
+    return { eur: Math.round(eur * 100) / 100, n: nb };
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = decalerPeriode(s0, p, -i), f = decalerPeriode(d, p, 1);
+    out.push({ cle: d.toISOString(), libelle: libellePeriodeCa(d, p), enCours: i === 0,
+      vendu: somme(series.vendu, d.getTime(), f.getTime()), finalise: somme(series.finalise, d.getTime(), f.getTime()), recu: somme(series.recu, d.getTime(), f.getTime()) });
+  }
+  return out;
+};
 
-function ComptaPro({ liveStats, onNav }) {
+// ── CA PAR PÉRIODE — vendu · finalisé · reçu (versé) ─────────────────────────
+// Julien appelle « encaissé » l'argent versé ; le CA déclaré ne dit jamais
+// « encaissé » (§5 : l'app ne connaît pas les recettes encaissées au sens de
+// l'URSSAF, et Leboncoin n'est pas daté au versement). D'où « reçu (versé) ».
+// AUCUNE règle de vente n'est écrite ici (§11) :
+//   · VENDU    = `ventesFaites` (au jour de la vente, en cours comprises, hors
+//                annulées et hors ventes/comptes cachés — la règle de Ma journée) ;
+//   · FINALISÉ = `ventesDeclarables` (lignes + « à dater »), au jour de la VENTE ;
+//   · REÇU     = `ventesDeclarables`, au jour du VERSEMENT (Vinted), de la vente
+//                (Leboncoin), de la commande (eBay) — `recuDuMois`, la date des
+//                barres de Ma journée, sans le registre des déclarations.
+// Les sources sont celles que la COQUE lit déjà (ventes de tous les comptes,
+// Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
+// Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
+const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
+function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { ventes, ko } = useVentesCoque();
+  const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
+  const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
+  const [versements, setVersements] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
+  // Les ventes et comptes masqués sont des réglages synchronisés (§5.49).
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setTick((t) => t + 1)), []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const calc = React.useMemo(() => {
+    if (ventes === undefined) return { etat: 'encours' };
+    if (!Array.isArray(ventes)) return { etat: 'passu' };
+    const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
+    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
+    const vf = ventesFaites({ vinted: ventes, lbc, ebay, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)) });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
+    let finSansDate = 0;
+    const finalise = [];
+    for (const l of [...decl.lignes, ...decl.aDater]) {
+      const t = l.o ? tsCommande(l.o) : (l.ts || 0);
+      if (t) finalise.push({ ts: t, eur: l.eur }); else finSansDate += 1;
+    }
+    const recu = versements ? decl.lignes.filter((l) => l.ts).map((l) => ({ ts: l.ts, eur: l.eur })) : null;
+    const aDater = versements ? decl.aDater : [];
+    const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
+    const manque = [
+      ...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe),
+      ...(lbcCoqueLu === null ? ['Leboncoin'] : []),
+      ...(ebayCommandes === null ? ['eBay'] : []),
+    ];
+    const attente = lbcCoqueLu === undefined || ebayCommandes === undefined;
+    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, finSansDate, manque, attente };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
+  const cur = lignes ? lignes[0] : null;
+  const partiel = calc.etat === 'lu' && (calc.manque.length > 0 || calc.attente);
+  const montant = (x) => x == null ? '—' : fmt(x.eur);
+  const nb = (x) => x == null ? '' : `${x.n} vente${x.n > 1 ? 's' : ''}`;
+  const COLS = [
+    ['vendu', 'Vendu', 'au jour de la vente, en cours comprises'],
+    ['finalise', 'Finalisé', 'ventes finalisées, au jour de la vente'],
+    ['recu', 'Reçu (versé)', versements === undefined ? 'dates de versement en lecture…' : versements === null ? 'dates de versement illisibles' : "au jour où l'argent a été versé"],
+  ];
+  const aDaterEur = calc.etat === 'lu' ? calc.aDater.reduce((t, l) => t + (Number(l.eur) || 0), 0) : 0;
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-ca-periode={periode} data-ca-etat={calc.etat} data-ca-partiel={partiel ? '1' : '0'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>
+          <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Chiffre d'affaires par période</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>Toutes plateformes · les mêmes règles que Ma journée et le CA déclaré.</div>
+          </div>
+          <div role="group" aria-label="Période" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, flex: '1 1 260px', maxWidth: 360 }}>
+            {PERIODES_CA.map(([k, l]) => (
+              <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} data-ca-choix={k}
+                style={{ flex: 1, border: 'none', borderRadius: 6, padding: '7px 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: periode === k ? C.accent : 'transparent', color: periode === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {calc.etat !== 'lu' ? (
+          <div style={{ padding: '16px', fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
+            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+          </div>
+        ) : (<>
+          <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
+            {COLS.map(([k, l, s], i) => (
+              <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
+                <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{l} · {cur.libelle}</div>
+                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{partiel && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table data-ca-table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ color: C.muted, textAlign: 'right' }}>
+                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>Période</th>
+                  {COLS.map(([k, l]) => <th key={k} style={{ fontWeight: 600, padding: '9px 16px 9px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>{l}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.slice(1).map((r) => (
+                  <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
+                    {COLS.map(([k]) => <td key={k} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{montant(r[k])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || versements === null) && (
+            <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, lineHeight: 1.55 }}>
+              {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
+              {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
+              {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
+              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
+              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période.</div>}
+            </div>
+          )}
+        </>)}
+      </div>
+    </Card>
+  );
+}
+
+// ── PROFIL FISCAL — l'entité, le régime, le taux, réunis (16 octobre) ────────
+// Rien de neuf n'est stocké : l'entité est la ligne `vrm_pro_facture` (celle que
+// porte le reçu d'achat envoyé au comptable, §5 — même écriture que Réglages →
+// Facturation Pro), le régime `vinted_regime`, le taux `vinted_urssaf_taux`.
+// ⚠️ La ligne `vrm_pro_facture` se réécrit ENTIÈRE : lue en trois états
+//    (`lireReglage`), et une lecture ratée n'écrit RIEN (sinon la première
+//    frappe effaçait sa raison sociale et son SIRET).
+const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 110px'], ['ville', 'Ville', '1 1 160px']];
+function ProfilFiscalCarte({ onNav }) {
+  const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
+  const [statut, setStatut] = React.useState('');
+  const minuteur = React.useRef(null);
+  React.useEffect(() => { let mort = false; lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
+  const ecrire = (next) => {
+    if (!cfg) return;                                      // pas lu : on n'écrit rien
+    setCfg(next); setStatut('enregistrement…');
+    if (minuteur.current) clearTimeout(minuteur.current);
+    minuteur.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+          method: 'POST',
+          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
+        });
+        setStatut(r.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
+      } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
+    }, 600);
+  };
+  const [regime, setRegime] = React.useState(() => load('vinted_regime', 'micro'));
+  React.useEffect(() => onCloudReady(() => setRegime((v) => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
+  const virgule = (n) => String(n).replace('.', ',');
+  const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
+  React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
+  const siren = verifierSiren(cfg && cfg.siret);
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-profil-fiscal={cfg === undefined ? 'encours' : cfg === null ? 'passu' : 'lu'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Profil fiscal</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
+          </div>
+          {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
+        </div>
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {cfg === undefined && <div style={{ fontSize: 12.5, color: C.muted }}>Je lis ton entité…</div>}
+          {cfg === null && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
+          {cfg && (<>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {PROFIL_CHAMPS.map(([k, ph, flex]) => (
+                <input key={k} data-profil-champ={k} value={cfg[k] || ''} placeholder={ph} aria-label={ph} inputMode={k === 'siret' || k === 'codePostal' ? 'numeric' : undefined}
+                  onChange={(e) => ecrire({ ...cfg, [k]: e.target.value })}
+                  style={{ ...inp, flex, borderColor: k === 'siret' && siren.etat === 'invalide' ? C.warn : C.border }} />
+              ))}
+            </div>
+            <div data-siren={siren.etat} style={{ fontSize: 11.5, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
+              {siren.etat === 'vide' ? 'SIREN (9 chiffres) ou SIRET (14) : il figure sur ton avis de situation INSEE.'
+                : siren.etat === 'ok' ? `${siren.type} valide (clé de contrôle correcte).`
+                : `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`}
+            </div>
+          </>)}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div role="group" aria-label="Régime fiscal" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+              {[['micro', 'Micro-entreprise (BIC)'], ['marge', 'Société — régime de la marge']].map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={regime === k} data-regime-choix={k} onClick={() => { setRegime(k); save('vinted_regime', k); }}
+                  style={{ flex: 1, border: 'none', borderRadius: 6, padding: '8px 6px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: regime === k ? C.accent : 'transparent', color: regime === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+              ))}
+            </div>
+            {regime !== 'marge' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
+                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux
+                  onBlur={() => { const v = parseFloat(String(taux).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTaux(virgule(ok)); save('vinted_urssaf_taux', ok); }}
+                  style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600 }} />
+                <span style={{ fontSize: 12, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Réglages</button>.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ComptaLigne({ gauche, droite, onDel, extra }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px' }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
+      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+      {extra}
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
+    </div>
+  );
+}
+// Carte de section : chip + titre + total à droite, corps (formulaire + liste).
+function ComptaSection({ icon, titre, note, total, totalSub, children, data }) {
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-compta-section={data}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
+            {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{note}</div>}
+          </div>
+          {total != null && <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>
+            {totalSub && <div style={{ fontSize: 10.5, color: C.muted, whiteSpace: 'nowrap' }}>{totalSub}</div>}
+          </div>}
+        </div>
+        <div style={{ padding: 14 }}>{children}</div>
+      </div>
+    </Card>
+  );
+}
+
+function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
     catch (_) { return { ...COMPTA_DEFAUT }; }
@@ -22980,29 +23337,27 @@ function ComptaPro({ liveStats, onNav }) {
     try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
   }), []);
   const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
-  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [];
+  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [], abonnements = data.abonnements || [];
 
   // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
   const annee = new Date().getFullYear();
   const moisEcoules = new Date().getMonth() + 1;          // janvier = 1
-  const moisCle = `${annee}-${String(moisEcoules).padStart(2, '0')}`;
+  const moisCle = ymCourant();
   const cetteAnnee = (d) => String(d || '').slice(0, 4) === String(annee);
-  const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
   const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
   const fixesParMois = somme(fixes, x => x.montant);
-  // Total annuel : UNE seule règle, partagée avec le rapport annuel (§11).
-  const chargesAnnee = comptaChargesAnnee(data, annee).total;
-  const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
-  const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
+  // Total annuel et total du mois : UNE seule règle, partagée avec le rapport annuel (§11).
+  const charges = comptaChargesAnnee(data, annee);
+  const chargesAnnee = charges.total;
+  const chargesDuMois = comptaChargesMois(data, moisCle);
+  const chargesMois = chargesDuMois.total;
 
   // ── RÉSULTAT = recettes déclarées − charges ───────────────────────────────
-  // Les charges (packs, dépenses, coûts fixes) sont « prises en compte » ICI,
-  // au niveau qui est réellement calculable. On CONSOMME la ligne publiée par
-  // l'écran Ventes (`vinted_urssaf_mois`, le CA déclaré, toutes plateformes,
-  // §11) — on ne recalcule aucun CA. Ligne absente/pas encore publiée ⇒ `null`
-  // (on n'invente pas de recettes). ⚠️ Ce n'est PAS le bénéfice : le coût
-  // d'achat des paires n'est pas déduit ici (il n'est pas saisi, §2.5, et il
-  // vit dans Statistiques) — le libellé et la note le disent.
+  // On CONSOMME la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`, le CA
+  // déclaré, toutes plateformes, §11) — on ne recalcule aucun CA. Ligne
+  // absente/pas encore publiée ⇒ `null` (on n'invente pas de recettes).
+  // ⚠️ Ce n'est PAS le bénéfice : le coût d'achat des paires n'est pas déduit
+  // ici (il n'est pas saisi, §2.5, et il vit dans Statistiques).
   const recettesAnnee = (() => {
     try {
       const v = load('vinted_urssaf_mois', null);
@@ -23019,35 +23374,46 @@ function ComptaPro({ liveStats, onNav }) {
   const [dLib, setDLib] = React.useState('');
   const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
   const [dMnt, setDMnt] = React.useState('');
-  const [fLib, setFLib] = React.useState('');
-  const [fMnt, setFMnt] = React.useState('');
   const [pPlat, setPPlat] = React.useState('Leboncoin');
   const [pCpt, setPCpt] = React.useState('');
   const [pMnt, setPMnt] = React.useState('');
   const [pDate, setPDate] = React.useState(auj);
+  const [aLib, setALib] = React.useState('');
+  const [aMnt, setAMnt] = React.useState('');
+  const [aPer, setAPer] = React.useState('mois');
+  const [aDeb, setADeb] = React.useState(auj);
+  const [aFin, setAFin] = React.useState('');
+  const [aErr, setAErr] = React.useState('');
 
   const ajouterDepense = () => {
     const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
     maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
   };
-  const ajouterFixe = () => {
-    const m = parseMontant(fMnt); if (!m || !fLib.trim()) return;
-    maj({ ...data, fixes: [{ id: rCompId(), libelle: fLib.trim(), montant: m }, ...fixes] });
-    setFLib(''); setFMnt('');
-  };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
     maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
     setPCpt(''); setPMnt(''); setPDate(auj);
   };
+  // Un abonnement mal saisi n'est pas ajouté, et on DIT pourquoi (jamais en silence).
+  const ajouterAbonnement = () => {
+    const m = parseMontant(aMnt);
+    if (!aLib.trim()) { setAErr('Donne-lui un nom (ex. « VRM », « Canva »).'); return; }
+    if (!m) { setAErr('Le montant doit être un nombre en euros, par exemple 12,99.'); return; }
+    if (!ymCompta(aDeb)) { setAErr('Il faut une date de début.'); return; }
+    if (aFin && aFin < aDeb) { setAErr('La date de fin est avant la date de début.'); return; }
+    maj({ ...data, abonnements: [{ id: rCompId(), libelle: aLib.trim(), montant: m, periode: aPer === 'an' ? 'an' : 'mois', debut: aDeb, fin: aFin || '' }, ...abonnements] });
+    setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr('');
+  };
+  const terminerAbonnement = (id) => maj({ ...data, abonnements: abonnements.map(a => a.id === id ? { ...a, fin: auj } : a) });
   const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {
     const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     const L = [[`Charges ${annee}`], [], ['Date', 'Type', 'Libelle', 'Montant']];
     depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([d.date ? d.date.split('-').reverse().join('/') : '', 'Depense' + (d.cat ? ' (' + d.cat + ')' : ''), d.libelle || '', (Number(d.montant) || 0).toFixed(2)]));
-    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack / option', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    charges.aboLignes.forEach(x => L.push([x.a.debut ? x.a.debut.split('-').reverse().join('/') : '', `Abonnement x${x.n} echeance${x.n > 1 ? 's' : ''}`, x.a.libelle || '', x.total.toFixed(2)]));
     fixes.forEach(f => L.push(['', `Cout fixe x${moisEcoules} mois`, f.libelle || '', ((Number(f.montant) || 0) * moisEcoules).toFixed(2)]));
     L.push(['', '', 'TOTAL', chargesAnnee.toFixed(2)]);
     const csv = L.map(r => r.map(e).join(';')).join('\n');
@@ -23070,40 +23436,25 @@ function ComptaPro({ liveStats, onNav }) {
   const chip = (icon) => (
     <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
   );
-  const Ligne = ({ gauche, droite, onDel }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>
-      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
-      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
-    </div>
-  );
-  // Carte de section : chip + titre + total à droite, corps (formulaire + liste).
-  const Section = ({ icon, titre, note, total, children }) => (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
-        {chip(icon)}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
-          {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>{note}</div>}
-        </div>
-        {total != null && <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>}
-      </div>
-      <div style={{ padding: 14 }}>{children}</div>
-    </Card>
-  );
-  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '2px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
+  // Section et Ligne vivent HORS du composant : définies ici, elles changeaient
+  // d'identité à chaque rendu et React remontait leurs champs — le curseur
+  // sautait à chaque lettre tapée.
+  const Ligne = ComptaLigne, Section = ComptaSection;
+  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
   const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
+  const dateFr = (s) => String(s || '').split('-').reverse().join('/');
+  const lienBtn = (txt, tab, fs = 12.5) => <button type="button" onClick={() => onNav && onNav(tab)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: fs, minHeight: 0, display: 'inline', verticalAlign: 'baseline', lineHeight: 'inherit' }}>{txt}</button>;
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
+      <ScreenHead icon="euro" title="Comptabilité" desc="Tes charges, tes abonnements et ton chiffre d'affaires par période — chaque euro compte dans ton résultat." />
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
       <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ height: 3, background: C.accent }} />
-        <div style={{ padding: '16px 18px' }}>
+        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>CA déclaré − charges · {annee}</div>
           {recettesAnnee == null ? (
             <div>
@@ -23112,7 +23463,7 @@ function ComptaPro({ liveStats, onNav }) {
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
-                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
+                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre {lienBtn('Ventes', 'cat_ventes')} une fois, et tes charges y seront déduites.
               </div>
             </div>
           ) : (
@@ -23123,10 +23474,10 @@ function ComptaPro({ liveStats, onNav }) {
                 <span>CA déclaré</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
-                <span>de charges</span>
+                <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
               </div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 11.5)}) — ce n'est donc pas encore ton bénéfice net.
               </div>
             </div>
           )}
@@ -23136,14 +23487,16 @@ function ComptaPro({ liveStats, onNav }) {
       {/* Trois repères de charges — même carte, hiérarchie claire. */}
       <div className="vrm-finance-charges" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
-          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
-          { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
-          { l: `Total charges ${annee}`, v: fmt(chargesAnnee), s: `depuis janvier` },
-        ].map((x, i) => (
-          <Card key={i} style={{ padding: '13px 15px' }}>
-            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
-            <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{x.v}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+          { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },
+          { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
+          { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
+        ].map((x) => (
+          <Card key={x.k} style={{ padding: '13px 15px' }}>
+            <div data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
+              <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
+              <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{fmt(x.v)}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+            </div>
           </Card>
         ))}
       </div>
@@ -23153,46 +23506,96 @@ function ComptaPro({ liveStats, onNav }) {
         </button>
       )}
 
-      {/* DÉPENSES PONCTUELLES */}
-      <Section icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
-          <select value={dCat} onChange={e => setDCat(e.target.value)} style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
-          <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
-        </div>
-        {depenses.length === 0
-          ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
-          : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
-      </Section>
+      <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
 
-      {/* COÛTS FIXES MENSUELS */}
-      <Section icon="clock" titre="Coûts fixes" note="Chaque mois : abonnement, logiciel, local…" total={fixesParMois ? fixesParMois : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 180px' }} />
-          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 120 }} />
-          <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
-        </div>
-        {fixes.length === 0
-          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois — il sera compté chaque mois.')
-          : listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
-      </Section>
+      <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
+        {/* ABONNEMENTS RÉCURRENTS */}
+        <Section data="abonnements" icon="sync" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance, jamais dans ton CA."
+          total={abonnements.length ? charges.aboTotal : null} totalSub={abonnements.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="text" placeholder="Ex. VRM, Canva, appli photo" aria-label="Nom de l'abonnement" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, flex: '2 1 170px' }} />
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: 90 }} />
+            <select value={aPer} onChange={e => setAPer(e.target.value)} aria-label="Périodicité" data-abo-periode style={{ ...inp }}><option value="mois">par mois</option><option value="an">par an</option></select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Début
+              <input type="date" value={aDeb} onChange={e => { setADeb(e.target.value); setAErr(''); }} data-abo-debut style={{ ...inp, width: '100%' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Fin (facultatif)
+              <input type="date" value={aFin} onChange={e => { setAFin(e.target.value); setAErr(''); }} data-abo-fin style={{ ...inp, width: '100%' }} />
+            </label>
+            <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>Ajouter</button>
+          </div>
+          {aErr && <div data-abo-erreur style={{ fontSize: 12, color: C.warn, marginTop: 8 }}>{aErr}</div>}
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Payé d'avance : une échéance compte dès le début de son mois — le mois du début et le mois en cours comptent.</div>
+          {abonnements.length === 0
+            ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois — il sera compté à chaque échéance.')
+            : listeBox(abonnements.map((a, i) => {
+              const ech = echeancesAbonnement(a, moisCle);
+              const cumul = ech.length * (Number(a.montant) || 0);
+              const pasEncore = ymCompta(a.debut) > moisCle;
+              const fini = a.fin && ymCompta(a.fin) < moisCle;
+              return (
+                <div key={a.id} data-abo={a.libelle} data-abo-cumul={String(Math.round(cumul * 100) / 100)} data-abo-echeances={ech.length} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                  <Ligne
+                    gauche={<><span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{a.libelle}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 2 }}>
+                        {pasEncore ? `commence le ${dateFr(a.debut)}` : `depuis le ${dateFr(a.debut)}`}{a.fin ? ` · ${fini ? 'terminé' : 'jusqu’au'} ${dateFr(a.fin)}` : ''}
+                        {!pasEncore && ` · ${ech.length} échéance${ech.length > 1 ? 's' : ''}, ${fmt(cumul)} en tout`}
+                      </span></>}
+                    droite={fmt(a.montant) + (a.periode === 'an' ? ' /an' : ' /mois')}
+                    extra={!a.fin && !pasEncore ? <button type="button" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 6, fontSize: 11, fontWeight: 600, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Arrêter</button> : null}
+                    onDel={() => retirer('abonnements', a.id)} />
+                </div>
+              );
+            }))}
+        </Section>
 
-      {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
-          en compte du bénéfice ». */}
-      <Section icon="camera" titre="Packs de photos" note="Au-delà des photos gratuites, un compte pro achète un pack : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={pPlat} onChange={e => setPPlat(e.target.value)} style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
-          <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
-          <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
-        </div>
-        {packs.length === 0
-          ? vide('Tu as acheté un pack de photos sur un compte pro ? Note-le ici.')
-          : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
-      </Section>
+        {/* DÉPENSES PONCTUELLES */}
+        <Section data="depenses" icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null} totalSub={depenses.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
+            <input type="text" placeholder="Ex. rouleau de scotch" aria-label="Libellé" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
+            <select value={dCat} onChange={e => setDCat(e.target.value)} aria-label="Catégorie" style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
+            <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
+          </div>
+          {depenses.length === 0
+            ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
+            : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {dateFr(d.date)}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
+        </Section>
+
+        {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
+            en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
+            transmet à VRM ce que tu lui paies (ni pack, ni option, ni boost
+            Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
+            seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
+            par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
+        <Section data="packs" icon="camera" titre="Packs & options payés" note="Pack de photos, option de mise en avant sur Leboncoin ou eBay : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+            <input type="text" placeholder="Compte (ex. pro Cancale)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+            <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
+            <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies : note-le ici, il entre dans tes charges. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard', 11)}.</div>
+          {packs.length === 0
+            ? vide('Tu as acheté un pack de photos ou une option ? Note-le ici.')
+            : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {dateFr(p.date)}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
+        </Section>
+
+        {/* Les anciens COÛTS FIXES (sans date de début) : gardés tant qu'il en
+            reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
+            les remplace (rien n'est perdu, §4.11). */}
+        {fixes.length > 0 && (
+          <Section data="fixes" icon="clock" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
+            {listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+          </Section>
+        )}
+
+        <ProfilFiscalCarte onNav={onNav} />
+      </div>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
       <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: C.shadow || 'none' }}>
@@ -29085,6 +29488,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['CHARGES (registre)']); L.push(['Date','Type','Libelle','Montant']);
     R.charges.depLignes.forEach(d=>L.push([d.date?new Date(d.date).toLocaleDateString('fr-FR'):'','Depense',`${d.libelle||''}${d.cat?' ('+d.cat+')':''}`,(Number(d.montant)||0).toFixed(2)]));
     R.charges.packLignes.forEach(p=>L.push([p.date?new Date(p.date).toLocaleDateString('fr-FR'):'','Pack photos',`${p.plateforme||''}${p.compte?' '+p.compte:''}`,(Number(p.montant)||0).toFixed(2)]));
+    (R.charges.aboLignes||[]).forEach(x=>L.push([x.a.debut?new Date(x.a.debut).toLocaleDateString('fr-FR'):'',`Abonnement x${x.n} echeance${x.n>1?'s':''}`,x.a.libelle||'',x.total.toFixed(2)]));
     R.charges.fixes.forEach(f=>L.push(['',`Cout fixe x${R.charges.moisComptes} mois`,f.libelle||'',((Number(f.montant)||0)*R.charges.moisComptes).toFixed(2)]));
     L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
     L.push([]);
@@ -29119,7 +29523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
-    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
+    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, abonnements, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
@@ -33682,7 +34086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
-                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={`packs + dépenses + fixes × ${annual.charges.moisComptes} mois`}/>
+                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={(annual.charges.fixesTotal>0?`packs + dépenses + abonnements + fixes × ${annual.charges.moisComptes} mois`:'packs + dépenses + abonnements')}/>
                   {/* Le résultat dérive du bénéfice net : tant que celui-ci n'est
                       pas su (lecture en cours, dates Vinted illisibles), lui non
                       plus — jamais un nombre calculé sur un CA partiel. */}
@@ -41494,7 +41898,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab}/>}
+        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
