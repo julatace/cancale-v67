@@ -630,3 +630,163 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-stats-volets > details > summary { padding:12px 0 !important; font-size:12.5px; color:var(--vrm-muted); cursor:pointer; }
 .vrm-stats-volets > details > p { margin:0 0 10px; font-size:12px; line-height:1.5; }
 .vrm-stats-volets .vrm-finance-stock-grid { margin:0 0 14px; }
+
+/* ── Annonces · Leboncoin · eBay « premium » (16 oct.) ─────────────────────
+   Même grammaire que Ma journée : cartes sobres à bord fin, espacements en
+   multiples de 4, un chiffre fort par carte, chiffres tabulaires, cibles de
+   44 px au doigt. Seulement de la mise en page : aucune couleur nouvelle
+   (le thème `C` reste en ligne), aucune règle métier. */
+/* 1. Une rangée large (une ligne qui ne se coupe pas, une liste de boutons)
+   agrandissait la colonne « auto » du résumé : à 390 px l'écran Leboncoin →
+   Annonces débordait de 120 px et ses boutons étaient COUPÉS (« ↻ Act… »).
+   `contain:inline-size` retire leur largeur intrinsèque du calcul. */
+.vrm-market-space[aria-label="Leboncoin"] > :not(header):not(details),
+.vrm-market-space[aria-label="eBay"] > :not(header):not(details) { contain:inline-size; }
+/* Un enfant centré (`margin:0 auto`) ne s'étire pas : contenu, il tomberait à
+   zéro de large. Il prend la largeur de sa place, jusqu'à son maximum. */
+.vrm-market-space[aria-label="Leboncoin"] > div, .vrm-market-space[aria-label="eBay"] > div { width:100%; box-sizing:border-box; }
+.vrm-market-space :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces) { font-variant-numeric:tabular-nums; }
+
+/* 2. La carte d'annonce Vinted. */
+.vrm-ann-card .vrm-ann-overview > div { gap:4px !important; }
+.vrm-ann-card [data-titre] { letter-spacing:-.01em; color:var(--vrm-ink) !important; }
+.vrm-ann-card .vrm-ann-price-line { align-items:center !important; gap:12px !important; }
+.vrm-ann-card [data-prix] { font-weight:750 !important; letter-spacing:-.03em !important; white-space:nowrap; }
+.vrm-ann-card [data-chiffres] { align-items:baseline !important; column-gap:16px !important; font-size:12px; }
+.vrm-ann-card [data-chiffres] > span { display:inline-flex; align-items:baseline; gap:4px; white-space:nowrap; }
+.vrm-ann-card [data-plateformes] { margin-top:2px !important; }
+.vrm-ann-overview > a { border-radius:10px !important; }
+.vrm-ann-overview > a img { object-fit:cover; object-position:center; }
+.vrm-ann-actions > summary { font-size:12.5px !important; color:var(--vrm-muted) !important; }
+.vrm-ann-stock-tools { margin-bottom:12px; }
+[data-ann-resume] { font-variant-numeric:tabular-nums; }
+[data-places-wrap] > summary { min-height:48px; box-sizing:border-box; border-radius:12px !important; }
+@media(max-width:767px) {
+ /* Au doigt : une LISTE dense et alignée, comme une app native —
+    vignette · titre et méta · prix à droite. Les réglages passent derrière
+    « ⋯ » (une cible de 44 px dans le coin de la ligne). */
+ .vrm-market-space:is(:has(.vrm-ann-grid),[aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-screen-head:not(:has(button, a, input, select)) { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); margin:0 !important; padding:0 !important; border:0 !important; }
+ .vrm-ann-workbar { background:transparent !important; border:0 !important; padding:0 !important; margin-bottom:12px !important; }
+ .vrm-ann-grid { gap:0 !important; border:1px solid var(--vrm-line) !important; border-radius:14px !important; overflow:hidden !important; background:var(--vrm-surface); }
+ .vrm-ann-grid .vrm-ann-card { border:0 !important; border-bottom:1px solid var(--vrm-line) !important; border-radius:0 !important; box-shadow:none !important; position:relative; }
+ .vrm-ann-card:last-child { border-bottom:0 !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview { padding:12px 14px !important; gap:12px !important; align-items:flex-start; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > a { width:64px !important; height:84px !important; border-radius:8px !important; }
+ .vrm-ann-grid .vrm-ann-card [data-boostee] { font-size:9.5px !important; left:3px !important; right:3px !important; bottom:3px !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > div { display:grid !important; grid-template-columns:minmax(0,1fr) auto; column-gap:12px; row-gap:3px !important; align-content:start; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > div > * { grid-column:1; min-width:0; }
+ .vrm-ann-grid .vrm-ann-card [data-titre] { font-size:15px !important; line-height:1.3 !important; font-weight:600 !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line { grid-column:2 !important; grid-row:1 / span 3; flex-direction:column; align-items:flex-end !important; gap:0 !important; margin:0 !important; }
+ .vrm-ann-grid .vrm-ann-card [data-prix] { font-size:17px !important; line-height:1.3 !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line > span:last-child { border:0 !important; background:transparent !important; padding:0 !important; margin:0 !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line [data-edition="numero"] { min-height:44px; margin:-11px -4px -11px 0 !important; padding:0 4px !important; justify-content:flex-end !important; font-size:12px; font-weight:600; color:var(--vrm-muted); letter-spacing:.02em; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > div > div:nth-child(3) { font-size:13px !important; }
+ .vrm-ann-grid .vrm-ann-card [data-chiffres] { grid-column:1 / -1 !important; padding:0 !important; margin-top:4px !important; border:0 !important; column-gap:10px !important; row-gap:0 !important; font-size:12px; }
+ .vrm-ann-grid .vrm-ann-card [data-chiffres] [data-edition="achat"] { min-height:44px; margin:-14px 0 !important; }
+ .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > div > div:last-child { grid-column:1 / -1 !important; padding-right:40px; font-size:12px !important; }
+ .vrm-ann-actions { position:relative; border:0 !important; padding:0 14px !important; background:transparent !important; }
+ .vrm-ann-actions > summary { position:absolute; right:6px; top:-50px; width:44px; height:44px; min-height:44px !important; padding:0 !important; justify-content:center; border-radius:10px; font-size:0 !important; color:var(--vrm-muted) !important; }
+ .vrm-ann-actions > summary > * { display:none !important; }
+ .vrm-ann-actions > summary::before { content:'⋯'; font-size:20px; line-height:1; letter-spacing:1px; }
+ .vrm-ann-actions[open] > summary { background:var(--vrm-bg); color:var(--vrm-ink) !important; }
+ .vrm-ann-actions[open] > div { margin-top:0 !important; padding:0 0 14px 76px; }
+ .vrm-ann-actions button, .vrm-ann-actions a[href] { min-height:44px !important; display:inline-flex !important; align-items:center; justify-content:center; }
+ .vrm-ann-stock-tools > summary { min-height:44px; display:flex; align-items:center; padding:0; }
+ [data-comptes-annonces] { margin-bottom:4px !important; }
+}
+/* L'invite « cliquer pour modifier » : un pointillé sous le CHIFFRE, pas sous
+   une boîte de 44 px (il flottait loin du texte). */
+.vrm-ann-card [data-edition] { border-bottom:0 !important; display:inline-flex; align-items:center; justify-content:flex-start; }
+.vrm-ann-card [data-edition="achat"] > span { border-bottom:1px dashed var(--vrm-line); padding-bottom:1px; }
+
+/* 3. Le résumé d'une plateforme et ses sections. */
+.vrm-market-space .vrm-platform-summary .vrm-display { font-variant-numeric:tabular-nums; white-space:nowrap; letter-spacing:-.02em; }
+@media(max-width:767px) {
+ .vrm-market-space .vrm-platform-summary > summary { min-height:44px; display:flex; align-items:center; gap:6px; padding:0 !important; }
+ .vrm-market-space .vrm-platform-tabs:has(> button:nth-child(6)) > button { font-size:10.5px !important; letter-spacing:-.01em; }
+}
+
+/* 4. Leboncoin. */
+.vrm-lbc-ecran > div:not(.vrm-lbc-tete):not([data-lbc-lecture-ratee]):not(.vrm-lbc-compteur) { border-radius:14px !important; box-shadow:0 1px 2px #0000000a !important; }
+.vrm-lbc-tete h2 { font-size:21px !important; letter-spacing:-.02em; }
+.vrm-lbc-ecran .vrm-display { font-size:28px !important; font-weight:750 !important; letter-spacing:-.03em; line-height:1.1; }
+[data-lbc-relier] > div:first-child > div:nth-child(2) > div:first-child { white-space:normal !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
+@media(max-width:767px) {
+ .vrm-lbc-ecran { padding:12px 16px 32px !important; }
+ .vrm-lbc-ecran > div:not(.vrm-lbc-tete):not([data-lbc-lecture-ratee]):not(.vrm-lbc-compteur) { padding:16px !important; margin-bottom:12px !important; }
+ /* Relier : la saisie du N° passe sous la paire, sur toute la largeur. */
+ [data-lbc-relier] > div:first-child > div:last-child:has(> input) { flex:1 1 100%; margin-left:0 !important; }
+ [data-lbc-relier] > div:first-child > div:last-child:has(> input) > input { flex:1 1 auto; width:auto !important; min-width:0; }
+ :is(.vrm-lbc-ecran, [data-messages-lbc], .vrm-lbc-package) :is(button, select, input:not([type=checkbox]):not([type=radio]), summary) { min-height:44px !important; }
+ :is(.vrm-lbc-ecran, [data-messages-lbc], .vrm-lbc-package) a[href][style*="border"],
+ [data-messages-lbc] a[data-ouvrir-messages-lbc] { min-height:44px; display:inline-flex !important; align-items:center; justify-content:center; box-sizing:border-box; }
+ :is(.vrm-lbc-ecran, .vrm-lbc-package) summary { display:flex; align-items:center; }
+ /* Un lien court dans une ligne (« voir ») : la zone de doigt grandit sans
+    rien déplacer (le rembourrage d'un élément en ligne n'écarte pas les lignes). */
+ .vrm-lbc-ecran a[href]:not([style*="border"]) { padding:16px 6px; margin:-16px -6px; }
+}
+
+/* 5. eBay. */
+.vrm-ebay-annonces .vrm-screen-head { margin-bottom:8px !important; }
+.vrm-plat-intro { font-size:12.5px !important; line-height:1.45; }
+.vrm-plat-note { font-size:12px !important; line-height:1.5 !important; padding:8px 0 8px 12px; border-left:2px solid var(--vrm-line); margin:0 0 12px !important; }
+.vrm-ebay-liste { border-radius:14px !important; box-shadow:0 1px 2px #0000000a; }
+.vrm-ebay-carte-tete .vrm-display { font-size:17px !important; font-weight:750 !important; letter-spacing:-.02em; white-space:nowrap; }
+.vrm-ebay-carte-tete > div:first-of-type > div:first-child { font-size:14px !important; letter-spacing:-.01em; }
+.vrm-ebay-carte-tete img, .vrm-ebay-carte-tete > span:first-child { border-radius:10px !important; }
+.vrm-ebay-carte > div:not(.vrm-ebay-carte-tete) { padding-left:92px !important; padding-right:16px !important; }
+@media(max-width:767px) {
+ .vrm-ebay-carte > div:not(.vrm-ebay-carte-tete) { padding-left:92px !important; }
+ .vrm-market-space[aria-label="eBay"] :is(button, select, input:not([type=checkbox]):not([type=radio]), summary) { min-height:44px !important; }
+ .vrm-market-space[aria-label="eBay"] summary { display:flex; align-items:center; }
+ .vrm-market-space[aria-label="eBay"] a[href][style*="border"] { min-height:44px; display:inline-flex !important; align-items:center; justify-content:center; box-sizing:border-box; }
+ .vrm-ebay-annonces a[href]:not([style*="border"]) { padding:16px 6px; margin:-16px -6px; }
+}
+.vrm-ebay-suite { margin-top:16px; }
+/* La ligne d'annonce eBay : « détails » n'est pas une action d'argent — gris,
+   pas l'accent ; l'accent reste à « Vendre une paire sur eBay ». La règle
+   d'offre tient sur une ligne : l'état à gauche, le geste à droite. */
+.vrm-ebay-carte-tete > div:last-child > div:last-child { color:var(--vrm-muted) !important; font-weight:500 !important; font-size:11.5px !important; margin-top:4px !important; }
+.vrm-ebay-carte [data-offre-ouvrir] { background:transparent !important; color:var(--vrm-ink) !important; border:1px solid var(--vrm-line) !important; }
+.vrm-ebay-carte [data-regle-offre-ligne] > div:first-child { justify-content:space-between; row-gap:4px !important; }
+.vrm-ebay-carte [data-regle-offre-ligne] button, .vrm-ebay-carte [data-relier-ouvrir], .vrm-ebay-carte [data-offre-ouvrir] { font-size:13px !important; border-radius:10px !important; }
+/* Leboncoin → Annonces au téléphone : la FILE à publier est l'information
+   principale ; le compteur devient une ligne, les annonces à relier passent
+   après la file (l'ordre du DOM ne change pas : seuls les yeux suivent). */
+.vrm-lbc-ecran { display:flex; flex-direction:column; }
+.vrm-lbc-ecran > .vrm-lbc-compteur { border:0 !important; background:transparent !important; box-shadow:none !important; padding:0 2px !important; margin:-4px 0 12px !important; }
+.vrm-lbc-compteur .vrm-display { font-size:20px !important; }
+@media(max-width:767px) {
+ .vrm-lbc-ecran > * { order:1; }
+ .vrm-lbc-ecran > .vrm-lbc-non-reliees { order:2; }
+ .vrm-lbc-ecran > :last-child:not(.vrm-lbc-non-reliees) { order:3; }
+}
+/* Ventes Leboncoin / eBay au téléphone : la ligne d'une app native —
+   vignette · titre et état · montant aligné à droite. (Les ventes Vinted ont
+   leur propre mise en page : rien n'est touché hors de ces deux espaces.) */
+@media(max-width:767px) {
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-row { padding:12px 16px !important; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-overview { grid-template-columns:52px minmax(0,1fr) auto !important; column-gap:12px !important; row-gap:2px !important; align-items:start; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-photo { grid-row:1 / span 2; width:52px !important; height:68px !important; border-radius:8px !important; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-info { grid-column:2; grid-row:1; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-title { font-size:14px !important; font-weight:600 !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-meta { font-size:12px !important; margin-top:2px !important; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-price { grid-column:3 !important; grid-row:1; display:flex; flex-direction:column; align-items:flex-end !important; text-align:right !important; }
+ .vrm-market-space:is([aria-label="Leboncoin"],[aria-label="eBay"]) .vrm-sale-price > .vrm-display { font-size:15px !important; font-weight:700 !important; white-space:nowrap; }
+ .vrm-market-space[aria-label="eBay"] .vrm-ebay-order-actions { margin:0 16px 8px 80px !important; padding:0 !important; }
+}
+/* « Vendre une paire sur eBay » : la forme unique des boutons (rayon 12, pas
+   une pilule), pleine largeur au doigt, à sa taille sur grand écran. */
+.vrm-ebay-annonces [data-poster="ebay"] { border-radius:12px !important; min-height:48px; }
+@media(min-width:768px) { .vrm-ebay-annonces [data-poster="ebay"] { width:auto !important; margin:0 0 12px auto !important; padding:12px 20px !important; } }
+/* Grand écran : la colonne « Gérer l'annonce » (190 px presque vides sur
+   chaque ligne) devient le même « ⋯ » qu'au doigt. */
+@media(min-width:1024px) {
+ .vrm-ann-grid .vrm-ann-card { grid-template-columns:minmax(0,1fr) 64px !important; }
+ .vrm-ann-grid .vrm-ann-actions:not([open]) { border-left:0 !important; padding:12px 12px 0 0 !important; justify-content:flex-start !important; align-items:flex-end; }
+ .vrm-ann-grid .vrm-ann-actions > summary { width:44px; height:44px; min-height:44px; padding:0 !important; justify-content:center; border-radius:10px; font-size:0 !important; color:var(--vrm-muted) !important; }
+ .vrm-ann-grid .vrm-ann-actions > summary > * { display:none !important; }
+ .vrm-ann-grid .vrm-ann-actions > summary::before { content:'⋯'; font-size:20px; line-height:1; }
+ .vrm-ann-grid .vrm-ann-actions > summary:hover { background:var(--vrm-bg); color:var(--vrm-ink) !important; }
+ .vrm-ann-grid .vrm-ann-actions[open] > summary { margin-left:auto; background:var(--vrm-bg); color:var(--vrm-ink) !important; }
+}
