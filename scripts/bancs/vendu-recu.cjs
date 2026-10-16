@@ -24,7 +24,7 @@ catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwri
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4337;
+const PORT = Number(process.env.BANC_PORT) || 4337;
 
 const maintenant = new Date();
 // Un jour « il y a n jours », à midi heure locale (jamais près de minuit).

@@ -7262,6 +7262,275 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
     />
   );
 }
+// ── ACHATS HORS PLATEFORME (brocante, fournisseur, main propre…) ────────────
+// Julien : « des achats hors plateforme faciles ». C'est de la SAISIE au doigt,
+// souvent debout à la brocante : un titre, le prix payé, la date (aujourd'hui
+// par défaut), où, et une photo si on veut. RIEN n'oblige à relier une paire —
+// le N° reste possible, replié (« Relier à une paire »), parce qu'un N° faux ne
+// se voit pas (§5) et qu'il saisit lui-même ses prix (§2.5).
+// ⚠️ UNE SEULE RÈGLE, UN SEUL PROPRIÉTAIRE (§11) : les achats vivent dans
+//    `vinted_offvinted_buys` (synchronisé), la même clé que le « dépensé »
+//    (`treasury`) lit déjà. On ne crée pas de seconde liste.
+// ⚠️ L'ancien formulaire déclarait son `Field` DANS le rendu : un composant neuf
+//    à chaque frappe, donc le champ perdait le focus après chaque lettre — sur
+//    téléphone on ne pouvait taper qu'un caractère. Ici les champs sont des
+//    éléments, jamais un composant redéclaré.
+// ⚠️ LA PHOTO NE VA PAS DANS `main` (§4.4 : la ligne la plus lue pèse déjà
+//    ~200 Ko). Elle a SA ligne (`achat_hors_photo_{id}`, ~20 Ko), lue seulement
+//    quand la liste est ouverte. L'achat ne porte `photo:true` que si
+//    l'écriture a RÉUSSI ; sinon on le dit et l'achat est gardé sans photo.
+const SOURCES_ACHAT_HORS = ['Brocante', 'Vide-grenier', 'Fournisseur', 'Leboncoin (main propre)', 'Particulier'];
+const SOURCE_ANCIENNE = { brocante: 'Brocante', fournisseur: 'Fournisseur', particulier: 'Particulier', 'vide-grenier': 'Vide-grenier', autre: 'Autre' };
+const libelleSourceAchat = (s) => SOURCE_ANCIENNE[s] || String(s || '').trim();
+const dateLocaleISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const idPhotoAchatHors = (id) => 'achat_hors_photo_' + String(id).replace(/[^\w-]/g, '');
+// Écrit la photo dans sa ligne. Rend true seulement si la base l'a acceptée.
+// (Un DELETE sur app_data ne supprime rien : on VIDE la ligne à la place.)
+const ecrirePhotoAchatHors = async (id, b64) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: idPhotoAchatHors(id), data: b64 ? { b64, at: new Date().toISOString() } : { b64: null, supprime: true, at: new Date().toISOString() } })]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// Trois états : `null` = la base n'a pas répondu (pas su), sinon { id → dataURL }.
+const lirePhotosAchatsHors = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.achat_hors_photo_*&select=id,b:data->>b64`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const m = {};
+    for (const x of rows) if (x && x.id && typeof x.b === 'string' && x.b.startsWith('data:image/')) m[x.id] = x.b;
+    return m;
+  } catch (_) { return null; }
+};
+// Le prix tapé, relu en centimes (« 12,5 » → « 12,50 »). `undefined` = vide,
+// `null` = illisible (on refuse, on ne devine pas).
+const prixAchatSaisi = (v) => {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return undefined;
+  const c = centimes(t.replace(/\s|€/g, ''));
+  return (c == null || c < 0) ? null : (c / 100).toFixed(2).replace('.', ',');
+};
+const prixAchatHorsNombre = (b) => { const p = parseFloat(String(b && b.price != null ? b.price : '').replace(',', '.')); return isNaN(p) ? null : p; };
+
+function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero }) {
+  const BROUILLON0 = () => ({ title: '', price: '', date: dateLocaleISO(), source: '', numero: '', photo: null, photoAvant: false });
+  const [form, setForm] = useState(null);       // null = fermé ; sinon le brouillon
+  const [editId, setEditId] = useState(null);
+  const [erreur, setErreur] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const [photos, setPhotos] = useState(undefined); // undefined en cours · null pas su · objet lu
+  const fichierRef = useRef(null);
+  const liste = Array.isArray(achats) ? achats : [];
+  const total = liste.reduce((s, b) => s + (prixAchatHorsNombre(b) || 0), 0);
+  const avecPhoto = liste.some(b => b && b.photo);
+  useEffect(() => {
+    if (!ouvert || !avecPhoto) return;
+    let vivant = true;
+    lirePhotosAchatsHors().then(m => { if (vivant) setPhotos(p => (m == null ? (p || null) : { ...(p || {}), ...m })); });
+    return () => { vivant = false; };
+  }, [ouvert, avecPhoto]);
+  const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  const ouvrirEdition = (b) => {
+    setEditId(b.id); setErreur('');
+    setForm({ title: b.title || '', price: b.price || '', date: b.date || dateLocaleISO(), source: libelleSourceAchat(b.source), numero: b.numero || '', photo: null, photoAvant: !!b.photo });
+  };
+  const fermer = () => { setForm(null); setEditId(null); setErreur(''); };
+  const choisirPhoto = async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    const b64 = await compressImage(f, 480, 0.62);
+    if (!b64) { setErreur("Cette photo n'a pas pu être lue — essaie une autre, ou enregistre sans photo."); return; }
+    setForm(d => d && ({ ...d, photo: b64 }));
+  };
+  const enregistrer = async () => {
+    if (!form || envoi) return;
+    const titre = form.title.trim();
+    if (!titre) { setErreur('Donne un nom à cet achat (ex : Nike P-6000 argent 38).'); return; }
+    const prix = prixAchatSaisi(form.price);
+    if (prix === null) { setErreur('Le prix payé doit être un montant en euros (ex : 25 ou 25,50).'); return; }
+    setEnvoi(true);
+    const id = editId || ('ob_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    let photoOk = form.photoAvant;
+    let photoRatee = false;
+    if (form.photo) {
+      const ok = await ecrirePhotoAchatHors(id, form.photo);
+      if (ok) { photoOk = true; const b64 = form.photo; setPhotos(p => ({ ...(p || {}), [idPhotoAchatHors(id)]: b64 })); }
+      else photoRatee = true;
+    }
+    const rec = { title: titre, price: prix || '', date: form.date || dateLocaleISO(), source: form.source.trim(), numero: String(form.numero || '').trim(), photo: photoOk || undefined };
+    if (editId) onModifier(editId, rec); else onAjouter({ id, ...rec });
+    if (rec.numero && rec.price && onPrixParNumero) onPrixParNumero(rec.numero, rec.price);
+    setEnvoi(false);
+    if (!ouvert) onBasculer(true);
+    if (photoRatee) toast("Achat enregistré — mais la photo n'a pas pu être envoyée (la base n'a pas répondu). Modifie l'achat pour la remettre.");
+    else toast(editId ? 'Achat modifié' : 'Achat ajouté');
+    fermer();
+  };
+  const supprimer = async () => {
+    const b = liste.find(x => x.id === editId); if (!b) return;
+    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price} €)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    onSupprimer(b.id);
+    if (b.photo) ecrirePhotoAchatHors(b.id, null);
+    fermer();
+  };
+  const lab = { fontSize: 11.5, color: C.muted, fontWeight: 600 };
+  const inp = { border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 12px', height: 46, fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0, WebkitAppearance: 'none', appearance: 'none' };
+  const champ = (label, enfant) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}><span style={lab}>{label}</span>{enfant}</label>
+  );
+  const sousTitre = liste.length
+    ? `${liste.length} achat${liste.length > 1 ? 's' : ''} · ${total.toFixed(2).replace('.', ',')} € payés`
+    : 'Brocante, fournisseur, main propre…';
+  const photoForm = form ? (form.photo || (form.photoAvant && photos ? photos[idPhotoAchatHors(editId)] : null)) : null;
+  return (
+    <div data-achats-hors style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, marginBottom: 12, boxShadow: C.shadow || 'none', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 14px', minHeight: 58 }}>
+        <button type="button" data-achats-hors-entete onClick={() => onBasculer(!ouvert)} aria-expanded={ouvert}
+          style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: '6px 0', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Achats hors plateforme</span>
+            <span data-achats-hors-resume style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sousTitre}</span>
+          </span>
+          {liste.length > 0 && <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0, padding: '0 4px' }}>›</span>}
+        </button>
+        <button type="button" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label="Ajouter un achat hors plateforme"
+          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card2 || C.bg, color: C.text, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, color: C.accent, fontWeight: 500 }}>+</span> Ajouter
+        </button>
+      </div>
+      {form && (
+        <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{editId ? "Modifier l'achat" : 'Nouvel achat'}</div>
+          {champ('Ce que tu as acheté', <input data-champ="titre" value={form.title} onChange={e => { setErreur(""); setForm(d => ({ ...d, title: e.target.value })); }} placeholder="ex : Nike P-6000 argent 38" enterKeyHint="next" autoComplete="off" style={inp} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            {champ('Prix payé', <div style={{ position: 'relative' }}><input data-champ="prix" value={form.price} onChange={e => { setErreur(""); setForm(d => ({ ...d, price: e.target.value })); }} inputMode="decimal" placeholder="0,00" autoComplete="off" style={{ ...inp, paddingRight: 30 }} /><span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span></div>)}
+            {champ('Date', <input data-champ="date" type="date" value={form.date} onChange={e => setForm(d => ({ ...d, date: e.target.value }))} style={inp} />)}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {champ('Où (facultatif)', <input data-champ="lieu" value={form.source} onChange={e => setForm(d => ({ ...d, source: e.target.value }))} placeholder="Brocante de Cancale, fournisseur…" autoComplete="off" style={inp} />)}
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {SOURCES_ACHAT_HORS.map(s => {
+                const actif = form.source.trim().toLowerCase() === s.toLowerCase();
+                return <button key={s} type="button" data-source={s} onClick={() => setForm(d => ({ ...d, source: s }))} aria-pressed={actif}
+                  style={{ flexShrink: 0, height: 36, padding: '0 13px', borderRadius: 999, border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{s}</button>;
+              })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {photoForm ? <img data-achat-hors-apercu src={photoForm} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} /> : null}
+            <button type="button" data-achat-hors-photo onClick={() => fichierRef.current && fichierRef.current.click()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 14px', border: `1px dashed ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Icon name="camera" size={17} /> {form.photo || form.photoAvant ? 'Changer la photo' : 'Photo (facultatif)'}
+            </button>
+            {form.photo && <button type="button" onClick={() => setForm(d => ({ ...d, photo: null }))} style={{ height: 44, padding: '0 8px', border: 'none', background: 'transparent', color: C.muted, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>retirer</button>}
+            <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
+          </div>
+          <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
+            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à une paire (facultatif)</summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
+              {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
+                <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
+                  <option value="">— choisir —</option>
+                  {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
+                </select>)}
+              {champ('N° de la paire', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de la paire : quand elle se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
+            </div>
+          </details>
+          {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
+              style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
+            <button type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+          </div>
+          {editId && <button type="button" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start', height: 44, padding: '0 4px', border: 'none', background: 'transparent', color: C.danger, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="trash" size={15} /> Supprimer cet achat</button>}
+        </div></div>
+      )}
+      {ouvert && liste.length > 0 && (
+        <div data-achats-hors-liste style={{ borderTop: `1px solid ${C.border}` }}>
+          {photos === null && avecPhoto && <div style={{ fontSize: 11.5, color: C.muted, padding: '8px 14px 0' }}>Les photos n'ont pas pu être lues (la base n'a pas répondu) — elles reviendront à la prochaine ouverture.</div>}
+          {liste.map((b, i) => {
+            const src = b.photo && photos ? photos[idPhotoAchatHors(b.id)] : null;
+            const p = prixAchatHorsNombre(b);
+            const d = b.date ? new Date(String(b.date).length === 10 ? b.date + 'T12:00:00' : b.date) : null;
+            const meta = [libelleSourceAchat(b.source), d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' · ');
+            return (
+              <button key={b.id} type="button" data-achat-hors-id={b.id} onClick={() => ouvrirEdition(b)} title="Modifier ou supprimer"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 64, border: 'none', borderTop: i > 0 ? `1px solid ${C.border}` : 'none', borderRadius: 0, background: editId === b.id ? (C.card2 || C.bg) : 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+                <span style={{ width: 44, height: 44, borderRadius: 10, background: C.card2 || C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={17} style={{ color: C.muted, opacity: .6 }} />}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 14.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || 'Achat'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginTop: 2, minWidth: 0 }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{meta || '—'}</span>
+                    {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 5, padding: '1px 6px' }}>N°{b.numero}</span>}
+                  </span>
+                </span>
+                <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15.5, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')} €` : '—'}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// ── LE COÛT D'UNE VENTE, SANS OBLIGATION DE RELIER (écran Ventes) ───────────
+// Julien : « enregistrer un prix d'achat sans relier ». Le champ existait, mais
+// caché derrière « Modifier », et le seul geste visible était « Relier
+// l'achat » — qui exige un achat VINTED (une paire de brocante n'en a pas).
+// Les deux gestes sont maintenant côte à côte, visibles tant que le coût
+// manque : « Saisir le prix » écrit `saleOv[tx].buyPrice` — la MÊME écriture
+// que le champ de « Modifier », déjà lue par `effEntry` → `beneficePaire` (§11).
+// Un montant illisible n'est jamais enregistré : on le dit (§2.5, on ne devine pas).
+function CoutAchatVente({ onSaisir, onRelier }) {
+  const [edit, setEdit] = useState(false);
+  const [txt, setTxt] = useState('');
+  const [err, setErr] = useState('');
+  const valider = () => {
+    const p = prixAchatSaisi(txt);
+    if (p === undefined) { setEdit(false); setErr(''); return; }
+    if (p === null) { setErr('Un montant en euros (ex : 25 ou 25,50).'); return; }
+    onSaisir(p); setEdit(false); setTxt(''); setErr('');
+  };
+  const bouton = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, padding: '0 13px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' };
+  return (
+    <div data-cout-vente style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: C.muted, flex: '0 0 auto' }}>Coût d'achat ?</span>
+        {edit ? (
+          <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cette paire"
+                onKeyDown={e => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(''); } }}
+                style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+              <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
+            </div>
+            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: '#fff' }}>OK</button>
+          </form>
+        ) : (
+          <>
+            <button type="button" data-cout-vente-saisir onClick={() => setEdit(true)} title="Taper le prix payé, sans relier d'achat"
+              style={{ ...bouton, border: `1px solid ${C.border}`, background: C.card, color: C.text }}><Icon name="pencil" size={14} /> Saisir le prix</button>
+            <button type="button" data-cout-vente-relier onClick={onRelier} title="Choisir l'achat Vinted correspondant : son prix remplit le coût"
+              style={{ ...bouton, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}><Icon name="link" size={14} /> Relier un achat</button>
+          </>
+        )}
+      </div>
+      {err && <div role="alert" style={{ fontSize: 12, color: C.warn }}>{err}</div>}
+    </div>
+  );
+}
 // ── NOTICE : UN ENCADRÉ QUI INFORME SANS CRIER ───────────────────────────────
 // ⚠️ Avant, chaque information importante était un bloc ENTIÈREMENT TEINTÉ,
 // bordé de sa couleur, avec un emoji de 20 px et un paragraphe d'explication
@@ -7670,44 +7939,82 @@ function BarresVenduRecu({ jours, hauteur = 96 }) {
   );
 }
 
+// Le prénom du bonjour. ⚠️ Un EMAIL n'est jamais un prénom (16 oct., vu sur sa
+// capture iPhone : « Bon après-midi shopcancale35@gmail.com »). Ce qui contient
+// « @ » ne se dit pas — « Bon après-midi » tout court : mieux vaut un blanc
+// qu'un faux (§5). Le réglage n'est pas réécrit : on ne touche pas à SA donnée.
+function prenomLisible(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t.includes('@') ? '' : t;
+}
+
 // Courbe à POINTS RELIÉS de la semaine : en abscisse les jours (lun → dim), en
 // ordonnée le chiffre d'affaires, la valeur écrite au-dessus de chaque point.
 // Vendu (trait plein, accent) et reçu (pointillé, gris) quand il est connu.
-function CourbeSemaine({ jours }) {
-  const W = 340, H = 168, gx = 34, gy = 22, bas = 26;
+// ⚠️ (16 oct., « pas premium sur iPhone ») : dessinée à la LARGEUR MESURÉE et à
+//    une HAUTEUR FIXE — en `viewBox` étiré, elle grossissait avec l'écran
+//    (chiffres de 30 px sur ordinateur, graphique plus haut que l'écran). Plus
+//    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
+//    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
+//    aux repères.
+function CourbeSemaine({ jours, hauteur = 176 }) {
+  const ref = React.useRef(null);
+  const [W, setW] = React.useState(340);
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    mesure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(mesure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
+  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
   const haut = Math.ceil(max / pas) * pas;
-  const X = (i) => gx + (i * (W - gx - 10)) / 6;
+  const col = (W - gx - gd) / 6;
+  const X = (i) => gx + i * col;
   const Y = (v) => gy + (1 - v / haut) * (H - gy - bas);
+  const base = H - bas;
   const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
-  const chemin = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean).map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const points = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean);
+  const chemin = (pts) => pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const pv = points('vendu');
   const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
   const avecRecu = jours.every(j => j.recu);
-  const graduations = []; for (let v = 0; v <= haut; v += pas) graduations.push(v);
+  const iAuj = jours.findIndex(j => j.auj);
+  const bande = Math.min(40, col - 4);
   return (
-    <svg data-courbe-semaine="" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
-      {graduations.map(v => (
-        <g key={v}>
-          <line x1={gx} x2={W - 6} y1={Y(v)} y2={Y(v)} stroke={C.border} strokeWidth="1"/>
-          <text x={gx - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="9.5" fill={C.muted}>{v}</text>
-        </g>
-      ))}
-      {avecRecu && <path d={chemin('recu')} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 3"/>}
-      <path d={chemin('vendu')} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      {jours.map((j, i) => (
-        <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
-          {!j.futur && <>
-            <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
-            {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.6" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
-            <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.2 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
-            {j.vendu.eur > 0 && <text x={X(i)} y={Y(j.vendu.eur) - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.text}>{Math.round(j.vendu.eur)}</text>}
-          </>}
-          <text x={X(i)} y={H - 10} textAnchor="middle" fontSize="10" fontWeight={j.auj ? 700 : 500} fill={j.auj ? C.text : C.muted}>{j.jour} {j.num}</text>
-        </g>
-      ))}
-    </svg>
+    <div ref={ref} style={{width:'100%'}}>
+      <svg data-courbe-semaine="" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
+        <defs>
+          <linearGradient id={`csg${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.16"/>
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {iAuj >= 0 && <rect x={X(iAuj) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg}/>}
+        {[0.5, 1].map(f => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4"/>)}
+        <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1"/>
+        {pv.length > 1 && <path d={`${chemin(pv)} L${pv[pv.length - 1][0].toFixed(1)},${base} L${pv[0][0].toFixed(1)},${base} Z`} fill={`url(#csg${uid})`}/>}
+        {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 4" strokeLinecap="round"/>}
+        <path d={chemin(pv)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>
+        {jours.map((j, i) => (
+          <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
+            {!j.futur && <>
+              <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
+              {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
+              <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.6 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
+              {j.vendu.eur > 0 && <text x={X(i)} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
+            </>}
+            <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
+            <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? C.text : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -7769,6 +8076,49 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
       </div>
       <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:10.5,color:texte,fontWeight:500}}>
         <span>{libDebut || court(jours[0])}</span><span>{libFin || "aujourd'hui"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── LE CA DES 12 DERNIERS MOIS EN BARRES (Statistiques, 16 oct.) ─────────────
+// Une barre par mois, une seule teinte (§7) : le meilleur mois en plein, le mois
+// en cours hachuré (il n'est pas fini — un total partiel ne se présente pas
+// comme complet, §5), les autres en teinte claire. Un mois sans vente garde un
+// trait au ras de l'axe : l'axe se lit, rien n'est inventé. Les valeurs exactes
+// vivent dans la légende de la carte et dans l'infobulle de chaque barre.
+function BarresCA12({ mois, meilleur }) {
+  const max = Math.max(1, ...mois.map(m => m.eur));
+  const H = 120;
+  const dernier = mois.length - 1;
+  return (
+    <div role="img" aria-label={`Chiffre d'affaires des 12 derniers mois, par mois`} style={{marginTop:16}}>
+      <div style={{position:'relative',height:H,display:'flex',alignItems:'flex-end',gap:'clamp(4px,1.2vw,10px)'}}>
+        {/* Deux repères discrets : la moitié et le sommet du meilleur mois. */}
+        {[0.5, 1].map(f => <div key={f} aria-hidden="true" style={{position:'absolute',left:0,right:0,bottom:Math.round(H*f)-1,borderTop:`1px dashed ${C.border}`,opacity:f<1?0.9:0.6}}/>)}
+        {mois.map((m, i) => {
+          const fort = m.cle === meilleur, enCours = i === dernier;
+          const h = m.eur > 0 ? Math.max(4, Math.round(m.eur / max * H)) : 2;
+          const fond = m.eur <= 0 ? C.border
+            : enCours ? `repeating-linear-gradient(135deg, ${C.accent}, ${C.accent} 3px, ${C.accent}55 3px, ${C.accent}55 6px)`
+            : fort ? C.accent : `${C.accent}38`;
+          return (
+            <div key={m.cle} data-mois={m.cle} title={`${m.long} · ${m.n} vente${m.n > 1 ? 's' : ''} · ${fmt(m.eur)}${enCours ? ' (en cours)' : ''}`}
+              style={{position:'relative',flex:1,minWidth:0,height:h,background:fond,borderRadius:'5px 5px 0 0'}}/>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',gap:'clamp(4px,1.2vw,10px)',marginTop:7,borderTop:`1px solid ${C.border}`,paddingTop:6}}>
+        {mois.map((m, i) => {
+          const d = new Date(m.cle + '-01T12:00:00');
+          const court = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+          const fort = m.cle === meilleur || i === dernier;
+          return (
+            <div key={m.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:10.5,lineHeight:1.2,color:fort?C.text:C.muted,fontWeight:fort?600:500}}>
+              <span className="vrm-mois-long">{court}</span><span className="vrm-mois-court" aria-hidden="true">{court.slice(0, 1).toUpperCase()}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -16690,14 +17040,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const quoiDepuisDebut = stockInconnu
     ? 'La valeur du stock, le bénéfice et la marge'
     : 'Le bénéfice et la marge';
-  const LignePrixAchat = ({ quoi }) => (
+  // (16 oct., passe « premium ») : un LIEN discret, pas une ligne orange — la
+  // cause est dite une fois par groupe, et le geste est le lien lui-même.
+  const LignePrixAchat = ({ quoi, dans = false }) => (
     <button type="button" onClick={versSaisiePrix}
       title="Ouvrir la saisie en série des prix d'achat"
-      style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:'-6px 0 0',cursor:'pointer',
-        fontFamily:'inherit',fontSize:12,fontWeight:600,color:C.warn,textAlign:'left',minHeight:0}}>
-      {quoi} attendent tes prix d'achat — les saisir →
+      style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
+        fontFamily:'inherit',fontSize:12.5,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
+      {quoi} attendent tes prix d'achat — <span style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
     </button>
   );
+  // ── Typographie de l'écran (16 oct.) ─────────────────────────────────────
+  // Un montant ne se coupe JAMAIS en deux (« 2066,80 » puis « € » seul sur la
+  // ligne suivante) : `Mt` le garde d'un bloc, en chiffres tabulaires.
+  const Mt = ({ v }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(v)}</span>;
+  // Libellés en casse normale (plus de capitales espacées partout) : un titre
+  // de carte, un libellé de chiffre, une note.
+  const sTitre = {fontSize:14,fontWeight:600,color:C.text,letterSpacing:-0.15};
+  const sLib = {fontSize:12.5,color:C.muted,fontWeight:500};
+  const sNote = {fontSize:12,color:C.muted,lineHeight:1.5};
+  const sHero = {fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1.05,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'};
+  const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
 
   return (
     <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
@@ -16710,8 +17073,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
-      <div className="vrm-finance-period-label" style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
-      <div className="vrm-finance-overview">
+      <div data-stats-carte="hero" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
+        <div style={sLib}>CA finalisé · depuis le début</div>
         {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
             cette date). Le rapport comptable a été corrigé, ce titre-là était
@@ -16722,14 +17085,27 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             global alors que le « Total toutes plateformes » (Collectif) est plus
             grand dès qu'une autre plateforme a des ventes : un total partiel qui
             se présente comme complet (§5). On ne touche PAS la valeur (URSSAF). */}
-        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
-        {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
-            afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice estimé" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
-        {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
-            voisines, avec d'autres mots : trois formulations pour une seule
-            cause font croire à trois problèmes. */}
-        <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
+        {/* (16 oct.) Le chiffre héros, seul, en très gros — plus de cellule
+            noire, plus de filet vertical parasite à gauche de chaque texte
+            (l'ombre « -1px » de StatBox compact). */}
+        <div className="vrm-display" style={{...sHero,fontSize:'clamp(34px,10.5vw,46px)',marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
+        <div style={{...sNote,marginTop:6}}>Vinted, tous comptes · daté au jour de la vente</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
+          {/* Bénéfice/marge : un tiret tant qu'aucun prix d'achat n'est saisi
+              (sinon on afficherait le CA comme « bénéfice », ce qui est faux —
+              cf. écran Ventes). ⚠️ « prix d'achat manquants » disait la MÊME
+              chose que ses deux voisines : une cause, une phrase (le lien
+              dessous). */}
+          {[['Bénéfice estimé', liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit), liveStats&&liveStats.caEncaisse!=null?null:'argent reçu uniquement'],
+            ['Taux marge', (liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`, liveStats&&liveStats.caEncaisse!=null?null:(avgMargin===null?'dès ta première vente':'bénéf / CA')]].map(([l,v,sub],i)=>(
+            <div key={l} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
+              <div style={sLib}>{l}</div>
+              <div className="vrm-display" style={{...sHero,fontSize:22,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
+              {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+        {manquePrix && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
       {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
       <div className="vrm-finance-goal"><Card>
@@ -16758,8 +17134,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         )}
       </Card></div>
 
-      {liveStats && <details className="vrm-finance-activity" style={{marginBottom:10,fontSize:12,color:C.muted}}>
-        <summary style={{cursor:'pointer',padding:'8px 0'}}>Ventes enregistrées · <span data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui {liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</span> · <span data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois {liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</span></summary>
+      {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
+          l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
+      <div data-stats-carte="activite" className="vrm-stats-volets" style={{...sCarte,padding:'4px 18px'}}>
+      {liveStats && <details className="vrm-finance-activity" style={{fontSize:12.5,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
+        {/* (16 oct.) Chaque montant reste d'un bloc avec son libellé : « 2066,80 »
+            ne se sépare plus de son « € » au retour à la ligne. */}
+        <summary style={{cursor:'pointer',padding:'10px 0',lineHeight:1.65}}>Ventes enregistrées · <span style={{whiteSpace:'nowrap'}} data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</b></span> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</b></span></summary>
         <p>Ventes faites, toutes plateformes, avant encaissement. Le CA finalisé et l’argent reçu restent distincts.</p>
         {liveStats.venduPasSu && <p data-dash-vendu-pas-su="1">Les ventes n’ont pas pu être lues. Les montants restent inconnus.</p>}
         {(liveStats.venduManque || []).length>0 && <p data-dash-vendu-manque={liveStats.venduManque.join(',')}>Total partiel, sans {liveStats.venduManque.join(', ')} : ventes non lues.</p>}
@@ -16786,7 +17167,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
       </div></details>
-      {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
+      </div>
 
       {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
           « Des graphiques de qualité » : la même courbe que l'accueil, sur
@@ -16803,14 +17184,29 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const tot = mois.reduce((a,m)=>a+m.eur,0);
         if (!tot) return null;
         const meilleur = mois.reduce((a,m)=>m.eur>a.eur?m:a, mois[0]);
-        const court = (m) => new Date(m.cle+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+        const encours = mois[mois.length-1];
+        // (16 oct.) Douze BARRES plutôt qu'une ligne écrasée : un mois est un
+        // total, il se lit en hauteur. Le meilleur mois et le mois en cours sont
+        // MARQUÉS sur le graphique et leur valeur exacte écrite dessous — jamais
+        // une valeur arrondie différemment (« 2 k ») à côté du vrai montant (§7).
         return (
-          <Card style={{padding:'16px 16px 14px',background:C.card,border:`1px solid ${C.border}`,marginTop:12}}>
-            <div style={{fontSize:12,color:C.muted,fontWeight:500}}>Chiffre d'affaires · 12 derniers mois</div>
-            <div className="vrm-display" style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.6,marginTop:3}}>{fmt(tot)}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:3}}>Meilleur mois : <b style={{color:C.text,fontWeight:600}}>{meilleur.long} · {fmt(meilleur.eur)}</b></div>
-            <div style={{marginTop:14}}><CourbeVentes jours={mois} hauteur={110} libDebut={court(mois[0])} libFin="ce mois-ci"/></div>
-          </Card>
+          <div data-stats-carte="courbe" data-stats-courbe style={{...sCarte,marginTop:4}}>
+            <div style={sLib}>Chiffre d'affaires · 12 derniers mois</div>
+            <div className="vrm-display" style={{...sHero,fontSize:'clamp(28px,8vw,34px)',letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
+            <BarresCA12 mois={mois} meilleur={meilleur.cle}/>
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+                <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
+                <span style={{flex:1,minWidth:0}}>Meilleur mois · <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
+                <b style={{color:C.text,fontWeight:600}}><Mt v={meilleur.eur}/></b>
+              </div>
+              {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+                <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,flexShrink:0,background:`repeating-linear-gradient(135deg, ${C.accent}, ${C.accent} 2px, ${C.accent}55 2px, ${C.accent}55 4px)`}}/>
+                <span style={{flex:1,minWidth:0}}>En cours · <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
+                <b style={{color:C.text,fontWeight:600}}><Mt v={encours.eur}/></b>
+              </div>}
+            </div>
+          </div>
         );
       })()}
 
@@ -16835,42 +17231,45 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
         if (caVinted == null && caLbc == null) return null;
         const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
+        // (16 oct.) Une ligne = le nom, sa note, le montant à droite (d'un
+        // bloc, chiffres tabulaires) ; dessous, la part du total en barre
+        // pleine sur un rail, une seule teinte (§7). Une plateforme sans vente
+        // captée reste nommée, en sourdine, avec son tiret.
         const Ligne = ({label, val, note, fort, part}) => (
-          <div style={{padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+          <div style={{padding:fort?'12px 0 2px':'11px 0',borderTop:`1px solid ${C.border}`}}>
             <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
               <div style={{minWidth:0}}>
-                <div style={{fontSize:13.5,fontWeight:fort?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
-                {note && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{note}</div>}
+                <div style={{fontSize:fort?13.5:14,fontWeight:fort?600:500,color:val==null?C.muted:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
+                {note && <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.35}}>{note}</div>}
               </div>
-              <div style={{display:'flex',alignItems:'baseline',gap:8,flexShrink:0}}>
-                {part!=null && <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums'}}>{Math.round(part*100)} %</span>}
-                <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:val==null?C.muted:C.text}}>{val==null?'—':fmt(val)}</span>
-              </div>
+              <span className="vrm-display" style={{fontSize:fort?17:15,fontWeight:fort?700:600,color:val==null?C.muted:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',flexShrink:0,letterSpacing:-0.2}}>{val==null?'—':fmt(val)}</span>
             </div>
-            {/* Part du total : une barre fine, une seule teinte (§7). */}
-            {part!=null && <div style={{height:4,borderRadius:999,background:C.card2||C.border,marginTop:7,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>}
+            {part!=null && <div style={{display:'flex',alignItems:'center',gap:10,marginTop:8}}>
+              <div style={{flex:1,height:6,borderRadius:999,background:C.card2||C.border,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>
+              <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)} %</span>
+            </div>}
           </div>
         );
         const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
         const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(300px,100%), 1fr))',gap:12,marginTop:12}}>
-            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA finalisé par plateforme</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
+            <div data-stats-carte="plateformes" data-stats-plateformes style={{...sCarte,paddingBottom:12}}>
+              <div style={{...sTitre,marginBottom:8}}>CA finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
               {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total toutes plateformes" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
-            </Card>
-            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA Vinted par compte</div>
+            </div>
+            <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
+              <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
               {comptes.length
                 ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
-                : <div style={{fontSize:12,color:C.muted,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
+                : <div style={{fontSize:12,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
-            </Card>
+            </div>
           </div>
         );
       })()}
@@ -16882,216 +17281,218 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           haut — arrondi différemment (296 € contre 296,40 €). Le même nombre,
           deux fois, deux valeurs : c'est ce qui fait douter de tous les autres
           (§11). Une carte, un mois, et chaque chiffre une seule fois. */}
-      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          {moisCourant.nom}
+      {/* (16 oct., passe « premium ») Une carte, quatre chiffres, une ligne de
+          calcul et la couverture en lignes courtes : tout ce qui empêche un total
+          partiel de se faire passer pour complet reste VISIBLE (§5). Ce qui
+          s'explique (le détail du calcul, les gestes pour dater les ventes, la
+          réserve « je ne suis pas comptable ») se replie dans « Comment c'est
+          calculé » au lieu de quatre pavés colorés de même poids. L'ambre ne
+          reste que là où il y a vraiment quelque chose à faire (§7). */}
+      {(() => {
+        const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
+        const nA = Number(e.nAilleurs)||0, caA = Number(e.caAilleurs)||0;
+        const ou = Object.keys(e.ailleurs||{}).sort().map(k=>{ const [y,m]=k.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }).join(', ');
+        const decl = (urssafInfo && urssafInfo.declare) || '';
+        // La couverture : de la MÊME ligne publiée que le total (§5) — les
+        // « dont » somment au total, et ce qui MANQUE est dit à côté.
+        const par = Object.entries(e.par||{}).filter(([,v])=>v && v.n>0);
+        const src = (urssafInfo && urssafInfo.sources) || {};
+        const pasSu = Object.entries(src).filter(([,v])=>v==='pasSu').map(([k])=>k);
+        const ad = urssafInfo && urssafInfo.aDater;
+        const adV = ad && ad.par && ad.par.Vinted;
+        const adL = ad && (ad.par ? ad.par.Leboncoin : (ad.n > 0 ? ad : null));
+        const morceaux = [];
+        const Puce = ({ children, warn }) => (
+          <div style={{display:'flex',gap:8,alignItems:'baseline',color:warn?C.warn:C.muted}}>
+            <span aria-hidden="true" style={{width:4,height:4,borderRadius:999,background:'currentColor',opacity:.55,flexShrink:0,transform:'translateY(-2px)'}}/>
+            <span style={{minWidth:0}}>{children}</span>
+          </div>
+        );
+        if (moisCourantCA!=null) {
+          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<Puce key="d">dont {par.map(([k,v],i)=><React.Fragment key={k}>{i?' · ':''}{k} <Mt v={v.ca}/></React.Fragment>)}</Puce>);
+          if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
+          if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Collective : pas encore relié</Puce>);
+        }
+        const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
+          <div style={{minWidth:0}}>
+            <div style={sLib}>{lib}</div>
+            <div className="vrm-display" style={{...sHero,fontSize:fort?'clamp(26px,7.6vw,32px)':'clamp(22px,6.2vw,26px)',letterSpacing:fort?-0.8:-0.5,marginTop:5,color:couleur||C.text}}>{val}</div>
+            {sous && <div style={{...sNote,fontSize:11.5,marginTop:3,...(sousStyle||{})}}>{sous}</div>}
+          </div>
+        );
+        return (
+      <div data-stats-carte="mois" style={{...sCarte,padding:'20px 20px 16px'}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'4px 12px',flexWrap:'wrap'}}>
+          <div style={{...sTitre,fontSize:17,textTransform:'capitalize'}}>{moisCourant.nom}</div>
+          <div style={{...sNote,fontSize:12}}>Ce que tu déclares à l'URSSAF</div>
         </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:22}}>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes finalisées</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:moisCourantN!=null?C.text:C.muted}}>{moisCourantN!=null?moisCourantN:'—'}</div>
-            {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
-                n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
-                doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
-            {moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN && (
-              <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>sur {liveStats.ventesMois} vendue{liveStats.ventesMois>1?'s':''} ce mois-ci</div>
-            )}
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
-            {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
-                raison en clair — il n'est pas développeur. */}
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)}</div>
-            {liveStats&&liveStats.caMois!=null&&<div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>saisis tes prix d'achat</div>}
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
-          </div>
+        <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'18px 16px',marginTop:16}}>
+          <Chiffre fort lib={`À payer (${String(tauxUrssaf()).replace('.',',')} %)`} val={urssafEstime==null?'—':fmt(urssafEstime)} couleur={urssafEstime==null?C.muted:C.text}/>
+          <Chiffre fort lib="Net après paiement" val={netApresUrssaf==null?'—':fmt(netApresUrssaf)} couleur={netApresUrssaf==null?C.muted:C.text}/>
+          {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
+              n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
+              doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
+          <Chiffre lib="Ventes finalisées" val={moisCourantN!=null?moisCourantN:'—'} couleur={moisCourantN!=null?C.text:C.muted}
+            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN ? `sur ${liveStats.ventesMois} vendue${liveStats.ventesMois>1?'s':''} ce mois-ci` : null}/>
+          {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
+              raison en clair — il n'est pas développeur. */}
+          <Chiffre lib="Bénéfice" val={liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)} couleur={C.muted}
+            sous={liveStats&&liveStats.caMois!=null ? <button type="button" onClick={versSaisiePrix} title="Ouvrir la saisie en série des prix d'achat" style={{border:'none',background:'transparent',padding:0,margin:0,font:'inherit',color:C.accent,fontWeight:600,cursor:'pointer',minHeight:0,textAlign:'left',display:'inline-flex',alignItems:'flex-start',justifyContent:'flex-start'}}>saisis tes prix d'achat →</button> : null}/>
         </div>
-        <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
-              DEPUIS JUILLET 2026, donc « (0,00 €) ». Le commentaire juste
-              au-dessus dit pourtant que le récap ne vient plus de là. Les
-              CHIFFRES avaient été rebranchés sur la ligne publiée, la phrase
-              qui les explique était restée en arrière : l'écran affichait
-              « 19,32 € à payer » et, dessous, « calculé sur 0,00 € ». Sur
-              l'écran où il décide ce qu'il verse à l'URSSAF, c'est le pire
-              endroit possible pour un chiffre invérifiable (§2.7). */}
-          {/* ⚠️ (revue du 6 octobre) « argent versé en octobre » sur un chiffre qui
-              EXCLUT une vente versée en octobre mais déjà déclarée en septembre
-              (registre « J'ai déclaré ce mois ») : la phrase le dit, des MÊMES
-              champs de la MÊME ligne publiée (`nAilleurs`, `caAilleurs`,
-              `ailleurs`) — et dit aussi quand le registre n'était pas encore lu
-              au moment du calcul (`declare: 'pasSu'`). */}
+        {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
+            DEPUIS JUILLET 2026, donc « (0,00 €) ». Les CHIFFRES avaient été
+            rebranchés sur la ligne publiée, la phrase qui les explique était
+            restée en arrière (§5). Elle cite le MÊME montant que celui qui
+            produit « à payer », et reste visible (le banc urssaf.cjs la lit).
+            ⚠️ (revue du 6 octobre) une vente versée ce mois-ci mais déjà
+            déclarée ailleurs est EXCLUE : la phrase le dit, des MÊMES champs de
+            la MÊME ligne publiée (`nAilleurs`, `caAilleurs`, `ailleurs`) — et
+            dit aussi quand le registre n'était pas encore lu (`declare`). */}
+        <div style={{...sNote,fontSize:12.5,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
           {moisCourantCA==null
             ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
-            : (() => {
-              const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-              const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
-              const nA = Number(e.nAilleurs)||0, caA = Number(e.caAilleurs)||0;
-              const ou = Object.keys(e.ailleurs||{}).sort().map(k=>{ const [y,m]=k.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }).join(', ');
-              const decl = (urssafInfo && urssafInfo.declare) || '';
-              return <span data-urssaf-declare={decl}>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises
-                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, <b>hors {nA} vente{nA>1?'s':''} ({fmt(caA)})</b> versée{nA>1?'s':''} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} — {nA>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici</span>}
-                . C'est la somme à verser à la fin du mois (versement libératoire).
+            : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
+                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
+                .
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
-              </span>;
-            })()}
+              </span>}
         </div>
-        {/* TOUTES PLATEFORMES (3 octobre) — les « dont » viennent de la MÊME
-            ligne publiée que le total : ils somment au total, ils ne peuvent
-            pas le contredire (§5). Et ce qui MANQUE est dit à côté : une source
-            pas lue, des ventes sans date, Vestiaire pas relié. */}
-        {moisCourantCA!=null && (() => {
-          const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-          const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
-          const par = Object.entries(e.par||{}).filter(([,v])=>v && v.n>0);
-          const src = (urssafInfo && urssafInfo.sources) || {};
-          const pasSu = Object.entries(src).filter(([,v])=>v==='pasSu').map(([k])=>k);
-          const ad = urssafInfo && urssafInfo.aDater;
-          const morceaux = [];
-          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<span key="d">dont {par.map(([k,v])=>`${k} ${fmt(v.ca)}`).join(' · ')}</span>);
-          if (pasSu.length) morceaux.push(<span key="p" style={{color:C.warn}}>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</span>);
-          const adV = ad && ad.par && ad.par.Vinted;
-          if (adV && adV.n > 0) morceaux.push(<span key="av" style={{color:C.warn}}>{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement ({fmt(adV.ca)}) : dans aucun mois pour l'instant — {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}</span>);
-          const adL = ad && (ad.par ? ad.par.Leboncoin : (ad.n > 0 ? ad : null));
-          if (adL && adL.n > 0) morceaux.push(<span key="a" style={{color:C.warn}}>{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date ({fmt(adL.ca)}) : dans aucun mois tant que leur date n'est pas captée — {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate}), puis ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}</span>);
-          if ((e.par||{}).Leboncoin) morceaux.push(<span key="lv">Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée)</span>);
-          if (src.Vestiaire === 'nonRelie') morceaux.push(<span key="v">Vestiaire Collective : pas encore relié</span>);
-          if (!morceaux.length) return null;
-          return <div data-urssaf-couverture style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.6,display:'flex',flexDirection:'column',gap:2}}>{morceaux}</div>;
-        })()}
-        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
-            L'app date chaque vente au jour où elle a été VENDUE — la date à
-            laquelle Vinted libère l'argent n'est pas connue pour toutes les
-            ventes, donc on ne peut pas l'utiliser sans exclure des lignes en
-            silence. L'écart est de quelques jours à quelques semaines : on le
-            DIT au lieu de laisser croire à un chiffre officiel. */}
-        <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
-        </div>
-        {/* Prochaine échéance de DÉCLARATION (rappel) */}
-        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
-            <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
+        {morceaux.length > 0 && <div data-urssaf-couverture style={{...sNote,marginTop:8,display:'flex',flexDirection:'column',gap:4}}>{morceaux}</div>}
+        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
+            comment elle date chaque vente — replié, pas retiré. */}
+        <details className="vrm-stats-calcul" style={{marginTop:10}}>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:500,color:C.muted,padding:'6px 0',listStyle:'revert'}}>Comment c'est calculé</summary>
+          <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
+            {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
+            {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
+            {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
+            <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</div>
+          </div>
+        </details>
+        {/* Prochaine échéance de DÉCLARATION (rappel) — un encart neutre ; la
+            couleur ne vient QUE si l'échéance presse (≤ 14 j) ou est passée. */}
+        <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+            <span style={{...sTitre,fontSize:13.5,flex:1}}>Prochaine déclaration</span>
+            <div style={{display:'flex',gap:2,background:C.card2||C.surface,borderRadius:10,padding:2}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
+                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
               ))}
             </div>
           </div>
           {urssafDue ? (()=>{
             const late=urssafDue.daysLeft<0, soon=urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
-            const col=late?C.danger:soon?C.warn:C.accent;
+            const col=late?C.danger:soon?C.warn:C.text;
             return (
-              <div style={{border:`1px solid ${col}55`,background:`${col}0e`,borderRadius:10,padding:'11px 13px'}}>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-                  <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
-                  <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
+              <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
+                <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:16,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
+                  <span style={{fontSize:12.5,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))}</b></div>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:7}}>
-                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:700,color:'#fff',background:C.accent,borderRadius:8,padding:'6px 12px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
-                  <span style={{fontSize:9,color:C.muted}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là-bas.</span>
+                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:12.5,color:C.muted}}>
+                  <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
+                  <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
+                  <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
+                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
+                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.</span>
                 </div>
               </div>
             );
-          })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
+          })() : <div style={{fontSize:12,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
-      </Card>
+      </div>
+        );
+      })()}
 
       {/* Barre de progression du garage */}
-      <Card style={{padding:18}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><Icon name="home" size={12}/>Remplissage du stock</span>
-          <span style={{fontSize:13,fontWeight:600,color:C.accent}}>{fillRate}%</span>
+      <div data-stats-carte="garage" style={sCarte}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
+          <span style={{...sTitre,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="home" size={14}/>Remplissage du stock</span>
+          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{fillRate}%</span>
         </div>
-        <div style={{height:10,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        <div style={{height:6,background:C.card2||C.surface,borderRadius:999,overflow:'hidden'}}>
           <div style={{
             height:'100%',
             width:`${fillRate}%`,
             background:C.accent,
-            borderRadius:8,
+            borderRadius:999,
             transition:'width 0.4s ease',
           }}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:11,color:C.muted}}>
-          <span><b style={{color:C.accent}}>{stockCount}</b> boîtes occupées</span>
-          <span><b style={{color:C.warn}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:12,color:C.muted}}>
+          <span><b style={{color:C.text,fontWeight:600}}>{stockCount}</b> boîtes occupées</span>
+          <span><b style={{color:C.text,fontWeight:600}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
         </div>
-      </Card>
+      </div>
 
       {/* Stats secondaires */}
-      <div>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Détails</div>
-        {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
-            Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
-            nb ventes finalisées). Le « × moyen » et le « bénéf. moyen »
-            dépendent des prix d'achat (non saisis) → n/d honnête plutôt qu'un 0
-            trompeur. */}
-        {(()=>{
-          const hv = liveStats && liveStats.soldTotal!=null;
-          // Ventes illisibles : un tiret, jamais la moyenne de l'archive vide (0 €).
-          const venteMoy = liveStats && liveStats.venduPasSu ? null : (hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale);
-          return (
-        <>
-        <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-          {/* ⚠️ PAS DE « n/d » : c'est du vocabulaire d'informaticien, et la
-              règle est écrite noir sur blanc dans le dossier de passation. Un
-              tiret dit « on ne sait pas » ; la raison juste dessous dit quoi
-              faire. Les cartes voisines le faisaient déjà — ces trois-là
-              étaient restées en arrière (vues en capture le 7 septembre). */}
-          <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted}/>
-          <StatCard icon="💵" label="Vente moyenne" value={venteMoy==null?'—':fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
-          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted}/>
-          {/* ⚠️ TRANCHÉ. Cette carte s'appelait « CA / jour actif » et comptait
-              les jours d'après `receiveDate`, la date d'ENCAISSEMENT — retirée
-              exprès de l'app (elle n'existait que pour une partie des ventes).
-              Elle affichait donc un tiret que RIEN ne pouvait jamais remplir :
-              ni une saisie, ni une synchro. Une carte qui ne peut pas exister
-              n'apprend rien.
-              La date de VENTE, elle, est connue pour toutes les ventes. On
-              affiche donc le CA moyen par JOUR OÙ IL A VENDU — `joursVente` est
-              publié par le même calcul que `caEncaisse` (§11), sur exactement
-              les mêmes ventes finalisées : numérateur et dénominateur parlent
-              des mêmes lignes. Tant que la moisson n'a rien publié, tiret. */}
-          <StatCard icon="📅" label="CA / jour de vente"
-            value={hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—'} color={C.muted}
-            sub={hv && liveStats.joursVente>0
-              ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu`
-              : 'en attente de la synchro Vinted'}/>
-        </div>
-        {hv && <LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen"/>}
-        </>
-          );
-        })()}
-      </div>
+      {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
+          Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
+          nb ventes finalisées). Le « × moyen » et le « bénéf. moyen »
+          dépendent des prix d'achat (non saisis) → un tiret honnête plutôt
+          qu'un 0 trompeur. (16 oct.) Une carte, une grille 2 × 2 régulière, au
+          lieu de quatre boîtes de largeurs différentes. */}
+      {(()=>{
+        const hv = liveStats && liveStats.soldTotal!=null;
+        // Ventes illisibles : un tiret, jamais la moyenne de l'archive vide (0 €).
+        const venteMoy = liveStats && liveStats.venduPasSu ? null : (hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale);
+        // ⚠️ PAS DE « n/d » : un tiret dit « on ne sait pas » ; la raison juste
+        // dessous dit quoi faire.
+        // ⚠️ TRANCHÉ. « CA / jour actif » comptait les jours d'après
+        // `receiveDate` (retirée de l'app) : un tiret que RIEN ne pouvait
+        // remplir. On affiche le CA moyen par JOUR OÙ IL A VENDU — `joursVente`
+        // est publié par le même calcul que `caEncaisse` (§11), sur exactement
+        // les mêmes ventes finalisées. Tant que la moisson n'a rien publié, tiret.
+        const cases = [
+          ['× moyen', hv?'—':`×${avgX}`, null, true],
+          ['Vente moyenne', venteMoy==null?'—':fmt(venteMoy), hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:null, false],
+          ['Bénéf. moyen / vente', hv?'—':fmt(avgProfit), null, true],
+          ['CA / jour de vente', hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—',
+            hv && liveStats.joursVente>0 ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu` : 'en attente de la synchro Vinted', false],
+        ];
+        return (
+          <div data-stats-carte="details" style={sCarte}>
+            <div style={{...sTitre,marginBottom:4}}>Détails</div>
+            <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
+              {cases.map(([l,v,sub,sourd])=>(
+                <div key={l} style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+                  <div style={sLib}>{l}</div>
+                  <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:(sourd||v==='—')?C.muted:C.text}}>{v}</div>
+                  {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+                </div>
+              ))}
+            </div>
+            {hv && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+          </div>
+        );
+      })()}
 
-      {/* Records */}
-      <div>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Records</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+      {/* Records — seulement s'il y en a (un titre sans rien dessous n'apprend rien). */}
+      {(bestDayCA||bestDayProfit) && <div data-stats-carte="records" style={sCarte}>
+        <div style={{...sTitre,marginBottom:4}}>Records</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:0}}>
           {bestDayCA&&(
-            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🏆 Meilleur jour</div>
-              <div style={{fontSize:20,fontWeight:600,color:C.warn}}>{fmt(bestDayCA[1].ca)}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
-            </Card>
+            <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={sLib}>Meilleur jour</div>
+              <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayCA[1].ca)}</div>
+              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
+            </div>
           )}
           {bestDayProfit&&(
-            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🚀 Meilleur jour bénéfice</div>
-              <div style={{fontSize:20,fontWeight:600,color:C.accent}}>{fmt(bestDayProfit[1].profit)}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayProfit[0]}</div>
-            </Card>
+            <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={sLib}>Meilleur jour bénéfice</div>
+              <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
+              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayProfit[0]}</div>
+            </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── ÉVOLUTION MENSUELLE, SUR LES VRAIES DONNÉES (moisson) ──────────
           §11 : même source que le CA total. Une seule teinte d'accent (§7),
@@ -18962,7 +19363,9 @@ function LocalPhoto({ locate, onLocateConsumed }) {
 // ranger tes N° dans ses tiroirs/rayons (empilables). La recherche te montre le
 // meuble + la case. Rangé dans une ligne Supabase dédiée (vrm_room).
 const loadRoomPlan = async () => {
-  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
+  // Trois états : l'objet lu · null (aucune ligne) · undefined (la base n'a
+  // pas répondu — « pas su », l'assistant de rangement ne propose rien).
+  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return undefined; const rows = await res.json(); if (!Array.isArray(rows)) return undefined; return rows[0]?.data || null; } catch (_) { return undefined; }
 };
 // ⚠️ Le garage porte la VERSION de la numérotation (migration 013) : la base
 //    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
@@ -19073,8 +19476,120 @@ function normalizePlan(p) {
   return { rooms: [only], active: only.id };
 }
 
-function RoomPlan({ locate, onLocateConsumed }) {
+// ── L'ASSISTANT DE RANGEMENT (vue 2D) — règles pures ───────────────────────
+// Julien : un assistant qui l'aide à RANGER (quelle paire dans quelle case),
+// avec une vue 2D simple. Il lit le MÊME plan que la 3D (`vrm_room`) et la
+// MÊME liste des paires présentes (`numsPresents`, publiée par Annonces, §11).
+// ⚠️ Il ne touche JAMAIS un numéro : il écrit un N° existant dans une case
+//    vide, ou retire d'une case le N° d'une paire qui n'est plus là.
+// Un meuble « à cases » : un rangement (pas un décor), ni pile ni boîte seule
+// (eux portent leur numéro sur le carton, ils n'ont pas de case libre).
+const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
+const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
+const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+// GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
+// trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
+// (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
+const graviteCases = (slots, nr, nc) => {
+  const out = {};
+  for (let c = 0; c < nc; c++) {
+    const pleins = [];
+    for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
+    let r = nr - 1;
+    for (let i = pleins.length - 1; i >= 0 && r >= 0; i--) { out[r + '_' + c] = pleins[i]; r--; }
+  }
+  return out;
+};
+// Les meubles à cases du plan, dans l'ordre LISIBLE : pièce, puis meuble (ordre
+// de pose), puis colonne de gauche à droite, chaque colonne du bas vers le haut.
+const meublesDuPlan = (plan) => {
+  const out = [];
+  ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
+    if (!meubleACases(it)) return;
+    const { nr, nc } = dimsMeuble(it);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, vue: graviteCases(it.slots, nr, nc) });
+  }));
+  return out;
+};
+// La position d'une case dite en français (la 3D écrit la même chose).
+const nomCase = (nr, key) => { const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r; return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`; };
+// La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
+// en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
+const premiereCaseLibre = (plan) => {
+  for (const m of meublesDuPlan(plan)) {
+    for (let c = 0; c < m.nc; c++) {
+      let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
+      if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
+    }
+  }
+  return null;
+};
+// Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
+const ouEstNumero = (plan, num) => {
+  const t = cleNum(num); if (!t) return null;
+  for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
+    if (meubleACases(it)) {
+      const { nr, nc } = dimsMeuble(it); const vue = graviteCases(it.slots, nr, nc);
+      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k) };
+    }
+    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile' };
+    if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
+  }
+  return null;
+};
+// Ranger UN numéro dans la colonne d'une case : il atterrit sur la plus basse
+// case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
+// déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
+// ou une colonne pleine. Rend { plan, ou } ou { erreur }.
+const rangerNumeroDansPlan = (plan, itemId, key, num) => {
+  const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
+  const deja = ouEstNumero(plan, v);
+  if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
+  let res = null;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
+    if (!(c >= 0 && c < nc)) return it;
+    const vue = graviteCases(it.slots, nr, nc);
+    let plein = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) plein++;
+    if (plein >= nr) return it;
+    const k = (nr - 1 - plein) + '_' + c;
+    const slots = { ...vue, [k]: [v] };
+    // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
+    let grow = {};
+    if ((FURN_TYPES[it.type] || {}).build === 'grille' && Object.keys(slots).length >= nr * nc) {
+      const maxRows = Math.max(1, Math.floor(((rm.room && rm.room.wallH) || 3.4) / (it.cell || 0.5)));
+      if (nr < maxRows) {
+        grow = { rows: nr + 1 };
+        // On décale tout d'une rangée vers le bas des index (la nouvelle rangée est en haut, r=0).
+        const dec = {}; for (const kk in slots) { const p = kk.split('_'); dec[(+p[0] + 1) + '_' + p[1]] = slots[kk]; }
+        res = { itemName: it.name, roomName: rm.name, key: (+k.split('_')[0] + 1) + '_' + c, nom: nomCase(nr + 1, (+k.split('_')[0] + 1) + '_' + c) };
+        return { ...it, ...grow, slots: dec };
+      }
+    }
+    res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
+    return { ...it, slots };
+  }) }));
+  if (!res) return { erreur: 'Cette colonne est pleine — choisis une autre case.' };
+  return { plan: { ...plan, rooms }, ou: res };
+};
+// Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
+const libererNumeroDuPlan = (plan, itemId, num) => {
+  const t = cleNum(num); let fait = false;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const slots = {};
+    for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc) } : it;
+  }) }));
+  return fait ? { ...plan, rooms } : null;
+};
+
+function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
+  // Le plan du nuage a-t-il été relu ? undefined = en cours · false = la base
+  // n'a pas répondu · true = lu (même vide). L'assistant 2D attend `true`.
+  const [planLu, setPlanLu] = useState(undefined);
   const [sel, setSel] = useState(null);
   const [openItem, setOpenItem] = useState(null);
   const [search, setSearch] = useState('');
@@ -19083,7 +19598,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
-  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } })(); }, []);
+  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud === undefined) { setPlanLu(false); return; } if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } setPlanLu(true); })(); }, []);
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
   const saveTimer = React.useRef(null);
@@ -19647,6 +20162,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     return { boxes, freeCells, furn };
   }, [items]);
 
+  if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
@@ -19939,6 +20455,216 @@ function RoomPlan({ locate, onLocateConsumed }) {
     </div>
   );
 }
+// ── ASSISTANT DE RANGEMENT — la vue 2D ─────────────────────────────────────
+// Quelle paire va dans quelle case : la liste « À ranger » (paires PRÉSENTES,
+// avec un N°, posées nulle part), la PREMIÈRE case libre proposée une seule
+// fois en tête (§7 : la même destination écrite sur chaque ligne serait une
+// seule phrase), et c'est SON clic qui range — jamais tout seul. Une case qui
+// porte le N° d'une paire partie est proposée « à libérer », sur son clic.
+// « Pas su » (plan pas relu, liste des paires présentes jamais publiée) ⇒
+// aucune proposition, et c'est dit. Aucun numéro n'est jamais modifié.
+function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
+  const [q, setQ] = useState('');
+  const [placer, setPlacer] = useState(null);   // N° en cours de placement « autre case »
+  const [flash, setFlash] = useState(null);     // { itemId, key } — la case qu'on vient de remplir
+  const [voirLiberer, setVoirLiberer] = useState(false);
+  const presents = useMemo(() => numsPresents(), [plan]);
+  const meubles = useMemo(() => meublesDuPlan(plan), [plan]);
+  const plusieursPieces = ((plan && plan.rooms) || []).filter(rm => (rm.items || []).some(meubleACases)).length > 1;
+  // Les fiches par CLÉ de numéro (photo, titre) — pour reconnaître la paire.
+  const ficheDe = useMemo(() => { const m = {}; Object.entries(ficheParNum || {}).forEach(([n, f]) => { m[cleNum(n)] = { ...f, numero: n }; }); return m; }, [ficheParNum]);
+  const ranges = useMemo(() => {
+    const s = new Set();
+    ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
+      Object.values(it.slots || {}).forEach(a => numsCase(a).forEach(v => s.add(cleNum(v))));
+      if (Array.isArray(it.nums)) it.nums.forEach(v => { const k = cleNum(v); if (k) s.add(k); });
+      if (it.num != null) { const k = cleNum(it.num); if (k) s.add(k); }
+    }));
+    return s;
+  }, [plan]);
+  const sur = planLu === true && presents != null;
+  const aRanger = useMemo(() => !sur ? [] : Array.from(presents).filter(k => k && !ranges.has(k)).sort(triNum)
+    .map(k => ({ cle: k, numero: (ficheDe[k] && ficheDe[k].numero) || k, title: (ficheDe[k] && ficheDe[k].title) || '', photo: (ficheDe[k] && ficheDe[k].photo) || null })), [sur, presents, ranges, ficheDe]);
+  const aLiberer = useMemo(() => {
+    if (!sur) return [];
+    const out = [];
+    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key), numero: v }); })));
+    return out.sort((a, b) => triNum(a.numero, b.numero));
+  }, [sur, meubles, presents]);
+  const partiesCles = useMemo(() => new Set(aLiberer.map(x => cleNum(x.numero))), [aLiberer]);
+  const prochaine = useMemo(() => premiereCaseLibre(plan), [plan]);
+  const totalCases = meubles.reduce((s, m) => s + m.nr * m.nc, 0);
+  const casesLibres = meubles.reduce((s, m) => s + (m.nr * m.nc - Object.keys(m.vue).length), 0);
+  const hit = q.trim() ? ouEstNumero(plan, q) : null;
+  const hitRef = React.useRef(null);
+  const hitCle = hit ? hit.itemId + ':' + hit.key : '';
+  useEffect(() => { if (hitCle && hitRef.current) { try { hitRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (_) {} } }, [hitCle]);
+
+  const ranger = (numero, itemId, key) => {
+    if (!sur) return;
+    const r = rangerNumeroDansPlan(plan, itemId, key, numero);
+    if (r.erreur) { toast(r.erreur); return; }
+    ecrire(r.plan); setPlacer(null); setFlash({ itemId, key: r.ou.key, at: Date.now() });
+    toast(`N°${numero} rangée : ${r.ou.itemName} · ${r.ou.nom}.`);
+  };
+  const liberer = async (x) => {
+    if (!sur) return;
+    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Elle n'est plus parmi tes paires en stock (vendue ou partie). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
+    const next = libererNumeroDuPlan(plan, x.itemId, x.numero);
+    if (!next) { toast('Ce numéro n\'est plus dans cette case — rien n\'a été changé.'); return; }
+    ecrire(next); toast(`Case libérée : N°${x.numero} sortie de ${x.itemName}.`);
+  };
+
+  const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
+    : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
+    : presents == null ? "Je ne sais pas encore quelles paires sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait une paire partie dans une case." : null;
+  const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
+  const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
+  const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
+
+  return (
+    <div data-rangement="" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+      <style>{`.vrm-rgt{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);align-items:start}
+@media (min-width:1100px){.vrm-rgt{grid-template-columns:minmax(300px,370px) minmax(0,1fr)}}
+.vrm-rgt-case{transition:transform .12s ease,box-shadow .15s ease,background .15s ease}
+.vrm-rgt-case[data-cliquable="1"]:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+@keyframes vrmrgtpose{0%{transform:scale(.86);opacity:.4}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+.vrm-rgt-grille{--rgt-c:60px;--rgt-h:46px}
+@media (min-width:1100px){.vrm-rgt-grille{--rgt-c:72px;--rgt-h:48px}}
+@media (prefers-reduced-motion:reduce){.vrm-rgt-case{transition:none;animation:none!important}}`}</style>
+
+      {/* Le résumé, en texte neutre : des chiffres, pas des alertes. */}
+      <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }} data-rgt-resume="">
+        {sur
+          ? <><b style={{ color: C.text }}>{aRanger.length}</b> paire{aRanger.length > 1 ? 's' : ''} à ranger · <b style={{ color: C.text }}>{casesLibres}</b> case{casesLibres > 1 ? 's' : ''} libre{casesLibres > 1 ? 's' : ''} sur {totalCases}{aLiberer.length ? <> · <b style={{ color: C.text }}>{aLiberer.length}</b> à libérer</> : null}</>
+          : <>{totalCases} case{totalCases > 1 ? 's' : ''} dans {meubles.length} meuble{meubles.length > 1 ? 's' : ''}</>}
+      </div>
+      {raisonPasSu && <div data-rgt-passu="" style={{ ...carte, padding: '11px 13px', fontSize: 12.5, color: C.text, lineHeight: 1.5, boxShadow: 'none', background: C.bg }}>{raisonPasSu}</div>}
+
+      {/* Où est la N° X ? — une lecture, aucune écriture. */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Où est la N° … ?" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
+          style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+        {q && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche" onClick={() => setQ('')} style={{ ...btn(false), padding: '0 12px' }}><Icon name="close" size={15} /></button>}
+      </div>
+      {q.trim() && <div data-rgt-trouve={hit ? '1' : '0'} style={{ fontSize: 12.5, color: hit ? C.text : C.muted, lineHeight: 1.45, marginTop: -4 }}>
+        {hit ? <>N°{q.trim()} → <b>{hit.itemName}</b>{plusieursPieces ? ` (${hit.roomName})` : ''} · {hit.nom}</> : <>Aucune case ne porte la N°{q.trim()}.</>}
+      </div>}
+
+      <div className="vrm-rgt">
+        {/* ── Colonne gauche : ce qu'il y a à faire ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          {sur && (
+            <div style={carte} data-rgt-liste="">
+              {titreBloc('À ranger', aRanger.length)}
+              {aRanger.length === 0
+                ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tout ce qui est chez toi est déjà posé dans une case.</div>
+                : (<>
+                  {prochaine
+                    ? <div data-prochaine={`${prochaine.itemId}:${prochaine.key}`} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10, padding: '9px 11px', borderRadius: 9, background: C.bg, border: `1px solid ${C.border}` }}>
+                        Prochaine case libre : <b>{prochaine.itemName}</b>{plusieursPieces ? ` (${prochaine.roomName})` : ''} · {prochaine.nom}
+                      </div>
+                    : <div data-prochaine="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45, marginBottom: 10 }}>Plus aucune case libre : agrandis une grille ou ajoute un meuble (Ma pièce → Aménager la pièce).</div>}
+                  {placer && <div data-rgt-placer={placer} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginBottom: 10, padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${C.accent}` }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>Touche une case entourée pour y ranger la <b>N°{placer}</b>.</span>
+                    <button type="button" onClick={() => setPlacer(null)} style={btn(false)}>Annuler</button>
+                  </div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
+                    {aRanger.map(p => (
+                      <div key={p.cle} data-a-ranger={p.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 9px', borderRadius: 10, border: `1px solid ${placer === p.numero ? C.accent : C.border}`, background: C.card }}>
+                        {p.photo
+                          ? <PhotoVinted src={p.photo} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.card2 }} />
+                          : <span style={{ width: 40, height: 40, borderRadius: 8, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="box" size={18} style={{ color: C.muted, opacity: .6 }} /></span>}
+                        <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                          <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>N°{p.numero}</span>
+                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'paire présente'}</span>
+                        </span>
+                        <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
+                          {casesLibres > 0 && <button type="button" data-autre-case={p.numero} aria-label={`Choisir une autre case pour la N°${p.numero}`} title="Choisir une autre case" onClick={() => setPlacer(placer === p.numero ? null : p.numero)} style={{ ...btn(false), padding: '8px 10px' }}>Autre</button>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>)}
+            </div>
+          )}
+          {sur && aLiberer.length > 0 && (
+            <div style={carte} data-rgt-liberer="">
+              {titreBloc('À libérer', aLiberer.length)}
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand le carton est vide.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
+                  <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
+                    <span style={{ flex: 1, minWidth: 0 }}><b>N°{x.numero}</b> <span style={{ color: C.muted }}>· {x.itemName} · {x.nom}</span></span>
+                    <button type="button" onClick={() => liberer(x)} style={btn(false)}>Libérer</button>
+                  </div>
+                ))}
+              </div>
+              {aLiberer.length > 5 && <button type="button" onClick={() => setVoirLiberer(v => !v)} style={{ ...btn(false), marginTop: 8, border: 'none', padding: '4px 0', color: C.muted }}>{voirLiberer ? 'Réduire' : `Voir les ${aLiberer.length}`}</button>}
+            </div>
+          )}
+        </div>
+
+        {/* ── Colonne droite : le stock vu de face, meuble par meuble ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }} data-rgt-plan="">
+          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble à cases dans ta pièce. Ajoute une grille de boîtes, une étagère ou des casiers dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
+          {meubles.map((m, mi) => {
+            const pleines = Object.keys(m.vue).length;
+            const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
+            // La case où une boîte atterrit dans chaque colonne (gravité).
+            const basLibre = {}; for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
+            return (
+              <React.Fragment key={m.it.id}>
+                {enTete && <div className="vrm-label" style={{ color: C.muted, marginTop: mi ? 4 : 0 }}>{m.roomName}</div>}
+                <div style={carte} data-rgt-meuble={m.it.id}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14, fontWeight: 650, color: C.text, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.it.name}</span>
+                    <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{pleines}/{m.nr * m.nc}</span>
+                  </div>
+                  <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
+                    <div className="vrm-rgt-grille" style={{ display: 'grid', gridTemplateColumns: `repeat(${m.nc}, var(--rgt-c))`, gap: 6, width: 'max-content' }}>
+                      {Array.from({ length: m.nr * m.nc }, (_, i) => {
+                        const r = Math.floor(i / m.nc), c = i % m.nc, key = r + '_' + c;
+                        const a = m.vue[key] || [];
+                        const estHit = !!(hit && hit.itemId === m.it.id && hit.key === key);
+                        const estProchaine = !!(sur && aRanger.length && prochaine && prochaine.itemId === m.it.id && prochaine.key === key);
+                        const cliquable = !!(placer && sur && !a.length && basLibre[key]);
+                        const partie = !!(a.length && a.some(v => partiesCles.has(cleNum(v))));
+                        const vientDetre = !!(flash && flash.itemId === m.it.id && flash.key === key && a.length);
+                        const accent = estHit || estProchaine || cliquable;
+                        const bord = accent ? C.accent : partie ? C.warn : C.border;
+                        const trait = a.length && !partie ? 'solid' : (estProchaine || estHit ? 'solid' : 'dashed');
+                        return (
+                          <div key={key} ref={estHit ? hitRef : null} className="vrm-rgt-case"
+                            data-case={`${m.it.id}:${key}`} data-num={a[0] || ''} data-hi={estHit ? '1' : undefined} data-prochaine-case={estProchaine ? '1' : undefined} data-cliquable={cliquable ? '1' : undefined} data-partie={partie ? '1' : undefined}
+                            role={cliquable || a.length ? 'button' : undefined} tabIndex={cliquable || a.length ? 0 : undefined}
+                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key)}` : nomCase(m.nr, key)}
+                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); }}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); } }}
+                            style={{ height: 'var(--rgt-h)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', cursor: cliquable || a.length ? 'pointer' : 'default',
+                              border: `${accent ? 2 : 1}px ${trait} ${bord}`,
+                              background: estHit ? C.accent : a.length ? C.card2 : 'transparent', color: estHit ? (C.onAccent || '#fff') : partie ? C.muted : C.text,
+                              animation: vientDetre ? 'vrmrgtpose .38s ease-out' : 'none', boxShadow: vientDetre && !estHit ? `0 0 0 2px ${C.accent}` : 'none' }}>
+                            {a.length
+                              ? <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', textDecoration: partie ? 'line-through' : 'none', textDecorationColor: C.warn }}>{a[0]}{a.length > 1 ? <span style={{ fontSize: 10, fontWeight: 600, opacity: .7 }}> +{a.length - 1}</span> : null}</span>
+                              : estProchaine ? <span style={{ fontSize: 10.5, fontWeight: 700, color: C.accent }}>ici</span> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : les boîtes tombent en bas de chaque colonne. Touche une case pleine pour la retrouver.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
@@ -20153,10 +20879,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      <div style={{display:'flex',gap:6,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
-        {[['plan','home','Ma pièce'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+      <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start',maxWidth:'100%',overflowX:'auto'}}>
+        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
-            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
+            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
             <Icon name={ic} size={15}/>{l}
           </button>
         ))}
@@ -20164,6 +20890,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
       {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
+      {garageView==='ranger' && <RoomPlan mode="2d"/>}
 
       {garageView==='grid' && (<>
       {placing && (
@@ -22211,39 +22938,396 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
    Stockage : `vrm_compta`, une ligne APP (synchronisée via SYNC_KEYS), jamais
    l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
    sinon une saisie faite pendant le chargement serait écrasée. */
-const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
+const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [], abonnements: [] };
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
 const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length);
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length);
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
 const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// ── ABONNEMENTS RÉCURRENTS (16 octobre) ──────────────────────────────────────
+// Julien : « VRM 12,99 €/mois, Canva, l'appli photo… » — une dépense qui revient
+// toute seule. Rangés dans `vrm_compta.abonnements` (la ligne de cet écran, déjà
+// dans SYNC_KEYS et rattrapée par `onCloudReady` si restée vide, §5.49 — une
+// seconde clé aurait fait deux propriétaires pour « les charges », §11) :
+// `{ id, libelle, montant, periode: 'mois'|'an', debut: 'AAAA-MM-JJ', fin: '' | 'AAAA-MM-JJ' }`.
+// ⚠️ LA RÈGLE (décidée, et dite à l'écran) : un abonnement se paie D'AVANCE, au
+//    début de chaque période. Une échéance compte donc dès que son MOIS civil a
+//    commencé — le mois du début compte, le mois en cours compte, le mois de la
+//    fin compte, rien après. Commencé le 1er juillet, 10 €/mois, vu en octobre :
+//    juillet, août, septembre, octobre ⇒ 40 € cumulés, dont 10 € ce mois-ci.
+//    Annuel : une échéance par an, au mois anniversaire du début.
+//    C'est une CHARGE : elle n'entre jamais dans le CA (aucun lecteur du CA ne
+//    lit `vrm_compta`).
+const ymCompta = (s) => /^\d{4}-\d{2}/.test(String(s || '')) ? String(s).slice(0, 7) : null;
+const ymCourant = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+// Les mois (AAAA-MM) où l'abonnement a une échéance, jusqu'au mois `jusqua` inclus.
+const echeancesAbonnement = (a, jusqua) => {
+  const deb = ymCompta(a && a.debut); if (!deb || !jusqua) return [];
+  const fin = ymCompta(a.fin);
+  const borne = fin && fin < jusqua ? fin : jusqua;
+  const pas = a.periode === 'an' ? 12 : 1;
+  const out = [];
+  let y = Number(deb.slice(0, 4)), m = Number(deb.slice(5, 7));
+  for (let i = 0; i < 2400; i++) {
+    const ym = `${y}-${String(m).padStart(2, '0')}`;
+    if (ym > borne) break;
+    out.push(ym);
+    m += pas; while (m > 12) { m -= 12; y += 1; }
+  }
+  return out;
+};
+// Charge d'un abonnement sur les mois retenus par `filtre` : montant × échéances.
+const chargeAbonnement = (a, filtre, jusqua) => echeancesAbonnement(a, jusqua).filter(filtre).length * (Number(a && a.montant) || 0);
 // Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
 // ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Les coûts
-// fixes sont au tarif ACTUEL × nombre de mois de l'année (12 pour une année
-// passée, le mois courant pour l'année en cours) — on le DIT au libellé, on ne
-// prétend pas connaître leur historique mois par mois.
-const comptaChargesAnnee = (data, annee) => {
+// fixes (l'ancienne forme, sans date de début) sont au tarif ACTUEL × nombre de
+// mois de l'année (12 pour une année passée, le mois courant pour l'année en
+// cours) — on le DIT au libellé, on ne prétend pas connaître leur historique.
+// Les abonnements, eux, ont une date de début : leurs échéances sont exactes.
+const comptaChargesAnnee = (data, annee, maintenant = Date.now()) => {
   const d = (data && typeof data === 'object') ? data : {};
-  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [];
-  const now = new Date(), thisY = now.getFullYear();
+  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [], abonnements = d.abonnements || [];
+  const now = new Date(maintenant), thisY = now.getFullYear();
   const mois = annee < thisY ? 12 : (annee > thisY ? 0 : now.getMonth() + 1);
+  const jusqua = mois ? `${annee}-${String(mois).padStart(2, '0')}` : null;
   const estAnnee = (x) => String(x || '').slice(0, 4) === String(annee);
   const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
   const fixesParMois = sum(fixes, x => x.montant);
   const depTotal = sum(depenses.filter(x => estAnnee(x.date)), x => x.montant);
   const packTotal = sum(packs.filter(x => estAnnee(x.date)), x => x.montant);
   const fixesTotal = fixesParMois * mois;
+  const aboLignes = abonnements.map(a => ({ a, n: echeancesAbonnement(a, jusqua).filter(estAnnee).length }))
+    .map(x => ({ ...x, total: x.n * (Number(x.a.montant) || 0) })).filter(x => x.n > 0);
+  const aboTotal = sum(aboLignes, x => x.total);
   return {
-    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal,
-    total: fixesTotal + depTotal + packTotal,
+    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal, aboTotal,
+    total: fixesTotal + depTotal + packTotal + aboTotal,
     depLignes: depenses.filter(x => estAnnee(x.date)),
     packLignes: packs.filter(x => estAnnee(x.date)),
+    aboLignes,
     fixes,
   };
 };
+// Charges d'un MOIS (AAAA-MM), même règle : fixes + dépenses + packs du mois +
+// échéances d'abonnement du mois.
+const comptaChargesMois = (data, ym) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const duMois = (x) => String(x || '').slice(0, 7) === ym;
+  const abo = sum(d.abonnements || [], a => chargeAbonnement(a, (m) => m === ym, ym));
+  return { abo, total: sum(d.fixes || [], x => x.montant) + sum((d.depenses || []).filter(x => duMois(x.date)), x => x.montant) + sum((d.packs || []).filter(x => duMois(x.date)), x => x.montant) + abo };
+};
+// ── PROFIL FISCAL : le SIREN se vérifie, il ne se bloque pas (16 octobre) ────
+// SIREN = 9 chiffres, SIRET = SIREN + 5 chiffres ; les deux portent une clé de
+// Luhn. On DIT qu'il est invalide (une faute de frappe part sur chaque reçu
+// envoyé au comptable, §5), on n'empêche jamais d'enregistrer : lui seul sait.
+// Exception connue : La Poste (SIREN 356000000) — ses SIRET ne suivent pas Luhn
+// mais une somme de chiffres multiple de 5.
+const luhnOk = (ch) => { let s = 0; for (let i = 0; i < ch.length; i++) { let n = Number(ch[ch.length - 1 - i]); if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; } s += n; } return s % 10 === 0; };
+const verifierSiren = (brut) => {
+  const ch = String(brut || '').replace(/[\s.-]/g, '');
+  if (!ch) return { etat: 'vide' };
+  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: 'il ne doit contenir que des chiffres' };
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: `${ch.length} chiffre${ch.length > 1 ? 's' : ''} — un SIREN en a 9, un SIRET 14` };
+  const type = ch.length === 9 ? 'SIREN' : 'SIRET';
+  const siren = ch.slice(0, 9);
+  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIREN ne correspond pas (faute de frappe ?)' };
+  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIRET ne correspond pas (faute de frappe ?)' };
+  return { etat: 'ok', type, siren };
+};
+// ── CA PAR PÉRIODE (16 octobre) : AUCUNE règle de vente n'est écrite ici ─────
+// Les lignes viennent de `ventesFaites` (VENDU) et `ventesDeclarables`
+// (FINALISÉ / REÇU) ; ces fonctions ne font que découper le temps.
+// Semaine = du lundi 00:00 au lundi suivant (heure de l'appareil, comme Ma journée).
+const debutPeriode = (t, p) => {
+  const d = new Date(t); d.setHours(0, 0, 0, 0);
+  if (p === 'semaine') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  else if (p === 'mois') d.setDate(1);
+  else if (p === 'trimestre') { d.setDate(1); d.setMonth(Math.floor(d.getMonth() / 3) * 3); }
+  else { d.setDate(1); d.setMonth(0); }
+  return d;
+};
+const decalerPeriode = (d, p, k) => {
+  const x = new Date(d);
+  if (p === 'semaine') x.setDate(x.getDate() + 7 * k);
+  else if (p === 'mois') x.setMonth(x.getMonth() + k);
+  else if (p === 'trimestre') x.setMonth(x.getMonth() + 3 * k);
+  else x.setFullYear(x.getFullYear() + k);
+  return x;
+};
+const MOIS_COMPTA = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const libellePeriodeCa = (d, p) => p === 'semaine' ? `sem. du ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+  : p === 'mois' ? `${MOIS_COMPTA[d.getMonth()]} ${d.getFullYear()}`
+  : p === 'trimestre' ? `T${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}` : String(d.getFullYear());
+// `series` = { vendu, finalise, recu } — chacune une liste `{ts, eur}` ou `null`
+// (« pas su » ⇒ la colonne vaut `null`, jamais 0).
+const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
+  const s0 = debutPeriode(maintenant, p);
+  const somme = (liste, a, b) => {
+    if (!Array.isArray(liste)) return null;
+    let eur = 0, nb = 0;
+    for (const l of liste) if (l && l.ts >= a && l.ts < b) { eur += Number(l.eur) || 0; nb += 1; }
+    return { eur: Math.round(eur * 100) / 100, n: nb };
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = decalerPeriode(s0, p, -i), f = decalerPeriode(d, p, 1);
+    out.push({ cle: d.toISOString(), libelle: libellePeriodeCa(d, p), enCours: i === 0,
+      vendu: somme(series.vendu, d.getTime(), f.getTime()), finalise: somme(series.finalise, d.getTime(), f.getTime()), recu: somme(series.recu, d.getTime(), f.getTime()) });
+  }
+  return out;
+};
 
-function ComptaPro({ liveStats, onNav }) {
+// ── CA PAR PÉRIODE — vendu · finalisé · reçu (versé) ─────────────────────────
+// Julien appelle « encaissé » l'argent versé ; le CA déclaré ne dit jamais
+// « encaissé » (§5 : l'app ne connaît pas les recettes encaissées au sens de
+// l'URSSAF, et Leboncoin n'est pas daté au versement). D'où « reçu (versé) ».
+// AUCUNE règle de vente n'est écrite ici (§11) :
+//   · VENDU    = `ventesFaites` (au jour de la vente, en cours comprises, hors
+//                annulées et hors ventes/comptes cachés — la règle de Ma journée) ;
+//   · FINALISÉ = `ventesDeclarables` (lignes + « à dater »), au jour de la VENTE ;
+//   · REÇU     = `ventesDeclarables`, au jour du VERSEMENT (Vinted), de la vente
+//                (Leboncoin), de la commande (eBay) — `recuDuMois`, la date des
+//                barres de Ma journée, sans le registre des déclarations.
+// Les sources sont celles que la COQUE lit déjà (ventes de tous les comptes,
+// Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
+// Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
+const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
+function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { ventes, ko } = useVentesCoque();
+  const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
+  const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
+  const [versements, setVersements] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
+  // Les ventes et comptes masqués sont des réglages synchronisés (§5.49).
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setTick((t) => t + 1)), []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const calc = React.useMemo(() => {
+    if (ventes === undefined) return { etat: 'encours' };
+    if (!Array.isArray(ventes)) return { etat: 'passu' };
+    const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
+    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
+    const vf = ventesFaites({ vinted: ventes, lbc, ebay, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)) });
+    const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
+    let finSansDate = 0;
+    const finalise = [];
+    for (const l of [...decl.lignes, ...decl.aDater]) {
+      const t = l.o ? tsCommande(l.o) : (l.ts || 0);
+      if (t) finalise.push({ ts: t, eur: l.eur }); else finSansDate += 1;
+    }
+    const recu = versements ? decl.lignes.filter((l) => l.ts).map((l) => ({ ts: l.ts, eur: l.eur })) : null;
+    const aDater = versements ? decl.aDater : [];
+    const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
+    const manque = [
+      ...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe),
+      ...(lbcCoqueLu === null ? ['Leboncoin'] : []),
+      ...(ebayCommandes === null ? ['eBay'] : []),
+    ];
+    const attente = lbcCoqueLu === undefined || ebayCommandes === undefined;
+    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, finSansDate, manque, attente };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
+  const cur = lignes ? lignes[0] : null;
+  const partiel = calc.etat === 'lu' && (calc.manque.length > 0 || calc.attente);
+  const montant = (x) => x == null ? '—' : fmt(x.eur);
+  const nb = (x) => x == null ? '' : `${x.n} vente${x.n > 1 ? 's' : ''}`;
+  const COLS = [
+    ['vendu', 'Vendu', 'au jour de la vente, en cours comprises'],
+    ['finalise', 'Finalisé', 'ventes finalisées, au jour de la vente'],
+    ['recu', 'Reçu (versé)', versements === undefined ? 'dates de versement en lecture…' : versements === null ? 'dates de versement illisibles' : "au jour où l'argent a été versé"],
+  ];
+  const aDaterEur = calc.etat === 'lu' ? calc.aDater.reduce((t, l) => t + (Number(l.eur) || 0), 0) : 0;
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-ca-periode={periode} data-ca-etat={calc.etat} data-ca-partiel={partiel ? '1' : '0'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>
+          <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Chiffre d'affaires par période</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>Toutes plateformes · les mêmes règles que Ma journée et le CA déclaré.</div>
+          </div>
+          <div role="group" aria-label="Période" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, flex: '1 1 260px', maxWidth: 360 }}>
+            {PERIODES_CA.map(([k, l]) => (
+              <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} data-ca-choix={k}
+                style={{ flex: 1, border: 'none', borderRadius: 6, padding: '7px 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: periode === k ? C.accent : 'transparent', color: periode === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {calc.etat !== 'lu' ? (
+          <div style={{ padding: '16px', fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
+            {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
+          </div>
+        ) : (<>
+          <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
+            {COLS.map(([k, l, s], i) => (
+              <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
+                <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{l} · {cur.libelle}</div>
+                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{partiel && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table data-ca-table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ color: C.muted, textAlign: 'right' }}>
+                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>Période</th>
+                  {COLS.map(([k, l]) => <th key={k} style={{ fontWeight: 600, padding: '9px 16px 9px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>{l}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.slice(1).map((r) => (
+                  <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
+                    {COLS.map(([k]) => <td key={k} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{montant(r[k])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || versements === null) && (
+            <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, lineHeight: 1.55 }}>
+              {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
+              {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
+              {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
+              {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
+              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période.</div>}
+            </div>
+          )}
+        </>)}
+      </div>
+    </Card>
+  );
+}
+
+// ── PROFIL FISCAL — l'entité, le régime, le taux, réunis (16 octobre) ────────
+// Rien de neuf n'est stocké : l'entité est la ligne `vrm_pro_facture` (celle que
+// porte le reçu d'achat envoyé au comptable, §5 — même écriture que Réglages →
+// Facturation Pro), le régime `vinted_regime`, le taux `vinted_urssaf_taux`.
+// ⚠️ La ligne `vrm_pro_facture` se réécrit ENTIÈRE : lue en trois états
+//    (`lireReglage`), et une lecture ratée n'écrit RIEN (sinon la première
+//    frappe effaçait sa raison sociale et son SIRET).
+const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 110px'], ['ville', 'Ville', '1 1 160px']];
+function ProfilFiscalCarte({ onNav }) {
+  const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
+  const [statut, setStatut] = React.useState('');
+  const minuteur = React.useRef(null);
+  React.useEffect(() => { let mort = false; lireReglage('vrm_pro_facture').then((d) => { if (!mort) setCfg(d === null ? null : { ...d }); }).catch(() => { if (!mort) setCfg(null); }); return () => { mort = true; }; }, []);
+  const ecrire = (next) => {
+    if (!cfg) return;                                      // pas lu : on n'écrit rien
+    setCfg(next); setStatut('enregistrement…');
+    if (minuteur.current) clearTimeout(minuteur.current);
+    minuteur.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+          method: 'POST',
+          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
+        });
+        setStatut(r.ok ? '✓ enregistré' : "⚠ pas enregistré — la base n'a pas répondu, réessaie");
+      } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
+    }, 600);
+  };
+  const [regime, setRegime] = React.useState(() => load('vinted_regime', 'micro'));
+  React.useEffect(() => onCloudReady(() => setRegime((v) => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
+  const virgule = (n) => String(n).replace('.', ',');
+  const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
+  React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
+  const siren = verifierSiren(cfg && cfg.siret);
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-profil-fiscal={cfg === undefined ? 'encours' : cfg === null ? 'passu' : 'lu'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Profil fiscal</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
+          </div>
+          {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
+        </div>
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {cfg === undefined && <div style={{ fontSize: 12.5, color: C.muted }}>Je lis ton entité…</div>}
+          {cfg === null && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
+          {cfg && (<>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {PROFIL_CHAMPS.map(([k, ph, flex]) => (
+                <input key={k} data-profil-champ={k} value={cfg[k] || ''} placeholder={ph} aria-label={ph} inputMode={k === 'siret' || k === 'codePostal' ? 'numeric' : undefined}
+                  onChange={(e) => ecrire({ ...cfg, [k]: e.target.value })}
+                  style={{ ...inp, flex, borderColor: k === 'siret' && siren.etat === 'invalide' ? C.warn : C.border }} />
+              ))}
+            </div>
+            <div data-siren={siren.etat} style={{ fontSize: 11.5, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
+              {siren.etat === 'vide' ? 'SIREN (9 chiffres) ou SIRET (14) : il figure sur ton avis de situation INSEE.'
+                : siren.etat === 'ok' ? `${siren.type} valide (clé de contrôle correcte).`
+                : `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`}
+            </div>
+          </>)}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div role="group" aria-label="Régime fiscal" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+              {[['micro', 'Micro-entreprise (BIC)'], ['marge', 'Société — régime de la marge']].map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={regime === k} data-regime-choix={k} onClick={() => { setRegime(k); save('vinted_regime', k); }}
+                  style={{ flex: 1, border: 'none', borderRadius: 6, padding: '8px 6px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: regime === k ? C.accent : 'transparent', color: regime === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+              ))}
+            </div>
+            {regime !== 'marge' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
+                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux
+                  onBlur={() => { const v = parseFloat(String(taux).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTaux(virgule(ok)); save('vinted_urssaf_taux', ok); }}
+                  style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600 }} />
+                <span style={{ fontSize: 12, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Réglages</button>.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ComptaLigne({ gauche, droite, onDel, extra }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px' }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
+      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+      {extra}
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
+    </div>
+  );
+}
+// Carte de section : chip + titre + total à droite, corps (formulaire + liste).
+function ComptaSection({ icon, titre, note, total, totalSub, children, data }) {
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-compta-section={data}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
+            {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{note}</div>}
+          </div>
+          {total != null && <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>
+            {totalSub && <div style={{ fontSize: 10.5, color: C.muted, whiteSpace: 'nowrap' }}>{totalSub}</div>}
+          </div>}
+        </div>
+        <div style={{ padding: 14 }}>{children}</div>
+      </div>
+    </Card>
+  );
+}
+
+function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
     catch (_) { return { ...COMPTA_DEFAUT }; }
@@ -22253,29 +23337,27 @@ function ComptaPro({ liveStats, onNav }) {
     try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
   }), []);
   const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
-  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [];
+  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [], abonnements = data.abonnements || [];
 
   // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
   const annee = new Date().getFullYear();
   const moisEcoules = new Date().getMonth() + 1;          // janvier = 1
-  const moisCle = `${annee}-${String(moisEcoules).padStart(2, '0')}`;
+  const moisCle = ymCourant();
   const cetteAnnee = (d) => String(d || '').slice(0, 4) === String(annee);
-  const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
   const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
   const fixesParMois = somme(fixes, x => x.montant);
-  // Total annuel : UNE seule règle, partagée avec le rapport annuel (§11).
-  const chargesAnnee = comptaChargesAnnee(data, annee).total;
-  const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
-  const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
+  // Total annuel et total du mois : UNE seule règle, partagée avec le rapport annuel (§11).
+  const charges = comptaChargesAnnee(data, annee);
+  const chargesAnnee = charges.total;
+  const chargesDuMois = comptaChargesMois(data, moisCle);
+  const chargesMois = chargesDuMois.total;
 
   // ── RÉSULTAT = recettes déclarées − charges ───────────────────────────────
-  // Les charges (packs, dépenses, coûts fixes) sont « prises en compte » ICI,
-  // au niveau qui est réellement calculable. On CONSOMME la ligne publiée par
-  // l'écran Ventes (`vinted_urssaf_mois`, le CA déclaré, toutes plateformes,
-  // §11) — on ne recalcule aucun CA. Ligne absente/pas encore publiée ⇒ `null`
-  // (on n'invente pas de recettes). ⚠️ Ce n'est PAS le bénéfice : le coût
-  // d'achat des paires n'est pas déduit ici (il n'est pas saisi, §2.5, et il
-  // vit dans Statistiques) — le libellé et la note le disent.
+  // On CONSOMME la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`, le CA
+  // déclaré, toutes plateformes, §11) — on ne recalcule aucun CA. Ligne
+  // absente/pas encore publiée ⇒ `null` (on n'invente pas de recettes).
+  // ⚠️ Ce n'est PAS le bénéfice : le coût d'achat des paires n'est pas déduit
+  // ici (il n'est pas saisi, §2.5, et il vit dans Statistiques).
   const recettesAnnee = (() => {
     try {
       const v = load('vinted_urssaf_mois', null);
@@ -22292,35 +23374,46 @@ function ComptaPro({ liveStats, onNav }) {
   const [dLib, setDLib] = React.useState('');
   const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
   const [dMnt, setDMnt] = React.useState('');
-  const [fLib, setFLib] = React.useState('');
-  const [fMnt, setFMnt] = React.useState('');
   const [pPlat, setPPlat] = React.useState('Leboncoin');
   const [pCpt, setPCpt] = React.useState('');
   const [pMnt, setPMnt] = React.useState('');
   const [pDate, setPDate] = React.useState(auj);
+  const [aLib, setALib] = React.useState('');
+  const [aMnt, setAMnt] = React.useState('');
+  const [aPer, setAPer] = React.useState('mois');
+  const [aDeb, setADeb] = React.useState(auj);
+  const [aFin, setAFin] = React.useState('');
+  const [aErr, setAErr] = React.useState('');
 
   const ajouterDepense = () => {
     const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
     maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
   };
-  const ajouterFixe = () => {
-    const m = parseMontant(fMnt); if (!m || !fLib.trim()) return;
-    maj({ ...data, fixes: [{ id: rCompId(), libelle: fLib.trim(), montant: m }, ...fixes] });
-    setFLib(''); setFMnt('');
-  };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
     maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
     setPCpt(''); setPMnt(''); setPDate(auj);
   };
+  // Un abonnement mal saisi n'est pas ajouté, et on DIT pourquoi (jamais en silence).
+  const ajouterAbonnement = () => {
+    const m = parseMontant(aMnt);
+    if (!aLib.trim()) { setAErr('Donne-lui un nom (ex. « VRM », « Canva »).'); return; }
+    if (!m) { setAErr('Le montant doit être un nombre en euros, par exemple 12,99.'); return; }
+    if (!ymCompta(aDeb)) { setAErr('Il faut une date de début.'); return; }
+    if (aFin && aFin < aDeb) { setAErr('La date de fin est avant la date de début.'); return; }
+    maj({ ...data, abonnements: [{ id: rCompId(), libelle: aLib.trim(), montant: m, periode: aPer === 'an' ? 'an' : 'mois', debut: aDeb, fin: aFin || '' }, ...abonnements] });
+    setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr('');
+  };
+  const terminerAbonnement = (id) => maj({ ...data, abonnements: abonnements.map(a => a.id === id ? { ...a, fin: auj } : a) });
   const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {
     const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     const L = [[`Charges ${annee}`], [], ['Date', 'Type', 'Libelle', 'Montant']];
     depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([d.date ? d.date.split('-').reverse().join('/') : '', 'Depense' + (d.cat ? ' (' + d.cat + ')' : ''), d.libelle || '', (Number(d.montant) || 0).toFixed(2)]));
-    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack / option', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    charges.aboLignes.forEach(x => L.push([x.a.debut ? x.a.debut.split('-').reverse().join('/') : '', `Abonnement x${x.n} echeance${x.n > 1 ? 's' : ''}`, x.a.libelle || '', x.total.toFixed(2)]));
     fixes.forEach(f => L.push(['', `Cout fixe x${moisEcoules} mois`, f.libelle || '', ((Number(f.montant) || 0) * moisEcoules).toFixed(2)]));
     L.push(['', '', 'TOTAL', chargesAnnee.toFixed(2)]);
     const csv = L.map(r => r.map(e).join(';')).join('\n');
@@ -22343,40 +23436,25 @@ function ComptaPro({ liveStats, onNav }) {
   const chip = (icon) => (
     <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
   );
-  const Ligne = ({ gauche, droite, onDel }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>
-      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
-      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
-    </div>
-  );
-  // Carte de section : chip + titre + total à droite, corps (formulaire + liste).
-  const Section = ({ icon, titre, note, total, children }) => (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
-        {chip(icon)}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
-          {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>{note}</div>}
-        </div>
-        {total != null && <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>}
-      </div>
-      <div style={{ padding: 14 }}>{children}</div>
-    </Card>
-  );
-  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '2px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
+  // Section et Ligne vivent HORS du composant : définies ici, elles changeaient
+  // d'identité à chaque rendu et React remontait leurs champs — le curseur
+  // sautait à chaque lettre tapée.
+  const Ligne = ComptaLigne, Section = ComptaSection;
+  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
   const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
+  const dateFr = (s) => String(s || '').split('-').reverse().join('/');
+  const lienBtn = (txt, tab, fs = 12.5) => <button type="button" onClick={() => onNav && onNav(tab)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: fs, minHeight: 0, display: 'inline', verticalAlign: 'baseline', lineHeight: 'inherit' }}>{txt}</button>;
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
+      <ScreenHead icon="euro" title="Comptabilité" desc="Tes charges, tes abonnements et ton chiffre d'affaires par période — chaque euro compte dans ton résultat." />
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
       <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ height: 3, background: C.accent }} />
-        <div style={{ padding: '16px 18px' }}>
+        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>CA déclaré − charges · {annee}</div>
           {recettesAnnee == null ? (
             <div>
@@ -22385,7 +23463,7 @@ function ComptaPro({ liveStats, onNav }) {
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
-                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
+                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre {lienBtn('Ventes', 'cat_ventes')} une fois, et tes charges y seront déduites.
               </div>
             </div>
           ) : (
@@ -22396,10 +23474,10 @@ function ComptaPro({ liveStats, onNav }) {
                 <span>CA déclaré</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
-                <span>de charges</span>
+                <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
               </div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 11.5)}) — ce n'est donc pas encore ton bénéfice net.
               </div>
             </div>
           )}
@@ -22409,14 +23487,16 @@ function ComptaPro({ liveStats, onNav }) {
       {/* Trois repères de charges — même carte, hiérarchie claire. */}
       <div className="vrm-finance-charges" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
-          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
-          { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
-          { l: `Total charges ${annee}`, v: fmt(chargesAnnee), s: `depuis janvier` },
-        ].map((x, i) => (
-          <Card key={i} style={{ padding: '13px 15px' }}>
-            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
-            <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{x.v}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+          { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },
+          { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
+          { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
+        ].map((x) => (
+          <Card key={x.k} style={{ padding: '13px 15px' }}>
+            <div data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
+              <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
+              <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{fmt(x.v)}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+            </div>
           </Card>
         ))}
       </div>
@@ -22426,46 +23506,96 @@ function ComptaPro({ liveStats, onNav }) {
         </button>
       )}
 
-      {/* DÉPENSES PONCTUELLES */}
-      <Section icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
-          <select value={dCat} onChange={e => setDCat(e.target.value)} style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
-          <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
-        </div>
-        {depenses.length === 0
-          ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
-          : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
-      </Section>
+      <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
 
-      {/* COÛTS FIXES MENSUELS */}
-      <Section icon="clock" titre="Coûts fixes" note="Chaque mois : abonnement, logiciel, local…" total={fixesParMois ? fixesParMois : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 180px' }} />
-          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 120 }} />
-          <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
-        </div>
-        {fixes.length === 0
-          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois — il sera compté chaque mois.')
-          : listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
-      </Section>
+      <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
+        {/* ABONNEMENTS RÉCURRENTS */}
+        <Section data="abonnements" icon="sync" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance, jamais dans ton CA."
+          total={abonnements.length ? charges.aboTotal : null} totalSub={abonnements.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="text" placeholder="Ex. VRM, Canva, appli photo" aria-label="Nom de l'abonnement" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, flex: '2 1 170px' }} />
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: 90 }} />
+            <select value={aPer} onChange={e => setAPer(e.target.value)} aria-label="Périodicité" data-abo-periode style={{ ...inp }}><option value="mois">par mois</option><option value="an">par an</option></select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Début
+              <input type="date" value={aDeb} onChange={e => { setADeb(e.target.value); setAErr(''); }} data-abo-debut style={{ ...inp, width: '100%' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Fin (facultatif)
+              <input type="date" value={aFin} onChange={e => { setAFin(e.target.value); setAErr(''); }} data-abo-fin style={{ ...inp, width: '100%' }} />
+            </label>
+            <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>Ajouter</button>
+          </div>
+          {aErr && <div data-abo-erreur style={{ fontSize: 12, color: C.warn, marginTop: 8 }}>{aErr}</div>}
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Payé d'avance : une échéance compte dès le début de son mois — le mois du début et le mois en cours comptent.</div>
+          {abonnements.length === 0
+            ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois — il sera compté à chaque échéance.')
+            : listeBox(abonnements.map((a, i) => {
+              const ech = echeancesAbonnement(a, moisCle);
+              const cumul = ech.length * (Number(a.montant) || 0);
+              const pasEncore = ymCompta(a.debut) > moisCle;
+              const fini = a.fin && ymCompta(a.fin) < moisCle;
+              return (
+                <div key={a.id} data-abo={a.libelle} data-abo-cumul={String(Math.round(cumul * 100) / 100)} data-abo-echeances={ech.length} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                  <Ligne
+                    gauche={<><span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{a.libelle}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 2 }}>
+                        {pasEncore ? `commence le ${dateFr(a.debut)}` : `depuis le ${dateFr(a.debut)}`}{a.fin ? ` · ${fini ? 'terminé' : 'jusqu’au'} ${dateFr(a.fin)}` : ''}
+                        {!pasEncore && ` · ${ech.length} échéance${ech.length > 1 ? 's' : ''}, ${fmt(cumul)} en tout`}
+                      </span></>}
+                    droite={fmt(a.montant) + (a.periode === 'an' ? ' /an' : ' /mois')}
+                    extra={!a.fin && !pasEncore ? <button type="button" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 6, fontSize: 11, fontWeight: 600, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Arrêter</button> : null}
+                    onDel={() => retirer('abonnements', a.id)} />
+                </div>
+              );
+            }))}
+        </Section>
 
-      {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
-          en compte du bénéfice ». */}
-      <Section icon="camera" titre="Packs de photos" note="Au-delà des photos gratuites, un compte pro achète un pack : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={pPlat} onChange={e => setPPlat(e.target.value)} style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
-          <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
-          <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
-        </div>
-        {packs.length === 0
-          ? vide('Tu as acheté un pack de photos sur un compte pro ? Note-le ici.')
-          : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
-      </Section>
+        {/* DÉPENSES PONCTUELLES */}
+        <Section data="depenses" icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null} totalSub={depenses.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
+            <input type="text" placeholder="Ex. rouleau de scotch" aria-label="Libellé" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
+            <select value={dCat} onChange={e => setDCat(e.target.value)} aria-label="Catégorie" style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
+            <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
+          </div>
+          {depenses.length === 0
+            ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
+            : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {dateFr(d.date)}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
+        </Section>
+
+        {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
+            en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
+            transmet à VRM ce que tu lui paies (ni pack, ni option, ni boost
+            Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
+            seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
+            par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
+        <Section data="packs" icon="camera" titre="Packs & options payés" note="Pack de photos, option de mise en avant sur Leboncoin ou eBay : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+            <input type="text" placeholder="Compte (ex. pro Cancale)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+            <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
+            <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies : note-le ici, il entre dans tes charges. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard', 11)}.</div>
+          {packs.length === 0
+            ? vide('Tu as acheté un pack de photos ou une option ? Note-le ici.')
+            : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {dateFr(p.date)}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
+        </Section>
+
+        {/* Les anciens COÛTS FIXES (sans date de début) : gardés tant qu'il en
+            reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
+            les remplace (rien n'est perdu, §4.11). */}
+        {fixes.length > 0 && (
+          <Section data="fixes" icon="clock" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
+            {listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+          </Section>
+        )}
+
+        <ProfilFiscalCarte onNav={onNav} />
+      </div>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
       <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: C.shadow || 'none' }}>
@@ -22657,7 +23787,7 @@ const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JS
 // avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
 // compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
 // pas la rangée (§7, pas de bruit).
-function SelecteurCompte({ accounts, sel, setSel, connecte }) {
+function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) {
   const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
   const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
   const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
@@ -22683,8 +23813,15 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   // Un compte choisi (par lui ou d'office) estompe les autres : on le dit UNE
   // fois, ici, avec le geste — sinon des lignes floues et inertes apparaissent
   // sans raison dès que l'extension est allumée (§7).
-  const note = val !== '*' ? <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
-    {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
+  // ⚠️ Messages (16 octobre) : le compte de l'extension n'y filtre plus rien —
+  //    ses conversations passent en tête, les autres restent lisibles en
+  //    lecture seule (la raison est dite au-dessus d'elles, pas ici : §7). La
+  //    note ne dit donc plus « estompés » là où rien ne l'est. Même condition
+  //    que l'écran (`msgCompteActif`) : sinon le filtre d'avant reste, et la
+  //    phrase d'avant avec lui.
+  const prioMessages = messages && val === coVu && String(sel || '') !== coVu && extSait('messagerie') === 'ok' && !__vmrPlusieurs;
+  const note = val !== '*' ? <span data-sel-compte-note={prioMessages ? 'extension-messages' : val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
+    {prioMessages ? "compte de l'extension · ses conversations passent en tête" : <>{val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir</>}
   </span> : null;
   return <ListeComptes id="vrm-sel-compte" valeur={val} onChange={setSel}
     options={tri.map(a => { const uid = String(a.vinted_user_id); return { val: uid, nom: (uid === co ? '📍 ' : '') + nom(a) }; })}
@@ -24253,11 +25390,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // est vide on dit « Bonjour » tout court — mieux vaut un blanc qu'un faux
   // (§5). On ne le devine PAS depuis l'email : « vinted35260 » n'est pas un
   // prénom, et un prénom inventé est un faux.
-  const [prenom, setPrenom] = useState(() => String(load('vrm_prenom', '') || '').trim());
+  const [prenom, setPrenom] = useState(() => prenomLisible(load('vrm_prenom', '')));
   useEffect(() => onCloudReady(() => {
     // §5.49 : un réglage synchronisé lu au MONTAGE lit du vide au premier
     // écran ouvert. On ne remplace que ce qui est resté vide.
-    setPrenom((p) => p || String(load('vrm_prenom', '') || '').trim());
+    setPrenom((p) => p || prenomLisible(load('vrm_prenom', '')));
   }), []);
   const [imprimante, setImprimante] = useState(() => imprMode(load('vrm_imprimante', 'normale')));
   const imprTouchee = React.useRef(false);
@@ -27114,10 +28251,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
   const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
-  const [offOpen, setOffOpen] = useState(false);
-  const OFF_DRAFT0 = { title:'', price:'', numero:'', source:'brocante', date: new Date().toISOString().slice(0,10) };
-  const [offDraft, setOffDraft] = useState(OFF_DRAFT0);
-  const [offEditId, setOffEditId] = useState(null);
+  // (le formulaire d'ajout vit dans `AchatsHorsPlateforme`, avec son état)
   // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
   // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
   // → le même N° apparaît côté Annonces, Ventes ET Achats : lien achat↔vente.
@@ -28361,6 +29495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['CHARGES (registre)']); L.push(['Date','Type','Libelle','Montant']);
     R.charges.depLignes.forEach(d=>L.push([d.date?new Date(d.date).toLocaleDateString('fr-FR'):'','Depense',`${d.libelle||''}${d.cat?' ('+d.cat+')':''}`,(Number(d.montant)||0).toFixed(2)]));
     R.charges.packLignes.forEach(p=>L.push([p.date?new Date(p.date).toLocaleDateString('fr-FR'):'','Pack photos',`${p.plateforme||''}${p.compte?' '+p.compte:''}`,(Number(p.montant)||0).toFixed(2)]));
+    (R.charges.aboLignes||[]).forEach(x=>L.push([x.a.debut?new Date(x.a.debut).toLocaleDateString('fr-FR'):'',`Abonnement x${x.n} echeance${x.n>1?'s':''}`,x.a.libelle||'',x.total.toFixed(2)]));
     R.charges.fixes.forEach(f=>L.push(['',`Cout fixe x${R.charges.moisComptes} mois`,f.libelle||'',((Number(f.montant)||0)*R.charges.moisComptes).toFixed(2)]));
     L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
     L.push([]);
@@ -28395,7 +29530,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
-    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
+    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, abonnements, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
@@ -28811,6 +29946,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
         action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
+  // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
+  // L'extension n'agit qu'au nom du compte connecté dans l'onglet Vinted de ce
+  // Chrome (`gardeStricte`, §3). Répondre ou faire une offre sur un AUTRE
+  // compte échouerait au clic : ses conversations restent lisibles, mais en
+  // LECTURE SEULE (boutons grisés, la raison dite une fois au-dessus d'elles).
+  // ⚠️ « Pas su » (état de l'extension inconnu, cookie pas lu, deux copies,
+  //    extension en retard) ⇒ `msgCompteActif` vide : rien n'est affirmé, le
+  //    comportement d'avant reste (« pas su » ne vaut pas oui).
+  const msgCompteActif = (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const msgLectureSeule = (acc) => !!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif;
+  const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : ''; };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -28854,8 +30000,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
-            {!openConv.loading && !openConv.error && openConv.convId && (
-              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+            {!openConv.loading && !openConv.error && openConv.convId && (()=>{ const ro = msgLectureSeule(openConv.acc); return (
+              <div data-conv-ro={ro?String(openConv.acc.vinted_user_id):undefined} style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
+                    distingue) — la raison générale est dite une fois au-dessus
+                    de la liste (§7). */}
+                {ro && (
+                  <div data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12,color:C.text,lineHeight:1.45,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',marginBottom:8}}>
+                    <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
+                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> dans Chrome (il est sur {msgNomActif()||'un autre compte'}).</span>
+                  </div>
+                )}
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
                     une. Par l'extension, sur le compte connecté dans Chrome. */}
                 {(()=>{
@@ -28871,20 +30026,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                   return (
-                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
+                    <div data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8,opacity:ro?0.55:1}}>
                       {off && (
                         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
                           <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
-                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:(offreBusy||ro)?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
                       {tx && (
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          <input inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
                             style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
-                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                          <button type="button" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${ro?C.border:C.accent}`,borderRadius:8,background:'transparent',color:ro?C.muted:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||ro||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div>
                       )}
                       {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
@@ -28894,21 +30049,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:11,color:C.muted,marginBottom:6}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
-                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
+                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch',opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
+                    <button key={i} type="button" disabled={ro} onClick={()=>setReplyText(q.t)} title={q.t}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea aria-label="Réponse à la conversation" value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||extSait('messagerie')!=='ok'||__vmrPlusieurs||openConv.conversation?.allow_reply===false} style={{flexShrink:0,border:'none',borderRadius:10,padding:'9px 14px',background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
                 {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
               </div>
-            )}
+            ); })()}
           </div>
         </div></ResponsiveChatPortal>
   );
@@ -29086,7 +30241,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Un compte dont les ventes n'ont pas pu être lues n'est pas dans ce
         // reçu (`ventesComptees`) : on le dit à côté du chiffre — un total
         // partiel ne se présente pas comme complet (§5).
-        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
+        // (16 oct.) Au-delà de deux comptes, le nombre : neuf identifiants à la suite
+        // remplissaient la carte sur iPhone. Les noms restent dans `data-recu-sans`
+        // et dans l'infobulle.
+        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.length > 2 ? `${nomsVentesKO.length} comptes` : nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
@@ -29094,19 +30252,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-day-layout">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* ═══ RÉTABLI LE 13 OCTOBRE (retiré par #500) ════════════════════
-                codex avait enlevé de Ma journée le bonjour, VENDU/REÇU du mois et
-                l'argent en attente/à virer — l'info que Julien regarde en premier
-                sur son téléphone. On les remet, en CARTE CLAIRE (cohérent avec le
-                thème actuel, plus l'ancien bloc sombre), en gardant toute la
-                logique §5/§11 (chiffres sûrs, « vendu » ≠ « reçu », escrow ≠
-                dispo, « pas su » ≠ 0). Toutes les variables sont déjà calculées
-                plus haut dans ce rendu. `vendu-recu.cjs` prouve le rétablissement. */}
+            {/* ═══ MA JOURNÉE, REFAITE LE 16 OCTOBRE (« pas premium sur iPhone ») ═══
+                Une hiérarchie au lieu de huit blocs de même poids : le bonjour,
+                la barre des quatre gestes, UN héros (le vendu du mois, le jour
+                dedans, le reçu dessous), la semaine VISIBLE (plus dans un repli),
+                puis l'argent en attente. Les chiffres et leurs phrases gardent
+                leur source (§5) ; seuls la forme et la longueur ont changé.
+                Cartes sobres : bord fin, ombre douce, une seule couleur d'accent
+                (le vendu du jour, la courbe, les liens). */}
             {!baseKO && (
-              <div className="vrm-day-greeting" style={{marginBottom:14}}>
-                <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
-                <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.4}}>{hello}{prenom ? ' ' + prenom : ''}</div>
-                {!loading && jobs.length>0 && <div style={{fontSize:13,color:C.muted,marginTop:3}}><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</div>}
+              <div className="vrm-day-greeting">
+                <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
+                <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
+                {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
               </div>
             )}
 
@@ -29119,8 +30277,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {/* LA BARRE DU QUOTIDIEN (16 oct., Julien : « juste les logos —
                 colis à envoyer, à retirer, messages, baisser les prix — sans les
-                textes, une barre en largeur »). Le nombre est un fait ; « — »
-                quand il n'a pas pu être lu (jamais un zéro inventé, §5). */}
+                textes, une barre en largeur »). UNE carte, quatre cases séparées
+                d'un filet. Le nombre est un fait ; « — » quand il n'a pas pu être
+                lu (jamais un zéro inventé, §5). */}
             {!baseKO && !premierJour && (()=>{
               const ko = nomsVentesKO.length > 0;
               const T = [
@@ -29130,16 +30289,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];
               return (
-                <div data-barre-jour="" style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:8,marginBottom:14}}>
-                  {T.map(x => {
+                <div data-barre-jour="" className="vrm-day-bar" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                  {T.map((x, k) => {
                     const n = x.t ? x.t.n : 0;
                     const vif = !x.pasSu && n > 0;
                     return (
                       <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
-                        style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'12px 6px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',minWidth:0}}>
-                        <span style={{display:'flex',color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
-                        <span className="vrm-display" style={{fontSize:20,fontWeight:700,lineHeight:1.1,color:vif ? C.text : C.muted,fontVariantNumeric:'tabular-nums'}}>{x.pasSu ? '—' : n}</span>
-                        <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{x.l}</span>
+                        style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
+                        <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
+                        <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
+                        <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
                       </button>
                     );
                   })}
@@ -29147,83 +30306,102 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
-            {/* VENDU / REÇU du mois — deux notions, deux mots (§ 4 oct.). Carte
-                claire : le gros chiffre en encre, l'accent réservé au lien. */}
-            {!baseKO && !premierJour && !loading && sales.items && (
-              <button type="button" className="vrm-day-money" onClick={()=>onNav&&onNav('cat_ventes')}
-                style={{width:'100%',textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none',display:'block',padding:'18px 18px 16px'}}>
-                <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Vendu en {moisNom}</div>
-                <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display" style={{fontSize:'clamp(34px, 10vw, 48px)',fontWeight:800,letterSpacing:-1,marginTop:6,lineHeight:1,color:C.text,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={moisEur}/></div>
-                <div style={{fontSize:13,color:C.muted,marginTop:6,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-                  <span><b style={{color:C.text,fontWeight:700}}>{moisN}</b> vente{moisN>1?'s':''} ce mois-ci</span>
-                  <span style={{opacity:.5}}>·</span>
-                  <span style={{color:C.accent,fontWeight:600}}>voir mes ventes ›</span>
-                </div>
-                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',color:C.muted}}>Reçu en {moisNom}</span>
-                  <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                  <span style={{fontSize:12,color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré')}</span>
-                </div>
-              </button>
-            )}
+            {/* LE HAUT DE LA JOURNÉE : héros + semaine (+ argent). Sur
+                téléphone : empilés dans cet ordre. Sur ordinateur : le héros et
+                l'argent à gauche, la semaine à droite (`.vrm-day-top`). */}
+            <div className="vrm-day-top">
 
-            {/* Vendu AUJOURD'HUI — le soir, la première chose qu'on veut voir. */}
-            {jourN>0 && (
-              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <div data-vendu-jour={Math.round(jourEur*100)} style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
-                  <span style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
-                  <span style={{fontSize:15,fontWeight:600,color:C.text}}>{jourN} vente{jourN>1?'s':''}</span>
-                </div>
-              </button>
-            )}
-
-            {/* VENDU / REÇU, 14 derniers jours (BarresVenduRecu). */}
+            {/* LE HÉROS : VENDU ce mois (le gros chiffre), VENDU aujourd'hui
+                dedans (l'accent, rare), REÇU dessous — deux notions, deux mots
+                (§ 4 oct.). Plus de carte bleue à part pour le jour : c'était le
+                bloc criard de la capture. */}
             {!baseKO && !premierJour && !loading && sales.items && (
-              <ResumePlateforme title="Ta semaine" className="vrm-day-history">
-              <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Cette semaine · <span className="vrm-display" data-total-semaine={Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)*100)}>{Math.round(semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0)).toLocaleString('fr-FR')} €</span> vendus</div>
-                  <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
+              <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div className="vrm-day-head">
+                  <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
+                  <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
+                </div>
+                <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display vrm-day-hero-n" style={{color:C.text}}><CountUpEuro value={moisEur}/></div>
+                <div className="vrm-day-meta" style={{color:C.muted}}>
+                  <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
+                  {jourN>0 && <>
+                    <span aria-hidden="true" style={{opacity:.45}}>·</span>
+                    <span data-vendu-jour={Math.round(jourEur*100)} style={{color:C.accent,fontWeight:600}}>+{Math.round(jourEur).toLocaleString('fr-FR')} € aujourd'hui <span style={{fontWeight:500,opacity:.85}}>({jourN} vente{jourN>1?'s':''})</span></span>
+                  </>}
+                </div>
+                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
+                  <div style={{minWidth:0}}>
+                    <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
+                    <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
                   </div>
-                </div>
-                <CourbeSemaine jours={semaine}/>
-                <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
-                  <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé.
-                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
-                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
+                  <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
                 </div>
               </div>
-              </ResumePlateforme>
             )}
 
+            {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
+                autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
+            {jourN>0 && !(!baseKO && !premierJour && !loading && sales.items) && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
+                style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
+                <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
+                <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.accent,fontVariantNumeric:'tabular-nums'}}>{Math.round(jourEur).toLocaleString('fr-FR')} €</span>
+                <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
+              </button>
+            )}
+
+            {/* LA SEMAINE EN COURS (lundi → dimanche), VISIBLE sans clic (elle
+                était cachée dans « ▸ Ta semaine »). */}
+            {!baseKO && !premierJour && !loading && sales.items && (()=>{
+              const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
+              const geste = extSait('versement');
+              return (
+              <div data-carte-jours="" className="vrm-day-week vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div className="vrm-day-head">
+                  <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
+                  <span className="vrm-day-legende" style={{color:C.muted}}>
+                    <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
+                    <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
+                  </span>
+                </div>
+                <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
+                <CourbeSemaine jours={semaine}/>
+                <div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
+                  Vendu : au jour de la vente · Reçu : au jour du versement.
+                  {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
+                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
+                </div>
+              </div>
+              );
+            })()}
+
             {/* ARGENT EN ATTENTE / DISPONIBLE À VIRER (§5.14 : deux notions,
-                deux montants, jamais confondus ; escrow réel sinon estimation). */}
+                deux montants, jamais confondus ; escrow réel sinon estimation).
+                Deux colonnes au lieu d'une phrase qui passait à la ligne. */}
             {!baseKO && !premierJour && (()=>{
               const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
+              const avecDispo = !!(escrow && escrow.dispo > 0);
               return (
-              <div style={{marginBottom:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:13,color:C.muted,fontWeight:500}}>en attente</span></div>
-                  <div style={{fontSize:12,color:C.muted,marginTop:1}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
-                  {escrow && escrow.dispo > 0 && (
-                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>
-                      et <b style={{color:C.text,fontWeight:700}}>{escrow.dispo.toFixed(2).replace('.',',')} €</b> déjà disponibles à virer
-                      {escrow.accounts>1?` · sur ${escrow.accounts} porte-monnaie`:''}
-                      {escrow.plusVieuxJours>7?` · le plus ancien lu il y a ${escrow.plusVieuxJours} j`:''}
-                    </div>
-                  )}
+              <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
+                <div style={{minWidth:0}}>
+                  <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
+                  <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow?'':'≈ '}{Math.round(val).toLocaleString('fr-FR')} €</div>
+                  <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
                 </div>
-                <span aria-hidden="true" style={{color:C.muted,fontSize:22,fontWeight:700}}>›</span>
+                {avecDispo && (
+                  <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
+                    <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
+                    <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow.dispo.toFixed(2).replace('.',',')} €</div>
+                    <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
+                  </div>
+                )}
               </div>
               );
             })()}
+
+            </div>
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -29261,6 +30439,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
                 grand écran et UNE sur téléphone — la même règle, sans test de
                 largeur dans le JavaScript. */}
+            {!loading && jobs.length>0 && (
+              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
+            )}
             {!loading && jobs.length>0 && (
               <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
@@ -29327,7 +30508,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
                 serait un faux, §5) — le prix de vente, qui est un fait. */}
             {!loading && dernieresVentes.length>0 && (
-              <div style={{marginTop:14}}>
+              <div className="vrm-day-recent" style={{marginTop:24}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                   <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
                   <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
@@ -29579,7 +30760,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
@@ -29597,6 +30778,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
+               {/* Coût inconnu : les deux gestes, VISIBLES (pas derrière « Modifier »). */}
+               {!hidden && st!=='cancelled' && buy==null && !(e && e.buyFromId) && (
+                 <CoutAchatVente onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
+                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/>
+               )}
                <div className="vrm-sale-footer"><FactureSousVente factures={facturesVentes} compte={o._acc?.login}/>
                <details className="vrm-sale-details"><summary title="Numéro, coût d’achat et autres actions">Modifier</summary>
                {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
@@ -29666,12 +30852,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
                    </div>
                  );
-                 if (buy==null) return (
-                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
-                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
-                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
-                   </button>
-                 );
+                 // (coût inconnu : « Saisir le prix » et « Relier un achat » sont
+                 //  visibles au-dessus, `CoutAchatVente` — pas une 2ᵉ fois ici, §7)
                  return null;
                })()}
                </details></div>
@@ -30964,101 +32146,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* ACHATS HORS VINTED : c'est de la SAISIE occasionnelle (brocante,
-            fournisseur…), pas une info à consulter tous les jours. Replié
-            derrière un bouton qui garde le total visible — la compta reste
-            juste, l'écran reste léger. */}
-        {(()=>{
-          const tot = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
-          return (
-            <button type="button" onClick={()=>setOffSecOpen(v=>!v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="tag" size={18}/></span>
-              <span style={{flex:1,textAlign:'left',minWidth:0}}>
-                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Achats hors Vinted</span>
-                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
-                  {offBuys.length ? `${offBuys.length} achat${offBuys.length>1?'s':''} · ${tot.toFixed(0)} € — brocante, fournisseur, particulier` : 'Ajoute une paire achetée ailleurs (brocante, fournisseur…)'}
-                </span>
-              </span>
-              <span style={{fontSize:13,color:C.muted,transform:offSecOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
-            </button>
-          );
-        })()}
-        {offSecOpen && (<>
-        {/* ── ACHATS HORS VINTED (brocante, fournisseur, particulier…) ────── */}
-        {(()=>{
-          const SRC = { brocante:{e:'🏷️',l:'Brocante'}, fournisseur:{e:'🏭',l:'Fournisseur'}, particulier:{e:'👤',l:'Particulier'}, 'vide-grenier':{e:'🎪',l:'Vide-grenier'}, autre:{e:'📦',l:'Autre'} };
-          const srcOf = s => SRC[s] || SRC.autre;
-          const offTotal = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
-          const saveOff = () => {
-            const rec = { title:offDraft.title.trim(), price:offDraft.price, numero:offDraft.numero, source:offDraft.source, date:offDraft.date };
-            if (offEditId) updOffBuy(offEditId, rec); else addOffBuy(rec);
-            // Lien compta : le N° + prix nourrit le prix d'achat PAR NUMÉRO → quand
-            // cette paire se vend, son bénéfice utilise ce coût automatiquement.
-            const nm = String(rec.numero||'').trim(); const pr = String(rec.price||'').trim();
-            if (nm && pr) setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; });
-            setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false);
-          };
-          const Field = ({label,children}) => (<label style={{display:'flex',flexDirection:'column',gap:3,flex:1,minWidth:0}}><span style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>{children}</label>);
-          const inp = {border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
-          return (
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 13px',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:38,height:38,borderRadius:10,background:`${C.accent}14`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏷️</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>Achats hors Vinted</div>
-              <div style={{fontSize:11,color:C.muted}}>{offBuys.length>0 ? `${offBuys.length} paire${offBuys.length>1?'s':''} · ${Math.round(offTotal)} € dépensés` : 'Brocante, fournisseur, particulier…'}</div>
-            </div>
-            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:8,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{offOpen?'✕ Fermer':'➕ Ajouter'}</button>
-          </div>
-          {offOpen && (
-            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:10,padding:'12px',border:`1px solid ${C.border}`}}>
-              <Field label="Désignation"><input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="ex : Nike P-6000 argenté 38" style={inp} autoFocus/></Field>
-              {/* Relier directement à une annonce EN LIGNE : remplit son N° tout
-                  seul → plus besoin de le retenir, et le prix payé arrive au bon
-                  endroit dans le calcul de bénéfice (utile pour un vrai pro qui
-                  source ailleurs mais revend sur Vinted). */}
-              {(()=>{ const opts = annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).sort((a,b)=>Number((numeros[a.id]||{}).numero)-Number((numeros[b.id]||{}).numero)); return opts.length>0 ? (
-                <Field label="Relier à une annonce en ligne (remplit le N°)">
-                  <select value="" onChange={e=>{ const it=annBase.find(x=>String(x.id)===e.target.value); if(!it) return; const nn=String((numeros[it.id]||{}).numero||''); setOffDraft(d=>({...d, numero:nn||d.numero, title:d.title.trim()?d.title:(it.title||'')})); }} style={inp}>
-                    <option value="">— optionnel : choisir une de tes annonces —</option>
-                    {opts.map(it=>{ const nn=(numeros[it.id]||{}).numero; return <option key={it.id} value={String(it.id)}>N°{nn} · {(it.title||'').slice(0,40)}</option>; })}
-                  </select>
-                </Field>
-              ) : null; })()}
-              <div style={{display:'flex',gap:9}}>
-                <Field label="Prix payé €"><input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="0" style={inp}/></Field>
-                <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,9)}))} inputMode={clavierNum()} placeholder={String(nextNumero)} style={inp}/></Field>
-              </div>
-              <div style={{display:'flex',gap:9}}>
-                <Field label="Provenance"><select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={inp}>{Object.entries(SRC).map(([k,v])=><option key={k} value={k}>{v.e} {v.l}</option>)}</select></Field>
-                <Field label="Date"><input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={inp}/></Field>
-              </div>
-              <button type="button" disabled={!offDraft.title.trim()} onClick={saveOff} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:8,padding:'11px',fontSize:13,fontWeight:600,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit',marginTop:2}}>{offEditId?'💾 Enregistrer':'➕ Ajouter cet achat'}</button>
-              <div style={{fontSize:11,color:C.muted,textAlign:'center',lineHeight:1.4}}>💡 Le N° relie l'achat à la vente : quand la paire se vend, son bénéfice utilise ce prix tout seul.</div>
-            </div>
-          )}
-          {offBuys.length>0 && (
-            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:11}}>
-              {offBuys.map(b=>{ const sc=srcOf(b.source); return (
-                <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 10px',background:C.bg}}>
-                  <div style={{width:32,height:32,borderRadius:8,background:`${C.accent}0e`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,flexShrink:0}} title={sc.l}>{sc.e}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
-                    <div style={{fontSize:11,color:C.muted,marginTop:1}}>{[sc.l,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
-                  </div>
-                  {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'2px 7px'}}>N°{b.numero}</span>}
-                  <span style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
-                  <button className="vrm-icon-control" type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="pencil" size={15}/></button>
-                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="trash" size={16}/></button>
-                </div>
-              );})}
-            </div>
-          )}
-        </div>
-          );
-        })()}
-        </>)}
+        {/* ACHATS HORS PLATEFORME (brocante, fournisseur, main propre…) : la
+            liste se replie (saisie occasionnelle, l'écran reste léger), mais
+            « + Ajouter » est TOUJOURS là, en un tap. Le composant porte la
+            règle ; ici on ne fait que brancher la clé synchronisée (§11). */}
+        <AchatsHorsPlateforme achats={offBuys} ouvert={offSecOpen} onBasculer={setOffSecOpen}
+          onAjouter={addOffBuy} onModifier={updOffBuy} onSupprimer={delOffBuy}
+          paires={annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).map(it=>({ id: it.id, num: String((numeros[it.id]||{}).numero), title: it.title||'' })).sort((a,b)=>String(a.num).localeCompare(String(b.num),'fr',{numeric:true}))}
+          prochainNumero={nextNumero}
+          onPrixParNumero={(nm,pr)=>setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; })}/>
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
@@ -32023,7 +33119,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!selEff || uidC(c)===selEff) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          // ⚠️ (16 octobre) Quand l'extension peut AGIR (`msgCompteActif`), le
+          //    compte de Chrome n'est plus un filtre : toutes les conversations
+          //    restent, les siennes EN TÊTE et actionnables, celles des autres
+          //    comptes en lecture seule. Seul un choix EXPLICITE dans la liste
+          //    « Compte » filtre encore ; « pas su » garde le comportement d'avant.
+          const choixExplicite = !!compteSel && compteSel!=='*' && String(compteSel)===selEff;
+          const filtreMsg = choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
+          const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
+          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -32034,14 +33138,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
-          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          const nonLusAilleurs = filtreMsg ? liste.filter(c=>c.unread && uidC(c)!==filtreMsg).length : 0;
           // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
           // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
           // partiel présenté comme complet (§5).
           const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
-          const coMsg = selEff;
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+          // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
+          // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
+          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
+          const nonLusRo = roListe.filter(c=>c.unread).length;
+          const nomActif = prioMsg ? msgNomActif() : '';
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
@@ -32113,9 +33221,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                  const ro = !!prioMsg && uidC(c)!==prioMsg;
+                  // Les deux groupes se nomment UNE fois, en tête de chacun : la
+                  // raison de la lecture seule vit dans l'en-tête de son groupe,
+                  // jamais sur chaque ligne (§7).
+                  const debutActif = !!prioMsg && !ro && i===0;
+                  const debutRo = ro && (i===0 || uidC(affiches[i-1])===prioMsg);
                   return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
+                    <React.Fragment key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id}>
+                    {debutActif && (
+                      <div data-msg-groupe-actif={prioMsg} style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px 7px',fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted,background:C.bg,borderBottom:`1px solid ${C.border}`}}>
+                        <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.accent,flexShrink:0}}/>
+                        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert dans Chrome</span>
+                      </div>
+                    )}
+                    {debutRo && (
+                      <div data-msg-lecture-seule={roListe.length} data-nonlus-autres={nonLusRo} style={{padding:'10px 12px 9px',background:C.bg,borderTop:i?`1px solid ${C.border}`:'none',borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase',color:C.muted}}>
+                          <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo}\u00a0non\u00a0lu${nonLusRo>1?'s':''}`:''}</span>
+                        </div>
+                        <div style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginTop:4}}>
+                          Chrome est connecté sur <b>{nomActif}</b> : VRM ne peut répondre et faire une offre qu'au nom de ce compte. Pour répondre à un autre, bascule Chrome sur ce compte (ouvre vinted.fr connecté dessus) — ses conversations remonteront ici.
+                        </div>
+                      </div>
+                    )}
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} onClick={()=>openConversation(c)}
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:(i&&!debutRo)?`1px solid ${C.border}`:'none',background:'transparent',color:ro?C.muted:C.text,cursor:'pointer',fontFamily:'inherit',...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
                       {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
@@ -32125,8 +33256,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </span>
                         <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
                       </span>
-                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
+                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:ro?C.muted:C.accent,flexShrink:0}}/>}
                     </button>
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -33017,7 +34149,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
-                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={`packs + dépenses + fixes × ${annual.charges.moisComptes} mois`}/>
+                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={(annual.charges.fixesTotal>0?`packs + dépenses + abonnements + fixes × ${annual.charges.moisComptes} mois`:'packs + dépenses + abonnements')}/>
                   {/* Le résultat dérive du bénéfice net : tant que celui-ci n'est
                       pas su (lecture en cours, dates Vinted illisibles), lui non
                       plus — jamais un nombre calculé sur un CA partiel. */}
@@ -38168,8 +39300,31 @@ function EmailsSetting() {
   return (
     <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et il t'est proposé ici dès que l'adresse où il est arrivé figure dans ta liste.
+      {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
+          paragraphe d'avant disait la RÈGLE (« l'adresse d'arrivée décide »)
+          sans dire l'USAGE. Trois lignes visibles — à quoi ça sert, un exemple,
+          ce qui se passe si une adresse manque — et le pas-à-pas replié. */}
+      <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',margin:'6px 0 12px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:12.5,lineHeight:1.45,color:C.text}}>
+          <span aria-hidden="true" style={{color:C.accent,marginTop:2}}><Icon name="mail" size={14}/></span>
+          <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
+          <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
+          <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
+          <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
+        </div>
+        <details style={{marginTop:8}}>
+          <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.accent,listStyle:'revert'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
+            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
+            <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
+            <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
+            <li>Ajoute ici l'adresse sur laquelle Vinted t'écrit — une par compte Vinted si elles sont différentes.</li>
+          </ol>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
+            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
+          </div>
+        </details>
       </div>
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
@@ -40750,7 +41905,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={platSub==='messages'}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
@@ -40829,7 +41984,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab}/>}
+        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>

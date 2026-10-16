@@ -160,7 +160,13 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(porte === 'page', 'l’ancien lien mène aux Messages DANS l’onglet Vinted (section active)', String(porte));
       const liste = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), txt: x.innerText })));
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
-      dit(liste.length === 3 && liste[2].id === '303', 'les non lues d’abord, la lue en dernier', JSON.stringify(liste.map((x) => x.id)));
+      // ⚠️ (16 octobre) L'ordre est : le compte ouvert dans Chrome d'abord (là
+      //    où VRM peut répondre — `messages-priorite.cjs`), puis les plus
+      //    récentes. Sur un téléphone (390 px tactile) l'extension n'existe pas :
+      //    aucune priorité, l'ordre des dates seul. (L'ancien contrôle « non
+      //    lues d'abord » était rouge depuis longtemps : l'app trie par date.)
+      const attendu = tel ? ['402', '303', '301'] : ['303', '301', '402'];
+      dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
@@ -169,11 +175,16 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       // 1 bis. Les offres reçues par email, en tête (proposition 6).
       await r.pg.waitForTimeout(800);
       const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')) } : null; });
-      dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente', JSON.stringify(ofs && ofs.ids));
-      dit(ofs && /45,00 €/.test(ofs.txt) && /acheteuse_9/.test(ofs.txt) && /toutes sur compte_a/.test(ofs.txt), 'le montant, qui la propose, et le compte où répondre', ofs && ofs.txt.slice(0, 200));
-      dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
-      dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
-      dit(ofs && !/remise|ton prix/i.test(ofs.txt), 'aucune remise ni « ton prix » inventés (l’email ne dit pas quelle paire)');
+      // ⚠️ Le bloc « offres reçues par email » a été RETIRÉ de Messages par
+      //    13f6c89 (« Simplifier les écrans revendeurs », 13 octobre). Ses
+      //    contrôles ne jugent que s'il est rendu ; absent, la seule règle qui
+      //    reste vérifiable est tenue : aucune remise ni « ton prix » inventés.
+      if (!ofs) dit(!/remise demandée|ton prix/i.test(await r.pg.evaluate(() => (document.querySelector('[data-messagerie]') || document.body).innerText)), 'bloc des offres par email absent (retiré le 13 octobre) — et rien d’inventé à sa place');
+      if (ofs) dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente', JSON.stringify(ofs && ofs.ids));
+      if (ofs) dit(ofs && /45,00 €/.test(ofs.txt) && /acheteuse_9/.test(ofs.txt) && /toutes sur compte_a/.test(ofs.txt), 'le montant, qui la propose, et le compte où répondre', ofs && ofs.txt.slice(0, 200));
+      if (ofs) dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
+      if (ofs) dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
+      if (ofs) dit(ofs && !/remise|ton prix/i.test(ofs.txt), 'aucune remise ni « ton prix » inventés (l’email ne dit pas quelle paire)');
       if (ofs) {
         await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-offres-' + (tel ? 390 : 1512) + '.png') });
         await r.pg.click('[data-offre-traitee="email_offer_o1"]');
@@ -188,7 +199,9 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(off && off.etat === 'attente' && /45,00/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
       await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click();
       await r.pg.waitForTimeout(500);
-      dit(r.execs.length === 0, 'accepter DEMANDE d’abord (vendre la paire à ce prix) — rien n’est parti', JSON.stringify(r.execs));
+      // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un
+      // GESTE compte ici.
+      dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'accepter DEMANDE d’abord (vendre la paire à ce prix) — rien n’est parti', JSON.stringify(r.execs));
       await r.pg.locator('div[style*="z-index: 2000"] button', { hasText: 'Accepter' }).click();
       await r.pg.waitForTimeout(900);
       const acc = r.execs.find((x) => x.method === 'PUT');
@@ -207,7 +220,7 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       await r.pg.waitForTimeout(400);
       await r.pg.click('[data-conv="402"]');
       await r.pg.waitForTimeout(1200);
-      const get = r.execs.find((x) => x.method === 'GET');
+      const get = r.execs.find((x) => x.method === 'GET' && /\/402$/.test(x.endpoint));
       const txt2 = await r.pg.evaluate(() => document.body.innerText);
       dit(get && get.endpoint === '/api/v2/conversations/402' && get.uid === '222', 'un fil pas encore capté est lu PAR L’EXTENSION, au nom du bon compte', JSON.stringify(get));
       dit(/Message lu par extension/.test(txt2), 'et ses messages s’affichent');
