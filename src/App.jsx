@@ -981,6 +981,7 @@ const SYNC_KEYS = [
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
+  'vrm_lbc_pas_de_paire',
   // Son rythme de programmation eBay (par jour, plage, jours, écart, ordre,
   // préréglages de départ) : le sien, sur tous ses appareils (5 octobre).
   'vrm_ebay_rythme',
@@ -22472,7 +22473,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null }) {
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
@@ -28750,6 +28751,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         { const pp = misDeCote && misDeCote.installation ? phrasePersonne(misDeCote.installation.personne) : null;
           if (pp) jobs.push({id:'emails-personne',icon:'mail',color:C.warn,title:pp.titre,sub:pp.geste,tab:'settings',prio:4,
             avant:()=>{ DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} }}); }
+        // ⚠️ ANTI DOUBLE VENTE (16 oct.) : une paire vendue sur une plateforme et
+        //    encore en vente ailleurs, ou un numéro porté par deux annonces, ne
+        //    vivait plus que dans la cloche (la refonte du tableau de bord l'avait
+        //    retirée). Une alerte cachée, c'est une paire vendue deux fois. Même
+        //    source que la cloche (`notifItems`, marquées `dv`, §11), en tête.
+        if (Array.isArray(alertes)) for (const a of alertes) {
+          if (!a || !a.dv) continue;
+          jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
+        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -34130,6 +34140,17 @@ function relierAnnonceLbc(id, n) {
   try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
   save('vrm_lbc_liens', liens);
 }
+// « Ce n'est aucune de celles-là » (16 oct., Julien : « ça sert à rien de relier
+// une paire vendue, je n'ai plus de numéro »). Sa réponse, rangée par identité
+// — `tx:{transaction}` pour une vente, `ad:{annonce}` pour une annonce en ligne —
+// jamais déduite. La question ne revient plus pour elle. Même double écriture
+// que le lien (copie locale tout de suite, nuage ensuite).
+function rangerSansJumelleLbc(cle) {
+  if (!cle) return;
+  const m = { ...(load('vrm_lbc_pas_de_paire', {}) || {}), [String(cle)]: new Date().toISOString() };
+  try { localStorage.setItem('vrm_lbc_pas_de_paire', JSON.stringify(m)); } catch (_) {}
+  save('vrm_lbc_pas_de_paire', m);
+}
 
 // ── SUGGESTIONS POUR RELIER UNE ANNONCE — JAMAIS UNE DÉCISION (§5) ──────────
 // Julien, 4 octobre : « quand une paire est vendue sur une plateforme, elle
@@ -34658,7 +34679,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   return { aRetirerEbay, aRetirerVinted, nonReliees, aAnnulerEbay };
 }
 
-function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
+function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = false, cleRangement = '' }) {
   const [num, setNum] = useState('');
   const [msg, setMsg] = useState('');
   const photo = (Array.isArray(ad.images) && ad.images[0]) || ad.image || '';
@@ -34670,57 +34691,73 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
     toast(`Annonce reliée à la paire N°${n}.`);
     onRelie && onRelie();
   };
+  const aucune = () => { rangerSansJumelleLbc(cleRangement); toast('Compris — je ne te le redemande plus.'); onRelie && onRelie(); };
   const relier = () => {
     // « n125 » (l'écriture des titres Vinted) vaut 125 — sauf s'il existe une
     // vraie série « N » : alors N125 est un numéro à part entière.
     const brut = cleNum(num);
     const sansN = brut.replace(/^N[°O]?(?=\d)/, '');
-    const n = numsConnus.includes(brut) ? brut : sansN;
+    let n = numsConnus.includes(brut) ? brut : sansN;
+    // (16 oct.) Le numéro écrit sur le CARTON d'une ancienne paire (« 233 ») est
+    // devenu « B233 » à la remise à zéro du 11 octobre : on le reconnaît, sans
+    // jamais prendre la nouvelle paire du même chiffre quand elle existe.
+    if (!numsConnus.includes(n) && /^\d+$/.test(n) && numsConnus.includes('B' + n)) n = 'B' + n;
     if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
     if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
     poser(n);
   };
   const sugg = (suggestions || []).filter((s) => s && s.numero);
+  const btn = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, padding: '7px 11px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   return (
-    <div data-lbc-relier={id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-      <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
-      </div>
-      <div style={{ flex: '1 1 150px', minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
-        <div style={{ fontSize: 11, color: C.muted }}>
-          {detail || (ad.price != null ? `${ad.price} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
-          {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
+    <div data-lbc-relier={id} style={{ padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
         </div>
-        {msg && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg}</div>}
+        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+            {detail || (ad.price != null ? `${ad.price} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
+            {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
+          </div>
+          {msg && <div style={{ fontSize: 11.5, color: C.warn, marginTop: 3 }}>{msg}</div>}
+        </div>
+        {/* Une paire VENDUE n'a plus de numéro à taper (Julien, 16 oct.) : seule
+            l'annonce encore en ligne garde le champ N°. */}
+        {!vendue && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+            <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
+              inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
+              style={{ width: 58, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 8px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
+            <button type="button" onClick={relier} style={btn}>Relier</button>
+          </div>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
-        <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
-          inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
-          style={{ width: 54, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 7px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
-        <button type="button" onClick={relier} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Relier</button>
-      </div>
-    </div>
-      {/* Les paires qui y ressemblent, À CONFIRMER : c'est son clic qui relie,
-          jamais la ressemblance (§5). Elles évitent juste de taper le N°. */}
+      {/* Les paires ENCORE EN VENTE SUR VINTED qui y ressemblent, à confirmer :
+          c'est son clic qui relie, jamais la ressemblance (§5). */}
       {sugg.length > 0 && (
-        <div data-lbc-suggestions={id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 7, paddingLeft: 62 }}>
-          <span style={{ fontSize: 11, color: C.muted }}>C'est peut-être :</span>
+        <div data-lbc-suggestions={id} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 12, color: C.muted }}>{vendue ? 'Est-ce la même paire ?' : "C'est peut-être :"}</span>
           {sugg.map((s) => (
             <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 260, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '4px 8px 4px 4px', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', minHeight: 0 }}>
-              {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, padding: '6px 10px 6px 6px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minHeight: 0 }}>
+              {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
+              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est elle" : 'Relier'}</span>
             </button>
           ))}
+        </div>
+      )}
+      {cleRangement && (
+        <div style={{ marginTop: 8 }}>
+          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucune de celles-là' : 'Pas de paire à relier'}</button>
         </div>
       )}
     </div>
   );
 }
-const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens'];
+const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_lbc_pas_de_paire'];
 // La limite d'annonces de son offre Leboncoin (le compteur la compare au nombre
 // en ligne). Elle se réglait dans le panneau sur leboncoin.fr, retiré en 5.130 :
 // elle se règle ici, et c'est l'extension qui l'écrit (propriétaire de la ligne
@@ -35090,13 +35127,27 @@ function LeboncoinScreen() {
     const candidats = online.filter((o) => numeros[o.id] && numeros[o.id].numero)
       .map((o) => ({ numero: String(numeros[o.id].numero), titre: o.title || '', marque: o.brand || '', taille: o.size || '', prix: o.price != null ? Number(o.price) : null, photo: o.photo || '' }));
     const suggPour = (titre, prix) => suggestionsPaires({ titre, prix }, candidats);
-    const aRelierVentes = dv.aRelier.map(({ vente, ad }) => ({ vente, ad, suggestions: suggPour(vente.title || ad.subject, vente.price != null ? Number(vente.price) / 100 : ad.price) }));
+    // ⚠️ (16 oct., Julien : « ça sert à rien de relier une paire vendue, je n'ai
+    //    plus de numéro ».) Relier une vente ne sert qu'à une chose : savoir si la
+    //    MÊME paire est encore en vente sur Vinted. Sans paire ressemblante encore
+    //    en ligne, il n'y a rien à vendre deux fois — on ne demande rien. Et sa
+    //    réponse « aucune de celles-là » range la question pour de bon.
+    const pasDePaire = { ...(main.vrm_lbc_pas_de_paire || {}), ...(load('vrm_lbc_pas_de_paire', {}) || {}) };
+    const aRelierTout = dv.aRelier.map(({ vente, ad }) => ({ vente, ad, suggestions: suggPour(vente.title || ad.subject, vente.price != null ? Number(vente.price) / 100 : ad.price) }));
+    const aRelierVentes = aRelierTout.filter((v) => v.suggestions.length > 0 && !pasDePaire['tx:' + (v.vente.txId || v.ad.id)]);
+    const ventesSansJumelle = aRelierTout.length - aRelierVentes.length;
     const doublons = dv.doublons.map((d) => ({ ...d, vintedUrl: d.surVinted[0] ? 'https://www.vinted.fr/items/' + d.surVinted[0] : '' }));
     unlinked.forEach((u) => { u.suggestions = suggPour(u.subject || u.title, u.price); });
+    // Une annonce Leboncoin ENCORE EN LIGNE garde son champ N° (la relier dit
+    // laquelle retirer quand la paire se vend sur Vinted). Seule sa réponse
+    // « pas de paire à relier » la range — jamais une déduction.
+    const nonRelieesTout = unlinked.length;
+    const unlinkedAsk = unlinked.filter((u) => !pasDePaire['ad:' + (u.id != null ? u.id : '')]);
+    const nonRelieesSansJumelle = nonRelieesTout - unlinkedAsk.length;
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -35113,9 +35164,14 @@ function LeboncoinScreen() {
   const lim = data ? (data.limit || null) : null;
   const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
   const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
-  const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '13px 15px', marginBottom: 12, ...style }}>{children}</div>;
+  // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
+  // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
+  // 600 px et tout s'empilait en pavés).
+  const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
+  const Titre = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
+  const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
   return (
-    <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
+    <div style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
@@ -35126,7 +35182,7 @@ function LeboncoinScreen() {
           l'annonce Vinted tout seul (§3 : irréversible côté Vinted). */}
       {data && data.doublons && data.doublons.length > 0 && (
         <Card style={{ borderColor: C.warn }}>
-          <div data-lbc-doublons={data.doublons.length} style={{ fontSize: 13.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>
+          <div data-lbc-doublons={data.doublons.length} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3 }}>
             {data.doublons.length} paire{data.doublons.length > 1 ? 's' : ''} vendue{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
           </div>
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 6 }}>
@@ -35154,14 +35210,13 @@ function LeboncoinScreen() {
       )}
       {data && data.aRelierVentes && data.aRelierVentes.length > 0 && (
         <Card>
-          <div data-lbc-ventes-a-relier={data.aRelierVentes.length} style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 3 }}>
+          <Titre data-lbc-ventes-a-relier={data.aRelierVentes.length}>
             {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quelle paire ?
-          </div>
-          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
-            Ces annonces ne sont reliées à aucune paire : je ne peux donc pas vérifier que la paire n'est plus en vente sur Vinted. Clique la bonne paire, ou tape son N°.
-          </div>
+          </Titre>
+          <Sous>Une paire qui y ressemble est encore en vente sur Vinted. Si c'est la même, touche-la : je te dirai de la retirer de Vinted.</Sous>
           {data.aRelierVentes.map(({ vente, ad, suggestions }) => (
-            <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions}
+            <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions} vendue
+              cleRangement={'tx:' + (vente.txId || ad.id)}
               detail={`Vendue${vente.price != null ? ' ' + lbcEuro(vente.price) : ''}${vente.stepLabel ? ' · ' + vente.stepLabel : ''}`}/>
           ))}
         </Card>
@@ -35191,8 +35246,8 @@ function LeboncoinScreen() {
         {/* Compteur / offre */}
         <Card>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
-            <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+            <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
+            <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
           </div>
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
@@ -35205,7 +35260,7 @@ function LeboncoinScreen() {
           {data.plan ? <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan}</div> : null}
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? '⚠️ Limite atteinte' : n >= lim - 3 ? '⚠️ Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? 'Limite atteinte' : n >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
           </>) : null}
         </Card>
         {/* À retirer (vendues sur Vinted) */}
@@ -35230,22 +35285,22 @@ function LeboncoinScreen() {
           );
           return (<>
             {vendues.length > 0 && (
-              <Card style={{ border: `1px solid ${C.danger}`, background: `${C.danger}0e` }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: C.danger, marginBottom: 6 }}>🔴 {vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>
+              <Card style={{ borderColor: C.warn }}>
+                <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-les de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger))}
               </Card>
             )}
             {doute.length > 0 && (
-              <Card style={{ border: `1px solid ${C.warn}66`, background: `${C.warn}0e` }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: C.warn, marginBottom: 6 }}>⚠️ {doute.length} plus en ligne sur Vinted — à vérifier</div>
+              <Card>
+                <Titre>{doute.length} plus en ligne sur Vinted — à vérifier</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Ces annonces ne sont plus sur Vinted, mais <b>je n'ai pas la preuve qu'elles sont vendues</b> : tu as peut-être simplement retiré l'annonce. Ouvre-les et décide — je ne te dis pas de les supprimer.</div>
                 {doute.slice(0, 30).map((r, i) => Ligne(r, i, C.warn))}
               </Card>
             )}
             {pause.length > 0 && (
               <Card>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>⏸ {pause.length} en pause sur Vinted</div>
+                <Titre>{pause.length} en pause sur Vinted</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Tu les as masquées sur Vinted, elles ne sont pas vendues. Elles restent sur Leboncoin : <b>rien à faire</b>.</div>
                 {pause.slice(0, 20).map((r, i) => Ligne(r, i, C.muted))}
               </Card>
@@ -35262,9 +35317,9 @@ function LeboncoinScreen() {
             présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
         {data.unlinked && data.unlinked.length > 0 && (
           <Card>
-            <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 4 }}>❔ {data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</div>
+            <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Clique la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
-            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions}/>)}
+            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
         )}
@@ -35273,8 +35328,8 @@ function LeboncoinScreen() {
           const flagged = (data.liveAds || []).filter(a => a.issue);
           if (!flagged.length) return null;
           return (
-            <Card style={{ border: `1px solid ${C.warn}66`, background: `${C.warn}0e` }}>
-              <div style={{ fontSize: 13, fontWeight: 900, color: C.warn, marginBottom: 4 }}>⚠️ {flagged.length} annonce{flagged.length > 1 ? 's' : ''} signalée{flagged.length > 1 ? 's' : ''} par Leboncoin</div>
+            <Card>
+              <Titre>{flagged.length} annonce{flagged.length > 1 ? 's' : ''} signalée{flagged.length > 1 ? 's' : ''} par Leboncoin</Titre>
               <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>C'est Leboncoin qui le dit dans ton espace pro : ces annonces sortent mal. Baisse le prix, améliore le titre/les photos, ou passe une option de visibilité.</div>
               {flagged.slice(0, 20).map((a, i) => (
                 <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
@@ -35287,7 +35342,7 @@ function LeboncoinScreen() {
         })()}
         {/* À publier */}
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.echecLecture ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.echecLecture ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
               Sans cette ligne, désélectionner faisait fondre la file sans que
               rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
@@ -39572,7 +39627,7 @@ function AppCoeur() {
       // Leboncoin pèsent 5 Ko ; les annonces (226 Ko) ne sont lues que si une
       // vente ne se relie pas sans elles (sa clé est une référence portée par
       // l'annonce), et une fois par session au plus.
-      let lbcDoubles=0, lbcVentesSansPaire=0;
+      let lbcDoubles=0;
       // (6 octobre) Gardées pour l'anti double vente eBay plus bas : une paire
       // vendue sur Leboncoin et PROGRAMMÉE sur eBay se dit aussi (§11).
       // `undefined` = pas lu · `null` = pas su · objet = lu.
@@ -39587,7 +39642,7 @@ function AppCoeur() {
           const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
           let dv=calc(null);
           if(dv.aRelier.length){ const items=await lbcAnnoncesSession(); lbcItemsLu=items||null; if(items) dv=calc(items); }
-          lbcDoubles=dv.doublons.length; lbcVentesSansPaire=dv.aRelier.length;
+          lbcDoubles=dv.doublons.length; 
         }
       }catch(_){}
       // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
@@ -39694,19 +39749,21 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});
-      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin'});
-      if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
-      if(lbcVentesSansPaire>0) items.push({icon:'🟠', ic:'tag', text:`${lbcVentesSansPaire} vente${lbcVentesSansPaire>1?'s':''} Leboncoin sans paire reliée — dis laquelle pour éviter une double vente`, n:lbcVentesSansPaire, tab:'leboncoin'});
-      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces'});
-      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces'});
-      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces'});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
+      if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
+      // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
+      // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
+      // une paire qui y ressemble est encore en vente sur Vinted.
+      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
+      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
       // Vintex). Ne pas les remettre dans la cloche.
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
-      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
+      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num'});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
@@ -40343,7 +40400,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" alertes={notifItems} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
