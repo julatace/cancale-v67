@@ -2,8 +2,7 @@
 
 La session qui a fait le travail du 2 au 16 octobre a atteint sa limite. Les
 agents ci-dessous ont été coupés en plein travail : leur code est **partiel et
-NON RELU**. Chaque patch est UN commit (sauf p1-retours : 3 commits construits,
-non relus), à appliquer sur la branche intégrée :
+NON RELU**.
 
 **Vérifié le 16 octobre : les 7 patchs s'appliquent À LA SUITE, dans l'ordre de
 leur numéro, sans aucun conflit, et le build passe ensuite** (`audit-variables`
