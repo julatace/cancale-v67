@@ -8984,6 +8984,74 @@ Chromium), corrigé, rouge sur 0caff0d et sous mutation.
 - **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
   (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
 
+### Leboncoin publié depuis VRM, Super PDP, titre eBay (16 octobre, 5.182)
+- **Fiche Leboncoin dans l'app** (`FicheLbc`, Leboncoin → Annonces) : titre (50 car.), prix, état (4 libellés MESURÉS du dépôt, l'état Vinted, ou « laisser Leboncoin demander »), photos captées choisies et ordonnées, description qui garde `VRM-{n°}`. Un bouton publie ; l'avancement arrive en direct (`depotProgres`, nettoyé par le fond, seulement depuis l'onglet du dépôt en cours). Règle commune `<annonce-lbc-regle>` (texte identique app/extension) ; l'extension **revérifie** tout (`appliquerAnnonceLbc`) et refuse en entier une fiche invalide. Extension < 5.182 : une fiche non corrigée part « tel quel », une fiche corrigée est grisée. Preuves : `audit-lbc-fiche.cjs` (19 rouges sur l'avant), banc `lbc-publier-app.cjs`. ⚠️ **Non mesuré sur le vrai leboncoin.fr.**
+- **Super PDP** (facturation électronique, Comptabilité) : mode `superpdp` de `/api/compte` (toujours 12 fonctions), identifiants du VENDEUR vérifiés chez Super PDP puis rangés **chiffrés** (`superpdp_cle`, clé `VRM_COFFRE_CLE` ou dérivée de `SUPABASE_SERVICE_KEY` ; sans clé de coffre : rien n'est rangé), jamais relus par le navigateur (§2.9). Envoi à trois issues (envoyée · refusée · incertaine), `external_id` = n° FX-AAAA-NNNN, une incertaine est CHERCHÉE avant tout renvoi. E-reporting PAS branché (forme non confirmée). ⚠️ **Formes d'API tirées d'un client open source** (la doc officielle est bloquée d'ici) : à vérifier sur le bac à sable. Preuves : `audit-superpdp-route.cjs` (36 rouges sur l'avant), banc `superpdp.cjs`.
+- **Titre eBay** : `lbcTitre` écrit désormais « taille 36 » (plus « T36 ») ; `ebayTitre` ne retirait que « T36 » ⇒ « taille 36 taille 36 » (capture de Julien). `audit-titre-ebay.cjs` (6 rouges sur l'avant).
+- **Refonte premium** (coque mobile `styles-coque.css`, Réglages iOS `styles-reglages.css`, Achats/Messages, Annonces/Leboncoin/eBay, Ventes/Colis) : bancs `coque-mobile`, `reglages-premium`, `achats-messages-premium`, `plateformes-premium`, `ventes-colis-premium`. ⚠️ Sur téléphone sans extension, le fil de Messages remplace la saisie par « Répondre sur Vinted ↗ ».
+
+### Le relais du téléphone : agir depuis l'iPhone par l'extension de l'ordinateur (16 octobre, 5.183)
+Julien : « quand je suis sur mon téléphone et que l'extension est allumée [sur
+mon ordinateur] je veux pouvoir faire des actions ». Avant, sur le téléphone,
+`raisonExtGlobale` rendait `telephone` et tout geste était grisé.
+- **Le chemin** : le téléphone écrit UNE ligne par commande, `cmd_relais_{id}`
+  (`{cmd, args, pour, demandeLe, expire = +10 min, etat:'attente', par:'telephone',
+  confirme?}`, au nom du vendeur — RLS) ; l'extension (alarme `vrm-relais` de
+  30 s, le minimum de Chrome, et chaque visite sur Vinted) lit
+  `id=like.cmd_relais_*&meta->>etat=eq.attente`, **5 au plus**, la PREND par une
+  écriture conditionnelle (`PATCH …&meta->>etat=eq.attente`), l'exécute par
+  **les mêmes fonctions** qu'un clic sur l'ordinateur (`executerCommande`,
+  `executerPourApp`, `publierDepuisApp` — donc `gardeStricte`, 20 actions/h,
+  `avecVinted`, la pause) et écrit le résultat dans la ligne. Un bordereau
+  accepté avance dans la ligne (`relaisSuivreJob`, branché sur `majCmd`).
+- **L'extension revérifie tout** : liste blanche (`bordereau`, `lbcPublier`,
+  `exec` par `EXEC_PERMIS` **sans les lectures** ; « Préparer sur eBay » ne se
+  relaie pas — le formulaire s'ouvre sur l'ordinateur) ; forme des arguments ;
+  propriétaire de la ligne ET `pour` = le propriétaire de SA session ; échéance
+  (10 min au plus : expirée ⇒ refusée, jamais exécutée en retard) ; annulée ⇒
+  jamais prise ; **une seule fois** (`vrmRelaisVus` dans `chrome.storage.local`,
+  noté AVANT d'agir — un service worker redémarré ne rejoue pas). Accepter une
+  offre exige `confirme` dans la ligne (l'entrée `confirmer: true`
+  d'`EXEC_PERMIS`) : le téléphone ne l'envoie qu'après sa confirmation (§3).
+- **Sans session VRM, la relève ne fait RIEN** — pas même une lecture de notre
+  base (le stockage local d'abord).
+- **Le signe de vie** `relais_ext` (`atMs, ver, code, vUid, vLogin,
+  pauseJusqua`, des scalaires lus par `meta->>`), au plus une écriture par
+  minute. Le téléphone le relit toutes les 30 s (visible, sans souris, sans
+  extension ici, session ouverte) : **vivant** (< 3 min et version ≥
+  `EXT_CAPACITES.relais`) · **éteint** (« pas donné signe de vie depuis X —
+  ouvre Chrome ») · **en retard** · **pas su** (lecture ratée : aucune promesse).
+  ⚠️ L'âge se compare à l'horloge du TÉLÉPHONE : une horloge d'ordinateur très
+  décalée le ferait dire éteint (le sens sûr).
+- **Côté app, aucun écran ne change de règle** : `vmrCmd` / `vmrExec` passent
+  par le relais quand il est vivant (`relaisCmd`, `relaisExec`) et rendent la
+  MÊME forme que le pont ; `raisonExtGlobale(sansSouris)` rend `null` sur relais
+  vivant ; `useExtVivante().etat` devient `etatAgissant()` (le compte Vinted
+  ouvert sur l'ordinateur) — `BoutonBordereau`, « Tout générer »,
+  `BoutonPublier`, la messagerie et la pastille suivent tout seuls (§11). Le
+  compte de la vente ≠ celui de l'ordinateur ⇒ grisé AVANT le clic.
+- **Jamais « fait » avant l'extension** : `relais-attente` (« Envoyé à ton
+  ordinateur… »), `relais-pris` (« En cours sur ton ordinateur… »), puis
+  l'étape écrite par elle. Pas prise en 2 min ⇒ annulée par une écriture
+  conditionnelle (prise entre-temps ⇒ rien n'est touché) et dit ; prise sans
+  résultat après 6 min ⇒ « je ne sais pas si elle est partie ».
+- **Une phrase, une fois** (§7) : « via ton ordinateur (compte Vinted ouvert :
+  X) » au-dessus de la liste (`LigneRelais`) et dans le fil de la messagerie ;
+  sur chaque bouton, en titre. Pastille : « Actions via ton ordinateur ·
+  {compte} » (sur le téléphone, l'en-tête n'affiche que l'icône ⓘ : le libellé
+  est dans `aria-label`, le panneau le détaille).
+- Preuves : `audit-relais.cjs` (le vrai `background.js` dans `_fond-vm`) **27
+  contrôles**, **14 rouges** sur b8d11f2 et **7 mutations sur 7** rouges (vus,
+  échéance, propriétaire, confirmation, prise conditionnelle, session, liste
+  blanche) ; banc `relais-telephone.cjs` (port 4941, 390 px tactile + 1512 px)
+  **41 contrôles**, **28 rouges** sur le build de b8d11f2, et rouge sous deux
+  mutations de l'app (âge ignoré ⇒ 4 ; « fait » avant l'extension ⇒ 7).
+- ⚠️ **Non mesuré** : le `PATCH` conditionnel sur `meta->>etat` contre la vraie
+  PostgREST (grammaire documentée, jamais appelé ici, §2.3) ; le délai réel de
+  l'alarme de 30 s dans son Chrome ; plusieurs ordinateurs relais à la fois (le
+  signe de vie est celui du DERNIER ; la prise conditionnelle empêche une double
+  exécution, mais l'autre ordinateur peut refuser « autre compte »).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9012,7 +9080,10 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
+| `relais` | `traiterRelais` | **5.183.0** (16 oct. — la 5.182 publiée par main, fiche Leboncoin, ne l'a pas) | « sur le téléphone : actions via ton ordinateur » (le relais lit le signe de vie, pas le pont) |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
+| `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
+| `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -9143,6 +9214,56 @@ vendeur reste chez le bon.
 - Le classement d'un colis se lit **sur le SUJET d'abord**, le corps seulement en
   repli (le corps d'un « colis disponible » contient les consignes de retrait).
 - **Un colis caché est un colis perdu** : on n'écarte jamais un colis en silence.
+
+### « App plus rapide » — mesuré d'abord, au volume de sa base (16 octobre)
+Retenue par Julien le 11 octobre. **Mesuré avant de coder** : banc
+`scripts/bancs/vitesse.cjs` sur une base INVENTÉE au volume de la sienne
+(`_base-volume.cjs`, tailles par famille lues en production le 16 octobre en
+lecture seule : ~1 200 transactions, ~1 300 conversations, PDF de 100 Ko), un
+aller-retour simulé (150 ms, 2 Mo/s, téléphone à processeur ×4), et le
+profileur de Chrome sur un build non minifié.
+- **Le code JS** : `App` = 1,73 Mo (518 Ko compressés), chargé à part de la
+  page d'accueil ; `pdf-lib` et la 3D sont déjà paresseux. Le découper est un
+  chantier à lui seul (un fichier de 42 000 lignes que cinq sessions modifient) :
+  **pas fait**.
+- ⚠️⚠️ **LE RÉSEAU : 16 à 45 LECTURES IDENTIQUES PAR ÉCRAN.** Ma journée faisait
+  72–77 lectures de notre base, dont 16–21 strictement identiques
+  (`lbc_ventes` ×5, `ebay_orders` ×5, `vinted_lbc_posted` ×4…) ; Messages 95–100
+  dont 40–45. Chaque écran et chaque passage du centre de notifications relit à
+  sa façon. ⇒ `src/lecturesPartagees.js` : une lecture GET de NOTRE base
+  identique à une lecture en cours ou finie depuis moins de 2 s reçoit la même
+  réponse (une copie). **Un échec n'est jamais gardé** (« pas su » reste « pas
+  su »), **toute écriture vide tout** (à son départ et à son retour), le signal
+  de l'extension (`vrm:ext`) vide tout, la session et `Range` font partie de la
+  clé (deux vendeurs ne partagent rien). Vinted n'y passe jamais (§3).
+  `audit-lectures-partagees.cjs` exécute la règle (`--prouve` : 3 mutations
+  rouges).
+- **La famille des transactions balayée 2 à 7 fois par écran** — la requête la
+  plus coûteuse de la base (`pg_stat_statements`). Le pont transaction → annonce
+  et les dates de versement lisent maintenant LA MÊME projection
+  (`TXN_META_SELECT`) : un balayage, chacun garde sa règle de « pas su ».
+- **Les suppressions lues une par compte** (7 allers-retours, à la suite des
+  lectures publiques) : `lireSupprimees(uid)` lit dans `lireSupprimeesTous()`.
+- **Le processeur au démarrage** (profileur, téléphone ×4) : le rapport
+  comptable (~170 ms), le registre annuel (~125 ms) et le récap « Wrapped »
+  (~100 ms) étaient recalculés à chaque arrivée de données sur TOUS les écrans
+  du composant, Ma journée comprise : calculés seulement panneau ouvert. Le
+  cache de session (`_persistAcctCache`, ~150 ms de `JSON.stringify` répétés)
+  ne s'écrit plus qu'une fois par rafale (un effacement reste immédiat).
+- **Résultat** (même base, même banc) : Ma journée **72–77 → 48–54 lectures**,
+  doublons **16–21 → 0–4** ; Ventes 98–105 → 65–66 ; Colis 102–107 → 63–69 ;
+  Annonces 87–92 → 47–50 ; Achats 97–102 → 58–63 ; Messages 95–100 → 50–51 ;
+  tableau de bord 63–68 → 50. **Texte rendu identique** sur les 14 rendus
+  (sauf la phrase des photos de Ventes, qui dépend du moment où le banc coupe
+  les images — elle apparaît dans les deux sens). `vitesse.cjs` : **56 rouges**
+  sur le build d'avant, 0 après.
+- **Pas fait, mesuré** : (1) une frappe dans la recherche de Ventes recrée les
+  60 lignes DEUX fois (rendu urgent + rendu différé : la liste n'est pas
+  mémoïsée) — 200 à 300 ms par lettre en émulation téléphone ; (2) le composant
+  qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
+  par arrivée de données) ; (3) le premier écran attend la sonde de schéma, puis
+  les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
+  de l'app (518 Ko compressés).
 
 ---
 

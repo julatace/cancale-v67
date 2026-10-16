@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.182.0';
+const CODE_VERSION = '5.183.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4448,11 +4448,15 @@ try {
   // Photos des annonces : tant qu'un onglet Vinted est ouvert, on complète tout
   // seul, sans attendre une navigation (Julien, 29 sept.). Voir `tickPhotos`.
   alarmeSiAbsente('vrm-photos', { periodInMinutes: 1 });
+  // 5.183 : le relais du téléphone — 30 s, le minimum de Chrome. Rien ne part
+  // sans session VRM (voir `relaisTick`).
+  alarmeSiAbsente('vrm-relais', { periodInMinutes: 0.5 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
     else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
     else if (a.name === 'vrm-photos') tickPhotos();
+    else if (a.name === 'vrm-relais') relaisTick('alarme');
     // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
     // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
     // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -4625,6 +4629,9 @@ async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
+    // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
+    // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
+    relaisTick('visite').catch(() => {});
     if (await compteSupprime(uid)) { noterDiag('visite_compte_supprime'); return; }
     // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
@@ -5007,7 +5014,10 @@ const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new UR
 const EXEC_PERMIS = [
   { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
   { methode: 'GET',  chemin: /^\/api\/v2\/conversations\/\d+$/, lecture: true }, // lire le fil
-  { methode: 'PUT',  chemin: /^\/api\/v2\/transactions\/\d+\/offer_requests\/\d+\/(accept|reject)$/ }, // trancher une offre
+  // 5.183 : accepter VEND la paire — une commande venue du téléphone n'est
+  // exécutée que si elle porte SA confirmation (`confirmer`, voir le relais).
+  { methode: 'PUT',  chemin: /^\/api\/v2\/transactions\/\d+\/offer_requests\/\d+\/accept$/, confirmer: true }, // accepter une offre
+  { methode: 'PUT',  chemin: /^\/api\/v2\/transactions\/\d+\/offer_requests\/\d+\/reject$/ }, // refuser une offre
   { methode: 'POST', chemin: /^\/api\/v2\/transactions\/\d+\/offers$/ },     // faire une offre
 ];
 function execPermis(methode, endpoint) {
@@ -5095,6 +5105,8 @@ async function majCmd(jobId, patch) {
   cmds[jobId] = Object.assign({}, cmds[jobId] || {}, patch, { at: t });
   try { await chrome.storage.local.set({ vrmCmds: cmds }); } catch (_) {}
   notifierApp(Object.assign({ type: 'cmd', jobId }, cmds[jobId], avecVivant(jobId)));
+  // 5.183 : une commande du TÉLÉPHONE suit ce bordereau — sa ligne avance aussi.
+  relaisSuivreJob(jobId, cmds[jobId]).catch(() => {});
   return cmds[jobId];
 }
 // `vivant: true` = cette demande est RÉELLEMENT dans la file de ce service
@@ -5663,6 +5675,249 @@ function sousAdmission(fn) {
   const suite = _admission.then(() => fn(), () => fn());
   _admission = suite.then(() => {}, () => {});
   return suite;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// LE RELAIS DU TÉLÉPHONE (5.183) — « quand je suis sur mon téléphone et que
+// l'extension est allumée sur mon ordinateur, je veux pouvoir faire des
+// actions » (Julien, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Le téléphone n'a pas d'extension : il dépose une COMMANDE dans SA base (une
+// ligne `cmd_relais_{id}` par commande, au nom du vendeur — RLS la protège ;
+// une ligne par commande, donc aucune fusion à rater) ; cette extension, dans
+// le Chrome de l'ordinateur, la prend et l'exécute avec EXACTEMENT les gardes
+// d'une commande venue de l'app sur l'ordinateur : `executerCommande`
+// (bordereau), `executerPourApp` (répondre, trancher ou faire une offre),
+// `publierDepuisApp` (Leboncoin) — donc `gardeStricte` (le compte du cookie
+// Vinted doit être celui visé), 20 actions/heure, la file `avecVinted` (une
+// requête Vinted à la fois), la pause quand Vinted freine.
+// L'extension REVÉRIFIE tout ce que le téléphone envoie :
+//   · liste blanche (rien d'autre que ces trois commandes ; `exec` passe par
+//     EXEC_PERMIS, sans les lectures) — aucun endpoint Vinted nouveau ;
+//   · forme des arguments ;
+//   · propriétaire de la ligne = propriétaire de SA session VRM ;
+//   · échéance (10 min au plus après la demande) : une commande expirée est
+//     REFUSÉE, jamais exécutée en retard ; une commande annulée (le téléphone
+//     ne l'a pas vue prise en 2 min) n'est jamais relevée ;
+//   · une seule fois : la ligne est PRISE par une écriture conditionnelle
+//     (`etat=attente` → `pris`), et l'identifiant est noté dans
+//     `chrome.storage.local` (§4.9) AVANT d'agir — un service worker qui
+//     redémarre ne la rejoue jamais.
+// ⚠️ ACCEPTER UNE OFFRE n'est jamais automatique (§3) : le téléphone l'envoie
+//    sur SON clic, après confirmation, et la ligne le porte (`confirme`) —
+//    sans, refusé.
+// La relève lit NOTRE base (pas Vinted) : une requête scalaire bornée, par
+// alarme (30 s, le minimum de Chrome) et à chaque visite sur Vinted — et RIEN
+// sans session VRM. Le battement (`relais_ext`) dit au téléphone que ce Chrome
+// tourne, sa version et le compte Vinted ouvert : au plus une écriture par
+// minute.
+const RELAIS_EXPIRE_MAX_MS = 10 * 60000;
+const RELAIS_BATTEMENT_MS = 60000;
+const RELAIS_LOT = 5;
+const RE_ID_RELAIS = /^cmd_relais_[a-z0-9]{8,40}$/;
+const RELAIS_VUS = 'vrmRelaisVus';            // { [id]: { at, resultat? } }
+const RELAIS_JOBS = 'vrmRelaisJobs';          // { [jobId]: { id, at } } — suivre un bordereau
+function ownerDeSession(s) { return String((s && (s.user_id || subDuJwt(s.access_token))) || ''); }
+// Une commande du téléphone → le message interne qu'exécuterait l'app de
+// l'ordinateur. `{ refus }` ⇒ refusée, avec le code.
+function relaisCommande(d) {
+  const a = (d && d.args && typeof d.args === 'object') ? d.args : {};
+  const num = (x) => /^\d{1,20}$/.test(String(x == null ? '' : x));
+  if (d.cmd === 'bordereau') {
+    if (!num(a.uid) || !num(a.tx)) return { refus: 'arguments' };
+    return { type: 'cmd', msg: { cmd: 'bordereau', uid: String(a.uid), tx: String(a.tx) } };
+  }
+  if (d.cmd === 'lbcPublier') {
+    if (!num(a.id)) return { refus: 'arguments' };
+    // 5.182 : la fiche de l'app voyage avec (revérifiée par `appliquerAnnonceLbc`) ; bornée.
+    let fiche = '';
+    try { fiche = a.annonce === undefined ? '' : JSON.stringify(a.annonce); } catch (_) { return { refus: 'arguments' }; }
+    if (fiche.length > 20000) return { refus: 'arguments' };
+    return { type: 'pub', msg: Object.assign({ cmd: 'lbcPublier', id: String(a.id) }, a.confirme === true ? { confirme: true } : {}, a.annonce !== undefined ? { annonce: a.annonce } : {}) };
+  }
+  if (d.cmd === 'exec') {
+    const methode = String(a.method || '').toUpperCase();
+    const permis = execPermis(methode, a.endpoint);
+    if (!num(a.uid) || !permis || permis.lecture) return { refus: 'non-autorise' };
+    let corps = '';
+    try { corps = a.body == null ? '' : JSON.stringify(a.body); } catch (_) { return { refus: 'arguments' }; }
+    if (corps.length > 4000) return { refus: 'arguments' };
+    if (permis.confirmer && d.confirme !== true) return { refus: 'confirmation' };
+    return { type: 'exec', msg: { uid: String(a.uid), method: methode, endpoint: String(a.endpoint), body: a.body == null ? null : a.body } };
+  }
+  return { refus: 'non-autorise' };
+}
+const RAISON_REFUS_RELAIS = {
+  'arguments': 'commande incomplète — rien n\'est parti',
+  'non-autorise': 'action non autorisée depuis le téléphone — rien n\'est parti',
+  'confirmation': 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti',
+  'expiree': 'commande trop ancienne (plus de 10 min) — rien n\'est parti, relance-la si tu le veux encore',
+};
+// `null` = le stockage n'a pas répondu (on ne décide rien sur « pas su »).
+async function lireRelaisVus() {
+  try { return (await chrome.storage.local.get(RELAIS_VUS))[RELAIS_VUS] || {}; } catch (_) { return null; }
+}
+async function noterRelaisVu(id, patch) {
+  const vus = (await lireRelaisVus()) || {};
+  const t = Date.now();
+  for (const k of Object.keys(vus)) if (t - Number((vus[k] && vus[k].at) || 0) > 86400000) delete vus[k];
+  vus[id] = Object.assign({}, vus[id] || {}, patch, { at: (vus[id] && vus[id].at) || t });
+  try { await chrome.storage.local.set({ [RELAIS_VUS]: vus }); } catch (_) {}
+}
+// Écrit la ligne de la commande — sous condition d'état (`cond`) quand on la
+// PREND : `true` = écrite · `false` = l'état avait changé (annulée, prise
+// ailleurs) · `null` = la base n'a pas répondu (« pas su »).
+async function relaisEcrire(id, moi, data, cond) {
+  try {
+    const q = `app_data?id=eq.${encodeURIComponent(id)}&owner=eq.${encodeURIComponent(moi)}${cond ? `&meta->>etat=eq.${cond}` : ''}&select=id`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, {
+      method: 'PATCH',
+      headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows.length > 0 : null;
+  } catch (_) { return null; }
+}
+async function relaisResultat(id, moi, d, etat, resultat) {
+  const data = Object.assign({}, d, { etat, resultat: resultat || null, finiLe: Date.now() });
+  await noterRelaisVu(id, { resultat: { etat, resultat: resultat || null } });
+  const ok = await relaisEcrire(id, moi, data, null);
+  if (!ok) noterDiag('relais_resultat_ecriture_ratee');
+  return ok;
+}
+// Le battement : « ce Chrome tourne, sa version, le compte Vinted ouvert ».
+async function battementRelais(moi, force) {
+  let bat = {};
+  try { bat = (await chrome.storage.local.get('vrmRelaisBat')).vrmRelaisBat || {}; } catch (_) {}
+  if (!force && bat.owner === moi && Date.now() - Number(bat.at || 0) < RELAIS_BATTEMENT_MS) return false;
+  let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
+  const uid = await avecDelai(compteConnecte('www.vinted.fr'), 1500, null).catch(() => null);
+  const login = uid ? await loginDe(String(uid), { attendreMs: 800 }) : '';
+  const pause = await pauseVinted().catch(() => null);
+  const data = { at: new Date().toISOString(), atMs: Date.now(), ver: version, code: CODE_VERSION,
+    vUid: uid ? String(uid) : '', vLogin: login || '', pauseJusqua: pause ? Number(pause.jusqua) || 0 : 0 };
+  const ok = await supabaseUpsert('app_data', [{ id: 'relais_ext', data }], 'id');
+  if (ok) { try { await chrome.storage.local.set({ vrmRelaisBat: { at: Date.now(), owner: moi } }); } catch (_) {} }
+  return ok;
+}
+async function relaisSessionOwner() {
+  // AUCUN réseau sans session : on regarde d'abord le stockage local.
+  const s = await loadSession();
+  if (!s || s.mort || !(s.access_token || s.refresh_token)) return null;
+  const tok = await authToken();
+  if (!tok) return null;
+  if (!(await isCloisonne())) return null;   // une base non cloisonnée n'a pas de propriétaire à vérifier
+  return ownerDeSession(tok) || null;
+}
+let _relaisEnVol = null;
+function relaisTick(source) {
+  if (_relaisEnVol) return _relaisEnVol;
+  _relaisEnVol = relaisTickUn(source).catch(() => ({ erreur: true })).finally(() => { _relaisEnVol = null; });
+  return _relaisEnVol;
+}
+async function relaisTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  await battementRelais(moi).catch(() => {});
+  const rows = await sbGet(`app_data?id=like.cmd_relais_*&meta->>etat=eq.attente&select=id,owner,data&order=id.asc&limit=${RELAIS_LOT}`);
+  if (!Array.isArray(rows)) { noterDiag('relais_lecture_ratee'); return { lu: false }; }
+  const issues = [];
+  for (const row of rows) issues.push(await traiterRelais(row, moi).catch(() => 'erreur'));
+  return { lu: true, n: rows.length, issues };
+}
+const texteAutreCompte = (login) => `Chrome est connecté sur ${login || 'un autre compte Vinted'} sur ton ordinateur — bascule sur le bon compte sur vinted.fr`;
+async function traiterRelais(row, moi) {
+  const id = String((row && row.id) || '');
+  const d = (row && row.data && typeof row.data === 'object') ? row.data : {};
+  if (!RE_ID_RELAIS.test(id)) return 'id';
+  // Le propriétaire de la ligne ET celui qu'elle annonce doivent être celui de
+  // SA session : une commande d'un autre vendeur n'est jamais exécutée.
+  if (String(row.owner || '') !== moi || String(d.pour || '') !== moi) { noterDiag('relais_autre_vendeur'); return 'proprietaire'; }
+  const vus = await lireRelaisVus();
+  if (vus === null) return 'pas-su';
+  if (vus[id]) {
+    // Déjà prise par ce Chrome : JAMAIS rejouée. Si son résultat n'avait pas
+    // pu être écrit, on le réécrit.
+    if (vus[id].resultat) await relaisEcrire(id, moi, Object.assign({}, d, { etat: vus[id].resultat.etat, resultat: vus[id].resultat.resultat, finiLe: Date.now() }), null);
+    return 'deja';
+  }
+  if (d.etat !== 'attente') return 'etat';
+  const t = Date.now();
+  const dem = Number(d.demandeLe) || 0;
+  const fin = Math.min(Number(d.expire) || 0, dem + RELAIS_EXPIRE_MAX_MS);
+  if (!dem || !fin || t > fin || dem > t + 120000) {
+    const res = { code: 'expiree', raison: RAISON_REFUS_RELAIS.expiree };
+    const ok = await relaisEcrire(id, moi, Object.assign({}, d, { etat: 'expiree', resultat: res, finiLe: t }), 'attente');
+    if (ok) await noterRelaisVu(id, { resultat: { etat: 'expiree', resultat: res } });
+    noterDiag('relais_expiree');
+    return 'expiree';
+  }
+  const c = relaisCommande(d);
+  if (c.refus) {
+    const res = { code: c.refus, raison: RAISON_REFUS_RELAIS[c.refus] || 'refusé' };
+    const ok = await relaisEcrire(id, moi, Object.assign({}, d, { etat: 'refuse', resultat: res, finiLe: t }), 'attente');
+    if (ok) await noterRelaisVu(id, { resultat: { etat: 'refuse', resultat: res } });
+    noterDiag('relais_refus_' + c.refus);
+    return 'refus:' + c.refus;
+  }
+  // La PRISE : conditionnelle — une commande annulée entre-temps ne part pas.
+  const pris = await relaisEcrire(id, moi, Object.assign({}, d, { etat: 'pris', prisLe: t }), 'attente');
+  if (pris !== true) return pris === null ? 'pas-su' : 'annulee';
+  await noterRelaisVu(id, {});                  // AVANT d'agir : un redémarrage ne la rejoue pas
+  const dPris = Object.assign({}, d, { etat: 'pris', prisLe: t });
+  noterDiag('relais_' + d.cmd);
+  if (c.type === 'exec') {
+    const r = await executerPourApp(c.msg, { origin: ORIGINES_APP[0] });
+    if (r && r.ok) { await relaisResultat(id, moi, dPris, 'fait', { ok: true, status: r.status || 200 }); return 'fait'; }
+    const actifLogin = r && r.actif ? await loginDe(String(r.actif)) : '';
+    const raison = r && r.code === 'vinted-autre' ? texteAutreCompte(actifLogin) : ((r && r.error) || 'refusé');
+    await relaisResultat(id, moi, dPris, r && r.code ? 'refuse' : 'echec', { ok: false, code: (r && r.code) || '', status: (r && r.status) || 0, raison, actifLogin });
+    return r && r.code ? 'refuse:' + r.code : 'echec';
+  }
+  const r = c.type === 'cmd' ? await executerCommande(c.msg) : await publierDepuisApp(c.msg);
+  if (!r || !r.accepte) {
+    const raison = r && r.code === 'vinted-autre' ? texteAutreCompte(r.actifLogin) : ((r && r.raison) || 'refusé');
+    await relaisResultat(id, moi, dPris, 'refuse', { accepte: false, code: (r && r.code) || '', raison, actifLogin: (r && r.actifLogin) || '' });
+    return 'refuse:' + ((r && r.code) || '');
+  }
+  // Un dépôt Leboncoin ouvert n'est pas fini : sa ligne suit l'avancement (5.182).
+  const termine = r.etape === 'fait';
+  if (r.jobId && !termine) {
+    try {
+      const jobs = (await chrome.storage.local.get(RELAIS_JOBS))[RELAIS_JOBS] || {};
+      jobs[r.jobId] = { id, at: Date.now() };
+      await chrome.storage.local.set({ [RELAIS_JOBS]: jobs });
+    } catch (_) {}
+  }
+  await relaisResultat(id, moi, dPris, termine ? 'fait' : 'en-cours', { accepte: true, jobId: r.jobId || '', etape: r.etape || '', deja: !!r.deja });
+  return termine ? 'fait' : 'en-cours';
+}
+// Un bordereau commandé par le téléphone avance (file → génération → PDF) :
+// la ligne de la commande suit, le téléphone la relit.
+const JOB_TERMINE = ['fait', 'echec', 'genere_sans_pdf', 'abandonne'];
+async function relaisSuivreJob(jobId, job) {
+  let jobs = {};
+  try { jobs = (await chrome.storage.local.get(RELAIS_JOBS))[RELAIS_JOBS] || {}; } catch (_) { return; }
+  const lien = jobs[jobId];
+  if (!lien || !lien.id || !job) return;
+  const moi = ownerDeSession(await loadSession());
+  if (!moi) return;
+  const fini = JOB_TERMINE.includes(job.etape);
+  const res = Object.assign({ accepte: true, jobId, etape: job.etape || '', raison: job.raison || null, code: job.code || null }, job.progres ? { progres: job.progres } : {});
+  const patch = { etat: fini ? (job.etape === 'echec' || job.etape === 'abandonne' ? 'echec' : 'fait') : 'en-cours', resultat: res };
+  // On relit la ligne pour garder sa demande (cmd, args, pour…) — une lecture
+  // ratée n'écrit rien (« rien lu ne vaut pas rien »).
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(lien.id)}&select=data`);
+  if (!Array.isArray(rows) || !rows[0] || !rows[0].data) return;
+  await relaisEcrire(lien.id, moi, Object.assign({}, rows[0].data, patch, fini ? { finiLe: Date.now() } : {}), null);
+  if (fini) {
+    delete jobs[jobId];
+    try { await chrome.storage.local.set({ [RELAIS_JOBS]: jobs }); } catch (_) {}
+    await noterRelaisVu(lien.id, { resultat: { etat: patch.etat, resultat: res } });
+  }
 }
 
 

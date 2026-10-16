@@ -1,0 +1,65 @@
+/* Rail compact : reprend les couleurs de la coque existante. */
+.vrm-atelier-rail { padding:24px 12px 18px; overflow:visible; box-sizing:border-box; }
+.vrm-atelier-rail .vrm-sidebar-brand { padding:4px 0 28px; display:flex; justify-content:center; }
+.vrm-rail-platforms { display:flex; flex-direction:column; align-items:center; gap:12px; overflow-y:auto; min-height:0; scrollbar-width:none; }
+.vrm-rail-button { position:relative; display:flex; align-items:center; justify-content:center; width:52px; min-height:48px; flex-shrink:0; padding:8px; border:1px solid transparent; border-radius:10px; background:transparent; color:inherit; cursor:pointer; transition:background .16s,border-color .16s; }
+.vrm-rail-button[aria-current="page"],.vrm-rail-button[data-active],.vrm-rail-button[aria-expanded="true"] { background:#ffffff15; border-color:#ffffff24; color:#fff; }
+.vrm-rail-button[aria-current="page"]::before,.vrm-rail-button[data-active]::before { content:''; position:absolute; left:-6px; height:18px; width:2px; border-radius:2px; background:#C3DEE5; }
+.vrm-rail-button:focus-visible { outline:2px solid #C3DEE5; outline-offset:2px; }
+.vrm-rail-bottom { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:auto; padding-top:24px; }
+@media(hover:hover) and (pointer:fine) {
+ .vrm-rail-button:hover { background:#ffffff12; border-color:#ffffff20; }
+}
+@media(prefers-reduced-motion:reduce) { .vrm-rail-button { transition:none; } }
+/* Les mêmes logos monochromes restent lisibles sur le chrome sombre. */
+.vrm-atelier-rail { --vrm-brand-filter:invert(1); }
+
+.vrm-rail-scroll { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.vrm-rail-scroll::-webkit-scrollbar { display:none; }
+.vrm-rail-platforms { overflow:visible; }
+.vrm-rail-management-group { display:flex; flex-direction:column; align-items:center; border-top:1px solid #ffffff20; margin-top:20px; padding-top:16px; }
+.vrm-rail-management { display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:8px; }
+@media(min-width:1024px) { .vrm-main .vrm-ebay-sales,.vrm-main .vrm-ebay-offers { max-width:none; } }
+
+/* Tous les accès sont permanents, dans un bandeau plus généreux. */
+.vrm-atelier-rail { padding-inline:20px; }
+.vrm-rail-platforms { gap:7px; }
+.vrm-rail-button { width:64px; min-height:44px; }
+.vrm-rail-management { gap:2px; padding-top:4px; }
+.vrm-rail-management-group { margin-top:14px; padding-top:12px; }
+.vrm-rail-section-label { color:inherit; opacity:.65; font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:0 0 6px; }
+.vrm-day-lower { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.vrm-day-lower .vrm-day-recent { margin-top:0!important; min-width:0; }
+.vrm-day-stock h3 { font-size:14px; margin:0; font-weight:600; }
+.vrm-day-stock h3 span { font-size:11px; font-weight:400; color:var(--vrm-muted); margin-left:5px; }
+.vrm-day-stock-total { display:flex; gap:10px; align-items:baseline; margin:16px 0; }
+.vrm-day-stock-total strong { font-size:36px; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.vrm-day-stock-total>span,.vrm-day-stock p { color:var(--vrm-muted); font-size:12px; line-height:1.5; }
+.vrm-day-stock-meter { height:6px; background:var(--vrm-bg); border-radius:4px; overflow:hidden; margin-bottom:14px; }
+.vrm-day-stock-meter span { display:block; height:100%; border-radius:inherit; }
+.vrm-day-stock-prices { display:flex; justify-content:space-between; gap:12px; font-size:12px; }
+.vrm-day-stock-prices span { color:var(--vrm-muted); }
+.vrm-day-stock-links { display:flex; gap:12px; border-top:1px solid var(--vrm-line); padding-top:10px; margin-top:14px; flex-wrap:wrap; }
+.vrm-day-stock-links button { border:0; background:transparent; color:var(--vrm-ink); cursor:pointer; padding:8px 0; font-family:inherit; font-size:12px; font-weight:500; }
+@media(min-width:1024px) {
+ .vrm-day-layout>.vrm-screen-head { display:none; }
+ .vrm-day-layout .vrm-day-greeting { margin:0 0 12px; gap:4px 12px; }
+ .vrm-day-greeting .vrm-day-todo { grid-column:auto; margin-left:auto; }
+ .vrm-day-layout .vrm-day-hello { font-size:20px; }
+ .vrm-day-layout .vrm-day-bar { margin-bottom:12px; }
+ .vrm-day-layout .vrm-day-bar>button { padding:10px 8px; }
+ .vrm-day-layout .vrm-day-task-list { grid-template-columns:repeat(auto-fit,minmax(300px,1fr))!important; margin-bottom:12px; }
+ .vrm-day-layout .vrm-day-task { padding:9px 12px!important; }
+ .vrm-day-layout .vrm-day-top { gap:12px; grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,.8fr); grid-template-rows:auto; margin-bottom:16px; align-items:stretch; }
+ .vrm-day-top>.vrm-day-money,.vrm-day-top>.vrm-day-jour { grid-column:1; grid-row:1; }
+ .vrm-day-top>.vrm-day-week { grid-column:2; grid-row:1; }
+ .vrm-day-top>.vrm-day-wallet { grid-column:3; grid-row:1; display:flex; flex-direction:column; justify-content:center; }
+ .vrm-day-layout .vrm-day-card { padding:14px 16px; }
+ .vrm-day-layout .vrm-day-hero-n { font-size:36px; margin-top:8px; }
+ .vrm-day-layout .vrm-day-recu { margin-top:10px; padding-top:10px; }
+ .vrm-day-lower { grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr); align-items:start; }
+ .vrm-day-recent .vrm-carrousel { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+ .vrm-day-recent .vrm-carrousel>button { display:grid!important; grid-template-columns:66px minmax(0,1fr); }
+ .vrm-day-recent .vrm-carrousel>button>div:first-child { aspect-ratio:auto!important; min-height:100px; }
+ .vrm-day-recent .vrm-carrousel>button>div+div { padding:10px!important; min-width:0; }
+}
