@@ -39648,6 +39648,26 @@ function PrenomSetting() {
 // ne devine rien et le bandeau du dépôt renvoie ici.
 function VilleSetting() {
   const [v, setV] = React.useState(() => String(load('vrm_ville', '') || ''));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
+    setV((p) => p || String(load('vrm_ville', '') || ''));
+  }), []);
+  const ecrire = (t) => { touche.current = true; const n = t.slice(0, 80); setV(n); save('vrm_ville', n.replace(/\s+/g, ' ').trim()); };
+  const cap = extSait('lbclieu');
+  return (
+    <div data-reglage-ville style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ta ville</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+        Le lieu de tes annonces Leboncoin (ex. « Vannes » ou « Vannes 56000 »).
+        {cap === 'retard' ? <> Ton extension doit être en {EXT_CAPACITES.lbclieu} ou plus pour la poser.</> : null}
+      </div>
+      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Ville" autoComplete="address-level2"
+        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
+    </div>
+  );
+}
+
 // ── MODE STREAM (15 octobre) ────────────────────────────────────────────────
 // Julien : « un mode stream pour les influenceurs, il faut cacher leurs données
 // sensibles comme leur CA ou leur nom de compte ». Le masquage lui-même vit
@@ -39714,37 +39734,6 @@ function PastilleStream() {
       style={{display:'inline-flex',alignItems:'center',gap:5,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:8,padding:'6px 10px',color:C.accent,cursor:'pointer',fontSize:12.5,fontWeight:600,fontFamily:'inherit',whiteSpace:'nowrap'}}>
       <Icon name="eyeOff" size={15}/><span className="vrm-stream-mot">Stream</span>
     </button>
-  );
-}
-
-// ── TES NUMÉROS DE RANGEMENT : CHIFFRES OU SÉRIE À LETTRE ──────────────────
-// Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
-// des fois elles commencent par B125, C123 ; rends la chose adaptable ».
-// Deux façons de numéroter, au choix de chacun : des chiffres (1, 2, 3… —
-// défaut, rien ne change pour lui) ou une série à lettre (B1, B2…). Le choix ne
-// porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
-// carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
-// tapé à la main peut toujours être « 125 » ou « C40 ».
-function NumerosSetting() {
-  const [p, setP] = React.useState(() => prefixeNumeros());
-  const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
-  const touche = React.useRef(false);
-  React.useEffect(() => onCloudReady(() => {
-    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
-    setV((p) => p || String(load('vrm_ville', '') || ''));
-  }), []);
-  const ecrire = (t) => { touche.current = true; const n = t.slice(0, 80); setV(n); save('vrm_ville', n.replace(/\s+/g, ' ').trim()); };
-  const cap = extSait('lbclieu');
-  return (
-    <div data-reglage-ville style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ta ville</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-        Le lieu de tes annonces Leboncoin (ex. « Vannes » ou « Vannes 56000 »).
-        {cap === 'retard' ? <> Ton extension doit être en {EXT_CAPACITES.lbclieu} ou plus pour la poser.</> : null}
-      </div>
-      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Ville" autoComplete="address-level2"
-        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
-    </div>
   );
 }
 
