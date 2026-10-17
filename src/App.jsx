@@ -56,7 +56,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.183.0';
+const EXT_ATTENDUE = '5.184.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1510,6 +1510,39 @@ const _emitSync = (status, raison) => {
   _syncInfo = { ..._syncInfo, etat: status, raison: status === 'error' || status === 'refus' ? (raison || _syncInfo.raison || '') : '', at: now, okAt: status === 'synced' ? now : _syncInfo.okAt };
   _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}});
 };
+// ── LE STATUT DU BOUTON NUAGE, HORS DE LA COQUE (« app plus rapide », 17 oct.) ─
+// Il vivait dans un `useState` d'AppCoeur : chaque « loading → saving → synced »
+// re-rendait TOUTE l'app (Ma journée, Ventes… : un composant de 12 000 lignes),
+// trois fois par sauvegarde, pour changer une icône. Seul `BoutonSync` le lit.
+// Même valeur ⇒ personne n'est prévenu.
+let _statutBouton = 'idle';
+const _statutBoutonSubs = new Set();
+const poserStatutBouton = (st) => { if (st === _statutBouton) return; _statutBouton = st; _statutBoutonSubs.forEach(fn => { try { fn(); } catch (_) {} }); };
+const abonnerStatutBouton = (fn) => { _statutBoutonSubs.add(fn); return () => _statutBoutonSubs.delete(fn); };
+const lireStatutBouton = () => _statutBouton;
+function BoutonSync({ ouvert, onBasculer }) {
+  const syncStatus = React.useSyncExternalStore(abonnerStatutBouton, lireStatutBouton);
+  return (
+    <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={ouvert} onClick={onBasculer} title={
+              syncStatus==='synced'?'Synchronisé avec le cloud':
+              syncStatus==='saving'?'Sauvegarde en cours...':
+              syncStatus==='loading'?'Chargement...':
+              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
+              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
+            }>
+              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
+                  rouge seulement si la base refuse ou ne répond pas. */}
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
+              </span>
+              {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
+                  portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
+                  cloche, rouage — huit éléments. L'icône de nuage dit déjà si
+                  c'est synchronisé ; l'heure exacte est dans Réglages. */}
+            </button>
+  );
+}
 // Une sauvegarde ratée se RELANCE toute seule (5 s, 15 s, 1 min, puis toutes
 // les 2 min) : avant, le nuage restait barré jusqu'à la prochaine saisie, et
 // ce qu'il venait de taper n'arrivait jamais dans la base s'il ne touchait à
@@ -17498,7 +17531,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {actions.map((a,i)=>(
-                <button type="button" key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
+                <button type="button" key={i} data-action-tab={a.tab||undefined} data-action-n={a.n!=null?String(a.n):undefined} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
                   <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
                     {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
                   </span>
@@ -17866,21 +17899,23 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // est resté au défaut, jamais un choix fait pendant le chargement.
   useEffect(() => onCloudReady(() => setUrssafFreq(v => v === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : v)), []);
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
+  // ⚠️⚠️ (revue des chiffres, 17 octobre) Le « CA finalisé » de la prochaine
+  //    échéance retombait sur l'ARCHIVE (`encaissees`, vide depuis juillet 2026)
+  //    quand aucune ligne n'était publiée sur cet appareil : « CA finalisé
+  //    0,00 € · À payer ≈ 0,00 € » juste sous la carte du mois qui, elle, disait
+  //    « — · ce chiffre se calcule sur l'écran Ventes ». Le même défaut que la
+  //    phrase URSSAF du 8 septembre, sur la ligne d'en dessous. Et sa liste de
+  //    dépendances oubliait `urssafMois` : une ligne publiée après le montage ne
+  //    le recalculait jamais. Une seule source (la ligne publiée par Ventes,
+  //    §11) ; sans elle, `null` — un tiret, jamais un zéro.
   const urssafPeriodCA=useMemo(()=>{
-    if(!urssafDue) return 0;
-    if (urssafMois) {
-      // Un mois publié tombe dans la période si son 1er jour y est.
-      return urssafMois.reduce((s,m)=>{
-        const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
-        return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+m.ca : s;
-      },0);
-    }
-    return encaissees.filter(v=>{
-      const p=(v.receiveDate||'').trim().split('/'); if(p.length!==3) return false;
-      const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
-      return d>=urssafDue.periodStart && d<=urssafDue.periodEnd;
-    }).reduce((s,v)=>s+ +v.sellPrice,0);
-  },[encaissees,urssafDue]);
+    if(!urssafDue || !urssafMois) return null;
+    // Un mois publié tombe dans la période si son 1er jour y est.
+    return Math.round(urssafMois.reduce((s,m)=>{
+      const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
+      return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+(Number(m.ca)||0) : s;
+    },0)*100)/100;
+  },[urssafMois,urssafDue]);
 
   const bestDayCA=useMemo(()=>[...days].sort((a,b)=>b[1].ca-a[1].ca)[0],[days]);
   const bestDayProfit=useMemo(()=>[...days].sort((a,b)=>b[1].profit-a[1].profit)[0],[days]);
@@ -18394,8 +18429,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
               n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
               doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
+          {/* ⚠️ (revue des chiffres, 17 octobre) « sur N vendues ce mois-ci »
+              présentait les finalisées comme une PARTIE des vendues. Depuis le
+              3 octobre elles sont comptées au mois du VERSEMENT : une vente
+              faite le mois dernier et versée ce mois-ci est dedans, sans être
+              « vendue ce mois-ci » (banc chiffres-croises : « 3 sur 4 » quand
+              2 seulement des 4 en font partie). Deux notions côte à côte, chacune
+              son mot — jamais « sur ». */}
           <Chiffre lib="Ventes finalisées" val={moisCourantN!=null?moisCourantN:'—'} couleur={moisCourantN!=null?C.text:C.muted}
-            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN ? `sur ${liveStats.ventesMois} vendue${liveStats.ventesMois>1?'s':''} ce mois-ci` : null}/>
+            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois!==moisCourantN ? <span data-mois-vendues={liveStats.ventesMois}>argent versé ce mois · {liveStats.ventesMois} vente{liveStats.ventesMois>1?'s':''} faite{liveStats.ventesMois>1?'s':''} ce mois-ci</span> : null}/>
           {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
               raison en clair — il n'est pas développeur. */}
           <Chiffre lib="Bénéfice" val={liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)} couleur={C.muted}
@@ -18454,8 +18496,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
                   <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
-                  <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
-                  <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
+                  <span>CA finalisé</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={urssafPeriodCA}/>}</span>
+                  <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/>}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
@@ -18805,8 +18847,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               </tbody>
             </table>
           </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+          {/* ⚠️ (revue des chiffres, 17 octobre) Cette phrase disait « ventes que
+              Vinted a marquées finalisées, à leur date de vente » — sous un
+              tableau qui lit la ligne publiée par Ventes (`vinted_urssaf_mois`) :
+              TOUTES plateformes, datée au VERSEMENT depuis le 3 octobre, et au
+              mois de déclaration quand il l'a notée. La carte du mois, au-dessus,
+              disait le contraire sur le même écran. La phrase qui explique un
+              chiffre vient de la même source que lui (§5) : `data-regle` dit
+              laquelle a produit les lignes. */}
+          <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
+            {urssafMois
+              ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </Card>
       )}
@@ -24801,6 +24853,21 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     } catch (_) { return null; }
   })();
   const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
+  // ⚠️ (revue des chiffres, 17 octobre) LA COUVERTURE DE LA MÊME LIGNE. Ce CA
+  // se présentait comme complet alors que la ligne publiée peut dire « eBay :
+  // pas pu lire » ou porter des ventes finalisées sans date (dans aucun mois) —
+  // ce que la carte URSSAF du tableau de bord dit, sur la MÊME ligne. Un total
+  // partiel qui se présente comme complet est pire qu'un total absent (§5).
+  const couvertureCa = (() => {
+    try {
+      const v = load('vinted_urssaf_mois', null);
+      if (!v || !Array.isArray(v.mois)) return null;
+      const pasSu = Object.entries(v.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
+      const ad = v.aDater && Number(v.aDater.n) > 0 ? { n: Number(v.aDater.n), ca: Number(v.aDater.ca) || 0 } : null;
+      return { pasSu, aDater: ad };
+    } catch (_) { return null; }
+  })();
+  const caPartiel = !!(couvertureCa && couvertureCa.pasSu.length);
 
   // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
   const auj = new Date().toISOString().slice(0, 10);
@@ -24905,14 +24972,20 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             </div>
           ) : (
             <div>
-              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{fmt(resultatAnnee)}</div>
+              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{caPartiel ? <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>au moins </span> : null}{fmt(resultatAnnee)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? 'au moins ' : ''}{fmt(recettesAnnee)}</span>
                 <span>CA déclaré</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                 <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
               </div>
+              {couvertureCa && (caPartiel || couvertureCa.aDater) && (
+                <div data-compta-couverture={couvertureCa.pasSu.join(',')} data-compta-adater={couvertureCa.aDater ? String(couvertureCa.aDater.n) : '0'} style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
+                  {caPartiel && <div>Sans {couvertureCa.pasSu.join(' ni ')} : {couvertureCa.pasSu.length > 1 ? 'leurs' : 'ses'} ventes n'ont pas pu être lues — ce CA est un minimum.</div>}
+                  {couvertureCa.aDater && <div>{couvertureCa.aDater.n} vente{couvertureCa.aDater.n > 1 ? 's' : ''} finalisée{couvertureCa.aDater.n > 1 ? 's' : ''} sans date de versement ({fmt(couvertureCa.aDater.ca)}) : dans aucun mois pour l'instant.</div>}
+                </div>
+              )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
                 Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 13)}) — ce n'est donc pas encore ton bénéfice net.
               </div>
@@ -40025,6 +40098,9 @@ const lireCacheEquipe = (uid) => { try { const j = JSON.parse(localStorage.getIt
 // La dernière liste connue est gardée sur l'appareil pour décider tout de suite
 // (pas d'éclair de sa boutique vide) ; la base tranche dès qu'elle répond.
 function PorteEquipe({ uid, children }) {
+  // Monté hors d'AppCoeur : le thème choisi (`vinted_dark`) doit valoir AUSSI
+  // pour l'écran d'équipe. AppCoeur le repose lui-même quand il est rendu.
+  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   const [lu, setLu] = React.useState(undefined);
   const [cache, setCache] = React.useState(() => lireCacheEquipe(uid));
   const [vue, setVue] = React.useState(() => lireVueEquipe(uid));
@@ -42335,9 +42411,9 @@ function AppCoeur() {
   const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
-  const [syncStatus,setSyncStatus]=useState('idle');
   const [syncOuvert, setSyncOuvert] = useState(false); // idle | saving | synced | error | loading
-  const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
+  // ⚠️ `syncStatus` et `lastSync` ne sont plus des états de la coque : voir
+  //    `BoutonSync` (le statut) ; `lastSync` n'était lu par personne.
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
   const logoSrc = customLogo || LOGO_CANCALE;
@@ -42619,8 +42695,8 @@ function AppCoeur() {
   useEffect(() => {
     let stop = false;
     // Écoute les changements de statut de synchro (saving / synced / error)
-    const off = onSyncChange((st)=>{ if(!stop){ setSyncStatus(st); if(st==='synced') setLastSync(new Date()); } });
-    setSyncStatus('loading');
+    const off = onSyncChange((st)=>{ if(!stop) poserStatutBouton(st); });
+    poserStatutBouton('loading');
     (async () => {
       // La base n'a pas répondu : on RÉESSAIE (2 s, 4 s, 8 s… plafonné à 30 s)
       // au lieu de conclure « nuage vide ». Rien n'est poussé entre-temps.
@@ -42668,8 +42744,7 @@ function AppCoeur() {
         apply('vinted_stock_vinted', setStockVinted);
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
-        setSyncStatus('synced');
-        setLastSync(new Date());
+        poserStatutBouton('synced');
       } else {
         // Cloud vide : on y envoie les données locales actuelles (1re utilisation)
         cloudPush();
@@ -42677,7 +42752,7 @@ function AppCoeur() {
       setSynced(true);
       markCloudReady(); // débloque la numérotation (le cloud est chargé)
     })();
-    return () => { stop = true; off(); };
+    return () => { stop = true; off(); poserStatutBouton('idle'); };
   }, []);
 
   // La VERSION de la numérotation est relue (une lecture scalaire) toutes les
@@ -42929,6 +43004,19 @@ function AppCoeur() {
       // appels (ventes / annonces / messages) de chaque compte aussi en parallèle
       // → chargement du tableau de bord bien plus rapide (avant : 9 comptes × 3
       // appels en série). Lecture moissonnée d'abord, donc paralléliser est sûr.
+      // ── LES DEUX PETITES LECTURES DE LA FIN PARTENT DÈS MAINTENANT (17 oct.) ──
+      // Le porte-monnaie et l'âge des captures étaient lus APRÈS les ventes, à
+      // la queue leu leu : « ventes arrivées » puis « chiffres calculés »
+      // faisaient DEUX rendus de toute l'app (mesuré : `vitesse.cjs`, rendus de
+      // Ma journée). Lancées en même temps que les ventes, elles sont déjà là
+      // quand les ventes arrivent : les deux mises à jour tombent dans le même
+      // rendu. Rien n'attend de plus (si elles traînent, on les attend comme
+      // avant) ; ce sont les MÊMES lectures, avec les mêmes replis.
+      const uidsVivantsTot=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
+      const walletP=fetchWalletEscrow(uidsVivantsTot).then(v=>({v}),()=>({v:null}));
+      const ageP=fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`,{headers:sbAuth()})
+        .then(rf=>rf.ok?rf.json().then(rows=>({ok:true,rows}),()=>({erreur:true})):{ok:false},()=>({erreur:true}));
+      ageP.catch(()=>{}); walletP.catch(()=>{});
       const activeAccts=vintedAccounts.filter(a=>!skipAcc(a.vinted_user_id));
       // ⚠️ Les VENTES de tous les comptes liés (bloqués compris) partent aussi
       //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
@@ -43053,7 +43141,7 @@ function AppCoeur() {
       //    montants Vinted qui ne se confondent JAMAIS (§5.14). Même source que
       //    Ma journée et Statistiques (§11), jamais un recalcul.
       let walletEsc=null;
-      try{ walletEsc=await fetchWalletEscrow(uidsVivants); if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
+      try{ walletEsc=(await walletP).v; if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
       // ⚠️ DEPUIS QUAND TES DONNÉES VINTED DATENT (Julien, 25 sept. : « j'ai des
       //    paires déjà expédiées qui restent »). C'est presque toujours une
       //    donnée GELÉE par une extension en retard, pas un défaut de l'app. On
@@ -43073,8 +43161,9 @@ function AppCoeur() {
       try{
         const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
         const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
-        const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`,{headers:sbAuth()});
-        if(rf.ok){ const rows=await rf.json(); let vieux=null, qui='';
+        const rf=await ageP;
+        if(rf.erreur) throw new Error('lecture');
+        if(rf.ok){ const rows=rf.rows; let vieux=null, qui='';
           for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
           if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
         }
@@ -43691,24 +43780,7 @@ function AppCoeur() {
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
             <span style={{position:'relative',display:'inline-flex'}}>
-            <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
-              syncStatus==='synced'?'Synchronisé avec le cloud':
-              syncStatus==='saving'?'Sauvegarde en cours...':
-              syncStatus==='loading'?'Chargement...':
-              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
-              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
-            }>
-              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
-                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
-                  rouge seulement si la base refuse ou ne répond pas. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
-                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
-              </span>
-              {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
-                  portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
-                  cloche, rouage — huit éléments. L'icône de nuage dit déjà si
-                  c'est synchronisé ; l'heure exacte est dans Réglages. */}
-            </button>
+            <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
             {syncOuvert && <PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/>}
             </span>
           </div>

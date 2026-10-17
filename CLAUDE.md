@@ -9200,6 +9200,43 @@ mon ordinateur] je veux pouvoir faire des actions ». Avant, sur le téléphone,
   signe de vie est celui du DERNIER ; la prise conditionnelle empêche une double
   exécution, mais l'autre ordinateur peut refuser « autre compte »).
 
+### Revue adverse de l'extension (17 octobre, 5.184) — trois défauts reproduits
+Chacun REPRODUIT d'abord en exécutant le vrai `background.js` (`_fond-vm.cjs`,
+harnais des audits), rouge sur 1872a1a (§6.1, arbre archivé, audit lancé depuis
+lui), vert après.
+- ⚠️⚠️ **Le plafond de 20 actions/heure cédait à deux gestes simultanés.**
+  `compterAction` (et `compterLecture`) faisaient lire-ajouter-réécrire dans
+  `chrome.storage.local` sans file : trois réponses lancées ensemble à 19
+  actions partaient TOUTES les trois, et quatre gestes sur un budget vide n'en
+  notaient qu'UN (la suite de l'heure dépassait encore). Le relais du téléphone
+  rend ce cas réel (un geste du téléphone pendant un clic dans l'app). ⇒ une
+  chaîne de promesses (`unCompteurALaFois`) sérialise le compte — ce n'est pas un
+  tampon de données (§4.9), l'état reste dans le stockage.
+  `audit-compteurs-concurrents.cjs` : 4 rouges sur l'avant.
+- ⚠️⚠️ **Une marque Leboncoin ratée publiait la paire deux fois.** `markPosted`
+  (après une publication réussie) et « Déjà publiée » (`lbcMarque`, `ebayMarque`)
+  jetaient le résultat de l'écriture de `vinted_lbc_posted` : base qui hoquette ⇒
+  l'app lisait « fait », la paire restait dans la file, et un nouveau « Publier »
+  (le téléphone par le relais ne voit pas l'état des jobs) ouvrait un SECOND
+  dépôt qui publie tout seul. ⇒ `writePosted`/`markLbcPosted` rendent le vrai
+  résultat ; « Déjà publiée » ratée répond `lecture` ; une publication non notée
+  garde `nonMarquee` sur sa commande, et `publierDepuisApp` retente la marque au
+  clic suivant sans JAMAIS rouvrir de dépôt (`deja-publiee`, même confirmé).
+  `audit-publier-app.cjs` : 4 rouges sur l'avant.
+- **Relais : « en cours » écrasait « fait ».** `traiterRelais` inscrivait le
+  suivi du bordereau AVANT d'écrire « en-cours » : un job rapide (PDF déjà prêt
+  chez Vinted) écrivait « fait » pendant que « en-cours » traînait dans une base
+  lente, et l'écrasait en arrivant — le téléphone restait « En cours sur ton
+  ordinateur… ». Et « pdf » puis « fait » partaient en parallèle. ⇒ « en-cours »
+  d'abord, puis le suivi, puis l'état relu (un job déjà fini est relayé) ;
+  `relaisSuivreJob` passe ses étapes une à une. `audit-relais.cjs` §10 : 3 rouges
+  sur l'avant.
+- Cherché sans rien trouver de confirmé : helpers hors portée (balayage Babel de
+  tous les fichiers de l'extension : 0), balayages non paginés (tous bornés par
+  compte), lire-fusionner-réécrire sans garde de lecture ratée (tous gardés).
+- Extension **5.184.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : des corrections.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9417,9 +9454,17 @@ profileur de Chrome sur un build non minifié.
   d'avant (`VENTES_REFERENCE`) et à une page ouverte à froid ; 2 rouges sur
   l'avant. ⚠️ Toute nouvelle valeur lue dans la ligne passe par
   `preparerLigneVente` (sinon ligne périmée).
-- **Pas fait, mesuré** : (2) le composant
-  qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
-  par arrivée de données) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
+- **Les rendus de `Comptabilite` au démarrage (17 oct.)** : mesuré par le crochet
+  React (`vitesse.cjs`, 390 px ×4, médiane de 3) **14–19 → 11–12**. Deux causes de
+  la COQUE : le statut du nuage (`syncStatus`, 3 rendus de toute l'app par
+  sauvegarde) vit dans `BoutonSync` (magasin `poserStatutBouton`), et le
+  porte-monnaie + l'âge des captures partent AVEC les ventes (un seul rendu au
+  lieu de deux). Temps de la fonction `Comptabilite` ~750 → ~615 ms. Texte
+  identique (`VITESSE_REFERENCE`). ⚠️ PAS de `React.memo` sur `Comptabilite` : elle
+  lit des globales au rendu (`C`, `extSait`, `etatRelais`, `load(...)`) ; ni de
+  garde « même contenu » sur ses `onCloudReady` (des effets de publication
+  relisent le `localStorage` sur ce changement). Reste par arrivée de données.
+- **Pas fait, mesuré** : (2) ~~rendus au démarrage~~ (réduits, ci-dessus) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
   ci-dessous) ; (4) le code de l'app (518 Ko compressés).
 - **La chaîne du premier écran raccourcie (16 octobre)** : au téléphone, le rendu
   d'AppCoeur (~600 ms de processeur ×4) s'intercalait entre la sonde et les
@@ -9590,6 +9635,38 @@ PROUVÉE en vente ailleurs. Règle pure : `api/_lib/double-vente.js`.
 - **Julien** : rien — la catégorie est activée d'office (Réglages →
   Notifications pour la couper).
 
+### Revue de cohérence des chiffres entre écrans (17 octobre)
+Même notion, même nombre, sur Ma journée, Statistiques, Compta, carte URSSAF,
+récap mensuel. Rendu sur données inventées (banc `chiffres-croises.cjs`, deux
+comptes, une vente vendue le mois d'avant et versée ce mois, une sans date de
+versement). **Vérifié égal** : vendu du mois (Ma journée = Statistiques =
+Compta), reçu du mois (Ma journée = Compta), CA déclaré de l'année (Compta =
+ligne publiée). **Quatre défauts, corrigés** (aucune règle URSSAF/DAC7 changée) :
+- **A. « Prochaine déclaration » (tableau de bord) écrivait « CA finalisé
+  0,00 € · à payer 0,00 € »** : elle sommait l'ANCIENNE archive (vide depuis
+  juillet). Elle somme maintenant les mois de la ligne publiée
+  (`vinted_urssaf_mois`) qui tombent dans SA période (`nextUrssafDeadline`) ;
+  pas de ligne publiée ⇒ « — », jamais 0. Attributs `data-echeance-*`.
+- **B. La note du récap mensuel disait « à leur date de vente »** au-dessous de
+  chiffres lus dans la ligne publiée (datée au versement) — la phrase qui
+  explique un chiffre doit venir de sa source (§5). `data-recap-regle`.
+- **C. La Compta présentait un CA déclaré complet avec eBay illisible** : il dit
+  « au moins », nomme la plateforme non lue (`sources` de la ligne publiée,
+  `data-compta-couverture`) et les ventes sans date de versement (`aDater`).
+- **D. « Ventes finalisées 3 · sur 4 vendues ce mois-ci »** comparait deux
+  dates différentes (versement / vente) comme une couverture : écrit « argent
+  versé ce mois · 4 ventes faites ce mois-ci » (`data-mois-vendues`).
+- ⚠️ **Deux bancs servaient une forme que le code ne lit plus (§6.3)** :
+  `vendu-recu` et `seuils-vinted` simulaient une panne de compte seulement sur
+  `harvest_{uid}_orders_*` ; `prechargerDemarrage` lit TOUS les comptes en une
+  lecture (`harvest_*_orders_*`) et contournait la panne. La lecture commune
+  tombe aussi maintenant (l'app repasse compte par compte, comme en vrai).
+- Preuves : `chiffres-croises.cjs` (port `BANC_PORT`, 18 contrôles) **5 rouges
+  sur le build d'avant** (§6.1), 0 après ; il juge les nombres par attributs.
+- **Noté, pas touché** : `received` de `api/widget.js` vient des emails de
+  finalisation, pas de `ventesDeclarables` (zone serveur) ; le « Bénéfice
+  estimé » du tableau de bord reste « — » (il ne ment pas, il se tait).
+
 ### Revue adverse des routes serveur (17 octobre)
 Toutes les routes `api/*.js` et `api/_lib/*.js` relues, chaque défaut REPRODUIT
 en exécutant la vraie route (`scripts/audit-routes-revue.cjs`, un processus neuf
@@ -9642,7 +9719,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **85 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **86 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -9963,8 +10040,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 94 audits
-scripts/bancs/                  les 85 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 95 audits
+scripts/bancs/                  les 87 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

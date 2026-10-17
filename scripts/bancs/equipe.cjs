@@ -240,18 +240,19 @@ const srv = http.createServer((q, r) => {
 });
 
 let compte = null;
-async function ouvrir(nav, { qui, largeur = 1512, tab = '', vue = undefined, cache = undefined }) {
+async function ouvrir(nav, { qui, largeur = 1512, tab = '', vue = undefined, cache = undefined, sombre = false }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   const popups = []; ctx.on('page', (p) => popups.push(p));
-  await pg.addInitScript(({ s, vue, uid, cache }) => {
+  await pg.addInitScript(({ s, vue, uid, cache, sombre }) => {
+    try { if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
     try { if (vue !== undefined && !sessionStorage.getItem('banc_init')) { localStorage.setItem('vrm_equipe_vue_' + uid, vue); } } catch (_) {}
     try { if (cache !== undefined && !sessionStorage.getItem('banc_init')) localStorage.setItem('vrm_equipe_cache_' + uid, JSON.stringify(cache)); } catch (_) {}
     try { sessionStorage.setItem('banc_init', '1'); } catch (_) {}
-  }, { s: session(qui), vue, uid: qui, cache });
+  }, { s: session(qui), vue, uid: qui, cache, sombre });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
     const rq = r.request(), u = rq.url();
     if (/supabase\.co\//.test(u)) {
@@ -292,6 +293,24 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
+    // (17 octobre) L'écran d'équipe est monté hors d'AppCoeur : il restait en
+    // clair dans une app choisie en sombre (cartes blanches sur fond noir).
+    console.log(`\n── 390 px · l'aide, app en mode sombre`);
+    await essaie('membre sombre', async () => {
+      reset();
+      const { ctx, pg } = await ouvrir(nav, { qui: M, largeur: 390, sombre: true });
+      const m = await pg.evaluate(() => {
+        const lum = (c) => { const v = (c.match(/[\d.]+/g) || []).slice(0, 4).map(Number); if (v.length === 4 && v[3] === 0) return null; const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]); };
+        const e = document.querySelector('[data-colis-equipe]'); if (!e) return null;
+        // Les SURFACES (cartes, blocs) seulement : un bouton d'accent bleu n'est pas un fond.
+        const fonds = [...e.querySelectorAll('*')].concat([e]).filter((x) => !x.closest('button,a') && x.getBoundingClientRect().width * x.getBoundingClientRect().height > 8000).map((x) => lum(getComputedStyle(x).backgroundColor)).filter((x) => x != null);
+        const txt = lum(getComputedStyle(e.querySelector('h1,h2,h3') || e).color);
+        return { max: fonds.length ? Math.max(...fonds) : null, txt };
+      });
+      dit(m && m.max != null && m.max < 0.2, 'mode sombre : aucun fond clair sur l\'écran des colis de l\'équipe', JSON.stringify(m));
+      dit(m && m.txt != null && m.txt > 0.4, 'mode sombre : le titre est écrit en clair', JSON.stringify(m));
+      await ctx.close();
+    });
     for (const L of [390, 1512]) {
       console.log(`\n── ${L} px · l'aide (aucune boutique) arrive sur les colis du vendeur`);
       await essaie(`membre ${L}`, async () => {

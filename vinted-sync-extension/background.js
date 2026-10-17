@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.183.0';
+const CODE_VERSION = '5.184.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1826,10 +1826,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'markPosted' && msg.id) {
-            await markLbcPosted(msg.id);
+            // ⚠️⚠️ Revue du 17 octobre : une marque RATÉE (lecture ou écriture de
+            //    `vinted_lbc_posted`) laissait la paire PUBLIÉE dans la file, et
+            //    « Publier » ouvrait un second dépôt qui publie tout seul — la
+            //    paire deux fois sur Leboncoin. La commande garde la trace
+            //    (`nonMarquee`) et `publierDepuisApp` ne relance pas sans elle.
+            const marque = await markLbcPosted(msg.id);
+            if (marque !== true) noterDiag('lbc_marque_ratee');
             // Publiée depuis une commande de l'app : l'app le sait tout de suite.
             const jid = 'lbc:' + String(msg.id);
-            if ((await lireCmds())[jid]) await majCmd(jid, { etape: 'fait' });
+            if ((await lireCmds())[jid]) await majCmd(jid, { etape: 'fait', nonMarquee: marque !== true ? true : null });
             notifierApp({ type: 'maj', quoi: 'lbc' });
             sendResponse({ ok: true }); return;
           }
@@ -4857,7 +4863,22 @@ async function compteConnecte(domain) {
 // bordereaux commandés par l'app s'arrêtent avant la réserve des gestes sur
 // clic, voir `RESERVE_GESTES`). `resteMs` dit quand une place se libère : la
 // raison d'un refus donne une heure, pas « plus tard ».
-async function compterAction(uid, plafond = ACTIONS_MAX_HEURE) {
+// ⚠️⚠️ REVUE DU 17 OCTOBRE — UN COMPTEUR À LA FOIS. Lire-ajouter-réécrire dans
+//    `chrome.storage.local` sans file : deux gestes simultanés (le relais du
+//    téléphone pendant un clic dans l'app, un double clic) lisaient tous les deux
+//    19, passaient tous les deux, et la seconde écriture effaçait la première —
+//    22 réponses parties dans l'heure, 20 notées (prouvé :
+//    `audit-compteurs-concurrents.cjs`). Une chaîne de promesses en mémoire
+//    sérialise le compte : ce n'est pas un tampon de données (§4.9), rien n'y
+//    est gardé — l'état reste dans le stockage.
+let _chaineCompteurs = Promise.resolve();
+function unCompteurALaFois(fn) {
+  const suite = _chaineCompteurs.then(() => fn(), () => fn());
+  _chaineCompteurs = suite.then(() => {}, () => {});
+  return suite;
+}
+function compterAction(uid, plafond = ACTIONS_MAX_HEURE) { return unCompteurALaFois(() => compterActionUn(uid, plafond)); }
+async function compterActionUn(uid, plafond) {
   try {
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
@@ -4895,7 +4916,8 @@ const RESERVE_GESTES = 5;
 const LECTURES_MAX_HEURE = 20;
 // `plafond` : la part du budget que CETTE lecture a le droit d'atteindre (les
 // photos s'arrêtent avant la réserve de l'argent et des colis, voir plus bas).
-async function compterLecture(uid, plafond = LECTURES_MAX_HEURE) {
+function compterLecture(uid, plafond = LECTURES_MAX_HEURE) { return unCompteurALaFois(() => compterLectureUn(uid, plafond)); }
+async function compterLectureUn(uid, plafond) {
   try {
     const cle = 'vrmLectures';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
@@ -5285,8 +5307,14 @@ async function publierDepuisApp(msg) {
   if (!/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
   if (cmd === 'lbcMarque' || cmd === 'ebayMarque') {
     const pose = msg.etat === 'posted';
-    if (cmd === 'lbcMarque') { if (pose) await markLbcPosted(id); else await unmarkLbcPosted(id); }
-    else await markEbayPosted(id, pose);
+    // ⚠️ Revue du 17 octobre : le résultat de l'écriture était JETÉ — base qui
+    //    hoquette, et l'app lisait « fait » pour une marque jamais posée (la
+    //    paire restait dans la file, « Publier » repartait). On dit ce qui est.
+    let note;
+    if (cmd === 'lbcMarque') note = pose ? await markLbcPosted(id) : await unmarkLbcPosted(id);
+    else note = (await markEbayPosted(id, pose)) === true;
+    if (note !== true) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est noté, réessaie dans un moment" };
+    if (cmd === 'lbcMarque') { const jid = 'lbc:' + id; const j = (await lireCmds())[jid]; if (j && j.nonMarquee) await majCmd(jid, { nonMarquee: null }); }
     notifierApp({ type: 'maj', quoi: cmd === 'lbcMarque' ? 'lbc' : 'ebay' });
     return { accepte: true, etape: 'fait' };
   }
@@ -5313,6 +5341,18 @@ async function publierDepuisApp(msg) {
     //        arrêté ⇒ on lui demande de reprendre, dans CET onglet ;
     //      · fermé ⇒ le dépôt est abandonné : on relance.
     //    Sans onglet connu (dépôt d'avant la 5.171), l'ancienne règle des 15 min.
+    // ⚠️⚠️ Revue du 17 octobre : PUBLIÉE PAR VRM, MAIS PAS NOTÉE (la base n'a
+    //    pas pris la marque) ⇒ elle est encore dans la file. On retente la
+    //    marque ; tant qu'elle ne passe pas, AUCUN nouveau dépôt (il publierait
+    //    la paire une seconde fois) — elle EST publiée, seule la note manque.
+    if (lbc && jobDeja && jobDeja.etape === 'fait' && jobDeja.nonMarquee) {
+      if (await markLbcPosted(id)) {
+        await majCmd(cleJob, { nonMarquee: null });
+        notifierApp({ type: 'maj', quoi: 'lbc' });
+        return { accepte: false, code: 'deja-publiee', jobId: cleJob, etape: 'fait', raison: 'VRM l\'a déjà publiée sur Leboncoin — elle est maintenant notée' };
+      }
+      return { accepte: false, code: 'deja-publiee', jobId: cleJob, etape: 'fait', raison: 'VRM l\'a déjà publiée sur Leboncoin, mais la base n\'a pas pu le noter — rien n\'est relancé, réessaie dans un moment' };
+    }
     let etapeDeja = jobDeja ? jobDeja.etape : '';
     if (jobDeja && (jobDeja.etape === 'depot' || jobDeja.etape === 'abandonne')) {
       let onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
@@ -5885,20 +5925,37 @@ async function traiterRelais(row, moi) {
   }
   // Un dépôt Leboncoin ouvert n'est pas fini : sa ligne suit l'avancement (5.182).
   const termine = r.etape === 'fait';
+  // ⚠️⚠️ Revue du 17 octobre : « en-cours » s'écrit AVANT d'inscrire le suivi.
+  //    Inscrit d'abord, un job rapide (PDF déjà prêt chez Vinted : deux
+  //    requêtes) écrivait « fait » pendant que « en-cours » traînait dans une
+  //    base lente — qui l'écrasait en arrivant : le téléphone restait « en
+  //    cours » pour toujours (prouvé : `audit-relais.cjs` §10). Et un job fini
+  //    avant l'inscription n'aurait plus jamais été relayé : on relit son état.
+  await relaisResultat(id, moi, dPris, termine ? 'fait' : 'en-cours', { accepte: true, jobId: r.jobId || '', etape: r.etape || '', deja: !!r.deja });
   if (r.jobId && !termine) {
     try {
       const jobs = (await chrome.storage.local.get(RELAIS_JOBS))[RELAIS_JOBS] || {};
       jobs[r.jobId] = { id, at: Date.now() };
       await chrome.storage.local.set({ [RELAIS_JOBS]: jobs });
     } catch (_) {}
+    const cur = (await lireCmds())[r.jobId];
+    if (cur && JOB_TERMINE.includes(cur.etape)) await relaisSuivreJob(r.jobId, cur).catch(() => {});
   }
-  await relaisResultat(id, moi, dPris, termine ? 'fait' : 'en-cours', { accepte: true, jobId: r.jobId || '', etape: r.etape || '', deja: !!r.deja });
   return termine ? 'fait' : 'en-cours';
 }
 // Un bordereau commandé par le téléphone avance (file → génération → PDF) :
 // la ligne de la commande suit, le téléphone la relit.
 const JOB_TERMINE = ['fait', 'echec', 'genere_sans_pdf', 'abandonne'];
-async function relaisSuivreJob(jobId, job) {
+// Une étape à la fois, dans l'ordre (revue du 17 octobre) : « pdf » puis
+// « fait » partaient en parallèle, et une base lente pouvait poser « pdf »
+// par-dessus « fait ».
+let _chaineSuiviRelais = Promise.resolve();
+function relaisSuivreJob(jobId, job) {
+  const suite = _chaineSuiviRelais.then(() => relaisSuivreJobUn(jobId, job), () => relaisSuivreJobUn(jobId, job));
+  _chaineSuiviRelais = suite.then(() => {}, () => {});
+  return suite;
+}
+async function relaisSuivreJobUn(jobId, job) {
   let jobs = {};
   try { jobs = (await chrome.storage.local.get(RELAIS_JOBS))[RELAIS_JOBS] || {}; } catch (_) { return; }
   const lien = jobs[jobId];
@@ -9126,22 +9183,24 @@ async function readPostedData() {
   return { echec: rows === null, ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null, plan: d.plan || null };
 }
 async function readPostedIds() { return new Set((await readPostedData()).ids); }
+// Rend `true` seulement si la base a pris l'écriture (revue du 17 octobre : un
+// « Déjà publiée » ou une publication qui n'a pas été NOTÉE se disait « fait »).
 async function writePosted(d) {
-  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, plan: d.plan || null, updatedAt: new Date().toISOString() } }], 'id');
+  return await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, plan: d.plan || null, updatedAt: new Date().toISOString() } }], 'id');
 }
 async function markLbcPosted(id) {
   const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.add(String(id));
-  await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
+  return (await writePosted({ ids: [...s], limit: d.limit, plan: d.plan })) === true;
 }
 async function unmarkLbcPosted(id) {
   const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.delete(String(id));
-  await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
+  return (await writePosted({ ids: [...s], limit: d.limit, plan: d.plan })) === true;
 }
 async function setLbcLimit(limit, plan) {
   const d = await readPostedData();
   if (d.echec) return false;
   const n = parseInt(String(limit), 10);
-  await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n, plan: (plan && String(plan).trim()) || null });
+  return (await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n, plan: (plan && String(plan).trim()) || null })) === true;
 }
 // AUTO-DÉTECTION du quota d'annonces depuis les données Leboncoin (offre / pack).
 // On cherche les champs qui ressemblent à un maximum/quota d'annonces. Best-effort :

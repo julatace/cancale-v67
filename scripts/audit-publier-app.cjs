@@ -22,7 +22,7 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
 
 const AD = { id: '1001', numero: '401', title: 'Salomon XT-6 blanc T40', price: '99.00', photos: ['https://x/1.jpg'], ref: 'VRM-401' };
 
-function faire({ queue = [AD], preuveKO = false } = {}) {
+function faire({ queue = [AD], preuveKO = false, marque = () => true } = {}) {
   const store = {}; const onglets = []; let ecouteur = null;
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
@@ -52,7 +52,9 @@ function faire({ queue = [AD], preuveKO = false } = {}) {
   vm.runInContext(src, ctx, { filename: 'background.js' });
   ctx.buildLbcData = async () => ({ queue, removals: [], unlinked: [], stats: { preuveKO }, postedList: [] });
   ctx.buildEbayData = async () => ({ queue, preuveKO });
-  ctx.markLbcPosted = async () => true;
+  ctx.markLbcPosted = async () => marque();
+  ctx.unmarkLbcPosted = async () => marque();
+  ctx.markEbayPosted = async () => marque();
   const cmd = (msg) => new Promise((res) => {
     ecouteur(Object.assign({ from: 'vmr-bridge', action: 'cmd' }, msg), { origin: 'https://vrm.center', url: 'https://vrm.center/' }, res);
   });
@@ -99,6 +101,32 @@ function faire({ queue = [AD], preuveKO = false } = {}) {
     const p = b.store.vrmPendingEbay && b.store.vrmPendingEbay.ad;
     dit(r && r.accepte && p && p.title === AD.title && b.onglets.some((u) => /ebay\.fr\/sl\/sell/.test(u)), 'eBay : la paire est préparée et la mise en vente s\'ouvre', JSON.stringify(r));
     dit(!(p && p.publier), 'et eBay ne reçoit AUCUN feu vert de publication (il relit et met en vente lui-même)');
+  });
+  // Revue du 17 octobre : une marque RATÉE ne se dit pas « fait », et une paire
+  // publiée mais pas notée ne repart pas dans un second dépôt.
+  await essaie('marque ratée après publication', async () => {
+    let base = false;
+    const b = faire({ marque: () => base });
+    await b.cmd({ cmd: 'lbcPublier', id: '1001' });
+    await b.lbc({ action: 'markPosted', id: '1001' });
+    const n1 = b.onglets.length;
+    const r = await b.cmd({ cmd: 'lbcPublier', id: '1001' });
+    const r2 = await b.cmd({ cmd: 'lbcPublier', id: '1001', confirme: true });
+    dit(b.onglets.length === n1 && r && r.accepte === false && r2 && r2.accepte === false, 'publiée mais pas notée (la base n\'a pas pris la marque) : AUCUN second dépôt, même confirmé', JSON.stringify({ r, r2, onglets: b.onglets.length - n1 }));
+    base = true;
+    const r3 = await b.cmd({ cmd: 'lbcPublier', id: '1001' });
+    const c = (b.store.vrmCmds || {})['lbc:1001'] || {};
+    dit(r3 && r3.accepte === false && b.onglets.length === n1 && !c.nonMarquee, 'la base revenue : la marque est posée au clic suivant, toujours rien de relancé', JSON.stringify({ r3, c }));
+  });
+  await essaie('Déjà publiée ratée', async () => {
+    const b = faire({ marque: () => false });
+    const r = await b.cmd({ cmd: 'lbcMarque', id: '1001', etat: 'posted' });
+    dit(r && r.accepte === false, '« Déjà publiée » que la base n\'a pas pris : refusé, jamais « fait »', JSON.stringify(r));
+    const r2 = await b.cmd({ cmd: 'ebayMarque', id: '1001', etat: 'posted' });
+    dit(r2 && r2.accepte === false, 'pareil côté eBay', JSON.stringify(r2));
+    const b2 = faire();
+    const r3 = await b2.cmd({ cmd: 'lbcMarque', id: '1001', etat: 'posted' });
+    dit(r3 && r3.accepte === true && r3.etape === 'fait', 'l\'autre sens : la base a pris la marque ⇒ « fait »', JSON.stringify(r3));
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);

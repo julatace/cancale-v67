@@ -106,6 +106,13 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   await pg.goto('http://localhost:4383/?tab=cat_achats',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
   await pg.screenshot({path:SC+'/z-retrait.png',fullPage:true});
+  // ⚠️ (17 oct.) Le prix et la date de chaque colis vivent dans un repli
+  //    « Détails de l'achat » (refonte du 16 octobre) : fermé, il est absent
+  //    d'`innerText`. On OUVRE chaque repli avant de lire — exactement le geste
+  //    de Julien — et le contrôle 5 ter reste le même (une ligne prix+date par
+  //    carte, jamais un 0 inventé).
+  await pg.evaluate(()=>{ document.querySelectorAll('details.vrm-pickup-details').forEach(d=>{ d.open=true; }); });
+  await pg.waitForTimeout(300);
   const v=await pg.evaluate(()=>{
     const liens=[...document.querySelectorAll('a[href*="/inbox/"]')].map(a=>({h:a.getAttribute('href'),t:(a.innerText||'').trim()}));
     return {liens, txt:document.body.innerText||''};
@@ -158,6 +165,14 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   await pg.goto('http://localhost:4383/?tab=journee',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
   await pg.screenshot({path:SC+'/z-retrait-journee.png',fullPage:true});
+  // ⚠️ (17 oct.) Ma journée ne déroule plus « Retirer N colis — … » : la barre
+  //    du quotidien porte une tuile `data-tuile="retirer"` dont `data-n` est le
+  //    nombre et le TITRE (l'infobulle) la phrase que l'app calcule
+  //    (`tuiles.retirer.sub`, la même qu'avant). On lit les deux, rien n'est
+  //    déduit ; « — » (pas su) donne `data-n` vide, donc aucun nombre.
+  const tuileRetirer=async(p)=>p.evaluate(()=>{ const t=document.querySelector('[data-tuile="retirer"]');
+    if(!t) return null; const n=t.getAttribute('data-n'); return { n: n===''||n==null ? null : Number(n), sub: t.getAttribute('title')||'' }; });
+  const tj=await tuileRetirer(pg);
   const j2=await pg.evaluate(()=>document.body.innerText||'');
   // ⚠️ LE CONTROLE SE DECLENCHE SUR LA DONNEE, PAS SUR LA FORMULE. Premiere
   // version : « si la phrase parle d'attendre un code, alors elle doit nommer un
@@ -166,13 +181,13 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // qu'il devait attraper. C'est la base qui decide : s'il existe un colis sans
   // code, la ligne DOIT nommer un compte, quelle que soit la formulation.
   const logins=[...new Set(accounts.map(a=>String(a.login||'')).filter(Boolean))];
-  const ligne=(/Retirer \d+ colis[\s\S]{0,220}/.exec(j2)||[''])[0];
+  const ligne=(tj&&tj.sub)||'';
   const sansCode=aRetirer.filter(o=>!codes[String(o.transaction_id||'')]);
   console.log('base servie : '+sansCode.length+' colis sans code, sur '
     +[...new Set(sansCode.map(o=>o.__uid).filter(Boolean))].length+' compte(s)');
   if(sansCode.length===0){ console.log('--  (aucun colis sans code dans ces fixtures)'); }
   else {
-    dit(/Retirer \d+ colis/.test(j2), 'Ma journee annonce les colis a retirer');
+    dit(!!(tj && tj.n > 0), 'Ma journee annonce les colis a retirer', tj ? 'tuile « À retirer » : '+(tj.n==null?'—':tj.n) : 'aucune tuile « À retirer »');
     dit(!/Ouvre la conversation UNE fois/.test(j2),
       "et ne reclame plus d'ouvrir chaque conversation",
       "l'extension va les chercher toute seule depuis le 27 aout");
@@ -277,9 +292,22 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // n'apparaissaient nulle part sur cet écran (§5.43 : un colis caché est un
   // colis perdu). `pickupUnion` publie maintenant, le tableau de bord consomme.
   const nombres = {};
-  for (const t of ['cat_achats','journee','dashboard']) {
+  // ⚠️ (17 oct.) Le tableau de bord (`?tab=dashboard`) est devenu l'écran
+  //    Statistiques et ne déroule plus aucune action ; la cloche ne s'ouvre
+  //    plus. L'écran qui rend `notifItems` (la règle publiée par `pickupUnion`)
+  //    est le COLLECTIF, sa liste « À faire ». On y lit le nombre que la ligne
+  //    PORTE (`data-n`, le total) — sa phrase peut commencer par les colis
+  //    « avec code » seulement. Ma journée : la tuile, `data-n`.
+  const ECRANS = ['cat_achats','journee','collectif'];
+  for (const t of ECRANS) {
     await pg.goto('http://localhost:4383/?tab='+t,{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(5000);
+    if (t === 'journee') { const x = await tuileRetirer(pg); if (x && x.n != null && x.n > 0) nombres[t] = x.n; continue; }
+    if (t === 'collectif') {
+      const n = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('[data-action-tab="cat_achats"]')].find(e=>/colis à retirer/.test(e.innerText||''));
+        return b ? Number(b.getAttribute('data-action-n')) : null; });
+      if (Number.isFinite(n) && n > 0) nombres[t] = n; continue;
+    }
     const txt = await pg.evaluate(()=>document.body.innerText||'');
     const m = /(\d+)\s+colis à retirer/.exec(txt) || /Retirer\s+(\d+)\s+colis/.exec(txt);
     if (m) nombres[t] = Number(m[1]);
@@ -290,7 +318,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // le defaut a attraper. Un ecran muet sur un colis, c'est justement le
   // probleme (§5.43). C'est la BASE qui declenche, comme au point 5.
   const vus = Object.values(nombres);
-  const detail = ['cat_achats','journee','dashboard'].map(k=>k+'='+(k in nombres?nombres[k]:'(muet)')).join(' · ');
+  const detail = ECRANS.map(k=>k+'='+(k in nombres?nombres[k]:'(muet)')).join(' · ');
   if (aRetirer.length === 0) { console.log('--  (aucun colis a retirer dans ces fixtures)'); }
   else {
     dit(vus.length === 3, 'les TROIS ecrans annoncent le colis a retirer', detail);
