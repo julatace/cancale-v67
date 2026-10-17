@@ -9261,9 +9261,22 @@ profileur de Chrome sur un build non minifié.
   60 lignes DEUX fois (rendu urgent + rendu différé : la liste n'est pas
   mémoïsée) — 200 à 300 ms par lettre en émulation téléphone ; (2) le composant
   qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
-  par arrivée de données) ; (3) le premier écran attend la sonde de schéma, puis
-  les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
-  de l'app (518 Ko compressés).
+  par arrivée de données) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
+  ci-dessous) ; (4) le code de l'app (518 Ko compressés).
+- **La chaîne du premier écran raccourcie (16 octobre)** : au téléphone, le rendu
+  d'AppCoeur (~600 ms de processeur ×4) s'intercalait entre la sonde et les
+  comptes, puis ~350 ms avant les ventes. `prechargerDemarrage` (appelé par
+  `authBoot` quand la porte sait qu'AppCoeur monte) lance les comptes ET les
+  commandes de tous les comptes en UNE lecture (`lireTout … strict`) ; chaque
+  compte LIÉ reçoit sa part dans `cachedRow('o:uid')` (mêmes lignes que
+  `fetchHarvestOrdersBrut`), famille illisible ⇒ lecture par compte. Gardes
+  inchangées : session = son jeton ; sans session seulement accès direct + base
+  MESURÉE non cloisonnée (`SCHEMA_MESURE`) ; rien pendant une récupération ;
+  échec ⇒ `null` (panne dite). Ventes lues au 2ᵉ aller-retour au lieu du 4ᵉ-5ᵉ
+  (`vitesse.cjs`, 2 rouges sur l'avant) ; Ma journée 52 → 46 lectures ; texte
+  identique (même build : famille coupée vs servie ; entre builds : `VITESSE_TEXTES`).
+  Le temps au héros (~2,3–3,4 s → ~1,9–2,1 s au téléphone) varie trop sur la
+  machine partagée pour un plafond.
 
 ---
 

@@ -54,7 +54,8 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4479);
+const PORT_BANC = Number(process.env.BANC_PORT) || 4479;
+srv.listen(PORT_BANC);
 
 // ⚠️ LA VRAIE FORME DE LA PANNE : Cloudflare rend du HTML avec un 522, pas un
 // JSON d'erreur. Servir `{"error":…}` mesurerait un cas qui n'arrive pas.
@@ -126,7 +127,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
         return j([]);});
       await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
     }
-    await pg.goto('http://localhost:4479/?tab='+t,{waitUntil:'domcontentloaded'});
+    await pg.goto('http://localhost:'+PORT_BANC+'/?tab='+t,{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(5000);
     if(panne) await pg.screenshot({path:SC+'/z-panne-'+t+'.png',fullPage:true});
     const txt=await pg.evaluate(()=>document.body.innerText||'');
