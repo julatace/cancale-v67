@@ -11952,6 +11952,24 @@ function useVueSession(nom, initial) {
   return [valeur,changer];
 }
 
+// Une ligne de la liste des ventes (16 oct., « app plus rapide »). Elle rend
+// ce que l'écran lui donne (`rendre`) — le même rendu qu'avant. Elle garde sa
+// sortie précédente dans deux cas seulement, la vente et sa place étant les
+// mêmes : (1) le rendu URGENT d'une frappe dans la recherche (`gel`) — seule
+// la recherche a changé, la liste affichée est encore l'ancienne, et le rendu
+// différé qui suit la redessine ; (2) `pre.deps` identique : tout ce que la
+// ligne lit dans l'écran (`preparerLigneVente`) est inchangé. Une valeur
+// « pas comparable » (première fois, rendu gelé avant) la fait redessiner.
+const LigneVenteVinted = React.memo(function LigneVenteVinted({ o, i, pre, rendre }) { return rendre(o, i, pre); },
+  (avant, apres) => {
+    if (avant.o !== apres.o || avant.i !== apres.i) return false;
+    if (apres.gel === true) return true;
+    const a = avant.pre && avant.pre.deps, b = apres.pre && apres.pre.deps;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let k = 0; k < a.length; k++) if (!Object.is(a[k], b[k])) return false;
+    return true;
+  });
+
 function PhotoArticleAgrandissable({src,titre,children}) {
   const url=photoArticle({photo:src});
   const [ouverte,setOuverte]=useState(false);
@@ -30609,6 +30627,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
     processBordereau(num, titre, lu.octets);
   };
+  // ── UNE LIGNE DE VENTE NE SE REDESSINE QUE SI CE QU'ELLE MONTRE A CHANGÉ ──
+  // (16 oct., « app plus rapide »). `LigneVenteVinted` compare `pre.deps` : la
+  // liste EXHAUSTIVE de ce que la ligne lit hors de la vente elle-même (relevée
+  // en suivant chaque identifiant libre de son rendu). Une valeur oubliée ici
+  // ferait garder une ligne périmée : tout ce que `rendre` lit dans l'écran
+  // doit passer par `preparerLigneVente` ou par `actionsVentes`.
+  const preparerLigneVente = (o) => {
+    const tx = String(o.transaction_id);
+    const e = effEntry(o); const num = e?.numero;
+    const baseE = resolvedEntry(o);
+    const lst = listings.items || _acctCache.listings?.items || [];
+    const photo = photoVenteVinted(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions) || photoArticle(baseE);
+    const sourcesPhoto = photosVenteVintedCandidates(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions);
+    const ov = saleOv[tx] || {};
+    const hidden = isHidden(o);
+    const cell = num ? garageCellOf(garageGrid, num) : null;
+    const deps = [C, INV_STATUS, facturesVentes, ventesUnCompte, garageUtilise, clavierNum(),
+      JSON.stringify(e), baseE, ov, photo, sourcesPhoto.join('\n'), hidden, isShipDone(o), estFloute(o),
+      JSON.stringify(venteStage(o)), o._acc ? accNameOf(o._acc) : '', cell ? garageCellLabel(cell) : '', inGarage(num),
+      saleOutcome(o), isPairLost(num), num ? numeroReprenable(num) : null,
+      !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o)];
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden };
+  };
+  const actionsVentes = React.useRef(null);
+  actionsVentes.current = { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden };
+  const actionsVentesProxy = React.useMemo(() => {
+    const a = {};
+    for (const k of ['imprimerBordereauVente', 'markPairLost', 'unmarkPairLost', 'openPicker', 'rechargerLabels', 'setSaleOverride', 'toggleHidden']) a[k] = (...x) => actionsVentes.current[k](...x);
+    // `onLocate` est une prop facultative : la ligne teste `onLocate&&…`.
+    Object.defineProperty(a, 'onLocate', { enumerable: true, get: () => (actionsVentes.current.onLocate ? (...x) => actionsVentes.current.onLocate(...x) : undefined) });
+    return a;
+  }, []);
   const printBordAndInvoice = async (b) => {
     try {
       const lu = await lirePdfLigne(b._row);
@@ -31753,22 +31803,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
+          {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
+              Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
+              recréait les 60 lignes au rendu urgent PUIS au rendu différé —
+              jusqu'à 350 ms par lettre. Pendant le rendu urgent, seule la
+              recherche a changé et la liste affichée reste l'ancienne
+              (`ordSearchDiff` est en retard) : `LigneVenteVinted` garde alors la
+              ligne déjà peinte. Le rendu différé, lui, refait tout comme avant
+              — aucun comportement ne change. */}
+          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{ const gel = ordSearch!==ordSearchDiff; return <LigneVenteVinted key={o.transaction_id} o={o} i={i} gel={gel} pre={gel?null:preparerLigneVente(o)} rendre={(o,i,pre)=>{
+            if (!pre) pre = preparerLigneVente(o);
             const st = classifyOrderStatus(o.status);
-            const hidden = isHidden(o);
-            const e = effEntry(o); const num = e?.numero;
+            const hidden = pre.hidden;
+            const e = pre.e; const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
             const fees = chargesVente(e);
             const bilan = beneficePaire(o.price?.amount,e);
             const benef = st==='cancelled'?null:bilan.benefice;
-            const ov = saleOv[String(o.transaction_id)] || {};
-            const baseE = resolvedEntry(o);
-            const photo = photoVenteVinted(o, listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees,photosVentesTransactions) || photoArticle(baseE);
-            const sourcesPhoto=photosVenteVintedCandidates(o,listings.items || _acctCache.listings?.items || [],txnItem[String(o.transaction_id)],photosVentesArchivees,photosVentesTransactions);
+            const ov = pre.ov;
+            const baseE = pre.baseE;
+            const photo = pre.photo;
+            const sourcesPhoto = pre.sourcesPhoto;
             const clePhoto=JSON.stringify([String(o._acc?.vinted_user_id),String(o.transaction_id)]);
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
+            // Les gestes passent par `actionsVentes` : une ligne gardée telle
+            // quelle appelle quand même la version À JOUR de chaque fonction.
+            const { imprimerBordereauVente, markPairLost, unmarkPairLost, onLocate, openPicker, rechargerLabels, setSaleOverride, toggleHidden } = actionsVentesProxy;
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
@@ -31912,7 +31974,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                </div>
               </div>
             );
-          })}
+          }}/>; })}
         </div>
         {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
             un clic ouvre la suite. On dessine 60 cartes au lieu de 287 — sur
