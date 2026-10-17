@@ -24,6 +24,10 @@ const MUTATIONS = {
   pas_de_descente: (s) => s.replace("const reste = pile.slice(0, i).concat(pile.slice(i + 1));", "const reste = pile.slice(0, i);"),
   sans_plafond: (s) => s.replace("if (pile.length >= cap) return null;", ''),
   croisee_ok: (s) => s.replace("if (seCroise(out)) return null;", ''),
+  // Le défaut du 17 oct. : retirer sur TOUTE la liste (« ça décolle tout »).
+  pile_toute_liste: (s) => s.replace("const col = a.slice(deb, fin); col.splice(idx - deb, 1);", "const col = a.slice(deb); col.splice(idx - deb, 1); return sansTrouFinal([...a.slice(0, deb), ...col]);"),
+  trou_ignore: (s) => s.replace("const t = a.findIndex(estTrou);", "const t = -1;"),
+  place_haut_dabord: (s) => s.replace("for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }", "for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }"),
 };
 
 async function charger(src) {
@@ -78,13 +82,38 @@ async function audit(src, bavard) {
     const e = R.empilerDansCase({ '0_0': ['1'] }, '0_0', '2', 2);
     dit(e && JSON.stringify(e['0_0']) === '["1","2"]', 'on empile AU-DESSUS');
     dit(R.empilerDansCase({ '0_0': ['1', '2'] }, '0_0', '3', 2) === null, 'une case pleine refuse (rien ne déborde du plateau)');
-    const pile = R.retirerDePile(['1', '2', '3', '4'], 0);
+    const pile = R.retirerDePile(['1', '2', '3', '4'], 0, 4);
     dit(JSON.stringify(pile) === '["2","3","4"]', 'cartons au sol : celui du dessous retiré, les autres descendent');
+    // Le cas de Julien (17 oct.) : PLUSIEURS colonnes. Retirer le bas de la
+    // 1re colonne ne doit faire descendre QUE la 1re colonne.
+    const p3 = R.retirerDePile(['1', '2', '3', '4', '5', '6', '7', '8', '9'], 0, 3);
+    dit(JSON.stringify(p3) === '["2","3","","4","5","6","7","8","9"]', 'plusieurs colonnes : seule la colonne du carton retiré descend, les autres restent à leur place', JSON.stringify(p3));
+    const p4 = R.retirerDePile(['1', '2', '3', '4', '5', '6', '7'], 4, 3);
+    dit(JSON.stringify(p4) === '["1","2","3","4","6","","7"]', 'au milieu d’une colonne : celui du dessus descend, la colonne suivante ne bouge pas', JSON.stringify(p4));
+    const p5 = R.retirerDePile(['1', '2', '3', '4', '5'], 3, 3);
+    dit(JSON.stringify(p5) === '["1","2","3","5"]', 'dans la DERNIÈRE colonne : elle raccourcit simplement', JSON.stringify(p5));
+    dit(R.retirerDePile(['1', '', '3'], 1, 3) === null, 'une place vide ne se « retire » pas');
+    const a1 = R.ajouterAPile(['2', '3', '', '4', '5', '6'], '99');
+    dit(JSON.stringify(a1) === '["2","3","99","4","5","6"]', 'ajouter comble d’abord la place vide (le haut de la colonne entamée)', JSON.stringify(a1));
+    dit(JSON.stringify(R.ajouterAPile(['1', '2'], '3')) === '["1","2","3"]', 'sans place vide, il se pose au-dessus');
+    dit(JSON.stringify(R.cartonsDePile(['1', '', '3'])) === '["1","3"]', 'les places vides ne comptent pas comme des cartons');
+  });
+  essaie('prochaine place libre', () => {
+    const metal = { build: 'metal', cases: 'pile', h3d: 1.25 };
+    const pp = R.prochainePlaceMeuble({ rows: 5, cols: 2, h3d: 1.25, slots: { '4_0': ['1', '2'] } }, metal, 3.4);
+    dit(pp && pp.cell === '4_1', 'étagère : le plateau du BAS d’abord, la case pleine est sautée', JSON.stringify(pp));
+    const pc = R.prochainePlaceMeuble({ rows: 1, cols: 3, slots: { '0_0': ['1'] } }, { cases: 'cintre' }, 3.4);
+    dit(pc && pc.cell === '0_1', 'portant : le premier cintre libre', JSON.stringify(pc));
+    const pg = R.prochainePlaceMeuble({ rows: 3, cols: 2, slots: { '2_0': ['1'] } }, { build: 'grille' }, 3.4);
+    dit(pg && pg.cell === '1_0', 'mur de boîtes : au-dessus de la dernière boîte de la colonne', JSON.stringify(pg));
+    dit(R.prochainePlaceMeuble({ rows: 1, cols: 1, slots: { '0_0': ['1'] } }, { cases: 'cintre' }, 3.4) === null, 'meuble plein : aucune place inventée');
+    dit(R.prochainePlaceMeuble({ rows: 1, cols: 1 }, { deco: true }, 3.4) === null, 'un décor ne range rien');
   });
   essaie('contenance', () => {
     const metal = { build: 'metal', cases: 'pile', rows: 5, h3d: 1.25 };
     dit(R.capaciteCase(metal, { rows: 5, h3d: 1.25 }, 3.4) === 2, 'une étagère métal tient 2 boîtes empilées par case', String(R.capaciteCase(metal, { rows: 5, h3d: 1.25 }, 3.4)));
     dit(R.capaciteCase({ cases: 'cintre' }, {}, 3.4) === 1, 'un cintre porte UN numéro');
+    dit(R.capaciteCase({ build: 'metal', bacs: true, cases: 'pile', h3d: 1.25 }, { rows: 2, h3d: 1.25 }, 3.4) === 1, 'une étagère À BACS tient UN bac par case, même haute', String(R.capaciteCase({ build: 'metal', bacs: true, cases: 'pile', h3d: 1.25 }, { rows: 2, h3d: 1.25 }, 3.4)));
     dit(R.capaciteCase({ build: 'table', cases: 'pile', h3d: 0.5 }, {}, 3.4) >= 5, 'une table tient une pile de plusieurs boîtes');
   });
   essaie('posé sur', () => {

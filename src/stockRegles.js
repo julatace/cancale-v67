@@ -134,12 +134,15 @@ export const placerSansTraverser = (cx, cy, w, h, obstacles, poly) => {
 //    DANS la case, retirer celle du dessous fait descendre celles du dessus,
 //    mais rien ne tombe d'un plateau à l'autre (le plateau les tient).
 //  · 'cintre' — un portant : un numéro par cintre, rien ne tombe.
+// Une étagère À BACS (`ft.bacs`) est un plateau dont chaque case tient UN bac
+// numéroté : bijoux, accessoires, petits objets — une case, un numéro.
 export const BOITE_H = 0.145, BOITE_JEU = 0.008;    // une boîte à chaussures
 export const modeCase = (ft) => (ft && ft.cases) || 'colonne';
 export const capaciteCase = (ft, it, wallH = 3.4) => {
   const m = modeCase(ft);
   if (m === 'cintre') return 1;
   if (m !== 'pile') return 1;
+  if (ft.bacs) return 1;                              // un bac par case (petits objets, accessoires)
   if (ft.build === 'table') return Math.max(1, Math.min(12, Math.floor((Math.max(1.2, wallH * 0.7) - (ft.h3d || 0.5) * 1.5) / (BOITE_H + BOITE_JEU))));
   const rows = Math.max(1, (it && it.rows) || ft.rows || 1);
   const ht = Math.max(0.35, ((it && it.h3d) != null ? it.h3d : ft.h3d) * 1.5);
@@ -167,11 +170,56 @@ export const retirerDeCase = (slots, key, num) => {
   if (reste.length) out[key] = reste; else delete out[key];
   return { slots: out, descendus: pile.slice(i + 1) };
 };
-// Une liste de piles (pile de cartons au sol, `nums` rempli colonne par colonne
-// de bas en haut) : retirer un carton fait descendre ceux du dessus.
-export const retirerDePile = (nums, idx) => {
-  const a = arr(nums).slice(); if (idx < 0 || idx >= a.length) return null;
-  a.splice(idx, 1); return a;
+// CARTONS AU SOL : `nums` est rempli colonne par colonne, de bas en haut
+// (`rows` cartons par colonne). Une place vide dans une colonne s'écrit '' —
+// elle garde les autres colonnes à leur place.
+// ⚠️ (17 oct.) Julien : « quand j'enlève un carton en bas d'une pile, ça décolle
+//    tout ». Retirer faisait `splice` sur TOUTE la liste : chaque carton d'après
+//    reculait d'un rang, donc le bas de la colonne suivante montait en HAUT de la
+//    précédente, et ainsi de suite — toutes les colonnes se déplaçaient. Seuls
+//    les cartons du DESSUS dans la MÊME colonne descendent d'un cran ; les
+//    autres colonnes ne bougent pas.
+export const estTrou = (v) => !String(v == null ? '' : v).trim();
+const sansTrouFinal = (a) => { const o = a.slice(); while (o.length && estTrou(o[o.length - 1])) o.pop(); return o; };
+export const retirerDePile = (nums, idx, rows) => {
+  const a = arr(nums).map((v) => String(v == null ? '' : v)); if (idx < 0 || idx >= a.length || estTrou(a[idx])) return null;
+  const R = Math.max(1, Number(rows) || 1);
+  const deb = Math.floor(idx / R) * R, fin = Math.min(deb + R, a.length);
+  const col = a.slice(deb, fin); col.splice(idx - deb, 1);
+  // La colonne garde sa hauteur : la place libérée passe EN HAUT de la colonne
+  // (sauf pour la dernière colonne, qui raccourcit simplement).
+  if (fin < a.length) col.push('');
+  return sansTrouFinal([...a.slice(0, deb), ...col, ...a.slice(fin)]);
+};
+// Ajouter un carton : il comble le premier TROU (le haut d'une colonne
+// entamée), sinon il se pose au-dessus de la dernière colonne.
+export const ajouterAPile = (nums, num) => {
+  const v = String(num == null ? '' : num).trim(); if (!v) return null;
+  const a = arr(nums).map((x) => String(x == null ? '' : x));
+  const t = a.findIndex(estTrou);
+  if (t >= 0) { a[t] = v; return a; }
+  return [...a, v];
+};
+// Les cartons réellement là (sans les places vides).
+export const cartonsDePile = (nums) => arr(nums).map((v) => String(v == null ? '' : v).trim()).filter(Boolean);
+
+// ── LA PROCHAINE PLACE LIBRE D'UN MEUBLE ─────────────────────────────────────
+// Pour ranger en un geste : la place où poser le prochain article. Plateau
+// (étagère, table) : le plateau du BAS d'abord, de gauche à droite, une case
+// qui n'est pas pleine. Portant : le premier cintre libre. Mur de boîtes : le
+// bas de la première colonne qui a de la place. Rend { cell } ou null (plein).
+// Ne décide aucun numéro : seulement OÙ.
+export const prochainePlaceMeuble = (it, ft, wallH = 3.4) => {
+  if (!it || !ft || ft.deco || ft.box || ft.pile) return null;
+  const nr = Math.max(1, it.rows || 1), nc = Math.max(1, it.cols || 1), slots = it.slots || {};
+  const m = modeCase(ft), cap = capaciteCase(ft, it, wallH);
+  const n = (k) => nettoie(slots[k]).length;
+  if (m === 'colonne') {
+    for (let c = 0; c < nc; c++) for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c; if (!n(k)) return { cell: k }; }
+    return null;
+  }
+  for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }
+  return null;
 };
 
 // ── POSÉ SUR UN MEUBLE ──────────────────────────────────────────────────────

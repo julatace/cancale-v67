@@ -9844,6 +9844,16 @@ couleur les numéros vendus ». Les règles vivent dans **`src/stockRegles.js`**
   de la vue du dessus sur une très grande pièce ; Julien n'a pas encore ouvert sa
   pièce réelle avec ce code (lecture seule de sa base : 2 pièces, 8 meubles).
 
+### Stock, finitions (chantier 11, 17 octobre) — la pile ne « décolle » plus, deux modes, ranger d'un geste
+Julien : « cet onglet doit être revu intégralement » (pile qui décolle, hauteur des étagères, rangement plus simple, refonte).
+- **La pile** : retirer le carton du bas ne fait descendre que SA colonne d'un cran (`retirerDePile`, local à la colonne ; avant, la liste entière se décalait et « tout décollait »), sans rebond ; `ajouterAPile`, `cartonsDePile`, `prochainePlaceMeuble` (la plus BASSE place libre d'abord) dans `src/stockRegles.js`.
+- **Réglages d'un meuble** (mode Aménager) : nombre de niveaux, hauteur d'un niveau (`changerNiveau` : refusé au-delà du plafond, ou si une boîte déjà rangée ne tient plus — dit, un seul toast : un même message ne s'empile plus), largeur, profondeur. Étagère à bacs (1 par case), cintres de face.
+- **Deux modes** (`data-mode-stock`) : **Ranger** (défaut ; aucun réglage à l'écran) et **Aménager** (le dépliant et les réglages). Une pièce VIDE s'ouvre en Aménager (rien à ranger). Barre au-dessus de la 3D : modes + recherche d'un N° qui nomme le meuble et la case. Onglet « Ranger » renommé « Liste des cases ».
+- **Ranger d'un geste** : toucher une place libre range directement (le meuble n'a plus à être choisi d'abord ; toucher une boîte, elle, choisit) ; bande « À ranger » (`data-bande-a-ranger`, seulement quand la liste des paires présentes est LUE) — toucher une paire puis une place, « Ranger ici » (prochaine place libre), ou la glisser (souris ou doigt) dans la pièce (`viseurRef` de `Room3D` : la cible est celle que vise la 3D). Un N° déjà rangé ailleurs n'est pas reposé (`dejaPoseOu`). Aucun numéro ne change.
+- **Sans WebGL** : la forme libre est dessinée (`PlanSecours`) ; étiquettes 3D à taille constante, sans chevauchement ; photo du local retirée.
+- Preuves : `audit-stock-plan.cjs` (`--prouve` 8/8) ; banc `stock-finitions.cjs` (sections I–VIII, 78 contrôles, 390 et 1512 px) — VII et VIII : **9 rouges sur 6c73bfd** (§6.1, banc copié dans l'arbre, build refait là) ; mutation « place libre jamais touchée d'un geste + dépôt ignoré » ⇒ 4 rouges. `stock-piece` (B choisit l'étagère par une boîte), `garage3d`, `rangement`, `premierjour` verts. `compta-stock-ui` : 2 rouges sur le placeholder SIRET de la Compta (#561, hors Stock).
+- **Non mesuré** : un vrai téléphone et un vrai WebGL (banc en rendu logiciel) ; sa pièce réelle porte des étagères métal qui se chevauchent (laissées telles quelles, à lui de les déplacer).
+
 ### Plateformes plus vivantes, ventes même vides, eBay plus complet (17 octobre)
 Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonces).
 - **En-tête des plateformes** : une tuile de marque (la marque dans SA couleur
