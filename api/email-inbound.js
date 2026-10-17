@@ -822,7 +822,9 @@ export function parseCarrierEmail(mail, carrier) {
   //    « suivant » et l'a affiché en gros comme code à donner au comptoir
   //    (vérifié en base, ligne `email_track_chronopost_XW476115185SP`).
   //    Aucun transporteur observé n'utilise de lettres. On n'accepte que des chiffres.
-  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
+  // (17 oct.) « Votre code de retrait EST 123456 » / « … sera 123456 » aussi :
+  // un petit verbe entre le libellé et le nombre faisait manquer le code.
+  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
   if (!code) {
     const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal
@@ -877,11 +879,15 @@ export function parseCarrierEmail(mail, carrier) {
     const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(l));
     if (idx >= 0) {
       const parts = [];
-      for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
+      // 4 lignes : nom, rue, code postal + ville (la consigne Vinted Go en a 3
+      // après son en-tête « Adresse » : « Consigne Vinted Go », l'enseigne, la rue).
+      for (let i = idx + 1; i < lines.length && parts.length < 4; i++) {
         const l = lines[i];
         if (!l) { if (parts.length) break; else continue; }
         if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis/i.test(l)) break;
-        parts.push(l.replace(/\s+/g, ' '));
+        // (17 oct.) Le gras de la version texte (« *Kusmi Tea* ») n'est pas le lieu.
+        const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (propre) parts.push(propre);
       }
       if (parts.length) {
         lieu = parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim();
@@ -948,7 +954,16 @@ export function parseCarrierEmail(mail, carrier) {
   // Consigne automatique (casier Pickup) ou point relais avec comptoir ? Le geste
   // n'est pas le même : au casier on saisit identifiant + code d'ouverture (ou on
   // scanne), au comptoir on présente un code et une pièce d'identité.
-  const consigne = /consigne\s+pickup|casier|locker/i.test(all);
+  // (17 oct.) Un slogan n'est pas un lieu. Mesuré : « ® juste ici ! » rangé
+  // comme lieu d'un Mondial Relay (le texte du bouton de la carte). Mieux vaut
+  // aucun lieu qu'un faux : l'app dit alors « lieu non indiqué » et montre le code.
+  if (lieu) {
+    lieu = lieu.replace(/[*_]+/g, ' ').replace(/®|™|©/g, ' ').replace(/\s{2,}/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+    if (/^(?:juste\s*ici|ici|super\s*pratique|voir|cliquez?|retrouvez|en\s*savoir\s*plus)\b/i.test(lieu) || lieu.replace(/[^a-zà-ÿ]/gi, '').length < 4) lieu = null;
+  }
+  // (17 oct.) La consigne Vinted Go est une CONSIGNE (on saisit un code, pas de
+  // comptoir) : « Consigne Vinted Go » ne passait pas le motif.
+  const consigne = /consigne\s+pickup|consigne\s+vinted\s*go|casier|locker/i.test(all);
 
   // ── MESURE : lieu introuvable sur un colis À RETIRER ─────────────────────
   // Julien (30 sept.) : « le lieu est en bas du mail ou dans ses infos ». Le
@@ -966,7 +981,20 @@ export function parseCarrierEmail(mail, carrier) {
     if (bouts.length) extraitLieu = bouts.join(' | ').slice(0, 600);
   }
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, ...(sortant ? { sens: 'sortant' } : {}) };
+  // ── MESURE : code introuvable sur un colis À RETIRER (17 oct.) ─────────
+  // Julien : « des fois tu me mets juste un colis dans un point relais sans le
+  // code ». Le texte brut n'est gardé nulle part : on garde, SEULEMENT dans ce
+  // cas, les lignes qui parlent de code / retrait / PIN (400 caractères au plus)
+  // pour écrire la règle sur la vraie forme au lieu de la deviner. Jamais affiché.
+  let extraitCode = null;
+  if (!code && status === 'available') {
+    const L = txt.split('\n').map(l => l.trim()).filter(Boolean);
+    const bouts = [];
+    L.forEach((l, i) => { if (/\bcode\b|retrait|\bpin\b|identifiant/i.test(l)) { bouts.push(l); if (L[i + 1]) bouts.push(L[i + 1]); } });
+    if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
+  }
+
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sortant ? { sens: 'sortant' } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -1537,6 +1565,7 @@ export async function traiterEmail(req, res) {
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
+        ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
       } }]);
