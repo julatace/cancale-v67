@@ -154,6 +154,16 @@ const lbcDescription = (brut) => {
   return t.replace(/^\s*Description\s*(?=\S)/, '').trim();
 };
 
+// (17 oct.) La description qui part sur eBay : la règle de Leboncoin (§11 —
+// texte publicitaire de Vinted écarté, libellé « Description » collé retiré),
+// plus les deux restes que le libellé peut laisser : un « : » de tête, ou le
+// mot « Description » tout seul (Julien : « j'ai "description" qui s'affiche
+// dans la description, ça ne sert à rien »). Jamais une vraie description.
+const descriptionEbayPropre = (brut) => {
+  const t = lbcDescription(brut).replace(/^[:\-–]\s*/, '').trim();
+  return /^description$/i.test(t) ? '' : t;
+};
+
 const LBC_TITRE_MAX = 50;
 const lbcTitre = (brand, base, size, max) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
@@ -13754,7 +13764,7 @@ function itemDeBrouillon(d) {
       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
     }
   }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -14405,7 +14415,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             // Seulement si c'est toujours CETTE paire, et sans écraser des photos retirées à la main.
             if (pairCourante.current !== p.id) return;
             setPhotos((old) => (old.split(/\s+/).filter(Boolean).length <= (p.photos || []).length ? lues.join('\n') : old));
-            if (!String(p.desc || '').trim() && d.description) setDesc((old) => old.trim() ? old : String(d.description));
+            if (!String(p.desc || '').trim() && descriptionEbayPropre(d.description)) setDesc((old) => old.trim() ? old : descriptionEbayPropre(d.description));
             setPhotosEtat('fait');
           } else setPhotosEtat({ raison: "Vinted n'a rendu aucune photo" });
         } catch (_) { setPhotosEtat({ raison: 'la base ne répond pas' }); }
@@ -14578,7 +14588,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       const t = deja.debut && Number.isFinite(Date.parse(deja.debut)) ? ` (${quandParisTexte(Date.parse(deja.debut))})` : '';
       return deja.etat === 'programmee'
         ? { k: 'deja-programmee', t: `La paire N°${n} est déjà programmée sur eBay${t} — une paire, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
-        : { k: 'deja-en-ligne', t: `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
+        : { k: 'deja-en-ligne', t: deja.via ? `Cette paire est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — une paire, une annonce : rien ne sera publié.` : `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
     }
     if (!pairSel) {
       if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `La paire N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-la en ligne sur Vinted, puis reviens.` };
@@ -14643,7 +14653,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
   const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
-  const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
+  // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
+  // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
+  // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.
+  const jumelles = React.useMemo(() => jumellesParPhoto(paires, (k) => !!(dejaSurEbay && typeof dejaSurEbay.has === 'function' && dejaSurEbay.has(k) && !(dejaSurEbay.get(k) || {}).via)), [paires, dejaSurEbay]);
+  const listePaires = paires.filter(p => { const j = jumelles.get(String(p.id)); if (j && j.gardeId !== String(p.id)) return false; const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
+  const nJumellesMasquees = paires.filter(p => { const j = jumelles.get(String(p.id)); return j && j.gardeId !== String(p.id); }).length;
   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
@@ -14719,6 +14734,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
+                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Une paire porte deux N° (même photo sur deux fiches) : elle n\'est proposée qu\'une fois.' : `${nJumellesMasquees} paires portent deux N° (même photo sur deux fiches) : chacune n'est proposée qu'une fois.`}</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -14726,7 +14742,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
-                          return ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}</b> : null; })()}</span>
+                          const jm = jumelles.get(String(p.id));
+                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même paire que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
                   ))}
@@ -14962,6 +14979,33 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
   });
   return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat };
 };
+// (17 oct.) UNE PAIRE, UNE PROPOSITION — Julien : « une paire est deux fois
+// proposée, la 80 et la 81 … et ça me propose de la publier sur eBay, je l'ai
+// donc publiée deux fois ». La liste se dédoublonnait par NUMÉRO : deux fiches
+// (deux annonces Vinted : une republication, ou un numéro posé deux fois) se
+// présentaient comme deux paires. L'IDENTITÉ est la PHOTO EXACTE (§5 : même
+// fichier = certain, mesuré 0 collision sur 261 annonces — le dossier seul en
+// donne 17, il ne compte pas ici). Jamais le titre. Rend id → { gardeId,
+// gardeNum, autres:[N°] } pour les paires qui partagent une photo ; la paire
+// retenue est celle déjà sur eBay, sinon l'annonce la plus récente.
+function jumellesParPhoto(paires, estPris) {
+  const liste = Array.isArray(paires) ? paires : [];
+  const cles = (x) => [...new Set([x && x.photoK, x && photoKey(x.cover), x && photoKey(Array.isArray(x.photos) ? x.photos[0] : null)].filter(Boolean))];
+  const parent = liste.map((_, i) => i);
+  const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const vu = new Map();
+  liste.forEach((x, i) => { for (const k of cles(x)) { if (vu.has(k)) parent[racine(i)] = racine(vu.get(k)); else vu.set(k, i); } });
+  const groupes = new Map();
+  liste.forEach((x, i) => { const r = racine(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(x); });
+  const pris = (n) => !!(typeof estPris === 'function' && n && estPris(cleNum(n)));
+  const out = new Map();
+  for (const g of groupes.values()) {
+    if (g.length < 2) continue;
+    const tri = [...g].sort((a, b) => (pris(b.num) ? 1 : 0) - (pris(a.num) ? 1 : 0) || (Number(b.id) || 0) - (Number(a.id) || 0));
+    for (const x of g) out.set(String(x.id), { gardeId: String(tri[0].id), gardeNum: tri[0].num, autres: g.filter((y) => y !== x).map((y) => y.num) });
+  }
+  return out;
+}
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
   const [enLigne, setEnLigne] = React.useState(undefined);
@@ -15017,12 +15061,16 @@ function useEbayPaires(comptes) {
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
         const cf = coffre[String(id)] || {};
         const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
-        const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
+        // (17 oct.) « Description » collé devant le texte (le libellé de la page
+        // Vinted, mesuré : « Descriptionautry reelwind gris… ») partait dans la
+        // description eBay. La même règle que Leboncoin (`lbcDescription`, §11).
+        const dscPropre = descriptionEbayPropre(dsc);
+        const desc = (dscPropre && !PUB.test(dscPropre)) ? dscPropre : '';   // sa vraie description Vinted, jamais le texte pub ni le libellé
         const titreP = String(f.title || titreMap[String(id)] || '').trim();
         const marque = String(cf.brand || '').trim();
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(cf.size || '').trim();
-        out.push({ id: String(id), num: n, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
@@ -16112,7 +16160,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
 //    annonce programmée par l'API n'est pas garantie, et une paire vendue
 //    ailleurs avant son heure peut quand même partir. Il le lit et coche
 //    « j'ai compris » avant sa PREMIÈRE programmation — c'est sa décision.
-function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
+function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes, dejaSurEbay = null, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
   const E = EBAY_SKIN;
   // (9 octobre) Le lot part sur UN compte eBay, choisi ici (pré-choisi comme le
   // formulaire) ; la confirmation le NOMME. `annoncesEbay` et `programmees`
@@ -16168,6 +16216,9 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     const sku = d.numero ? skuEbayDe(d.numero) : '';
     if (!sku) return { d, raison: 'pas de N° : sans lui, VRM ne la retrouverait pas si elle se vendait ailleurs avant l\'heure' };
     if (skusEnLigne.has(sku)) return { d, raison: 'déjà en vente sur eBay' };
+    // (17 oct.) La même paire déjà sur eBay sous un AUTRE N° (photo exacte).
+    const jv = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(numDeSkuEbay(sku)) : null;
+    if (jv && jv.via) return { d, raison: `déjà ${jv.etat === 'programmee' ? 'programmée' : 'en vente'} sur eBay sous la N°${jv.via} (même photo)` };
     const p = progParSku.get(sku);
     if (p) return { d, raison: `déjà programmée sur eBay${p.debut && Number.isFinite(Date.parse(p.debut)) ? ` (${quandParisTexte(Date.parse(p.debut))})` : ''}` };
     const ou = vendusPartout && vendusPartout.get(numDeSkuEbay(sku));
@@ -16178,7 +16229,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon de la même paire est déjà dans ce lot' };
     dansLeLot.add(sku);
     return { d, item: b.item, sku };
-  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout]);
+  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout, dejaSurEbay]);
   const ordonnes = React.useMemo(() => {
     const ok = analyse.filter((x) => x.item);
     if (rythme.ordre === 'numero') return [...ok].sort((a, b) => triNum(a.d.numero, b.d.numero));
@@ -17455,8 +17506,21 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
     for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
     for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    // (17 oct.) LA MÊME PAIRE SOUS UN AUTRE N° (photo exacte, `jumellesParPhoto`) :
+    // si l'une est déjà sur eBay, l'autre l'est aussi — « une paire, une
+    // annonce » vaut pour la paire, pas pour le numéro (la 80 publiée, la 81
+    // repartait). Toutes les gardes (Publier, planificateur, sélecteur) lisent
+    // cette carte : une seule règle (§11).
+    const base = new Map(m);
+    const jum = jumellesParPhoto(paires, (k) => base.has(k));
+    for (const x of (Array.isArray(paires) ? paires : [])) {
+      const j = jum.get(String(x.id)); const k = cleNum(x.num);
+      if (!j || !k || m.has(k)) continue;
+      const autre = j.autres.find((n) => base.has(cleNum(n)));
+      if (autre) m.set(k, { ...base.get(cleNum(autre)), via: cleNum(autre) });
+    }
     return m;
-  }, [pris, programmees, listeProgrammees]);
+  }, [pris, programmees, listeProgrammees, paires]);
   const surSku = React.useCallback((itemId, sku) => {
     setItems((l) => Array.isArray(l) ? l.map((a) => String(a.itemId) === String(itemId) ? { ...a, sku } : a) : l);
   }, []);
@@ -17529,7 +17593,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {planif && brouillonsChoisis.length > 0 && (
       <EbayPlanificateur key={planif.join(',')} brouillons={brouillonsChoisis}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub}
-        annoncesEbay={Array.isArray(items) ? items : null}
+        annoncesEbay={Array.isArray(items) ? items : null} dejaSurEbay={dejaSurEbay}
         programmees={programmees && typeof programmees === 'object' ? listeProgrammees : (programmees === 'jamais' ? [] : null)}
         ventes={ventesConnues}
         onFermer={() => setPlanif(null)}
@@ -39359,6 +39423,14 @@ function LeboncoinScreen() {
     //    ne sait pas DIRE pourquoi elle est vide (voir le bloc « Tout est
     //    publié 🎉 » plus bas — il le disait à quelqu'un qui n'a aucune annonce).
     let nNumerotees = 0;
+    // (17 oct.) La même paire sous deux N° (photo exacte, `jumellesParPhoto`) :
+    // une seule des deux se publie. Notée ici sur toutes les annonces numérotées
+    // (publiées ou non) ; la file reste celle de l'extension (§11), seule la
+    // ligne le DIT et ne propose pas de publier la seconde.
+    const candidatsJ = [];
+    for (const o of online) { const e = numeros[o.id]; const num = e && e.numero; if (num && String(num).trim()) candidatsJ.push({ id: String(o.id), num: String(num), photoK: (e && e.photoK) || null, cover: o.photo || null, posee: posted.has(o.id) || posted.has(String(num)) }); }
+    const jumLbc = jumellesParPhoto(candidatsJ, (k) => candidatsJ.some((c) => c.posee && cleNum(c.num) === k));
+    const twinDe = (id) => { const j = jumLbc.get(String(id)); if (!j) return null; const posee = candidatsJ.find((c) => c.posee && j.autres.some((n) => cleNum(n) === cleNum(c.num))); return posee ? { num: posee.num, posee: true } : (j.gardeId !== String(id) ? { num: j.gardeNum, posee: false } : null); };
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
@@ -39396,6 +39468,7 @@ function LeboncoinScreen() {
         base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
         etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
         compte: nomCompteDe(o.uid),
+        jumelle: twinDe(o.id),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -39750,64 +39823,66 @@ function LeboncoinScreen() {
               // Un seul groupe ⇒ pas de titre de groupe : il répéterait le
               //    compte de l'en-tête (§7, le même nombre deux fois).
               const groupes = [pretes, maigres, nues].filter(g => g.length).length;
+              // (17 oct.) UNE CARTE PAR PAIRE — Julien : « j'aime pas le visuel des
+              // propositions de paires à publier ». La photo en grand, le N° et
+              // le prix d'un coup d'œil, ce qui manque en pastilles (l'ambre
+              // seulement pour ce qui BLOQUE), les gestes en bas. La même paire
+              // sous deux N° (photo exacte) : la seconde ne propose pas de
+              // publier, elle dit laquelle est la bonne.
               const Ligne = (q) => {
                 const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
                 // Combien MANQUENT à la capture (le vrai nombre d'après Vinted).
                 const manque = (q.nReelles != null && q.nReelles > q.photos) ? (q.nReelles - q.photos) : 0;
+                const jm = q.jumelle || null;
+                const vign = toutes.slice(1, 7);
                 return (
-                <div key={q.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
-                      <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}{q.photos > 0 ? '' : ' · 0 photo'}{q.desc ? '' : ' · pas de description'}
-                        {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
-                      </span>
-                    </span>
+                <div key={q.id} className="vrm-apub-carte" data-apub={q.numero} {...(jm ? { 'data-apub-jumelle': cleNum(jm.num) } : {})}>
+                  <div className="vrm-apub-haut">
+                    {toutes[0]
+                      ? <PhotoVinted src={toutes[0]} alt="" loading="lazy" decoding="async" className="vrm-apub-photo" style={{ width: 84, height: 84, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                      : <span className="vrm-apub-photo"><Icon name="image" size={24} style={{ opacity: .5 }} /></span>}
+                    <div className="vrm-apub-corps">
+                      <div className="vrm-apub-ligne1">
+                        <span className="vrm-apub-num">N°{q.numero}</span>
+                        <span className="vrm-apub-prix">{q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+                      </div>
+                      <div className="vrm-apub-titre">{q.title || '—'}</div>
+                      <div className="vrm-apub-pastilles">
+                        <span className="vrm-apub-pastille" data-ton={q.photos === 0 ? 'bloque' : undefined}>{q.photos === 0 ? 'Aucune photo' : `${q.photos}${q.nReelles != null && q.nReelles > q.photos ? `/${q.nReelles}` : ''} photo${q.photos > 1 ? 's' : ''}`}</span>
+                        {!q.desc && <span className="vrm-apub-pastille">Pas de description</span>}
+                        {q.compte ? <span className="vrm-apub-pastille">{q.compte}</span> : null}
+                      </div>
+                    </div>
                   </div>
-
-                  {/* TOUTES les photos captées, en bande qui défile (Julien l'a
-                      demandé). Rien capté ⇒ un cadre neutre, jamais un trou. */}
-                  <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
-                    {toutes.length === 0
-                      ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
-                      : toutes.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
-                    {manque > 0 && (
-                      <span data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`} style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 9, fontWeight: 500 }}>photo{manque > 1 ? 's' : ''}</span><span style={{ fontSize: 9, fontWeight: 500 }}>à récupérer</span></span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
+                  {(vign.length > 0 || manque > 0) && (
+                    <div className="vrm-apub-vignettes">
+                      {vign.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 40, height: 40, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />)}
+                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`}>+{manque}</span>}
+                    </div>
+                  )}
+                  {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
+                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est la même paire, elle ne se publie pas deux fois.</>
+                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute la même paire sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
+                  <div className="vrm-apub-gestes">
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
-                    <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
-                      style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
+                    {!jm && q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
+                    <a href={q.url} target="_blank" rel="noreferrer" className="vrm-apub-lien">Annonce Vinted ↗</a>
+                    <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file" className="vrm-apub-lien">Déjà publiée</button>
                   </div>
                 </div>
                 );
               };
+              const Groupe = ({ titre, liste, note, ton }) => (<>
+                {groupes > 1 && <div className="vrm-apub-groupe"><span className="vrm-apub-groupe-titre" style={ton ? { color: C.warn } : undefined}>{titre}</span><span className="vrm-apub-groupe-n">{liste.length}</span></div>}
+                {note ? <div className="vrm-apub-groupe-note">{note}</div> : null}
+                <div className="vrm-apub-grille">{liste.slice(0, 40).map(Ligne)}</div>
+                {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
+              </>);
               return (<>
-                {nues.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.warn, marginTop: 4 }}>Aucune photo — {nues.length}</div>}
-                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.
-                  </div>
-                  {nues.slice(0, 40).map(Ligne)}
-                  {nues.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {nues.length - 40} autres…</div>}
-                </>)}
-                {pretes.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Prêtes — {pretes.length} avec toutes leurs photos</div>}
-                  {pretes.slice(0, 40).map(Ligne)}
-                  {pretes.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {pretes.length - 40} autres…</div>}
-                </>)}
-                {maigres.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Une seule photo — {maigres.length}</div>}
-                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Une annonce Leboncoin avec une seule photo se vend mal. Les autres existent, mais <b>Vinted ne les donne que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et les autres arrivent ici toutes seules. Mesuré chez toi : les annonces déjà ouvertes ont <b>5 photos</b> en moyenne.
-                  </div>
-                  {maigres.slice(0, 40).map(Ligne)}
-                  {maigres.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {maigres.length - 40} autres…</div>}
-                </>)}
+                {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
+                {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
+                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</>} />}
               </>);
             })()}
           </>)}

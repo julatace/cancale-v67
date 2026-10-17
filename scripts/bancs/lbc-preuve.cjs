@@ -140,10 +140,13 @@ async function fileApp(b, lignes, vp, pont) {
   if (pont) await pg.waitForTimeout(1200);
   const v = await pg.evaluate(() => ({ t: document.body.innerText, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
     boutons: Object.fromEntries([...document.querySelectorAll('[data-bouton-publier]')].map((e) => [e.getAttribute('data-id'), e.getAttribute('data-bouton-publier') + '|' + ((e.querySelector('button') || {}).title || '')])),
-    croit: [...document.querySelectorAll('[data-lbc-croit-vendue]')].map((e) => e.getAttribute('data-lbc-croit-vendue')) }));
+    croit: [...document.querySelectorAll('[data-lbc-croit-vendue]')].map((e) => e.getAttribute('data-lbc-croit-vendue')),
+    // (17 oct.) La file est une grille de CARTES : chaque paire proposée porte
+    // `data-apub` (son N°). Le texte « N°12 · » d'avant reste lu en repli.
+    apub: [...document.querySelectorAll('[data-apub]')].map((e) => e.getAttribute('data-apub')) }));
   await ctx.close();
   const m = /(\d+) à publier sur Leboncoin/.exec(v.t);
-  const nums = [...new Set((v.t.match(/N°(\d+) ·/g) || []).map((x) => /\d+/.exec(x)[0]))].sort();
+  const nums = [...new Set([...(v.apub || []), ...(v.t.match(/N°(\d+) ·/g) || []).map((x) => /\d+/.exec(x)[0])])].sort();
   return { n: m ? Number(m[1]) : null, nums, errs, deborde: v.sw > v.cw + 1, boutons: v.boutons, croit: v.croit };
 }
 
