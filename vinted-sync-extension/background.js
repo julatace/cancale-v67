@@ -8919,9 +8919,83 @@ async function comptesMiens() {
   return s;
 }
 
+// ── LE PACK PHOTO LEBONCOIN (17 octobre, 5.185). Julien : « l'extension peut
+//    capter si oui ou non l'utilisateur a pris un pack photo » — plutôt que de
+//    le lui faire saisir dans la compta. MESURÉ dans `lbc_recon.paths` : la page
+//    de son compte charge d'elle-même `api/usage-consumption-bff/v2/users/me/
+//    packages` (ses packs) et `selfserve-public-api/v1/users/me/product-catalog`
+//    (le CATALOGUE de ce qui s'achète — jamais une preuve de possession).
+//    ⚠️ JE N'AI JAMAIS VU LE CORPS de `packages` (aucun échantillon en base) :
+//    on ne décide donc que sur ce qui se LIT sans deviner —
+//      · un pack dont le nom / type / code dit « photo » ⇒ actif: true ;
+//      · une liste de packs LISIBLE (des objets qui portent un nom, ou une liste
+//        vide) sans aucun « photo » ⇒ actif: false ;
+//      · une forme qu'on ne sait pas lire ⇒ RIEN n'est écrit (pas su), et la
+//        FORME (noms de clés, types — jamais une valeur) est gardée pour la
+//        passe suivante (`lbc_pack_photo.forme`).
+//    Zéro requête de plus : on lit ce que la page a déjà reçu.
+const LBC_URL_PACKS = /\/usage-consumption-bff\/v\d+\/users\/me\/packages/i;
+const CHAMPS_NOM_PACK = ['name', 'label', 'title', 'type', 'code', 'product', 'productCode', 'product_code', 'kind', 'category', 'slug', 'offer', 'package'];
+function lirePackPhoto(data) {
+  const listes = [];
+  const walk = (n, d) => {
+    if (!n || d > 5) return;
+    if (Array.isArray(n)) { listes.push(n); for (const v of n) walk(v, d + 1); return; }
+    if (typeof n === 'object') for (const k of Object.keys(n)) walk(n[k], d + 1);
+  };
+  walk(data, 0);
+  const nomsDe = (o) => (o && typeof o === 'object' && !Array.isArray(o)) ? CHAMPS_NOM_PACK.map((k) => o[k]).filter((v) => typeof v === 'string' && v.trim()) : [];
+  let lisible = false, photo = false;
+  for (const l of listes) {
+    if (!l.length) { lisible = true; continue; }
+    const objets = l.filter((o) => o && typeof o === 'object' && !Array.isArray(o));
+    if (!objets.length || !objets.every((o) => nomsDe(o).length)) continue;
+    lisible = true;
+    if (objets.some((o) => nomsDe(o).some((t) => /photo/i.test(t)))) photo = true;
+  }
+  return photo ? true : (lisible ? false : null);
+}
+function formeDe(data) {
+  const out = []; const vus = new Set();
+  const walk = (n, chemin, d) => {
+    if (out.length >= 60 || d > 6) return;
+    const t = Array.isArray(n) ? 'array' : n === null ? 'null' : typeof n;
+    const c = chemin + ':' + t;
+    if (!vus.has(c)) { vus.add(c); out.push(c); }
+    if (Array.isArray(n)) { if (n.length) walk(n[0], chemin + '[]', d + 1); return; }
+    if (n && typeof n === 'object') for (const k of Object.keys(n).slice(0, 30)) walk(n[k], chemin ? chemin + '.' + k : k, d + 1);
+  };
+  walk(data, '', 0);
+  return out;
+}
+let chainePack = Promise.resolve();
+function noterPackPhoto(data, url) {
+  const actif = lirePackPhoto(data);
+  const forme = formeDe(data);
+  const fait = chainePack.then(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_pack_photo&select=data');
+      if (rows === null) { noterDiag('lbc_pack_lecture_ratee'); return false; }   // pas su : on n'écrit rien
+      const avant = (rows[0] && rows[0].data) || {};
+      const at = new Date().toISOString();
+      const neuf = Object.assign({}, avant, { forme, formeAt: at, source: 'extension', endpoint: String(url || '').replace(/^https?:\/\//, '').split('?')[0].slice(0, 120) });
+      if (typeof actif === 'boolean') { neuf.actif = actif; neuf.at = at; }
+      const memeForme = JSON.stringify(avant.forme || []) === JSON.stringify(forme);
+      const recent = avant.at && (Date.now() - Date.parse(avant.at)) < 6 * 3600e3;
+      if (memeForme && (typeof actif !== 'boolean' || (avant.actif === actif && recent))) return false;   // rien de neuf
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_pack_photo', data: neuf }], 'id');
+      noterDiag(ok === false ? 'lbc_pack_ecriture_ratee' : (typeof actif === 'boolean' ? `lbc_pack_${actif ? 'oui' : 'non'}` : 'lbc_pack_forme_inconnue'));
+      if (ok !== false && typeof actif === 'boolean' && avant.actif !== actif) { try { notifierApp({ type: 'maj', quoi: 'lbcpack' }); } catch (_) {} }
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+  chainePack = fait.catch(() => false);
+  return fait;
+}
 async function handleLbcRaw(url, body) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
+  if (LBC_URL_PACKS.test(String(url || ''))) { try { await noterPackPhoto(data, url); } catch (_) {} }
   const found = []; const seen = new Set();
   // Qui suis-je ? (pour ne garder que MES annonces dans le parcours générique)
   const miens = await comptesMiens();
