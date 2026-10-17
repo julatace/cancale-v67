@@ -22196,7 +22196,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // une application dans l'application »). Le choix reste MÉMORISÉ par appareil :
   // qui préfère la grille la retrouve au prochain passage — on change le point
   // de départ, pas son habitude.
-  const [garageView,setGarageView]=useState(()=>load('vinted_garage_view','plan')); // plan | grid | photo
+  // (17 oct.) Julien : « enlève aussi les autres types de rangement ». Le Stock
+  // n'a plus que la pièce (3D + vue du dessus) et l'assistant « Ranger » ; la
+  // grille de zones et la photo du local ne s'ouvrent plus (mesuré : vides chez
+  // lui). Un choix mémorisé « grille »/« photo » retombe sur la pièce.
+  const [garageView,setGarageView]=useState(()=>{ if (DEMANDE_STOCK_CHERCHE.nums) return 'plan'; const v=load('vinted_garage_view','plan'); return v==='ranger'?'ranger':'plan'; }); // plan | ranger
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
@@ -22406,7 +22410,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+        {[['plan','home','Ma pièce'],['ranger','box','Ranger']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -35698,6 +35702,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {lignePostes}
+              {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
+                  les numéros que tu as vendus ». Les N° des colis À FAIRE (pas
+                  les postés), lus sur la ligne elle-même — jamais devinés. */}
+              {(() => {
+                const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
+                if (!nums.length) return null;
+                return (
+                  <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
+                    style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    <Icon name="home" size={16}/>Où sont ces {nums.length} paire{nums.length>1?'s':''} dans le stock
+                  </button>
+                );
+              })()}
               {/* La raison commune des boutons grisés, une fois (§7). */}
               <RaisonBordereauxGrises ventes={ex.filter(e => !estPoste(e) && !aSonPdf(e) && e.o && e.o.transaction_id!=null).map(e => e.o)}/>
               {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Ventes et Achats (§5.63).
