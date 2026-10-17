@@ -76,16 +76,21 @@ const srv = http.createServer((q, res) => { let fi = q.url.split('?')[0]; if (fi
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
 
 // Le background.js de l'extension servie par main (la version qu'il a installée).
+// ⚠️ « L'extension PUBLIÉE sans la règle de l'instantané » n'est plus celle que
+// sert main : depuis la 5.172 (`capterPreuvesVente`), main sert des extensions
+// qui la portent (5.181, 5.182…), et ce cas D jugeait alors une extension À JOUR
+// en la croyant ancienne (rouge sur un code intact). On prend donc, dans
+// l'HISTORIQUE publié (`_versions-publiees.cjs`, jamais une liste recopiée), la
+// plus récente version servie SANS `capterPreuvesVente` — celle qui peut encore
+// tourner chez lui et refuser « Publier ». Historique illisible ⇒ `null`, dit.
 function bgPublie() {
-  const { spawnSync } = require('child_process');
-  for (const depot of [process.env.VRM_GIT, RACINE].filter(Boolean)) {
-    for (const ref of ['origin/main', 'main']) {
-      const man = spawnSync('git', ['-C', depot, 'show', `${ref}:vinted-sync-extension/manifest.json`], { encoding: 'utf8' });
-      const bg = spawnSync('git', ['-C', depot, 'show', `${ref}:vinted-sync-extension/background.js`], { encoding: 'utf8', maxBuffer: 1 << 28 });
-      if (man.status === 0 && bg.status === 0) { const f = path.join(require('os').tmpdir(), `vrm-bg-publie-${process.pid}.js`); fs.writeFileSync(f, bg.stdout); return { f, version: JSON.parse(man.stdout).version }; }
-    }
-  }
-  return null;
+  const { versionsPubliees, aLaFonction } = require(path.join(RACINE, 'scripts/_versions-publiees.cjs'));
+  const pub = versionsPubliees({ racine: RACINE });
+  if (!pub) return null;
+  const c = pub.commits.find((x) => x.bg && !aLaFonction(x.bg, 'capterPreuvesVente'));
+  if (!c) return null;
+  const f = path.join(require('os').tmpdir(), `vrm-bg-publie-${process.pid}.js`); fs.writeFileSync(f, c.bg);
+  return { f, version: c.version };
 }
 async function fileExtension(lignes, src) {
   const f = faireFond({ src: src || path.join(RACINE, 'vinted-sync-extension/background.js'), lignes: JSON.parse(JSON.stringify(lignes)), vinted: () => ({ status: 404, body: {} }), lectureKO: () => false, connecte: '111', comptes: ACCS, store: {} });
@@ -164,7 +169,7 @@ async function fileApp(b, lignes, vp, pont) {
     console.log('── D. transaction figée + vente remboursée, extension PUBLIÉE (sans la règle de l\'instantané)');
     await essaie('D', async () => {
       const pub = bgPublie();
-      dit(!!pub, 'le background.js de l\'extension servie par main se lit dans l\'historique', pub ? pub.version : 'historique illisible — relance avec VRM_GIT=<dépôt>');
+      dit(!!pub, 'le background.js de la dernière extension publiée sans la règle de l\'instantané se lit dans l\'historique', pub ? pub.version : 'historique illisible — relance avec VRM_GIT=<dépôt>');
       if (!pub) return;
       const extPub = await fileExtension(base('B'), pub.f);
       const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');

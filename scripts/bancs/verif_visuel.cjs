@@ -139,6 +139,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     for(const t of TABS){
       await pg.goto('http://localhost:'+PORT_VV+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
+      // « À faire » du Collectif (`notifItems`) se calcule APRÈS les lectures (ventes eBay comprises) : 2,2 s ne
+      // suffisent pas sous charge (rouge vu chez d'autres agents, vert seul). On attend l'état OBSERVÉ — la ligne
+      // eBay —, borné à 12 s : si elle ne vient jamais, le contrôle plus bas reste rouge.
+      if(t==='collectif') await pg.waitForFunction(()=>/eBay à expédier/.test(document.body.innerText||''),null,{timeout:12000}).catch(()=>{});
       // `SHOTS=dossier` : une capture par écran et par taille (pour REGARDER, §6.2).
       if(process.env.SHOTS){ try{ fs.mkdirSync(process.env.SHOTS,{recursive:true}); await pg.screenshot({path:require('path').join(process.env.SHOTS,`${t}-${W}.png`),fullPage:true}); }catch(_){} }
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
@@ -207,7 +211,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // La décomposition vit sur la MÊME source que le total (§11) — donc chaque
     // chiffre est vérifiable. §7/§5 : une plateforme SANS vente captée dit
     // « pas encore de vente captée », JAMAIS « 0 € » (un zéro inventé).
-    dit(/CA finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
+    dit(/Finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
     dit(/CA Vinted par compte/i.test(dashTxt),'le CA Vinted se décompose par compte');
     dit(/pas encore de vente captée/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente captée », pas « 0 € »');
     // ── eBay câblé dans le CA (§ caEbayPayees) : une commande PAYÉE captée doit
@@ -220,7 +224,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // sous-titre), et la carte « par plateforme » porte un « Total toutes
     // plateformes » = le global du Collectif. Sur le code d'avant : ni le scope,
     // ni le total (§6.1).
-    dit(/Total toutes plateformes/i.test(dashTxt),'la carte « par plateforme » porte le Total (= global du Collectif, §11)',dashTxt?'':'tableau de bord non lu');
+    dit(/Total finalisé/i.test(dashTxt),'la carte « par plateforme » porte le Total (= global du Collectif, §11)',dashTxt?'':'tableau de bord non lu');
     dit(/CA finalisé[\s\S]{0,80}Vinted, tous comptes/i.test(dashTxt),'le headline « CA finalisé » dit son scope Vinted (pas un total partiel présenté comme complet, §5)');
     // ── eBay dans « À faire aujourd'hui » : une vente eBay payée non expédiée
     // est un colis à envoyer, exactement comme une vente Vinted (« tout

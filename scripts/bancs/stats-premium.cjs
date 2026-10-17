@@ -121,7 +121,7 @@ const ouvrir = async (b, vp, opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -183,7 +183,19 @@ const lire = (pg) => pg.evaluate(() => {
   const w2 = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
   for (let n = w2.nextNode(); n; n = w2.nextNode()) for (const s of (n.nodeValue.match(RE) || [])) montants.push(s.replace(/[\u00a0\u202f ]/g, ''));
   const a = (sel, at) => { const e = document.querySelector(sel); return e ? e.getAttribute(at) : null; };
+  // Les notions (§5) : chaque grosse carte dit CE qu'elle compte, de sa source.
+  const carte = (k) => { const e = document.querySelector(`[data-stats-carte="${k}"]`); return e ? { notion: e.getAttribute('data-notion'), texte: e.innerText } : null; };
+  // L'échelle typographique : la taille calculée de chaque texte VISIBLE.
+  const tailles = {};
+  const w3 = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+  for (let n = w3.nextNode(); n; n = w3.nextNode()) {
+    const el = n.parentElement; if (!el || !n.nodeValue.trim()) continue;
+    const r = el.getBoundingClientRect(); if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') continue;
+    const fs = parseFloat(getComputedStyle(el).fontSize); const k = String(Math.round(fs * 10) / 10);
+    (tailles[k] = tailles[k] || []).push(n.nodeValue.trim().slice(0, 24));
+  }
   return {
+    hero: carte('hero'), courbe: carte('courbe'), plateformes: carte('plateformes'), tailles,
     coupes, montants,
     texte: page.innerText, textContent: page.textContent.replace(/\s+/g, ' '),
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
@@ -248,6 +260,27 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
             'la carte se lit comme urssaf.cjs la lit (libellé puis montant, phrase de calcul visible)', `${taux} · ${cc} · ${ap} · ${nt} · ${nf}`);
         }
         dit(lu.declare === 'lu', 'la phrase de calcul porte toujours data-urssaf-declare', String(lu.declare));
+        // ── Trois chiffres d'affaires, trois notions, trois libellés (§5) ─────
+        // Le héros (finalisé, Vinted seul, depuis le début) peut être plus petit
+        // que la courbe (vendu, toutes plateformes, en cours comprises, 12 mois) :
+        // chacun doit DIRE ce qu'il compte, sinon 12 mois > depuis le début se lit
+        // comme une erreur de calcul.
+        dit(lu.hero && lu.hero.notion === 'finalise-vinted' && /finalis/i.test(lu.hero.texte) && /Vinted/.test(lu.hero.texte.split('\n')[0]),
+          'héros : finalisé, Vinted seul — dit dans son libellé', lu.hero ? `${lu.hero.notion} · ${lu.hero.texte.split('\n')[0]}` : 'absent');
+        dit(lu.courbe && lu.courbe.notion === 'vendu' && /^Vendu/.test(lu.courbe.texte) && /en cours/i.test(lu.courbe.texte) && /toutes plateformes/i.test(lu.courbe.texte) && !/Chiffre d.affaires/i.test(lu.courbe.texte.split('\n')[0]),
+          'courbe : « Vendu », toutes plateformes, en cours comprises — pas « Chiffre d’affaires »', lu.courbe ? `${lu.courbe.notion} · ${lu.courbe.texte.split('\n')[0]}` : 'absente');
+        dit(lu.plateformes && lu.plateformes.notion === 'finalise' && /Finalisé par plateforme/.test(lu.plateformes.texte) && (!/Total/.test(lu.plateformes.texte) || /Total finalisé/.test(lu.plateformes.texte)),
+          'par plateforme : finalisé, et son total le dit', lu.plateformes ? lu.plateformes.notion : 'absente');
+        // La jauge lit le VENDU du mois (toutes plateformes, en cours compris) :
+        // sa phrase le dit, elle ne parle plus de « Vinted, finalisées ».
+        dit(/% de ton objectif · vendu ce mois, toutes plateformes/.test(lu.textContent) && !/Vinted, ventes finalisées et en cours du mois/.test(lu.textContent),
+          'objectif : la phrase dit « vendu ce mois, toutes plateformes » (la source de la jauge)', (/[^.]{0,30}% de ton objectif[^<]{0,70}/.exec(lu.textContent) || [''])[0]);
+        {
+          const OK = new Set(['11', '13', '15', '20']);
+          const hors = Object.entries(lu.tailles).filter(([k]) => !OK.has(k) && !(Number(k) >= 28));
+          dit(!hors.length, 'échelle 28 / 20 / 15 / 13 / 11 — aucune autre taille de texte', hors.map(([k, v]) => `${k}px « ${v[0]} »×${v.length}`).slice(0, 6).join(' · '));
+          dit(!Object.keys(lu.tailles).some((k) => Number(k) < 11), 'aucun texte sous 11 px', Object.keys(lu.tailles).filter((k) => Number(k) < 11).join(', '));
+        }
         if (!dark) {
           base[nom] = [...lu.montants].sort();
         }

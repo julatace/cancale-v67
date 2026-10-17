@@ -56,12 +56,23 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   let gen = 0;
   const stats = { partagees: 0, parties: 0 };
   const invalider = () => { gen++; cache.clear(); };
+  const origine = opts.origine != null ? opts.origine : (typeof location !== 'undefined' && location.origin ? location.origin : '');
+  const estRouteApp = (u) => u.indexOf('/api/') === 0 || (!!origine && u.indexOf(origine + '/api/') === 0);
   const f = function (input, init) {
     // Seules les adresses en chaîne (ou URL) sont regardées ; un `Request`
     // passe tel quel (ses en-têtes et son corps vivent dans l'objet).
     const url = typeof input === 'string' ? input : (typeof URL !== 'undefined' && input instanceof URL ? input.href : null);
-    if (url == null || url.indexOf(prefixe) !== 0) return fetchOrig(input, init);
     const methode = String((init && init.method) || 'GET').toUpperCase();
+    // ⚠️ NOS ROUTES SERVEUR ÉCRIVENT AUSSI EN BASE (16 octobre, banc revendeurs) :
+    //    `POST /api/ebay` (« Lire davantage de commandes », synchro, règle d'offre…)
+    //    range la ligne `ebay_orders` côté serveur, puis l'écran la relit — dans
+    //    les 2 s, la lecture partagée rendait la ligne d'AVANT (`complet:false`),
+    //    et « Lire davantage » restait affiché sous « Lecture terminée ». Un appel
+    //    qui n'est pas une lecture vers `/api/` de l'app vaut une écriture : il
+    //    vide tout, à son départ et à son retour.
+    const versBase = url != null && url.indexOf(prefixe) === 0;
+    const versRoute = url != null && methode !== 'GET' && methode !== 'HEAD' && estRouteApp(url);
+    if (!versBase && !versRoute) return fetchOrig(input, init);
     if (methode !== 'GET') {
       if (methode === 'HEAD') return fetchOrig(input, init);
       invalider();

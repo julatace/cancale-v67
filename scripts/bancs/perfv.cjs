@@ -38,7 +38,7 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4411);
+const PORT=Number(process.env.BANC_PORT||process.env.PORT)||4411; srv.listen(PORT);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
@@ -59,7 +59,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     return j([]);});
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   const t0=Date.now();
-  await pg.goto('http://localhost:4411/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT+'/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
   for(let i=0;i<400;i++){ const n=await pg.evaluate(()=>document.querySelectorAll("input[placeholder*='prix']").length); if(n>50) break; await pg.waitForTimeout(50); }
   const pret=Date.now()-t0;
   const m=await pg.evaluate(()=>({noeuds:document.querySelectorAll('*').length,
@@ -70,8 +70,12 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
      //    de flottaison : il doit charger TOUT DE SUITE, pas en lazy (sinon il
      //    clignote). L'ancien compte prenait le logo → rouge dès son ajout (30
      //    sept.), alors que l'app a raison. On l'exclut par son src.
-     images:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm/i.test(i.getAttribute('src')||i.src||'')).length,
-     pasLazy:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm/i.test(i.getAttribute('src')||i.src||'') && i.getAttribute('loading')!=='lazy').length}));
+     // ⚠️ Même règle pour les LOGOS DE PLATEFORME du rail (`/brands/*.svg`,
+     //    posés le 13 octobre, 13f6c89) : de la chrome locale, toujours
+     //    visible, jamais une vignette de vente. Une photo de vente vient du
+     //    CDN de Vinted (ou d'une URL objet) et reste comptée.
+     images:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|^\/brands\//i.test(i.getAttribute('src')||'')).length,
+     pasLazy:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|^\/brands\//i.test(i.getAttribute('src')||'') && i.getAttribute('loading')!=='lazy').length}));
   // ce que coûte un filtre : on clique « Sans prix d'achat »
   const t1=Date.now();
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Sans prix/.test(x.textContent)); if(b)b.click();});
@@ -102,6 +106,23 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Toutes'); if(b)b.click();
   });
   await pg.waitForTimeout(500);
+  // ⚠️ LES TOTAUX DE L'ÉCRAN VENTES VIVENT DANS « ANALYSE DE TES VENTES »
+  // depuis le 13 octobre (156c95c, « Recomposer les écrans autour des outils
+  // et des listes » — décision écrite dans docs/design/ui-responsive.md :
+  // « Les totaux et graphiques de Ventes sont accessibles dans Analyse »).
+  // Le dépliant est replié par défaut ; on l'ouvre (SON geste) et on lit les
+  // totaux là — étiquette « CA finalisé » puis « N ventes », « En attente »
+  // puis « N en cours ». Avant, ce banc prenait « la première ligne avec un
+  // € » : sous la forme actuelle c'était le prix d'une CARTE, et le contrôle
+  // « les totaux ne bougent pas » était vert par vacuité.
+  await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Analyse de tes ventes/.test(x.textContent)); if(b && b.getAttribute('aria-expanded')!=='true') b.click();});
+  await pg.waitForFunction(()=>(document.body.innerText||'').split('\n').some(l=>/^CA finalis/i.test(l.trim())),null,{timeout:8000}).catch(()=>{});
+  const totaux=()=>pg.evaluate(()=>{
+    const t=(document.body.innerText||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    const apres=(re,re2)=>{const i=t.findIndex(l=>re.test(l)); if(i<0) return null;
+      for(let j=i+1;j<Math.min(t.length,i+4);j++){const m=re2.exec(t[j]); if(m) return m[1];} return null;};
+    return {ca:apres(/^CA finalis/i,/^([\d\s\u202f\u00a0.,]+\s?€)$/), nb:apres(/^CA finalis/i,/^(\d+) ventes?$/)};
+  });
   // ⚠️ ON NE DESSINE QU'UNE TRANCHE — mais RIEN n'est perdu : le bouton dit le
   // total, et un clic ouvre la suite. Et les totaux du haut portent TOUJOURS
   // sur l'ensemble, jamais sur la tranche affichée.
@@ -109,10 +130,9 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const t=document.body.innerText||'';
     const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
     return {n:document.querySelectorAll("input[placeholder*='prix']").length,
-            bouton:b?b.textContent.trim():null,
-            ca:(t.split('\n').find(l=>/€/.test(l)&&/\d/.test(l))||'').trim()||null,
-            nb:(/(\d+) ventes/.exec(t)||[])[1]||null};
+            bouton:b?b.textContent.trim():null};
   });
+  Object.assign(av, await totaux());
   dit(!!av.bouton, `${tag} : le bouton « Voir plus » dit le total`, av.bouton||'absent');
   // ⚠️ On repère la LISTE une fois pour toutes (elle précède le bouton) : après
   // dépliage complet le bouton disparaît, et c'est elle qu'on comptera. Une
@@ -123,14 +143,10 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     if(b && b.previousElementSibling) b.previousElementSibling.setAttribute('data-banc-liste','1');});
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent)); if(b)b.click();});
   await pg.waitForTimeout(400);
-  const ap=await pg.evaluate(()=>{
-    const t=document.body.innerText||'';
-    return {n:document.querySelectorAll("input[placeholder*='prix']").length,
-            ca:(t.split('\n').find(l=>/€/.test(l)&&/\d/.test(l))||'').trim()||null,
-            nb:(/(\d+) ventes/.exec(t)||[])[1]||null};
-  });
+  const ap=await pg.evaluate(()=>({n:document.querySelectorAll("input[placeholder*='prix']").length}));
+  Object.assign(ap, await totaux());
   dit(ap.n > av.n, `${tag} : un clic ouvre la suite`, av.n+' -> '+ap.n+' cartes');
-  dit(av.ca === ap.ca && av.nb === ap.nb,
+  dit(!!av.ca && !!av.nb && av.ca === ap.ca && av.nb === ap.nb,
     `${tag} : les totaux du haut ne bougent pas — ils portent sur tout`,
     `CA ${av.ca} -> ${ap.ca} · ${av.nb} -> ${ap.nb} ventes`);
   // ⚠️ « ET CE TOTAL EST CELUI DE TOUTES LES VENTES ». Ce contrôle s'écrivait
