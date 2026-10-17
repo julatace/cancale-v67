@@ -12289,8 +12289,13 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
+// (17 oct., Julien : « pourquoi il y a deux logos eBay quand on est dessus »).
+// Le logo d'eBay EST son nom écrit (« ebay ») : posé devant le titre « eBay »,
+// le nom s'écrivait deux fois. Vinted et Leboncoin ont un pictogramme, eBay
+// n'en a pas : son en-tête ne garde que le titre.
+const LOGO_EST_LE_NOM = new Set(['ebay']);
 function EntetePlateforme({nom,plateforme}) {
-  return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
+  return <header className="vrm-market-heading" data-entete-plateforme={plateforme}>{!LOGO_EST_LE_NOM.has(plateforme) && <BrandIcon plateforme={plateforme} size={30}/>}<h1>{nom}</h1></header>;
 }
 // UN contrôle segmenté pour toute l'app (revue du 16 octobre : trois formes,
 // dont des segments BLEUS pleins, contraires au §7). C'est le dessin des

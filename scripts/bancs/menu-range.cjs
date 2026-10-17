@@ -109,6 +109,15 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
         await ctx.close();
       }
     }
+    // (17 oct., Julien : « pourquoi il y a deux logos eBay quand on est dessus »)
+    // Le logo d'eBay est son nom écrit : devant le titre « eBay », le nom
+    // apparaissait deux fois. Une seule fois dans l'en-tête de l'onglet.
+    for (const tel of [true, false]) {
+      const { ctx, pg } = await page(nav, tel, 'plat_ebay');
+      const e = await pg.evaluate(() => { const h = document.querySelector('[data-entete-plateforme="ebay"], .vrm-market-heading'); return h ? { logos: h.querySelectorAll('img[src*="ebay"]').length, titre: (h.querySelector('h1') || {}).innerText || '' } : null; });
+      dit(!!e && e.logos === 0 && e.titre === 'eBay', `${tel ? 'téléphone' : 'ordinateur'} : l’en-tête eBay écrit « eBay » une seule fois`, JSON.stringify(e));
+      await ctx.close();
+    }
     console.log('── téléphone : la feuille du menu');
     {
       const { ctx, pg } = await page(nav, true, 'journee');
