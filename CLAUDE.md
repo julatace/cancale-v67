@@ -9470,6 +9470,33 @@ cliquable « Coût d'achat » sur une seule ligne (vu en capture).
 Les styles **en ligne** gagnent sur une classe : la règle ne pose donc que ce
 qu'un bouton ne fixe pas lui-même.
 
+### Les formes communes (revue du 16 octobre) — banc `formes-communes.cjs`
+Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci :
+- **Contrôle segmenté** : `Segmente` (App.jsx) = `.vrm-seg` + `.vrm-seg-btn`
+  (styles-coque.css), le même dessin que les sous-onglets des plateformes ;
+  `aria-pressed` pour un choix d'écran, `aria-current` pour une section ;
+  `plein` = segments égaux. **Jamais de segment bleu plein** (§7). Colis
+  (imprimante), Achats, Compta (période), Stock (vues), Réglages (taille de
+  l'affichage, détourage) y passent.
+- **Filtres** : la rangée porte `vrm-filtres` ; pastille neutre, l'active à
+  l'encre (clair) ou en surface élevée bordée (sombre — jamais blanc plein).
+- **Replis** : `className="vrm-repli"` sur le `<details>` (et `vrm-label-help`,
+  `vrm-quick-settings`, `vrm-ann-stock-tools`, `vrm-platform-summary`) = une
+  rangée de 44 px à l'encre, chevron › qui tourne ; ni texte gris, ni triangle
+  du navigateur. Ne pas remettre de style en ligne sur le `<summary>`.
+- **Lien-texte au doigt** : sans fond, sans bordure, `padding:0` (ou la classe
+  `vrm-lien-action`) ⇒ la boîte garde 44 px, une marge négative rend la place
+  à la ligne (« tout voir » ne gonfle plus sa rangée à 44 px).
+- **Rangée qui défile** (`.vrm-rangee`, `.vrm-carrousel`, `.vrm-defile`) : un
+  fondu sur le bord droit, posé seulement si elle DÉBORDE — c'est
+  `src/rangeesDefilantes.js` qui mesure (`data-defile="suite"`).
+- Sombre : le logo porte un liseré ; un bouton grisé (« Tout générer »,
+  « Bordereau ») = l'encre à 46 %, plus « texte secondaire à 55 % en gris ».
+- ⚠️ `conflitsDeNumeros` : une **case du garage est un emplacement, pas une
+  paire**. Une annonce rangée dans sa case allumait le bloc rouge sur Colis
+  (« 5 numérox portés par deux paires », la coquille comprise) pour chaque paire
+  rangée. `audit-conflits-numeros.cjs` : 3 rouges sur l'avant.
+
 - Une couleur en dur qui n'est pas dans `THEMES` ne suivra pas un changement de
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.
 - Un emoji utilisé **comme icône** devient une icône au trait (`ICON_PATHS`, qui

@@ -90,8 +90,71 @@
   .vrm-seg-btn { flex: 0 0 auto; padding: 0 18px; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .vrm-seg-btn:not([aria-current]):hover { color: var(--seg-ink); filter: none; }
+  .vrm-seg-btn:not([aria-current]):not([aria-pressed="true"]):hover { color: var(--seg-ink); filter: none; }
 }
+/* Le MÊME contrôle sert aux choix d'un écran (imprimante, période, taille de
+   l'affichage, détourage, vues du stock) : `Segmente` pose aria-pressed au lieu
+   d'aria-current. Jamais de segment bleu plein (§7 : l'accent ne marque pas une
+   sélection) — revue du 16 oct., trois formes pour une fonction. */
+.vrm-seg { --seg-ink: var(--vrm-ink); --seg-muted: var(--vrm-muted); }
+.vrm-seg-btn[aria-pressed="true"] {
+  background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
+  box-shadow: 0 1px 2px rgba(10,14,22,.10), 0 0 0 .5px rgba(10,14,22,.05);
+}
+:root[data-theme="dark"] .vrm-seg-btn[aria-pressed="true"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
+.vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
+.vrm-seg-plein { width: 100%; }
+.vrm-seg-plein > .vrm-seg-btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
+.vrm-seg > .vrm-seg-btn { min-height: 34px; }
+@media (max-width: 1023px) { .vrm-main .vrm-seg > .vrm-seg-btn { min-height: 44px !important; padding-block: 0 !important; } }
+
+/* ── LES FILTRES : une seule pastille (revue du 16 oct.) ────────────────────
+   Pastille neutre ; l'active est à l'encre pleine en clair, une surface élevée
+   bordée en sombre (une pastille BLANCHE pleine devenait le point le plus
+   lumineux de l'écran). Posée par la classe `vrm-filtres` sur la rangée. */
+.vrm-filtres > button[aria-pressed] {
+  border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
+  background: var(--vrm-surface) !important; color: var(--vrm-ink) !important;
+  box-shadow: none !important; font-weight: 600;
+}
+.vrm-filtres > button[aria-pressed="true"] {
+  background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
+}
+:root[data-theme="dark"] .vrm-filtres > button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--vrm-muted) 30%, var(--vrm-surface)) !important;
+  border-color: color-mix(in srgb, var(--vrm-ink) 34%, transparent) !important; color: var(--vrm-ink) !important;
+}
+
+/* ── UNE RANGÉE QUI DÉFILE DIT QU'ELLE DÉFILE ───────────────────────────────
+   Au doigt, `.vrm-rangee` ne revient pas à la ligne : le bord droit est coupé
+   net (« Finalisée », « Annulées »). Un fondu sur le bord dit qu'il y a une
+   suite ; il disparaît une fois la rangée défilée jusqu'au bout. C'est
+   src/rangeesDefilantes.js qui MESURE (data-defile) : sans débordement, rien. */
+@media (max-width: 1023px) {
+  :is(.vrm-rangee, .vrm-defile, .vrm-carrousel)[data-defile="suite"] {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+            mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
+/* ── LES REPLIS : une seule forme (revue du 16 oct.) ───────────────────────
+   Une rangée de 44 px, libellé à l'encre, chevron › qui tourne à l'ouverture.
+   Plus de texte gris sans affordance, plus de triangle du navigateur. */
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary {
+  list-style: none; align-items: center; gap: 8px; min-height: 44px; box-sizing: border-box;
+  padding-block: 0; color: var(--vrm-ink); font-size: 14px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help) > summary { display: flex; padding-inline: 2px; }
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::-webkit-details-marker { display: none; }
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::marker { content: ''; }
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after {
+  content: ''; flex: none; width: 7px; height: 7px; margin-inline: auto 6px;
+  border-right: 1.75px solid var(--vrm-muted); border-bottom: 1.75px solid var(--vrm-muted);
+  transform: rotate(-45deg); transition: transform .18s var(--vrm-ease-out, ease);
+}
+.vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary)[open] > summary::after { transform: translateY(-2px) rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after { transition: none; } }
 
 /* ── LE CHOIX DU COMPTE : une rangée de réglage, pas un formulaire ─────── */
 .vrm-compte-choix { padding: 0 16px 12px; min-width: 0; }
@@ -268,4 +331,17 @@
 @media (hover: hover) and (pointer: fine) { .vrm-sheet-row:hover { background: var(--vrm-card2); filter: none; } }
 @media (prefers-reduced-motion: reduce) {
   .vrm-sheet, .vrm-sheet-voile, .vrm-hdr-titre { animation: none !important; transition: none !important; }
+}
+
+/* ── LE MODE SOMBRE (revue du 16 oct.) ──────────────────────────────────────
+   1. Le logo est un carré NOIR : sur l'en-tête ou le rail noirs il disparaissait.
+      Un liseré à peine plus clair le détache, sans le recolorer. */
+:root[data-theme="dark"] :is(img.vrm-logo, .vrm-header-logo > img) { box-shadow: 0 0 0 1px rgba(255,255,255,.14); }
+/* 2. Un bouton GRISÉ restait quasi invisible : texte secondaire + 55 % d'opacité
+      + niveaux de gris, sur fond noir. Grisé = l'encre normale à 45 %, avec son
+      contour : on le lit, on voit qu'on ne peut pas cliquer. */
+:root[data-theme="dark"] :is([data-tout-generer="grise"], [data-bouton-bord="grise"] > button) {
+  opacity: 1 !important; filter: none !important;
+  color: color-mix(in srgb, var(--vrm-ink) 46%, transparent) !important;
+  border-color: color-mix(in srgb, var(--vrm-ink) 20%, transparent) !important;
 }
