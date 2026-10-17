@@ -297,7 +297,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     const fautes = (src, permis) => {
       const code = sansCom(src), lignes = code.split('\n'), out = [];
       lignes.forEach((l, i) => {
-        if (!/_txn_/.test(l) || !/status_title/.test(l)) return;
+        if (!/_txn_/.test(l) || !/(^|[^_\w])status_title/.test(l)) return;   // `ship_status_title` est l'état du COLIS, pas de la commande
         let fn = '?';
         for (let k = i; k >= 0; k--) { const m = /^(?:async\s+)?function\s+(\w+)\s*\(|^const\s+(\w+)\s*=/.exec(lignes[k]); if (m) { fn = m[1] || m[2]; break; } }
         if (!permis.includes(fn)) out.push(`${fn} (ligne ${i + 1})`);
