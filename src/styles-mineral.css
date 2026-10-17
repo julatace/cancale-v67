@@ -160,7 +160,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-finance-metric.is-primary { background:#0E1A2B; border-color:#0E1A2B; }
 .vrm-finance-metric.is-primary * { color:#EAEFF7 !important; }
 .vrm-finance-metric.is-primary .vrm-display { font-size:36px !important; }
-.vrm-finance-stock > summary { font-size:12px; cursor:pointer; color:var(--vrm-muted); padding:8px 0; }
+.vrm-finance-stock > summary { font-size:13px; cursor:pointer; color:var(--vrm-muted); padding:8px 0; }
 .vrm-finance-stock-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:8px; }
 .vrm-finance-charges { gap:8px !important; }
 .vrm-finance-page table td { font-variant-numeric:tabular-nums; }
@@ -191,7 +191,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-chat-panel textarea { font-size:16px !important; }
   .vrm-chat-panel button { min-height:40px; }
   .vrm-finance-metric { padding:14px; }
-  .vrm-finance-metric .vrm-display { font-size:24px !important; }
+  .vrm-finance-metric .vrm-display { font-size:20px !important; }
   .vrm-finance-metric.is-primary .vrm-display { font-size:32px !important; }
   .vrm-finance-charges { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
   .vrm-finance-charges > * { padding:10px !important; }
@@ -562,12 +562,14 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    Les mois du graphique : abrégés en entier, une seule lettre sur téléphone.
    La carte du mois : 2 colonnes au doigt, 4 sur grand écran. */
 .vrm-finance-metric > * { box-shadow:none !important; }
+/* (16 oct.) Échelle 28/20/15/13/11 sur les chiffres de Statistiques : StatBox est partagé, la taille de son libellé et de sa légende se règle ICI, sur la seule carte qui la porte. */
+.vrm-finance-metric > * > div:not(.vrm-display) { font-size:11px !important; }
 .vrm-mois-court { display:none; }
 @media(max-width:560px) { .vrm-mois-long { display:none; } .vrm-mois-court { display:inline; } }
 @media(min-width:900px) { .vrm-mois-grille { grid-template-columns:repeat(4,minmax(0,1fr)) !important; } }
 .vrm-stats-calcul > summary::marker { color:var(--vrm-muted); }
-.vrm-stats-volets > details > summary { padding:12px 0 !important; font-size:12.5px; color:var(--vrm-muted); cursor:pointer; }
-.vrm-stats-volets > details > p { margin:0 0 10px; font-size:12px; line-height:1.5; }
+.vrm-stats-volets > details > summary { padding:12px 0 !important; font-size:13px; color:var(--vrm-muted); cursor:pointer; }
+.vrm-stats-volets > details > p { margin:0 0 10px; font-size:13px; line-height:1.5; }
 .vrm-stats-volets .vrm-finance-stock-grid { margin:0 0 14px; }
 
 /* ── Annonces · Leboncoin · eBay « premium » (16 oct.) ─────────────────────
@@ -1066,3 +1068,14 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-colis-carte .vrm-colis-actions { row-gap:6px !important; }
 }
 @media(min-width:1024px) { .vrm-ventes-liste .vrm-sale-overview { grid-template-columns:64px minmax(0,1fr) minmax(130px,200px) !important; gap:12px !important; } }
+/* (16 oct.) Comptabilité en listes groupées (modèle Réglages) : ses lignes
+   n'ont pas d'icône, le filet part donc du bord du texte. */
+.vrm-compta-groupe .vrm-set-ligne + .vrm-set-ligne::before { left:16px; }
+.vrm-compta-groupe .vrm-set-lib > small { font-size:13px; }
+.vrm-compta-groupe .vrm-set-titre { font-size:13px; }
+/* (16 oct.) Feuille « Prix d'achat à compléter » : feuille du bas sur téléphone,
+   fenêtre centrée à partir de 768 px (elle restait collée en bas, étroite). */
+@media(min-width:768px){
+  .vrm-feuille-fond { align-items:center !important; padding:24px; }
+  .vrm-feuille { border-radius:14px !important; max-height:min(80vh, 760px) !important; box-shadow:0 24px 64px rgba(0,0,0,.28); }
+}

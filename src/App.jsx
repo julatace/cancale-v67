@@ -8474,7 +8474,7 @@ function BarresCA12({ mois, meilleur }) {
   const H = 120;
   const dernier = mois.length - 1;
   return (
-    <div role="img" aria-label={`Chiffre d'affaires des 12 derniers mois, par mois`} style={{marginTop:16}}>
+    <div role="img" aria-label={`Vendu sur les 12 derniers mois, par mois`} style={{marginTop:16}}>
       <div style={{position:'relative',height:H,display:'flex',alignItems:'flex-end',gap:'clamp(4px,1.2vw,10px)'}}>
         {/* Deux repères discrets : la moitié et le sommet du meilleur mois. */}
         {[0.5, 1].map(f => <div key={f} aria-hidden="true" style={{position:'absolute',left:0,right:0,bottom:Math.round(H*f)-1,borderTop:`1px dashed ${C.border}`,opacity:f<1?0.9:0.6}}/>)}
@@ -8496,7 +8496,7 @@ function BarresCA12({ mois, meilleur }) {
           const court = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
           const fort = m.cle === meilleur || i === dernier;
           return (
-            <div key={m.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:10.5,lineHeight:1.2,color:fort?C.text:C.muted,fontWeight:fort?600:500}}>
+            <div key={m.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:11,lineHeight:1.2,color:fort?C.text:C.muted,fontWeight:fort?600:500}}>
               <span className="vrm-mois-long">{court}</span><span className="vrm-mois-court" aria-hidden="true">{court.slice(0, 1).toUpperCase()}</span>
             </div>
           );
@@ -17716,7 +17716,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className={label==='CA finalisé'?'vrm-finance-metric is-primary':'vrm-finance-metric'}><StatBox compact label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/></div>;
   // Une seule phrase pour une seule cause, et elle ouvre la saisie en série sur
   // l'écran Annonces (le propriétaire de la modale, §11).
-  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onGo) onGo('cat_annonces'); };
+  // (16 oct.) Vinted → Annonces (l'écran de la plateforme), plus l'ancien
+  // écran isolé « Annonces en ligne » (`cat_annonces`).
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onGo) onGo('vinted_annonces'); };
   // Les cartes qui ne peuvent rien afficher gardent leur tiret ; la RAISON et la
   // PORTE vivent ici, une fois par groupe (§7 : la même phrase répétée sur
   // chaque ligne est UNE phrase — il y en avait six sur cet écran).
@@ -17736,7 +17738,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <button type="button" onClick={versSaisiePrix}
       title="Ouvrir la saisie en série des prix d'achat"
       style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
-        fontFamily:'inherit',fontSize:12.5,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
+        fontFamily:'inherit',fontSize:13,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
       {quoi} attendent tes prix d'achat — <span style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
     </button>
   );
@@ -17746,25 +17748,25 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const Mt = ({ v }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(v)}</span>;
   // Libellés en casse normale (plus de capitales espacées partout) : un titre
   // de carte, un libellé de chiffre, une note.
-  const sTitre = {fontSize:14,fontWeight:600,color:C.text,letterSpacing:-0.15};
-  const sLib = {fontSize:12.5,color:C.muted,fontWeight:500};
-  const sNote = {fontSize:12,color:C.muted,lineHeight:1.5};
+  const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
+  const sLib = {fontSize:13,color:C.muted,fontWeight:500};
+  const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
   const sHero = {fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1.05,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'};
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
 
   return (
     <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <div>
-        <h2 style={{margin:0,color:C.text,fontSize:22,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
-        <div style={{fontSize:12,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
+        <h2 style={{margin:0,color:C.text,fontSize:28,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
+        <div style={{fontSize:13,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
       </div>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
-      <div data-stats-carte="hero" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
-        <div style={sLib}>CA finalisé · depuis le début</div>
+      <div data-stats-carte="hero" data-notion="finalise-vinted" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
+        <div style={sLib}>Finalisé sur Vinted · depuis le début</div>
         {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
             cette date). Le rapport comptable a été corrigé, ce titre-là était
@@ -17778,8 +17780,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {/* (16 oct.) Le chiffre héros, seul, en très gros — plus de cellule
             noire, plus de filet vertical parasite à gauche de chaque texte
             (l'ombre « -1px » de StatBox compact). */}
-        <div className="vrm-display" style={{...sHero,fontSize:'clamp(34px,10.5vw,46px)',marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
-        <div style={{...sNote,marginTop:6}}>Vinted, tous comptes · daté au jour de la vente</div>
+        <div className="vrm-display" style={{...sHero,fontSize:28,marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
+        <div style={{...sNote,marginTop:6}}>Ventes finalisées, Vinted seul (tous comptes) · au jour de la vente · Leboncoin et eBay sont dans « Finalisé par plateforme »</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
           {/* Bénéfice/marge : un tiret tant qu'aucun prix d'achat n'est saisi
               (sinon on afficherait le CA comme « bénéfice », ce qui est faux —
@@ -17790,8 +17792,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             ['Taux marge', (liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`, liveStats&&liveStats.caEncaisse!=null?null:(avgMargin===null?'dès ta première vente':'bénéf / CA')]].map(([l,v,sub],i)=>(
             <div key={l} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
               <div style={sLib}>{l}</div>
-              <div className="vrm-display" style={{...sHero,fontSize:22,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
-              {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+              <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
+              {sub && <div style={{...sNote,fontSize:11,marginTop:2}}>{sub}</div>}
             </div>
           ))}
         </div>
@@ -17801,15 +17803,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <div className="vrm-finance-goal"><Card>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
+          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
         </div>
         {objEdit ? (
           <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
-            <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:16,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
           </div>
         ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
         ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
           <>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
@@ -17817,17 +17819,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
             </div>
             <div role="progressbar" aria-label="Progression vers l’objectif du mois" aria-valuemin={0} aria-valuemax={objectif} aria-valuenow={Math.min(caMoisCourant,objectif)} aria-valuetext={`${fmt(caMoisCourant)} sur ${fmt(objectif)}`} style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · Vinted, ventes finalisées et en cours du mois</div>
+            <div style={{fontSize:13,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, ventes en cours comprises</div>
           </>
         ); })() : (
-          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
         )}
       </Card></div>
 
       {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
           l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
       <div data-stats-carte="activite" className="vrm-stats-volets" style={{...sCarte,padding:'4px 18px'}}>
-      {liveStats && <details className="vrm-finance-activity" style={{fontSize:12.5,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
+      {liveStats && <details className="vrm-finance-activity" style={{fontSize:13,color:C.muted,borderBottom:`1px solid ${C.border}`}}>
         {/* (16 oct.) Chaque montant reste d'un bloc avec son libellé : « 2066,80 »
             ne se sépare plus de son « € » au retour à la ligne. */}
         <summary style={{cursor:'pointer',padding:'10px 0',lineHeight:1.65}}>Ventes enregistrées · <span style={{whiteSpace:'nowrap'}} data-dash-vendu-jour={liveStats.ventesJour!=null?Math.round((liveStats.caJour || 0)*100):undefined} data-dash-vendu-jour-n={liveStats.ventesJour!=null?liveStats.ventesJour:undefined}>aujourd’hui <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caJour!=null?fmt(liveStats.caJour):'—'}</b></span> · <span style={{whiteSpace:'nowrap'}} data-dash-stat="caMois" data-dash-cents={liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined}>ce mois <b style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{liveStats.caMois!=null?fmt(liveStats.caMois):'—'}</b></span></summary>
@@ -17888,17 +17890,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // MARQUÉS sur le graphique et leur valeur exacte écrite dessous — jamais
         // une valeur arrondie différemment (« 2 k ») à côté du vrai montant (§7).
         return (
-          <div data-stats-carte="courbe" data-stats-courbe style={{...sCarte,marginTop:4}}>
-            <div style={sLib}>Chiffre d'affaires · 12 derniers mois</div>
-            <div className="vrm-display" style={{...sHero,fontSize:'clamp(28px,8vw,34px)',letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
+          <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
+            <div style={sLib}>Vendu · 12 derniers mois</div>
+            <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
+            <div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div>
             <BarresCA12 mois={mois} meilleur={meilleur.cle}/>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
                 <span style={{flex:1,minWidth:0}}>Meilleur mois · <span style={{color:C.text,fontWeight:500}}>{meilleur.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={meilleur.eur}/></b>
               </div>
-              {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.muted}}>
+              {encours.cle !== meilleur.cle && <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,flexShrink:0,background:`repeating-linear-gradient(135deg, ${C.accent}, ${C.accent} 2px, ${C.accent}55 2px, ${C.accent}55 4px)`}}/>
                 <span style={{flex:1,minWidth:0}}>En cours · <span style={{color:C.text,fontWeight:500}}>{encours.long}</span></span>
                 <b style={{color:C.text,fontWeight:600}}><Mt v={encours.eur}/></b>
@@ -17937,14 +17940,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div style={{padding:fort?'12px 0 2px':'11px 0',borderTop:`1px solid ${C.border}`}}>
             <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
               <div style={{minWidth:0}}>
-                <div style={{fontSize:fort?13.5:14,fontWeight:fort?600:500,color:val==null?C.muted:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
-                {note && <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.35}}>{note}</div>}
+                <div style={{fontSize:15,fontWeight:fort?600:500,color:val==null?C.muted:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
+                {note && <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.35}}>{note}</div>}
               </div>
-              <span className="vrm-display" style={{fontSize:fort?17:15,fontWeight:fort?700:600,color:val==null?C.muted:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',flexShrink:0,letterSpacing:-0.2}}>{val==null?'—':fmt(val)}</span>
+              <span className="vrm-display" style={{fontSize:15,fontWeight:fort?700:600,color:val==null?C.muted:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',flexShrink:0,letterSpacing:-0.2}}>{val==null?'—':fmt(val)}</span>
             </div>
             {part!=null && <div style={{display:'flex',alignItems:'center',gap:10,marginTop:8}}>
               <div style={{flex:1,height:6,borderRadius:999,background:C.card2||C.border,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>
-              <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)} %</span>
+              <span style={{fontSize:11,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)} %</span>
             </div>}
           </div>
         );
@@ -17952,20 +17955,20 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
-            <div data-stats-carte="plateformes" data-stats-plateformes style={{...sCarte,paddingBottom:12}}>
-              <div style={{...sTitre,marginBottom:8}}>CA finalisé par plateforme</div>
+            <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
+              <div style={{...sTitre,marginBottom:8}}>Finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
-              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total toutes plateformes" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total finalisé" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
             </div>
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
               {comptes.length
                 ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
-                : <div style={{fontSize:12,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
+                : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
             </div>
           </div>
@@ -18017,15 +18020,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
           <div style={{minWidth:0}}>
             <div style={sLib}>{lib}</div>
-            <div className="vrm-display" style={{...sHero,fontSize:fort?'clamp(26px,7.6vw,32px)':'clamp(22px,6.2vw,26px)',letterSpacing:fort?-0.8:-0.5,marginTop:5,color:couleur||C.text}}>{val}</div>
-            {sous && <div style={{...sNote,fontSize:11.5,marginTop:3,...(sousStyle||{})}}>{sous}</div>}
+            <div className="vrm-display" style={{...sHero,fontSize:fort?28:20,letterSpacing:fort?-0.8:-0.5,marginTop:5,color:couleur||C.text}}>{val}</div>
+            {sous && <div style={{...sNote,fontSize:11,marginTop:3,...(sousStyle||{})}}>{sous}</div>}
           </div>
         );
         return (
       <div data-stats-carte="mois" style={{...sCarte,padding:'20px 20px 16px'}}>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'4px 12px',flexWrap:'wrap'}}>
-          <div style={{...sTitre,fontSize:17,textTransform:'capitalize'}}>{moisCourant.nom}</div>
-          <div style={{...sNote,fontSize:12}}>Ce que tu déclares à l'URSSAF</div>
+          <div style={{...sTitre,fontSize:15,textTransform:'capitalize'}}>{moisCourant.nom}</div>
+          <div style={{...sNote,fontSize:13}}>Ce que tu déclares à l'URSSAF</div>
         </div>
         <div className="vrm-mois-grille" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'18px 16px',marginTop:16}}>
           <Chiffre fort lib={`À payer (${String(tauxUrssaf()).replace('.',',')} %)`} val={urssafEstime==null?'—':fmt(urssafEstime)} couleur={urssafEstime==null?C.muted:C.text}/>
@@ -18049,7 +18052,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             déclarée ailleurs est EXCLUE : la phrase le dit, des MÊMES champs de
             la MÊME ligne publiée (`nAilleurs`, `caAilleurs`, `ailleurs`) — et
             dit aussi quand le registre n'était pas encore lu (`declare`). */}
-        <div style={{...sNote,fontSize:12.5,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
+        <div style={{...sNote,fontSize:13,marginTop:10,paddingTop:14,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
           {moisCourantCA==null
             ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
             : <span data-urssaf-declare={decl}>Calculé sur le CA des ventes finalisées en {moisCourant.nom}, toutes plateformes (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>)
@@ -18062,7 +18065,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
             comment elle date chaque vente — replié, pas retiré. */}
         <details className="vrm-stats-calcul" style={{marginTop:10}}>
-          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:500,color:C.muted,padding:'6px 0',listStyle:'revert'}}>Comment c'est calculé</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0',listStyle:'revert'}}>Comment c'est calculé</summary>
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
@@ -18075,10 +18078,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             couleur ne vient QUE si l'échéance presse (≤ 14 j) ou est passée. */}
         <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
-            <span style={{...sTitre,fontSize:13.5,flex:1}}>Prochaine déclaration</span>
+            <span style={{...sTitre,fontSize:13,flex:1}}>Prochaine déclaration</span>
             <div style={{display:'flex',gap:2,background:C.card2||C.surface,borderRadius:10,padding:2}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
+                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
               ))}
             </div>
           </div>
@@ -18088,10 +18091,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             return (
               <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
                 <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
-                  <span style={{fontSize:16,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
-                  <span style={{fontSize:12.5,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:12.5,color:C.muted}}>
+                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
                   <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
                   <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
                   <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
@@ -18102,7 +18105,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
               </div>
             );
-          })() : <div style={{fontSize:12,color:C.muted}}>Aucune échéance à venir.</div>}
+          })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
       </div>
         );
@@ -18123,7 +18126,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             transition:'width 0.4s ease',
           }}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:12,color:C.muted}}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,fontSize:13,color:C.muted}}>
           <span><b style={{color:C.text,fontWeight:600}}>{stockCount}</b> boîtes occupées</span>
           <span><b style={{color:C.text,fontWeight:600}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
         </div>
@@ -18162,7 +18165,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <div key={l} style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
                   <div style={sLib}>{l}</div>
                   <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:(sourd||v==='—')?C.muted:C.text}}>{v}</div>
-                  {sub && <div style={{...sNote,fontSize:11.5,marginTop:2}}>{sub}</div>}
+                  {sub && <div style={{...sNote,fontSize:11,marginTop:2}}>{sub}</div>}
                 </div>
               ))}
             </div>
@@ -18179,14 +18182,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
               <div style={sLib}>Meilleur jour</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayCA[1].ca)}</div>
-              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
+              <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
             </div>
           )}
           {bestDayProfit&&(
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
               <div style={sLib}>Meilleur jour bénéfice</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
-              <div style={{...sNote,fontSize:11.5,marginTop:2}}>{bestDayProfit[0]}</div>
+              <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayProfit[0]}</div>
             </div>
           )}
         </div>
@@ -18224,11 +18227,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                   <div key={i} onClick={()=>setSelMois(actif?null:h.key)}
                        title={`${h.nomComplet} · ${fmt(h.ca)} · ${h.ventes} vente${h.ventes>1?'s':''}${h.enCours?' (en cours)':''}`}
                        style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer',minWidth:0}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{caMode==='ca'?Math.round(h.ca):h.ventes}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{caMode==='ca'?Math.round(h.ca):h.ventes}</div>
                     <div style={{width:'100%',maxWidth:32,height:`${pct}%`,minHeight:3,borderRadius:'8px 8px 0 0',transition:'height .4s',
                          background:h.enCours?`repeating-linear-gradient(135deg, ${col}, ${col} 3px, ${col}66 3px, ${col}66 6px)`:col,
                          outline:actif?`2px solid ${C.accent}`:'none',outlineOffset:1}}/>
-                    <div style={{fontSize:10,color:actif?C.accent:C.muted,fontWeight:actif?700:500,whiteSpace:'nowrap'}}>{h.label}</div>
+                    <div style={{fontSize:11,color:actif?C.accent:C.muted,fontWeight:actif?700:500,whiteSpace:'nowrap'}}>{h.label}</div>
                   </div>
                 );
               })}
@@ -18258,7 +18261,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 return (
                   <div key={i} onClick={()=>setSelMonthEnc(actif?null:h.key)}
                        style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
                     <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:C.accent,borderRadius:'14px 14px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.accent}`:'none'}}/>
                     <div style={{fontSize:11,color:actif?C.accent:C.muted,fontWeight:actif?600:500}}>{h.label}</div>
                   </div>
@@ -18273,22 +18276,22 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
       <Card>
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
           <div>
             <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Du</label>
-            <input type="date" value={caDu} onChange={e=>setCaDu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
+            <input type="date" value={caDu} onChange={e=>setCaDu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:15,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
           </div>
           <div>
             <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Au</label>
-            <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
+            <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:15,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
           </div>
-          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
+          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
         </div>
         {caRange ? (
           <div style={{marginTop:14}}>
-            <div className="vrm-display" style={{fontSize:30,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+            <div className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
+            <div style={{fontSize:13,color:C.muted,marginTop:2}}>
               {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}
               {caDu&&caAu?` du ${caDu.split('-').reverse().join('/')} au ${caAu.split('-').reverse().join('/')}`
                 : caDu?` depuis le ${caDu.split('-').reverse().join('/')}`
@@ -18296,7 +18299,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             </div>
           </div>
         ) : (
-          <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
         )}
       </Card>
 
@@ -18308,7 +18311,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <Card>
             <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Répartition du CA par plateforme</div>
-            <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>La part de chaque plateforme dans ton chiffre d'affaires.</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:12}}>La part de chaque plateforme dans ton chiffre d'affaires.</div>
             <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
               <svg width="132" height="132" viewBox="0 0 132 132" style={{flexShrink:0}} role="img" aria-label="Répartition du CA par plateforme">
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.card2||C.border} strokeWidth="14"/>
@@ -18316,12 +18319,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                   <circle key={p.nom} cx={cx} cy={cy} r={r} fill="none" stroke={C.accent} strokeOpacity={op[p.nom]!=null?op[p.nom]:0.3} strokeWidth="14"
                     strokeDasharray={`${len} ${CIRC-len}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"/>);
                   acc+=len; return el; })}
-                <text x="66" y="62" textAnchor="middle" className="vrm-display" style={{fontSize:'16px',fontWeight:800,fill:C.text}}>{Math.round(platParts.total)} €</text>
-                <text x="66" y="79" textAnchor="middle" style={{fontSize:'9px',fill:C.muted}}>CA total</text>
+                <text x="66" y="62" textAnchor="middle" className="vrm-display" style={{fontSize:'15px',fontWeight:800,fill:C.text}}>{Math.round(platParts.total)} €</text>
+                <text x="66" y="79" textAnchor="middle" style={{fontSize:'11px',fill:C.muted}}>CA total</text>
               </svg>
               <div style={{flex:'1 1 150px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
                 {platParts.arr.map((p)=>(
-                  <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5}}>
+                  <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:13}}>
                     <span style={{width:11,height:11,borderRadius:999,background:C.accent,opacity:op[p.nom]!=null?op[p.nom]:0.3,flexShrink:0}}/>
                     <span style={{flex:1,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.court}</span>
                     <span style={{color:C.text,fontWeight:700}}>{fmt(p.ca)}</span>
@@ -18341,18 +18344,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce qui rapporte le plus</div>
             <div style={{display:'flex',gap:3,background:C.card2||C.bg,borderRadius:8,padding:3}}>
               {[['marques','Marques'],['tailles','Pointures']].map(([k,l])=>(
-                <button key={k} type="button" onClick={()=>setTopMode(k)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:topMode===k?C.accent:'transparent',color:topMode===k?(C.onAccent||'#fff'):C.muted}}>{l}</button>
+                <button key={k} type="button" onClick={()=>setTopMode(k)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:topMode===k?C.accent:'transparent',color:topMode===k?(C.onAccent||'#fff'):C.muted}}>{l}</button>
               ))}
             </div>
           </div>
           {(()=>{ const rows=topMode==='marques'?topStats.marques:topStats.tailles;
-            if(!rows.length) return <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>Pas encore assez de ventes reliées à une paire pour {topMode==='marques'?'classer les marques':'classer les pointures'}.</div>;
+            if(!rows.length) return <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore assez de ventes reliées à une paire pour {topMode==='marques'?'classer les marques':'classer les pointures'}.</div>;
             const max=Math.max(...rows.map(r=>r.v),1);
             return (<div style={{display:'flex',flexDirection:'column',gap:9}}>{rows.map(r=>(
               <div key={r.k} style={{display:'flex',alignItems:'center',gap:10}}>
-                <span style={{width:70,fontSize:12.5,color:C.text,flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{topMode==='tailles'?`T${r.k}`:r.k}</span>
+                <span style={{width:70,fontSize:13,color:C.text,flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{topMode==='tailles'?`T${r.k}`:r.k}</span>
                 <div style={{flex:1,height:10,background:C.card2||C.bg,borderRadius:5,overflow:'hidden'}}><div style={{width:`${Math.max(4,r.v/max*100)}%`,height:'100%',background:C.accent,borderRadius:5}}/></div>
-                <span style={{width:62,textAlign:'right',fontSize:12.5,fontWeight:700,color:C.text,flexShrink:0}} className="vrm-display">{fmt(r.v)}</span>
+                <span style={{width:62,textAlign:'right',fontSize:13,fontWeight:700,color:C.text,flexShrink:0}} className="vrm-display">{fmt(r.v)}</span>
               </div>
             ))}</div>);
           })()}
@@ -18375,7 +18378,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 return (
                   <div key={i} onClick={()=>setSelMonthVente(actif?null:h.key)}
                        style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
                     <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:C.blue,borderRadius:'14px 14px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.blue}`:'none'}}/>
                     <div style={{fontSize:11,color:actif?C.blue:C.muted,fontWeight:actif?600:500}}>{h.label}</div>
                   </div>
@@ -18403,9 +18406,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 const pct=Math.round(h.count/maxAjout*100);
                 return (
                   <div key={i} style={{flex:'1 0 auto',minWidth:22,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:500}}>{h.count}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:500}}>{h.count}</div>
                     <div style={{width:'100%',maxWidth:30,height:`${pct}%`,minHeight:4,background:C.accent,borderRadius:'14px 14px 0 0',transition:'height .4s'}}/>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{h.label}</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{h.label}</div>
                   </div>
                 );
               })}
@@ -18419,10 +18422,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
             <span style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta}>📥 Exporter (CSV · Excel · Numbers)</Btn>
+            <Btn small onClick={exportCompta} style={{fontSize:13}}>📥 Exporter (CSV · Excel · Numbers)</Btn>
           </div>
           <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
                   {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
@@ -18433,12 +18436,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <tbody>
                 {moisRecap.map(m=>(
                   <tr key={m.label} style={{borderBottom:`1px solid ${C.border}`}}>
-                    <td style={{padding:'8px 10px',fontWeight:600,color:C.accent,whiteSpace:'nowrap'}}>{m.label}</td>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.text,whiteSpace:'nowrap'}}>{m.label}</td>
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.accent}}>{m.profit==null?'—':fmt(m.profit)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(m.net)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500,whiteSpace:'nowrap'}}>{fmt(m.ca)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.text,whiteSpace:'nowrap'}}>{m.profit==null?'—':fmt(m.profit)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:C.muted,whiteSpace:'nowrap'}}>{fmt(m.urssaf)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(m.net)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -18456,7 +18459,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
               <div style={{fontSize:13,fontWeight:600,color:C.blue,marginBottom:6}}>📅 Récap semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
-              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
@@ -18466,7 +18469,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               ); })()}
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
-              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:17,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
+              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
       )}
@@ -18477,14 +18480,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
             <div>
               <div style={{fontSize:13,fontWeight:600,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
-              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
-              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:17,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
+              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:15,lineHeight:1,padding:'2px 4px'}}><Icon name="close" size={15}/></button>
           </div>
         </Card>
       )}
@@ -20842,6 +20845,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 
   // Occupation de la pièce : combien de boîtes rangées, combien de places libres,
   // combien de meubles → un vrai tableau de bord de rangement en un coup d'œil.
+  const refAmenager = React.useRef(null);   // le dépliant « Aménager la pièce », ouvert par le geste de la pièce vide
   const capacity = useMemo(() => {
     const GRID = ['grille', 'commode', 'etagere', 'casier', 'armoire'];
     let boxes = 0, freeCells = 0, furn = 0;
@@ -20871,6 +20875,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
         <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
+      {/* (16 oct.) UNE PIÈCE VIDE NE SE TAIT PAS : la scène 3D sans meuble ne dit
+          rien de ce qu'il faut faire. On dit le geste, et le bouton y mène. */}
+      {items.length === 0 && (
+        <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ flex: '1 1 220px', minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
+            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Ajoute un meuble à cases (grille de boîtes, étagère, casiers) : tu y ranges tes paires, et VRM retrouve chacune par son numéro.</span>
+          </span>
+          <button type="button" data-piece-vide-geste="" onClick={() => { const d = refAmenager.current; if (d) { d.open = true; try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
+        </div>
+      )}
 
       {ranger && (
         <RangerSheet
@@ -20895,17 +20910,21 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       })()}
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>
-        {plan.rooms.map(r => {
+      {/* (16 oct.) UNE pièce : pas de pastille « Ma pièce » sélectionnée — l'onglet
+          du dessus le dit déjà (elle apparaissait sélectionnée DEUX fois). Les
+          pastilles ne servent qu'à passer d'une pièce à l'autre, à partir de deux,
+          et la pièce choisie est marquée en NEUTRE (§7 : l'accent ne sélectionne pas). */}
+      <div data-pieces={plan.rooms.length} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        {plan.rooms.length > 1 && <span style={{ fontSize: 13, color: C.muted, fontWeight: 500, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>}
+        {plan.rooms.length > 1 && plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
           return (
-            <button type="button" key={r.id} onClick={() => switchRoom(r.id)} style={{ border: `1.5px solid ${on ? C.accent : C.border}`, borderRadius: 999, background: on ? C.accent : C.card, color: on ? '#fff' : C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button type="button" key={r.id} onClick={() => switchRoom(r.id)} aria-pressed={on} style={{ border: `1px solid ${on ? C.text : C.border}`, borderRadius: 999, background: on ? `${C.text}12` : C.card, color: C.text, fontSize: 13, fontWeight: on ? 600 : 500, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
               {r.name}{r.items && r.items.length ? ` · ${r.items.length}` : ''}
             </button>
           );
         })}
-        <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ Pièce</button>
+        <button type="button" onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
         <button className="vrm-icon-control" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
         {plan.rooms.length > 1 && <button className="vrm-icon-control" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
       </div>
@@ -20916,7 +20935,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           de construction (meubles, dimensions, murs, déplacement) part donc
           derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
           recherche. */}
-      <details style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
+      <details ref={refAmenager} data-amenager="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
         {/* ⚠️ `listStyle:none` retire le triangle du navigateur : sans repère
             ajouté, plus rien ne dit que ça s'ouvre. On pose donc un chevron. */}
         <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -21577,8 +21596,15 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      <Segmente label="Vue du stock" value={garageView} onChange={v=>{setGarageView(v);save('vinted_garage_view',v);}} style={{alignSelf:'flex-start'}}
-        options={[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>({v,l,icone:ic}))}/>
+      {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
+          de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
+      <nav aria-label="Vues du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
+        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+          <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
+            <Icon name={ic} size={15}/>{l}
+          </button>
+        ))}
+      </nav>
 
       {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
@@ -23899,28 +23925,33 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>
           <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Chiffre d'affaires par période</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>Toutes plateformes · les mêmes règles que Ma journée et le CA déclaré.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Chiffre d'affaires par période</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Toutes plateformes · les mêmes règles que Ma journée et le CA déclaré.</div>
           </div>
-          <Segmente label="Période" plein value={periode} onChange={choisir} style={{ flex: '1 1 260px', maxWidth: 360 }}
-            options={PERIODES_CA.map(([k, l]) => ({ v: k, l, data: { 'data-ca-choix': k } }))}/>
+          {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
+              sous-onglets de plateforme) : plus de segment rempli d'accent. */}
+          <nav role="group" aria-label="Période" className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, flex: '1 1 260px', maxWidth: 360, margin: 0 }}>
+            {PERIODES_CA.map(([k, l]) => (
+              <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} aria-current={periode === k ? 'page' : undefined} data-ca-choix={k} className="vrm-seg-btn">{l}</button>
+            ))}
+          </nav>
         </div>
         {calc.etat !== 'lu' ? (
-          <div style={{ padding: '16px', fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
+          <div style={{ padding: '16px', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
             {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun chiffre n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
           </div>
         ) : (<>
           <div className="vrm-ca-periode-tuiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', borderBottom: `1px solid ${C.border}` }}>
             {COLS.map(([k, l, s], i) => (
               <div key={k} data-ca-cur={k} data-ca-eur={cur[k] == null ? '' : String(cur[k].eur)} style={{ padding: '14px 16px', borderLeft: i ? `1px solid ${C.border}` : 'none' }}>
-                <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{l} · {cur.libelle}</div>
-                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{partiel && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{l} · {cur.libelle}</div>
+                <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: cur[k] == null ? C.muted : C.text, marginTop: 4, letterSpacing: -0.5 }}>{partiel && cur[k] != null ? <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span> : null}{montant(cur[k])}</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{cur[k] == null ? s : `${nb(cur[k])} · ${s}`}</div>
               </div>
             ))}
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table data-ca-table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <table data-ca-table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ color: C.muted, textAlign: 'right' }}>
                   <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>Période</th>
@@ -23938,7 +23969,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             </table>
           </div>
           {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || versements === null) && (
-            <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11.5, color: C.muted, lineHeight: 1.55 }}>
+            <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
               {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
               {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
@@ -23959,7 +23990,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
 // ⚠️ La ligne `vrm_pro_facture` se réécrit ENTIÈRE : lue en trois états
 //    (`lireReglage`), et une lecture ratée n'écrit RIEN (sinon la première
 //    frappe effaçait sa raison sociale et son SIRET).
-const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 110px'], ['ville', 'Ville', '1 1 160px']];
+const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
 function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
@@ -23987,21 +24018,21 @@ function ProfilFiscalCarte({ onNav }) {
   const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
   React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
   const siren = verifierSiren(cfg && cfg.siret);
-  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-profil-fiscal={cfg === undefined ? 'encours' : cfg === null ? 'passu' : 'lu'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Profil fiscal</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Profil fiscal</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {cfg === undefined && <div style={{ fontSize: 12.5, color: C.muted }}>Je lis ton entité…</div>}
-          {cfg === null && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
+          {cfg === undefined && <div style={{ fontSize: 13, color: C.muted }}>Je lis ton entité…</div>}
+          {cfg === null && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}><span style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: C.muted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', marginRight: 6 }}>{REGLAGE_PAS_LU}</span>La base n'a pas répondu : je ne te montre pas de champs vides à remplir (ils remplaceraient ton entité). Rouvre cet écran dans un moment.</div>}
           {cfg && (<>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
@@ -24010,29 +24041,29 @@ function ProfilFiscalCarte({ onNav }) {
                   style={{ ...inp, flex, borderColor: k === 'siret' && siren.etat === 'invalide' ? C.warn : C.border }} />
               ))}
             </div>
-            <div data-siren={siren.etat} style={{ fontSize: 11.5, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
+            <div data-siren={siren.etat} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
               {siren.etat === 'vide' ? 'SIREN (9 chiffres) ou SIRET (14) : il figure sur ton avis de situation INSEE.'
                 : siren.etat === 'ok' ? `${siren.type} valide (clé de contrôle correcte).`
                 : `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`}
             </div>
           </>)}
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
-            <div role="group" aria-label="Régime fiscal" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
-              {[['micro', 'Micro-entreprise (BIC)'], ['marge', 'Société — régime de la marge']].map(([k, l]) => (
-                <button key={k} type="button" aria-pressed={regime === k} data-regime-choix={k} onClick={() => { setRegime(k); save('vinted_regime', k); }}
-                  style={{ flex: 1, border: 'none', borderRadius: 6, padding: '8px 6px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: regime === k ? C.accent : 'transparent', color: regime === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+            {/* (16 oct.) Contrôle segmenté PARTAGÉ (`.vrm-seg`) : plus de segment rempli d'accent. */}
+            <nav role="group" aria-label="Régime fiscal" className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, margin: 0 }}>
+              {[['micro', 'Micro-entreprise (BIC)', 'Micro-entreprise'], ['marge', 'Société — régime de la marge', 'Régime de la marge']].map(([k, l, court]) => (
+                <button key={k} type="button" aria-pressed={regime === k} aria-current={regime === k ? 'page' : undefined} data-regime-choix={k} title={l} onClick={() => { setRegime(k); save('vinted_regime', k); }} className="vrm-seg-btn">{court}</button>
               ))}
-            </div>
+            </nav>
             {regime !== 'marge' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
+                <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
                 <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux
                   onBlur={() => { const v = parseFloat(String(taux).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTaux(virgule(ok)); save('vinted_urssaf_taux', ok); }}
                   style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600 }} />
-                <span style={{ fontSize: 12, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
+                <span style={{ fontSize: 13, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Réglages</button>.</div>
+              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Réglages</button>.</div>
             )}
           </div>
         </div>
@@ -24199,7 +24230,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   };
 
   const chip = (icon) => <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>;
-  const btn2 = (actif) => ({ border: `1px solid ${C.border}`, background: C.card, color: actif ? C.text : C.muted, borderRadius: 8, padding: '8px 13px', fontSize: 12.5, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, opacity: actif ? 1 : 0.6 });
+  const btn2 = (actif) => ({ border: `1px solid ${C.border}`, background: C.card, color: actif ? C.text : C.muted, borderRadius: 8, padding: '8px 13px', fontSize: 13, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, opacity: actif ? 1 : 0.6 });
   const peutFacturer = etat.ok && nuage;
   const raisonGrise = !etat.ok ? etat.raison : !nuage ? "Je relis d'abord les numéros de facture déjà donnés." : '';
   const parPlat = recap ? Object.entries(recap.parPlateforme) : [];
@@ -24209,8 +24240,8 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           {chip('doc')}
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Facturation électronique</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Facturation électronique</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>VRM prépare les fichiers. Connecte ton compte Super PDP pour que tes factures partent d'ici, ou dépose-les toi-même.</div>
           </div>
           <select value={ym} onChange={(e) => { setYm(e.target.value); setMsg(''); }} aria-label="Mois" data-fe-mois
             style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 600 }}>
@@ -24225,28 +24256,28 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
             <div key={t} data-fe-explique={i} style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, marginTop: -1 }}>
-              <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{t}</div>
-              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginTop: 4 }}>{d}</div>
+              <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{t}</div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginTop: 4 }}>{d}</div>
             </div>
           ))}
         </div>
 
         {/* ── SUPER PDP : SON compte ── */}
         <div data-spdp data-spdp-etat={spdp === undefined ? 'encours' : spdp === null ? 'passu' : spdp.connecte ? 'connecte' : spdp.illisible ? 'illisible' : 'deconnecte'} style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
-          {spdp === undefined && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
-          {spdp === null && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Plateforme agréée · Super PDP</div>
+          {spdp === undefined && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Je lis ta connexion Super PDP…</div>}
+          {spdp === null && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>Je n'ai pas pu lire ta connexion Super PDP (le serveur n'a pas répondu) — je ne dis ni « connecté » ni « pas connecté ». <button type="button" onClick={() => { setSpdp(undefined); relireSpdp(); }} style={{ ...btn2(true), padding: '4px 10px', marginLeft: 4 }}>Réessayer</button></div>}
           {spdp && spdp.connecte && <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-            <div style={{ flex: '1 1 220px', fontSize: 12.5, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
+            <div style={{ flex: '1 1 220px', fontSize: 13, color: C.text, lineHeight: 1.5 }} data-spdp-env={spdp.env}>
               <strong>Connecté à Super PDP</strong> · {ENV_LIBELLE[spdp.env] || spdp.env}{spdp.env === 'sandbox' ? ' (rien ne part réellement aux impôts)' : ''}
               <div style={{ fontSize: 11, color: C.muted }}>Ce choix est celui que tu as déclaré : c'est ton compte Super PDP qui décide de l'environnement. Tes identifiants restent sur le serveur, chiffrés.</div>
             </div>
             <button type="button" data-spdp-deconnecter disabled={!!spOccupe} onClick={deconnecterSpdp} style={btn2(!spOccupe)}>{spOccupe === 'deconnexion' ? '…' : 'Déconnecter'}</button>
           </div>}
           {spdp && !spdp.connecte && <div style={{ marginTop: 8 }}>
-            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
-            {spdp.coffre === false && <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
+            {spdp.illisible && <div data-spdp-illisible style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Ta connexion Super PDP ne se lit plus côté serveur (sa clé a changé) : reconnecte-la.</div>}
+            {spdp.coffre === false && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 8 }}>Le serveur n'a pas de coffre configuré : aucune clé ne peut être rangée pour l'instant.</div>}
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Colle l'identifiant client et le secret client de TON compte Super PDP (espace développeur). Ils partent une seule fois au serveur, chiffrés ; VRM ne te les remontrera jamais. Les envois sont facturés sur ton compte Super PDP, pas sur celui de VRM.</div>
             <div role="radiogroup" aria-label="Environnement" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               {[['sandbox', 'Bac à sable'], ['production', 'Production']].map(([k, t]) => (
                 <button key={k} type="button" role="radio" aria-checked={spEnv === k} data-spdp-choix={k} onClick={() => setSpEnv(k)}
@@ -24261,27 +24292,27 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               <button type="button" data-spdp-connecter disabled={!!spOccupe || !spId.trim() || !spSecret.trim() || spdp.coffre === false} onClick={connecterSpdp} style={btn2(!spOccupe && !!spId.trim() && !!spSecret.trim() && spdp.coffre !== false)}>{spOccupe === 'connexion' ? 'Vérification…' : 'Connecter'}</button>
             </div>
           </div>}
-          {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
+          {spMsg && <div data-spdp-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{spMsg}</div>}
         </div>
 
         {/* ── RÉCAP E-REPORTING ── */}
         <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Récapitulatif e-reporting · {libelleYm(ym)}</div>
           {!recap ? (
-            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-fe-recap-etat={calc.etat}>
               {calc.etat === 'encours' ? 'Je lis tes ventes…' : "Je n'ai pas pu lire tes ventes : aucun total n'est affiché plutôt qu'un zéro qui ne serait pas vrai. Rouvre cet écran dans un moment."}
             </div>
           ) : (<div data-fe-recap data-recap-ym={ym} data-recap-total={eurDe(recap.centimes)} data-recap-n={recap.n} data-recap-partiel={recap.partiel ? '1' : '0'}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 750, color: C.text, letterSpacing: -0.6 }}>
+              <div className="vrm-display" style={{ fontSize: 20, fontWeight: 750, color: C.text, letterSpacing: -0.6 }}>
                 {recap.partiel && <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>au moins </span>}{fmt(recap.centimes / 100)}
               </div>
-              <div style={{ fontSize: 12.5, color: C.muted }}>{recap.n} vente{recap.n > 1 ? 's' : ''} · datées comme ton CA déclaré (au versement pour Vinted)</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{recap.n} vente{recap.n > 1 ? 's' : ''} · datées comme ton CA déclaré (au versement pour Vinted)</div>
             </div>
             {parPlat.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-              {parPlat.map(([p, x]) => <span key={p} data-recap-plateforme={p} style={{ fontSize: 11.5, color: C.text, border: `1px solid ${C.border}`, borderRadius: 999, padding: '3px 10px' }}>{p} · {fmt(x.centimes / 100)} · {x.n}</span>)}
+              {parPlat.map(([p, x]) => <span key={p} data-recap-plateforme={p} style={{ fontSize: 11, color: C.text, border: `1px solid ${C.border}`, borderRadius: 999, padding: '3px 10px' }}>{p} · {fmt(x.centimes / 100)} · {x.n}</span>)}
             </div>}
-            {recap.partiel && <div data-fe-manque style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
+            {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>
               Total partiel — il manque : {recap.manques.join(' ; ')}. Le fichier le dit aussi.
             </div>}
             <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>VRM ne sait pas si un acheteur est une entreprise : toutes tes ventes du mois y figurent. Retire celles faites à une entreprise (elles demandent une facture).</div>
@@ -24295,12 +24326,12 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         {/* ── FACTURES FACTUR-X ── */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
-          {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 12.5, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Factures Factur-X · ventes de {libelleYm(ym)}</div>
+          {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
             {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
           </div>}
           {etat.ok && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Vendeur : {etat.vendeur.nom} · SIREN {etat.vendeur.siren} · « {etat.vendeur.mention} ». Acheteur : le nom porté par la vente, sinon « Particulier ».</div>}
-          {recap && recap.lignes.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>Aucune vente datée sur ce mois{recap.partiel ? ' (avec ce qui a pu être lu)' : ''}.</div>}
+          {recap && recap.lignes.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>Aucune vente datée sur ce mois{recap.partiel ? ' (avec ce qui a pu être lu)' : ''}.</div>}
           {recap && recap.lignes.length > 0 && <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
             {recap.lignes.map((l, i) => {
               const num = numeroDe(l.id);
@@ -24314,7 +24345,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{l.plateforme} · {l.plateforme === 'Vinted' ? 'versée' : l.plateforme === 'eBay' ? 'payée' : 'vendue'} le {frJour(l.ts)}{num ? ` · ${num.numero}` : ''}</div>
                     {lib && <div data-spdp-statut={env.etat} style={{ fontSize: 11, marginTop: 2, lineHeight: 1.45, color: lib.ton === 'attention' ? C.warn : C.muted, overflowWrap: 'anywhere' }}>{lib.texte}</div>}
                   </div>
-                  <span className="vrm-display" style={{ fontSize: 13.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
+                  <span className="vrm-display" style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(l.eur)}</span>
                   <button type="button" data-fe-facture={l.id} disabled={!peutFacturer || enCours === l.id} title={raisonGrise || 'Télécharger la facture Factur-X (PDF + XML)'}
                     onClick={() => genererFacture(l)} style={btn2(peutFacturer && enCours !== l.id)}>
                     <Icon name="receipt" size={14} />{enCours === l.id ? '…' : 'Facture'}
@@ -24327,46 +24358,49 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
               );
             })}
           </div>}
-          {msg && <div data-fe-msg role="status" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{msg}</div>}
-          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numérotation continue par année (FX-AAAA-0001) ; une vente garde toujours le même numéro. La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</div>
+          {msg && <div data-fe-msg role="status" style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{msg}</div>}
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>Numérotation continue par année (FX-AAAA-0001) ; une vente garde toujours le même numéro. La conformité du fichier n'a pas été validée par un outil officiel : ta plateforme le vérifiera au dépôt.</div>
         </div>
       </div>
     </Card>
   );
 }
 
-function ComptaLigne({ gauche, droite, onDel, extra }) {
+function ComptaLigne({ gauche, droite, onDel, extra, attrs }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px' }}>
-      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
-      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+    <div className="vrm-set-ligne" {...(attrs || {})}>
+      <span className="vrm-set-lib">{gauche}</span>
+      <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>
       {extra}
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px', minHeight: 36, minWidth: 28 }}>×</button>
     </div>
   );
 }
-// Carte de section : chip + titre + total à droite, corps (formulaire + liste).
-function ComptaSection({ icon, titre, note, total, totalSub, children, data }) {
+// (16 oct.) Une section = un GROUPE comme dans Réglages : le titre en casse
+// normale au-dessus (son total à droite), une liste à lignes, la note en pied.
+// Le formulaire d'ajout ne s'ouvre plus d'office : une ligne « + Ajouter… »
+// le déplie dans la liste (trois formulaires toujours ouverts écrasaient
+// l'écran, placeholders tronqués compris).
+function ComptaSection({ titre, note, total, totalSub, children, data }) {
   return (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <div data-compta-section={data}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
-            {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1, lineHeight: 1.45 }}>{note}</div>}
-          </div>
-          {total != null && <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>
-            {totalSub && <div style={{ fontSize: 10.5, color: C.muted, whiteSpace: 'nowrap' }}>{totalSub}</div>}
-          </div>}
-        </div>
-        <div style={{ padding: 14 }}>{children}</div>
+    <section className="vrm-set-groupe vrm-compta-groupe" data-compta-section={data} style={{ margin: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '0 16px 8px' }}>
+        <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0 }}>{titre}</h3>
+        {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
-    </Card>
+      <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
+      {note && <div className="vrm-set-pied" style={{ color: C.muted }}>{note}</div>}
+    </section>
   );
 }
-
+// Ligne « + Ajouter… » d'une section : déplie le formulaire dans la liste.
+function ComptaAjout({ ouvert, onClick, libelle, data }) {
+  return (
+    <button type="button" className="vrm-set-ligne" onClick={onClick} aria-expanded={ouvert} {...data} style={{ color: C.accent }}>
+      <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>{ouvert ? 'Fermer' : `+ ${libelle}`}</b></span>
+    </button>
+  );
+}
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -24424,16 +24458,18 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const [aDeb, setADeb] = React.useState(auj);
   const [aFin, setAFin] = React.useState('');
   const [aErr, setAErr] = React.useState('');
+  const [ouvert, setOuvert] = React.useState('');          // '' · 'abo' · 'dep' · 'pack' : un formulaire à la fois
+  const basculer = (k) => setOuvert(o => o === k ? '' : k);
 
   const ajouterDepense = () => {
     const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
     maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
-    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
+    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setOuvert('');
   };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
     maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
-    setPCpt(''); setPMnt(''); setPDate(auj);
+    setPCpt(''); setPMnt(''); setPDate(auj); setOuvert('');
   };
   // Un abonnement mal saisi n'est pas ajouté, et on DIT pourquoi (jamais en silence).
   const ajouterAbonnement = () => {
@@ -24443,7 +24479,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     if (!ymCompta(aDeb)) { setAErr('Il faut une date de début.'); return; }
     if (aFin && aFin < aDeb) { setAErr('La date de fin est avant la date de début.'); return; }
     maj({ ...data, abonnements: [{ id: rCompId(), libelle: aLib.trim(), montant: m, periode: aPer === 'an' ? 'an' : 'mois', debut: aDeb, fin: aFin || '' }, ...abonnements] });
-    setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr('');
+    setALib(''); setAMnt(''); setAPer('mois'); setADeb(auj); setAFin(''); setAErr(''); setOuvert('');
   };
   const terminerAbonnement = (id) => maj({ ...data, abonnements: abonnements.map(a => a.id === id ? { ...a, fin: auj } : a) });
   const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
@@ -24471,19 +24507,21 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   React.useEffect(() => { let stop = false; fetchProInvoices().then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
 
   // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
-  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
-  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
-  const chip = (icon) => (
-    <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
-  );
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 40 };
+  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, minHeight: 40 };
+  const formBox = { padding: '12px 16px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 };
+  const lab = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: C.muted, flex: '1 1 140px', minWidth: 0 };
   // Section et Ligne vivent HORS du composant : définies ici, elles changeaient
   // d'identité à chaque rendu et React remontait leurs champs — le curseur
   // sautait à chaque lettre tapée.
   const Ligne = ComptaLigne, Section = ComptaSection;
-  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
-  const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
+  const vide = (txt) => <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>{txt}</small></span></div>;
+  const listeBox = (items) => items;
   const dateFr = (s) => String(s || '').split('-').reverse().join('/');
-  const lienBtn = (txt, tab, fs = 12.5) => <button type="button" onClick={() => onNav && onNav(tab)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: fs, minHeight: 0, display: 'inline', verticalAlign: 'baseline', lineHeight: 'inherit' }}>{txt}</button>;
+  // (16 oct.) Un LIEN dans une phrase, pas un bouton : la règle des boutons
+  // (hauteur plancher au doigt) étirait la ligne qui le portait — un
+  // interligne de ~2 dans le paragraphe du résultat.
+  const lienBtn = (txt, tab, fs = 13) => <a href={`?tab=${tab}`} onClick={(e) => { e.preventDefault(); if (onNav) onNav(tab); }} style={{ color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: fs, textDecoration: 'none' }}>{txt}</a>;
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -24493,116 +24531,121 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
       <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ height: 3, background: C.accent }} />
         <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)}>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>CA déclaré − charges · {annee}</div>
+          <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
           {recettesAnnee == null ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-                <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
+                <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.muted, letterSpacing: -0.8 }}>—</div>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
-              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
                 Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre {lienBtn('Ventes', 'cat_ventes')} une fois, et tes charges y seront déduites.
               </div>
             </div>
           ) : (
             <div>
-              <div className="vrm-display" style={{ fontSize: 40, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -1.5, lineHeight: 1 }}>{fmt(resultatAnnee)}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 12.5, color: C.muted }}>
+              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{fmt(resultatAnnee)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
                 <span>CA déclaré</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                 <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
               </div>
-              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 11.5)}) — ce n'est donc pas encore ton bénéfice net.
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 13)}) — ce n'est donc pas encore ton bénéfice net.
               </div>
             </div>
           )}
         </div>
       </Card>
 
-      {/* Trois repères de charges — même carte, hiérarchie claire. */}
-      <div className="vrm-finance-charges" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        {[
-          { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },
-          { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
-          { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
-        ].map((x) => (
-          <Card key={x.k} style={{ padding: '13px 15px' }}>
-            <div data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
-              <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
-              <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{fmt(x.v)}</div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+      {/* Trois repères de charges — une liste groupée, comme Réglages : le
+          libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
+      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+        <h3 className="vrm-set-titre" style={{ color: C.muted }}>Tes charges</h3>
+        <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+          {[
+            { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },
+            { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
+            { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
+          ].map((x) => (
+            <div key={x.k} className="vrm-set-ligne" data-compta-kpi={x.k} data-eur={String(Math.round(x.v * 100) / 100)}>
+              <span className="vrm-set-lib"><b style={{ color: C.text }}>{x.l}</b><small style={{ color: C.muted }}>{x.s}</small></span>
+              <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(x.v)}</span>
             </div>
-          </Card>
-        ))}
-      </div>
-      {chargesAnnee > 0 && (
-        <button type="button" onClick={exporterCharges} style={{ alignSelf: 'flex-start', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: -4 }}>
-          <Icon name="save" size={14} />Exporter mes charges {annee} (CSV)
-        </button>
-      )}
+          ))}
+          {chargesAnnee > 0 && (
+            <button type="button" className="vrm-set-ligne" onClick={exporterCharges}>
+              <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>Exporter mes charges {annee} (CSV)</b></span>
+              <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted }}><Icon name="save" size={16} /></span>
+            </button>
+          )}
+        </div>
+      </section>
 
       <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
 
       <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
         {/* ABONNEMENTS RÉCURRENTS */}
-        <Section data="abonnements" icon="sync" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance, jamais dans ton CA."
+        <Section data="abonnements" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance (une échéance compte dès le début de son mois), jamais dans ton CA."
           total={abonnements.length ? charges.aboTotal : null} totalSub={abonnements.length ? `en ${annee}` : null}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input type="text" placeholder="Ex. VRM, Canva, appli photo" aria-label="Nom de l'abonnement" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, flex: '2 1 170px' }} />
-            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: 90 }} />
-            <select value={aPer} onChange={e => setAPer(e.target.value)} aria-label="Périodicité" data-abo-periode style={{ ...inp }}><option value="mois">par mois</option><option value="an">par an</option></select>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Début
-              <input type="date" value={aDeb} onChange={e => { setADeb(e.target.value); setAErr(''); }} data-abo-debut style={{ ...inp, width: '100%' }} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.muted, flex: '1 1 140px' }}>Fin (facultatif)
-              <input type="date" value={aFin} onChange={e => { setAFin(e.target.value); setAErr(''); }} data-abo-fin style={{ ...inp, width: '100%' }} />
-            </label>
-            <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>Ajouter</button>
-          </div>
-          {aErr && <div data-abo-erreur style={{ fontSize: 12, color: C.warn, marginTop: 8 }}>{aErr}</div>}
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Payé d'avance : une échéance compte dès le début de son mois — le mois du début et le mois en cours comptent.</div>
-          {abonnements.length === 0
-            ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois — il sera compté à chaque échéance.')
-            : listeBox(abonnements.map((a, i) => {
+          {abonnements.length === 0 && ouvert !== 'abo' ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois — il sera compté à chaque échéance.') : null}
+          {abonnements.length > 0 && listeBox(abonnements.map((a) => {
               const ech = echeancesAbonnement(a, moisCle);
               const cumul = ech.length * (Number(a.montant) || 0);
               const pasEncore = ymCompta(a.debut) > moisCle;
               const fini = a.fin && ymCompta(a.fin) < moisCle;
               return (
-                <div key={a.id} data-abo={a.libelle} data-abo-cumul={String(Math.round(cumul * 100) / 100)} data-abo-echeances={ech.length} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                  <Ligne
-                    gauche={<><span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{a.libelle}</span>
-                      <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 2 }}>
+                  <Ligne key={a.id} attrs={{ 'data-abo': a.libelle, 'data-abo-cumul': String(Math.round(cumul * 100) / 100), 'data-abo-echeances': ech.length }}
+                    gauche={<><b style={{ color: C.text }}>{a.libelle}</b>
+                      <small style={{ color: C.muted }}>
                         {pasEncore ? `commence le ${dateFr(a.debut)}` : `depuis le ${dateFr(a.debut)}`}{a.fin ? ` · ${fini ? 'terminé' : 'jusqu’au'} ${dateFr(a.fin)}` : ''}
                         {!pasEncore && ` · ${ech.length} échéance${ech.length > 1 ? 's' : ''}, ${fmt(cumul)} en tout`}
-                      </span></>}
+                      </small></>}
                     droite={fmt(a.montant) + (a.periode === 'an' ? ' /an' : ' /mois')}
-                    extra={!a.fin && !pasEncore ? <button type="button" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 6, fontSize: 11, fontWeight: 600, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Arrêter</button> : null}
+                    extra={!a.fin && !pasEncore ? <button type="button" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 6, fontSize: 13, fontWeight: 600, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Arrêter</button> : null}
                     onDel={() => retirer('abonnements', a.id)} />
-                </div>
               );
             }))}
+          <ComptaAjout ouvert={ouvert === 'abo'} onClick={() => basculer('abo')} libelle="Ajouter un abonnement" data={{ 'data-abo-ouvrir': '' }} />
+          {ouvert === 'abo' && <div style={formBox}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="text" placeholder="Nom (ex. Canva)" aria-label="Nom de l'abonnement" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, flex: '2 1 170px' }} />
+            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: 90 }} />
+            <select value={aPer} onChange={e => setAPer(e.target.value)} aria-label="Périodicité" data-abo-periode style={{ ...inp }}><option value="mois">par mois</option><option value="an">par an</option></select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label style={lab}>Début
+              <input type="date" value={aDeb} onChange={e => { setADeb(e.target.value); setAErr(''); }} data-abo-debut style={{ ...inp, width: '100%' }} />
+            </label>
+            <label style={lab}>Fin (facultatif)
+              <input type="date" value={aFin} onChange={e => { setAFin(e.target.value); setAErr(''); }} data-abo-fin style={{ ...inp, width: '100%' }} />
+            </label>
+            <button type="button" onClick={ajouterAbonnement} data-abo-ajouter style={btnAdd}>Ajouter</button>
+          </div>
+          {aErr && <div data-abo-erreur style={{ fontSize: 13, color: C.warn }}>{aErr}</div>}
+          </div>}
         </Section>
 
         {/* DÉPENSES PONCTUELLES */}
-        <Section data="depenses" icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null} totalSub={depenses.length ? `en ${annee}` : null}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
-            <input type="text" placeholder="Ex. rouleau de scotch" aria-label="Libellé" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
-            <select value={dCat} onChange={e => setDCat(e.target.value)} aria-label="Catégorie" style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
-            <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
-          </div>
-          {depenses.length === 0
+        <Section data="depenses" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null} totalSub={depenses.length ? `en ${annee}` : null}>
+          {depenses.length === 0 && ouvert !== 'dep'
             ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
-            : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {dateFr(d.date)}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
+            : listeBox(depenses.map((d) => <Ligne key={d.id} gauche={<><b style={{ color: C.text }}>{d.libelle}</b><small style={{ color: C.muted }}>{d.cat} · {dateFr(d.date)}</small></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} />))}
+          <ComptaAjout ouvert={ouvert === 'dep'} onClick={() => basculer('dep')} libelle="Ajouter une dépense" data={{ 'data-dep-ouvrir': '' }} />
+          {ouvert === 'dep' && <div style={formBox}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="text" placeholder="Ce que tu as payé" aria-label="Libellé" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 180px' }} />
+              <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 96 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} aria-label="Date" style={{ ...inp, flex: '1 1 150px' }} />
+              <select value={dCat} onChange={e => setDCat(e.target.value)} aria-label="Catégorie" style={{ ...inp, flex: '1 1 150px' }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+              <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
+            </div>
+          </div>}
         </Section>
 
         {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
@@ -24611,26 +24654,30 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             Leboncoin : aucune ligne captée). Un montant deviné serait un faux :
             seul ce qui est saisi ici compte. Les boosts Vinted, eux, se notent
             par annonce (champ « boost ») et sortent de la marge dans Statistiques. */}
-        <Section data="packs" icon="camera" titre="Packs & options payés" note="Pack de photos, option de mise en avant sur Leboncoin ou eBay : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-            <input type="text" placeholder="Compte (ex. pro Cancale)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
-            <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, width: 150 }} />
-            <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
-            <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
-          </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies : note-le ici, il entre dans tes charges. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard', 11)}.</div>
-          {packs.length === 0
+        <Section data="packs" titre="Packs & options payés" note={<>Pack de photos, option de mise en avant : c'est une charge. Leboncoin et eBay ne transmettent pas à VRM ce que tu leur paies, note-le ici. Les boosts Vinted se notent par annonce et sortent de ta marge dans {lienBtn('Statistiques', 'dashboard')}.</>} total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null} totalSub={packs.length ? `en ${annee}` : null}>
+          {packs.length === 0 && ouvert !== 'pack'
             ? vide('Tu as acheté un pack de photos ou une option ? Note-le ici.')
-            : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {dateFr(p.date)}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
+            : listeBox(packs.map((p) => <Ligne key={p.id} gauche={<><b style={{ color: C.text }}>{p.plateforme}</b><small style={{ color: C.muted }}>{p.compte ? `${p.compte} · ` : ''}{dateFr(p.date)}</small></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} />))}
+          <ComptaAjout ouvert={ouvert === 'pack'} onClick={() => basculer('pack')} libelle="Ajouter un pack ou une option" data={{ 'data-pack-ouvrir': '' }} />
+          {ouvert === 'pack' && <div style={formBox}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select value={pPlat} onChange={e => setPPlat(e.target.value)} aria-label="Plateforme" style={{ ...inp, flex: '1 1 130px' }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+              <input type="text" placeholder="Compte (facultatif)" aria-label="Compte" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} aria-label="Date" style={{ ...inp, flex: '1 1 150px' }} />
+              <input type="text" inputMode="decimal" placeholder="€" aria-label="Montant" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 96 }} />
+              <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+            </div>
+          </div>}
         </Section>
 
         {/* Les anciens COÛTS FIXES (sans date de début) : gardés tant qu'il en
             reste, comptés comme avant ; on n'en ajoute plus — un abonnement daté
             les remplace (rien n'est perdu, §4.11). */}
         {fixes.length > 0 && (
-          <Section data="fixes" icon="clock" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
-            {listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+          <Section data="fixes" titre="Coûts fixes (sans date)" note={`Comptés au tarif actuel × ${moisEcoules} mois depuis janvier. Pour un compte exact, recrée-les en abonnement avec leur date de début.`} total={fixesParMois} totalSub="par mois">
+            {listeBox(fixes.map((f) => <Ligne key={f.id} gauche={<b style={{ color: C.text }}>{f.libelle}</b>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} />))}
           </Section>
         )}
 
@@ -24638,14 +24685,15 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
-      <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: C.shadow || 'none' }}>
-        {chip('receipt')}
-        <span style={{ flex: 1 }}>
-          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</span>
-          <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1 }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</span>
-        </span>
-        <span style={{ fontSize: 20, color: C.muted }}>›</span>
-      </button>
+      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+        <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+          <button type="button" className="vrm-set-ligne" onClick={() => onNav && onNav('invoices')}>
+            <IconeReglage name="receipt" />
+            <span className="vrm-set-lib"><b style={{ color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</b><small style={{ color: C.muted }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</small></span>
+            <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted, fontSize: 20 }}>›</span>
+          </button>
+        </div>
+      </section>
 
       {/* FACTURATION ÉLECTRONIQUE — Factur-X par vente + récap e-reporting du mois. */}
       <FacturationElectroniqueCarte data={data} maj={maj} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
@@ -29889,7 +29937,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Venu du tableau de bord : « Bénéfice net — saisis tes prix d'achat » est un
   // bouton, il amène ICI et ouvre la saisie. Le drapeau est consommé une fois.
   useEffect(() => {
-    if (DEMANDE_SAISIE_PRIX.on) { DEMANDE_SAISIE_PRIX.on = false; setFillBuyOpen(true); }
+    // Consommé par l'écran des ANNONCES seulement : en passant par Vinted, une
+    // autre section (Ventes) peut se monter un instant avant Annonces.
+    if (DEMANDE_SAISIE_PRIX.on && curSub === 'annonces') { DEMANDE_SAISIE_PRIX.on = false; setFillBuyOpen(true); }
   }, [curSub]);
   // ── LA LISTE DES ACHATS : CHARGÉE UNE SEULE FOIS, PARTAGÉE ────────────────
   // ⚠️ MESURÉ EN ME METTANT À SA PLACE : le sélecteur « Quel achat correspond à
@@ -29942,20 +29992,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = (impact[k] = impact[k] || { n: 0, ca: 0 });
       e.n += 1; e.ca += p;
     }
+    // (16 oct.) « (sans titre) » s'affichait pour des paires dont la FICHE n'a
+    // pas gardé de titre alors que leur annonce (en ligne) ou leur vente le
+    // porte : le titre se lit dans l'annonce, puis la vente — par IDENTITÉ
+    // (id d'annonce, §5), jamais par ressemblance. Sinon on le dit.
+    const titreAnnonce = {};
+    for (const it of (listings.items || [])) if (it && it.id != null && String(it.title || '').trim()) titreAnnonce[String(it.id)] = String(it.title).trim();
+    for (const o of (sales.items || [])) { const k = identiteAnnonce(o); if (k && !titreAnnonce[String(k)] && String(o.title || '').trim()) titreAnnonce[String(k)] = String(o.title).trim(); }
     const out = [];
     for (const k in numeros) {
       const e = numeros[k]; if (!e) continue;
       if (String(e.buyPrice || '').trim()) continue;          // déjà renseigné
       const num = String(e.numero || '').trim(); if (!num) continue;
       const im = impact[k] || { n: 0, ca: 0 };
-      out.push({ key: k, e, numero: num, enLigne: onlineAnnonceIds.has(String(k)), nVentes: im.n, ca: im.ca });
+      out.push({ key: k, e, numero: num, titre: String(e.title || '').trim() || titreAnnonce[String(k)] || '', enLigne: onlineAnnonceIds.has(String(k)), nVentes: im.n, ca: im.ca });
     }
     // Les paires VENDUES d'abord, au CA décroissant : c'est là que le coût
     // manquant fausse vraiment les chiffres. Les annonces en ligne ensuite.
     out.sort((a, b) => (b.ca - a.ca) || (Number(b.enLigne) - Number(a.enLigne)) || (parseInt(a.numero, 10) - parseInt(b.numero, 10)));
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeros, sales.items, onlineAnnonceIds, txnItem, txnLink]);
+  }, [numeros, sales.items, listings.items, onlineAnnonceIds, txnItem, txnLink]);
   // ── UNE SUGGESTION PAR PAIRE, ET UNE SEULE FOIS ─────────────────────────
   // Le sélecteur d'achat existait déjà, mais il fallait l'ouvrir paire par
   // paire. Ici on propose directement le meilleur candidat — même barème que
@@ -35712,13 +35769,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
           plus la compta tant que leur coût manque. */}
       {fillBuyOpen && (
-        <div onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
+          {/* (16 oct.) Sur téléphone une feuille du bas ; à partir de 768 px une
+              fenêtre CENTRÉE (elle restait collée en bas, étroite, sur ordinateur). */}
+          <div className="vrm-feuille" role="dialog" aria-modal="true" aria-label="Prix d'achat à compléter" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
+                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                     {fillBuyRows.length} paire{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe à la suivante
                     {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
                     {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} paire{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
@@ -35747,11 +35806,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {r.e.photo?<PhotoVinted src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                    {r.e.photo?<PhotoVinted src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
                   <div style={{flex:'1 1 130px',minWidth:0}}>
-                    <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      <span style={{color:C.accent,fontWeight:700}}>N°{r.numero}</span> {r.e.title||'(sans titre)'}
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      <span style={{color:C.text,fontWeight:700}}>N°{r.numero}</span> {r.titre||<span style={{color:C.muted,fontWeight:500}}>titre pas encore capté</span>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                       {/* Montants au format français (virgule) : `eur` ne fait que
@@ -35781,8 +35840,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                ? <PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
                                : <span style={{width:26,height:26,borderRadius:5,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                              <span style={{flex:1,minWidth:0}}>
-                               <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
-                               <span style={{display:'block',fontSize:10.5,color:C.muted}}>
+                               <span style={{display:'block',fontSize:11,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
+                               <span style={{display:'block',fontSize:11,color:C.muted}}>
                                  {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
                                </span>
                              </span>
@@ -38767,7 +38826,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('cat_annonces');} },
+      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
       { id:'tampons', type:'action', ic:'doc', lib:'Position du N° tamponné', val:'Réinitialiser', onClick:async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } } },
     ]},
     { id:'affichage', titre:'Affichage', items:[
@@ -41179,6 +41238,9 @@ function AppCoeur() {
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
   // où vivent « Retirer d'eBay » et le lien vers l'annonce Vinted.
   React.useEffect(()=>{ if(tab==='ebay_annonces'){ subVoulue.current='annonces'; setTab('plat_ebay'); } },[tab]);
+  // « Compléter les prix d'achat » (Réglages, Statistiques) mène à Vinted →
+  // Annonces, la même porte que le rail — plus l'ancien écran `cat_annonces`.
+  React.useEffect(()=>{ if(tab==='vinted_annonces'){ subVoulue.current='annonces'; setTab('plat_vinted'); } },[tab]);
   // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
   // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
   // toujours joignables ; un bouton retour de plus n'apprenait rien.
@@ -41208,7 +41270,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };

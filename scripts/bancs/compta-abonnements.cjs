@@ -143,7 +143,11 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       await pg.setViewportSize(vp); await pg.waitForTimeout(200);
 
       // ── Un abonnement de 10 €/mois commencé le 1er du mois il y a 3 mois.
+      // (16 oct.) Le formulaire est replié derrière « + Ajouter un abonnement » :
+      // on l'ouvre comme lui (un formulaire ouvert d'office n'existe plus).
+      const ouvrirAbo = async () => { if (!(await pg.$('[data-abo-libelle]'))) { const o = await pg.$('[data-abo-ouvrir]'); if (o) await o.click(); await pg.waitForSelector('[data-abo-libelle]', { timeout: 3000 }).catch(() => {}); } };
       try {
+        await ouvrirAbo();
         await pg.fill('[data-abo-libelle]', 'Logiciel test');
         await pg.fill('[data-abo-montant]', '10');
         await pg.selectOption('[data-abo-periode]', 'mois');
@@ -166,6 +170,7 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       dit(a && a.montant === 10 && a.periode === 'mois' && a.debut === debutIso && a.fin === '', 'l’abonnement est rangé dans `vrm_compta` (synchronisé)', JSON.stringify(a));
 
       // ── Une fin avant le début est refusée, et dite.
+      await ouvrirAbo();
       await pg.fill('[data-abo-libelle]', 'Mauvais');
       await pg.fill('[data-abo-montant]', '5');
       await pg.fill('[data-abo-debut]', `${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, '0')}-10`);
