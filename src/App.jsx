@@ -651,7 +651,99 @@ const sessionFrom = (j) => ({
   refresh_token: j.refresh_token,
   expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
   user: j.user ? { id: j.user.id, email: j.user.email } : (AUTH.user || null),
+  // Double vérification (16 octobre) : les facteurs TOTP VÉRIFIÉS de ce compte,
+  // lus dans la réponse de GoTrue (son `user` les porte — `factors`, absent
+  // quand il n'y en a aucun). Sans `user` dans la réponse, on garde ce qu'on
+  // savait. `undefined` = jamais lu (session d'avant cette fonction) : la porte
+  // le relit avant de laisser entrer (`etatMfa`).
+  totp: j.user ? totpVerifies(j.user) : (AUTH.session ? AUTH.session.totp : undefined),
 });
+// ══════════════════════════════════════════════════════════════════════════
+// DOUBLE VÉRIFICATION DE CONNEXION (TOTP) — retenue par Julien le 11 octobre
+// ══════════════════════════════════════════════════════════════════════════
+// FACULTATIVE : rien ne change pour qui ne l'active pas. L'API MFA native de
+// GoTrue (Supabase Auth), appelée à la main comme le reste de l'auth :
+//   POST /factors (totp) → QR + clé · POST /factors/{id}/challenge ·
+//   POST /factors/{id}/verify (rend une session `aal2`) · DELETE /factors/{id}
+//   (exige `aal2`) · GET /user (porte `factors`).
+// Le niveau se lit dans le jeton (`aal`). Un compte qui a un facteur VÉRIFIÉ et
+// une session `aal1` passe par l'écran du code AVANT que le cœur de l'app ne
+// monte : aucune donnée n'est lue, l'extension ne reçoit aucune session, le
+// téléphone ne s'abonne à aucune notification.
+// ⚠️ TROIS ÉTATS, et « pas su » n'enferme personne dehors : GoTrue injoignable
+//    ⇒ on le dit, on propose de réessayer, on ne déconnecte jamais.
+const totpVerifies = (u) => (Array.isArray(u && u.factors) ? u.factors : [])
+  .filter((f) => f && f.factor_type === 'totp' && f.status === 'verified' && f.id)
+  .map((f) => String(f.id));
+const aalDuJeton = (tok) => {
+  try {
+    const p = String(tok || '').split('.')[1];
+    if (!p) return null;
+    const b = p.replace(/-/g, '+').replace(/_/g, '/');
+    const j = JSON.parse(atob(b + '='.repeat((4 - (b.length % 4)) % 4)));
+    return typeof j.aal === 'string' ? j.aal : null;
+  } catch (_) { return null; }
+};
+// 'ok' (entrer) · 'code' (demander le code) · 'verifier' (on ne sait pas encore
+// s'il en faut un : session rangée avant cette fonction, ou lien email).
+const etatMfa = (s) => {
+  if (!s || !s.access_token) return 'ok';
+  if (aalDuJeton(s.access_token) === 'aal2') return 'ok';
+  if (Array.isArray(s.totp)) return s.totp.length ? 'code' : 'ok';
+  return 'verifier';
+};
+const mfaPasse = () => etatMfa(AUTH.session) === 'ok';
+// Un appel à GoTrue avec le jeton de la session. Rend { ok, status, json } ;
+// `status: 0` = injoignable (réseau, délai) — le « pas su ».
+const mfaAppel = async (methode, chemin, corps) => {
+  const tok = AUTH.session && AUTH.session.access_token;
+  if (!tok) return { ok: false, status: 401, json: {} };
+  try {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), 12000) : null;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/${chemin}`, {
+      method: methode,
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, ...(corps ? { 'Content-Type': 'application/json' } : {}) },
+      ...(corps ? { body: JSON.stringify(corps) } : {}),
+      ...(ctl ? { signal: ctl.signal } : {}),
+    });
+    if (t) clearTimeout(t);
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, json: json || {} };
+  } catch (_) { return { ok: false, status: 0, json: {} }; }
+};
+// GoTrue répond par un 5xx (ou pas du tout) : on ne sait pas. Un 4xx, lui, est
+// une réponse (code faux, défi expiré…).
+const mfaInjoignable = (r) => !r || r.status === 0 || r.status >= 500;
+// Les facteurs du compte, relus chez GoTrue. `null` = pas su.
+const mfaLireFacteurs = async () => {
+  const r = await mfaAppel('GET', 'user');
+  if (!r.ok) return null;
+  const tous = Array.isArray(r.json.factors) ? r.json.factors : [];
+  return { verifies: tous.filter((f) => f && f.factor_type === 'totp' && f.status === 'verified'), enAttente: tous.filter((f) => f && f.factor_type === 'totp' && f.status !== 'verified'), user: r.json };
+};
+// Défi + vérification d'un code. Rend { ok } · { ok:false, faux:true } (code
+// refusé) · { ok:false, passu:true } (injoignable). Réussi : la session passe en
+// `aal2` (GoTrue rend de nouveaux jetons) et elle est rangée.
+const mfaVerifierCode = async (factorId, code) => {
+  const c = String(code || '').replace(/\D/g, '');
+  if (c.length !== 6) return { ok: false, faux: true, message: 'Le code fait 6 chiffres.' };
+  const d = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/challenge`, {});
+  if (!d.ok || !d.json.id) return mfaInjoignable(d) ? { ok: false, passu: true } : { ok: false, faux: false, message: d.json.msg || d.json.message || `Erreur ${d.status}` };
+  const v = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/verify`, { challenge_id: d.json.id, code: c });
+  if (!v.ok) {
+    if (mfaInjoignable(v)) return { ok: false, passu: true };
+    return { ok: false, faux: true, message: 'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.' };
+  }
+  if (!v.json.access_token) return { ok: false, passu: true };
+  // Le facteur qu'on vient de vérifier EST vérifié, même si la fiche rendue
+  // par GoTrue l'a lue juste avant (première activation).
+  const s2 = sessionFrom(v.json);
+  s2.totp = Array.from(new Set([...(Array.isArray(s2.totp) ? s2.totp : []), String(factorId)]));
+  writeSession(s2);
+  return { ok: true };
+};
+
 const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.session.expires_at > Date.now() + 60000);
 
 const authSignIn  = async (email, password) => {
@@ -860,7 +952,7 @@ const consumeAuthRedirect = async () => {
     cleanAuthUrl();
     AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
-    writeSession({ ...sess, user: me });
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
     return { ok: true, recovery: type === 'recovery' };
   }
@@ -873,7 +965,9 @@ const fetchMe = async (token) => {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
     if (!res.ok) return null;
     const j = await res.json();
-    return { id: j.id, email: j.email };
+    // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
+    // dans la session par l'appelant — jamais dans `user`.
+    return { id: j.id, email: j.email, _totp: totpVerifies(j) };
   } catch (_) { return null; }
 };
 
@@ -1056,7 +1150,9 @@ if (MULTI_USER && typeof window !== 'undefined') {
     const a = !!(AUTH.session && AUTH.user);
     __sessionAvait = a;
     // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
-    if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
+    // ⚠️ Double vérification : pas avant le code — sinon le mot de passe seul
+    //    donnerait une session à l'extension (`mfaPasse`).
+    if (a && mfaPasse()) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
   });
 }
 
@@ -5219,7 +5315,7 @@ const lireSansSouris = () => {
 // `undefined` pas encore lu · `null` lecture ratée (pas su) · `{absent:true}`
 // aucun signe de vie jamais · objet = le dernier signe de vie.
 let __relais = undefined, __relaisEnVol = null, __relaisMinuteur = null;
-const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user);
+const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user) && mfaPasse();
 async function lireRelais() {
   if (__relaisEnVol) return __relaisEnVol;
   __relaisEnVol = (async () => {
@@ -5584,6 +5680,8 @@ if (typeof window !== 'undefined') {
 }
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
+  // Double vérification pas encore passée : l'extension n'a rien à recevoir.
+  if (!mfaPasse()) return;
   // 5.165 : deux extensions répondent ⇒ on ne donne rien (on ne saurait pas
   // laquelle garder, et l'ancienne exécuterait encore les commandes).
   await sondageConnu();
@@ -9948,6 +10046,99 @@ function LiensLegaux() {
     <nav aria-label="Documents légaux" style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:11.5}}>
       {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.muted,textDecoration:'none'}}>{t}</a>)}
     </nav>
+  );
+}
+
+// ── L'ÉCRAN DU CODE (double vérification) ─────────────────────────────────
+// Monté par `App` À LA PLACE du cœur : rien n'est lu tant qu'il est là.
+// `etatMfa` = 'verifier' : la session ne dit pas encore si un code est demandé
+// (rangée avant cette fonction, ou arrivée par un lien email) — on demande à
+// GoTrue. 'code' : on demande le code. Dans les deux cas, « pas su » (GoTrue
+// injoignable) se DIT, avec « Réessayer » ; on ne déconnecte jamais tout seul.
+function PorteMfa({ session }) {
+  const etat = etatMfa(session);
+  const [passu, setPassu] = React.useState(false);
+  const [code, setCode] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [essai, setEssai] = React.useState(0);
+  // 'verifier' : relire les facteurs, puis ranger la réponse dans la session.
+  React.useEffect(() => {
+    if (etat !== 'verifier') return;
+    let mort = false;
+    setPassu(false);
+    (async () => {
+      const f = await mfaLireFacteurs();
+      if (mort) return;
+      if (!f) { setPassu(true); return; }
+      const cur = AUTH.session;
+      if (!cur || cur.access_token !== session.access_token) return;
+      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)) });
+    })();
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etat, essai, session.access_token]);
+  // « Pas su » : on réessaie aussi tout seul, toutes les 15 s (le bouton reste).
+  React.useEffect(() => {
+    if (etat !== 'verifier' || !passu) return;
+    const t = setTimeout(() => setEssai((n) => n + 1), 15000);
+    return () => clearTimeout(t);
+  }, [etat, passu, essai]);
+  const envoyer = async (e) => {
+    e && e.preventDefault();
+    if (busy) return;
+    setErr(''); setPassu(false);
+    const id = Array.isArray(session.totp) ? session.totp[0] : '';
+    if (!id) { setEssai((n) => n + 1); return; }
+    setBusy(true);
+    const r = await mfaVerifierCode(id, code);
+    setBusy(false);
+    if (r.ok) return;            // la session passe en aal2 : `App` monte le cœur
+    if (r.passu) { setPassu(true); return; }
+    setErr(r.message || 'Code refusé.'); setCode('');
+  };
+  const contact = contactEmail();
+  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'13px 14px', fontSize:22, letterSpacing:6, textAlign:'center',
+    background:C.card, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
+  const lien = { background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer', fontFamily:'inherit', padding:'10px 4px', minHeight:44, textDecoration:'underline' };
+  return (
+    <div data-porte-mfa={etat} data-mfa-passu={passu ? '1' : '0'} style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
+      <div style={{width:'100%',maxWidth:380}}>
+        <div style={{textAlign:'center',marginBottom:22}}><VrmLogo size={64}/></div>
+        <form onSubmit={envoyer} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
+          {etat === 'verifier' ? (<>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:6}}>{passu ? 'Vérification impossible pour l’instant' : 'Vérification de ta connexion…'}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>
+              {passu
+                ? <>Je n'ai pas pu savoir si ton compte demande un code de vérification : le service de connexion ne répond pas. Tu n'es pas déconnecté et rien n'est perdu — réessaie dans un instant.</>
+                : <>Je regarde si ton compte demande un code de vérification.</>}
+            </div>
+            {passu && <button type="button" data-mfa-reessayer="" onClick={() => setEssai((n) => n + 1)} style={{marginTop:14,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>}
+          </>) : (<>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>Code de ton app d'authentification</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
+              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.
+            </div>
+            <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
+              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
+            {err && <div data-mfa-erreur="" style={{fontSize:12.5,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
+            {passu && <div data-mfa-injoignable="" style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginTop:10,lineHeight:1.45}}>Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Tu n'es pas déconnecté — réessaie dans un instant.</div>}
+            <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6}
+              style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
+              {busy ? 'Vérification…' : passu ? 'Réessayer' : 'Valider'}
+            </button>
+            <div data-mfa-perdu="" style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
+              <b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
+                ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
+                : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.
+            </div>
+          </>)}
+        </form>
+        <div style={{textAlign:'center',marginTop:8}}>
+          <button type="button" data-mfa-deconnexion="" onClick={() => { authSignOut(); location.reload(); }} style={lien}>Se déconnecter</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -38885,6 +39076,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
+      // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
@@ -39140,6 +39333,150 @@ async function fermerMonCompte(confirmation) {
     return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
   } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
 }
+// ── DOUBLE VÉRIFICATION — le panneau de Réglages → Mon compte → Connexion ──
+// Trois états pour la lecture des facteurs : `undefined` en cours · `null` pas
+// su (GoTrue injoignable : on le dit, « Réessayer ») · l'objet lu.
+// « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
+// Désactiver demande une confirmation ET un code (la session repasse en aal2,
+// ce que GoTrue exige pour supprimer un facteur vérifié).
+const qrEnSrc = (q) => {
+  const t = String(q || '').trim();
+  if (/^data:image\/svg\+xml/i.test(t)) return t;
+  if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
+  return '';
+};
+function DoubleVerification() {
+  const [f, setF] = React.useState(undefined);
+  const [essai, setEssai] = React.useState(0);
+  // { etape: 'qr', id, qr, secret } · { etape: 'off' } (confirmation de désactivation)
+  const [cours, setCours] = React.useState(null);
+  const [code, setCode] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);   // { t, ton: 'ok'|'err'|'passu' }
+  React.useEffect(() => {
+    let mort = false; setF(undefined);
+    mfaLireFacteurs().then((x) => { if (!mort) setF(x); });
+    return () => { mort = true; };
+  }, [essai]);
+  const actif = f && f.verifies.length ? f.verifies[0] : null;
+  const relire = () => setEssai((n) => n + 1);
+  const btn = (primaire, off) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
+    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.55 : 1, fontFamily:'inherit' });
+  const champ = { width:150, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:18, letterSpacing:4, textAlign:'center', background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
+  const txt = { fontSize:12.5, color:C.muted, lineHeight:1.55 };
+  const PASSU = "Le service de connexion ne répond pas — rien n'a changé. Réessaie dans un instant.";
+
+  const activer = async () => {
+    if (busy) return;
+    setBusy(true); setMsg(null);
+    // Un essai d'activation laissé en plan (facteur non vérifié) bloquerait le
+    // suivant : on le retire d'abord (un facteur non vérifié ne protège rien).
+    for (const x of (f && f.enAttente) || []) { await mfaAppel('DELETE', `factors/${encodeURIComponent(x.id)}`); }
+    const r = await mfaAppel('POST', 'factors', { factor_type: 'totp', friendly_name: 'VRM ' + new Date().toISOString().slice(0, 16), issuer: 'VRM' });
+    setBusy(false);
+    const t = r.json && r.json.totp;
+    if (!r.ok || !r.json.id || !t) {
+      if (mfaInjoignable(r)) setMsg({ t: PASSU, ton: 'passu' });
+      else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
+      return;
+    }
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrEnSrc(t.qr_code), secret: String(t.secret || '') });
+  };
+  const annulerActivation = async () => {
+    const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
+    if (id) await mfaAppel('DELETE', `factors/${encodeURIComponent(id)}`);
+    relire();
+  };
+  const confirmerActivation = async () => {
+    if (busy || !cours) return;
+    setBusy(true); setMsg(null);
+    const r = await mfaVerifierCode(cours.id, code);
+    setBusy(false);
+    if (r.passu) { setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Rien n'est activé pour l'instant — réessaie.", ton: 'passu' }); return; }
+    if (!r.ok) { setMsg({ t: (r.message || 'Code refusé.') + ' Rien n’est activé.', ton: 'err' }); setCode(''); return; }
+    setCours(null); setCode('');
+    setMsg({ t: 'Double vérification activée. À ta prochaine connexion, VRM te demandera le code de ton app après ton mot de passe.', ton: 'ok' });
+    relire();
+  };
+  const desactiver = async () => {
+    if (busy || !actif) return;
+    setBusy(true); setMsg(null);
+    const v = await mfaVerifierCode(String(actif.id), code);
+    if (!v.ok) {
+      setBusy(false);
+      if (v.passu) setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. La double vérification reste activée — réessaie.", ton: 'passu' });
+      else { setMsg({ t: (v.message || 'Code refusé.') + ' La double vérification reste activée.', ton: 'err' }); setCode(''); }
+      return;
+    }
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(actif.id)}`);
+    setBusy(false); setCode('');
+    if (d.ok) {
+      const cur = AUTH.session;
+      if (cur) writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== String(actif.id)) });
+      setCours(null);
+      setMsg({ t: 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.', ton: 'ok' });
+    } else if (mfaInjoignable(d)) {
+      setMsg({ t: "Je ne sais pas si elle a été désactivée : le service de connexion n'a pas répondu. Je relis son état.", ton: 'passu' });
+    } else {
+      setMsg({ t: `Le service de connexion a refusé la désactivation (erreur ${d.status}). Elle reste activée.`, ton: 'err' });
+    }
+    relire();
+  };
+
+  const bandeau = msg && (
+    <div data-mfa-message={msg.ton} style={{fontSize:12.5,lineHeight:1.5,marginTop:10,borderRadius:8,padding:'9px 11px',
+      color: msg.ton === 'err' ? C.danger : C.text,
+      background: msg.ton === 'passu' ? `${C.warn}12` : msg.ton === 'err' ? `${C.danger}0f` : `${C.text}0a`,
+      border: `1px solid ${msg.ton === 'passu' ? C.warn + '44' : msg.ton === 'err' ? C.danger + '33' : C.border}`}}>{msg.t}</div>
+  );
+  const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
+  return (
+    <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
+      {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
+      {f === null && (<>
+        <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
+        <button type="button" data-mfa-relire="" onClick={relire} style={{...btn(false),marginTop:10}}>Réessayer</button>
+      </>)}
+      {f && !actif && !cours && (<>
+        <div style={txt}>
+          <b style={{color:C.text}}>Désactivée.</b> Facultatif : une fois activée, VRM te demande, après ton mot de passe, un code à 6 chiffres affiché par une app d'authentification sur ton téléphone (Google Authenticator, Microsoft Authenticator, Authy, ou les mots de passe de l'iPhone). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.
+        </div>
+        <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+      </>)}
+      {cours && cours.etape === 'qr' && (<>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Dans ton app d'authentification, ajoute un compte en scannant ce code :</div>
+        {cours.qr
+          ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
+          : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
+        <div style={txt}>Tu es sur ce téléphone et ne peux pas scanner ? Choisis « saisir une clé » dans l'app et recopie :</div>
+        <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+          <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
+          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} style={btn(true, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Confirmer'}</button>
+          <button type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
+        </div>
+      </>)}
+      {actif && !cours && (<>
+        <div style={txt}>
+          <b style={{color:C.text}}>Activée{actif.created_at ? ` depuis le ${new Date(actif.created_at).toLocaleDateString('fr-FR')}` : ''}.</b> À chaque connexion, VRM demande le code de ton app d'authentification après ton mot de passe.
+          {' '}Si tu perds ton téléphone, elle ne se retire pas depuis l'app : désactive-la ici AVANT de changer de téléphone.
+        </div>
+        <button type="button" data-mfa-desactiver="" onClick={() => { setCours({ etape: 'off' }); setCode(''); setMsg(null); }} style={{...btn(false),marginTop:10}}>Désactiver…</button>
+      </>)}
+      {actif && cours && cours.etape === 'off' && (<>
+        <div style={txt}>Pour désactiver la double vérification, tape le code actuel de ton app. Ton mot de passe suffira ensuite pour te connecter.</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+          <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
+          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={desactiver} style={btn(false, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Désactiver'}</button>
+          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} style={btn(false, busy)}>Garder</button>
+        </div>
+      </>)}
+      {bandeau}
+    </div>
+  );
+}
+
 function FermerCompte() {
   const [ouvert, setOuvert] = React.useState(false);
   // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
@@ -41121,6 +41458,10 @@ export default function App() {
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  // Double vérification (16 octobre) : un compte qui l'a activée et une session
+  // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
+  // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
+  if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   return (MULTI_USER && authState.user) ? <PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement> : coeur;
 }
@@ -42714,6 +43055,10 @@ function AppCoeur() {
   // devient vrai et la porte se referme toute seule, sans changement de code.
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  // Double vérification (16 octobre) : un compte qui l'a activée et une session
+  // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
+  // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
+  if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
 
   return (
     <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-faint':C.faint,'--vrm-hair':C.hair,'--vrm-bar':C.bar,'--vrm-accent':C.accent,'--vrm-card2':C.card2,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}

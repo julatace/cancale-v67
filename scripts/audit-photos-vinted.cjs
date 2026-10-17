@@ -142,6 +142,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
+      'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
       'AbonnementRequis :: "/logo-vrm-96.png"': 'logo de l’app',
       'ProFactureSetting :: cfg.logo': 'logo de facture choisi sur l’appareil (data:)',
       'AppCoeur :: logoSrc': 'logo de l’app ou logo choisi (data:)',
