@@ -216,7 +216,6 @@ async function ouvrir(b, vp, panne, opts = {}) {
   // sans elle, « l'extension écrit dans un autre compte » ne peut pas se juger).
   if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
   else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (opts.session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
   if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: opts.pont.etatCode !== undefined ? opts.pont.etatCode : codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   await pg.addInitScript(() => {
@@ -224,6 +223,18 @@ async function ouvrir(b, vp, panne, opts = {}) {
     setInterval(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); const v = e && e.getAttribute('data-ebay-retrait-auto'); if (v && window.__etatsAuto[window.__etatsAuto.length - 1] !== v) window.__etatsAuto.push(v); }, 25);
   });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // Le faux GoTrue, enregistré APRÈS le fourre-tout des hôtes externes (qui
+  // laisse passer vers le vrai réseau) : Playwright prend la DERNIÈRE route en
+  // premier (§6.6). Posé avant, il n'était jamais atteint — invisible tant que
+  // rien ne lisait GoTrue au démarrage, rouge depuis la double vérification
+  // (`PorteMfa` relit `GET /user` pour une session qui ne dit pas `totp`).
+  // `GET /user` rend la VRAIE forme : la fiche utilisateur (`factors` absent
+  // quand il n'y en a aucun), pas une session (§6.3).
+  if (opts.session) await pg.route('**/auth/v1/**', (r) => {
+    const chemin = new URL(r.request().url()).pathname.replace(/^.*\/auth\/v1\//, '');
+    const corps = chemin === 'user' ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated' } : { ...SESSION, expires_in: 3600 };
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) });
+  });
   await pg.route('**/rest/v1/**', async (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (opts.mainLent && /id=eq\.main(&|$)/.test(u) && route.request().method() === 'GET') await new Promise((r) => setTimeout(r, opts.mainLent));
