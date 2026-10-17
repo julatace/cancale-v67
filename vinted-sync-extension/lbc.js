@@ -922,6 +922,34 @@
     }
     return false;
   }
+  // ── LA COULEUR (17 octobre). Leboncoin écrit ses couleurs en groupes
+  //    (« Bleu / Ciel », « Gris / Anthracite », mesuré sur son dépôt). La couleur
+  //    de la paire est celle que Vinted AFFICHE (`ad.couleur`, « Bleu ») : on ne
+  //    clique que l'option dont le libellé, découpé sur « / », contient
+  //    EXACTEMENT ce mot (« Bleu » ∈ « Bleu / Ciel »), jamais une ressemblance
+  //    (« Bleu marine » ne prend pas « Bleu / Ciel »). Deux couleurs Vinted ⇒
+  //    seule la première est cherchée. Rien d'exact ⇒ laissé vide (§5).
+  function optionCouleurExacte(lib, cible) {
+    const n = normMarque(lib); if (!n || !cible) return false;
+    return n === cible || n.split('/').map((x) => x.trim()).includes(cible);
+  }
+  async function choisirCouleur(valeur) {
+    const cible = normMarque(String(valeur || '').split('/')[0]);
+    if (!cible) return false;
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]')).filter((el) => !DANS_ENTETE(el));
+    for (const box of boxes) {
+      if (!/couleur|colou?r/.test(labelCombobox(box))) continue;
+      const val = String(box.value || box.getAttribute('data-choisi') || '').trim();
+      if (val) return false;
+      try { box.focus(); box.click(); } catch (_) {}
+      await new Promise((r) => setTimeout(r, 160));
+      const opts = Array.from(document.querySelectorAll('[role="option"]')).filter((o) => optionCouleurExacte(o.textContent, cible));
+      if (opts.length === 1) { try { opts[0].click(); } catch (_) {} return true; }
+      try { box.blur(); } catch (_) {}              // aucune, ou deux options qui la portent : on ne choisit pas
+      return false;
+    }
+    return false;
+  }
   // On ne remplit ces menus qu'UNE fois par paire (l'observateur du formulaire
   // rappelle fillNow à chaque mutation — sans ça on ré-ouvrirait le menu en
   // boucle). Réinitialisé par « Re-remplir » (fillNowForce).
@@ -945,9 +973,12 @@
       // pendant 90 s sous ses doigts (une marque absente de la liste reste absente).
       if (marque && !_composFaits.has(cle('m')) && (_essaisMarque[cle('m')] = (_essaisMarque[cle('m')] || 0) + 1) <= 2
           && await choisirComposantRecherche(/marque|brand/, marque)) { _composFaits.add(cle('m')); k++; }
+      // COULEUR : celle que Vinted affiche, sur une option exacte seulement.
+      const couleur = String(ad.couleur || '').trim();
+      if (couleur && !_composFaits.has(cle('c')) && await choisirCouleur(couleur)) { _composFaits.add(cle('c')); k++; }
     } catch (_) {}
     _composEnCours = false;
-    if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état / marque)');
+    if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état / marque / couleur)');
     return k;
   }
   // ── LA LIVRAISON — Julien, 23 sept. : « active la livraison quand tu

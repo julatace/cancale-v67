@@ -101,6 +101,10 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<scr'+'ipt>(function(){var CAT=["A Bathing Ape (BAPE)","Abercrombie & Fitch","Adidas","Airstep","New Balance","Nike","Nike ACG","Salomon"];var cb=document.getElementById("cbm"),mn=document.getElementById("cbm-menu");window.__marqueTape=[];'
       + 'function rendre(q){mn.innerHTML="";var l=q?CAT.filter(function(c){return c.toLowerCase().indexOf(q.toLowerCase())>=0;}):CAT.slice(0,4);l.forEach(function(c){var li=document.createElement("li");li.setAttribute("role","option");li.textContent=c;li.addEventListener("click",function(){cb.value=c;cb.setAttribute("data-choisi",c);mn.hidden=true;});mn.appendChild(li);});}'
       + 'cb.addEventListener("click",function(){mn.hidden=false;rendre(cb.value);});cb.addEventListener("input",function(){window.__marqueTape.push(cb.value);mn.hidden=false;setTimeout(function(){rendre(cb.value);},120);});})();</scr'+'ipt>'
+      // ⚠️ LA COULEUR (17 oct.) : les libellés de Leboncoin sont GROUPÉS
+      //    (« Bleu / Ciel », « Gris / Anthracite », mesuré sur son dépôt).
+      + '<div><label for="cbc">Couleur</label><input id="cbc" role="combobox" aria-label="Couleur" readonly>'
+      + '<ul id="cbc-menu" role="listbox" hidden><li role="option">Blanc</li><li role="option">Bleu / Ciel</li><li role="option">Bleu marine</li><li role="option">Gris / Anthracite</li><li role="option">Noir</li></ul></div>'
       // ⚠️ LA CATÉGORIE = des boutons RADIO (mesuré au rendu, 20 sept.), + un
       //    bouton « Continuer » et un « Publier ». L'extension doit cocher le
       //    bon radio (Chaussures), cliquer Continuer, et JAMAIS Publier (§3/§5).
@@ -145,7 +149,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
 
 // La file servie au panneau : les trois cas de photo, et les trois preuves.
 const QUEUE = [
-  { id: '1001', numero: '401', account: 'julatace3535', marque: 'Salomon', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', ville: 'Cancale', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
+  { id: '1001', numero: '401', account: 'julatace3535', marque: 'Salomon', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', ville: 'Cancale', category: 'Chaussures', taille: '40', etat: 'Très bon état', couleur: 'Gris', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
   { id: '1002', numero: '402', account: 'julatace3535', title: 'Nike air max 1 clear jade T44', description: 'Réf. VRM-402\n\nBon état.', price: '44.00', category: 'Chaussures', photos: ['https://ex/b1.jpg'], ref: 'VRM-402', vintedUrl: 'https://www.vinted.fr/items/1002' },
   { id: '1003', numero: '403', account: 'llloollllaa', title: 'Autry medalist blanc T36', description: 'Réf. VRM-403', price: '24.00', category: 'Chaussures', photos: [], ref: 'VRM-403', vintedUrl: 'https://www.vinted.fr/items/1003' },
 ];
@@ -486,6 +490,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       etat: (document.getElementById('cbe') || {}).getAttribute ? (document.getElementById('cbe').getAttribute('data-choisi') || '') : '',
       marque: (document.getElementById('cbm') || {}).getAttribute ? (document.getElementById('cbm').getAttribute('data-choisi') || '') : '',
       marqueTexte: (document.getElementById('cbm') || {}).value || '',
+      couleur: (document.getElementById('cbc') || {}).getAttribute ? (document.getElementById('cbc').getAttribute('data-choisi') || '') : '',
       marqueTape: (window.__marqueTape || []).length,
       categorie: lab,
       continuer: window.__cont || 0,
@@ -563,6 +568,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(ok.etat === 'Très bon état', 'l’ÉTAT est choisi par correspondance EXACTE', 'état = « ' + ok.etat + ' »');
     // ── LA MARQUE (17 oct.) : tapée, puis choisie dans la liste FILTRÉE ──────
     dit(ok.marque === 'Salomon', 'la MARQUE de la paire est tapée puis choisie dans la liste filtrée (« Salomon »)', 'marque = « ' + ok.marque + ' »');
+    // ── LA COULEUR (17 oct.) : celle que Vinted affiche, sur une option EXACTE ─
+    dit(ok.couleur === 'Gris / Anthracite', 'la COULEUR Vinted (« Gris ») choisit l’option qui la porte exactement (« Gris / Anthracite »)', 'couleur = « ' + ok.couleur + ' »');
     dit(/chaussures/i.test(ok.categorie), 'la CATÉGORIE (bouton radio « Mode > Chaussures ») est cochée', 'coché : « ' + ok.categorie + ' »');
     dit(ok.continuer >= 1, 'le bouton « Continuer » est cliqué pour enchaîner l’étape', ok.continuer + ' clic(s)');
     dit(ok.publier === 0, '⚠️ « Publier » n’est JAMAIS cliqué tout seul (§3/§5)', ok.publier + ' clic(s) sur Publier');
@@ -570,12 +577,13 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(ok.livraison === 'true', 'l’interrupteur d’ENVOI éteint est rallumé (livraison activée)', 'aria-checked = « ' + ok.livraison + ' »');
     dit(ok.news === false, 'et RIEN d’autre n’est coché — le leurre « offres par email » reste éteint', 'offres par email cochées : ' + ok.news);
     // Négatif : une valeur qui ne colle à AUCUNE option reste VIDE (§5).
-    const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant', marque: 'Nike SB' });
+    const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant', marque: 'Nike SB', couleur: 'Bleu clair' });
     dit(ko.marque === '' && ko.marqueTexte === '', '« Nike SB » absente de la liste : AUCUNE marque choisie (pas « Nike » à peu près) et le texte tapé est effacé',
       'choisie « ' + ko.marque + ' » · champ « ' + ko.marqueTexte + ' »');
     dit(ko.marqueTape <= 4, 'une marque introuvable n’est pas retapée en boucle (deux essais au plus)', ko.marqueTape + ' frappe(s)');
     dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');
     dit(ko.etat === '', '« Satisfaisant » (≠ « État satisfaisant ») laisse l’état VIDE — mieux vaut un blanc qu’un faux', 'état = « ' + ko.etat + ' »');
+    dit(ko.couleur === '', '« Bleu » est porté par une option groupée, mais « Bleu clair » n’est EXACTEMENT nulle part : couleur VIDE', 'couleur = « ' + ko.couleur + ' »');
   }
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -58,7 +58,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.185.0';
+const EXT_ATTENDUE = '5.186.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -14915,13 +14915,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {}, marque = {}, taille = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -14942,9 +14942,17 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       // (17 oct.) L'ÉTAT écrit par Vinted sur l'annonce (« Très bon état ») —
       // un fait capté, il sert à pré-remplir l'état eBay (jamais deviné).
       if (typeof it.status === 'string' && it.status.trim()) etat[id] = it.status.trim();
+      // (17 oct., remesuré) LA MARQUE ET LA TAILLE SONT DANS LE DRESSING : `brand`
+      // (372 annonces sur 373) et `size`, en texte, tels que Vinted les affiche.
+      // La mesure « 0 sur 271 » cherchait `brand_title`, que ce point d'API
+      // n'envoie pas. Le dressing d'abord, le coffre en repli (useEbayPaires).
+      const mq = it.brand_title || it.brand;
+      if (typeof mq === 'string' && mq.trim()) marque[id] = mq.trim();
+      const tl = it.size_title || it.size;
+      if (typeof tl === 'string' && tl.trim()) taille[id] = tl.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat, marque, taille };
 };
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
@@ -14967,7 +14975,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -14979,9 +14987,9 @@ function useEbayPaires(comptes) {
       // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
       // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
       // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
-      // description. Le dressing, lui, ne porte pas la marque (mesuré : 0 sur
-      // 271 annonces) — c'est pour ça que « la marque ne s'est pas remplie
-      // toute seule ». Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
+      // description. ⚠️ Remesuré le 17 oct. : le dressing PORTE la marque
+      // (`brand`, 372/373) — elle est lue là d'abord, le coffre n'est qu'un
+      // repli (annonce absente du dressing). Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
       // on fait sans (rien n'est inventé à la place).
       let coffre = {};
       try {
@@ -15003,9 +15011,9 @@ function useEbayPaires(comptes) {
         const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
         const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
         const titreP = String(f.title || titreMap[String(id)] || '').trim();
-        const marque = String(cf.brand || '').trim();
+        const marque = String(marqueMap[String(id)] || cf.brand || '').trim();
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
-        const tailleV = String(cf.size || '').trim();
+        const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
         out.push({ id: String(id), num: n, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));

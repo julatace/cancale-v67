@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.185.0';
+const CODE_VERSION = '5.186.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2013,6 +2013,41 @@ async function storeSeenUrls(domain, paths, reponses) {
 //    CHEMIN et leur méthode (diagnostic), jamais leur contenu. Et une requête
 //    vers un autre site (publicité, mesure d'audience) n'est pas rangée du tout.
 const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses/i;
+// (17 oct.) LA FORME D'UNE DEMANDE DE RETRAIT D'ARGENT. Julien veut « un endroit
+// où on peut retirer l'argent du porte-monnaie ». Sa page a déjà appelé
+// `POST /api/v2/users/{id}/payouts`, mais VRM n'en connaît que le chemin : son
+// contenu est retiré (WREQ_SENSIBLE, c'est de l'argent et un compte bancaire).
+// On garde ici la FORME seulement — noms des clés et TYPE de chaque valeur
+// (« amount:number », « bank_account_id:number »), jamais une valeur, jamais une
+// longueur — pour pouvoir un jour proposer le virement sans rien deviner.
+// VRM n'appelle JAMAIS cette adresse : c'est une lecture de ce que la page a fait.
+const WREQ_FORME = /payout/i;
+function formeCorps(body) {
+  const out = [];
+  const t = String(body == null ? '' : body).trim();
+  if (!t) return out;
+  if (/^\[FormData\]/.test(t)) {
+    for (const part of t.replace(/^\[FormData\]\s*/, '').split(' & ')) { const k = part.split('=')[0].trim(); if (k) out.push(k.slice(0, 60) + ':form'); }
+    return out.slice(0, 60);
+  }
+  let j = null;
+  try { j = JSON.parse(t); } catch (_) { j = null; }
+  if (j === null && /^[\w.%\[\]-]+=/.test(t)) {
+    for (const part of t.split('&')) { const k = decodeURIComponent(part.split('=')[0] || '').trim(); if (k) out.push(k.slice(0, 60) + ':form'); }
+    return out.slice(0, 60);
+  }
+  const typ = (v) => v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
+  const walk = (v, pre, prof) => {
+    if (out.length >= 60) return;
+    if (v && typeof v === 'object' && !Array.isArray(v) && prof < 5) {
+      for (const k of Object.keys(v)) walk(v[k], pre ? pre + '.' + k : k, prof + 1);
+    } else if (Array.isArray(v) && v.length && prof < 5) {
+      walk(v[0], pre + '[]', prof + 1);
+    } else out.push(String(pre || '(racine)').slice(0, 80) + ':' + typ(v));
+  };
+  if (j !== null && typeof j === 'object') walk(j, '', 0); else if (j !== null) out.push('(racine):' + typ(j));
+  return out;
+}
 async function storeWriteReq(domain, method, url, body) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
@@ -2021,11 +2056,13 @@ async function storeWriteReq(domain, method, url, body) {
   try { const U = new URL(url, `https://${domain}`); path = U.pathname; hote = U.hostname; } catch (_) {}
   // Une URL relative part forcément vers Vinted ; une absolue, on vérifie l'hôte.
   if (/^https?:/i.test(String(url)) && !/(^|\.)vinted\.[a-z.]+$/i.test(hote)) return;
+  const forme = WREQ_FORME.test(path) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
   const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
+  if (forme) data.forme = forme;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
 }
 
@@ -3158,7 +3195,7 @@ async function vintedGetHtml(acc, endpoint) {
 // l'identité prime, jamais un autre article). Repli : balayage des grandes
 // images vinted.net du HTML.
 function extraireDetailPage(html, id) {
-  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [] };
+  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '' };
   if (!html) return out;
   try {
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -3193,6 +3230,12 @@ function extraireDetailPage(html, id) {
         else if (found.price != null) c.price = String(found.price);
         if (Array.isArray(found.color_ids)) c.color_ids = found.color_ids.filter(x => typeof x === 'number');
         if (Array.isArray(found.item_attributes)) c.item_attributes = found.item_attributes.map(a => a && ({ code: String(a.code || ''), ids: Array.isArray(a.ids) ? a.ids.filter(x => typeof x === 'number') : [] })).filter(a => a && a.code);
+        // (17 oct.) LA COULEUR telle que Vinted l'AFFICHE (« Blanc », « Noir ») —
+        // un libellé texte de l'annonce, jamais déduit d'une photo ni d'un titre.
+        // Leboncoin la demande dans sa liste Couleur ; lbc.js ne la pose que sur
+        // une option EXACTE. Absente ou d'une autre forme ⇒ '' (rien d'inventé).
+        const libCouleur = (v) => typeof v === 'string' ? v.trim() : (v && typeof v === 'object' && typeof v.title === 'string' ? v.title.trim() : '');
+        out.couleur = [libCouleur(found.color1), libCouleur(found.color2)].filter(Boolean).join(' / ').slice(0, 60);
         out.codes = Object.keys(c).length ? c : null;
         out.cles = Object.keys(found).slice(0, 80);
         for (const p of found.photos) if (p && typeof p.id === 'number') out.photoIds.push(p.id);
@@ -3287,7 +3330,8 @@ async function capterPhotosAnnonces(uid) {
       // ou si les photos vivent dans un champ qu'on ne lit pas encore.
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
-        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []) };
+        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
+        couleur: det.couleur || prev.couleur || '' };
       dirty = true;
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
@@ -3317,7 +3361,7 @@ async function completerPhotos(uid, id) {
     if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
     const det = extraireDetailPage(rep.text, id);
     if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
-    await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    await saveItemDetail(id, { description: det.description || '', photos: det.photos, couleur: det.couleur || '' });
     noterDiag('photos_page_ecrit');
     return true;
   } catch (_) { return false; }
@@ -4888,6 +4932,8 @@ async function saveItemDetail(id, detail) {
     description: desc || prev.description || '',
     photos: photos.length ? photos : (prev.photos || []),
     readAt: new Date().toISOString(),
+    // La couleur affichée par Vinted : jamais écrasée par du vide.
+    couleur: String(detail.couleur || '').trim().slice(0, 60) || prev.couleur || '',
   };
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
@@ -7595,7 +7641,7 @@ function buildLbcAd(raw, det, num, account) {
   const base = String(firstDefined(det.title, raw.title)).trim();
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
   const cond = String(firstDefined(det.status, raw.status)).trim();
-  const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
+  const color = String(firstDefined(det.couleur, [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' / '))).trim();
   // (16 oct., « il a mis un prix au pif, je veux le même que sur Vinted ») :
   // le prix de l'annonce EN LIGNE (le dressing, relu à chaque visite) d'abord ;
   // le détail capté à l'ouverture de la page peut dater d'avant une baisse.
@@ -7614,7 +7660,7 @@ function buildLbcAd(raw, det, num, account) {
   const ref = 'VRM-' + num;
   const description = descriptionLbcDe({ ref, texte: desc0, base, marque: brand, taille: size, etat: cond, couleur: color });
   // marque/taille : le formulaire Leboncoin a des listes déroulantes pour ça.
-  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', couleur: color || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
