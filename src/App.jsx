@@ -12896,7 +12896,9 @@ function RetirerArgent({ liveStats }) {
   return (
     <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
-        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{total > 0 ? `${fmt(total)} disponible${liste.filter((x) => x.dispo > 0).length > 1 ? ` sur ${liste.filter((x) => x.dispo > 0).length} comptes` : ''}` : 'Rien de disponible pour l\'instant'}</span></span>
+        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
+            ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
+            OÙ il est. */}{total > 0 ? (() => { const n = liste.filter((x) => x.dispo > 0).length; return n > 1 ? `Disponible sur ${n} comptes — détail par compte` : `Disponible sur ${liste.find((x) => x.dispo > 0)?.login || 'un compte'} — ouvre ton porte-monnaie`; })() : 'Rien de disponible pour l\'instant'}</span></span>
         <span aria-hidden="true" style={{ color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
       </button>
       {ouvert && (
@@ -13319,7 +13321,21 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
 // ventes — côté achat « finalisé » = colis reçu. Photo + titre + statut + prix.
 function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const achats = (lbcVentes.achats || []);
-  if (achats.length === 0) return null;
+  // (17 oct., revue) La section « Achats » est toujours dans la navigation :
+  // rendre `null` laissait un écran BLANC sous le titre (vu au rendu). Une
+  // liste vide a une cause, et une cause se dit — jamais lu (« — ») n'est pas
+  // « aucun achat » (lu, vide).
+  if (achats.length === 0) {
+    const lu = !!lbcVentes.maj;
+    return (
+      <div data-lbc-achats-vide={lu ? 'lu' : 'jamais'} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Achats Leboncoin</div>
+        {lu
+          ? <>Aucun achat Leboncoin dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
+          : <>Tes achats Leboncoin arrivent quand l’extension passe sur leboncoin.fr (« Mes transactions »). Seules les transactions où tu es l’acheteur sont rangées ici.</>}
+      </div>
+    );
+  }
   const actives = achats.filter(o => !lbcAnnulee(o));
   const recus = actives.filter(lbcFinalisee);
   const enRoute = actives.filter(o => !lbcFinalisee(o));
@@ -15407,7 +15423,10 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   // ces cases »). Lu et vide ⇒ 0 ; un compte illisible ⇒ « — » (pas su).
   const plusieursEbay = Array.isArray(comptesEbay) && comptesEbay.length >= 2;
   const kpi = (() => {
-    const passu = illisibles.length > 0;
+    // (17 oct., revue) Aucune ligne de commandes rangée (jamais synchronisé,
+    // aucun compte relié) : rien n'a été LU — « — », pas un 0 inventé (§5).
+    const jamais = !!(lu && Array.isArray(lu.lignes) && lu.lignes.length && lu.lignes.every((x) => x.ligne === null) && !orders.length);
+    const passu = illisibles.length > 0 || jamais;
     const enCours = orders.filter((o) => { const e = etatCommandeEbay(o); return e.peutExpedier || e.kind === 'review' || e.kind === 'payment'; });
     const exp = orders.filter((o) => etatCommandeEbay(o).expedie);
     const ca = caEbayPayees(orders);
@@ -15417,7 +15436,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
       { cle: 'encours', lib: 'En cours', val: passu ? null : enCours.length },
       { cle: 'finalisees', lib: 'Expédiées', val: passu ? null : exp.length },
       { cle: 'ca', lib: 'CA payé', val: caVal, brut: caVal == null ? null : (aPayee ? ca : 0), sub: plusieursEbay ? (vue === '*' ? `${comptesEbay.length} comptes` : nomCompteEbay(comptesEbay.find((c) => c.ref === vue) || {})) : null },
-    ]} note={passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici." : null}/>;
+    ]} note={jamais ? "Aucune vente eBay lue pour l'instant : relie ton compte dans « Compte » et synchronise — tes commandes, leur expédition et leur suivi arriveront ici." : passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici." : null}/>;
   })();
   if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
@@ -16028,7 +16047,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
   };
   const etatListe = brouillons === undefined ? 'charge' : brouillons === null ? 'pas-su' : 'lu';
   const btn = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
-  if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" style={{ fontSize: 12, color: E.muted, margin: '12px 2px 0', lineHeight: 1.5 }}>Aucun brouillon eBay. Prépare une annonce ci-dessus et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</div>;
+  if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" style={{ fontSize: 12, color: E.muted, margin: '12px 2px 0', lineHeight: 1.5 }}>Aucun brouillon eBay.{connected === true ? <> Prépare une annonce ci-dessus et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</> : null}</div>;
   return (
     <div data-ebay-brouillons={etatListe} data-nb={liste.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -23459,7 +23478,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                   </div>
                 </div>
                 <details data-gerer-compte="" style={{flex:'1 1 100%'}}>
-                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0',listStyle:'revert'}}>Gérer ce compte</summary>
+                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0'}}>Gérer ce compte</summary>
                   <div style={{paddingTop:8}}>
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
@@ -25484,7 +25503,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ, et l'app dit
             comment elle date chaque vente — replié, pas retiré. */}
         <details className="vrm-stats-calcul" style={{marginTop:10}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0',listStyle:'revert'}}>Comment c'est calculé</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:500,color:C.muted,padding:'6px 0'}}>Comment c'est calculé</summary>
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
@@ -26015,7 +26034,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               {couvertureCa && (caPartiel || couvertureCa.aDater) && (
                 <div data-compta-couverture={couvertureCa.pasSu.join(',')} data-compta-adater={couvertureCa.aDater ? String(couvertureCa.aDater.n) : '0'} style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
                   {caPartiel && <div>Sans {couvertureCa.pasSu.join(' ni ')} : {couvertureCa.pasSu.length > 1 ? 'leurs' : 'ses'} ventes n'ont pas pu être lues — ce CA est un minimum.</div>}
-                  {couvertureCa.aDater && <div>{couvertureCa.aDater.n} vente{couvertureCa.aDater.n > 1 ? 's' : ''} finalisée{couvertureCa.aDater.n > 1 ? 's' : ''} sans date de versement ({fmt(couvertureCa.aDater.ca)}) : dans aucun mois pour l'instant.</div>}
+                  {/* (17 oct., revue) La carte URSSAF, juste en dessous sur le même écran,
+                      écrit déjà « N ventes sans date de versement (X €) » avec le
+                      geste : ici on y renvoie, sans redire les mêmes nombres (§7). */}
+                  {couvertureCa.aDater && <div>Des ventes finalisées n'ont pas encore de date de versement : elles ne sont dans aucun mois pour l'instant (le détail est dans « Ta déclaration URSSAF »).</div>}
                 </div>
               )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
@@ -42660,7 +42682,7 @@ function EmailsSetting() {
           <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
         </div>
         <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,listStyle:'revert',padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
             <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
@@ -43345,16 +43367,13 @@ function AppCoeur() {
       if (m) m.setAttribute('content', t.bg);
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
-  // La direction Minéral remplace les anciennes bascules contradictoires.
-  // Appliquer une fois après synchronisation, puis respecter le choix utilisateur.
-  useEffect(() => onCloudReady(() => {
-    try {
-      if (localStorage.getItem('vrm_bascule_mineral_v1') === '1') return;
-      setDark(false);
-      save('vinted_dark', false);
-      localStorage.setItem('vrm_bascule_mineral_v1', '1');
-    } catch (_) {}
-  }), []);
+  // (17 oct., revue) Une « bascule Minéral » remettait ici le thème CLAIR une
+  // fois par navigateur, armée sur un drapeau du localStorage — §5 : « aucune
+  // migration ne s'arme sur un drapeau du localStorage ». Sur un appareil neuf,
+  // après une reconnexion ou un cache vidé, le mode sombre CHOISI redevenait
+  // clair au premier écran, et `save` poussait ce `false` dans le nuage : tous
+  // ses appareils repassaient en clair. Retirée : son travail est fait depuis
+  // la mise en ligne de Minéral, et le thème est un choix (§7).
   const [catalog,setCatalog]=useState(()=>{
     const s=load('vinted_catalog',null);
     if(!s||s.length===0){return INIT_CAT;}
@@ -45273,7 +45292,6 @@ function AppCoeur() {
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
           <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
-          {platSub==='ventes' && !baseKO && <div style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
@@ -45282,6 +45300,8 @@ function AppCoeur() {
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={platSub==='messages'}/>}
+          {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
+          {platSub==='ventes' && !baseKO && <div style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
@@ -45289,8 +45309,8 @@ function AppCoeur() {
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
               VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
-              L'onglet Achats n'apparaît que si des achats sont captés — sinon il
-              ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
+              L'onglet Achats est toujours là : sans achat capté, il dit pourquoi
+              (jamais lu ≠ lu et vide), il ne reste jamais blanc. */}
           {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
             const note = (ar.actives && lbcVentes.maj)
               ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`

@@ -240,7 +240,9 @@ const jugerSegment = async (pg, label, ecran) => {
     await essaie('Réglages 1512', async () => {
       const { ctx, pg } = await ouvrir(b, PC, 'settings');
       await pg.waitForTimeout(3000);
-      for (const label of ["Taille de l'affichage", 'Détourage des photos']) {
+      // « Détourage des photos » a quitté Réglages le 17 octobre (5.185, décision
+      // de Julien : détourage pour Vestiaire seul, sans réglage) : plus exigé.
+      for (const label of ["Taille de l'affichage"]) {
         let s = await segments(pg, label);
         if (!s) { // un sous-écran : on l'ouvre par son titre
           const cle = label === 'Détourage des photos' ? /Détour/i : /Affichage|Apparence|Taille/i;

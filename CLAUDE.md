@@ -9903,6 +9903,35 @@ Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonc
   retours et annulations (Post-Order API : authentification et forme non
   mesurées), annonces sponsorisées (Marketing API), achats eBay.
 
+### Revue de tous les écrans après les sept chantiers (17 octobre)
+Banc `revue-ecrans.cjs` (fixtures, chaque écran et chaque section, 390 tactile
+et 1512, clair · sombre · mode stream). **32 rouges sur a80f584, 0 après.**
+- ⚠️⚠️ **Le mode sombre CHOISI repassait en clair** sur un appareil neuf, après
+  une reconnexion ou un cache vidé : une « bascule Minéral » armée sur un drapeau
+  du `localStorage` (`vrm_bascule_mineral_v1`) remettait `vinted_dark` à faux au
+  premier écran — et le POUSSAIT dans le nuage (tous ses appareils en clair).
+  Trois bancs posaient ce drapeau à la main pour ne pas le voir. Retirée (§5 :
+  aucune migration ne s'arme sur le `localStorage`).
+- **Leboncoin → Achats était un écran blanc** sans achat capté (`AchatsLeboncoin`
+  rendait `null` sous une section toujours dans la navigation) : il dit
+  maintenant « jamais lu » ou « lu, aucun achat » (`data-lbc-achats-vide`).
+- **eBay → Ventes disait « 0 · 0 · 0,00 € »** sans aucune ligne de commandes
+  rangée (jamais synchronisé) : rien lu ⇒ « — » et la phrase qui dit de relier
+  le compte. Les brouillons ne disent plus « prépare une annonce ci-dessus »
+  quand il n'y a rien au-dessus (compte pas relié).
+- **Replis avec le triangle du navigateur** (Statistiques, Compta « Comment
+  c'est calculé », Réglages, Comptes liés « Gérer ce compte », frais d'une
+  vente) : même chevron partout — un filet CSS pour tout `<summary>` sans forme
+  à lui (pas de classe, pas de `list-style`, pas d'icône étiquetée), les trois
+  `listStyle:'revert'` retirés.
+- §7 : « Retirer mon argent » ne redit plus le disponible écrit juste au-dessus
+  (il dit où il est), et passe SOUS la navigation de Vinted ; la carte Résultat
+  de Compta renvoie à « Ta déclaration URSSAF » au lieu de redire « 162 ventes
+  sans date de versement (6983,57 €) ».
+- **Constaté, laissé** : la scène 3D du Stock garde son ambiance (claire par
+  défaut) en mode sombre — c'est un réglage à part (« Ambiance ») ; la fixture
+  du 5 octobre n'a pas de pièce (« Ta pièce est vide » au banc).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
