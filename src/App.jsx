@@ -24854,7 +24854,7 @@ function RepartitionsVentes({ panelOff }) {
               {top.map((e) => (
                 <div key={e.k} data-repart-ligne={e.k} data-repart-n={e.n} style={{display:'grid',gridTemplateColumns:'minmax(70px, 34%) 1fr auto',alignItems:'center',gap:10}}>
                   <span style={{fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={lib(e.k)}>{lib(e.k)}</span>
-                  <div style={{height:8,background:C.card2||C.bg,borderRadius:4,overflow:'hidden'}}><div style={{width:`${Math.max(4, e.n / maxN * 100)}%`,height:'100%',background:C.accent,borderRadius:4}}/></div>
+                  <div style={{height:8,background:C.card2||C.bg,borderRadius:5,overflow:'hidden'}}><div style={{width:`${Math.max(4, e.n / maxN * 100)}%`,height:'100%',background:C.accent,borderRadius:5}}/></div>
                   <span style={{fontSize:13,color:C.muted,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',textAlign:'right'}}><b style={{color:C.text,fontWeight:600}}>{e.n}</b> · {fmt(e.eur)}</span>
                 </div>
               ))}

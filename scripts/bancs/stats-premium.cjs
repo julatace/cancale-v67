@@ -242,24 +242,9 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         dit(tc.includes(fr(caA)) && tc.includes(fr(caB)), 'CA par compte = somme des finalisées de chaque compte', `${fr(caA)} · ${fr(caB)}`);
         dit(tc.includes(fr(tot12)), 'courbe : total des 12 derniers mois (vendu, toutes plateformes captées)', fr(tot12));
         dit(tc.includes(fr(meilleur[1])), 'courbe : la valeur du meilleur mois est écrite', `${meilleur[0]} ${fr(meilleur[1])}`);
-        dit(tc.includes(fr(caMoisDecl)) && tc.includes(fr(aPayer)) && tc.includes(fr(net)), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
-        dit(new RegExp('(?<!\\d)' + nMoisDecl + '(?!\\d)').test(lu.textContent), 'carte du mois : nombre de ventes finalisées de la ligne publiée', String(nMoisDecl));
-        dit(lu.couverture && /51 ventes Vinted/.test(lu.textContent) && tc.includes(fr(982.7)), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
-        dit(/2 ventes Leboncoin/.test(lu.textContent) && /Vestiaire Collective/.test(lu.textContent), 'couverture : Leboncoin sans date et Vestiaire pas relié restent dans la page');
-        dit(/sans date/.test(lu.texte), 'la couverture se VOIT sans rien déplier (au moins « sans date »)');
-        // La lecture de `urssaf.cjs` (mêmes motifs, sur le texte VISIBLE) doit
-        // toujours retrouver taux, CA cité, à payer, net et nombre de ventes.
-        {
-          const t = lu.texte, e2 = (s) => s == null ? null : Number(String(s).replace(/[\s  €]/g, '').replace(',', '.'));
-          const taux = e2((/À PAYER \(([\d,.]+) ?%\)/i.exec(t) || [])[1]);
-          const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
-          const nt = e2((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
-          const cc = e2((/CA des ventes finalisées[^\n]*?\(([\d\s.,  ]+€)\)/i.exec(t) || [])[1]);
-          const nf = Number((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t) || [])[1]);
-          dit(taux === TAUX && ap === aPayer && nt === net && cc === caMoisDecl && nf === nMoisDecl,
-            'la carte se lit comme urssaf.cjs la lit (libellé puis montant, phrase de calcul visible)', `${taux} · ${cc} · ${ap} · ${nt} · ${nf}`);
-        }
-        dit(lu.declare === 'lu', 'la phrase de calcul porte toujours data-urssaf-declare', String(lu.declare));
+        // (17 oct.) La déclaration URSSAF a quitté Statistiques : elle vit dans
+        // Comptabilité (jugée plus bas, sur cet onglet-là).
+        dit(!lu.declare && !/À payer \(/.test(lu.texte), 'la déclaration URSSAF n’est plus dans Statistiques');
         // ── Trois chiffres d'affaires, trois notions, trois libellés (§5) ─────
         // Le héros (finalisé, Vinted seul, depuis le début) peut être plus petit
         // que la courbe (vendu, toutes plateformes, en cours comprises, 12 mois) :
@@ -281,6 +266,30 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
           dit(!hors.length, 'échelle 28 / 20 / 15 / 13 / 11 — aucune autre taille de texte', hors.map(([k, v]) => `${k}px « ${v[0]} »×${v.length}`).slice(0, 6).join(' · '));
           dit(!Object.keys(lu.tailles).some((k) => Number(k) < 11), 'aucun texte sous 11 px', Object.keys(lu.tailles).filter((k) => Number(k) < 11).join(', '));
         }
+        // ── La carte URSSAF du mois, dans Comptabilité (même ligne publiée) ──
+        await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-compta-urssaf]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+        const lc = await lire(pg);
+        const tcC = lc.textContent.replace(/[\u00a0\u202f ]/g, '');
+        dit(tcC.includes(fr(caMoisDecl)) && tcC.includes(fr(aPayer)) && tcC.includes(fr(net)), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
+        dit(new RegExp('(?<!\\d)' + nMoisDecl + '(?!\\d)').test(lc.textContent), 'carte du mois : nombre de ventes finalisées de la ligne publiée', String(nMoisDecl));
+        dit(lc.couverture && /51 ventes Vinted/.test(lc.textContent) && tcC.includes(fr(982.7)), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
+        dit(/2 ventes Leboncoin/.test(lc.textContent) && /Vestiaire Collective/.test(lc.textContent), 'couverture : Leboncoin sans date et Vestiaire pas relié restent dans la page');
+        dit(/sans date/.test(lc.texte), 'la couverture se VOIT sans rien déplier (au moins « sans date »)');
+        // La lecture de `urssaf.cjs` (mêmes motifs, sur le texte VISIBLE) doit
+        // toujours retrouver taux, CA cité, à payer, net et nombre de ventes.
+        {
+          const t = lc.texte, e2 = (s) => s == null ? null : Number(String(s).replace(/[\s  €]/g, '').replace(',', '.'));
+          const taux = e2((/À PAYER \(([\d,.]+) ?%\)/i.exec(t) || [])[1]);
+          const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
+          const nt = e2((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
+          const cc = e2((/CA des ventes finalisées[^\n]*?\(([\d\s.,  ]+€)\)/i.exec(t) || [])[1]);
+          const nf = Number((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t) || [])[1]);
+          dit(taux === TAUX && ap === aPayer && nt === net && cc === caMoisDecl && nf === nMoisDecl,
+            'la carte se lit comme urssaf.cjs la lit (libellé puis montant, phrase de calcul visible)', `${taux} · ${cc} · ${ap} · ${nt} · ${nf}`);
+        }
+        dit(lc.declare === 'lu', 'la phrase de calcul porte toujours data-urssaf-declare', String(lc.declare));
         if (!dark) {
           base[nom] = [...lu.montants].sort();
         }

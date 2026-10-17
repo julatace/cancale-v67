@@ -150,7 +150,7 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
     "la ligne publiée compte les ventes versées ce mois-ci, et seulement elles",
     `attendu ${attenduMois.length} vente(s) · ${caAttendu} € — publié ${publie.n} · ${publie.ca} €`);
 
-  await pg.goto('http://localhost:'+PORT+'/?tab=dashboard',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT+'/?tab=compta',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4500);
   await pg.screenshot({path:SC+'/z-urssaf.png',fullPage:true});
   const t=await pg.evaluate(()=>document.body.innerText||'');
