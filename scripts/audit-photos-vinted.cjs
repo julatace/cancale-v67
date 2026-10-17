@@ -146,6 +146,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
       'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
       'AbonnementRequis :: "/logo-vrm-96.png"': 'logo de l’app',
+      'TeteEquipe :: "/logo-vrm-96.png"': 'logo de l’app (écran des colis de l’équipe, mode équipe)',
       'ProFactureSetting :: cfg.logo': 'logo de facture choisi sur l’appareil (data:)',
       'AppCoeur :: logoSrc': 'logo de l’app ou logo choisi (data:)',
       'Fenetre :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',

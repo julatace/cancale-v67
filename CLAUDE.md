@@ -4559,12 +4559,11 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
-### Le mode équipe : migration 016 (fonction n°37, 16 octobre) — PAS APPLIQUÉE, PAS D'ÉCRAN
+### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17
 Retenue le 11 octobre : le vendeur invite un aide qui voit les colis à expédier
 et à retirer, les codes de retrait, imprime les bordereaux — et RIEN d'autre.
-**Livré : la migration prouvée et un plan d'écran. L'app n'est pas touchée**
-(trois autres agents modifient `App.jsx` en ce moment ; l'aiguillage du membre
-touche le démarrage et la porte d'abonnement — à faire seul, avec son banc).
+**Livré le 16 : la migration prouvée. Le 17 : la route, les écrans et leur banc**
+(section « L'écran du mode équipe » ci-dessous).
 Fichier : `supabase/migrations/016-equipe.sql` (la 015 est réservée à l'horloge
 de l'agent eBay).
 - **Une table** `vrm_equipe` (vendeur, email, membre, rôle `colis`, statut
@@ -4628,27 +4627,85 @@ de l'agent eBay).
   à l'installation et refuse sinon) ; l'en-tête `x-vrm-equipe` dans
   `request.headers` de SA PostgREST (forme `noter_ecriture`, pas essayé) ; banc
   sur Postgres 16, production en 17.6.
-- **Plan d'écran (pas fait)** :
-  1. `api/compte.js?mode=equipe` (logique dans `api/_lib/equipe.js`, aucune
-     13ᵉ fonction) : GET → `rpc/vrm_equipe_lister` avec le jeton du vendeur ;
-     POST `{action: inviter|revoquer|accepter}`. Fonction absente (404 PGRST202)
-     ⇒ 503 « pas encore installé », jamais « équipe vide ».
-  2. Réglages → Mon compte → « Équipe » (`src/Equipe.jsx`, monté d'une ligne) :
-     inviter par email, lister (statut), révoquer ; côté invité : ses
-     invitations (« Accepter ») et « membre de X — Ouvrir ses colis ».
-  3. `ColisEquipe` (écran seul, Colis uniquement) : lectures avec l'en-tête
-     `x-vrm-equipe` ET `owner=eq.<vendeur>`, `rpc/vrm_equipe_colis`, `aExpedier`
-     de l'app, impression par `lirePdfLigne`. Aiguillage dans `App` AVANT
-     `PorteAbonnement` (un aide ne paie pas) : membre connu en cache ⇒
-     `ColisEquipe`, avec « Ouvrir ma propre boutique ».
-  4. `api/compte.js` mode `fermer` : appeler `vrm_equipe_effacer` (vendeur ET
-     membre). Banc à 390/1512 px sur faux PostgREST qui applique la règle.
 - **Gestes de Julien** : (1) Supabase → Authentication : **confirmation d'email
   obligatoire** (sinon l'adresse « confirmée » ne prouve rien) ; (2) lancer
   l'essai annulé (`essai.sql`) dans l'outil SQL, lire la ligne `essai` ; (3)
   appliquer la 016 VRM fermé ; (4) `--verifier` ⇒ `ok: true`. Rien ne change
-  pour personne tant qu'aucune invitation n'est acceptée et que l'écran n'existe
-  pas.
+  pour personne tant qu'aucune invitation n'est acceptée (l'écran, sans la 016,
+  dit « le mode équipe n'est pas encore activé sur ta base »).
+
+#### L'écran du mode équipe (17 octobre)
+- **Route** : `api/compte.js?mode=equipe` (logique `api/_lib/equipe.js`, toujours
+  **12 fonctions**). GET → `rpc/vrm_equipe_lister` + `aBoutique` (a-t-il au moins
+  un compte Vinted à lui, lu avec SON jeton) ; POST `{action: inviter | accepter
+  | revoquer | quitter}`. Tout part avec le **jeton de l'appelant**, jamais la clé
+  de service. Trois états : 200 · **503 `non-installe`** (fonction absente,
+  PGRST202 ⇒ « Le mode équipe n'est pas encore activé sur ta base. », jamais une
+  erreur brute ni une équipe vide) · **503 `pas-su`** · 400/409 refus réel dit en
+  clair (adresse invalide, la sienne, plafond de 5, adresse pas confirmée…).
+  ⚠️ **Aucun email d'invitation n'est envoyé** (pas de SMTP) : le panneau le dit,
+  le vendeur prévient la personne.
+- **Fermer mon compte** appelle `vrm_equipe_effacer` (clé de service, `sbCle`)
+  APRÈS les compteurs et AVANT les photos : base sans la 016 ⇒ 0, rien à effacer ;
+  base muette ⇒ fermeture INCOMPLÈTE, dite, compte de connexion gardé.
+- **Réglages → Mon compte → Équipe** (`EquipeSetting`) : ce qu'un membre voit et
+  ne voit pas (`CE_QUE_VOIT_UN_MEMBRE`, une phrase pour le panneau et
+  l'invitation, §11), inviter par email, la liste (membre / invitée), « Retirer »
+  (confirmé) ; côté invité : « Accepter », et « Tu prépares les colis de X —
+  Ouvrir ses colis · Quitter ».
+- **L'aiguillage** (`PorteEquipe`, dans `App`, **AVANT `PorteAbonnement`** : un aide
+  ne paie pas, c'est l'abonnement du VENDEUR que la base vérifie) :
+  · l'appareil a choisi l'écran d'un vendeur (`vrm_equipe_vue_{uid}`) ⇒ ses colis ;
+  · jamais choisi + **aucune boutique à lui** (lu, pas supposé) ⇒ l'équipe, ou ses
+    invitations à accepter ;
+  · sinon ⇒ sa propre app, exactement comme avant. **Un vendeur qui est aussi
+    membre garde sa propre app** et ouvre l'équipe sur son clic ; « Ma propre
+    boutique » le ramène.
+  · Choisi mais plus membre (révoqué / quitté) ⇒ « Tu n'as plus accès », rien de
+    la boutique du vendeur. Base sans la 016 ⇒ la phrase prévue.
+  · ⚠️ La liste est mise en cache sur l'appareil (`vrm_equipe_cache_{uid}`) : seule
+    la TOUTE PREMIÈRE ouverture sur un appareil attend la réponse (2,5 s au plus)
+    — sans ça un aide voyait d'abord une boutique vide et ses écrans lisaient
+    ses lignes pour rien (vu au banc : `txn`, `billing`, `main`…). Ensuite, aucune
+    attente pour personne. `AppCoeur` ne monte toujours qu'avec une session.
+- **`ColisEquipe`** : chaque lecture porte `x-vrm-equipe: <vendeur>` ET
+  `owner=eq.<vendeur>` ; la liste des ventes/achats vient de `rpc/vrm_equipe_colis`
+  (aucun montant) ; « à expédier » = `aExpedier` de l'app moins les coches
+  « posté » ; « à retirer » = `isAtRelayStatus` / `needs_action` moins les
+  « retirés », avec le code (`panel_colis_relais`, `codeRetrait`) et le QR ;
+  les codes reçus par email (`email_track_*`, disponibles, ≤ 14 j). Impression :
+  `lirePdfLigne(row, '', {'x-vrm-equipe'})` (nouveau 3ᵉ paramètre), tamponnée du
+  N° que porte la ligne `email_bord_*` — le membre ne lit jamais `main`, il ne
+  recalcule aucun numéro (un bordereau capté sans email part avec le titre seul).
+  Trois états : chargement · pas su (une ligne, « Réessayer ») · non installé ·
+  plus d'accès (projection `null`) · lu ; une lecture partielle est dite une fois.
+  `lecturesPartagees` met `x-vrm-equipe` dans sa clé.
+- **Preuves** : banc `scripts/bancs/equipe.cjs` (port 5011, `BANC_PORT`), faux
+  PostgREST qui applique la règle de la 016 (liste blanche, en-tête, adhésion
+  active, aucune règle sur `vinted_accounts`), faux GoTrue, le VRAI
+  `api/compte.js` exécuté, 390 et 1512 px — **76 contrôles** : l'aide arrive sur
+  les colis (pas de porte d'abonnement), ne voit que la vente à poster (ni la
+  finalisée, ni celle cochée « posté »), le code de retrait, AUCUN montant ;
+  aucune requête de son navigateur vers `main`, `vinted_accounts`, `_txn_`,
+  `_billing`, `orders_*`, `email_sale_*` ; chaque lecture porte l'en-tête ET
+  `owner=eq.` ; l'impression lit le PDF avec l'en-tête et ouvre le bordereau ;
+  invitation retirée ⇒ plus rien ; base sans la 016 ⇒ la phrase (écran et
+  Réglages) ; le vendeur garde son app (aucune requête avec l'en-tête), invite et
+  retire ; accepter d'un clic ouvre les colis ; une vendeuse-membre garde SA
+  boutique, ouvre celle de V sur son clic, sans mélange. **35 rouges sur le build
+  d'avant** (ed52842, §6.1) ; mutation « lecture sans `x-vrm-equipe` » ⇒ 8
+  rouges. `audit-fermer-compte.cjs` : +3 contrôles (équipe effacée chez lui seul,
+  base sans la 016, base muette ⇒ incomplet).
+- **Non mesuré** : que la passerelle de Supabase laisse passer l'en-tête
+  personnalisé `x-vrm-equipe` depuis le navigateur (CORS : le greffon Kong
+  renvoie par défaut les en-têtes demandés — non vérifié, supabase.co est bloqué
+  d'ici) ; si elle le refusait, l'écran dirait « pas pu lire » (jamais « aucun
+  colis ») et la lecture devrait passer par la route. Le thème sombre n'est pas
+  appliqué sur l'écran d'équipe (monté hors d'`AppCoeur`).
+- **Gestes de Julien** (en plus de ceux de la migration) : rien d'autre. Une fois
+  la 016 appliquée : Réglages → Mon compte → Équipe → inviter l'adresse de son
+  aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
+  arrive directement sur « Colis à préparer ».
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
@@ -9821,7 +9878,7 @@ api/                            email-inbound · push · widget · ship-reminder
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
 scripts/audit-*.cjs             les 93 audits
-scripts/bancs/                  les 84 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 85 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
