@@ -189,12 +189,13 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
 }
 async function harvestOrders(kind, vivants) {
   try {
-    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,data`));
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,my_orders:data->payload->my_orders`));
     if (!j) return null;
     const out = {};
     for (const row of j) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
-      const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
+      // Projeté (§4.4) : seule la liste des commandes voyage, jamais la ligne entière.
+      const items = Array.isArray(row.my_orders) ? row.my_orders : [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
     return Object.values(out);
