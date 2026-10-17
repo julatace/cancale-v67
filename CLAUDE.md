@@ -9710,6 +9710,10 @@ par scénario, fausse base à état) : **15 rouges sur le code d'avant, 0 après
   `vinted-connect` ne vérifie pas un `accessToken` encore valide auprès de
   Vinted (il ne touche que les lignes du vendeur lui-même).
 
+### La cloche retirée, « Sécurité des données » une fois (17 octobre)
+- Le panneau « 🔔 Notifications » et `notifOpen` étaient morts (`setNotifOpen(true)` nulle part) : retirés. `notifItems` reste (Ma journée, tableau de bord, Collectif). 26 `tab===` avant et après ; retrait (4 KO identiques sur l'avant, donnée datée), premierjour, journee-premium, demarrage verts.
+- Sous-écran « Sécurité des données » (téléphone) : le titre du panneau se tait (`.vrm-titre-panneau`, CSS), le verdict reste. `reglages-premium.cjs` compte le titre de CHAQUE sous-écran (hors bouton : « Fermer mon compte » s'ouvre en deux temps, exprès) : rouge sur l'avant (2 fois), vert après.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
