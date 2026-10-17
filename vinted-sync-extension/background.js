@@ -1797,6 +1797,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 fichiersMultiple: !!msg.fichiersMultiple, categorie: String(msg.categorie || ''),
                 depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
                 ver: String(msg.ver || ''),
+                // 5.186 : les BOUTONS de l'étape (libellé de Leboncoin, borné) et
+                // l'état coché des options payantes — pour voir où le dépôt cale
+                // et vérifier qu'aucun boost n'est actif. Aucun contenu saisi.
+                boutons: (Array.isArray(msg.boutons) ? msg.boutons : []).slice(0, 25).map((b) => ({ t: String((b && b.t) || '').slice(0, 50), prix: !!(b && b.prix), off: !!(b && b.off) })),
+                optionsCochees: Number(msg.optionsCochees) || 0,
                 at: new Date().toISOString() } },
             });
             sendResponse({ ok: true }); return;
@@ -5326,7 +5331,10 @@ async function etatSite(url) {
     site = uid ? { id: String(uid), nom: await loginDe(String(uid)) } : { id: null, nom: '' };
   } else if (plateforme === 'leboncoin') {
     const c = local.vrmLbcCompte;
-    site = c && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
+    // 5.186 : seul un compte vu sur l'endpoint de la SESSION (`courant`, v:2)
+    // nomme le compte connecté — une ancienne valeur (le dernier « moi » vu,
+    // parfois un autre compte lié ou un vendeur) n'est plus montrée.
+    site = c && c.v === 2 && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
   }
   const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
   // Vestiaire : rien n'est capté, mais le site est MESURÉ (5.154) — la carte le
@@ -8502,13 +8510,13 @@ async function storeLbcAccount(acc) {
       const s = merged[id] && merged[id].source;
       if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
     }
-    merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
+    { const { courant: _c, ...sansCourant } = acc; merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], sansCourant, { seenAt: new Date().toISOString() }); }
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
     try {
-      if (!acc.source || !LBC_URL_AUTRUI.test(String(acc.source))) {
-        await chrome.storage.local.set({ vrmLbcCompte: { id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
+      if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {
+        await chrome.storage.local.set({ vrmLbcCompte: { v: 2, id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
       }
     } catch (_) {}
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
@@ -9024,6 +9032,17 @@ async function publierPrepLbc(enMain) {
 //   côtés (détection ET auto-nettoyage de storeLbcAccount), §11.
 const LBC_URL_MOI = /\/(users?|accounts?)\/me(\b|\/|$)|linked_accounts|\/me(\b|\/|$)|mon-compte|\/user\/settings/i;
 const LBC_URL_AUTRUI = /user-card|\/discovery\/|\/same\/|\/search(\b|\/|\?)|\/dashboard\//i;
+// (17 oct., Julien : « ça met le mauvais compte Leboncoin connecté »). Mesuré :
+// le compte « connecté » de la petite carte était le DERNIER compte vu sur un
+// endpoint « moi » — y compris `users/me/linked_accounts`, qui LISTE tous ses
+// comptes liés : le premier de la liste devenait « le compte connecté », quel
+// que soit celui ouvert dans l'onglet. Et la page (`lbc.js`) remontait n'importe
+// quel objet { user_id, pseudo } — le vendeur de l'annonce affichée.
+// ⇒ Seul l'endpoint qui décrit LA SESSION (`members/me/account`, vu dans son
+//   navigateur ; `users/me` en repli) désigne le compte courant, et seulement
+//   pour un objet hors d'une liste. Les autres « moi » enrichissent la liste de
+//   ses comptes, jamais « celui qui est connecté ».
+const LBC_URL_SESSION = /\/members\/me\/account\/?(\?|$)|\/(?:users?|accounts?)\/me\/?(\?|$)/i;
 function detectLbcAccount(data, url) {
   let best = null;
   const u = String(url || '');
@@ -9032,9 +9051,10 @@ function detectLbcAccount(data, url) {
   if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
     || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
-  const walk = (node, depth, key) => {
+  const session = LBC_URL_SESSION.test(u);
+  const walk = (node, depth, key, dansListe) => {
     if (best || !node || depth > 8 || typeof node !== 'object') return;
-    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1, key); return; }
+    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1, key, true); return; }
     const id = node.user_id || node.userId || node.store_id || node.storeId || node.account_id || node.accountId || node.id;
     const name = node.store_name || node.storeName || node.company_name || node.companyName
       || node.pseudo || node.pseudonym || node.name || node.display_name || node.displayName;
@@ -9042,11 +9062,12 @@ function detectLbcAccount(data, url) {
     if (id && name && (marqueurMoi(node) || (cleMoi && (node.pseudo || node.pseudonym || node.email)))) {
       const pro = !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
       best = { id: String(id), name: String(name), type: pro ? 'pro' : 'particulier', platform: 'leboncoin', source: String(url || '').slice(0, 120) };
+      if (session && !dansListe) best.courant = true;
       return;
     }
-    for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1, k);
+    for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1, k, dansListe);
   };
-  try { walk(data, 0, ''); } catch (_) {}
+  try { walk(data, 0, '', false); } catch (_) {}
   return best;
 }
 

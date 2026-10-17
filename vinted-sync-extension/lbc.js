@@ -167,7 +167,11 @@
           if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
           const id = node.user_id || node.userId || node.store_id;
           const name = node.pseudo || node.pseudonym || node.name || node.email;
-          if (id && name && (node.email || node.pseudo || node.pseudonym)) {
+          // (17 oct.) Un { user_id, pseudo } n'est PAS forcément la session : sur
+          // une page d'annonce c'est son VENDEUR. On n'en prend un que s'il porte
+          // une donnée privée (l'email), et il ne désigne jamais « le compte
+          // connecté » (seul `members/me/account` le fait, côté fond).
+          if (id && name && node.email) {
             account = { id: String(id), name: String(name), seenAt: new Date().toISOString() };
             return;
           }
@@ -745,6 +749,10 @@
         chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
           fields: fields.slice(0, 150), selects: sels.slice(0, 30), livraison: livraison.slice(0, 30), fichiers, fichiersMultiple,
           categorie, depot: DEPOT_ID, ordre: ordreEtape, ver: EXT_VER,
+          boutons: tousLesNoeuds('button,[role="button"],input[type="submit"]').filter((el) => !DANS_ENTETE(el) && !(el.closest && el.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]')))
+            .map((el) => { const t = String(el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim(); return { t: t.slice(0, 50), prix: PRIX_ARGENT.test(t), off: !!el.disabled || el.getAttribute('aria-disabled') === 'true' }; })
+            .filter((b) => b.t).slice(0, 25),
+          optionsCochees: optionsBoost().filter(estCoche).length,
           etape: signature.slice(0, 160) });
       }
     } catch (_) {}
@@ -769,12 +777,25 @@
   // qu'elles ne sont pas posées, on NE clique PAS « Continuer » : l'étape photo
   // partirait sans elles.
   let photosFaites = false, photosEtat = null, photosEnCours = false;
+  // (5.186, « elle ne publie pas jusqu'au bout ») : mesuré le 17 oct., son dépôt
+  // est arrivé sur `/deposer-une-annonce/options` puis plus rien. La publication
+  // n'y partait que si des photos avaient été envoyées PAR CETTE PAGE — or
+  // l'étape options est une autre adresse : une page rechargée y repart sans
+  // mémoire. On retient l'envoi dans l'onglet (sessionStorage), et sur l'étape
+  // options elle-même (aucun champ photo, les photos sont derrière) la
+  // publication n'attend plus. Les photos ne sont pas une question d'argent ;
+  // les options payantes le sont, et elles sont vérifiées à part.
+  const photosPretes = () => {
+    if (photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) return true;
+    try { if (pending && sessionStorage.getItem('vrmPhotosEnvoyees:' + String(pending.id)) === '1') return true; } catch (_) {}
+    return /\/options(\/|$)/.test(location.pathname) && champsFichier().length === 0;
+  };
   const lancerPhotos = () => {
     photosFaites = true; photosEnCours = true;
     direProgres();
-    attacherPhotos(pending).then((r) => { photosEtat = r; }, () => {}).finally(() => { photosEnCours = false; banner(); direProgres(); });
+    attacherPhotos(pending).then((r) => { photosEtat = r; try { if (r && (r.envoyees || r.n || 0) > 0) sessionStorage.setItem('vrmPhotosEnvoyees:' + String(pending.id), '1'); } catch (_) {} }, () => {}).finally(() => { photosEnCours = false; banner(); direProgres(); });
   };
-  let publieFait = false, publieEtat = null;
+  let publieFait = false, publieEtat = null, cliqueFait = false;   // cliqueFait : jamais remis à faux (pas de second clic de publication)
   // ── 5.182 : L'AVANCEMENT, DIT À L'APP ─────────────────────────────────────
   // La fiche de VRM montre le dépôt en direct : l'étape, les photos POSÉES sur
   // le total (et confirmées quand on peut les compter), le champ obligatoire qui
@@ -800,7 +821,27 @@
     _dernierProgres = cle;
     send({ action: 'depotProgres', id: pending.id, progres: p });
   }
+  // ── LA PUBLICATION SE PROUVE À LA PAGE DE CONFIRMATION (5.186) ───────────
+  //   Julien : « ça doit capter tout seul si j'ai publié ou pas ». Mesuré : un
+  //   dépôt réussi finit sur `/deposer-une-annonce/confirmation`. Arrivé là,
+  //   dans l'onglet ouvert POUR la paire (le service worker ne la rend qu'à lui),
+  //   elle est marquée publiée — qu'il ait cliqué lui-même ou que VRM l'ait fait.
+  //   Un dépôt abandonné ne voit jamais cette page : il ne marque rien.
+  const PAGE_CONFIRMATION = /\/deposer-une-annonce\/confirmation/i;
+  async function confirmerDepot() {
+    const r = await send({ action: 'getPending' });
+    const ad = (r && r.ok && r.ad) ? r.ad : null;
+    if (!ad) return;
+    clearInterval(pendingTimer);
+    pending = ad;
+    publieEtat = { ok: true };
+    send({ action: 'markPosted', id: ad.id });   // sort de la file (et l'app le sait)
+    send({ action: 'setPending', ad: null });     // ne pas republier
+    try { send({ action: 'depotProgres', id: ad.id, progres: { etape: 'publication' } }); } catch (_) {}
+    banner();
+  }
   async function autoPrefill() {
+    if (PAGE_CONFIRMATION.test(location.href)) { await confirmerDepot(); return; }
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
     const r = await send({ action: 'getPending' });
     pending = (r && r.ok && r.ad) ? r.ad : null;
@@ -820,16 +861,12 @@
       //   bouton (`pending.publier !== false`), seulement à l'étape des boosts
       //   (mesurée), et seulement si des photos ont été ENVOYÉES (sinon Leboncoin
       //   refuse de toute façon — on ne clique pas pour rien). Une fois.
-      if (!publieFait && pending.publier !== false && estEtapePublication()
-          && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+      if (!publieFait && !cliqueFait && pending.publier !== false && estEtapePublication() && photosPretes()) {
         publieFait = true;
+        // 5.186 : le clic ne PROUVE pas la publication. La paire n'est marquée
+        // publiée qu'à la page de CONFIRMATION de Leboncoin (`confirmerDepot`).
         publierSansBooster().then((r) => {
-          publieEtat = r; banner(); direProgres();
-          if (r && r.ok) {
-            clearInterval(pendingTimer);
-            send({ action: 'markPosted', id: pending.id });   // sort de la file
-            send({ action: 'setPending', ad: null });          // ne pas republier
-          }
+          if (r && r.ok) cliqueFait = true; publieEtat = r && r.ok ? Object.assign({ attente: true, t: Date.now() }, r) : r; banner(); direProgres();
         });
       }
       // On s'arrete au bout de 90 s : au-dela, soit c'est rempli, soit la page
@@ -844,6 +881,9 @@
       //    restait « Publication en cours… » 15 minutes, sans un mot, après un
       //    dépôt qui n'aboutissait pas (reproduit 2 sur 2). On le dit au
       //    service worker : l'app propose « Réessayer ».
+      // Clic fait, pas de confirmation après 30 s : on le DIT, et on ne reclique
+      // jamais (une seconde publication — ou un second paiement — est pire).
+      if (publieEtat && publieEtat.attente && Date.now() - publieEtat.t > 30000) { publieEtat = { ok: false, raison: 'j\'ai cliqué « ' + (publieEtat.bouton || 'Publier') + ' », mais Leboncoin n\'a pas confirmé la publication — vérifie dans Mes annonces' }; banner(); direProgres(); }
       if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; send({ action: 'depotArrete', id: pending.id, raison: 'arret' }); banner(); }
     }, 1000);
   }
@@ -1039,11 +1079,19 @@
   const BTN_PUBLIER = /publier|d[ée]poser|mettre en ligne|payer|valider|confirmer|finaliser|en ligne/i;
   const BTN_AVANCER = /continuer|suivant|[ée]tape suivante/i;
   function cliquerContinuer() {
+    // ⚠️⚠️ ARGENT (17 oct., Julien : « elle active le booster automatiquement »).
+    //   L'étape des options payantes n'est JAMAIS franchie par « Continuer » :
+    //   seul `publierSansBooster` y agit, après avoir VÉRIFIÉ qu'aucune option
+    //   n'est active. Avant, l'enchaînement des étapes y cliquait « Continuer »
+    //   comme ailleurs — une option active (pré-cochée, ou cochée par erreur)
+    //   partait alors vers le paiement.
+    if (estEtapePublication()) return false;
     const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"],a[role="button"]')).filter((el) => !DANS_ENTETE(el));
     for (const b of btns) {
       const t = (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
       if (!t) continue;
       if (BTN_PUBLIER.test(t)) continue;              // ⚠️ on ne publie jamais tout seul
+      if (PRIX_ARGENT.test(t)) continue;              // ⚠️ un bouton qui porte un prix ou un boost : jamais
       if (BTN_AVANCER.test(t)) {
         if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
         try { b.click(); } catch (_) {}
@@ -1089,49 +1137,93 @@
   //      un PRIX (€ / 9,90) ni « booster/remonter/payer/premium/pack/option ».
   //   Au pire (bouton introuvable, forme inconnue) : rien n'est cliqué, il publie
   //   à la main — jamais un faux, jamais une dépense.
+  // ⚠️ Une option payante se reconnaît à son NOM (mesuré : gallery, gallery30,
+  //   daily_bump, daily_bump30, sub_toplist, urgent) OU à un PRIX dans son
+  //   libellé (« Pendant 7 jours 7 € ») — une case, un radio ou un interrupteur.
+  //   Une case DANS un interrupteur déjà compté n'est comptée qu'une fois (sinon
+  //   on la cliquait deux fois : décochée puis recochée).
+  const PRIX_ARGENT = /€|\beuros?\b|\d[.,]\d{2}\b|booster|boost|remont|payer|paiement|premium|\bpack\b|\bà la une\b|mise en avant/i;
+  const NOM_BOOST = /(gallery|galerie|bump|remont|toplist|top.?liste|urgent|boost|mise en avant|premium|\bpack\b|photos?\s*suppl|[àa] la une|logo)/i;
   function optionsBoost() {
-    return Array.from(document.querySelectorAll('input[type="checkbox"],[role="checkbox"],[role="switch"]')).filter((cb) => {
+    const tous = Array.from(document.querySelectorAll('input[type="checkbox"],input[type="radio"],[role="checkbox"],[role="switch"],[role="radio"]')).filter((cb) => {
       if (DANS_ENTETE(cb)) return false;
-      const n = ((cb.name || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '') + ' ' + (libelleDe(cb) || '')).toLowerCase();
-      return /(gallery|galerie|bump|remont|toplist|top.?liste|urgent|boost|mise en avant|premium|\bpack\b|photos?\s*suppl)/.test(n);
+      if (cb.closest && cb.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]')) return false;
+      const nom = ((cb.name || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '')).toLowerCase();
+      const lib = String(libelleDe(cb) || '');
+      if (NOM_BOOST.test(nom) || NOM_BOOST.test(lib)) return true;
+      // Un choix qui porte un PRIX est payant (sauf « 0 € » / « gratuit ») —
+      // SEULEMENT sur l'étape des options (mesurée : `/deposer-une-annonce/options`).
+      // Ailleurs, un prix est celui d'un mode de livraison : on n'y touche pas.
+      if (!/\/options(\/|$)/.test(location.pathname)) return false;
+      return /€|\beuros?\b/i.test(lib) && !/\b0(?:[.,]00)?\s*€|gratuit|sans option|aucune option/i.test(lib);
     });
+    return tous.filter((cb) => !(cb.tagName === 'INPUT' && cb.parentElement && tous.some((o) => o !== cb && o.tagName !== 'INPUT' && o.contains(cb))));
   }
-  const estCoche = (cb) => cb.checked || cb.getAttribute('aria-checked') === 'true';
-  async function publierSansBooster() {
-    // 1) décocher toute option payante.
-    for (const cb of optionsBoost()) if (estCoche(cb)) { try { cb.click(); } catch (_) {} }
-    await attendre(450);
-    if (optionsBoost().some(estCoche)) return { ok: false, raison: 'une option payante n\'a pas pu être décochée — publie toi-même, sans booster' };
-    // 2) le bouton de publication GRATUITE, jamais un bouton payant.
-    const PRIX = /€|\beuros?\b|\d[.,]\d{2}|booster|remont|payer|premium|\bpack\b|\boption/i;
-    const PUBLIER = /publier|d[ée]poser\s+(?:mon|l)|d[ée]poser l['’]annonce|mettre en ligne|valider\s+(?:mon|l['’])\s*annonce/i;
-    const NEG = /annuler|retour|pr[ée]c[ée]dent|revenir|\bback\b|supprim|brouillon|plus tard|aper[çc]u|pr[ée]visualis/i;
-    const CONTINUER = /continuer|suivant/i;
-    const libBtn = (b) => (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
-    const actif = (b) => !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !!libBtn(b);
-    // ⚠️ On exclut NOTRE PROPRE interface (bandeau/témoin VRM) : sinon la
-    //   recherche du bouton « le plus bas » cliquerait un bouton de notre bandeau,
-    //   pas celui de Leboncoin (le bandeau est en position fixe, tout en bas).
-    const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]');
-    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI(el));
-    let publier = btns.find((b) => {
-      if (!actif(b)) return false;
-      if (PRIX.test(libBtn(b))) return false;         // paie / boost → jamais
-      return PUBLIER.test(libBtn(b));
-    });
-    // Julien 20 sept. : « le clic Publier est tout en bas de la page ; même si tu
-    // ne l'as pas, essaie de le deviner ». On tente donc le bouton le PLUS BAS de
-    // l'étape — mais la garde ARGENT ne bouge pas : jamais un bouton à prix ou à
-    // boost (PRIX), jamais « annuler/retour/aperçu » (NEG), jamais « Continuer »
-    // (géré par l'enchaînement des étapes). Au pire rien n'est dépensé, jamais un faux.
-    if (!publier) {
-      const surs = btns.filter((b) => { const t = libBtn(b); return actif(b) && !PRIX.test(t) && !NEG.test(t) && !CONTINUER.test(t); });
-      surs.sort((a, b) => a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom);
-      publier = surs[surs.length - 1] || null;
+  const estCoche = (cb) => {
+    if (cb.tagName === 'INPUT') return !!cb.checked || cb.getAttribute('aria-checked') === 'true';
+    if (cb.getAttribute('aria-checked') === 'true') return true;
+    const inp = cb.querySelector && cb.querySelector('input[type="checkbox"],input[type="radio"]');
+    return !!(inp && inp.checked);
+  };
+  // Le choix GRATUIT d'un groupe de radios (« Sans option », « Gratuit »), s'il existe.
+  function radioGratuit() {
+    if (!/\/options(\/|$)/.test(location.pathname)) return null;   // jamais « gratuit » d'un mode de livraison
+    return Array.from(document.querySelectorAll('input[type="radio"],[role="radio"]')).find((r) => {
+      if (DANS_ENTETE(r)) return false;
+      const lib = String(libelleDe(r) || r.getAttribute('aria-label') || '');
+      return /sans option|aucune option|gratuit|\b0(?:[.,]00)?\s*€/i.test(lib) && !NOM_BOOST.test(lib);
+    }) || null;
+  }
+  // Le bouton de publication est-il celui d'une OPTION (dans sa carte) ? Le plus
+  // petit bloc qui le contient et contient aussi une option payante ne doit en
+  // contenir qu'UNE pour être une carte d'option — alors c'est « ajouter cette
+  // option », jamais « publier ».
+  function dansCarteOption(b, opts) {
+    let el = b.parentElement;
+    for (let i = 0; el && i < 6; i++, el = el.parentElement) {
+      const n = opts.filter((o) => el.contains(o)).length;
+      if (n === 1) return true;
+      if (n > 1) return false;
     }
-    if (!publier) return { ok: false, raison: 'bouton « Publier » introuvable sur cette étape' };
+    return false;
+  }
+  async function publierSansBooster() {
+    // 1) décocher toute option payante — une à une, en vérifiant.
+    const radio = radioGratuit();
+    if (radio && !estCoche(radio)) { try { radio.click(); } catch (_) {} }
+    for (const cb of optionsBoost()) {
+      if (!estCoche(cb)) continue;
+      if (cb.tagName !== 'INPUT' && (cb.getAttribute('role') === 'radio')) continue;   // un radio ne se décoche pas : le choix gratuit l'a fait
+      try { cb.click(); } catch (_) {}
+      await attendre(120);
+    }
+    await attendre(450);
+    // ⚠️ Deux lectures à 300 ms d'intervalle : une option que React recoche
+    //   après notre clic ne doit pas passer entre les deux.
+    if (optionsBoost().some(estCoche)) return { ok: false, raison: 'une option payante est encore active — rien n\'est publié : publie toi-même, sans booster' };
+    await attendre(300);
+    const opts = optionsBoost();
+    if (opts.some(estCoche)) return { ok: false, raison: 'une option payante est encore active — rien n\'est publié : publie toi-même, sans booster' };
+    // 2) le bouton de publication GRATUITE — et SEULEMENT lui.
+    // ⚠️ Plus de « bouton le plus bas » deviné : il a cliqué des boutons qui
+    //   AJOUTAIENT une option. On ne clique qu'un bouton dont le libellé dit
+    //   publier/déposer/mettre en ligne/continuer sans option, ou « Continuer »
+    //   quand AUCUNE option n'est active (vérifié deux fois ci-dessus) — jamais
+    //   un bouton à prix, jamais un bouton dans la carte d'une option.
+    const PUBLIER = /publier|d[ée]poser\s+(?:mon|l)|d[ée]poser l['’]annonce|mettre en ligne|valider\s+(?:mon|l['’])\s*annonce|continuer sans|sans option/i;
+    const CONTINUER = /^\s*(continuer|suivant|valider)\s*$/i;
+    const NEG = /annuler|retour|pr[ée]c[ée]dent|revenir|\bback\b|supprim|brouillon|plus tard|aper[çc]u|pr[ée]visualis|ajouter|s[ée]lectionner|choisir/i;
+    const libBtn = (b) => (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').replace(/\s+/g, ' ').trim();
+    const actif = (b) => !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !!libBtn(b);
+    const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]');
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"],a[role="button"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI(el));
+    const sur = (b) => actif(b) && !PRIX_ARGENT.test(libBtn(b)) && !NEG.test(libBtn(b)) && !dansCarteOption(b, opts);
+    const publier = btns.find((b) => sur(b) && PUBLIER.test(libBtn(b))) || btns.find((b) => sur(b) && CONTINUER.test(libBtn(b))) || null;
+    if (!publier) return { ok: false, raison: 'je n\'ai pas trouvé de bouton de publication gratuite sur cette étape — rien n\'est cliqué, publie toi-même, sans booster' };
+    // Dernière vérification, au moment même du clic.
+    if (optionsBoost().some(estCoche)) return { ok: false, raison: 'une option payante s\'est activée — rien n\'est publié' };
     try { publier.click(); } catch (_) {}
-    return { ok: true, bouton: ((publier.innerText || publier.value || '') + '').trim().slice(0, 40) };
+    return { ok: true, bouton: libBtn(publier).slice(0, 40) };
   }
   // On est à l'étape de publication quand l'étape des boosts (cases mesurées) est
   // là : c'est la dernière, tout le reste a été rempli pour y arriver.
@@ -1304,7 +1396,7 @@
       // Statut de PUBLICATION : ce qui compte, dit clairement.
       (publieEtat
         ? '<div style="margin-top:6px">' + (publieEtat.ok
-            ? '✅ <b style="color:#E8ECF2">Publiée sans booster.</b>'
+            ? (publieEtat.attente ? '⏳ <b style="color:#E8ECF2">Publication envoyée sans booster</b> — j\'attends la confirmation de Leboncoin.' : '✅ <b style="color:#E8ECF2">Publiée sans booster.</b>')
             : '<span style="color:#F5A524">Je n\'ai pas publié — ' + esc(publieEtat.raison || 'à faire toi-même') + '.</span>') + '</div>'
         : '') +
       (pendingArrete && !(publieEtat && publieEtat.ok)
@@ -1344,9 +1436,9 @@
       if (n2 > pendingDone) { pendingDone = n2; banner(); }
       direProgres();
       if (!photosFaites && champsFichier().length) lancerPhotos();
-      if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+      if (!publieFait && !cliqueFait && pending.publier !== false && estEtapePublication() && photosPretes()) {
         publieFait = true;
-        publierSansBooster().then((r) => { publieEtat = r; banner(); direProgres(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
+        publierSansBooster().then((r) => { if (r && r.ok) cliqueFait = true; publieEtat = r && r.ok ? Object.assign({ attente: true, t: Date.now() }, r) : r; banner(); direProgres(); });
       }
       if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; send({ action: 'depotArrete', id: pending.id, raison: 'arret' }); banner(); }
     }, 1000);

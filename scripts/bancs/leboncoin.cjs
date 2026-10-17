@@ -31,7 +31,22 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'obligatoire'
+  <main>${depot === 'optionsreel'
+    // ⚠️⚠️ L'ÉTAPE OPTIONS TELLE QUE MESURÉE le 17 oct. (5.184, `lbc_recon.etapes`,
+    //    url `/deposer-une-annonce/options`) : six cases PAYANTES aux vrais noms et
+    //    aux vrais libellés (« Pendant 7 jours 7 € »…). En plus, ce qu'on ne peut
+    //    pas exclure : une option PRÉ-COCHÉE par Leboncoin (urgent), un bouton
+    //    « Sélectionner » DANS chaque carte d'option, et un seul « Continuer » en
+    //    bas. Cliquer « Continuer » avec une option active = le paiement (__paye).
+    ? '<h2>Boostez votre annonce</h2>'
+      + [['gallery','À la une','Pendant 7 jours 7 €'],['gallery30','À la une','Pendant 30 jours 12,80 €'],['daily_bump','Remontée quotidienne','Chaque jour pendant 7 jours 4,20 €'],['daily_bump30','Remontée quotidienne','Chaque jour pendant 30 jours 9,10 €'],['sub_toplist','Remontée hebdo','Chaque semaine pendant 8 semaines 6 €'],['urgent','Logo urgent','Pendant toute la durée de votre annonce 2,50 €']]
+        .map(([n, t, l]) => '<div class="carte"><label><input type="checkbox" name="' + n + '"' + (n === 'urgent' ? ' checked' : '') + '> <b>' + t + '</b> ' + l + '</label><button type="button" class="sel">Sélectionner</button></div>').join('')
+      + '<div><button type="button" id="cont">Continuer</button></div>'
+      + '<scr'+'ipt>window.__cont=0;window.__sel=0;window.__paye=0;document.querySelectorAll(".sel").forEach(function(b){b.onclick=function(){window.__sel++;b.parentNode.querySelector("input").checked=true;};});'
+      + 'document.getElementById("cont").onclick=function(){window.__cont++;if(document.querySelectorAll(".carte input:checked").length)window.__paye++;};</scr'+'ipt>'
+    : depot === 'confirmation'
+    ? '<h1>Votre annonce a bien été déposée</h1><p>Elle sera en ligne après vérification.</p>'
+    : depot === 'obligatoire'
     // 5.182 : une étape dont un champ OBLIGATOIRE ne se devine pas (« Univers* »),
     //    et un « Continuer » grisé tant qu'il est vide — la fiche de l'app doit
     //    apprendre LEQUEL manque (son libellé, jamais un contenu).
@@ -173,7 +188,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/obligatoire/.test(q.url) ? 'obligatoire' : /basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/optionsreel/.test(q.url) ? 'optionsreel' : /\/confirmation/.test(q.url) ? 'confirmation' : /obligatoire/.test(q.url) ? 'obligatoire' : /basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -596,6 +611,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const b64 = (() => { const bin = JPEG.match(/../g).map((h) => String.fromCharCode(parseInt(h, 16))).join(''); return btoa(bin); })();
       window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
         const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        try { (window.__msgs = window.__msgs || []).push(m && m.action); } catch (_) {}
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
         if (m && m.action === 'photoBytes') return rep({ ok: true, photos: (m.urls || []).map((u) => ({ url: u, b64, type: 'image/jpeg', taille: 22 })) });
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
@@ -686,14 +702,14 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       dit(/sans booster/i.test(r.bandeau), 'le bandeau dit « publiée sans booster »', (r.bandeau || '').replace(/\n/g, ' ').slice(-70));
     }
     {
-      const faible = SRC.replace('if (PRIX.test(libBtn(b))) return false;', 'if (false) return false;').replace('&& !PRIX.test(t) &&', '&&');
+      const faible = SRC.replace('actif(b) && !PRIX_ARGENT.test(libBtn(b)) && ', 'actif(b) && ');
       if (faible === SRC) dit(false, 'la garde « prix » attendue est introuvable — l\'audit ne prouve rien');
       else { const { r } = await lancerBoost(faible); dit(r.paid >= 1, '§6.1 — sans la garde « prix », le bouton PAYANT EST cliqué (donc la garde protège de la dépense)', '__paid=' + r.paid + ' __pub=' + r.pub); }
     }
-    // 5) ⚠️ DEVINER LE BOUTON DU BAS (Julien, 20 sept. : « il est tout en bas ; même
-    //    si tu ne l'as pas, essaie de le deviner »). Sur une étape SANS libellé
-    //    « Publier », on clique le bouton le PLUS BAS qui n'est ni à prix, ni
-    //    « annuler/retour », ni « continuer » — la garde argent tient en devinant.
+    // 5) ⚠️⚠️ 17 oct. — PLUS DE BOUTON « DEVINÉ ». Le « bouton le plus bas »
+    //    deviné a pu AJOUTER une option (Julien : « elle active le booster »).
+    //    Sur une étape SANS libellé de publication sûr, RIEN n'est cliqué : ni
+    //    « Terminer », ni le bouton à prix, ni « Annuler » — et c'est dit.
     {
       const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -702,11 +718,63 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       await pg.goto('http://localhost:4491/depot/basdepage', { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: SRC });
       await pg.waitForTimeout(9000);
-      const r = await pg.evaluate(() => ({ fin: window.__fin, paidx: window.__paidx, annx: window.__annx, prev: document.querySelectorAll('#previews img').length, gallery: !!document.querySelector('input[name=gallery]:checked'), banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
+      const r = await pg.evaluate(() => ({ fin: window.__fin, paidx: window.__paidx, annx: window.__annx, banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
       await pg.close();
-      dit(r.fin === 1, 'sans libellé « Publier », le bouton le PLUS BAS (« Terminer ») est cliqué', '__fin=' + r.fin + ' prev=' + r.prev + ' gallery_encore_cochee=' + r.gallery + ' | ' + (r.banner || '').replace(/\n/g, ' ').slice(0, 70));
-      dit(r.paidx === 0, 'le bouton à PRIX (9,90 €) reste JAMAIS cliqué, même en devinant', '__paidx=' + r.paidx);
-      dit(r.annx === 0, '« Annuler » n\'est pas pris pour « Publier » (garde NEG)', 'ann=' + r.annx);
+      dit(r.fin === 0, 'sans libellé de publication sûr, AUCUN bouton n’est deviné (« Terminer » pas cliqué)', '__fin=' + r.fin);
+      dit(r.paidx === 0, 'le bouton à PRIX (9,90 €) n’est JAMAIS cliqué', '__paidx=' + r.paidx);
+      dit(r.annx === 0, '« Annuler » n’est pas cliqué', 'ann=' + r.annx);
+      dit(/pas publi|rien n.est cliqu/i.test(r.banner), 'et le bandeau le DIT (publie toi-même, sans booster)', (r.banner || '').replace(/\n/g, ' ').slice(0, 120));
+    }
+    // 6) ⚠️⚠️ L'ÉTAPE OPTIONS RÉELLE (17 oct.) — LA PREUVE ARGENT.
+    const lancerOptions = async (srcJs, ad) => {
+      const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+      await pg.addInitScript(initChrome, { ad });
+      await pg.goto('http://localhost:4491/deposer-une-annonce/options?optionsreel', { waitUntil: 'domcontentloaded' });
+      await pg.addScriptTag({ content: srcJs });
+      await pg.waitForTimeout(9000);
+      const r = await pg.evaluate(() => ({ cont: window.__cont, sel: window.__sel, paye: window.__paye,
+        coches: [...document.querySelectorAll('.carte input:checked')].map((c) => c.name), msgs: window.__msgs || [],
+        banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
+      await pg.close(); return { r, errs };
+    };
+    {
+      // a) publier : l'option pré-cochée est DÉCOCHÉE, puis « Continuer » (gratuit).
+      const { r, errs } = await lancerOptions(SRC, adPub);
+      dit(!errs.length, 'aucune erreur sur l’étape options réelle', errs[0] || '');
+      dit(r.coches.length === 0, 'l’option PRÉ-COCHÉE par Leboncoin (urgent 2,50 €) est décochée', 'cochées : ' + (r.coches.join(',') || 'aucune'));
+      dit(r.paye === 0, '⚠️ AUCUN paiement : « Continuer » n’est jamais cliqué avec une option active', '__paye=' + r.paye);
+      dit(r.sel === 0, 'aucun bouton « Sélectionner » d’une carte d’option n’est cliqué', '__sel=' + r.sel);
+      dit(r.cont === 1, 'la publication GRATUITE aboutit : « Continuer » cliqué une fois, options toutes éteintes', '__cont=' + r.cont);
+      dit(!r.msgs.includes('markPosted'), 'le clic seul ne marque PAS la paire publiée (il faut la confirmation de Leboncoin)', r.msgs.join(','));
+      dit(/attends la confirmation/i.test(r.banner), 'le bandeau dit « envoyée, j’attends la confirmation »', (r.banner || '').replace(/\n/g, ' ').slice(0, 120));
+    }
+    {
+      // b) LE DÉFAUT (paire non lancée pour publier : l'enchaînement des étapes
+      //    seul) : « Continuer » ne doit JAMAIS être cliqué sur l'étape options.
+      const { r } = await lancerOptions(SRC, { ...adPub, publier: false });
+      dit(r.cont === 0 && r.paye === 0, '⚠️ l’enchaînement des étapes ne franchit JAMAIS l’étape options (sinon : paiement de l’option pré-cochée)', '__cont=' + r.cont + ' __paye=' + r.paye);
+    }
+    {
+      // c) Une option qui se RECOCHE (React) : rien n'est publié, et c'est dit.
+      const recoche = SRC.replace('async function publierSansBooster() {', "async function publierSansBooster() { setInterval(() => { const u = document.querySelector('input[name=urgent]'); if (u) u.checked = true; }, 50);");
+      const { r } = await lancerOptions(recoche, adPub);
+      dit(recoche !== SRC, 'la mutation « option qui se recoche » est posée');
+      dit(r.cont === 0 && r.paye === 0, 'une option qui se recoche toute seule : RIEN n’est publié', '__cont=' + r.cont + ' __paye=' + r.paye);
+      dit(/encore active|s.est activ/i.test(r.banner), 'et le bandeau dit pourquoi (option payante encore active)', (r.banner || '').replace(/\n/g, ' ').slice(0, 120));
+    }
+    // 7) LA PUBLICATION SE PROUVE À LA CONFIRMATION : la page de fin marque la paire.
+    {
+      const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+      await pg.addInitScript(initChrome, { ad: adPub });
+      await pg.goto('http://localhost:4491/deposer-une-annonce/confirmation', { waitUntil: 'domcontentloaded' });
+      await pg.addScriptTag({ content: SRC });
+      await pg.waitForTimeout(2500);
+      const msgs = await pg.evaluate(() => window.__msgs || []);
+      await pg.close();
+      dit(msgs.includes('markPosted') && msgs.includes('setPending'), 'la page de CONFIRMATION de Leboncoin marque la paire publiée (et vide le dépôt en cours)', msgs.join(','));
     }
   }
 
