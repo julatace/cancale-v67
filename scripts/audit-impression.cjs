@@ -39,36 +39,40 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(
 
 // ── On extrait le VRAI code, rien d'autre ───────────────────────────────────
 const morceau = (re, quoi) => { const m = re.exec(APP); if (!m) { dit(false, `${quoi} introuvable dans App.jsx`); return null; } return m[0]; };
+const bloc = (nom) => morceau(new RegExp(`const ${nom} = (?:async )?\\([\\s\\S]*?\\n\\};`), '`' + nom + '`');
+const ligne = (nom) => morceau(new RegExp(`const ${nom} = [^\\n]*\\n`), '`' + nom + '`');
 const parts = [
   morceau(/const IMPR_MODES = \[[^\n]*\n/, '`IMPR_MODES`'),
   morceau(/const imprMode = \([^\n]*\n/, '`imprMode`'),
   morceau(/const PAS_L_ETIQUETTE = \/[^\n]*\n/, '`PAS_L_ETIQUETTE`'),
   morceau(/const _mulM = \([^\n]*\n/, '`_mulM`'),
   morceau(/const _apM = \([^\n]*\n/, '`_apM`'),
-  morceau(/const relevePage = \([\s\S]*?\n\};/, '`relevePage`'),
-  morceau(/const _couperSelon = \([\s\S]*?\n\};/, '`_couperSelon`'),
-  morceau(/const zoneEtiquette = \([\s\S]*?\n\};/, '`zoneEtiquette`'),
-  morceau(/const posePrefsImpression = \([\s\S]*?\n\};/, '`posePrefsImpression`'),
-  morceau(/const drawSkuThermique = \([\s\S]*?\n\};/, '`drawSkuThermique`'),
+  ligne('MM_PT'), ligne('ETIQ_TH'), ligne('TAILLES_ETIQUETTE'), ligne('TH_MARGE'),
+  morceau(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/, '`TYPES_BORDEREAU`'),
+  bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
+  bloc('posePrefsImpression'), bloc('drawBordereauStamp'), bloc('placementThermique'), bloc('poserEtiquettesThermiques'),
+  bloc('poserBordereau'), bloc('typeBordereau'),
 ];
 
 let R = null;
 if (parts.every(Boolean)) {
   let src = parts.join('\n');
   if (PROUVE) {
-    // RÉAFFAIBLISSEMENT : on découpe TOUJOURS, même quand on n'a rien reconnu —
-    // c'est-à-dire qu'on rogne au hasard le bordereau dont on ignore la mise en
-    // page. Les contrôles doivent virer au rouge.
+    // RÉAFFAIBLISSEMENTS : chacun doit faire virer au rouge au moins un contrôle.
+    // (1) on découpe TOUJOURS, même sans avoir rien reconnu ;
     src = src.replace(/return \{ ok: false, raison: \(cand\[0\][^\n]*\n/,
       'return { ok:true, x:0, y:0, w:Math.round(W*0.5), h:Math.round(H*0.5) };\n');
-    src = src.replace(/if \(dans\.length < 10\) return \{ ok: false, raison: [^\n]*\n/,
+    src = src.replace(/if \(dans\.length < 10\) return parObjets\(\) \|\| \{ ok: false, raison: [^\n]*\n/,
       'if (dans.length < 10) return { ok:true, x:0, y:0, w:Math.round(W*0.5), h:Math.round(H*0.5) };\n');
+    // (2) deux étiquettes qui se chevauchent seraient prises quand même ;
+    src = src.replace(/\{ etiquettes\.length = 0; break; \}/, '{}');
+    // (3) la page thermique garde la taille de la zone (l'ancien rendu).
+    src = src.replace(/const p = out\.addPage\(\[ETIQ_TH\.w, ETIQ_TH\.h\]\);/, 'const p = out.addPage([r.w, r.h]);');
   }
   try {
-    const ctx = { console: { log() {} }, TextDecoder };
-    vm.createContext(ctx);
-    vm.runInContext(`${src}\nglobalThis.R = { imprMode, zoneEtiquette, posePrefsImpression, drawSkuThermique };`, ctx, { filename: 'App.jsx' });
-    R = ctx.R;
+    // ⚠️ `new Function`, pas `vm` : pdf-lib vérifie `instanceof Array`, et un
+    // tableau né dans un autre « realm » n'en est pas un (§ dossier, `vm`).
+    R = new Function('TextDecoder', `${src}\nreturn { imprMode, zoneEtiquette, posePrefsImpression, placementThermique, poserBordereau, typeBordereau, estTailleEtiquette, ETIQ_TH, TH_MARGE, TH_BANDE };`)(TextDecoder);
   } catch (e) { dit(false, 'le code d’impression se charge', String((e && e.message) || e)); }
 }
 
@@ -140,11 +144,20 @@ const airePage = (p) => { const s = p.getSize(); return s.width * s.height; };
       const dedans = z.x <= bx.x + 1 && z.y <= bx.y + 1 && z.x + z.w >= bx.X - 1 && z.y + z.h >= bx.Y - 1;
       dit(dedans, `« ${cas} » : le code-barres est entier dans la découpe`,
         dedans ? '' : `zone x${Math.round(z.x)}..${Math.round(z.x + z.w)} y${Math.round(z.y)}..${Math.round(z.y + z.h)} contre code-barres x${bx.x}..${bx.X} y${bx.y}..${bx.Y}`);
-      // le SKU : un petit numéro, DANS la zone
-      const bold = await d.embedFont(PL.StandardFonts.HelveticaBold);
-      const pose = R.drawSkuThermique(p, PL.rgb, bold, '412', z);
-      dit(pose === true, `« ${cas} » : le N° est tamponné en petit dans l'étiquette`);
-      dit(R.drawSkuThermique(p, PL.rgb, bold, '', z) === false, `« ${cas} » : pas de numéro ⇒ pas de cartouche vide`);
+      // ce qui sort vraiment : une page 100×150 mm, l'étiquette entière dedans,
+      // le N° dans la bande SOUS l'étiquette (il ne recouvre plus rien)
+      const out = await PL.PDFDocument.create();
+      const r1 = await R.poserBordereau(PL, out, d, { numero: '412', title: 'x', pos: null, thermique: true });
+      dit(r1.isole === true && out.getPageCount() === 1, `« ${cas} » : en thermique, une étiquette = une page`, `${out.getPageCount()} page(s)`);
+      const pg = out.getPages()[0], { width: tw, height: th } = pg.getSize();
+      dit(Math.abs(tw - 283.46) < 0.05 && Math.abs(th - 425.2) < 0.05, `« ${cas} » : la page fait exactement 100 × 150 mm`, `${(tw / 72 * 25.4).toFixed(1)} × ${(th / 72 * 25.4).toFixed(1)} mm`);
+      const pl = R.placementThermique(z, z.sens, true);
+      const b = pl.boite;
+      dit(b.x >= R.TH_MARGE - 0.01 && b.x + b.w <= R.ETIQ_TH.w - R.TH_MARGE + 0.01 && b.y + b.h <= R.ETIQ_TH.h - R.TH_MARGE + 0.01,
+        `« ${cas} » : l'étiquette tient entière dans la marge (rien de rogné)`, `boîte ${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}`);
+      dit(b.y >= R.TH_MARGE + R.TH_BANDE - 0.01, `« ${cas} » : le N° a sa bande sous l'étiquette, il ne recouvre rien`);
+      const sansNum = R.placementThermique(z, z.sens, false);
+      dit(sansNum.bande === 0, `« ${cas} » : pas de numéro ⇒ pas de bande vide`);
     });
   }
 
@@ -176,10 +189,82 @@ const airePage = (p) => { const s = p.getSize(); return s.width * s.height; };
   dit(!/(ton étiquette est prête|tout est prêt)/i.test(bloc),
     'il ne promet pas « ton étiquette est prête »');
   // la découpe ne part QUE du résultat de zoneEtiquette, jamais d'une position écrite en dur
+  const poser = (APP.match(/const poserBordereau = async[\s\S]*?\n\};/) || [])[0] || '';
+  dit(/zoneEtiquette\(PL, first\)/.test(poser) && /if \(thermique && z\.ok\)/.test(poser),
+    'la découpe ne part que d’une zone MESURÉE (`poserBordereau`)');
   const fusion = (APP.match(/const mergeAndDownloadBordereaux = async[\s\S]*?\n\};/) || [])[0] || '';
-  dit(/zoneEtiquette\(PL, first\)/.test(fusion) && /if \(thermique && z\.ok\)/.test(fusion),
-    'le lot ne découpe que sur une zone MESURÉE');
-  dit(/entiers\.push/.test(fusion), 'et il retient ce qu’il n’a pas su découper');
+  const unique = (APP.match(/const annotateAndDownloadBordereau = async[\s\S]*?\n\};/) || [])[0] || '';
+  const avecFacture = (APP.match(/const printBordAndInvoice = async[\s\S]*?\n  \};/) || [])[0] || '';
+  dit(/poserBordereau\(/.test(fusion) && /poserBordereau\(/.test(unique) && /poserBordereau\(/.test(avecFacture),
+    'les trois chemins d’impression (lot, un bordereau, bordereau + facture) passent par LA même règle');
+  dit(!/setMediaBox|drawSkuThermique/.test(fusion + unique + avecFacture), 'plus aucune découpe « à la main » à côté de la règle');
+  dit(/entiers\.push/.test(fusion), 'et le lot retient ce qu’il n’a pas su découper');
+
+  // ── 6. L'ÉTIQUETTE POSÉE TELLE QUELLE PAR LE TRANSPORTEUR ──────────────────
+  // (a) une page qui EST déjà une étiquette 10×15 : entière, rien de coupé.
+  await essaie('page au format étiquette', async () => {
+    const d = await PL.PDFDocument.create(); const p = d.addPage([R.ETIQ_TH.w, R.ETIQ_TH.h]);
+    p.drawRectangle({ x: 10, y: 10, width: 200, height: 60, color: PL.rgb(0, 0, 0) });
+    const z = R.zoneEtiquette(PL, (await PL.PDFDocument.load(await d.save())).getPages()[0]);
+    dit(z.ok && z.via === 'page' && Math.abs(z.w - R.ETIQ_TH.w) < 0.5, 'une page déjà au format 10×15 part entière', JSON.stringify(z).slice(0, 80));
+  });
+  // (b) deux étiquettes en images de 100×150, côte à côte, aucun mot lisible
+  //     (la forme mesurée de l'envoi international Mondial Relay → An Post).
+  const deuxImages = async (chevauche) => {
+    const d = await PL.PDFDocument.create(); const p = d.addPage(A4);
+    const png = await d.embedPng(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'));
+    p.drawImage(png, { x: 8.5, y: 36.9, width: 283.44, height: 425.28 });
+    p.drawImage(png, { x: chevauche ? 150 : 297.6, y: 30.2, width: 288, height: 432 });
+    for (let i = 0; i < 12; i++) p.drawRectangle({ x: 40, y: 800 - i * 22, width: 500, height: 8, color: PL.rgb(0.3, 0.3, 0.3) });
+    return PL.PDFDocument.load(await d.save());
+  };
+  await essaie('deux étiquettes images', async () => {
+    const d = await deuxImages(false);
+    const z = R.zoneEtiquette(PL, d.getPages()[0]);
+    dit(z.ok && z.via === 'objet' && (z.etiquettes || []).length === 2, 'deux étiquettes posées en images ⇒ deux étiquettes reconnues', z.ok ? `${(z.etiquettes || []).length}` : z.raison);
+    const out = await PL.PDFDocument.create();
+    const r1 = await R.poserBordereau(PL, out, d, { numero: '7', title: '', pos: null, thermique: true });
+    dit(r1.isole && out.getPageCount() === 2 && out.getPages().every((pg) => Math.abs(pg.getWidth() - 283.46) < 0.05 && Math.abs(pg.getHeight() - 425.2) < 0.05),
+      'et deux pages 100×150 (les deux vont sur le colis)', `${out.getPageCount()} page(s)`);
+  });
+  await essaie('étiquettes qui se chevauchent', async () => {
+    const z = R.zoneEtiquette(PL, (await deuxImages(true)).getPages()[0]);
+    dit(!(z.ok && z.via === 'objet'), 'deux « étiquettes » qui se chevauchent ne sont PAS découpées', z.ok ? `via ${z.via}` : '');
+  });
+  // (c) une étiquette couchée est tournée pour tenir debout, entière
+  const couchee = R.placementThermique({ x: 0, y: 0, w: 433, h: 291 }, -90, true);
+  dit(couchee.angle === -90 && couchee.boite.w <= R.ETIQ_TH.w - 2 * R.TH_MARGE + 0.01 && couchee.boite.h <= R.ETIQ_TH.h - 2 * R.TH_MARGE - R.TH_BANDE + 0.01,
+    'une étiquette couchée est tournée et tient entière sur le rouleau');
+  dit(couchee.s <= 1.25, 'et elle n’est jamais agrandie de plus de 25 %');
+
+  // ── 7. SUR SES VRAIS BORDEREAUX (s'ils sont là, hors dépôt) ─────────────────
+  // `scripts/bancs/fx/bordereaux/*.pdf` : copie locale de ses PDF, gitignorée
+  // (vrais acheteurs, vraies adresses, dépôt PUBLIC — §6). Absents ⇒ on le dit,
+  // on ne fait pas semblant.
+  const FX = path.join(racine, 'scripts', 'bancs', 'fx', 'bordereaux');
+  const vrais = fs.existsSync(FX) ? fs.readdirSync(FX).filter((f) => f.endsWith('.pdf')) : [];
+  if (!vrais.length) console.log('ℹ︎  aucun vrai bordereau local (scripts/bancs/fx/bordereaux) : section 7 sautée');
+  else await essaie('vrais bordereaux', async () => {
+    let iso = 0, pages = 0, mauvaises = 0, hors = 0; const types = {};
+    for (const f of vrais) {
+      const d = await PL.PDFDocument.load(fs.readFileSync(path.join(FX, f)));
+      const t = R.typeBordereau(PL, d); types[t.type] = (types[t.type] || 0) + 1;
+      const z = R.zoneEtiquette(PL, d.getPages()[0]);
+      const out = await PL.PDFDocument.create();
+      const r1 = await R.poserBordereau(PL, out, await PL.PDFDocument.load(fs.readFileSync(path.join(FX, f))), { numero: '123', title: '', pos: null, thermique: true });
+      if (r1.isole) {
+        iso++;
+        for (const pg of out.getPages()) { pages++; if (Math.abs(pg.getWidth() - 283.46) > 0.05 || Math.abs(pg.getHeight() - 425.2) > 0.05) mauvaises++; }
+        const { width: W, height: H } = d.getPages()[0].getSize();
+        for (const e of (z.etiquettes || [z])) if (e.x < -0.5 || e.y < -0.5 || e.x + e.w > W + 0.5 || e.y + e.h > H + 0.5) hors++;
+      }
+    }
+    console.log(`ℹ︎  ${vrais.length} vrais bordereaux : ${iso} découpés · types ${JSON.stringify(types)}`);
+    dit(iso > 0, 'sur ses vrais bordereaux, des étiquettes sont découpées', `${iso}/${vrais.length}`);
+    dit(mauvaises === 0, 'toutes les pages thermiques font exactement 100 × 150 mm', `${mauvaises} sur ${pages}`);
+    dit(hors === 0, 'aucune zone ne déborde de sa page');
+    dit(!types.autre || types.autre < vrais.length, 'le type de chaque bordereau se reconnaît (au moins en partie)', JSON.stringify(types));
+  });
 
   console.log(`\n${ko ? `${ko} contrôle(s) au rouge.` : 'Une feuille par bordereau, et rien n’est rogné au hasard.'}`);
   process.exit(ko ? 1 : 0);

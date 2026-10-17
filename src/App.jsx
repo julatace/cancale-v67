@@ -7160,7 +7160,11 @@ const relevePage = (PL, ctx, flux, ressources, ctm, out, prof) => {
         const g = _mulM(tm, cur), larg = 0.5 * taille * txt.length;
         const p = [_apM(g, 0, -taille * 0.25), _apM(g, larg, -taille * 0.25), _apM(g, 0, taille * 0.85), _apM(g, larg, taille * 0.85)];
         const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
-        out.push({ x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys),
+        // `d` = le SENS de lecture sur la page (vecteur de la ligne de base) :
+        // c'est lui qui dit dans quel sens tourner une étiquette couchée pour
+        // qu'elle se lise droite sur le rouleau 10×15 — même quand la police n'a
+        // pas de table ToUnicode (les octets sont illisibles, la matrice non).
+        out.push({ x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys), d: [g[0], g[1]],
                    s: txt.replace(/\\(\d{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8))).replace(/\\(.)/g, '$1') });
       }
     }
@@ -7183,10 +7187,17 @@ const relevePage = (PL, ctx, flux, ressources, ctm, out, prof) => {
       let sub = null; try { sub = o.dict && o.dict.get(PL.PDFName.of('Subtype')); } catch (_) {}
       if (sub && sub.asString && sub.asString() === '/Image') {
         const p = [_apM(cur, 0, 0), _apM(cur, 1, 0), _apM(cur, 0, 1), _apM(cur, 1, 1)];
-        out.push({ x: Math.min(...p.map((q) => q[0])), y: Math.min(...p.map((q) => q[1])), X: Math.max(...p.map((q) => q[0])), Y: Math.max(...p.map((q) => q[1])), s: '' });
+        out.push({ x: Math.min(...p.map((q) => q[0])), y: Math.min(...p.map((q) => q[1])), X: Math.max(...p.map((q) => q[0])), Y: Math.max(...p.map((q) => q[1])), s: '', img: true });
       } else {
         let mm = [1, 0, 0, 1, 0, 0];
         try { const ma = o.dict.get(PL.PDFName.of('Matrix')); if (ma && ma.asArray) mm = ma.asArray().map((n) => n.asNumber()); } catch (_) {}
+        // Le cadre d'un Form XObject (`BBox`), en coordonnées de PAGE, rangé À
+        // PART (`out.formes`) : mis dans `out`, ce pavé compterait comme un aplat
+        // et fausserait la carte d'occupation. Il ne sert qu'à reconnaître une
+        // étiquette posée telle quelle par le transporteur (10×15 cm).
+        try { const bb = o.dict.get(PL.PDFName.of('BBox')); if (bb && bb.asArray) { const v = bb.asArray().map((n) => n.asNumber()); const g2 = _mulM(mm, cur);
+          const q = [_apM(g2, v[0], v[1]), _apM(g2, v[2], v[1]), _apM(g2, v[0], v[3]), _apM(g2, v[2], v[3])];
+          (out.formes || (out.formes = [])).push({ x: Math.min(...q.map((z) => z[0])), y: Math.min(...q.map((z) => z[1])), X: Math.max(...q.map((z) => z[0])), Y: Math.max(...q.map((z) => z[1])) }); } } catch (_) {}
         let res2 = null; try { res2 = ctx.lookup(o.dict.get(PL.PDFName.of('Resources'))); } catch (_) {}
         relevePage(PL, ctx, fluxDe(ref), res2 || ressources, _mulM(mm, cur), out, prof + 1);
       }
@@ -7251,6 +7262,35 @@ const _couperSelon = (dans, W, H, axe) => {
   return { ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) };
 };
 
+// ── LE ROULEAU THERMIQUE : 100 × 150 mm, rien d'autre ──────────────────────
+// Une étiquette thermique fait 10×15 cm (en Europe ; 4×6 pouces = 101,6×152,4
+// mm ailleurs). La page produite pour une imprimante thermique a EXACTEMENT ce
+// format, en portrait, et l'étiquette y est posée entière, mise à l'échelle
+// sans jamais être rognée.
+const MM_PT = 72 / 25.4;
+const ETIQ_TH = { w: 100 * MM_PT, h: 150 * MM_PT };      // 283,46 × 425,20 pt
+const TAILLES_ETIQUETTE = [[100, 150], [101.6, 152.4]];   // mm : 10×15 cm · 4×6 pouces
+const estTailleEtiquette = (w, h) => {
+  const a = Math.min(w, h) / MM_PT, b = Math.max(w, h) / MM_PT;
+  return TAILLES_ETIQUETTE.some(([x, y]) => Math.abs(a - x) <= x * 0.04 && Math.abs(b - y) <= y * 0.04);
+};
+// Le sens de lecture DANS la zone : une étiquette couchée (plus large que
+// haute) doit être tournée pour tenir sur le rouleau ; on la tourne du côté
+// qui remet son texte à l'endroit. `sens` = 90 (sens inverse des aiguilles) ou
+// -90 (sens des aiguilles) ; sans texte pour le dire, -90.
+const avecSens = (z, dans) => {
+  if (!z || !z.ok || z.w <= z.h) return z ? { ...z, sens: null } : z;
+  let monte = 0, descend = 0;
+  for (const o of dans || []) {
+    if (!o.d || o.X < z.x || o.x > z.x + z.w || o.Y < z.y || o.y > z.y + z.h) continue;
+    const [dx, dy] = o.d, n = Math.hypot(dx, dy) || 1;
+    if (dy / n > 0.7) monte++; else if (dy / n < -0.7) descend++;
+  }
+  // Un texte qui MONTE (lu de bas en haut) se remet droit en tournant la page
+  // dans le sens des aiguilles d'une montre ; un texte qui DESCEND, dans l'autre.
+  return { ...z, sens: descend > monte ? 90 : -90 };
+};
+
 // OÙ EST L'ÉTIQUETTE SUR CETTE PAGE ? `{ok:true, x,y,w,h}` ou `{ok:false, raison}`.
 // Mesuré sur ses 148 bordereaux : **144 isolés (97 %)**, 4 mises en page distinctes,
 // et la zone est IDENTIQUE d'un bordereau à l'autre pour une mise en page donnée.
@@ -7262,19 +7302,49 @@ const zoneEtiquette = (PL, page) => {
     const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
       if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
       if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
-    relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);
     const { width: W, height: H } = page.getSize();
+    // ① LA PAGE EST DÉJÀ UNE ÉTIQUETTE (10×15 cm ou 4×6 pouces) : rien à
+    // découper, elle part entière sur le rouleau — c'est la mise en page même
+    // du transporteur, aucun code-barres ne peut y être coupé.
+    if (estTailleEtiquette(W, H)) return { ok: true, x: 0, y: 0, w: W, h: H, part: 1, via: 'page', sens: null };
+    relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);
     // ⚠️ Un FOND pleine page remplit toute la carte d'occupation et efface la
     // séparation : une marque qui couvre plus de la moitié de la feuille n'est
     // pas du contenu.
     const dans = out.filter((o) => o.X >= -2 && o.x <= W + 2 && o.Y >= -2 && o.y <= H + 2)
                     .filter((o) => (o.X - o.x) * (o.Y - o.y) <= W * H * 0.5);
-    if (dans.length < 10) return { ok: false, raison: 'ce PDF ne contient aucun texte lisible' };
+    const parObjets = () => {
+      // ② DERNIER REPÈRE : L'ÉTIQUETTE POSÉE TELLE QUELLE PAR LE TRANSPORTEUR.
+      // Mesuré le 17 octobre sur ses 93 bordereaux : le seul qui partait encore
+      // entier (envoi international Mondial Relay → An Post, PDF « FPDF ») ne
+      // porte AUCUN mot lisible, mais pose ses DEUX étiquettes en images de
+      // 100×150 mm exactement, côte à côte — et les deux doivent aller sur le
+      // colis (« ne recouvrez pas les codes-barres des transporteurs partenaires »).
+      // Une image (ou un Form XObject) au format exact d'une étiquette EST une
+      // étiquette : on la prend entière, à ses bords, donc rien n'y est coupé.
+      // On ne devine rien d'autre : deux objets qui se chevauchent, ou un objet
+      // hors de la page, et on retombe sur « la page part entière ».
+      const objets = [...dans.filter((o) => o.img), ...((out.formes || []).filter((o) => o.X >= -2 && o.x <= W + 2 && o.Y >= -2 && o.y <= H + 2))]
+        .filter((o) => estTailleEtiquette(o.X - o.x, o.Y - o.y) && o.x >= -2 && o.y >= -2 && o.X <= W + 2 && o.Y <= H + 2);
+      const etiquettes = [];
+      for (const o of objets) {
+        const r = { x: Math.max(0, o.x), y: Math.max(0, o.y), w: Math.min(W, o.X) - Math.max(0, o.x), h: Math.min(H, o.Y) - Math.max(0, o.y) };
+        const doublon = etiquettes.find((e) => Math.abs(e.x - r.x) < 3 && Math.abs(e.y - r.y) < 3 && Math.abs(e.w - r.w) < 3 && Math.abs(e.h - r.h) < 3);
+        if (doublon) continue;
+        if (etiquettes.some((e) => r.x < e.x + e.w - 2 && e.x < r.x + r.w - 2 && r.y < e.y + e.h - 2 && e.y < r.y + r.h - 2)) { etiquettes.length = 0; break; }
+        etiquettes.push(r);
+      }
+      if (!etiquettes.length) return null;
+      etiquettes.sort((a, b) => (b.y - a.y) || (a.x - b.x));    // de haut en bas, puis de gauche à droite
+      const liste = etiquettes.map((e) => avecSens({ ok: true, ...e, part: (e.w * e.h) / (W * H) }, dans));
+      return { ...liste[0], via: 'objet', etiquettes: liste };
+    };
+    if (dans.length < 10) return parObjets() || { ok: false, raison: 'ce PDF ne contient aucun texte lisible' };
     // ⚠️ LA COUPURE N'EST PAS TOUJOURS VERTICALE : Chronopost coupe en colonnes,
     // Mondial Relay tantôt en colonnes, tantôt en bandes (notice en haut).
     const cand = [_couperSelon(dans, W, H, 'x'), _couperSelon(dans, W, H, 'y')].filter(Boolean);
     const bons = cand.filter((z) => z.ok);
-    if (bons.length) { bons.sort((a, b) => a.part - b.part); return bons[0]; }
+    if (bons.length) { bons.sort((a, b) => a.part - b.part); return avecSens(bons[0], dans); }
     // ⚠️ REPLI : LE CADRE. Ces bordereaux-là encadrent leur étiquette d'un
     // rectangle tracé — un repère qui ne dépend d'aucune police.
     const dedans = (r, o) => o.x >= r.x - 2 && o.X <= r.x + r.w + 2 && o.y >= r.y - 2 && o.Y <= r.y + r.h + 2;
@@ -7302,8 +7372,9 @@ const zoneEtiquette = (PL, page) => {
         x = Math.min(x, o.x); y = Math.min(y, o.y); X = Math.max(X, o.X); Y = Math.max(Y, o.Y);
       }
       x = Math.max(0, x - M); y = Math.max(0, y - M); X = Math.min(W, X + M); Y = Math.min(H, Y + M);
-      if ((X - x) * (Y - y) <= W * H * 0.92) return { ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) };
+      if ((X - x) * (Y - y) <= W * H * 0.92) return avecSens({ ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) }, dans);
     }
+    const o2 = parObjets(); if (o2) return o2;
     return { ok: false, raison: (cand[0] && cand[0].echec) || 'aucune séparation nette entre l’étiquette et la fiche' };
   } catch (_) { return { ok: false, raison: 'ce bordereau n’a pas pu être analysé' }; }
 };
@@ -7321,17 +7392,293 @@ const posePrefsImpression = (PL, doc) => {
   } catch (_) { /* vieux lecteur : rien de perdu, la page part quand même */ }
 };
 
-// Le « tout petit SKU en bas » de l'impression thermique : sur une étiquette de
-// 10×15 cm il n'y a pas la place d'un cartouche — juste le numéro du carton, en
-// bas à gauche, sur un fond blanc pour rester lisible sur un aplat.
-const drawSkuThermique = (page, rgb, bold, numero, zone) => {
+// ── L'IMPRESSION THERMIQUE AU POINT (17 octobre) ───────────────────────────
+// Avant, la page « thermique » gardait les dimensions de la ZONE découpée
+// (152×103 mm couchée, 103×153 mm debout…) : c'est le pilote de l'imprimante
+// qui décidait de la tourner, de la réduire ou d'en rogner un bord — et le
+// « tout petit SKU » était posé PAR-DESSUS l'étiquette, à 4 pt du bord, là où
+// un code-barres pouvait se trouver.
+// Maintenant chaque étiquette devient UNE page de 100 × 150 mm exactement,
+// en portrait :
+//   • tournée si elle est couchée, du côté qui remet son texte à l'endroit ;
+//   • mise à l'échelle pour tenir ENTIÈRE dans une marge de 2,5 mm (la tête
+//     d'une imprimante thermique n'imprime pas jusqu'au bord), jamais rognée,
+//     jamais agrandie de plus de 25 % ;
+//   • le N° dans une bande réservée SOUS l'étiquette — il ne recouvre plus rien.
+// Une page qui porte deux étiquettes (envoi international : celle de Mondial
+// Relay ET celle du transporteur partenaire) en donne deux.
+const TH_MARGE = 2.5 * MM_PT, TH_BANDE = 5 * MM_PT;
+// La géométrie, à part (et pure) : `audit-impression.cjs` la vérifie seule.
+const placementThermique = (r, sens, avecNum) => {
+  const bande = avecNum ? TH_BANDE : 0;
+  const tourne = r.w > r.h;
+  const lw = tourne ? r.h : r.w, lh = tourne ? r.w : r.h;          // une fois tournée
+  const dispoW = ETIQ_TH.w - 2 * TH_MARGE, dispoH = ETIQ_TH.h - 2 * TH_MARGE - bande;
+  const s = Math.min(dispoW / lw, dispoH / lh, 1.25);
+  const dw = lw * s, dh = lh * s;
+  const x0 = (ETIQ_TH.w - dw) / 2, y0 = TH_MARGE + bande + (dispoH - dh) / 2;
+  const angle = !tourne ? 0 : (sens === 90 ? 90 : -90);
+  // Le point d'ancrage de `drawPage` selon la rotation (pdf-lib tourne autour
+  // du coin bas-gauche de l'objet posé).
+  const x = angle === 90 ? x0 + dw : x0, y = angle === -90 ? y0 + dh : y0;
+  return { x, y, s, angle, boite: { x: x0, y: y0, w: dw, h: dh }, bande };
+};
+// Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
+// 100×150 chacune. Rend le nombre de pages ajoutées.
+const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
   const n = numero == null ? '' : String(numero).trim();
-  if (!n) return false;
-  const t = `N° ${n}`, taille = 11, larg = t.length * taille * 0.62 + 10;
-  const x = zone.x + 4, y = zone.y + 4;
-  page.drawRectangle({ x, y, width: larg, height: taille + 7, color: rgb(1, 1, 1), borderColor: rgb(0, 0, 0), borderWidth: 0.8 });
-  page.drawText(t, { x: x + 5, y: y + 5, size: taille, font: bold, color: rgb(0, 0, 0) });
-  return true;
+  const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
+  let k = 0;
+  for (const r of rects) {
+    const emb = await out.embedPage(page, { left: r.x, bottom: r.y, right: r.x + r.w, top: r.y + r.h });
+    const pl = placementThermique(r, r.sens != null ? r.sens : z.sens, !!n);
+    const p = out.addPage([ETIQ_TH.w, ETIQ_TH.h]);
+    p.drawPage(emb, { x: pl.x, y: pl.y, xScale: pl.s, yScale: pl.s, rotate: PL.degrees(pl.angle) });
+    if (n) {
+      const t = `N° ${n}`, taille = 9.5, larg = bold.widthOfTextAtSize(t, taille);
+      p.drawText(t, { x: (ETIQ_TH.w - larg) / 2, y: TH_MARGE + (TH_BANDE - taille) / 2 + 1, size: taille, font: bold, color: PL.rgb(0, 0, 0) });
+    }
+    k++;
+  }
+  return k;
+};
+// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
+// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
+const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
+// UN bordereau posé dans `out`, la même règle pour les trois chemins
+// d'impression (une vente, un lot, Leboncoin) :
+//   thermique + étiquette reconnue ⇒ pages 100×150 (et les pages suivantes du
+//   PDF, une déclaration en douane par exemple, telles quelles) ;
+//   sinon ⇒ la page entière, tamponnée du N° à son emplacement appris.
+// Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
+  const { rgb, StandardFonts } = PL;
+  const first = src.getPages()[0];
+  const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  if (thermique && z.ok) {
+    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
+    const n = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras);
+    const reste = src.getPageIndices().slice(1);
+    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
+    return { isole: true, etiquettes: n, raison: '' };
+  }
+  const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+  const sReg = await src.embedFont(StandardFonts.Helvetica);
+  drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
+  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '' };
+};
+
+// ── QUEL TYPE DE BORDEREAU EST-CE ? ──────────────────────────────────────────
+// Pour les aperçus de Réglages seulement — l'impression, elle, ne dépend
+// JAMAIS du type (elle repère l'étiquette sur la page, `zoneEtiquette`). Mesuré
+// le 17 octobre sur ses 93 bordereaux : les mots du transporteur sont lisibles
+// sur Chronopost (43+4), Colissimo (3) et la plupart des Mondial Relay ; les
+// autres se reconnaissent à leur créateur (« MondialRelay … ») ou à l'étiquette
+// partenaire posée au format exact (envoi international). Rien d'autre n'est
+// deviné : sans repère, c'est « autre mise en page », avec ses dimensions.
+const TYPES_BORDEREAU = [
+  ['mondialrelay', 'Mondial Relay · InPost'],
+  ['international', 'Mondial Relay · envoi international'],
+  ['chronopost', 'Chronopost · Shop2Shop'],
+  ['colissimo', 'Colissimo'],
+  ['vintedgo', 'Vinted Go'],
+  ['relaiscolis', 'Relais Colis'],
+  ['ups', 'UPS'],
+  ['dpd', 'DPD'],
+];
+const typeBordereau = (PL, doc) => {
+  try {
+    const page = doc.getPages()[0], ctx = doc.context, out = [];
+    let res = null; try { res = ctx.lookup(page.node.get(PL.PDFName.of('Resources'))); } catch (_) {}
+    const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
+      if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
+      if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
+    relevePage(PL, ctx, fluxDe(page.node.get(PL.PDFName.of('Contents'))), res, [1, 0, 0, 1, 0, 0], out, 0);
+    const mots = out.filter((o) => o.s).map((o) => o.s).join(' ').toLowerCase();
+    let createur = ''; try { createur = String(doc.getCreator() || '') + ' ' + String(doc.getProducer() || ''); } catch (_) {}
+    const { width: W, height: H } = page.getSize();
+    const sens = W > H ? 'paysage' : 'portrait';
+    const objetEtiquette = [...out.filter((o) => o.img), ...(out.formes || [])].some((o) => estTailleEtiquette(o.X - o.x, o.Y - o.y));
+    let t = '';
+    // Chronopost AVANT Colissimo : ses étiquettes citent La Poste (sa maison
+    // mère) — mesuré, 4 Shop2Shop étaient rangés en « Colissimo » sinon.
+    if (/chronopost|shop2shop/.test(mots)) t = 'chronopost';
+    else if (/colissimo/.test(mots)) t = 'colissimo';
+    else if (/vinted\s*go/.test(mots)) t = 'vintedgo';
+    else if (/relais\s*colis/.test(mots)) t = 'relaiscolis';
+    else if (/\bups\b/.test(mots)) t = 'ups';
+    else if (/\bdpd\b/.test(mots)) t = 'dpd';
+    else if (/hermes|an\s*post|\bgls\b/.test(mots)) t = 'international';
+    else if (/mondial\s*relay|inpost/.test(mots) || /mondialrelay/i.test(createur)) t = 'mondialrelay';
+    else if (objetEtiquette) t = 'international';
+    return { type: t || 'autre', cle: `${t || 'autre'}·${sens}`, sens, W, H };
+  } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
+};
+const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
+
+// Le lecteur de PDF des APERÇUS (pdf.js), chargé au premier aperçu demandé —
+// jamais avant, et seulement pour dessiner : l'impression n'en a pas besoin.
+// Version figée (pdfjs-dist 3.11.174, Mozilla, licence Apache 2.0).
+const PDFJS_V = '3.11.174';
+const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/`;
+let _pdfjs = null;
+const chargerPdfjs = () => _pdfjs || (_pdfjs = new Promise((ok, ko) => {
+  try {
+    if (window.pdfjsLib) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js'; return ok(window.pdfjsLib); }
+    const sc = document.createElement('script'); sc.src = PDFJS_BASE + 'pdf.min.js'; sc.async = true;
+    sc.onload = () => { const L = window.pdfjsLib; if (!L) { _pdfjs = null; return ko(new Error('pdf.js')); } L.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js'; ok(L); };
+    sc.onerror = () => { _pdfjs = null; ko(new Error('pdf.js')); };
+    document.head.appendChild(sc);
+  } catch (e) { _pdfjs = null; ko(e); }
+}));
+// Dessine la page 1..n d'un PDF (octets) dans un canvas, avec un cadre en
+// pointillés autour de `zone` (coordonnées PDF) — « ce qui part en thermique ».
+const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = null } = {}) => {
+  const L = await chargerPdfjs();
+  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets }).promise;
+  const pg = await d.getPage(page);
+  const v0 = pg.getViewport({ scale: 1 });
+  const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
+  const v = pg.getViewport({ scale: sc });
+  canvas.width = Math.round(v.width); canvas.height = Math.round(v.height);
+  canvas.style.width = `${Math.round(v.width / dpr)}px`; canvas.style.height = `${Math.round(v.height / dpr)}px`;
+  const c2 = canvas.getContext('2d'); c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
+  await pg.render({ canvasContext: c2, viewport: v }).promise;
+  if (zone) {
+    const H = v0.height;
+    c2.save(); c2.strokeStyle = '#2458E6'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
+  }
+  return d.numPages;
+};
+
+function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
+  const ref = React.useRef(null);
+  const [etat, setEtat] = React.useState('charge');   // charge · ok · ko
+  React.useEffect(() => {
+    let vivant = true;
+    setEtat('charge');
+    dessinerPdf(ref.current, octets, { page, largeur, zone }).then(() => { if (vivant) setEtat('ok'); }).catch(() => { if (vivant) setEtat('ko'); });
+    return () => { vivant = false; };
+  }, [octets, page, largeur, zone]);
+  const ouvrir = () => { try { const u = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' })); window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000); } catch (_) {} };
+  return (
+    <figure data-apercu={etat} style={{margin:0,display:'flex',flexDirection:'column',gap:6,alignItems:'flex-start'}}>
+      <figcaption style={{fontSize:11.5,fontWeight:600,color:C.muted}}>{label}</figcaption>
+      <canvas ref={ref} aria-label={label} style={{display: etat === 'ko' ? 'none' : 'block', borderRadius:8, border:`1px solid ${C.border}`, background:'#fff', maxWidth:'100%'}}/>
+      {etat === 'charge' && <span style={{fontSize:11.5,color:C.muted}}>Je dessine l’aperçu…</span>}
+      {etat === 'ko' && <span style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>Je n’ai pas pu dessiner l’aperçu ici. <button type="button" onClick={ouvrir} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Ouvrir le PDF</button></span>}
+    </figure>
+  );
+}
+
+// ── RÉGLAGES → IMPRIMANTE ET BORDEREAUX (17 octobre) ────────────────────────
+// Julien : « dans les paramètres, imprimante thermique et normale ; tous les
+// types de bordereau avec une visualisation pour chaque type collecté par
+// l'app ». Le choix est LE réglage `vrm_imprimante` — le même que les deux
+// pastilles de l'écran Colis (§11 : un réglage, deux portes).
+// Les aperçus se calculent sur SES bordereaux, dans son navigateur, au clic :
+// ils lisent des PDF (≈ 70 Ko chacun), donc rien ne part tant qu'il ne le
+// demande pas, et jamais plus de `APERCU_MAX` (§4.4).
+const APERCU_MAX = 24;
+const ImprimanteSetting = ({ nu = false }) => {
+  const [mode, setMode] = React.useState(imprimanteChoisie);
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setMode(imprimanteChoisie()); }), []);
+  const choisir = (v) => { touche.current = true; const m = imprMode(v); setMode(m); save('vrm_imprimante', m); };
+  const [ap, setAp] = React.useState(null);   // null = pas demandé · {etat:'charge'|'pasSu'|'vide'|'lu', ...}
+  const charger = async () => {
+    setAp({ etat: 'charge' });
+    const [emails, captes] = await Promise.all([
+      lireTout('id=like.email_bord_*&meta->>_pdf=eq.true&select=id,at:meta->>receivedAt'),
+      lireTout('id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,at:meta->>capturedAt'),
+    ]);
+    if (emails === null && captes === null) { setAp({ etat: 'pasSu' }); return; }
+    // Un bordereau peut être là deux fois (capté par l'extension ET reçu par
+    // email) : la transaction le dit, on n'en garde qu'un.
+    const vus = new Set(), lignes = [];
+    for (const r of [...(captes || []), ...(emails || [])].sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')))) {
+      if (/_label_latest$/.test(r.id)) continue;
+      const tx = (r.id.match(/(\d{6,})$/) || [])[1] || r.id;
+      if (vus.has(tx)) continue; vus.add(tx); lignes.push(r);
+    }
+    if (!lignes.length) { setAp({ etat: 'vide', partiel: emails === null || captes === null }); return; }
+    const PL = await import('pdf-lib');
+    const types = new Map(); let lus = 0, rates = 0;
+    for (const r of lignes.slice(0, APERCU_MAX)) {
+      const lu = await lirePdfLigne(r.id);
+      if (!lu || !lu.octets) { if (lu === null) rates++; continue; }
+      let doc; try { doc = await PL.PDFDocument.load(lu.octets); } catch (_) { continue; }
+      lus++;
+      const ty = typeBordereau(PL, doc);
+      const z = zoneEtiquette(PL, doc.getPages()[0]);
+      const e = types.get(ty.cle) || { ...ty, n: 0, isoles: 0, raisons: new Set(), exemple: null };
+      e.n++; if (z.ok) e.isoles++; else e.raisons.add(z.raison || 'mise en page inconnue');
+      if (!e.exemple) {
+        // Les deux impressions, faites par LE code d'impression (`poserBordereau`),
+        // avec un N° d'exemple — ce qu'on voit est ce qui sortira.
+        const fabrique = async (thermique) => { const src = await PL.PDFDocument.load(lu.octets); const out = await PL.PDFDocument.create();
+          // le N° tombe là où il tombera vraiment : l'emplacement appris pour ce format
+          const { width: fw, height: fh } = src.getPages()[0].getSize();
+          const pos = (load('vinted_bordereau_formats', {}) || {})[bordereauFormatKey(fw, fh)] || smartDefaultBordPos(fw, fh);
+          const r1 = await poserBordereau(PL, out, src, { numero: '123', title: '', pos, thermique }); return { octets: await out.save(), r1, pages: out.getPageCount() }; };
+        const normale = await fabrique(false), thermique = await fabrique(true);
+        e.exemple = { normale, thermique, zone: z.ok ? z : null };
+      }
+      types.set(ty.cle, e);
+    }
+    const sens = new Set([...types.values()].map((e) => e.type + '|' + e.sens));
+    const doubles = new Set([...types.values()].filter((e) => [...sens].filter((k) => k.startsWith(e.type + '|')).length > 1).map((e) => e.type));
+    setAp({ etat: 'lu', lus, rates, total: lignes.length, types: [...types.values()].sort((a, b) => b.n - a.n), doubles, partiel: emails === null || captes === null });
+  };
+  const vus = ap && ap.etat === 'lu' ? new Set(ap.types.map((e) => e.type)) : new Set();
+  return (
+    <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
+      <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
+        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
+      <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+        {mode === 'thermique'
+          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° en petit sous l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
+          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° tamponné à l’emplacement appris. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
+      </div>
+      <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
+        {!ap && <>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>Pour chaque type que l’app a reçu, ce qui sortira sur une imprimante normale et sur une thermique. Calculé sur tes {APERCU_MAX} derniers bordereaux.</div>
+          <button type="button" data-apercus-voir onClick={charger} style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'0 16px',minHeight:44,fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir les aperçus</button>
+        </>}
+        {ap && ap.etat === 'charge' && <div data-apercus="charge" style={{fontSize:12.5,color:C.muted,marginTop:6}}>Je lis tes bordereaux…</div>}
+        {ap && ap.etat === 'pasSu' && <div data-apercus="passu" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>La base n’a pas répondu : je n’ai pas pu lire tes bordereaux. <button type="button" onClick={charger} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Réessayer</button></div>}
+        {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Aucun bordereau avec son PDF pour l’instant : les aperçus apparaîtront avec ta prochaine vente.'}</div>}
+        {ap && ap.etat === 'lu' && <div data-apercus="lu" style={{marginTop:6}}>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5}} data-apercus-compte={ap.lus}>
+            D’après tes {ap.lus} derniers bordereaux{ap.total > ap.lus + ap.rates ? ` (sur ${ap.total})` : ''}.{ap.rates > 0 ? ` ${ap.rates} n’ont pas pu être lus (la base n’a pas répondu).` : ''}{ap.partiel ? ' Une partie de la liste n’a pas pu être lue.' : ''} Le N° montré est un exemple.
+          </div>
+          {ap.types.map((e) => (
+            <div key={e.cle} data-apercu-type={e.type} data-apercu-isoles={e.isoles} data-apercu-n={e.n} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontSize:13.5,fontWeight:600,color:C.text}}>{e.type === 'autre' ? `Autre mise en page (${Math.round(e.W / MM_PT)} × ${Math.round(e.H / MM_PT)} mm)` : nomTypeBordereau(e.type)}{ap.doubles.has(e.type) ? (e.sens === 'paysage' ? ' · page couchée' : ' · page debout') : ''}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>
+                {e.n} bordereau{e.n > 1 ? 'x' : ''} · {e.isoles === e.n ? (e.n > 1 ? 'étiquette repérée sur tous' : 'étiquette repérée') : e.isoles === 0 ? <>étiquette <b style={{color:C.text}}>non repérée</b> : en thermique la page part entière ({[...e.raisons].join(' · ')})</> : <>étiquette repérée sur {e.isoles} — les autres partent entières en thermique ({[...e.raisons].join(' · ')})</>}
+              </div>
+              <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:10,alignItems:'flex-start'}}>
+                <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>
+                {Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
+                  <ApercuPdf key={i} octets={e.exemple.thermique.octets} page={i + 1} largeur={e.exemple.thermique.r1.isole ? 120 : 180}
+                    label={e.exemple.thermique.r1.isole ? `Thermique · 10×15${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
+                ))}
+              </div>
+            </div>
+          ))}
+          {(() => { const jamais = TYPES_BORDEREAU.filter(([k]) => !vus.has(k)); return jamais.length ? (
+            <div data-apercus-jamais={jamais.map(([k]) => k).join(',')} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:12,color:C.muted,lineHeight:1.5}}>
+              <b style={{color:C.text}}>Pas encore vus</b> dans tes derniers bordereaux : {jamais.map(([, l]) => l).join(' · ')}. Pas d’aperçu inventé : il apparaîtra avec le premier reçu. En thermique, l’app les découpera si elle repère l’étiquette, sinon la page partira entière.
+            </div>) : null; })()}
+        </div>}
+      </div>
+    </div>
+  );
 };
 
 // ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
@@ -7377,23 +7724,25 @@ const ouvrirPdfOnglet = (url) => {
     return !!w;
   } catch (_) { return false; }
 };
-const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
-  const { PDFDocument, rgb, StandardFonts } = PL;
-  const pdf = await PDFDocument.load(pdfArrayBuffer);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const hasNum = drawBordereauStamp(pdf, rgb, bold, reg, numero, title, pos);
+  const { PDFDocument } = PL;
+  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
+  const src = await PDFDocument.load(pdfArrayBuffer);
+  const pdf = await PDFDocument.create();
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique });
+  const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
-  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
+  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const ouvert = ouvrirPdfOnglet(url);
-  return { url, filename, printed: ouvert, ouvert };
+  return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
+           entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [] };
 };
 // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
@@ -7404,33 +7753,20 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
-  const thermique = imprMode(opts.imprimante) === 'thermique';
-  let count = 0, nInv = 0, isoles = 0;
+  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
+  let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   for (const it of items) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
-      const first = src.getPages()[0];
-      const { width, height } = first.getSize();
+      const { width, height } = src.getPages()[0].getSize();
       const pos = resolvePos ? resolvePos(width, height) : null;
-      // On tamponne dans le PDF source (avec des polices embarquées dans out via
-      // copyPages : pdf-lib ré-embarque les ressources à la copie).
-      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
-      const sReg = await src.embedFont(StandardFonts.Helvetica);
-      // IMPRIMANTE THERMIQUE : on ne garde que l'étiquette. Si on ne SAIT pas où
-      // elle est, la page part ENTIÈRE — jamais un code-barres coupé au hasard.
-      const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
-      if (thermique && z.ok) {
-        drawSkuThermique(first, rgb, sBold, it.numero, z);
-        first.setMediaBox(z.x, z.y, z.w, z.h);
-        first.setCropBox(z.x, z.y, z.w, z.h);
-        isoles++;
-      } else {
-        if (thermique) entiers.push({ titre: it.title || '', raison: z.raison || '' });
-        drawBordereauStamp(src, rgb, sBold, sReg, it.numero, it.title, pos);
-      }
-      const pages = await out.copyPages(src, src.getPageIndices());
-      pages.forEach(p => out.addPage(p));
+      // IMPRIMANTE THERMIQUE : l'étiquette seule, sur des pages 100×150. Si on
+      // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
+      // coupé au hasard (`poserBordereau`, la même règle partout).
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique });
+      if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
+      else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
       count++;
       // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
       if (it.invBytes) {
@@ -7446,7 +7782,7 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url);
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, entiers };
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -12752,7 +13088,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
-            {bordResult.pdfBuf && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
+            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
@@ -31831,24 +32168,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const PL = await import('pdf-lib');
       const { PDFDocument, rgb, StandardFonts } = PL;
       const out = await PDFDocument.create();
-      // 1) le bordereau tamponné du N°
+      // 1) le bordereau : tamponné du N°, ou — en thermique — l'étiquette seule
+      //    sur des pages 100×150 (sans la fiche destinataire ni la pub), mais
+      //    seulement si on SAIT où elle est (sinon page entière).
       const src = await PDFDocument.load(buf);
-      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
-      const sReg = await src.embedFont(StandardFonts.Helvetica);
-      // Imprimante thermique : l'étiquette seule, sans la fiche destinataire ni
-      // la pub — mais seulement si on SAIT où elle est (sinon page entière).
-      const zTh = imprMode(imprimante) === 'thermique' ? zoneEtiquette(PL, src.getPages()[0]) : { ok: false };
-      let thermiqueOK = false, thermiqueRaison = '';
-      if (zTh.ok) {
-        drawSkuThermique(src.getPages()[0], rgb, sBold, numero, zTh);
-        src.getPages()[0].setMediaBox(zTh.x, zTh.y, zTh.w, zTh.h);
-        src.getPages()[0].setCropBox(zTh.x, zTh.y, zTh.w, zTh.h);
-        thermiqueOK = true;
-      } else {
-        if (imprMode(imprimante) === 'thermique') thermiqueRaison = zTh.raison || '';
-        drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
-      }
-      (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+      const thermique = imprMode(imprimante) === 'thermique';
+      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique });
+      const thermiqueOK = r1.isole, thermiqueRaison = r1.raison;
       // 2) la facture pro (si elle existe)
       let joined = false;
       if (inv && ent) {
@@ -35770,7 +36096,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
                     {imprimante==='thermique'
-                      ? <>L'étiquette seule, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin.</>
+                      ? <>L'étiquette seule, <b>au format 10 × 15 cm</b>, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin. Aperçus de chaque type : Réglages → Imprimante et bordereaux.</>
                       : <>La page complète, une <b>feuille par bordereau</b>. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d'impression : le PDF le demande, le pilote peut passer outre.</>}
                   </div></details>
                 </div>
@@ -36428,7 +36754,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {bordResult.pdfBuf && !bordResult.batch && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {/* En thermique, le N° est dans la bande réservée sous l'étiquette :
+                il n'y a rien à déplacer — le bouton ne sert qu'à la page entière. */}
+            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && !bordResult.thermique && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
@@ -36439,7 +36767,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px'}}>
                   <div style={{color:C.text,fontWeight:600,marginBottom:ent.length?4:0}}>
-                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format 10×15 cm (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {(bordResult.etiquettes||0)>iso ? ` · ${bordResult.etiquettes} pages : un envoi international porte aussi l'étiquette du transporteur partenaire, colle-les toutes` : ''}
                     {ent.length>0 ? ` · ${ent.length} page${ent.length>1?'s':''} entière${ent.length>1?'s':''}` : ''}
                   </div>
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
@@ -39947,6 +40276,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+    ]},
+    { id:'impression', titre:'Impression', items:[
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ]},
     { id:'compta', titre:'Comptabilité', items:[
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', el:<RegimeSetting nu/> },

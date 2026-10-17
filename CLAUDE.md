@@ -2001,6 +2001,52 @@ la source.*
   deuxième a été corrigée **dans l'app** : une chaîne PDF s'écrit des deux façons,
   et n'en lire qu'une laisse la page muette.
 
+### L'imprimante thermique au point, et un réglage « Imprimante » avec un aperçu par type (17 octobre)
+Julien : « dans les paramètres, imprimante thermique et normale, tous les types
+de bordereau avec une visualisation pour chaque type, et la thermique au point ».
+- **Mesuré d'abord sur ses 93 bordereaux avec PDF** (lecture seule, copie locale
+  dans `scripts/bancs/fx/bordereaux/`, gitignorée) : Chronopost/Shop2Shop 47
+  (paysage 43, debout 4), Mondial Relay · InPost 16, Mondial Relay international
+  27 (étiquette partenaire Hermes/An Post), Colissimo 3. `zoneEtiquette` en
+  isolait **92** ; le 93ᵉ (international « FPDF ») partait entier : AUCUN mot
+  lisible, mais ses DEUX étiquettes sont des images de 100×150 mm exactement.
+- **Thermique** : chaque étiquette devient UNE page de **100 × 150 mm**
+  exactement (`ETIQ_TH`), tournée si elle est couchée (du côté qui remet le texte
+  à l'endroit, lu dans la matrice du texte : `avecSens`), mise à l'échelle ENTIÈRE
+  dans une marge de 2,5 mm (jamais rognée, jamais agrandie de plus de 25 %), le N°
+  dans une bande réservée SOUS l'étiquette (avant : posé par-dessus, à 4 pt du
+  bord, et la page gardait la taille de la zone — le pilote décidait du reste).
+- **Deux repères de plus, sans rien deviner** : une page déjà au format étiquette
+  part entière ; une image ou un Form XObject au format exact d'une étiquette EST
+  une étiquette (deux qui se chevauchent ⇒ page entière). Résultat : **93/93**,
+  94 pages (l'international donne ses deux étiquettes — les deux vont sur le colis).
+- **Une règle pour les trois chemins d'impression** (une vente, un lot,
+  bordereau + facture, et Leboncoin par `annotateAndDownloadBordereau`) :
+  `poserBordereau`. Le réglage est lu par `imprimanteChoisie()` (§11, le même
+  `vrm_imprimante` que les pastilles de Colis). En thermique isolé, plus de
+  « déplacer le N° » (il est dans la bande).
+- **Réglages → Impression → « Imprimante et bordereaux »** (`ImprimanteSetting`) :
+  le choix, une phrase par mode, et « Voir les aperçus » — au CLIC seulement, au
+  plus 24 PDF lus (§4.4), un aperçu normal (zone thermique en pointillés) et
+  thermique par type (`typeBordereau` : mots du transporteur, puis créateur
+  « MondialRelay », puis étiquette partenaire ; sinon « autre mise en page »),
+  fabriqués par `poserBordereau` lui-même, avec un N° d'exemple dit comme tel ;
+  les types jamais reçus sont dits « pas encore vus », sans aperçu inventé. Le
+  dessin passe par pdf.js 3.11.174 chargé au premier aperçu depuis jsdelivr ;
+  injoignable ⇒ « Ouvrir le PDF ».
+- Preuves : `audit-impression.cjs` (vrai code, `new Function` — un tableau né
+  dans un `vm` n'est pas un `Array` pour pdf-lib) **+ section 7 sur ses vrais PDF
+  si présents** : 93 découpés, 0 page hors 100×150, 0 zone hors page ;
+  `--prouve` : **8 rouges** (découpe sans savoir · étiquettes qui se chevauchent
+  prises · page à la taille de la zone). Banc `imprimante.cjs` (390/1512, trois
+  autres états) vert. Sur le code d'avant, les fonctions n'existent pas
+  (11 rouges — pas une preuve en soi) ; la mesure de l'ancien rendu : 92/93 et des
+  pages à la taille de la zone (152×103 mm couchées, 103×153 mm debout).
+- ⚠️ **Non mesuré** : l'impression sur une vraie imprimante thermique (Zebra,
+  Rollo, Phomemo…) — le PDF fait 100×150 mm, mais l'échelle « 100 % » et le
+  papier se choisissent dans la fenêtre d'impression (l'écran le dit) ; Vinted Go,
+  Relais Colis, UPS, DPD seuls jamais vus ; le PDF Leboncoin.
+
 ### ⚠️⚠️ « EST-CE QUE MON EXTENSION EST À JOUR ? » — L'APP NE POUVAIT PAS RÉPONDRE
 Trois sessions de suite ont dû **DEVINER** la version installée (« aucun
 compteur `retrait_*`, donc antérieure à 5.45 ») — et §8 dit noir sur blanc que
