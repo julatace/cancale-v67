@@ -38,7 +38,7 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4411);
+const PORT=Number(process.env.BANC_PORT||process.env.PORT)||4411; srv.listen(PORT);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' â€” '+d:''));};
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
@@ -59,7 +59,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' â€
     return j([]);});
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   const t0=Date.now();
-  await pg.goto('http://localhost:4411/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+PORT+'/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
   for(let i=0;i<400;i++){ const n=await pg.evaluate(()=>document.querySelectorAll("input[placeholder*='prix']").length); if(n>50) break; await pg.waitForTimeout(50); }
   const pret=Date.now()-t0;
   const m=await pg.evaluate(()=>({noeuds:document.querySelectorAll('*').length,

@@ -9257,9 +9257,19 @@ profileur de Chrome sur un build non minifié.
   (sauf la phrase des photos de Ventes, qui dépend du moment où le banc coupe
   les images — elle apparaît dans les deux sens). `vitesse.cjs` : **56 rouges**
   sur le build d'avant, 0 après.
-- **Pas fait, mesuré** : (1) une frappe dans la recherche de Ventes recrée les
-  60 lignes DEUX fois (rendu urgent + rendu différé : la liste n'est pas
-  mémoïsée) — 200 à 300 ms par lettre en émulation téléphone ; (2) le composant
+- **La frappe dans la recherche de Ventes** (fait, 16 oct.) : mesuré (banc
+  `ventes-frappe.cjs`, base inventée, 390 px, processeur ×4) — chaque lettre
+  recréait les 60 lignes au rendu urgent PUIS au différé (120 à 240 par lettre),
+  **151 ms de processeur** avant l'image (horloge médiane 343 ms). Ligne extraite
+  en `LigneVenteVinted` (`React.memo`) : gardée telle quelle au rendu urgent
+  (`gel` : seule la recherche a changé) ou quand `pre.deps` — tout ce qu'elle lit
+  dans l'écran (`preparerLigneVente`) — n'a pas bougé ; gestes par
+  `actionsVentes` (toujours la version à jour). Après : **0 ligne au rendu
+  urgent**, 3 à 63 en tout, **62 ms** (horloge 120). Texte identique au build
+  d'avant (`VENTES_REFERENCE`) et à une page ouverte à froid ; 2 rouges sur
+  l'avant. ⚠️ Toute nouvelle valeur lue dans la ligne passe par
+  `preparerLigneVente` (sinon ligne périmée).
+- **Pas fait, mesuré** : (2) le composant
   qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
   par arrivée de données) ; (3) le premier écran attend la sonde de schéma, puis
   les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
@@ -9280,7 +9290,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | `node scripts/audit-*.cjs` | **93 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **84 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **85 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
