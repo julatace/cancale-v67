@@ -64,6 +64,16 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-shell { height:calc(100dvh / var(--vrm-zoom, 1)) !important; min-height:0; }
   .vrm-main { scroll-padding-block:16px; }
   .vrm-main button:not([role="switch"]) { min-height:44px !important; }
+  /* Un LIEN-TEXTE (sans fond, sans bordure, sans marge intérieure) garde sa
+     zone de 44 px au doigt, mais ne doit pas GONFLER la ligne : la hauteur
+     ajoutée est rendue par une marge négative (revue du 16 oct. : « Gérer la
+     commande », « Faire une contre-offre » posés dans un bloc vide). La boîte
+     mesurée reste à 44 px — c'est elle que les bancs jugent. Opt-in explicite :
+     la classe `vrm-lien-action`. Une marge posée en ligne reste maîtresse. */
+  .vrm-main button.vrm-lien-action,
+  .vrm-main button:is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
+    margin-block:-12px;
+  }
   .vrm-main button[aria-label] { min-width:44px; }
   .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
   .vrm-main textarea, .vrm-main select {
@@ -1031,11 +1041,14 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-colis-carte:has(+ .vrm-colis-groupe), .vrm-colis-carte:last-child { border-bottom-left-radius:12px !important; border-bottom-right-radius:12px !important; }
   .vrm-colis-carte + .vrm-colis-carte { border-top-color:transparent !important; box-shadow:inset 0 1px var(--vrm-line); }
   .vrm-colis-carte .vrm-colis-photo { width:56px !important; height:56px !important; }
-  .vrm-colis-carte .vrm-colis-actions { display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; margin-top:12px !important; }
-  .vrm-colis-carte .vrm-colis-actions > * { width:100%; min-width:0; justify-content:center; text-align:center; }
-  .vrm-colis-carte .vrm-colis-actions > [data-bouton-bord] { grid-column:1 / -1; }
+  .vrm-colis-carte .vrm-colis-actions { display:flex !important; flex-wrap:wrap !important; gap:8px !important; margin-top:12px !important; }
+  .vrm-colis-carte .vrm-colis-actions > * { flex:1 1 0 !important; max-width:none !important; min-width:92px; justify-content:center; text-align:center; }
+  /* Le geste principal (imprimer ou générer) prend toute la ligne ; les deux
+     gestes secondaires (« Imprimé ? », « Colis fait », « J'ai le PDF ») se
+     partagent la suivante — avant, le 3e restait seul sur sa ligne (revue du 16 oct.). */
+  .vrm-colis-carte .vrm-colis-actions > :is([data-bouton-bord], .vrm-colis-primaire) { flex-basis:100% !important; }
   .vrm-colis-carte .vrm-colis-actions > [data-bouton-bord] > button { width:100%; justify-content:center; }
-  .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { grid-column:1 / -1; text-align:left; }
+  .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { flex-basis:100% !important; text-align:left; }
   .vrm-colis-carte .vrm-colis-actions > .vrm-colis-sec { padding:0 8px !important; }
   .vrm-colis-carte [data-bord-vinted] { display:inline-flex; align-items:center; min-height:44px; }
 }
@@ -1049,7 +1062,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-sales-workbar > .vrm-rangee > button { border-radius:999px !important; padding:0 16px !important; font-size:13px !important; }
 }
 @media(max-width:767px) {
-  .vrm-colis-carte .vrm-colis-actions > .vrm-colis-ter { border-color:transparent !important; background:transparent !important; min-height:44px; }
+  .vrm-colis-carte .vrm-colis-actions > .vrm-colis-ter { border-color:transparent !important; background:color-mix(in srgb, var(--vrm-muted) 11%, transparent) !important; min-height:44px; }
   .vrm-colis-carte .vrm-colis-actions { row-gap:6px !important; }
 }
 @media(min-width:1024px) { .vrm-ventes-liste .vrm-sale-overview { grid-template-columns:64px minmax(0,1fr) minmax(130px,200px) !important; gap:12px !important; } }

@@ -29,6 +29,8 @@ import './styles-mineral.css';
 import './styles-reglages.css';
 import './styles-coque.css';
 import './styles-atelier.css';
+import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
+if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
 // ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
 // garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page

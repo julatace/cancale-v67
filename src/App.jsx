@@ -8732,7 +8732,7 @@ let _logoSeq = 0;
 function VrmLogo({ size = 40, style, anim = true }) {
   // srcSet : le navigateur prend la 96 px (10 Ko) quand elle suffit — l'en-tête
   // affiche le logo à 38-44 px — et la 192 px (32 Ko) sur un écran très dense.
-  return <img src="/logo-vrm-192.png" srcSet="/logo-vrm-96.png 96w, /logo-vrm-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo-anim' : undefined}
+  return <img src="/logo-vrm-192.png" srcSet="/logo-vrm-96.png 96w, /logo-vrm-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-logo-anim' : 'vrm-logo'}
     style={{ width: size, height: size, borderRadius: Math.round(size * 0.24), objectFit: 'cover', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -11868,6 +11868,27 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 function EntetePlateforme({nom,plateforme}) {
   return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
 }
+// UN contrôle segmenté pour toute l'app (revue du 16 octobre : trois formes,
+// dont des segments BLEUS pleins, contraires au §7). C'est le dessin des
+// sous-onglets des plateformes (`.vrm-seg`, styles-coque.css) : piste neutre,
+// segment actif en surface. Pour un CHOIX d'écran on pose aria-pressed ; les
+// sous-onglets gardent aria-current (PlatSubNav). `data` passe les attributs
+// que les bancs lisent (data-ca-choix, data-detourage-choix…).
+function Segmente({ label, options, value, onChange, plein = false, disabled = false, className = '', style }) {
+  return (
+    <div role="group" aria-label={label} className={`vrm-seg${plein ? ' vrm-seg-plein' : ''}${className ? ' ' + className : ''}`} style={style}>
+      {options.map(o => (
+        <button key={o.v} type="button" className="vrm-seg-btn" aria-pressed={value === o.v}
+          disabled={disabled || !!o.disabled} onClick={() => onChange(o.v)} {...(o.data || {})}>
+          {o.icone ? <Icon name={o.icone} size={15}/> : null}
+          {o.l}
+          {o.n ? <span className="vrm-seg-n"> {o.n}</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PlatSubNav({ sub, setSub, sections, dark }) {
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   // (16 oct.) CONTRÔLE SEGMENTÉ : une piste neutre, le segment actif posé dessus
@@ -12001,7 +12022,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
-    <div className="vrm-rangee vrm-sales-filters" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
+    <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
   </div>;
 }
 
@@ -21531,14 +21552,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start',maxWidth:'100%',overflowX:'auto'}}>
-        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
-          <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
-            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:8,padding:'7px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
-            <Icon name={ic} size={15}/>{l}
-          </button>
-        ))}
-      </div>
+      <Segmente label="Vue du stock" value={garageView} onChange={v=>{setGarageView(v);save('vinted_garage_view',v);}} style={{alignSelf:'flex-start'}}
+        options={[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>({v,l,icone:ic}))}/>
 
       {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
@@ -22647,6 +22662,34 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// <conflits-numeros-regle>
+// Deux paires PRÉSENTES sous un même numéro (§5, le seul rouge de l'app).
+// ⚠️ Une case du garage n'est pas une PAIRE, c'est un EMPLACEMENT : une
+// annonce en ligne rangée dans sa case (ou une vente à poster encore au
+// garage), c'est UNE paire — l'état normal du stock. Avant, « annonce + case
+// A-1 » comptait pour deux porteurs (types différents, et le garage ne porte
+// jamais le titre) : le bloc rouge s'allumait pour chaque paire rangée.
+// Restent un conflit : le même numéro dans DEUX cases différentes (deux
+// cartons), ou deux paires différentes hors garage (deux annonces, une
+// annonce et une autre vente…). Une vente et son annonce encore ouverte au
+// même titre restent la même paire (règle d'avant, inchangée).
+function conflitsDeNumeros(porteurs) {
+  const out = [];
+  for (const n in (porteurs || {})) {
+    const p = porteurs[n] || [];
+    const cases = new Set(p.filter(x => x.type === 'garage').map(x => x.id));
+    const paires = p.filter(x => x.type !== 'garage');
+    const ids = new Set(paires.map(x => x.type + ':' + x.id));
+    let deux = cases.size > 1;
+    if (!deux && paires.length > 1 && ids.size > 1) {
+      const titres = new Set(paires.map(x => normTitle(x.titre || '')));
+      if (!(paires.length === 2 && titres.size === 1)) deux = true;
+    }
+    if (deux) out.push({ numero: n, porteurs: p });
+  }
+  return out.sort((a, b) => triNum(a.numero, b.numero));
+}
+// </conflits-numeros-regle>
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
@@ -23834,12 +23877,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Chiffre d'affaires par période</div>
             <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>Toutes plateformes · les mêmes règles que Ma journée et le CA déclaré.</div>
           </div>
-          <div role="group" aria-label="Période" style={{ display: 'flex', gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, flex: '1 1 260px', maxWidth: 360 }}>
-            {PERIODES_CA.map(([k, l]) => (
-              <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} data-ca-choix={k}
-                style={{ flex: 1, border: 'none', borderRadius: 6, padding: '7px 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: periode === k ? C.accent : 'transparent', color: periode === k ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
-            ))}
-          </div>
+          <Segmente label="Période" plein value={periode} onChange={choisir} style={{ flex: '1 1 260px', maxWidth: 360 }}
+            options={PERIODES_CA.map(([k, l]) => ({ v: k, l, data: { 'data-ca-choix': k } }))}/>
         </div>
         {calc.etat !== 'lu' ? (
           <div style={{ padding: '16px', fontSize: 12.5, color: C.muted, lineHeight: 1.55 }}>
@@ -26829,20 +26868,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Conflits : un même numéro sur deux paires présentes = la mauvaise chaussure
   // part à l'expédition. C'est LE risque n°1 (§19) — on le montre en rouge.
-  const conflitsNum = useMemo(() => {
-    const out = [];
-    for (const n in porteursNum) {
-      const p = porteursNum[n];
-      // Une vente et son annonce encore ouverte, c'est la MÊME paire (Vinted
-      // laisse parfois l'annonce en ligne après la vente) : pas un conflit.
-      const ids = new Set(p.map(x => x.type + ':' + x.id));
-      if (p.length > 1 && ids.size > 1) {
-        const titres = new Set(p.map(x => normTitle(x.titre || '')));
-        if (!(p.length === 2 && titres.size === 1)) out.push({ numero: n, porteurs: p });
-      }
-    }
-    return out.sort((a, b) => triNum(a.numero, b.numero));
-  }, [porteursNum]);
+  const conflitsNum = useMemo(() => conflitsDeNumeros(porteursNum), [porteursNum]);
   // ── CHANGER LE NUMÉRO D'UNE PAIRE À LA MAIN ────────────────────────────────
   // Julien : « on peut donner la possibilité aux gens de changer de numéro, et
   // lorsqu'ils mettent un numéro qui a déjà été attribué, il demande si c'était
@@ -31637,7 +31663,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>}
           </div>
         )}
-        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
@@ -32422,7 +32448,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div className="vrm-seg" role="group" aria-label="Étapes de tes achats" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+        <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque paire entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -32435,7 +32461,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
             return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button type="button" key={id} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} style={{color:aFilter===id?C.text:C.muted,background:aFilter===id?C.card:'transparent'}}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
+            <button type="button" key={id} className="vrm-seg-btn" onClick={()=>setAFilter(id)} aria-pressed={aFilter===id}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -33413,7 +33439,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>}
 
-        {listings.items?.length>0 && <div className="vrm-stock-views" role="group" aria-label="Vues rapides des annonces">
+        {listings.items?.length>0 && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
           <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
@@ -33458,7 +33484,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {numDoublons.length > 0 && (
           <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:13.5,fontWeight:700,color:C.danger}}>
-              {numDoublons.length} numéro{numDoublons.length>1?'x':''} porté{numDoublons.length>1?'s':''} par deux annonces
+              {numDoublons.length} numéro{numDoublons.length>1?'s':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
               Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Donne un numéro NEUF à l'une des deux (les numéros ne se réutilisent jamais).
@@ -34382,7 +34408,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
+        <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
@@ -34511,16 +34537,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-colis-imprimante" style={{flexBasis:'100%',marginTop:4,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
                   <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase'}}>Imprimante</span>
-                    <div role="group" aria-label="Imprimante" className="vrm-segment" style={{display:'inline-flex',padding:3,gap:2,borderRadius:10,background:C.bg,border:`1px solid ${C.border}`}}>
-                    {[['normale','Normale (A4)'],['thermique','Thermique']].map(([v,lib])=>(
-                      <button key={v} type="button" onClick={()=>choisirImprimante(v)}
-                        aria-pressed={imprimante===v}
-                        style={{border:'none',borderRadius:8,padding:'0 14px',minHeight:32,
-                                background:imprimante===v?C.card:'transparent',color:imprimante===v?C.text:C.muted,
-                                boxShadow:imprimante===v?'0 1px 2px rgba(15,20,30,.08)':'none',
-                                cursor:'pointer',fontSize:12.5,fontWeight:600,fontFamily:'inherit'}}>{lib}</button>
-                    ))}
-                    </div>
+                    <Segmente label="Imprimante" className="vrm-segment" value={imprimante} onChange={choisirImprimante}
+                      options={[{v:'normale',l:'Normale (A4)'},{v:'thermique',l:'Thermique'}]}/>
                   </div>
                   <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
                     {imprimante==='thermique'
@@ -34646,7 +34664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {conflitsNum.length > 0 && (
           <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:10,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
-              <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires
+              <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux paires
             </div>
             <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
             {conflitsNum.slice(0,6).map(c=>(
@@ -34957,8 +34975,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const morceaux = [[nb('En transit'), 'en transit'], [nb('Au relais'), 'au relais'], [nb('Livrée'), 'livré' + (nb('Livrée') > 1 ? 's' : '')], [retours, 'retour' + (retours > 1 ? 's' : '') + ' à vérifier']].filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}`);
           const plusieursComptes = (accounts || []).length > 1;
           return (
-            <details data-colis-partis={partis.length} className="vrm-colis-partis" style={{marginTop:18,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'0 14px 4px'}}>
-              <summary style={{cursor:'pointer',fontSize:13.5,fontWeight:600,color:C.text,listStyle:'revert',padding:'14px 0',lineHeight:1.4}}>
+            <details data-colis-partis={partis.length} className="vrm-colis-partis vrm-repli" style={{marginTop:18,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'0 14px 4px'}}>
+              <summary style={{lineHeight:1.4,paddingBlock:12}}>
                 Partis — Vinted suit le colis · {partis.length}
                 <span style={{fontWeight:500,color:C.muted}}> ({morceaux.join(' · ')})</span>
               </summary>
@@ -36449,7 +36467,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
-                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'x':''} porté{conflits.size>1?'s':''} par deux paires</span>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux paires</span>
                   <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
@@ -38135,8 +38153,8 @@ function LeboncoinScreen() {
           paragraphe d'explication, les comptes et la limite de l'offre. Ce qui
           se LIT une fois descend ici ; ce qui se FAIT reste en haut. */}
       {data && Array.isArray(data.liensPoses) && data.liensPoses.length > 0 && (
-        <details data-lbc-liens={data.liensPoses.length} style={{ marginTop: 6 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: C.muted, padding: '8px 2px' }}>Paires que tu as reliées ({data.liensPoses.length}) — corriger une erreur</summary>
+        <details data-lbc-liens={data.liensPoses.length} className="vrm-repli" style={{ marginTop: 6 }}>
+          <summary>Paires que tu as reliées ({data.liensPoses.length}) — corriger une erreur</summary>
           <Card>
             {data.liensPoses.map((l, i) => (
               <div key={l.id} data-lien-lbc={l.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap' }}>
@@ -38155,8 +38173,8 @@ function LeboncoinScreen() {
         </details>
       )}
       {data && (
-        <details data-lbc-details="" style={{ marginTop: 6 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: C.muted, padding: '8px 2px' }}>Détails et réglages</summary>
+        <details data-lbc-details="" className="vrm-repli" style={{ marginTop: 6 }}>
+          <summary>Détails et réglages</summary>
           <div style={{ paddingTop: 8 }}>
       {/* ══════════════════════════════════════════════════════════════════════
           PUBLIER TOUT SEUL : OÙ ÇA EN EST, ET CE QUI FAIT AVANCER
@@ -39499,19 +39517,8 @@ function DetourageSetting({ nu = false }) {
             voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
             liens Vinted bruts, sans passer par l'extension. */}
       </div>
-      <div role="group" aria-label="Détourage des photos"
-        style={{display:'flex',gap:4,background:C.bg,borderRadius:8,padding:3,border:`1px solid ${C.border}`,marginTop:10,opacity:reserve?0.55:1}}>
-        {DETOURAGE_MODES.map(([v, label]) => {
-          const on = v === mode;
-          return (
-            <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on} disabled={reserve} data-detourage-choix={v}
-              style={{flex:1,border:'none',borderRadius:8,padding:'8px 4px',fontSize:12,fontWeight:600,cursor:reserve?'not-allowed':'pointer',fontFamily:'inherit',
-                background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,transition:'background .18s ease, color .18s ease'}}>
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      <Segmente label="Détourage des photos" plein disabled={reserve} value={mode} onChange={choisir} style={{marginTop:10}}
+        options={DETOURAGE_MODES.map(([v, label]) => ({ v, l: label, data: { 'data-detourage-choix': v } }))}/>
       {/* Ce que dit le serveur — une phrase, celle qui correspond à l'état. */}
       <div style={{marginTop:9,fontSize:11.5,lineHeight:1.5,color:etat==='sanscle'&&actif?C.warn:C.muted}} data-detourage-phrase>
         {etat === 'attente' ? 'Je vérifie le service de détourage…'
@@ -39592,19 +39599,8 @@ function ZoomSetting({ nu = false }) {
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.45}}>
         {telephone ? 'Une taille lisible et des boutons faciles à toucher. Réglage propre à cet appareil.' : "Ajuste la taille de l'app. Réglage propre à cet appareil."}
       </div>
-      <div role="group" aria-label="Taille de l'affichage"
-        style={{display:'flex',gap:4,background:C.bg,borderRadius:8,padding:3,border:`1px solid ${C.border}`,marginTop:11}}>
-        {choix.map(([v, label]) => {
-          const on = v === selection;
-          return (
-            <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on}
-              style={{flex:1,border:'none',borderRadius:8,padding:'8px 4px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
-                background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,transition:'background .18s ease, color .18s ease'}}>
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      <Segmente label="Taille de l'affichage" plein value={selection} onChange={choisir} style={{marginTop:11}}
+        options={choix.map(([v, label]) => ({ v, l: label }))}/>
     </div>
   );
 }
@@ -40711,9 +40707,10 @@ function ConnexionsSetting() {
     const h = (Date.now() - ts) / 3600000;
     return h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
   };
-  // Vert < 2 j, orange < 7 j, rouge au-delà — même échelle que l'écran Santé de
-  // l'extension, pour qu'un même état ne porte pas deux couleurs différentes.
-  const teinte = (ts) => !ts ? C.muted : (Date.now() - ts) < 2 * 864e5 ? INV_STATUS.online.color
+  // Frais (< 2 j) = neutre, orange < 7 j, rouge au-delà. ⚠️ Plus de vert : c'était
+  // le #0F8A6A de l'ancienne palette menthe (revue du 16 oct.) — et §7 ne colore
+  // un état que s'il y a quelque chose à rattraper. Tout va bien = rien à voir.
+  const teinte = (ts) => !ts ? C.muted : (Date.now() - ts) < 2 * 864e5 ? C.muted
                        : (Date.now() - ts) < 7 * 864e5 ? C.warn : C.danger;
   const Ligne = ({ t, etat, coul, d }) => (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
@@ -40731,7 +40728,7 @@ function ConnexionsSetting() {
       {/* ⚠️ UN NUMÉRO DE VERSION NE VEUT RIEN DIRE TOUT SEUL. On dit s'il est
           à jour, et sinon ce que ça coûte et quoi faire — une version en retard
           ne « bugue » pas, elle ne capte simplement pas, en silence. */}
-      <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
+      <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : C.muted}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
         d={!ext.on ? <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
            : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions — dans CHAQUE Chrome où elle est installée. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
