@@ -19,6 +19,8 @@
 //   /api/compte?mode=equipe       (GET/POST, session) LE MODE ÉQUIPE (migration
 //                                 016) : lister · inviter · accepter · révoquer ·
 //                                 quitter — voir api/_lib/equipe.js
+//   /api/compte?mode=entreprise&siret= (GET, session) le NOM de l'entreprise
+//                                 d'un SIREN/SIRET (registre public, sans clé)
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
@@ -38,6 +40,7 @@ import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } fr
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
+import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
 
@@ -388,8 +391,8 @@ async function checkout(req, res) {
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],
-    success_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=merci`,
-    cancel_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=annule`,
+    success_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=merci`,
+    cancel_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
     client_reference_id: u.id,
     metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe },
     subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe } },
@@ -434,7 +437,7 @@ async function portail(req, res) {
   const ligne = await ligneDe(req);
   if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   if (!ligne || !ligne.client_stripe) return repondre(res, 404, { erreur: 'aucun', message: "Tu n'as pas encore d'abonnement." });
-  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=compte` });
+  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=abonnement` });
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir la page de gestion. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
 }
@@ -878,6 +881,14 @@ async function superpdp(req, res) {
   return routeSuperPdp(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id) });
 }
 
+// ── SIRET → nom de l'entreprise (api/_lib/entreprise.js) : la session d'abord ─
+async function entreprise(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const r = await routeEntreprise(req.query && req.query.siret);
+  return repondre(res, r.status, r.body);
+}
+
 // ── Le mode équipe : la session d'abord (api/_lib/equipe.js) ─────────────────
 async function equipe(req, res) {
   const utilisateur = await vendeurExige(req, res);
@@ -916,6 +927,7 @@ export default async function handler(req, res) {
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

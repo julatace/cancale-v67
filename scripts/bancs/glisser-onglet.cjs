@@ -38,7 +38,7 @@ async function page(nav, telephone, tab) {
     ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
     : { viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Shopcancale')); } catch (_) {} }, SESSION);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' }));
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
@@ -57,9 +57,10 @@ async function glisserSouris(pg, x, y, dx) {
   for (let i = 1; i <= 10; i++) await pg.mouse.move(x + (dx * i) / 10, y);
   await pg.mouse.up(); await pg.waitForTimeout(600);
 }
-async function glisserDoigt(pg, x, y, dx) {
+async function glisserDoigt(pg, x, y, dx, appuiMs = 0) {
   const cdp = await pg.context().newCDPSession(pg);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  if (appuiMs) await pg.waitForTimeout(appuiMs);
   for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (dx * i) / 8, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await pg.waitForTimeout(600);
@@ -118,6 +119,39 @@ const unBouton = (pg) => pg.evaluate(() => {
       await glisserDoigt(pg, 200, 780, 200);
       const e2 = await ecran(pg);
       dit(!/vestiaire/i.test(e2), 'un balayage depuis eBay ne mène jamais à Vestiaire', `→ ${e2}`);
+      await ctx.close();
+    }
+    // (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et
+    // que je relâche, ça me met dans l'onglet Vinted »). Sélectionner un texte
+    // n'est pas balayer : ni à la souris (glisser sur le texte pour le
+    // surligner), ni au doigt (appui long, puis le doigt qui glisse).
+    console.log('── Ma journée : sélectionner le bonjour');
+    const bonjour = (pg) => pg.evaluate(() => { const el = document.querySelector('.vrm-day-hello'); if (!el) return null; const r = el.getBoundingClientRect(); const rg = document.createRange(); rg.selectNodeContents(el); const t = rg.getBoundingClientRect(); return { x0: t.left + 4, x1: Math.min(t.right, r.right) - 4, y: r.top + r.height / 2, txt: el.innerText }; });
+    {
+      const { ctx, pg } = await page(nav, false, 'journee');
+      const b = await bonjour(pg);
+      dit(!!b && /Shopcancale/.test(b.txt), 'le bonjour est rendu (ordinateur)', b && b.txt);
+      if (b) {
+        await pg.mouse.move(b.x1, b.y); await pg.mouse.down();
+        for (let i = 1; i <= 12; i++) await pg.mouse.move(b.x1 - ((b.x1 - b.x0) * i) / 12, b.y);
+        await pg.mouse.up(); await pg.waitForTimeout(600);
+      }
+      const e = await ecran(pg);
+      dit(/journ/i.test(e), 'souris : surligner le bonjour ne change pas d’onglet', `→ ${e}`);
+      await ctx.close();
+    }
+    {
+      const { ctx, pg } = await page(nav, true, 'journee');
+      const b = await bonjour(pg);
+      dit(!!b, 'le bonjour est rendu (téléphone)', '');
+      if (b) await glisserDoigt(pg, b.x1, b.y, -Math.max(120, b.x1 - b.x0), 800);
+      const e = await ecran(pg);
+      dit(/journ|accueil/i.test(e), 'doigt : appui long sur le bonjour puis relâcher en glissant ne change pas d’onglet', `→ ${e}`);
+      // L'autre sens : un balayage FRANC et rapide sur une zone vide change toujours d'onglet.
+      // (même point de départ, mais un geste franc et rapide : c'est un balayage)
+      if (b) await glisserDoigt(pg, Math.min(370, b.x1 + 40), b.y, -260);
+      const e2 = await ecran(pg);
+      dit(/vinted/i.test(e2), 'l’autre sens : un balayage rapide depuis Ma journée mène toujours à Vinted', `→ ${e2}`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

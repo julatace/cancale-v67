@@ -299,7 +299,8 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   //    est le COLLECTIF, sa liste « À faire ». On y lit le nombre que la ligne
   //    PORTE (`data-n`, le total) — sa phrase peut commencer par les colis
   //    « avec code » seulement. Ma journée : la tuile, `data-n`.
-  const ECRANS = ['cat_achats','journee','collectif'];
+  // (17 oct.) Collectif retiré : Achats et Ma journée sont les deux voix.
+  const ECRANS = ['cat_achats','journee'];
   for (const t of ECRANS) {
     await pg.goto('http://localhost:'+PORT_BANC+'/?tab='+t,{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(5000);
@@ -322,7 +323,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const detail = ECRANS.map(k=>k+'='+(k in nombres?nombres[k]:'(muet)')).join(' · ');
   if (aRetirer.length === 0) { console.log('--  (aucun colis a retirer dans ces fixtures)'); }
   else {
-    dit(vus.length === 3, 'les TROIS ecrans annoncent le colis a retirer', detail);
+    dit(vus.length === ECRANS.length, 'les DEUX ecrans annoncent le colis a retirer', detail);
     dit(new Set(vus).size === 1,
       'et ils annoncent le MEME nombre', detail);
   }
