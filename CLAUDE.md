@@ -4559,6 +4559,97 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
+### Le mode équipe : migration 016 (fonction n°37, 16 octobre) — PAS APPLIQUÉE, PAS D'ÉCRAN
+Retenue le 11 octobre : le vendeur invite un aide qui voit les colis à expédier
+et à retirer, les codes de retrait, imprime les bordereaux — et RIEN d'autre.
+**Livré : la migration prouvée et un plan d'écran. L'app n'est pas touchée**
+(trois autres agents modifient `App.jsx` en ce moment ; l'aiguillage du membre
+touche le démarrage et la porte d'abonnement — à faire seul, avec son banc).
+Fichier : `supabase/migrations/016-equipe.sql` (la 015 est réservée à l'horloge
+de l'agent eBay).
+- **Une table** `vrm_equipe` (vendeur, email, membre, rôle `colis`, statut
+  `invitee | actif | revoquee`, dates), lue et écrite par **personne** en direct
+  (RLS forcé, aucune règle, tous droits retirés — même à `service_role`) ; tout
+  passe par des fonctions `SECURITY DEFINER`, `search_path` vide, qui prennent
+  l'identité dans le jeton : `vrm_equipe_inviter(email)`, `_accepter(id)`,
+  `_revoquer(id)` (le vendeur, ou le membre qui QUITTE), `_lister()`,
+  `_colis(vendeur)`, et `_effacer(owner)` (serveur seul). Empreinte de forme
+  (une table d'une autre forme fait tout refuser). 5 invitations vivantes au plus.
+- **L'acceptation exige une adresse CONFIRMÉE** (`auth.users.email_confirmed_at`)
+  égale à celle de l'invitation — une identité. Sans ça, quelqu'un créerait un
+  compte à l'adresse invitée.
+- **Lecture : une liste blanche d'`id`** (`vrm_equipe_id_permis`, ancrée) :
+  `email_bord_{tx}` (le PDF porte l'adresse de l'acheteur : c'est ce qu'on colle
+  sur le carton), `harvest_{uid}_label_{tx|latest}` (+ leur `meta`, même ligne),
+  `panel_colis_relais`, `email_track_{transporteur}_{n}`. Rien d'autre : ni
+  `main`, ni `orders_*` (prix), ni `txn_*`, `billing`, `releve_*`, `inbox`,
+  `conv_*`, `email_sale|final|offer|invoice|achat|inconnu|quarantaine_*`,
+  `ebay_*`, et **aucune** règle sur `vinted_accounts` (jetons).
+- **Les ventes à expédier / achats à retirer passent par une PROJECTION**
+  (`vrm_equipe_colis`) : `transaction_id, item_id, title, status,
+  transaction_user_status, date, photo` (l'adresse), le login des comptes, les
+  clés de `vinted_ship_done` / `vinted_pickup_done` — **aucun montant, aucun
+  acheteur, aucun jeton**. Liste LARGE (sans finalisé/annulé/remboursé/
+  completed) : la règle « à expédier » reste `aExpedier` dans l'app (§11).
+- ⚠️⚠️ **LA DEMANDE EXPLICITE (en-tête `x-vrm-equipe: <vendeur>`)**. L'app lit
+  ses lignes SANS filtre de propriétaire (`id=like.email_bord_*`) : si un membre
+  qui est aussi vendeur voyait d'office les colis de l'autre, ses propres écrans
+  les mêleraient aux siens. Les lignes du vendeur ne sont donc visibles que dans
+  une requête qui porte l'en-tête (PostgREST l'expose dans `request.headers`,
+  déjà lu en production par `noter_ecriture`) ET si l'appelant en est membre
+  actif. Sans en-tête : rien ne change pour personne.
+- **Zéro écriture pour le membre.** « Coché posté » n'est pas indispensable :
+  Vinted sort le colis d'« à expédier » dès le scan au relais.
+- **L'abonnement est celui du VENDEUR** : `vrm_equipe_actif` exige
+  `vrm_acces_pour(vendeur)`. Seul objet existant modifié : la restrictive
+  `abonnement_requis` d'`app_data` (`… or owner = (select
+  vrm_equipe_vendeur())`) — un aide ne paie pas. Texte d'avant dans le fichier
+  (retour arrière). `with check` inchangé ; `vinted_accounts` inchangée.
+- **Preuves** : `scripts/audit-equipe-sql.cjs` (Postgres 16 jetable, socle
+  `agent-sql/supabase-min.sql` + 005-007 + 013 tels quels, `auth.users` complété
+  de `email`/`email_confirmed_at`) — **106 contrôles verts** : le membre lit
+  EXACTEMENT les 5 lignes de colis ; ni `main`, ni prix, ni jetons, ni l'autre
+  vendeur ; sans en-tête il ne voit que SES lignes ; la projection ne porte
+  aucun de `42.00`, `price`, `tokJ`, `buyPrice`, l'acheteur ; il n'écrit rien
+  (UPDATE/DELETE 0 ligne, INSERT refusé, table et `_effacer` refusées) ; un
+  membre d'un autre vendeur, une invitation non acceptée, une adresse non
+  confirmée, une invitation révoquée (ou quittée), un vendeur qui ne paie plus ⇒
+  rien ; le vendeur et le serveur voient comme avant ; l'essai annulé ne laisse
+  rien ; `--verifier` rend ok, et ok = false sur 10 gardes touchées (droit de
+  table, de colonne, RLS non forcé, règle sur la table, fonction INVOKER, corps
+  changé, `anon` exécutant, restrictive revenue, règle d'écriture ajoutée,
+  forme). `--prouve` : **16 mutations sur 16 au rouge**.
+  Pas de « rouge sur le code d'avant » : la migration est neuve, ce sont les
+  mutations qui prouvent.
+- **Essai annulé / vérification** : `node scripts/equipe-sql/essai-annule.cjs >
+  essai.sql` (~15 Ko, ROLLBACK), puis après application `… --verifier`.
+- **Non mesuré** : jamais appliquée ; `postgres` doit pouvoir lire
+  `auth.users.email`/`email_confirmed_at` en production (la migration le vérifie
+  à l'installation et refuse sinon) ; l'en-tête `x-vrm-equipe` dans
+  `request.headers` de SA PostgREST (forme `noter_ecriture`, pas essayé) ; banc
+  sur Postgres 16, production en 17.6.
+- **Plan d'écran (pas fait)** :
+  1. `api/compte.js?mode=equipe` (logique dans `api/_lib/equipe.js`, aucune
+     13ᵉ fonction) : GET → `rpc/vrm_equipe_lister` avec le jeton du vendeur ;
+     POST `{action: inviter|revoquer|accepter}`. Fonction absente (404 PGRST202)
+     ⇒ 503 « pas encore installé », jamais « équipe vide ».
+  2. Réglages → Mon compte → « Équipe » (`src/Equipe.jsx`, monté d'une ligne) :
+     inviter par email, lister (statut), révoquer ; côté invité : ses
+     invitations (« Accepter ») et « membre de X — Ouvrir ses colis ».
+  3. `ColisEquipe` (écran seul, Colis uniquement) : lectures avec l'en-tête
+     `x-vrm-equipe` ET `owner=eq.<vendeur>`, `rpc/vrm_equipe_colis`, `aExpedier`
+     de l'app, impression par `lirePdfLigne`. Aiguillage dans `App` AVANT
+     `PorteAbonnement` (un aide ne paie pas) : membre connu en cache ⇒
+     `ColisEquipe`, avec « Ouvrir ma propre boutique ».
+  4. `api/compte.js` mode `fermer` : appeler `vrm_equipe_effacer` (vendeur ET
+     membre). Banc à 390/1512 px sur faux PostgREST qui applique la règle.
+- **Gestes de Julien** : (1) Supabase → Authentication : **confirmation d'email
+  obligatoire** (sinon l'adresse « confirmée » ne prouve rien) ; (2) lancer
+  l'essai annulé (`essai.sql`) dans l'outil SQL, lire la ligne `essai` ; (3)
+  appliquer la 016 VRM fermé ; (4) `--verifier` ⇒ `ok: true`. Rien ne change
+  pour personne tant qu'aucune invitation n'est acceptée et que l'écran n'existe
+  pas.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
