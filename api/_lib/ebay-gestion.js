@@ -24,6 +24,14 @@ export function offresEbay(root) {
   const groupes=[...liste(root?.ItemBestOffers),...liste(root?.ItemBestOffersArray?.ItemBestOffers)];
   return groupes.flatMap(g=>liste(g.BestOffers?.BestOffer).map(o=>({id:texte(o.BestOfferID),itemId:texte(g.Item?.ItemID),titre:texte(g.Item?.Title),buyer:texte(o.Buyer?.UserID),price:texte(o.Price),currency:o.Price?.['@_currencyID'] || null,quantity:Number(texte(o.Quantity)),status:texte(o.Status),expiresAt:texte(o.ExpirationTime),message:texte(o.BuyerMessage)}))).filter(o=>o.id && o.itemId);
 }
+// (17 octobre) Les ÉVALUATIONS à laisser à tes acheteurs (Trading
+// `GetItemsAwaitingFeedback`). On ne garde que les ventes (un acheteur nommé) ;
+// ⚠️ NON MESURÉ sur son compte : la forme vient de la documentation d'eBay.
+export function evaluationsEbay(root) {
+  return liste(root?.ItemsAwaitingFeedback?.TransactionArray?.Transaction).map(t=>({
+    itemId:texte(t.Item?.ItemID),transactionId:texte(t.TransactionID),titre:texte(t.Item?.Title),buyer:texte(t.Buyer?.UserID),
+  })).filter(e=>/^\d{1,24}$/.test(e.itemId) && /^\d{1,24}$/.test(e.transactionId) && e.buyer);
+}
 export function lignesRestantAExpedier(order,fulfillments) {
   if(!Array.isArray(order?.lineItems) || !Array.isArray(fulfillments))return null;
   const deja=new Map();
@@ -179,5 +187,28 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     if(!id(b.itemId))return echec('Annonce invalide.');const a=await jeton(owner);if(!a.token)return a;
     return ecrire('EndFixedPriceItem',`<ItemID>${b.itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`,a.token);
   }
-  return {commande,transporteurs,expedier,contacterAcheteur,messages,message,repondre,offres,offre,repondreOffre,modifierAnnonce,terminerAnnonce};
+  const attente=async token=>{
+    const r=await lire('GetItemsAwaitingFeedback','<Sort>EndTime</Sort><Pagination><EntriesPerPage>100</EntriesPerPage><PageNumber>1</PageNumber></Pagination>',token);
+    return r.root?{liste:evaluationsEbay(r.root)}:r;
+  };
+  async function evaluations(b,owner){
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await attente(a.token);if(!r.liste)return r;
+    return succes({evaluations:r.liste});
+  }
+  // Laisser une évaluation POSITIVE (eBay ne permet au vendeur que celle-là).
+  // La vente est RELUE chez eBay juste avant : elle doit attendre encore son
+  // évaluation, avec CET acheteur — sinon rien ne part (409).
+  async function evaluer(b,owner){
+    if(b.confirme!==true)return echec('Confirme l’évaluation.',400,'confirmation');
+    const commentaire=String(b.commentaire || '').trim();
+    if(!id(b.itemId) || !id(b.transactionId) || !commentaire || commentaire.length>80)return echec('Indique un commentaire de 80 caractères maximum.');
+    const a=await jeton(owner);if(!a.token)return a;
+    const r=await attente(a.token);if(!r.liste)return r;
+    const e=r.liste.find(x=>x.itemId===String(b.itemId) && x.transactionId===String(b.transactionId));
+    if(!e)return echec('Cette vente n’attend plus d’évaluation (déjà laissée, ou délai dépassé).',409);
+    if(b.buyer!=null && String(b.buyer)!==e.buyer)return echec('L’acheteur de cette vente a changé — actualise la liste.',409);
+    return ecrire('LeaveFeedback',`<ItemID>${e.itemId}</ItemID><TransactionID>${e.transactionId}</TransactionID><TargetUser>${xml(e.buyer)}</TargetUser><CommentType>Positive</CommentType><CommentText>${xml(commentaire)}</CommentText>`,a.token);
+  }
+  return {commande,transporteurs,expedier,contacterAcheteur,messages,message,repondre,offres,offre,repondreOffre,modifierAnnonce,terminerAnnonce,evaluations,evaluer};
 }

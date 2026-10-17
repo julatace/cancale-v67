@@ -102,6 +102,7 @@ const ROWS = [
 ];
 
 let ko = 0, ok = 0;
+const envoisEval = [];
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).split('\n')[0].slice(0, 200)); } };
 
@@ -133,7 +134,9 @@ const projette = (row, sel) => {
   return out;
 };
 
-const ouvrir = async (b, vp) => {
+const ouvrir = async (b, vp, opts = {}) => {
+  // (17 oct.) `vide` : AUCUNE vente captée (Leboncoin jamais lu, eBay relié sans vente).
+  const LIGNES = opts.vide ? ROWS.filter((r) => !['lbc_ventes', 'ebay_orders'].includes(r.id)).concat([{ id: 'ebay_orders', data: { orders: [], capturedAt: Date.now() } }]) : ROWS;
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -150,11 +153,11 @@ const ouvrir = async (b, vp) => {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: cap, cap: r.data && r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
     const inn = /id=in\.\(([^)]*)\)/.exec(u);
-    if (inn) { const ids = inn[1].split(','); return j(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
+    if (inn) { const ids = inn[1].split(','); return j(LIGNES.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -166,6 +169,9 @@ const ouvrir = async (b, vp) => {
     if (body.action === 'status') return j({ ok: true, connected: true });
     if (body.action === 'offreinfo') return j({ ok: true, eligibles: ['110000000041'], complet: true });
     if (body.action === 'finances') return j({ ok: false, reason: 'scope', error: 'x' });
+    // (17 oct.) Évaluations à laisser : une vente, puis l'évaluation positive.
+    if (body.action === 'evaluations') return j({ ok: true, evaluations: [{ itemId: '110000000044', transactionId: '5550', titre: 'New Balance 550 blanc vert taille 43', buyer: 'acheteur_exemple' }] });
+    if (body.action === 'evaluer') { envoisEval.push(body); return j({ ok: true }); }
     return j({ ok: true });
   });
   return { ctx, pg, errs };
@@ -218,12 +224,18 @@ const mesurer = (pg, tel) => pg.evaluate((tel) => {
 
 const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
-  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-plat-resume]', attrs: ['[data-plat-resume]', '[data-section="annonces"]'] },
+  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]'] },
   { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]'] },
   { nom: 'leboncoin-messages', tab: 'plat_leboncoin', section: 'messages', attend: '[data-messages-lbc]', attrs: ['[data-messages-lbc]', '[data-compte-lbc="u1"]'] },
-  { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-plat-resume]', attrs: ['[data-plat-resume]'] },
+  { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"]'] },
   { nom: 'ebay-annonces', tab: 'plat_ebay', section: 'annonces', attend: '[data-ebay-annonce]', attrs: ['[data-ebay-annonce="110000000041"]', '[data-ebay-annonce="110000000099"]'] },
   { nom: 'ebay-compte', tab: 'plat_ebay', section: 'compte', attend: null, attrs: [] },
+  // (17 oct.) Julien : « même s'il n'y a pas de ventes, mets ventes en cours,
+  // finalisées, le CA… ». Les trois cases existent SANS vente : eBay lu et vide
+  // ⇒ 0 ; Leboncoin jamais lu ⇒ « — » (pas su n'est pas zéro).
+  { nom: 'leboncoin-ventes-vide', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"] [data-kpi="encours"][data-kpi-valeur=""]', '[data-ventes-kpi="leboncoin"] [data-kpi="ca"][data-kpi-valeur=""]'], vide: true },
+  { nom: 'ebay-ventes-vide', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"] [data-kpi="encours"][data-kpi-valeur="0"]', '[data-ventes-kpi="ebay"] [data-kpi="ca"][data-kpi-valeur="0"]'], vide: true },
+  { nom: 'ebay-a-traiter', tab: 'plat_ebay', section: 'agent', attend: '[data-ebay-evaluation]', attrs: ['[data-ebay-evaluation="110000000044:5550"]'], evaluer: true },
 ];
 
 (async () => {
@@ -236,7 +248,7 @@ const ecrans = [
       for (const ec of ecrans) {
         console.log(`\n── ${ec.nom}, ${vp.width} px`);
         await essaie(`${ec.nom} ${vp.width}`, async () => {
-          const { ctx, pg, errs } = await ouvrir(b, vp);
+          const { ctx, pg, errs } = await ouvrir(b, vp, { vide: !!ec.vide });
           await pg.goto(`http://localhost:${PORT}/?tab=${ec.tab}`, { waitUntil: 'domcontentloaded' });
           await pg.waitForSelector(`[data-section="${ec.section}"]`, { timeout: 15000 });
           await pg.click(`[data-section="${ec.section}"]`);
@@ -254,6 +266,22 @@ const ecrans = [
           dit(m.coupes.length === 0, 'aucun montant coupé', m.coupes.join(' | '));
           if (tel) dit(m.petites.length === 0, 'aucune cible tactile de moins de 44 px', `${m.petites.length} : ${m.petites.slice(0, 10).join(' | ')}`);
           for (const a of ec.attrs) dit(!!(await pg.$(a)), `${a} est rendu`);
+          if (ec.evaluer && !tel) {
+            // Annuler la confirmation n'envoie RIEN ; « Laisser l'évaluation » envoie
+            // exactement { action:'evaluer', itemId, transactionId, buyer, confirme:true }.
+            const avant = envoisEval.length;
+            await pg.click('[data-ebay-evaluation="110000000044:5550"] button');
+            await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click({ timeout: 20000 });
+            await pg.waitForTimeout(300);
+            dit(envoisEval.length === avant, 'Annuler l’évaluation n’envoie rien', String(envoisEval.length - avant));
+            await pg.click('[data-ebay-evaluation="110000000044:5550"] button');
+            await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Laisser l’évaluation' }).click({ timeout: 20000 });
+            await pg.waitForTimeout(600);
+            const e = envoisEval[envoisEval.length - 1] || {};
+            dit(envoisEval.length === avant + 1 && e.confirme === true && e.itemId === '110000000044' && e.transactionId === '5550' && e.buyer === 'acheteur_exemple' && String(e.commentaire || '').length > 0 && String(e.commentaire).length <= 80,
+              'l’évaluation part une fois, confirmée, sur la vente et l’acheteur lus', JSON.stringify(e));
+            dit(/confirmée par eBay/.test(await pg.$eval('[data-ebay-evaluation="110000000044:5550"]', (x) => x.innerText)), 'la carte dit que c’est fait (confirmé par eBay)');
+          }
           await ctx.close();
         });
       }

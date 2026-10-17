@@ -348,3 +348,13 @@
   color: color-mix(in srgb, var(--vrm-ink) 46%, transparent) !important;
   border-color: color-mix(in srgb, var(--vrm-ink) 20%, transparent) !important;
 }
+
+/* (17 oct.) Le nom de l'entreprise, à côté du logo (retrouvé par le SIRET). */
+.vrm-sidebar-brand { flex-direction: column; align-items: center; gap: 7px; }
+.vrm-sidebar-entreprise { display: block; max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 600; letter-spacing: -.01em; opacity: .72; text-align: center; }
+.vrm-hdr-entreprise { display: none; }
+@media (max-width: 1023px) {
+  .vrm-hdr-entreprise { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; letter-spacing: -.015em; color: var(--vrm-ink); padding-left: 2px; transition: opacity .2s ease; }
+  /* Au défilement, le titre de l'écran prend le centre : le nom s'efface. */
+  .vrm-app-header.is-defile .vrm-hdr-entreprise { opacity: 0; }
+}

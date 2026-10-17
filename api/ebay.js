@@ -27,7 +27,7 @@ import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
-  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
+  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
@@ -1728,11 +1728,13 @@ async function handleApp(req, res) {
         if ((await apprendrePrincipal(owner).catch(() => null)) === true) reg = await lireComptes(owner);
       }
       if (reg === undefined) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire tes comptes eBay (base injoignable).' }); return; }
+      // (17 octobre) Pro ou particulier, demandé à eBay une fois par compte.
+      if ((await apprendreTypes(owner, reg).catch(() => null)) === true) { const r2 = await lireComptes(owner); if (r2) reg = r2; }
       const comptes = [];
       for (const c of comptesActifs(reg)) {
         const relie = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
         if (c.implicite && !relie) continue;
-        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null });
+        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null, type: c.type || '' });
       }
       res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true), comptes });
       return;
@@ -1769,6 +1771,10 @@ async function handleApp(req, res) {
       offredetail:(ctx)=>gestionEbay.offre(b,ctx),
       repondre:(ctx)=>gestionEbay.repondre(b,ctx),
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
+      // (17 octobre) Évaluations à laisser aux acheteurs : la liste (lecture), et
+      // l'évaluation positive (sur clic + confirmation, journalisée).
+      evaluations:(ctx)=>gestionEbay.evaluations(b,ctx),
+      evaluer:(ctx)=>gestionEbay.evaluer(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
@@ -1796,7 +1802,7 @@ async function handleApp(req, res) {
     const rc = await resoudreCompte(b.compte, owner);
     if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
     const ctx={owner,compte:rc.compte};
-    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce']);
+    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer']);
     const r = commerciales.has(action) && b.confirme===true
       ? await executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
       : await ACTIONS[action](ctx);

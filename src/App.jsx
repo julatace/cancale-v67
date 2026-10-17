@@ -14,7 +14,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
+import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -22,6 +22,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { jetonsStream, demarrerStream } from "./streamFlou.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -89,6 +90,31 @@ const EXT_ATTENDUE = '5.185.0';
 // Un geste qui commence sur un bouton, un lien, un champ ou dans une zone qui
 // défile de côté (photos, rangées de pastilles) n'est JAMAIS un changement
 // d'onglet : il appartient à ce qu'il touche (voir `slideTab`).
+// (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et que je
+// relâche, ça me met dans l'onglet Vinted »). SÉLECTIONNER UN TEXTE N'EST PAS
+// BALAYER. Trois chemins menaient à l'onglet voisin :
+//   · à la souris, glisser SUR un texte pour le surligner passait pour un
+//     balayage (et le code effaçait même la sélection en route) ;
+//   · au doigt, un appui long (qui ouvre la sélection) suivi d'un doigt qui
+//     glisse en relâchant ;
+//   · une sélection encore active au moment de relâcher.
+// ⇒ La souris ne balaie que depuis un endroit SANS texte (`surDuTexte`) ; le
+//    doigt ne balaie que d'un geste rapide (`BALAYAGE_MAX_MS`), sans sélection.
+const BALAYAGE_MAX_MS = 600;
+function surDuTexte(x, y) {
+  try {
+    let noeud = null;
+    if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); noeud = r && r.startContainer; }
+    else if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); noeud = p && p.offsetNode; }
+    if (!noeud || noeud.nodeType !== 3 || !/\S/.test(noeud.nodeValue || '')) return false;
+    const rg = document.createRange(); rg.selectNodeContents(noeud);
+    for (const b of rg.getClientRects()) if (x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2) return true;
+  } catch (_) {}
+  return false;
+}
+function selectionActive() {
+  try { const s = window.getSelection(); return !!(s && !s.isCollapsed && String(s).trim()); } catch (_) { return false; }
+}
 function gesteHorsNavigation(cible) {
   let n = cible;
   for (let k = 0; n && n !== document.body && k < 40; k++, n = n.parentElement) {
@@ -8791,6 +8817,7 @@ const streamActif = () => { try { return localStorage.getItem('vrm_stream') === 
 const poserStream = (on) => {
   try { localStorage.setItem('vrm_stream', on ? '1' : '0'); } catch (_) {}
   try { document.documentElement.setAttribute('data-stream', on ? '1' : '0'); } catch (_) {}
+  try { demarrerStream(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:stream', { detail: !!on })); } catch (_) {}
 };
 try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-stream', streamActif() ? '1' : '0'); } catch (_) {}
@@ -8799,6 +8826,28 @@ const useStream = () => {
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
   return on;
 };
+// (17 oct.) L'ENTREPRISE DU VENDEUR, pour l'en-tête : la ligne `vrm_pro_facture`
+// (celle du reçu d'achat, §11), relue au montage et suivie quand « Ton
+// entreprise » (Comptabilité) ou « Facturation Pro » (Réglages) l'écrivent.
+// Trois états : `undefined` en cours · `null` pas su · objet lu.
+const useEntreprise = () => {
+  const [e, setE] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireReglage('vrm_pro_facture').then((d) => { if (!mort) setE(d === null ? null : { nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); }).catch(() => { if (!mort) setE(null); });
+    const suivre = (ev) => { const d = ev && ev.detail; if (d && typeof d === 'object') setE({ nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); };
+    window.addEventListener('vrm:profil-fiscal', suivre);
+    return () => { mort = true; window.removeEventListener('vrm:profil-fiscal', suivre); };
+  }, []);
+  return e;
+};
+// Le nom de l'entreprise, à côté du logo. Rien tant qu'il n'est pas connu (on
+// n'invente pas de nom, §5) ; `vrm-sensible` : le mode stream le floute.
+function NomEntreprise({ entreprise, className }) {
+  const nom = entreprise && entreprise.nom;
+  if (!nom) return null;
+  return <span className={`${className} vrm-sensible`} data-nom-entreprise={nom} title={nom}>{nom}</span>;
+}
 // (16 oct.) Les comptes que la RECHERCHE regarde : liés et pas masqués. Un
 // compte supprimé (plus dans `vinted_accounts`) ou masqué n'y apparaît plus.
 // Liste vide ⇒ `null` (« pas su » : on n'écarte rien).
@@ -9743,12 +9792,10 @@ const PLUS_TABS=[
      Il reste en tête du menu — c'est le geste quotidien le plus fréquent après
      l'accueil — et à un tap depuis la carte « Expédier N colis » de Ma journée. */
   {id:'cat_bord',       icon:'box',  emoji:'📄',label:'Colis',       desc:'Bordereaux à imprimer, colis à retirer'},
-  {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
   /* ⚠️ `plat_vinted`, `plat_leboncoin`, `plat_vestiaire` ET `plat_ebay` sont
      tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
-  {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
-  {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Dépenses, coûts fixes, packs photos, factures'},
-  {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
+  {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, ce qui se vend, prix qui marche'},
+  {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Déclarations, dépenses, factures'},
   /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
      avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
      visent encore `leboncoin` (cloche, notifications) y mènent tout seuls. */
@@ -9758,12 +9805,13 @@ const PLUS_TABS=[
      ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
      simplement plus dans le menu. */
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
-  {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
   /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
      paramètres, ça prend de la place pour rien »). L'écran reste monté et
      joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
 ];
 const NAV_GESTION = ['cat_bord', 'garage', 'dashboard', 'compta'].map(id => PLUS_TABS.find(t => t.id===id));
+// Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique].
+const ONGLETS_DEPLACES = { prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null] };
 const NAV_OUTILS = PLUS_TABS.filter(t => !NAV_GESTION.includes(t));
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -10347,12 +10395,12 @@ const NAV_LARGEUR = 160;
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
-function SideBar({ tab, setTab }) {
+function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/></div>
+    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll">
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
@@ -10405,8 +10453,10 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   const groupes = [
     { titre: bottom?'Autres plateformes':'Plateformes', items: BOTTOM_TABS.filter(t => bottom?t.id==='plat_vestiaire':t.id !== 'journee') },
     { titre: 'Gestion', items: NAV_GESTION },
-    ...(!bottom?[{ titre: 'Dans Vinted', items: VINTED_TABS }]:[]),
-    { titre: 'Autres outils', items: NAV_OUTILS },
+    // (17 oct., Julien) Plus de « Dans Vinted » (Annonces, Ventes, Achats sont
+    // déjà dans l'onglet Vinted) ni d'« Autres outils » : ce qu'ils portaient
+    // est rangé dans Statistiques et Comptabilité.
+    ...(NAV_OUTILS.length ? [{ titre: 'Autres outils', items: NAV_OUTILS }] : []),
   ];
   // (16 oct.) LISTE GROUPÉE FAÇON iOS : des groupes en cartes arrondies, une
   // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
@@ -12708,8 +12758,50 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
+// (17 oct.) Julien : « pourquoi il y a deux logos eBay quand on est dessus » —
+// le logo d'eBay EST son nom écrit (« ebay »), et le titre le répétait à côté.
+// Et « la mise en page est éteinte » : chaque plateforme a maintenant sa tuile,
+// la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
+// couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
+// lecteurs d'écran).
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0064D2' };
 function EntetePlateforme({nom,plateforme}) {
-  return <header className="vrm-market-heading"><BrandIcon plateforme={plateforme} size={30}/><h1>{nom}</h1></header>;
+  const mot = plateforme === 'ebay';
+  const src = {vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg'}[plateforme];
+  return <header className="vrm-market-heading" data-plat-entete={plateforme} data-entete-plateforme={plateforme} style={{ '--plat': COULEUR_PLATEFORME[plateforme] || 'currentColor' }}>
+    <span className={'vrm-plat-tuile' + (mot ? ' vrm-plat-tuile-mot' : '')} aria-hidden="true"><span className="vrm-plat-marque" style={src ? { WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` } : undefined}/></span>
+    <h1 className={mot ? 'vrm-sr' : undefined}>{nom}</h1>
+  </header>;
+}
+// (17 oct.) Julien : « trop de texte, ça rend moche » (écran Annonces eBay). Une
+// explication qui ne change pas d'une fois à l'autre se replie derrière un « ⓘ »
+// au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
+// Ce qui dit un RISQUE propre à la donnée (une règle d'offre, une raison qui
+// distingue une ligne) reste visible — seul le texte fixe se replie.
+function Pourquoi({ children, label = 'Pourquoi ?' }) {
+  return <details className="vrm-pourquoi" data-pourquoi><summary aria-label={label} title={label}>ⓘ</summary><div>{children}</div></details>;
+}
+// (17 oct.) LES VENTES, MÊME QUAND IL N'Y EN A PAS ENCORE — Julien : « même s'il
+// n'y a pas de ventes tu peux faire comme Vinted : ventes en cours, finalisées,
+// le CA… ça fait une mise en forme et ça motive à remplir ces cases ». Les mêmes
+// trois cases sur Leboncoin et eBay. Une case LUE vide vaut 0 ; une case qu'on
+// ne SAIT pas vaut « — » (§5 : pas su n'est pas zéro) ; la ligne du dessous dit
+// comment la remplir.
+function KpiVentes({ tuiles, note, plateforme }) {
+  return (
+    <div className="vrm-kpi-ventes" data-ventes-kpi={plateforme}>
+      <div className="vrm-kpi-ventes-grille">
+        {tuiles.map((t) => (
+          <div key={t.cle} className="vrm-kpi-ventes-case" data-kpi={t.cle} data-kpi-valeur={t.val == null ? '' : String(t.brut != null ? t.brut : t.val)}>
+            <div className="vrm-kpi-ventes-lib">{t.lib}</div>
+            <div className={'vrm-display vrm-kpi-ventes-val' + (t.val == null ? ' vrm-kpi-ventes-vide' : '')}>{t.val == null ? '—' : t.val}</div>
+            {t.sub ? <div className="vrm-kpi-ventes-sub">{t.sub}</div> : null}
+          </div>
+        ))}
+      </div>
+      {note ? <div className="vrm-kpi-ventes-note">{note}</div> : null}
+    </div>
+  );
 }
 // UN contrôle segmenté pour toute l'app (revue du 16 octobre : trois formes,
 // dont des segments BLEUS pleins, contraires au §7). C'est le dessin des
@@ -12785,6 +12877,44 @@ function ResumePlateforme({children,title='Chiffres de la plateforme',className=
   const [open,setOpen]=useState(()=>window.matchMedia('(min-width:768px)').matches);
   useEffect(()=>{const mq=window.matchMedia('(min-width:768px)');const change=()=>setOpen(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
   return <details className={`vrm-platform-summary ${className}`} open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>{title==='Chiffres de la plateforme'?<><span className="vrm-summary-short">Chiffres</span><span className="vrm-summary-accessible"> de la plateforme</span></>:title}</summary>{children}</details>;
+}
+// (17 oct.) Julien : « un endroit où on peut retirer l'argent du porte-monnaie,
+// si possible ». ⚠️ VRM NE FAIT PAS LE VIREMENT, et c'est une décision : son
+// navigateur a bien vu Vinted appeler `POST /api/v2/users/{id}/payouts`
+// (mesuré dans `seen_urls`), mais jamais la FORME de la demande (montant ? compte
+// bancaire ? confirmation ?) — envoyer de l'argent sur une adresse dont on
+// devine le contenu est exactement ce que ce projet s'interdit. VRM dit donc
+// combien est disponible sur CHAQUE compte, et ouvre son porte-monnaie Vinted :
+// le virement se fait là-bas, en deux clics, sur le compte connecté dans le
+// navigateur. ⚠️ L'adresse de la page (`/wallet/balance`) n'est pas mesurée ici.
+const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
+function RetirerArgent({ liveStats }) {
+  const [ouvert, setOuvert] = useState(false);
+  const liste = liveStats && Array.isArray(liveStats.walletParCompte) ? liveStats.walletParCompte.filter((x) => x.dispo != null) : null;
+  if (!liste) return null;
+  const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
+  return (
+    <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
+      <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
+        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{total > 0 ? `${fmt(total)} disponible${liste.filter((x) => x.dispo > 0).length > 1 ? ` sur ${liste.filter((x) => x.dispo > 0).length} comptes` : ''}` : 'Rien de disponible pour l\'instant'}</span></span>
+        <span aria-hidden="true" style={{ color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
+      </button>
+      {ouvert && (
+        <div style={{ marginTop: 6 }}>
+          {liste.map((x) => (
+            <div key={x.uid} data-retirer-compte={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
+                <div style={{ fontSize: 11.5, color: C.muted }}>{fmt(x.dispo || 0)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
+              </div>
+              {x.dispo > 0 && <a href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Retirer sur Vinted ↗</a>}
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>Le virement se fait dans ton porte-monnaie Vinted, sur le compte <b>connecté dans ton navigateur</b> — connecte-toi d'abord sur le bon compte. VRM ne déplace jamais ton argent lui-même.</div>
+        </div>
+      )}
+    </div>
+  );
 }
 function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
@@ -13313,13 +13443,47 @@ function BlocEbay({ n, titre: t, right, children }) {
 // seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
 // vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
 // jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
-function autoRemplirAttributs(attributs, { titre, marque, taille }) {
+// (17 oct.) La description quand Vinted n'en a pas été captée : les FAITS de la
+// paire (marque, pointure, état enregistrés par Vinted, son N° de référence),
+// rien d'autre. Une phrase commerciale inventée serait pire qu'un champ court.
+function descriptionDeFaits(p) {
+  if (!p) return '';
+  const l = [];
+  if (p.title) l.push(String(p.title).trim());
+  if (p.marque) l.push(`Marque : ${p.marque}`);
+  if (p.tailleVinted || p.taille) l.push(`Pointure : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
+  if (p.etat) l.push(`État : ${p.etat}`);
+  if (p.num) l.push(`Référence : VRM-${p.num}`);
+  return l.length > 1 ? l.join('\n') : '';
+}
+// (17 oct.) L'ÉTAT eBay à partir de l'état que VINTED a écrit sur l'annonce —
+// seulement vers un état qu'eBay PROPOSE pour cette catégorie (sa liste,
+// `conditions`), jamais deviné : « Neuf avec étiquette » → 1000, « Neuf sans
+// étiquette » → 1500, un état d'occasion (« Très bon état », « Bon état »,
+// « Satisfaisant ») → 3000. Inconnu ou absent de la liste d'eBay ⇒ null.
+function etatEbayDeVinted(etat, conditions) {
+  const e = String(etat || '').toLowerCase();
+  if (!e) return null;
+  const id = /neuf avec/.test(e) ? '1000' : /neuf sans/.test(e) ? '1500' : /(tr[eè]s bon|bon [eé]tat|satisfaisant)/.test(e) ? '3000' : null;
+  if (!id) return null;
+  if (Array.isArray(conditions) && conditions.length && !conditions.some((c) => String(c && c.id) === id)) return null;
+  return id;
+}
+// `faits` : ce que Vinted a ENREGISTRÉ pour la paire (marque, pointure) — pas
+// une déduction. Ils remplissent aussi un champ eBay en texte libre (la marque
+// n'a souvent pas de liste chez eBay) ; une déduction du titre, jamais.
+function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) {
   const out = {};
   const hay = ' ' + String(titre || '').toLowerCase() + ' ';
   const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const a of attributs || []) {
-    if (!a || !Array.isArray(a.valeurs) || !a.valeurs.length) continue;   // texte libre : jamais deviné
+    if (!a) continue;
     const nl = String(a.nom || '').toLowerCase();
+    if (!Array.isArray(a.valeurs) || !a.valeurs.length) {   // texte libre : jamais deviné — seulement un FAIT capté
+      if (/marque|brand/.test(nl) && faits.marque) out[a.nom] = String(faits.marque);
+      else if (/pointure|taille|size/.test(nl) && faits.taille) out[a.nom] = String(faits.taille).replace('.', ',');
+      continue;
+    }
     if (/pointure|taille|size/.test(nl) && taille) {
       const t = String(taille).replace(',', '.');
       const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
@@ -13619,7 +13783,7 @@ const corpsCompteEbay = (ref) => (ref && ref !== 'principal' && CLE_COMPTE_EBAY.
 // identité n'est pas apprise. La MÊME règle que la route (`comptesActifs`, §11).
 function comptesEbayActifs(reg) {
   const l = (reg && Array.isArray(reg.comptes) ? reg.comptes : []).filter((e) => e && typeof e === 'object')
-    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null }))
+    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null, type: (e.type === 'pro' || e.type === 'particulier') ? e.type : '' }))
     .filter((e) => e.principal || e.cle);
   const out = l.filter((e) => !e.deconnecteLe).map((e) => ({ ...e, suffixe: suffixeCompteEbay(e), ref: refCompteEbay(e) }));
   if (!l.some((e) => e.principal)) out.unshift({ cle: '', pseudo: '', principal: true, implicite: true, deconnecteLe: null, ajouteLe: null, suffixe: '', ref: 'principal' });
@@ -13627,6 +13791,9 @@ function comptesEbayActifs(reg) {
 }
 // Le nom à montrer pour un compte : son pseudo eBay, sinon « compte principal ».
 const nomCompteEbay = (c) => (c && c.pseudo) ? c.pseudo : 'compte principal';
+// (17 oct.) Pro ou particulier, tel qu'eBay le dit (GetUser, rangé par la route).
+// Pas su ⇒ rien (jamais « particulier » par défaut).
+const typeCompteEbayTexte = (c) => (c && c.type === 'pro') ? 'Pro' : (c && c.type === 'particulier') ? 'Particulier' : '';
 // Le registre, lu une fois par ouverture (et relu après une connexion ou une
 // déconnexion : `vrm:ebay-comptes`). TROIS états : `undefined` en cours ·
 // `null` pas su (la base n'a pas répondu) · la liste des comptes actifs.
@@ -14191,15 +14358,21 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // (publiée il y a deux minutes : rien n'est encore capté), on demande à
   // l'extension de lire sa page TOUT DE SUITE (`cmd: 'photos'`, sur ce clic).
   const [photosEtat, setPhotosEtat] = React.useState(null);   // null · 'cherche' · 'fait' · {raison}
+  // (17 oct.) Choisir une paire lance l'analyse eBay (catégorie + caractéristiques)
+  // sans attendre un second clic : c'est ELLE qui remplit marque, pointure et
+  // état. Une LECTURE chez eBay (Taxonomy), rien n'est publié.
+  const [autoAnalyse, setAutoAnalyse] = React.useState(0);
   const pairCourante = React.useRef(null);
   const choisirPaire = (p) => {
     pairCourante.current = p.id;
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
-    setDesc(p.desc || '');                                 // sa description Vinted, reprise automatiquement
+    setDesc(p.desc || descriptionDeFaits(p));              // sa description Vinted ; à défaut, ses FAITS captés (jamais inventés)
     if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
+    { const ce = etatEbayDeVinted(p.etat, null); if (ce) setCond(ce); }   // l'état Vinted de la paire (vérifié contre la liste d'eBay à l'analyse)
     setCat(null); setCheck(null);
+    setAutoAnalyse((n) => n + 1);   // la catégorie et ses caractéristiques (marque, pointure, état) se cherchent tout de suite
     setPhotosEtat(null);
     const manque = (p.photos || []).length < Math.max(2, Number(p.nPhotos) || 0);
     if (manque && p.uid && vmrExtPresent()) {
@@ -14245,13 +14418,18 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setCat(c);
     // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
     // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
-    if (conditions && !conditions.some(c => c.id === cond)) {
+    const condVinted = pairSel ? etatEbayDeVinted(pairSel.etat, conditions) : null;
+    if (condVinted) setCond(condVinted);
+    else if (conditions && !conditions.some(c => c.id === cond)) {
       const occ = conditions.find(c => c.id === '3000');
       setCond((occ || conditions[0]).id);
     }
     // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
+    // La marque : celle que VINTED a enregistrée pour la paire d'abord, sinon
+    // celle reconnue dans le titre (une liste de marques, jamais inventée).
     const src = pairSel ? pairSel.title : titre;
-    const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
+    const marqueV = (pairSel && pairSel.marque) || '';
+    const auto = autoRemplirAttributs(attributs, { titre: src, marque: marqueV || extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '', faits: { marque: marqueV, taille: (pairSel && pairSel.tailleVinted) || '' } });
     // Changement de catégorie ⇒ on repart des valeurs prouvées (les anciennes
     // caractéristiques n'ont pas de sens dans la nouvelle catégorie).
     if (fresh) setAsp(auto); else if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
@@ -14267,6 +14445,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
+  React.useEffect(() => { if (autoAnalyse && titre.trim() && !analyse) analyser(); /* eslint-disable-line */ }, [autoAnalyse]);
   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
   // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
@@ -14736,13 +14915,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -14760,9 +14939,12 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       // Titre de l'annonce Vinted : repli quand la fiche N° n'en porte pas (le
       // choix de paire écrivait « — »). Même identifiant, aucune ressemblance.
       if (typeof it.title === 'string' && it.title.trim()) titre[id] = it.title.trim();
+      // (17 oct.) L'ÉTAT écrit par Vinted sur l'annonce (« Très bon état ») —
+      // un fait capté, il sert à pré-remplir l'état eBay (jamais deviné).
+      if (typeof it.status === 'string' && it.status.trim()) etat[id] = it.status.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat };
 };
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
@@ -14785,7 +14967,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -14794,6 +14976,18 @@ function useEbayPaires(comptes) {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
         if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
       } catch (_) { /* réseau : on se contente de la couverture */ }
+      // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
+      // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
+      // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
+      // description. Le dressing, lui, ne porte pas la marque (mesuré : 0 sur
+      // 271 annonces) — c'est pour ça que « la marque ne s'est pas remplie
+      // toute seule ». Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
+      // on fait sans (rien n'est inventé à la place).
+      let coffre = {};
+      try {
+        const rows = await lireTout('id=like.coffre_*&select=id,brand:data->>brand,etat:data->>etat,size:data->>size,desc:data->>desc');
+        for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
+      } catch (_) { coffre = {}; }
       const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
       const vus = new Set(), out = [];
       for (const id in fiches) {
@@ -14805,10 +14999,14 @@ function useEbayPaires(comptes) {
         const cover = f.photo || couvMap[String(id)] || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
-        const dsc = String((details[id] && details[id].description) || '').trim();
+        const cf = coffre[String(id)] || {};
+        const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
         const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
         const titreP = String(f.title || titreMap[String(id)] || '').trim();
-        out.push({ id: String(id), num: n, title: titreP, taille: extractSize(titreP) || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        const marque = String(cf.brand || '').trim();
+        const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
+        const tailleV = String(cf.size || '').trim();
+        out.push({ id: String(id), num: n, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
@@ -15007,6 +15205,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
             <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
               <Icon name="check" size={15}/> <b>Compte eBay relié</b>
+              {Array.isArray(comptesStatut) && comptesStatut.length === 1 && typeCompteEbayTexte(comptesStatut[0]) && <span data-ebay-compte-type={comptesStatut[0].type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(comptesStatut[0])}</span>}
             </div>
             <button type="button" onClick={synchroniser} disabled={syncing}
               style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 10, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
@@ -15024,7 +15223,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 return (
                   <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}</div>
                       <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'état pas lu'}</div>
                       {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
                     </div>
@@ -15072,6 +15271,14 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {item(solde.dispo, 'disponible à virer', C.text)}
                       {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
+                    </div>
+                    {/* (17 oct.) « Retirer l'argent » : sur eBay il n'y a rien à
+                        retirer à la main — eBay verse lui-même le disponible sur
+                        ton compte bancaire, selon ton calendrier de versements.
+                        VRM ne déplace jamais d'argent. (Page non mesurée ici.) */}
+                    <div data-ebay-retirer style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                      <span style={{ flex: '1 1 180px', fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>eBay vire tout seul le disponible sur ton compte bancaire, selon ton calendrier de versements.</span>
+                      <a href="https://www.ebay.fr/sh/fin" target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Mes versements ↗</a>
                     </div>
                   </div>
                 );
@@ -15196,7 +15403,23 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
-  if (!orders.length && !cible) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
+  // (17 oct.) Les trois cases, même sans vente (Julien : « ça motive à remplir
+  // ces cases »). Lu et vide ⇒ 0 ; un compte illisible ⇒ « — » (pas su).
+  const plusieursEbay = Array.isArray(comptesEbay) && comptesEbay.length >= 2;
+  const kpi = (() => {
+    const passu = illisibles.length > 0;
+    const enCours = orders.filter((o) => { const e = etatCommandeEbay(o); return e.peutExpedier || e.kind === 'review' || e.kind === 'payment'; });
+    const exp = orders.filter((o) => etatCommandeEbay(o).expedie);
+    const ca = caEbayPayees(orders);
+    const aPayee = orders.some((o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
+    const caVal = passu ? null : (aPayee ? (ca == null ? null : fmt(ca)) : fmt(0));
+    return <KpiVentes plateforme="ebay" tuiles={[
+      { cle: 'encours', lib: 'En cours', val: passu ? null : enCours.length },
+      { cle: 'finalisees', lib: 'Expédiées', val: passu ? null : exp.length },
+      { cle: 'ca', lib: 'CA payé', val: caVal, brut: caVal == null ? null : (aPayee ? ca : 0), sub: plusieursEbay ? (vue === '*' ? `${comptesEbay.length} comptes` : nomCompteEbay(comptesEbay.find((c) => c.ref === vue) || {})) : null },
+    ]} note={passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici." : null}/>;
+  })();
+  if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   const visibles=orders.filter(o=>{
@@ -15207,8 +15430,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   });
   return wrap(<>
     {head}
-    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{orders.length} commande{orders.length > 1 ? 's' : ''}{payees ? ` · ${payees} payée${payees > 1 ? 's' : ''}` : ''}</div>
-    {illisibles.length>0 && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
+    {!cible && kpi}
+    {illisibles.length>0 && cible && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
     {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} doneLabel="Expédiées"/>}
@@ -17352,8 +17575,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {deuxComptesVue.length > 0 && (
       <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
         {deuxComptesVue.map((d) => (
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
@@ -17369,7 +17591,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {dvVue.aAnnulerEbay.length > 0 && (
       <div data-ebay-a-annuler={dvVue.aAnnulerEbay.length} style={bloc(E.warn)}>
         <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} paire{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendue{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmée{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</div>
+        <Pourquoi>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</Pourquoi>
         {dvVue.aAnnulerEbay.map((d) => {
           const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
           return (
@@ -17388,8 +17610,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbay.length > 0 && (
       <div data-ebay-a-retirer={dvVue.aRetirerEbay.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbay.length} paire{dvVue.aRetirerEbay.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbay.length} paire{dvVue.aRetirerEbay.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {(() => {
           // Retrait automatique allumé : la raison commune à TOUTES les lignes se
           // dit une fois (§7) ; une raison qui distingue se dit sur sa ligne.
@@ -17422,8 +17643,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerVinted.length > 0 && (
       <div data-ebay-retirer-vinted={dvVue.aRetirerVinted.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerVinted.length} paire{dvVue.aRetirerVinted.length > 1 ? 's' : ''} vendue{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerVinted.length} paire{dvVue.aRetirerVinted.length > 1 ? 's' : ''} vendue{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
         {dvVue.aRetirerVinted.map((d, i) => (
           <div key={String((d.commande && d.commande.orderId) || i) + d.numero} data-ebay-vendue={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -17808,12 +18028,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     <div className="vrm-ebay-suite">
     {nSans > 0 && (
       <div className="vrm-plat-note" data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
-        Offre aux observateurs : {nElig ? `possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} ; pour ${nSans === 1 ? "l'autre" : `les ${nSans} autres`}, ` : ''}pas d'observateur à qui l'envoyer pour l'instant.
+        {nElig ? `Offre aux observateurs possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} · ` : ''}pas d'observateur à qui l'envoyer pour {nElig ? (nSans === 1 ? "l'autre" : `les ${nSans} autres`) : (nSans === 1 ? 'cette annonce' : `ces ${nSans} annonces`)} pour l'instant.
       </div>
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'}{nonRelieesPeutEtre ? ' (peut-être)' : ''} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.</Pourquoi>
       </div>
     )}
       {outilsSuite}
@@ -17977,213 +18197,9 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   );
 }
 
-// ── ONGLET COLLECTIF : LA VUE GLOBALE, TOUTES PLATEFORMES RÉUNIES ───────────
-// Julien, 21 sept. : « l'onglet collectif — une vue globale toutes plateformes ».
-// Il ne RECALCULE rien (§11) : il CONSOMME `liveStats` (Vinted) et `lbcVentes`
-// (Leboncoin prouvé) via `caParPlateforme`, le même helper que le Tableau de
-// bord. Aujourd'hui seul Vinted remonte des ventes ; les autres plateformes
-// disent « pas encore de vente captée » (jamais un 0 € inventé, §5/§7) et
-// s'ajouteront d'elles-mêmes le jour où une vente y est captée.
-function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, onGo, baseKO, actions, premierJour }) {
-  const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa);
-  const connues = plateformes.filter(p => p.ca != null);
-  const caGlobal = connues.reduce((s,p)=> s + p.ca, 0);
-  const maxCA = Math.max(...connues.map(p=>p.ca), 1);
-  const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
-  const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
-  // Argent à VIRER (Vinted) — publié par liveStats (§11, jamais recalculé).
-  // « disponible » et « en attente » ne se confondent jamais (§5.14).
-  const wDispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
-  const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
-  const wAge = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
-  // Sélecteur de plateforme : « Toutes » = la vue globale ; chaque plateforme a
-  // sa propre vue, qui ne montre QUE ce qui est mesuré (§5, jamais un 0 inventé).
-  // Julien : « il y a pas l'onglet vinted ebay leboncoin et vestiaire. »
-  const [plat, setPlat] = React.useState('toutes');
-  const platSel = plateformes.find(p => p.nom === plat) || null;
-  return (
-    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="chart" title="Collectif" desc="Toutes tes plateformes réunies"/>
-      {premierJour ? <Onboarding setTab={onGo}/> : baseKO ? (
-        <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
-      ) : (<>
-        {/* À FAIRE AUJOURD'HUI. Le Collectif est la PAGE D'OUVERTURE : elle ne
-            doit JAMAIS cacher un colis à expédier ou à retirer (le mensonge le
-            plus coûteux du projet — §« quand la base ne répond pas »). Même
-            source que Ma journée et le Tableau de bord : `notifItems` (§11),
-            jamais un second calcul. Rien à faire ⇒ on ne dit rien (§7). */}
-        {Array.isArray(actions) && actions.length>0 && (
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {actions.map((a,i)=>(
-                <button type="button" key={i} data-action-tab={a.tab||undefined} data-action-n={a.n!=null?String(a.n):undefined} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
-                  <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
-                    {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
-                  </span>
-                  <span style={{flex:1,fontSize:15,fontWeight:600,color:C.text}}>{a.text}</span>
-                  <span style={{fontSize:20,color:C.muted}}>›</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* SÉLECTEUR DE PLATEFORME — Toutes · Vinted · Leboncoin · eBay ·
-            Vestiaire. Une rangée qui défile au doigt (§7, `.vrm-rangee`). La
-            pastille active distingue ; le libellé ne porte que le nom. */}
-        <div className="vrm-rangee" style={{display:'flex',gap:8}}>
-          {[{k:'toutes',l:'Toutes'},...plateformes.map(p=>({k:p.nom,l:p.nom==='Vestiaire Collective'?'Vestiaire':p.nom}))].map(o=>{
-            const actif = plat===o.k;
-            return (
-              <button key={o.k} type="button" onClick={()=>setPlat(o.k)} style={{flexShrink:0,padding:'8px 14px',borderRadius:8,border:`1px solid ${actif?C.text:C.border}`,background:actif?C.text:C.card,color:actif?C.card:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{o.l}</button>
-            );
-          })}
-        </div>
-
-        {plat==='toutes' ? (<>
-        {/* CHIFFRE D'AFFAIRES GLOBAL — la somme des plateformes captées.
-            Même source que le CA finalisé du Tableau de bord : ils sont égaux
-            quand seul Vinted a des ventes (§11). */}
-        <Card style={{padding:18}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>Chiffre d'affaires · toutes plateformes</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{connues.length?fmt(caGlobal):'—'}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
-            {connues.length
-              ? `ventes finalisées${connues.length<plateformes.length?` · ${connues.length} plateforme${connues.length>1?'s':''} sur ${plateformes.length} avec des ventes captées`:''}`
-              : 'aucune vente captée pour l’instant'}
-          </div>
-        </Card>
-
-        {/* RÉPARTITION PAR PLATEFORME — barres horizontales, UNE seule teinte
-            d'accent (§7). Une plateforme sans donnée montre un tiret + sa
-            raison, jamais une barre à zéro. */}
-        <Card style={{padding:16}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>Répartition du CA par plateforme</div>
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {plateformes.map(p=>(
-              <div key={p.nom}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,marginBottom:4}}>
-                  <span style={{fontSize:13.5,fontWeight:600,color:C.text}}>{p.nom}</span>
-                  <span className="vrm-display" style={{fontSize:14,fontWeight:700,color:p.ca==null?C.muted:C.text}}>{p.ca==null?'—':fmt(p.ca)}</span>
-                </div>
-                {p.ca==null
-                  ? <div style={{fontSize:11,color:C.muted}}>{p.note}</div>
-                  : <div style={{height:8,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}} role="img" aria-label={`${p.nom} : ${fmt(p.ca)}`}>
-                      <div style={{height:'100%',width:`${Math.max(2,Math.round(p.ca/maxCA*100))}%`,background:C.accent,borderRadius:8,transition:'width .4s'}}/>
-                    </div>}
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* CUMULS — ventes finalisées, annonces en ligne, argent en cours.
-            Cliquables vers l'écran détaillé. §11 : mêmes chiffres que le Tableau
-            de bord (mêmes `liveStats`). */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes finalisées</div>
-            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{ventesVinted==null?'—':ventesVinted}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Vinted · les autres s'ajoutent dès qu'une vente y est captée</div>
-          </button>
-          <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
-            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{texteEnLigne(liveStats)}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Vinted (capté)</div>
-          </button>
-          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes en cours</div>
-            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{enAttente==null?'—':enAttente}</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente de finalisation</div>
-          </button>
-        </div>
-
-        {/* ARGENT À VIRER — le chiffre qui compte pour un revendeur : ce qu'il
-            peut sortir. Publié par liveStats (§11, jamais recalculé). « dispo »
-            et « en attente » ne se confondent JAMAIS (§5.14) : deux lignes, deux
-            mots. Absent ⇒ on n'affiche pas la carte (pas de 0 inventé, §5/§7).
-            eBay a le sien sur son propre onglet (droit « paiements » à
-            reconnecter) ; Vinted est le seul lisible sans geste. */}
-        {(wDispo != null || wAttente != null) && (
-          <Card style={{padding:16}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Argent à virer · Vinted</div>
-            <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
-              <div>
-                <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{wDispo==null?'—':fmt(wDispo)}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1}}>disponible à virer</div>
-              </div>
-              {wAttente!=null && wAttente>0 && (
-                <div>
-                  <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.muted}}>{fmt(wAttente)}</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:1}}>en attente (retenu par Vinted)</div>
-                </div>
-              )}
-            </div>
-            {wAge!=null && wAge>7 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>Solde lu il y a {Math.round(wAge)} j — repasse sur Vinted pour le rafraîchir.</div>}
-          </Card>
-        )}
-
-        {/* Le détail mois par mois vit sur Statistiques — une seule source. */}
-        <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
-          Voir l'évolution mois par mois → Statistiques
-        </button>
-        <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
-          Leboncoin et eBay apparaîtront ici <b>dès qu'une vente y sera captée</b> ; pour l'instant seul Vinted remonte des ventes. Rien n'est inventé : une plateforme sans donnée affiche un tiret.
-        </div>
-        </>) : platSel && platSel.nom==='Vinted' ? (<>
-          {/* VUE VINTED — la seule plateforme qui remonte des ventes. Tous les
-              chiffres viennent de `liveStats` (§11), jamais recalculés. */}
-          <Card style={{padding:18}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>Vinted · chiffre d'affaires</div>
-            <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{platSel.ca==null?'—':fmt(platSel.ca)}</div>
-            <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{platSel.ca==null?'aucune vente finalisée captée':'ventes finalisées, tous comptes'}</div>
-          </Card>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-            <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes finalisées</div>
-              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{ventesVinted==null?'—':ventesVinted}</div>
-            </button>
-            <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes en cours</div>
-              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{enAttente==null?'—':enAttente}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente de finalisation</div>
-            </button>
-            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
-              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{texteEnLigne(liveStats)}</div>
-            </button>
-          </div>
-          <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
-            Voir le détail → Statistiques
-          </button>
-        </>) : platSel ? (<>
-          {/* VUE D'UNE PLATEFORME SANS DONNÉE CAPTÉE — on ne fête rien et on
-              n'invente pas de 0 € (§5/§7). Un tiret + la cause connue + le geste
-              (publier depuis Annonces pour Leboncoin/eBay ; Vestiaire n'est pas
-              encore reliée à VRM). C'est « il n'y a encore rien », une cause qui
-              se dit — pas « tout est à jour 🎉 ». */}
-          <Card style={{padding:18}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>{platSel.nom} · chiffre d'affaires</div>
-            <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.muted}}>—</div>
-            <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>pas encore de vente captée</div>
-          </Card>
-          <Card style={{padding:16}}>
-            <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
-              {platSel.nom==='Vestiaire Collective'
-                ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM. Rien n'y est capté aujourd'hui — dès qu'une vente y remontera, elle apparaîtra ici, comptée dans le total, sans que tu aies rien à faire.</>
-                : <>Aucune vente n'a encore été captée sur {platSel.nom}. Tu publies tes paires depuis l'écran <b>Annonces</b> ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total — jamais avant, rien n'est inventé.</>}
-            </div>
-            {platSel.nom!=='Vestiaire Collective' && (
-              <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
-                Ouvrir l'écran Annonces →
-              </button>
-            )}
-          </Card>
-        </>) : null}
-      </>)}
-    </div>
-  );
-}
-
+// (17 oct.) L'écran « Collectif » est retiré — Julien : « il ne sert à rien, il
+// est déjà représenté dans les statistiques ». `?tab=collectif` mène aux
+// Statistiques (`ONGLETS_DEPLACES`).
 function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,panelOff=null}) {
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
@@ -24896,7 +24912,26 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
 // ⚠️ La ligne `vrm_pro_facture` se réécrit ENTIÈRE : lue en trois états
 //    (`lireReglage`), et une lecture ratée n'écrit RIEN (sinon la première
 //    frappe effaçait sa raison sociale et son SIRET).
-const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
+// (17 oct., Julien : « je ne sais pas ce que c'est que le profil fiscal » ;
+// « l'utilisateur n'a pas besoin de mettre son nom d'entreprise, il met son
+// numéro de SIRET »). La carte s'appelle « Ton entreprise », le SIRET vient en
+// premier, et le nom (et l'adresse) sont retrouvés au registre public des
+// entreprises (`chercherEntreprise`, par son SIREN EXACT — jamais un nom qui
+// ressemble, §5). Le nom reste modifiable : s'il le change à la main, VRM ne le
+// remplace plus (`nomAuto` garde le nom que VRM a posé).
+const _entreprisesLues = new Map();          // chiffres → réponse (une fois par session)
+async function chercherEntreprise(brut) {
+  const ch = String(brut || '').replace(/\D/g, '');
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide' };
+  if (_entreprisesLues.has(ch)) return _entreprisesLues.get(ch);
+  try {
+    const r = await fetch(`/api/compte?mode=entreprise&siret=${ch}`, { headers: enTeteSession() });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && (j.etat === 'trouve' || j.etat === 'inconnu')) { _entreprisesLues.set(ch, j); return j; }
+    return { etat: 'passu' };
+  } catch (_) { return { etat: 'passu' }; }
+}
+const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise — retrouvé avec ton SIRET", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
 function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
@@ -24924,6 +24959,34 @@ function ProfilFiscalCarte({ onNav }) {
   const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
   React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
   const siren = verifierSiren(cfg && cfg.siret);
+  // Le registre : interrogé quand le numéro est VALIDE (clé de contrôle), une
+  // fois par numéro. Trouvé ⇒ le nom (et l'adresse si elle est vide) sont posés,
+  // sauf s'il a tapé lui-même un autre nom.
+  const [registre, setRegistre] = React.useState(null);   // null · {etat:'encours'|'trouve'|'inconnu'|'passu', …}
+  const chiffres = String((cfg && cfg.siret) || '').replace(/\D/g, '');
+  const cfgRef = React.useRef(cfg); cfgRef.current = cfg;
+  const pret = !!cfg;
+  React.useEffect(() => {
+    if (!pret || siren.etat !== 'ok') { setRegistre(null); return undefined; }
+    let mort = false;
+    setRegistre({ etat: 'encours' });
+    chercherEntreprise(chiffres).then((j) => {
+      if (mort) return;
+      setRegistre(j);
+      const c = cfgRef.current;
+      if (j.etat !== 'trouve' || !c || String(c.siret || '').replace(/\D/g, '') !== chiffres) return;
+      const libre = !String(c.nom || '').trim() || c.nom === c.nomAuto;
+      const next = { ...c };
+      let change = false;
+      if (libre && c.nom !== j.nom) { next.nom = j.nom; next.nomAuto = j.nom; change = true; }
+      if (j.etabTrouve && !String(c.adresse || '').trim() && j.adresse) { next.adresse = j.adresse; change = true; }
+      if (j.etabTrouve && !String(c.codePostal || '').trim() && j.codePostal) { next.codePostal = j.codePostal; change = true; }
+      if (j.etabTrouve && !String(c.ville || '').trim() && j.ville) { next.ville = j.ville; change = true; }
+      if (change) ecrire(next);
+    });
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chiffres, siren.etat, pret]);
   const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -24931,8 +24994,8 @@ function ProfilFiscalCarte({ onNav }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Profil fiscal</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures ; ton régime sert à calculer tes cotisations.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
@@ -24944,13 +25007,17 @@ function ProfilFiscalCarte({ onNav }) {
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
                 <input key={k} data-profil-champ={k} value={cfg[k] || ''} placeholder={ph} aria-label={ph} inputMode={k === 'siret' || k === 'codePostal' ? 'numeric' : undefined}
                   onChange={(e) => ecrire({ ...cfg, [k]: e.target.value })}
+                  data-profil-auto={k === 'nom' && cfg.nom && cfg.nom === cfg.nomAuto ? '1' : undefined}
                   style={{ ...inp, flex, borderColor: k === 'siret' && siren.etat === 'invalide' ? C.warn : C.border }} />
               ))}
             </div>
-            <div data-siren={siren.etat} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
-              {siren.etat === 'vide' ? 'SIREN (9 chiffres) ou SIRET (14) : il figure sur ton avis de situation INSEE.'
-                : siren.etat === 'ok' ? `${siren.type} valide (clé de contrôle correcte).`
-                : `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`}
+            <div data-siren={siren.etat} data-registre={registre ? registre.etat : undefined} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
+              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres) : il figure sur ton avis de situation INSEE. Le nom de ton entreprise se remplit tout seul.'
+                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`
+                : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
+                : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
+                : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
+                : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
             </div>
           </>)}
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -32770,9 +32837,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    vivait plus que dans la cloche (la refonte du tableau de bord l'avait
         //    retirée). Une alerte cachée, c'est une paire vendue deux fois. Même
         //    source que la cloche (`notifItems`, marquées `dv`, §11), en tête.
+        // (17 oct.) L'écran Collectif est retiré : les actions qui ne vivaient
+        //    QUE dans sa liste « À faire » (compte bloqué, ventes eBay à
+        //    expédier, annonces sans numéro, déclaration du mois — marquées `jr`)
+        //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
-          if (!a || !a.dv) continue;
-          jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
+          if (!a || !(a.dv || a.jr)) continue;
+          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
+          else jobs.push({id:'a-faire-'+a.ic, n:a.n, icon:a.ic||'info', color:C.text, title:a.text, tab:a.tab, prio:3});
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -40078,11 +40150,15 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const ongletsCompte = MULTI_USER && !!AUTH.user;
   const [vue, setVueBrute] = React.useState(() => {
     // Retour de Stripe (paiement, page de gestion) : on revient sur le compte.
-    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'compte') return 'compte';
-    try { return localStorage.getItem('vrm_reglages_vue') === 'compte' ? 'compte' : 'reglages'; } catch (_) { return 'reglages'; }
+    // (17 oct., Julien : « prépare dans les paramètres un onglet abonnement »)
+    // Le retour de Stripe (paiement, page de gestion) ouvre l'onglet Abonnement.
+    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement') return 'abonnement';
+    if (RETOUR_VUE === 'compte') return 'compte';
+    try { const v = localStorage.getItem('vrm_reglages_vue'); return v === 'compte' || v === 'abonnement' ? v : 'reglages'; } catch (_) { return 'reglages'; }
   });
   const voirCompte = !ongletsCompte || vue === 'compte';
   const voirReglages = !ongletsCompte || vue === 'reglages';
+  const voirAbonnement = ongletsCompte && !!AUTH.user && vue === 'abonnement';
 
   // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
   // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
@@ -40150,8 +40226,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     if (!g || !g.items.some(Boolean)) return null;
     const items = g.items.filter(Boolean);
     // Téléphone : tout en lignes. Ordinateur : les lignes, puis les panneaux dépliés.
+    // Un groupe « brut » (l'onglet Abonnement) se rend tel quel, sans liste.
     let corps;
-    if (etroit) corps = liste(items);
+    if (g.brut) corps = items.map((it) => <React.Fragment key={it.id}>{it.el}</React.Fragment>);
+    else if (etroit) corps = liste(items);
     else {
       const blocs = []; let courant = [];
       items.forEach((it) => {
@@ -40314,8 +40392,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
     ]},
+    // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
-      { id:'abonnement', type:'panneau', ic:'wallet', lib:'Abonnement et factures', el:<MonAbonnement/> },
+      { id:'abonnement-lien', type:'nav', ic:'wallet', lib:'Abonnement et factures', desc:'Statut, prix, carte, factures, résiliation', onClick:()=>setVue('abonnement') },
     ]},
     { id:'connexion', titre:'Connexion', items:[
       { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
@@ -40336,11 +40415,14 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
     ]},
   ];
-  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : [])].filter(Boolean)
+  // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
+  // carte, factures, résilier) — le MÊME composant qu'avant (§11).
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/></div> }] }];
+  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = etroit && sous ? panneaux.find((it) => it.id === sous) : null;
-  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : 'Réglages';
+  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : vue === 'abonnement' ? 'Abonnement' : 'Réglages';
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
   // Toujours présent en multi-vendeurs, y compris quand on est entré par la
@@ -40389,7 +40471,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
-            {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
+            {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
               <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
                 style={{background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?'0 1px 2px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04)':'none'}}>
                 {l}
@@ -41700,6 +41782,7 @@ function ProFactureSetting() {
   const persist = (next) => {
     if (cfg === null) return;                  // pas lu : on n'écrit rien
     setCfg(next); setStatus('enregistrement…');
+    try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
@@ -43124,7 +43207,20 @@ function AppCoeur() {
   //    vois pas l'utilité d'avoir les deux »). Ma journée est le poste de
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
-  const [tab,setTab]=useState('journee');
+  const [tab,setTabBrut]=useState('journee');
+  // (17 oct., Julien) TROIS ÉCRANS QUITTENT LE MENU, SANS DISPARAÎTRE : « Prix
+  // qui marche » devient une rubrique de Statistiques, « Factures » une rubrique
+  // de Comptabilité, et « Collectif » (déjà dans Statistiques) est retiré. Les
+  // liens qui visent encore ces onglets (notifications, ?tab=, Réglages) mènent
+  // à leur nouvelle place : la redirection vit ICI, une fois (§11), pas chez
+  // chaque appelant.
+  const setTab=React.useCallback((v)=>setTabBrut((t)=>{
+    const n=typeof v==='function'?v(t):v;
+    const r=ONGLETS_DEPLACES[n];
+    if(!r) return n;
+    if(r[1]){ subVoulue.current=r[1]; if(r[0]===t) setTimeout(()=>setPlatSub(r[1]),0); }
+    return r[0];
+  }),[]);
   // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
   React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
   // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
@@ -43555,7 +43651,7 @@ function AppCoeur() {
   // d'assez dense · échec ⇒ baseKO parle déjà. select=data sur orders_sold /
   // listings : lignes légères (pas de PDF), §4.4 respecté.
   const [pqmData,setPqmData]=useState(null);
-  useEffect(()=>{ if(tab!=='prixmarche' || pqmData!==null) return; (async()=>{
+  useEffect(()=>{ if(!(tab==='dashboard'&&platSub==='prix') || pqmData!==null) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data');
     if(so===null) return; // pas su ⇒ on laisse `null`, baseKO affiche la panne
@@ -43568,7 +43664,7 @@ function AppCoeur() {
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
     setPqmData({ groups: g, valo: valoriserStock(g, online) });
-  })(); /* eslint-disable-next-line */ },[tab]);
+  })(); /* eslint-disable-next-line */ },[tab,platSub]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
   // transaction le dit) — jamais déduite d'une transaction vue en liste. Lecture
@@ -43628,6 +43724,27 @@ function AppCoeur() {
   // comme complet. `ebayCmdTous` garde le détail par compte pour le résumé
   // de l'onglet eBay (le compte choisi, ou tous).
   const comptesEbay = useComptesEbay();
+  // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
+  // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
+  // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
+  // s'écrit dans une phrase (« Actions possibles · … ») est flouté comme les
+  // autres, sans qu'il faille y penser à chaque écran.
+  const streamOn = useStream();
+  const entreprise = useEntreprise();
+  React.useEffect(() => { demarrerStream(streamOn); }, [streamOn]);
+  React.useEffect(() => {
+    const labels = load('vinted_account_labels', {}) || {};
+    const mails = load('vinted_account_emails', {}) || {};
+    const ch = vintedDeChrome(); const rl = etatRelais();
+    jetonsStream('comptes', [
+      ...(vintedAccounts || []).flatMap((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id]]),
+      ...Object.values(mails), ...Object.values(labels),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
+      AUTH.user && AUTH.user.email,
+      entreprise && entreprise.nom, entreprise && entreprise.siret,
+    ]);
+  });
   const [ebayCmdTous,setEbayCmdTous]=useState(undefined);
   useEffect(()=>{ if (comptesEbay === undefined) return; let stop=false; (async()=>{
     if (comptesEbay === null) { setEbayCmdTous(null); setEbayCommandes(null); return; }
@@ -44160,6 +44277,9 @@ function AppCoeur() {
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
+        // (17 oct.) Le disponible COMPTE PAR COMPTE, pour « Retirer » (il faut
+        // savoir sur quel compte aller : il en a plusieurs).
+        walletParCompte:(walletEsc&&Array.isArray(walletEsc.parCompte))?walletEsc.parCompte.map(x=>({uid:x.uid,login:(()=>{const a=(vintedAccounts||[]).find(y=>String(y.vinted_user_id)===String(x.uid));return a?String(a.login||''):'';})(),dispo:x.dispo,jours:x.jours})):null,
         walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
@@ -44535,7 +44655,7 @@ function AppCoeur() {
         const hit=(vintedAccounts||[]).filter(a=>blocked.has(String(a.vinted_user_id)));
         if(hit.length){
           const noms=hit.map(a=>String(a.login||`#${a.vinted_user_id}`)).join(', ');
-          items.push({icon:'🚫', ic:'alert', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
+          items.push({icon:'🚫', ic:'alert', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts', jr:true});
         }
       }catch(_){}
       // ⚠️ ON CONSOMME LA RÈGLE PUBLIÉE, on ne la refait pas. `colisCount`
@@ -44571,7 +44691,7 @@ function AppCoeur() {
         if (pub && Number.isFinite(pub.total) && Date.now() - (Number(pub.at) || 0) < 12 * 3600000) toShipCount = pub.total;
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
-      if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});
+      if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
@@ -44587,7 +44707,7 @@ function AppCoeur() {
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num'});
-      if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
+      if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
       // jours suivants, pour qui n'ouvre pas l'app le 1er). Julien, 30 sept. :
@@ -44595,7 +44715,7 @@ function AppCoeur() {
       // premier de chaque mois pour la faire, pas besoin de la laisser ».
       {
         const j=new Date().getDate();
-        if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'dashboard'});
+        if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'compta', jr:true});
       }
       setNotifItems(items);
       // Le mémo des conversations reste borné (les plus récentes gardées).
@@ -44667,13 +44787,17 @@ function AppCoeur() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
-      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
+      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY,t0:Date.now()};
       }}
       onTouchEnd={e=>{
       const s=swipeStart.current; if(!s) return; swipeStart.current=null;
       const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+      // Un appui long (la sélection de texte) ou une sélection encore active
+      // n'est pas un balayage.
+      if(Date.now()-s.t0>BALAYAGE_MAX_MS || selectionActive()) return;
       slideTab(t.clientX-s.x, t.clientY-s.y, 70);
       }}
+      onTouchCancel={()=>{ swipeStart.current=null; }}
       // À LA SOURIS (ordinateur). Les événements tactiles ci-dessus ne sont
       // JAMAIS émis par une souris : sur ordinateur, glisser ne faisait donc
       // rien du tout. On écoute le pointeur, mais uniquement pour la souris —
@@ -44688,6 +44812,8 @@ function AppCoeur() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
+      // Appuyer sur un texte, c'est commencer à le sélectionner.
+      if(surDuTexte(e.clientX,e.clientY)){ swipeStart.current=null; return; }
       swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
       // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
@@ -44715,7 +44841,11 @@ function AppCoeur() {
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
       }}
-      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
+      // ⚠️ Seulement la SOURIS : au doigt, le navigateur envoie `pointercancel`
+      // dès qu'il prend la main sur le geste — remettre le départ à zéro ici
+      // tuait TOUT balayage au doigt sur Android (vu au banc, 17 oct.). Le doigt
+      // a ses propres événements (touchstart / touchend / touchcancel).
+      onPointerCancel={e=>{ if(e.pointerType!=='mouse') return; swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -44759,6 +44889,8 @@ function AppCoeur() {
               ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim"/>
               : <VrmLogo key={tab} size={30}/>}
           </div>
+          {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
+          <NomEntreprise entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         <div className="vrm-header-actions">
@@ -45137,9 +45269,10 @@ function AppCoeur() {
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
+        {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
+        {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='dashboard'&&platSub!=='prix'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -45151,6 +45284,7 @@ function AppCoeur() {
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
           <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
+          {platSub==='ventes' && !baseKO && <div style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
@@ -45172,12 +45306,25 @@ function AppCoeur() {
             const note = (ar.actives && lbcVentes.maj)
               ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
               : null;
+            // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
+            // du haut se tait (le même nombre deux fois sur un écran, §7).
+            if (platSub === 'ventes') return null;
             return (
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
-          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
+          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
+            {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
+              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
+              const v = (n) => (vide && !lu) ? null : n;
+              return <KpiVentes plateforme="leboncoin" tuiles={[
+                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
+                { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
+                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
+              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? `Lu sur Leboncoin ${ilYaCourt(lbcVentes.maj)} — ouvre « Mes transactions » avec l'extension pour rafraîchir.` : null)}/>; })()}
+            {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
+          </>}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
@@ -45202,6 +45349,7 @@ function AppCoeur() {
             const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
             const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
+            if (platSub === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
@@ -45211,18 +45359,17 @@ function AppCoeur() {
           {Array.isArray(comptesEbay) && comptesEbay.length >= 2 && (
             <ListeComptes id="vrm-sel-compte-ebay" skin={EBAY_SKIN} valeur={ebayVueEff} onChange={setEbayVue}
               attrs={{ 'data-ebay-vue': ebayVueEff }}
-              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) }))} />
+              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') }))} />
           )}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/>}</EbayActionCompte></div>}
+          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
-        {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
@@ -45233,11 +45380,12 @@ function AppCoeur() {
         }}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/>}
         {tab==='masques' &&<EcranMasques comptes={vintedAccounts} ordi={ordi}/>}
-        {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
+        {tab==='compta'&&platSub==='factures'&&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
+        {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={[['compta','Comptabilité'],['factures','Factures']]}/></div>}
+        {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
@@ -45245,7 +45393,7 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise}/> : <BottomBar tab={tab} setTab={setTab}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
