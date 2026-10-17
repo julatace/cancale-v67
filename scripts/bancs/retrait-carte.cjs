@@ -100,7 +100,7 @@ async function main() {
           return { tr: tr ? tr.getAttribute('data-relais-transporteur') + '|' + tr.innerText : '', ad: ad ? ad.innerText : '', badgeV: !!document.querySelector('.vrm-pickup-point [title="Vinted Go"]'), code: c && c.querySelector('strong').textContent, croise, dedans: !!(rc && z && z.right <= rc.right + 1 && a.right <= rc.right + 1), txt: carte ? carte.innerText : '' };
         });
         dit(/^mondialrelay\|Mondial Relay/.test(m.tr) && !m.badgeV, `${T} le transporteur nommé par la conversation est dit (jamais « Vinted Go » en dur)`, m.tr);
-        dit(/12 rue du Port, 35260 Cancale/.test(m.ad), `${T} l’adresse du point relais est écrite en entier`, m.ad);
+        dit(/12 rue du Port, 35260 Cancale/i.test(m.ad), `${T} l’adresse du point relais est écrite en entier`, m.ad);
         dit(m.code === '012345', `${T} le code garde son zéro de tête`, m.code);
         dit(m.croise === false, `${T} « J’ai retiré » ne recouvre pas le code de retrait`);
         dit(m.dedans, `${T} le code et le bouton restent dans la carte`);

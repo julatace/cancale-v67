@@ -12803,6 +12803,13 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       {enRoute.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
         {enRoute.map(Carte)}
+        {/* (17 oct.) OÙ ARRIVE LE CODE D'UN COLIS LEBONCOIN. Mesuré sur sa base :
+            une transaction Leboncoin ne porte NI point de retrait NI code (champs
+            captés : statut, transporteur, prix). Le code vient de l'e-mail du
+            transporteur — qui ne dit pas de quelle plateforme vient le colis :
+            il rejoint donc la liste « À retirer » des achats, comme ceux de
+            Vinted. On le dit une fois, plutôt qu'un « en route » muet. */}
+        {enRoute.some(o => o.deliveryLabel) && <div data-lbc-code-ou="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Quand un colis arrive au point relais, son code de retrait vient de l’e-mail du transporteur : il s’affiche dans Achats → À retirer, avec les colis Vinted.</div>}
       </>)}
       {recus.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
@@ -23728,8 +23735,33 @@ const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retire
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
 // Retrouvez… »). Renvoie { nom, adresse, display } propres.
 const titleCasePR = (s) => s.toLowerCase().replace(/\b([a-zà-ÿ])/g, (m) => m.toUpperCase()).replace(/\b(De|Du|La|Le|Les|Des|Et)\b/g, w => w.toLowerCase());
+// (17 oct.) LE TYPE DE LIEU N'EST PAS SON NOM. Mesuré sur sa base : l'email
+// Vinted Go écrit « *Consigne Vinted Go*, * Kusmi Tea *, * 13 Rue Saint-Vincent »
+// (gras de la version texte compris), la conversation « Kusmi Tea, 13 Rue
+// Saint-Vincent, 56000 Vannes » et « point relais TABAVAP, TABAVAP, 29 RUE
+// HOCHE ». Le nom pris était « *Consigne Vinted Go* » : deux consignes de deux
+// enseignes dans un même bloc, et la même consigne dans deux blocs. On retire le
+// gras, le type générique en tête (gardé dans `type`) et un nom répété.
+const TYPE_LIEU = /^(?:point\s+relais|point\s+de\s+retrait|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
 const cleanLieu = (raw) => {
-  let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/\s+/g, ' ').trim();
+  let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) return { nom: '', adresse: '', display: '', type: '' };
+  let type = '';
+  {
+    const parts = s.split(',').map(x => x.trim()).filter(Boolean);
+    const m0 = parts.length && parts[0].match(TYPE_LIEU);
+    if (m0) {
+      const reste = parts[0].slice(m0[0].length).trim();
+      type = m0[0].replace(/[\s:\-–]+$/, '').trim();
+      if (reste) parts[0] = reste; else if (parts.length > 1) parts.shift();
+    }
+    for (let i = parts.length - 1; i > 0; i--) if (parts[i].toLowerCase() === parts[i - 1].toLowerCase()) parts.splice(i, 1);
+    s = parts.join(', ');
+  }
+  const r = cleanLieuCorps(s);
+  return { ...r, type: r.nom ? type : '' };
+};
+const cleanLieuCorps = (s) => {
   if (!s) return { nom: '', adresse: '', display: '' };
   // Coupe le baratin après l'adresse.
   s = s.replace(/\s+(super\s*pratique|retrouvez|horaires?|ouvert|du lundi|https?:\/\/|www\.).*$/i, '').trim();
@@ -33197,6 +33229,101 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ? <PhotoVinted src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
                 className="vrm-pickup-thumb" style={{width:48,height:48,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
             : <span className="vrm-pickup-thumb" style={{flexShrink:0,color:C.muted,background:C.card2||C.bg,width:48,height:48,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="bag" size={20}/></span>;
+          // (17 oct.) UNE CARTE « COLIS VU PAR VINTED », UNE FORME : rendue dans le bloc
+          // du lieu quand un email nomme le même endroit (un endroit = un bloc,
+          // plus « Consigne Vinted Go » ici et « Kusmi Tea » là pour la même consigne),
+          // sinon dans son propre bloc plus bas.
+          const carteColisVinted = (o, i, melange, memeCompte) => {
+                    // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
+                    // relais et le code de retrait. Pour Vinted Go c'est la seule
+                    // source — aucun email ne les porte (voir `colisRelais`).
+                    const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
+                    return (
+                    <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
+                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
+                      <div style={{flex:'1 1 150px',minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
+                            la date SONT portés par la commande Vinted (§5 retrait :
+                            transaction_id, date, titre, prix, statut) — la MÊME
+                            source et le MÊME format que le bloc « repartis chez
+                            leurs vendeurs » plus bas (§11 : montantCommande + o.date).
+                            Chacun ne s'affiche que s'il est connu — jamais un 0
+                            inventé (§5/§7). */}
+                        <details className="vrm-pickup-details"><summary>Détails de l’achat</summary>{(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
+                          const jour = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('fr-FR') : '';
+                          const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+' €'); if(jour) bits.push('commandé le '+jour);
+                          return bits.length ? <div style={{fontSize:11,color:C.muted,marginTop:1}}>{bits.join(' · ')}</div> : null;
+                        })()}</details>
+                        {/* L'adresse est déjà en tête du bloc : ici on ne met que
+                            ce qui est propre à CE colis. */}
+                        {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne
+                            distingue vraiment ce colis de ses voisins. Si AUCUN
+                            n'a de code, l'en-tête du bloc l'a déjà dit. */}
+                        {!cd && melange && !(rel && rel.lieu) && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
+                        {/* ⚠️ LE COMPTE, PARCE QU'IL EN A NEUF. Mesuré le
+                            7 septembre : ses cinq colis à retirer sont TOUS sur
+                            `julatace3535`, dont la dernière capture datait de
+                            4 jours — et leurs cinq conversations n'avaient
+                            JAMAIS été captées. `capterRetraits` (extension,
+                            depuis le 27 août) va pourtant les chercher TOUT
+                            SEUL — mais seulement pour le compte connecté dans
+                            l'onglet : encore faut-il savoir lequel. C'est tout
+                            ce qui manquait. */}
+                        {o && o._acc && !memeCompte && (
+                          <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+                            compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
+                          </div>
+                        )}
+                        {!cd && !(rel && rel.qr) && rel && rel.lieu && <div data-colis-sans-code-conv="" style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.35}}>La conversation Vinted ne donne pas de code pour ce colis : il arrive par l’e-mail du transporteur (« Votre colis … est disponible ») sur l’adresse de ce compte. Si cette boîte fait suivre ses e-mails à VRM, il s’affichera ici.</div>}
+                        {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
+                            (§17). Si le message porte le lien direct du code, on
+                            l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
+                        {/* ⚠️ UNE LIGNE QUI DIT « en attente de leur code » SANS
+                            RIEN À TOUCHER NE SERT À RIEN. Le lien de la
+                            conversation existe toujours (`conversation_id` de la
+                            commande) : même sans l'extension, il est à un tap du
+                            code et du QR, à l'endroit exact où Vinted les met. */}
+                        {(()=>{
+                          const href = (rel && (rel.qr || rel.url)) || lienConv(o);
+                          if (!href) return null;
+                          // ⚠️ POUR UN NOVICE, LE GESTE DOIT DIRE CE QU'IL RAPPORTE
+                          //    (Julien, 25 sept. : « quel code de retrait par
+                          //    colis »). « Ouvrir la conversation » ne dit pas qu'on
+                          //    y trouve LE CODE. Quand le code n'est pas encore
+                          //    affiché ici, le bouton dit « Voir mon code de retrait »
+                          //    et ressemble à un bouton (bordé, accent) : c'est LA
+                          //    chose à toucher. Quand le code est déjà en gros à
+                          //    côté (`cd`), le lien reste discret (rien de neuf à
+                          //    aller chercher).
+                          const qr = !!(rel && rel.qr);
+                          const primaire = !cd;   // pas de code visible → c'est l'action principale
+                          // (17 oct.) La conversation a été LUE (le lieu en vient) et ne
+                          // porte aucun code : promettre « Voir mon code de retrait »
+                          // enverrait chercher un code qui n'y est pas (mesuré : 3 colis
+                          // Mondial Relay, lieu lu, code vide). Le bouton dit ce qu'il ouvre.
+                          const luSansCode = !cd && !qr && !!(rel && rel.lieu);
+                          const quoi = qr ? 'Voir le QR de retrait ↗'
+                            : (cd || luSansCode) ? 'Ouvrir la conversation ↗'
+                            : 'Voir mon code de retrait ↗';
+                          return primaire ? (
+                            <a className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:8,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
+                              {quoi}
+                            </a>
+                          ) : (
+                            <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{fontSize:12.5,color:C.accent,fontWeight:600,textDecoration:'none'}}>
+                              {quoi}
+                            </a>
+                          );
+                        })()}
+                      </div>
+                      {cd&&(
+                        <CodeRetraitCopiable label="Code de retrait" code={cd}/>
+                      )}
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                    </div>
+                    );
+          };
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
           // compte la localisation, seulement les informations du mail »).
           // Avant, un email sans adresse de relais héritait du relais le plus
@@ -33220,6 +33347,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ((dropOffs&&dropOffs.carriers)||[]).forEach(c=>c.points.forEach(p=>{ const k=normNom(p.nom); if(k&&!pointsConnus[k]) pointsConnus[k]=p; }));
           const groups = {};
           avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          // (17 oct.) UN ENDROIT = UN BLOC, QUELLE QUE SOIT LA SOURCE. Plainte de Julien :
+          // « des colis à Vinted Go et d'autres à Kusmi Tea (aussi Vinted Go) ». Mesuré :
+          // l'email nommait le lieu « *Consigne Vinted Go*, * Kusmi Tea *… » (rangé sous
+          // « Consigne Vinted Go », avec la consigne de Vannes Speed Queen dans le même
+          // bloc) et la conversation « Kusmi Tea, 13 Rue Saint-Vincent… » (un second
+          // bloc). `cleanLieu` rend maintenant le même NOM pour les deux, et un colis
+          // vu par Vinted dont le lieu porte le nom d'un bloc email rejoint ce bloc.
+          // Identité : le nom EXACT normalisé du lieu, jamais une ressemblance.
+          const nomsEmail = new Set(Object.keys(groups).filter(n => !groups[n].lieuInconnu).map(normNom));
+          const extraFusion = {}; const extraSeul = [];
+          extra.forEach(o => { const rel = relaisDe(o); const k = normNom(cleanLieu(rel && rel.lieu).nom); if (k && nomsEmail.has(k)) (extraFusion[k] = extraFusion[k] || []).push(o); else extraSeul.push(o); });
           return (
             <div className="vrm-pickup-board">
               <div className="vrm-pickup-head">
@@ -33447,13 +33585,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     );
                   })}
+                  {(extraFusion[normNom(nom)]||[]).map((o,i)=>carteColisVinted(o,'f'+i,true,null))}
                   </div>
                 </div>
                 )); })()}
               {/* Colis vus « déposés » par Vinted mais dont le CODE n'est pas
                   encore arrivé par email → on les montre quand même (sinon le
                   compteur dirait 2 et la liste n'en montrerait qu'1). */}
-              {extra.length>0 && (()=>{
+              {extraSeul.length>0 && (()=>{
                 // ⚠️ MÊME RÈGLE QUE CI-DESSUS : une destination = un bloc. Depuis
                 // que la conversation nous donne l'adresse (Vinted Go, §5.72), ces
                 // colis ont un ENDROIT eux aussi — les laisser en vrac dans une
@@ -33461,11 +33600,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // par un pour savoir où aller. Les colis dont on ne connaît pas
                 // encore le lieu restent groupés à part, et on le dit.
                 const pts = {};
-                extra.forEach(o => {
+                // Le nom vient de `cleanLieu` (§11, la même règle que les blocs email) :
+                // « point relais TABAVAP, TABAVAP, 29 RUE HOCHE » → « Tabavap ».
+                extraSeul.forEach(o => {
                   const rel = relaisDe(o);
-                  const nom = (rel && rel.lieu) ? String(rel.lieu).split(',')[0].trim() : '';
-                  const k = nom || '__inconnu';
-                  (pts[k] = pts[k] || { nom, adresse: (rel && rel.lieu) || '', colis: [] }).colis.push(o);
+                  const cl = cleanLieu(rel && rel.lieu);
+                  const k = normNom(cl.nom) || '__inconnu';
+                  (pts[k] = pts[k] || { nom: cl.nom, adresse: cl.adresse || '', colis: [] }).colis.push(o);
                 });
                 const ordre = Object.entries(pts).sort((a,b)=>{
                   if ((a[0]==='__inconnu') !== (b[0]==='__inconnu')) return a[0]==='__inconnu' ? 1 : -1;
@@ -33495,7 +33636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // dur sur un relais Mondial Relay. Inconnu ⇒ aucun badge.
                   const transpGr = [...new Set(pt.colis.map(o => { const r = relaisDe(o); return (r && r.transporteur) || ''; }))];
                   const transpUn = transpGr.length === 1 && transpGr[0] && CARRIERS[transpGr[0]] ? transpGr[0] : '';
-                  const adresseSuite = pt.adresse && pt.nom && pt.adresse.length > pt.nom.length ? pt.adresse.slice(pt.nom.length).replace(/^\s*[,—-]\s*/, '') : '';
+                  const adresseSuite = pt.adresse || '';
                   return (
                 <div className="vrm-pickup-point" key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   <div className="vrm-pickup-dest" style={{borderBottom:`1px solid ${C.border}`}}>
@@ -33549,91 +33690,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       deux écrans. Le `min()` évite qu'une piste de 430 px déborde
                       un téléphone. */}
                   <div style={{padding:'10px 12px 4px',display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:7,alignItems:'start'}}>
-                  {pt.colis.map((o,i)=>{
-                    // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
-                    // relais et le code de retrait. Pour Vinted Go c'est la seule
-                    // source — aucun email ne les porte (voir `colisRelais`).
-                    const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
-                    return (
-                    <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
-                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
-                      <div style={{flex:'1 1 150px',minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
-                        {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
-                            la date SONT portés par la commande Vinted (§5 retrait :
-                            transaction_id, date, titre, prix, statut) — la MÊME
-                            source et le MÊME format que le bloc « repartis chez
-                            leurs vendeurs » plus bas (§11 : montantCommande + o.date).
-                            Chacun ne s'affiche que s'il est connu — jamais un 0
-                            inventé (§5/§7). */}
-                        <details className="vrm-pickup-details"><summary>Détails de l’achat</summary>{(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
-                          const jour = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('fr-FR') : '';
-                          const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+' €'); if(jour) bits.push('commandé le '+jour);
-                          return bits.length ? <div style={{fontSize:11,color:C.muted,marginTop:1}}>{bits.join(' · ')}</div> : null;
-                        })()}</details>
-                        {/* L'adresse est déjà en tête du bloc : ici on ne met que
-                            ce qui est propre à CE colis. */}
-                        {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne
-                            distingue vraiment ce colis de ses voisins. Si AUCUN
-                            n'a de code, l'en-tête du bloc l'a déjà dit. */}
-                        {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
-                        {/* ⚠️ LE COMPTE, PARCE QU'IL EN A NEUF. Mesuré le
-                            7 septembre : ses cinq colis à retirer sont TOUS sur
-                            `julatace3535`, dont la dernière capture datait de
-                            4 jours — et leurs cinq conversations n'avaient
-                            JAMAIS été captées. `capterRetraits` (extension,
-                            depuis le 27 août) va pourtant les chercher TOUT
-                            SEUL — mais seulement pour le compte connecté dans
-                            l'onglet : encore faut-il savoir lequel. C'est tout
-                            ce qui manquait. */}
-                        {o && o._acc && !memeCompte && (
-                          <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                            compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
-                          </div>
-                        )}
-                        {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
-                            (§17). Si le message porte le lien direct du code, on
-                            l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
-                        {/* ⚠️ UNE LIGNE QUI DIT « en attente de leur code » SANS
-                            RIEN À TOUCHER NE SERT À RIEN. Le lien de la
-                            conversation existe toujours (`conversation_id` de la
-                            commande) : même sans l'extension, il est à un tap du
-                            code et du QR, à l'endroit exact où Vinted les met. */}
-                        {(()=>{
-                          const href = (rel && (rel.qr || rel.url)) || lienConv(o);
-                          if (!href) return null;
-                          // ⚠️ POUR UN NOVICE, LE GESTE DOIT DIRE CE QU'IL RAPPORTE
-                          //    (Julien, 25 sept. : « quel code de retrait par
-                          //    colis »). « Ouvrir la conversation » ne dit pas qu'on
-                          //    y trouve LE CODE. Quand le code n'est pas encore
-                          //    affiché ici, le bouton dit « Voir mon code de retrait »
-                          //    et ressemble à un bouton (bordé, accent) : c'est LA
-                          //    chose à toucher. Quand le code est déjà en gros à
-                          //    côté (`cd`), le lien reste discret (rien de neuf à
-                          //    aller chercher).
-                          const qr = !!(rel && rel.qr);
-                          const primaire = !cd;   // pas de code visible → c'est l'action principale
-                          const quoi = qr ? 'Voir le QR de retrait ↗'
-                            : cd ? 'Ouvrir la conversation ↗'
-                            : 'Voir mon code de retrait ↗';
-                          return primaire ? (
-                            <a className="vrm-pickup-cta" href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:8,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,textDecoration:'none'}}>
-                              {quoi}
-                            </a>
-                          ) : (
-                            <a className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{fontSize:12.5,color:C.accent,fontWeight:600,textDecoration:'none'}}>
-                              {quoi}
-                            </a>
-                          );
-                        })()}
-                      </div>
-                      {cd&&(
-                        <CodeRetraitCopiable label="Code de retrait" code={cd}/>
-                      )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
-                    </div>
-                    );
-                  })}
+                  {pt.colis.map((o,i)=>carteColisVinted(o,i,melange,memeCompte))}
                   </div>
                 </div>
                 );}); })()}
