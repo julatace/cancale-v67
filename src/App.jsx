@@ -316,7 +316,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -328,6 +328,19 @@ const extSait = (quoi) => {
   return cmpVersion(v, EXT_CAPACITES[quoi] || EXT_ATTENDUE) < 0 ? 'retard' : 'ok';
 };
 const extSaitLireCodes = () => extSait('codes');
+// ── COMPTE PRO OU PARTICULIER (17 octobre). La MÊME règle, texte pour texte,
+//    que l'extension (`typeCompteVinted`, background.js — §11 ; audit-etat-compte
+//    compare les deux). Lue dans le profil `users/current` que l'extension range
+//    déjà (`harvest_{uid}_profile`) : true · false · null (pas su).
+function typeCompteVinted(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return null;
+  const ba = u.business_account;
+  const baid = u.business_account_id;
+  if (u.business === true || (ba && typeof ba === 'object') || (baid != null && baid !== 0 && baid !== '')) return true;
+  if (u.business === false && (ba == null) && (baid == null || baid === 0 || baid === '')) return false;
+  return null;
+}
 // Ce qu'une version VUE (la dernière capture, d'un autre appareil) ne sait pas
 // encore faire, en mots — tiré de la MÊME table (§11), jamais une liste écrite à
 // la main qui dérive dès qu'EXT_ATTENDUE avance (revue du 9 octobre : « c'est
@@ -340,7 +353,6 @@ const CAPACITES_DITES = [
   ['lbcfiche', 'publier sur Leboncoin l\'annonce corrigée dans la fiche de VRM'],
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
-  ['detourage', 'détourer tes photos'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -1258,7 +1270,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -22612,6 +22624,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // (« 06 12… » et « +33 6 12… » sont le même numéro).
   const telNorm = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.startsWith('33') && d.length === 11 ? '0' + d.slice(2) : d; };
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
+  const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
   const setAcctEmail = (uid, val) => {
     const u = { ...acctEmails, [String(uid)]: val.trim() };
     if (!u[String(uid)]) delete u[String(uid)];
@@ -22639,6 +22652,13 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         }
       });
       if (Object.keys(rep).length) setReput(rep);
+      const typ = {};
+      rows.forEach(r => {
+        const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
+        const t = typeCompteVinted(r.data && r.data.payload);
+        if (uid && typeof t === 'boolean') typ[uid] = t;
+      });
+      if (Object.keys(typ).length) setTypesProfil(typ);
       setAcctEmails(prev => {
         const u = { ...prev }; let changed = false;
         rows.forEach(r => {
@@ -22999,6 +23019,17 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                     {(()=>{ const h=acctHealth(acc); return (<>
                       <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
                       {h.ago && <span style={{fontSize:11,color:C.muted,marginLeft:8}}>{h.ago}</span>}
+                      {(() => {
+                        // Pro / particulier : ce que l'extension a publié d'abord
+                        // (`panel_comptes_etat`, 5.185), sinon le profil capté —
+                        // la même règle. Pas su ⇒ rien (jamais « particulier » par défaut).
+                        const uid = String(acc.vinted_user_id);
+                        const ev = etatExt && etatExt[uid];
+                        const pro = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
+                        if (pro == null) return null;
+                        return <span data-type-compte={pro ? 'pro' : 'particulier'} title={pro ? 'Compte Vinted Pro : Vinted t\'envoie les coordonnées de l\'acheteur, une facture est possible.' : 'Compte particulier : Vinted ne transmet pas les coordonnées de l\'acheteur, aucune facture n\'est faite.'}
+                          style={{display:'inline-flex',alignItems:'center',marginTop:4,marginLeft:8,fontSize:11,fontWeight:600,color:C.text,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 8px'}}>{pro ? 'Pro' : 'Particulier'}</span>;
+                      })()}
                     </>); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
@@ -39092,7 +39123,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
   const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
-  const valDetourage = (DETOURAGE_MODES.find(([k]) => k === modeDetourageLu()) || [, ''])[1];
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
   const tokWidget = load('vrm_widget_token', '');
@@ -39253,7 +39283,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', val:valNumeros, el:<NumerosSetting nu/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
-      { id:'detourage', type:'panneau', nu:true, ic:'image', lib:'Détourage des photos', val:valDetourage, el:<DetourageSetting nu/> },
+      // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
+      //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
     ]},
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
@@ -40586,85 +40617,11 @@ function NumerosSetting({ nu = false }) {
 }
 
 
-// ══════════════════════════════════════════════════════════════════════════════
-// DÉTOURAGE DES PHOTOS (Photoroom) — juste avant de les attacher à une annonce
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien, 4 octobre : « intègre l'API de Photoroom pour le détourage des photos
-// avant chaque poste ». Le réglage vit ICI (`vrm_detourage`, ligne main) ;
-// l'EXTENSION le lit au moment où elle attache les photos à Leboncoin ou eBay
-// (`detourerPhotos`). Éteint par défaut : chaque photo détourée coûte.
-// Ce que l'écran dit vient de la MÊME source que ce qui se passe (§5, la phrase
-// qui explique un chiffre vient de la même source que lui) : le serveur rend
-// `ready` (la clé est posée ?), `autorise` (ce compte y a droit ?) et le
-// compteur du mois. Trois états, jamais deux : `undefined` en cours · `null`
-// pas su · un objet lu. « Pas su » n'affirme ni que ça marche ni que ça ne
-// marche pas.
-const DETOURAGE_MODES = [['eteint', 'Éteint'], ['couverture', 'Photo de couverture'], ['toutes', 'Toutes les photos']];
-const modeDetourageLu = () => { const v = load('vrm_detourage', 'eteint'); return DETOURAGE_MODES.some(([k]) => k === v) ? v : 'eteint'; };
-function DetourageSetting({ nu = false }) {
-  const [mode, setMode] = React.useState(modeDetourageLu);
-  const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
-  const touche = React.useRef(false);
-  // §5.49 : le nuage arrive après le montage. Pas touché ⇒ on prend ce qu'il dit
-  // (c'est ce que l'extension lira). Touché pendant le chargement ⇒ on garde le
-  // choix ET on le réécrit, pour que ce qui est affiché soit ce qui part au nuage.
-  React.useEffect(() => onCloudReady(() => {
-    if (touche.current) { setMode((m) => { save('vrm_detourage', m); return m; }); return; }
-    setMode(modeDetourageLu());
-  }), []);
-  const [raisonPasSu, setRaisonPasSu] = React.useState('');
-  React.useEffect(() => {
-    let vivant = true;
-    (async () => {
-      try {
-        const r = await fetch('/api/ai?mode=detourage&usage=1', { headers: enTeteSession() });
-        const j = await r.json().catch(() => null);
-        if (!vivant) return;
-        setUsage(r.ok && j && j.ok ? j : null);
-        setRaisonPasSu(!r.ok && j && j.reason ? String(j.reason) : '');
-      } catch (_) { if (vivant) setUsage(null); }
-    })();
-    return () => { vivant = false; };
-  }, []);
-  const cap = extSait('detourage');
-  const reserve = !!usage && usage.autorise === false;
-  const choisir = (v) => { if (reserve) return; touche.current = true; setMode(v); save('vrm_detourage', v); };
-  const etat = usage === undefined ? 'attente' : usage === null ? (raisonPasSu === 'compteur' ? 'compteur' : 'pasSu') : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
-  const actif = mode !== 'eteint';
-  return (
-    <div style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
-      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>}
-      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Quand l’extension attache tes photos à une annonce <b>Leboncoin</b>, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas. Sur eBay, la mise en vente passe par eBay directement, sans l’extension : ses photos ne sont pas détourées.
-        {/* ⚠️ « Leboncoin ou eBay » était FAUX (revue adverse, 4 octobre) : la seule
-            voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
-            liens Vinted bruts, sans passer par l'extension. */}
-      </div>
-      <Segmente label="Détourage des photos" plein disabled={reserve} value={mode} onChange={choisir} style={{marginTop:10}}
-        options={DETOURAGE_MODES.map(([v, label]) => ({ v, l: label, data: { 'data-detourage-choix': v } }))}/>
-      {/* Ce que dit le serveur — une phrase, celle qui correspond à l'état. */}
-      <div style={{marginTop:9,fontSize:11.5,lineHeight:1.5,color:etat==='sanscle'&&actif?C.warn:C.muted}} data-detourage-phrase>
-        {etat === 'attente' ? 'Je vérifie le service de détourage…'
-          : etat === 'pasSu' ? 'Je n’ai pas pu vérifier le service de détourage. Rouvre cet écran dans un moment.'
-          : etat === 'compteur' ? 'Le compteur du détourage est illisible côté serveur : tant que ça dure, aucune photo n’est détourée (elles partent telles quelles).'
-          : etat === 'reserve' ? 'Le détourage n’est pas encore ouvert à ton compte : tes photos partent telles quelles.'
-          : etat === 'sanscle' ? <>La clé Photoroom n’est pas encore posée sur le serveur&nbsp;: {actif ? 'tant qu’elle manque, tes photos partent telles quelles.' : 'le détourage ne pourra marcher qu’une fois posée.'}</>
-          : <>Ce mois-ci&nbsp;: <b style={{color:C.text}}>{usage.n}</b> photo{usage.n > 1 ? 's' : ''} détourée{usage.n > 1 ? 's' : ''} sur <b style={{color:C.text}}>{usage.plafond}</b> possibles. Environ 2 centimes par photo nouvelle.</>}
-      </div>
-      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
-      {actif && !reserve && cap === 'absente' && (
-        <div style={{marginTop:7,fontSize:11.5,color:C.muted,lineHeight:1.5}} data-detourage-cap="absente">
-          C’est l’extension, dans le Chrome de ton ordinateur, qui détoure au moment de publier — pas cette page.
-        </div>
-      )}
-      {actif && !reserve && cap === 'retard' && (
-        <div style={{marginTop:7,fontSize:11.5,color:C.warn,lineHeight:1.5}} data-detourage-cap="retard">
-          L’extension installée ici ne sait pas encore détourer. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, tes photos partent telles quelles.
-        </div>
-      )}
-    </div>
-  );
-}
+// ⛔ DÉTOURAGE DES PHOTOS : plus de réglage (17 octobre, sa décision — « le
+// détourage ne doit être présent QUE dans Vestiaire Collective, pas du tout pour
+// Leboncoin, ne le mets pas dans les paramètres »). L'extension ne détoure plus
+// rien pour Leboncoin ni eBay ; Vestiaire, qui l'exige, détoure toujours, sans
+// réglage (`photosPourVestiaire`). `vrm_detourage` n'est plus lu nulle part.
 
 // La carte « Les offres, c'est toi qui décides » (Réglages) est RETIRÉE avec
 // l'acceptation automatique des offres (5 octobre, à sa demande) : une carte qui

@@ -2413,6 +2413,25 @@ function etatDuProfil(json) {
   if (u.is_account_banned === false) return { etat: 'actif', preuve: 'champ profil is_account_banned' };
   return { etat: 'passu', preuve: 'champ profil is_account_banned absent' };
 }
+// ── COMPTE PRO OU PARTICULIER (17 octobre, 5.185). Julien : « elle doit être
+//    capable de voir si le compte connecté est un compte pro ou non ». MESURÉ
+//    avant d'écrire (les 10 profils `harvest_*_profile` de sa base) : le profil
+//    `users/current` porte `business` (booléen), `business_account` (objet, ou
+//    null) et `business_account_id`. Chez lui : `business: false`,
+//    `business_account: null` partout — tous ses comptes sont particuliers.
+//    Trois états, jamais deux : true · false · null (champ absent = pas su,
+//    jamais « particulier » par défaut). Le pro se reconnaît à N'IMPORTE lequel
+//    des trois signaux ; le particulier exige `business === false` ET aucun
+//    compte professionnel rattaché.
+function typeCompteVinted(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return null;
+  const ba = u.business_account;
+  const baid = u.business_account_id;
+  if (u.business === true || (ba && typeof ba === 'object') || (baid != null && baid !== 0 && baid !== '')) return true;
+  if (u.business === false && (ba == null) && (baid == null || baid === 0 || baid === '')) return false;
+  return null;
+}
 // Une écriture à la fois (lire-fusionner-réécrire) : deux profils rangés coup sur
 // coup ne s'effacent pas l'un l'autre. Une chaîne perdue au réveil du service
 // worker ne perd qu'une mise à jour, refaite à la visite suivante (§4.9).
@@ -2421,6 +2440,7 @@ function noterEtatCompte(uid, json) {
   const k = String(uid || '');
   if (!k) return Promise.resolve(false);
   const ev = etatDuProfil(json);
+  const pro = typeCompteVinted(json);
   const fait = chaineEtatCompte.then(async () => {
     try {
       const rows = await sbGet(`app_data?id=eq.${ETAT_COMPTE_ROW}&select=data`);
@@ -2429,14 +2449,22 @@ function noterEtatCompte(uid, json) {
       const comptes = (cur.comptes && typeof cur.comptes === 'object') ? { ...cur.comptes } : {};
       const avant = comptes[k];
       // « passu » ne remplace jamais un verdict lu (un profil illisible n'apprend rien).
-      if (ev.etat === 'passu' && avant && (avant.etat === 'actif' || avant.etat === 'banni')) return false;
+      // Le TYPE (pro / particulier) suit la même règle : `null` garde le connu.
+      const proConnu = (avant && typeof avant.pro === 'boolean') ? avant.pro : null;
+      const proNeuf = typeof pro === 'boolean' ? pro : proConnu;
+      const proChange = proNeuf !== proConnu;
+      const etatGarde = ev.etat === 'passu' && avant && (avant.etat === 'actif' || avant.etat === 'banni');
+      if (etatGarde && !proChange) return false;
+      const etat = etatGarde ? avant.etat : ev.etat;
+      const preuve = etatGarde ? avant.preuve : ev.preuve;
       const maintenant = Date.now();
-      const recent = avant && avant.etat === ev.etat && avant.at && (maintenant - Date.parse(avant.at)) < 3600000;
+      const recent = avant && avant.etat === etat && !proChange && avant.at && (maintenant - Date.parse(avant.at)) < 3600000;
       if (recent) return false;                     // rien de neuf : pas d'écriture (égress)
-      comptes[k] = { etat: ev.etat, at: new Date(maintenant).toISOString(), preuve: ev.preuve };
+      comptes[k] = { etat, at: etatGarde ? avant.at : new Date(maintenant).toISOString(), preuve };
+      if (typeof proNeuf === 'boolean') { comptes[k].pro = proNeuf; comptes[k].proAt = (proChange || !avant || !avant.proAt) ? new Date(maintenant).toISOString() : avant.proAt; }
       const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
-      noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${ev.etat}`);
-      if (ok !== false && (!avant || avant.etat !== ev.etat)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
+      noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${etat}`);
+      if (ok !== false && (!avant || avant.etat !== etat || proChange)) { try { notifierApp({ type: 'maj', quoi: 'etatcompte', uid: k }); } catch (_) {} }
       return ok !== false;
     } catch (_) { return false; }
   });
@@ -9020,6 +9048,13 @@ async function handleLbcRaw(url, body) {
 // ⇒ Le fond récupère les OCTETS (il a les permissions d'hôte ; le CDN de Vinted
 //   ne renvoie aucun en-tête CORS, donc la page seule ne peut pas les lire) et
 //   les passe au panneau, qui les attache. Rien ne touche son disque.
+// ⚠️ 17 octobre — Julien : « le détourage de photo doit être présent QUE dans
+//    Vestiaire Collective, pas du tout pour Leboncoin ; ne mets pas cette
+//    fonctionnalité dans les paramètres ». Vestiaire oblige le fond détouré ;
+//    Leboncoin et eBay reçoivent les photos D'ORIGINE, toujours, quel que soit
+//    l'ancien réglage `vrm_detourage` (il n'est plus lu). Le détourage ne part
+//    donc que par `photosPourVestiaire` (aucune publication Vestiaire n'existe
+//    encore : rien n'est dépensé aujourd'hui).
 async function photosEnOctets(urls, max) {
   const out = [];
   for (const u of (urls || []).slice(0, max || 12)) {
@@ -9034,21 +9069,23 @@ async function photosEnOctets(urls, max) {
       out.push({ url: u, b64: btoa(bin), type: type.split(';')[0].trim(), taille: buf.length });
     } catch (e) { out.push({ url: u, erreur: String((e && e.message) || e).slice(0, 60) }); }
   }
-  return await detourerPhotos(out);
+  return out;
 }
+// Vestiaire Collective seulement : TOUTES les photos détourées (le site l'exige),
+// sans réglage. Toute issue autre qu'un succès garde la photo d'origine.
+async function photosPourVestiaire(urls, max) { return await detourerPhotos(await photosEnOctets(urls, max), 'toutes'); }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DÉTOURAGE PHOTOROOM — juste avant d'attacher les photos (5.156, 4 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « intègre l'API de Photoroom pour le détourage des photos avant chaque
-// poste ». C'est ICI le seul point où passent les photos de Leboncoin ET d'eBay
-// (photosPourEbay n'est qu'un alias) : un seul propriétaire de la règle (§11).
-// Le réglage vit dans l'APP (`vrm_detourage`, ligne main) : éteint · couverture ·
-// toutes. L'extension le LIT, elle ne décide rien.
+// poste ». ⚠️ Depuis le 17 octobre (sa décision) : Vestiaire Collective SEUL
+// (`photosPourVestiaire`, mode « toutes », aucun réglage) — plus jamais
+// Leboncoin ni eBay.
 //
 // Les bornes, chacune pour une raison :
-//   • Réglage illisible (`null`) ⇒ ÉTEINT : « pas su » ne vaut pas « oui », et ici
-//     « oui » coûte de l'argent à chaque photo.
+//   • Sans mode donné par l'appelant ⇒ ÉTEINT : ici « oui » coûte de l'argent à
+//     chaque photo.
 //   • Seules les vraies photos du CDN Vinted partent (`images*.vinted.net/t/`) :
 //     12 des 780 photos captées sont le visuel générique du site, pas une paire —
 //     on ne paie pas pour détourer une affiche.
@@ -9067,13 +9104,6 @@ const DETOURAGE_MAX_B64 = 3000000;     // même borne que le serveur (api/_lib/d
 const DETOURAGE_BUDGET_MS = 45000;
 // Une raison qui vaut pour TOUTES les photos suivantes : inutile d'insister.
 const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, plafond: 1, compteur: 1, cache: 1, acces: 1 };
-
-async function modeDetourage() {
-  const m = await lireMain(['vrm_detourage']);
-  if (!m) return 'eteint';
-  const v = m.vrm_detourage;
-  return (v === 'couverture' || v === 'toutes') ? v : 'eteint';
-}
 
 async function empreinteB64(b64) {
   const bin = atob(b64);
@@ -9104,8 +9134,9 @@ async function appelDetourage(jeton, corps, restantMs) {
 // et `detourage` (la raison). Réglage éteint ⇒ la liste revient intacte.
 async function detourerPhotos(photos, modeForce) {
   const liste = Array.isArray(photos) ? photos : [];
-  let mode = modeForce;
-  if (!mode) { try { mode = await modeDetourage(); } catch (_) { mode = 'eteint'; } }
+  // Le mode est DONNÉ par l'appelant (Vestiaire : « toutes ») — plus aucun
+  // réglage lu : sans mode, rien ne part (rien n'est dépensé).
+  const mode = modeForce;
   if (mode !== 'couverture' && mode !== 'toutes') return liste;
   const cibles = [];
   for (let i = 0; i < liste.length; i++) {
