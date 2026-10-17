@@ -191,6 +191,12 @@ qu'aucune règle n'en désigne une.
 - ⚠️ **LE CA DÉCLARÉ EST DATÉ AU JOUR DU VERSEMENT** (il l'a redemandé le
   3 octobre — voir « dater au versement » plus bas). Les autres écrans
   (Statistiques, Ma journée) restent datés au jour de la vente.
+- **`vinted_urssaf_mois` est synchronisée (17 octobre)**. Elle ne vivait que dans
+  le navigateur qui avait ouvert Ventes : Comptabilité ouverte ailleurs disait
+  « ton CA déclaré arrive sur cet appareil » (rien ne l'y amenait) sous un
+  « Reçu » chiffré. La carte Résultat la relit (nuage, `vrm:save`) et porte
+  `data-compta-ca-etat` = `encours` · `passu` (« — », où elle se calcule) · `lu`.
+  Banc `chiffres-croises.cjs` D : 3 rouges sur l'avant, rouge sous 2 mutations.
 - Le rapport comptable dit « CA des ventes finalisées », **jamais « encaissé »** :
   l'URSSAF demande légalement les recettes encaissées, et l'app ne les connaît pas.
 - ⚠️⚠️ **LA PHRASE QUI EXPLIQUE UN CHIFFRE DOIT VENIR DE LA MÊME SOURCE QUE LUI.**

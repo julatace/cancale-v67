@@ -1303,6 +1303,13 @@ const SYNC_KEYS = [
   // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
   // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
   'vrm_paires_dorment',
+  // Le CA déclaré mois par mois : PUBLIÉ par l'écran Ventes (son propriétaire,
+  // §11), CONSOMMÉ par le tableau de bord et la carte « Résultat » de
+  // Comptabilité. (17 octobre) Il ne vivait que dans le navigateur qui avait
+  // ouvert Ventes : sur un autre appareil, Comptabilité disait « ton CA déclaré
+  // arrive sur cet appareil » — rien ne l'y amenait — juste sous un « Reçu »
+  // chiffré. Synchronisé, il arrive avec le nuage. Aucune règle ne change.
+  'vinted_urssaf_mois',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -24844,14 +24851,30 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // absente/pas encore publiée ⇒ `null` (on n'invente pas de recettes).
   // ⚠️ Ce n'est PAS le bénéfice : le coût d'achat des paires n'est pas déduit
   // ici (il n'est pas saisi, §2.5, et il vit dans Statistiques).
-  const recettesAnnee = (() => {
-    try {
-      const v = load('vinted_urssaf_mois', null);
-      if (!v || !Array.isArray(v.mois)) return null;
-      return v.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee))
-        .reduce((s, m) => s + (Number(m.ca) || 0), 0);
-    } catch (_) { return null; }
-  })();
+  // ⚠️ (17 octobre) TROIS ÉTATS, ET LA LIGNE SE RELIT QUAND ELLE CHANGE. Elle
+  // était lue une fois au rendu : sur un appareil qui n'avait jamais ouvert
+  // Ventes, la carte disait « ton CA déclaré arrive sur cet appareil » — rien ne
+  // l'y amenait (la ligne n'était pas synchronisée) — pendant que la carte « CA
+  // par période », juste en dessous, chiffrait déjà le reçu du mois. La ligne
+  // est maintenant synchronisée (elle arrive avec le nuage) et la carte la relit
+  // à l'arrivée du nuage et à chaque publication :
+  //   `encours` (nuage pas encore arrivé) · `passu` (nuage arrivé, jamais
+  //   publiée : « — » et où elle se calcule) · `lu`.
+  const lireLigneCa = () => { try { const v = load('vinted_urssaf_mois', null); return v && Array.isArray(v.mois) ? v : null; } catch (_) { return null; } };
+  const [ligneCa, setLigneCa] = React.useState(lireLigneCa);
+  const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => { setNuagePret(true); setLigneCa(lireLigneCa()); }), []);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_urssaf_mois') setLigneCa(lireLigneCa()); };
+    const g = (e) => { if (e && e.key === 'vinted_urssaf_mois') setLigneCa(lireLigneCa()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  }, []);
+  const etatCa = ligneCa ? 'lu' : (nuagePret ? 'passu' : 'encours');
+  const caAt = ligneCa && Number(ligneCa.at) > 0 ? Number(ligneCa.at) : null;
+  const recettesAnnee = ligneCa
+    ? ligneCa.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee)).reduce((s, m) => s + (Number(m.ca) || 0), 0)
+    : null;
   const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
   // ⚠️ (revue des chiffres, 17 octobre) LA COUVERTURE DE LA MÊME LIGNE. Ce CA
   // se présentait comme complet alors que la ligne publiée peut dire « eBay :
@@ -24859,13 +24882,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // ce que la carte URSSAF du tableau de bord dit, sur la MÊME ligne. Un total
   // partiel qui se présente comme complet est pire qu'un total absent (§5).
   const couvertureCa = (() => {
-    try {
-      const v = load('vinted_urssaf_mois', null);
-      if (!v || !Array.isArray(v.mois)) return null;
-      const pasSu = Object.entries(v.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
-      const ad = v.aDater && Number(v.aDater.n) > 0 ? { n: Number(v.aDater.n), ca: Number(v.aDater.ca) || 0 } : null;
-      return { pasSu, aDater: ad };
-    } catch (_) { return null; }
+    if (!ligneCa) return null;
+    const pasSu = Object.entries(ligneCa.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
+    const ad = ligneCa.aDater && Number(ligneCa.aDater.n) > 0 ? { n: Number(ligneCa.aDater.n), ca: Number(ligneCa.aDater.ca) || 0 } : null;
+    return { pasSu, aDater: ad };
   })();
   const caPartiel = !!(couvertureCa && couvertureCa.pasSu.length);
 
@@ -24958,7 +24978,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
       <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)}>
+        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
           {recettesAnnee == null ? (
             <div>
@@ -24967,7 +24987,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
               <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre {lienBtn('Ventes', 'cat_ventes')} une fois, et tes charges y seront déduites.
+                {etatCa === 'encours'
+                  ? 'Je lis ton CA déclaré…'
+                  : <>Ton CA déclaré n'a encore été calculé sur aucun de tes appareils : il se calcule dans {lienBtn('Ventes', 'cat_ventes')}. Ouvre-le une fois, et tes charges y seront déduites ici.</>}
               </div>
             </div>
           ) : (
