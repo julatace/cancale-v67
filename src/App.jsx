@@ -40025,6 +40025,9 @@ const lireCacheEquipe = (uid) => { try { const j = JSON.parse(localStorage.getIt
 // La dernière liste connue est gardée sur l'appareil pour décider tout de suite
 // (pas d'éclair de sa boutique vide) ; la base tranche dès qu'elle répond.
 function PorteEquipe({ uid, children }) {
+  // Monté hors d'AppCoeur : le thème choisi (`vinted_dark`) doit valoir AUSSI
+  // pour l'écran d'équipe. AppCoeur le repose lui-même quand il est rendu.
+  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   const [lu, setLu] = React.useState(undefined);
   const [cache, setCache] = React.useState(() => lireCacheEquipe(uid));
   const [vue, setVue] = React.useState(() => lireVueEquipe(uid));
