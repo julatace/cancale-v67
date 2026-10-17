@@ -105,6 +105,9 @@
 .vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
 .vrm-seg-plein { width: 100%; }
 .vrm-seg-plein > .vrm-seg-btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
+/* Segments à parts égales : un libellé long (« Photo de couverture » à 390 px)
+   passe à la ligne au lieu de déborder sur son voisin (revue visuelle du 17 oct.). */
+.vrm-seg-plein > .vrm-seg-btn { white-space: normal; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
 .vrm-seg > .vrm-seg-btn { min-height: 34px; }
 @media (max-width: 1023px) { .vrm-main .vrm-seg > .vrm-seg-btn { min-height: 44px !important; padding-block: 0 !important; } }
 

@@ -17866,8 +17866,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // est resté au défaut, jamais un choix fait pendant le chargement.
   useEffect(() => onCloudReady(() => setUrssafFreq(v => v === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : v)), []);
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
+  // ⚠️ SANS LIGNE PUBLIÉE : « pas su » (`null`), jamais l'ancienne archive (vide
+  //    depuis juillet 2026). Vu au rendu le 17 octobre : « CA finalisé 0,00 € ·
+  //    À payer 0,00 € » cinq lignes sous le « — » de la même carte (§5, §7).
   const urssafPeriodCA=useMemo(()=>{
     if(!urssafDue) return 0;
+    if (!urssafMois) return null;
     if (urssafMois) {
       // Un mois publié tombe dans la période si son 1er jour y est.
       return urssafMois.reduce((s,m)=>{
@@ -17880,7 +17884,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
       return d>=urssafDue.periodStart && d<=urssafDue.periodEnd;
     }).reduce((s,v)=>s+ +v.sellPrice,0);
-  },[encaissees,urssafDue]);
+  },[encaissees,urssafDue,urssafMois]);
 
   const bestDayCA=useMemo(()=>[...days].sort((a,b)=>b[1].ca-a[1].ca)[0],[days]);
   const bestDayProfit=useMemo(()=>[...days].sort((a,b)=>b[1].profit-a[1].profit)[0],[days]);
@@ -18454,8 +18458,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
                   <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
-                  <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
-                  <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
+                  <span>CA finalisé</span><span data-echeance-ca={urssafPeriodCA==null?'pas-su':Math.round(urssafPeriodCA*100)} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={urssafPeriodCA}/>}</span>
+                  <span>À payer ≈</span><span style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/>}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
@@ -29008,7 +29012,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })();
     return()=>{stop=true;};
   },[sales.items,listings.items,txnItem,curSub,photosVentesForcees]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
+  // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
+  // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -31359,7 +31366,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Prix Vinted formaté proprement : l'API renvoie « 88.0 » / « 95.0 » (chaîne),
   // qui s'affichait tel quel (« 88.0 € »). On formate en français sans zéro
   // inutile : « 88 € », « 158,99 € ».
-  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{maximumFractionDigits:2})} ${cur(c)}`;
+  // « 249,5 € » se lisait inachevé (revue visuelle du 17 oct.) : des centimes
+  // s'écrivent sur deux chiffres, un prix rond reste rond.
+  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{minimumFractionDigits:Number.isInteger(Number(p))?0:2,maximumFractionDigits:2})} ${cur(c)}`;
 
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
@@ -40242,7 +40251,10 @@ function ColisEquipe({ vendeur, de, onPropre }) {
         const numero = b && b.numero && b.numero !== 'None' ? String(b.numero) : '';
         return (
           <div key={k} data-equipe-vente={k} style={{ ...carte, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            {o.photo ? <PhotoVinted src={o.photo} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: C.bg }}/> : null}
+            {/* ⚠️ `o.photo` est un OBJET Vinted ({url, …}) : posé tel quel en
+                `src`, l'image était CASSÉE (revue visuelle du 17 oct.). La même
+                lecture que partout ailleurs (`orderPhoto`, §11). */}
+            {orderPhoto(o) ? <PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: C.bg }}/> : null}
             <div style={{ flex: '1 1 180px', minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{numero ? `N°${numero} · ` : ''}{o.title || 'Article'}</div>
               <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', b && b.dateLimite ? `à poster avant le ${b.dateLimite}` : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
@@ -40280,7 +40292,9 @@ function ColisEquipe({ vendeur, de, onPropre }) {
           return (
             <div key={(t.suivi || '') + i} data-equipe-track="" style={carte}>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${t.lieu}` : ''}</div>
-              {t.limite && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {t.limite}</div>}
+              {/* « aaaa-mm-jj » s'écrivait tel quel (revue visuelle du 17 oct.) :
+                  la date se lit comme sur l'écran Achats ; illisible ⇒ rien. */}
+              {joursAvant(t.limite) != null && <div data-equipe-limite="" style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {new Date(String(t.limite) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>}
               {code ? <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
               {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
             </div>
@@ -41974,6 +41988,12 @@ function RegimeSetting({ nu = false }) {
 export default function App() {
   const [authState,setAuthState]=useState(AUTH);
   React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
+  // ⚠️ LE THÈME CHOISI VAUT AUSSI POUR LES ÉCRANS D'AVANT LE CŒUR (revue
+  //    visuelle du 17 oct.) : `C` n'était réassigné que dans `AppCoeur`, donc
+  //    l'écran « Colis à préparer » d'un membre d'équipe (et la porte de la
+  //    double vérification) restaient CLAIRS dans une app réglée en sombre —
+  //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
+  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
