@@ -1510,6 +1510,39 @@ const _emitSync = (status, raison) => {
   _syncInfo = { ..._syncInfo, etat: status, raison: status === 'error' || status === 'refus' ? (raison || _syncInfo.raison || '') : '', at: now, okAt: status === 'synced' ? now : _syncInfo.okAt };
   _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}});
 };
+// ── LE STATUT DU BOUTON NUAGE, HORS DE LA COQUE (« app plus rapide », 17 oct.) ─
+// Il vivait dans un `useState` d'AppCoeur : chaque « loading → saving → synced »
+// re-rendait TOUTE l'app (Ma journée, Ventes… : un composant de 12 000 lignes),
+// trois fois par sauvegarde, pour changer une icône. Seul `BoutonSync` le lit.
+// Même valeur ⇒ personne n'est prévenu.
+let _statutBouton = 'idle';
+const _statutBoutonSubs = new Set();
+const poserStatutBouton = (st) => { if (st === _statutBouton) return; _statutBouton = st; _statutBoutonSubs.forEach(fn => { try { fn(); } catch (_) {} }); };
+const abonnerStatutBouton = (fn) => { _statutBoutonSubs.add(fn); return () => _statutBoutonSubs.delete(fn); };
+const lireStatutBouton = () => _statutBouton;
+function BoutonSync({ ouvert, onBasculer }) {
+  const syncStatus = React.useSyncExternalStore(abonnerStatutBouton, lireStatutBouton);
+  return (
+    <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={ouvert} onClick={onBasculer} title={
+              syncStatus==='synced'?'Synchronisé avec le cloud':
+              syncStatus==='saving'?'Sauvegarde en cours...':
+              syncStatus==='loading'?'Chargement...':
+              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
+              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
+            }>
+              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
+                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
+                  rouge seulement si la base refuse ou ne répond pas. */}
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
+              </span>
+              {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
+                  portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
+                  cloche, rouage — huit éléments. L'icône de nuage dit déjà si
+                  c'est synchronisé ; l'heure exacte est dans Réglages. */}
+            </button>
+  );
+}
 // Une sauvegarde ratée se RELANCE toute seule (5 s, 15 s, 1 min, puis toutes
 // les 2 min) : avant, le nuage restait barré jusqu'à la prochaine saisie, et
 // ce qu'il venait de taper n'arrivait jamais dans la base s'il ne touchait à
@@ -42335,9 +42368,9 @@ function AppCoeur() {
   const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
-  const [syncStatus,setSyncStatus]=useState('idle');
   const [syncOuvert, setSyncOuvert] = useState(false); // idle | saving | synced | error | loading
-  const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
+  // ⚠️ `syncStatus` et `lastSync` ne sont plus des états de la coque : voir
+  //    `BoutonSync` (le statut) ; `lastSync` n'était lu par personne.
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
   const logoSrc = customLogo || LOGO_CANCALE;
@@ -42619,8 +42652,8 @@ function AppCoeur() {
   useEffect(() => {
     let stop = false;
     // Écoute les changements de statut de synchro (saving / synced / error)
-    const off = onSyncChange((st)=>{ if(!stop){ setSyncStatus(st); if(st==='synced') setLastSync(new Date()); } });
-    setSyncStatus('loading');
+    const off = onSyncChange((st)=>{ if(!stop) poserStatutBouton(st); });
+    poserStatutBouton('loading');
     (async () => {
       // La base n'a pas répondu : on RÉESSAIE (2 s, 4 s, 8 s… plafonné à 30 s)
       // au lieu de conclure « nuage vide ». Rien n'est poussé entre-temps.
@@ -42668,8 +42701,7 @@ function AppCoeur() {
         apply('vinted_stock_vinted', setStockVinted);
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
-        setSyncStatus('synced');
-        setLastSync(new Date());
+        poserStatutBouton('synced');
       } else {
         // Cloud vide : on y envoie les données locales actuelles (1re utilisation)
         cloudPush();
@@ -42677,7 +42709,7 @@ function AppCoeur() {
       setSynced(true);
       markCloudReady(); // débloque la numérotation (le cloud est chargé)
     })();
-    return () => { stop = true; off(); };
+    return () => { stop = true; off(); poserStatutBouton('idle'); };
   }, []);
 
   // La VERSION de la numérotation est relue (une lecture scalaire) toutes les
@@ -42929,6 +42961,19 @@ function AppCoeur() {
       // appels (ventes / annonces / messages) de chaque compte aussi en parallèle
       // → chargement du tableau de bord bien plus rapide (avant : 9 comptes × 3
       // appels en série). Lecture moissonnée d'abord, donc paralléliser est sûr.
+      // ── LES DEUX PETITES LECTURES DE LA FIN PARTENT DÈS MAINTENANT (17 oct.) ──
+      // Le porte-monnaie et l'âge des captures étaient lus APRÈS les ventes, à
+      // la queue leu leu : « ventes arrivées » puis « chiffres calculés »
+      // faisaient DEUX rendus de toute l'app (mesuré : `vitesse.cjs`, rendus de
+      // Ma journée). Lancées en même temps que les ventes, elles sont déjà là
+      // quand les ventes arrivent : les deux mises à jour tombent dans le même
+      // rendu. Rien n'attend de plus (si elles traînent, on les attend comme
+      // avant) ; ce sont les MÊMES lectures, avec les mêmes replis.
+      const uidsVivantsTot=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
+      const walletP=fetchWalletEscrow(uidsVivantsTot).then(v=>({v}),()=>({v:null}));
+      const ageP=fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`,{headers:sbAuth()})
+        .then(rf=>rf.ok?rf.json().then(rows=>({ok:true,rows}),()=>({erreur:true})):{ok:false},()=>({erreur:true}));
+      ageP.catch(()=>{}); walletP.catch(()=>{});
       const activeAccts=vintedAccounts.filter(a=>!skipAcc(a.vinted_user_id));
       // ⚠️ Les VENTES de tous les comptes liés (bloqués compris) partent aussi
       //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
@@ -43053,7 +43098,7 @@ function AppCoeur() {
       //    montants Vinted qui ne se confondent JAMAIS (§5.14). Même source que
       //    Ma journée et Statistiques (§11), jamais un recalcul.
       let walletEsc=null;
-      try{ walletEsc=await fetchWalletEscrow(uidsVivants); if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
+      try{ walletEsc=(await walletP).v; if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
       // ⚠️ DEPUIS QUAND TES DONNÉES VINTED DATENT (Julien, 25 sept. : « j'ai des
       //    paires déjà expédiées qui restent »). C'est presque toujours une
       //    donnée GELÉE par une extension en retard, pas un défaut de l'app. On
@@ -43073,8 +43118,9 @@ function AppCoeur() {
       try{
         const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
         const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
-        const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`,{headers:sbAuth()});
-        if(rf.ok){ const rows=await rf.json(); let vieux=null, qui='';
+        const rf=await ageP;
+        if(rf.erreur) throw new Error('lecture');
+        if(rf.ok){ const rows=rf.rows; let vieux=null, qui='';
           for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
           if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
         }
@@ -43691,24 +43737,7 @@ function AppCoeur() {
             {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
             <span style={{position:'relative',display:'inline-flex'}}>
-            <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={syncOuvert} onClick={()=>setSyncOuvert(v=>!v)} title={
-              syncStatus==='synced'?'Synchronisé avec le cloud':
-              syncStatus==='saving'?'Sauvegarde en cours...':
-              syncStatus==='loading'?'Chargement...':
-              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
-              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
-            }>
-              {/* Icône au trait : neutre quand tout est synchronisé (l'état normal
-                  ne réclame pas l'œil — §7, l'accent est rare) ; ambre en cours,
-                  rouge seulement si la base refuse ou ne répond pas. */}
-              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.muted:C.warn}}>
-                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={20}/>
-              </span>
-              {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
-                  portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
-                  cloche, rouage — huit éléments. L'icône de nuage dit déjà si
-                  c'est synchronisé ; l'heure exacte est dans Réglages. */}
-            </button>
+            <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
             {syncOuvert && <PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/>}
             </span>
           </div>

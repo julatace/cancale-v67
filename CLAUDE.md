@@ -9417,9 +9417,17 @@ profileur de Chrome sur un build non minifié.
   d'avant (`VENTES_REFERENCE`) et à une page ouverte à froid ; 2 rouges sur
   l'avant. ⚠️ Toute nouvelle valeur lue dans la ligne passe par
   `preparerLigneVente` (sinon ligne périmée).
-- **Pas fait, mesuré** : (2) le composant
-  qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
-  par arrivée de données) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
+- **Les rendus de `Comptabilite` au démarrage (17 oct.)** : mesuré par le crochet
+  React (`vitesse.cjs`, 390 px ×4, médiane de 3) **14–19 → 11–12**. Deux causes de
+  la COQUE : le statut du nuage (`syncStatus`, 3 rendus de toute l'app par
+  sauvegarde) vit dans `BoutonSync` (magasin `poserStatutBouton`), et le
+  porte-monnaie + l'âge des captures partent AVEC les ventes (un seul rendu au
+  lieu de deux). Temps de la fonction `Comptabilite` ~750 → ~615 ms. Texte
+  identique (`VITESSE_REFERENCE`). ⚠️ PAS de `React.memo` sur `Comptabilite` : elle
+  lit des globales au rendu (`C`, `extSait`, `etatRelais`, `load(...)`) ; ni de
+  garde « même contenu » sur ses `onCloudReady` (des effets de publication
+  relisent le `localStorage` sur ce changement). Reste par arrivée de données.
+- **Pas fait, mesuré** : (2) ~~rendus au démarrage~~ (réduits, ci-dessus) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
   ci-dessous) ; (4) le code de l'app (518 Ko compressés).
 - **La chaîne du premier écran raccourcie (16 octobre)** : au téléphone, le rendu
   d'AppCoeur (~600 ms de processeur ×4) s'intercalait entre la sonde et les
