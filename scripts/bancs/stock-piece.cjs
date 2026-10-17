@@ -130,7 +130,9 @@ const cliquerSel = (pg, sel) => pg.evaluate((s) => { const b = document.querySel
       dit(!!(await sonde(pg, 'project', 'm1', {})) && !!(await sonde(pg, 'project', 'c1', {})) && !!(await sonde(pg, 'project', 't1', {})), 'A. les trois nouveaux meubles sont à l’écran');
 
       await essaie('B. ranger avec l’aperçu', async () => {
-        let p = await sonde(pg, 'project', 'm1', {}); await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(800);   // choisit l'étagère
+        // Toucher une BOÎTE choisit l'étagère (une place libre, elle, se range d'un geste
+        // depuis le chantier 11 : on choisit donc par la boîte 401).
+        let p = await sonde(pg, 'project', 'm1', { cell: '4_0', num: '401', avant: true }) || await sonde(pg, 'project', 'm1', { cell: '4_0', num: '401' }); await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(800);   // choisit l'étagère
         p = await sonde(pg, 'project', 'm1', { cell: '4_1' });
         if (!p) throw new Error('place libre 4_1 introuvable');
         await pg.mouse.click(p.x, p.y);

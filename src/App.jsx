@@ -10267,7 +10267,9 @@ const toast = (msg, type) => {
   const t = type || (/^(⚠|❌|erreur|échec|impossible|invalide)/i.test(text.trim()) ? 'err'
                     : /^(✓|✅)/.test(text.trim()) ? 'ok' : 'info');
   const id = ++_toastId;
-  _toasts = [..._toasts.slice(-3), { id, text, type: t }];
+  // Le même message redit (un réglage cliqué plusieurs fois) remplace le précédent :
+  // quatre bulles identiques empilées ne disent rien de plus qu'une (§7).
+  _toasts = [..._toasts.filter(x => x.text !== text).slice(-3), { id, text, type: t }];
   _emitToasts();
   setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
 };
@@ -21473,7 +21475,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // (17 oct.) DEUX MODES, séparés : RANGER (le quotidien — poser, retrouver,
   // sortir des paires ; les meubles sont verrouillés) et AMÉNAGER (dessiner la
   // pièce, ajouter, régler et déplacer les meubles). Une barre en tête les sépare.
-  const [edition, setEdition] = useState(false);
+  const [editionChoisie, setEdition] = useState(false);
+  const edition = editionChoisie || items.length === 0;   // une pièce vide n’a rien à ranger : elle s’ouvre en « Aménager »
   const [pairePrete, setPairePrete] = useState(null);   // un N° choisi dans « À ranger », en attente d'une place
   const viseurRef = React.useRef(null);                 // ce qui est sous le doigt dans la 3D (glisser-déposer)
   const refFantome = React.useRef(null);                // la vignette qui suit le doigt pendant un glisser
