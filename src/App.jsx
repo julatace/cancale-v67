@@ -41165,7 +41165,9 @@ function SecuriteSetting() {
   return (
     <div style={{border:`1px solid ${proteges || sondeInconnue ? C.border : C.warn + '66'}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
+        {/* Le titre du sous-écran (téléphone) le dit déjà : caché là par CSS (§7) ;
+            le verdict à côté reste. Sur ordinateur, c'est le seul titre du panneau. */}
+        <div className="vrm-titre-panneau" style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
         <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn,background:(sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
           {st === null ? 'vérification…' : sondeInconnue ? 'pas encore vérifié' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
@@ -42310,8 +42312,7 @@ function AppCoeur() {
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
-  const [notifItems,setNotifItems]=useState([]); // centre de notifications (actions du jour)
-  const [notifOpen,setNotifOpen]=useState(false);
+  const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     ...ENTREPRISE_VIDE,
@@ -43845,24 +43846,9 @@ function AppCoeur() {
         </div>
         );
       })()}
-      {/* Centre de notifications : les actions du moment, chacune ouvre le bon onglet. */}
-      {notifOpen && (
-        <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
-            <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>🔔 Notifications</div>
-            {notifItems.length===0 ? (
-              <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
-            ) : notifItems.map((it,i)=>(
-              <button type="button" key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                <span style={{fontSize:20}}>{it.icon}</span>
-                <span style={{flex:1,fontSize:13,fontWeight:600,color:C.text}}>{it.text}</span>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
+          l'ouvrait plus (`setNotifOpen(true)` n'existait nulle part). `notifItems`
+          reste : Ma journée, le tableau de bord et le Collectif le rendent. */}
       {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
           la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.

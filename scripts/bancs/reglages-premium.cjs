@@ -181,6 +181,17 @@ async function interrupteurs(pg, T) {
               }
               dit(!s.tombe && s.deb <= 1 && s.panneauxVisibles === 1 && !!titre, `${T} › « ${titre} » : un seul panneau, sans débordement`, `déb ${s.deb} · ${s.panneauxVisibles} panneau(x)`);
               dit(s.petites.length === 0, `${T} › « ${titre} » : aucune cible de moins de 44 px`, s.petites.slice(0, 6).join(' · '));
+              // §7 : le titre du sous-écran ne se redit pas juste dessous (« Sécurité des
+              // données » ×2, revue du 17 oct.). On compte les TITRES RENDUS égaux au titre :
+              // éléments visibles (un titre caché par CSS ne compte pas), le plus profond qui
+              // porte le texte, hors bouton ou lien — un bouton qui porte le même mot est un
+              // GESTE (« Fermer mon compte » s'ouvre en deux temps, exprès), pas un titre.
+              const nTitre = await pg.evaluate((t) => {
+                const vis = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const st = getComputedStyle(e); return st.visibility !== 'hidden' && st.display !== 'none' && !e.closest('[hidden]'); };
+                const egal = (e) => (e.innerText || '').trim() === t.trim();
+                return [...document.querySelectorAll('.vrm-set *')].filter((e) => egal(e) && vis(e) && ![...e.children].some(egal) && !e.closest('button, a, summary')).length;
+              }, titre);
+              dit(nTitre === 1, `${T} › « ${titre} » : le titre n’est écrit qu’une fois`, `${nTitre} fois`);
               await interrupteurs(pg, `${T} › ${titre}`);
               await pg.locator('[data-sous-retour]').click();
               await pg.waitForTimeout(500);
