@@ -210,7 +210,9 @@ const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire
     // visible. Sur téléphone, « seule la vente prouvée compte » est déjà couvert
     // par « la vente est affichée » + « Rolex (achat) jamais montré » + « à
     // confirmer (N) » ci-dessus/dessous.
-    if (W >= 1024) dit(/CA FINALIS[^\n]*\b1\b/i.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)',(lbcTxt.match(/CA FINALIS[^\n]*/i)||[''])[0]);
+    // ⚠️ 17 oct. : le résumé « CA FINALISÉ · N » a laissé la place aux trois cases
+    //    des ventes (KpiVentes, « Finalisées » puis son nombre) : on juge la case.
+    if (W >= 1024) dit(/CA FINALIS[^\n]*\b1\b/i.test(lbcTxt) || /\bFINALIS[EÉ]ES\s*\n\s*1\b/i.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)',(lbcTxt.match(/CA FINALIS[^\n]*|Finalis[ée]es\s*\n[^\n]*/i)||[''])[0]);
     dit(/à confirmer \(\d/i.test(lbcTxt),'le côté pas encore su est DIT (« à confirmer (N) »), pas compté comme vente');
     // ── §6 CA PAR PLATEFORME + PAR COMPTE (tableau de bord) ─────────────────
     // Julien : « un CA global, un CA par application, et décomposer par compte ».
