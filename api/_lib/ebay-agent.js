@@ -17,7 +17,7 @@ export function preparerAgentEbay({orders,messages,offres,journal},now=Date.now(
  return {status:200,body:{ok:true,tasks:[...new Map(tasks.map(t=>[t.id,t])).values()].sort((a,b)=>(b.urgent===true)-(a.urgent===true) || (date(a.deadline) ?? Infinity)-(date(b.deadline) ?? Infinity)),sources,journal:Array.isArray(journal?.items)?journal.items:[],journalLisible:journal!==undefined,capturedAt:now}};
 }
 export async function executerAvecJournal({action,b,execute,modifier}) {
- const entry={id:randomUUID(),action,entityId:String(b.messageId || b.offerId || b.orderId || b.itemId || '').slice(0,64),ref:String(b.orderId || b.itemId || '').slice(0,64),at:Date.now(),etat:'en_cours'};
+ const entry={id:randomUUID(),action,entityId:String(b.messageId || b.offerId || b.returnId || b.cancelId || b.orderId || b.itemId || b.listingId || '').slice(0,64),ref:String(b.orderId || b.itemId || b.listingId || '').slice(0,64),at:Date.now(),etat:'en_cours'};
  let saved;try{saved=await modifier(d=>({...d,items:[entry,...(Array.isArray(d?.items)?d.items:[])].slice(0,100)}));}catch(_){saved=false;}
  if(saved!==true)return {status:503,body:{ok:false,error:'Le suivi de cette action n’a pas pu être préparé. Réessaie plus tard ; rien n’a été envoyé.',reason:'journal'}};
  let r;try{r=await execute();}catch(_){r={status:504,body:{ok:false,reason:'incertain',error:'État incertain : relis les données eBay avant de recommencer.'}};}

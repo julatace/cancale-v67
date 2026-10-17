@@ -14,7 +14,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations} from "./ebayGestion.jsx";
+import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -18059,19 +18059,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     </div>
   </>);
 }
-// ── eBay · ACHATS — pas captés aujourd'hui (l'API de VENTE ne porte pas les
-//    achats). On le DIT au lieu d'un onglet vide qui laisserait croire à un bug.
-function EbayAchats() {
-  const E = EBAY_SKIN;
-  return (
-    <div style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Achats eBay</div>
-      <div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
-        Tes achats eBay ne sont pas encore récupérés : la connexion eBay porte tes <b style={{ color: E.text }}>ventes</b> et tes <b style={{ color: E.text }}>annonces</b>, pas le côté acheteur. Dès que ce sera possible, ils s'afficheront ici — comme pour Vinted.
-      </div>
-    </div>
-  );
-}
+// (17 oct.) Les achats eBay sont lus (Trading GetMyeBayBuying) : `EbayAchats`
+// vit dans ebayGestion.jsx, avec les retours, annulations et la promotion.
 // ── VESTIAIRE : OÙ EN EST LA MESURE DU SITE (4 octobre, extension 5.154) ─────
 // On ne chiffre AUCUNE vente Vestiaire tant que la mesure n'a pas montré où vit
 // une vente, son montant net et sa date. En attendant, l'écran dit où en est la
@@ -45372,7 +45361,7 @@ function AppCoeur() {
             if (platSub === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
-          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
+          <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['promo','Promotion'],['achats','Achats'],['compte','Compte']]} dark/></div>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}
@@ -45383,9 +45372,10 @@ function AppCoeur() {
           )}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {platSub==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {platSub==='achats'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
-          {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
