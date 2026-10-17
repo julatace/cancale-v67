@@ -9265,6 +9265,64 @@ profileur de Chrome sur un build non minifié.
   les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
   de l'app (518 Ko compressés).
 
+### Double vérification de connexion (TOTP, 16 octobre)
+Retenue par Julien le 11 octobre (n° 17). **Facultative** : Réglages → Mon
+compte → Connexion → « Double vérification ». Rien ne change pour qui ne
+l'active pas.
+- **L'API MFA native de GoTrue, à la main** (comme le reste de l'auth, aucune
+  bibliothèque) : `POST /factors` (totp) → QR (`data:image/svg+xml`, affiché en
+  `<img>`, jamais en HTML) + clé à recopier ; `challenge` + `verify` (rend des
+  jetons `aal2`) ; `DELETE /factors/{id}` ; `GET /user` (porte `factors`).
+  Helpers : `totpVerifies`, `aalDuJeton`, `etatMfa`, `mfaPasse`, `mfaAppel`,
+  `mfaVerifierCode`, `mfaLireFacteurs`.
+- **La session porte `totp`** (les facteurs TOTP VÉRIFIÉS), lu dans le `user` de
+  chaque réponse de jeton (mot de passe, renouvellement, PKCE, lien email par
+  `fetchMe`). `etatMfa` : `aal2` ⇒ entrer · `totp` non vide ⇒ le code · `[]` ⇒
+  entrer · absent (session rangée avant cette fonction) ⇒ on relit `/user`.
+- **La porte vit dans `App`, AVANT le cœur** (`PorteMfa`) : tant que le code
+  n'est pas passé, `AppCoeur` ne monte pas, aucune lecture au nom du vendeur ;
+  ni l'extension (`assurerSessionExtension`), ni le relais du téléphone
+  (`relaisUtile`), ni l'abonnement aux notifications (`main.jsx`) ne partent.
+  Vaut pour une session restaurée au rechargement.
+- **« Activée » ne s'écrit qu'après un premier code juste.** Désactiver :
+  confirmation + code (la session repasse en `aal2`, ce que GoTrue exige pour
+  supprimer un facteur vérifié).
+- **Personne enfermé dehors** : GoTrue injoignable ⇒ « le service de connexion
+  ne répond pas », « Réessayer » (et nouvel essai seul toutes les 15 s quand on
+  ne sait pas s'il faut un code) ; jamais de déconnexion automatique. Téléphone
+  perdu : l'écran dit que ça ne se retire pas d'ici et donne l'adresse de
+  contact (`src/contact.js` — vide aujourd'hui ⇒ « adresse de contact à venir »).
+  Aucune procédure inventée.
+- **L'extension** : sa session (`/api/compte?mode=session-extension`, lien
+  magique) est en `aal1`, et c'est sans effet sur ce qu'elle fait — RLS ne
+  regarde pas `aal`. Elle n'est simplement plus fabriquée avant le code.
+  Extension NON modifiée, pas de bump.
+- ⚠️ **Limite à connaître** : la double vérification protège l'APP (l'écran),
+  pas l'API. Une session `aal1` (mot de passe seul) lit encore la base en
+  direct : RLS n'exige pas `aal2`. L'exiger (règle restrictive `aal = aal2`
+  quand un facteur existe) couperait l'extension, dont la session est `aal1`.
+  À trancher plus tard, avec une session extension en `aal2`.
+- Preuves : banc `bancs/double-verification.cjs` (port 4981, faux GoTrue à la
+  forme documentée, 390 tactile + 1512 px) — sans MFA comme avant (connexion et
+  session d'avant), activation (QR, clé, code faux refusé, « activée » après),
+  désactivation (code faux, DELETE en `aal2`), connexion protégée (zéro lecture
+  au nom du vendeur avant le code, rechargement compris, code faux refusé),
+  GoTrue injoignable (ni « activée », ni déconnexion). **63 contrôles** ; sur le
+  build d'avant (§6.1, banc copié dans l'arbre de 0969738) **20 rouges** — les 8
+  verts sont les cas « sans double vérification », comme attendu. Le banc ne
+  compte que les lectures faites AVEC le jeton du vendeur (les sondes anonymes
+  de l'écran de connexion ne lisent rien de lui). `audit-photos-vinted` admet
+  le `<img>` du QR (source fermée : `qrEnSrc`). ⚠️ `demarrage.cjs` sort 1 rouge
+  (« une vraie nouvelle vente est annoncée ») — **déjà rouge sur 0969738**, sans
+  lien avec cette passe.
+- **Non mesuré** : le vrai GoTrue de production (formes tirées de la doc
+  Supabase) ; que TOTP soit activé dans le projet (Authentication → MFA —
+  **geste de Julien : vérifier**, rien n'a été écrit en production) ; « mot de
+  passe oublié » sur un compte protégé (`PUT /user` en `aal1` : GoTrue peut le
+  refuser, l'erreur est affichée, puis le code est demandé) ; un compte qui
+  active la double vérification sur un appareil voit ses AUTRES sessions `aal1`
+  demander le code au renouvellement suivant de leur jeton (≤ 1 h).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
