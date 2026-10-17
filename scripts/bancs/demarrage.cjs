@@ -20,7 +20,7 @@ const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4502;
+const PORT = Number(process.env.BANC_PORT) || 4502;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 
 const JETON = 'jeton-de-banc';

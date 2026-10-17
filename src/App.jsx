@@ -554,6 +554,11 @@ const writeSession = (s) => {
 const SCHEMA_MEMO = 'schema_cloisonne';
 let CLOISONNE = (() => { try { return localStorage.getItem(SCHEMA_MEMO) === '1'; } catch (_) { return false; } })();
 let SB_CONFLICT = CLOISONNE ? 'owner,id' : 'id';
+// La sonde a-t-elle RÉPONDU pendant cette ouverture ? (vrai seulement sur une
+// réponse mesurée, 2xx ou 400 ; jamais sur un « pas su »). Sert au préchargement
+// du démarrage : une lecture sans session n'y part que sur une base MESURÉE non
+// cloisonnée, jamais sur un repli.
+let SCHEMA_MESURE = false;
 const sondeSchema = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
@@ -572,6 +577,7 @@ const detectSchema = async () => {
   }
   if (v !== null) {
     CLOISONNE = v;
+    SCHEMA_MESURE = true;
     try { if (v) localStorage.setItem(SCHEMA_MEMO, '1'); else localStorage.removeItem(SCHEMA_MEMO); } catch (_) {}
   }
   // Pas su et rien de mémorisé : on garde la valeur courante (le repli
@@ -1080,17 +1086,75 @@ const authBoot = async () => {
   // trois essais servent justement les jours où la base traîne.
   if (CLOISONNE) detectSchema();
   else await Promise.race([detectSchema(), new Promise(r => setTimeout(r, 6000))]);
-  if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
   if (AUTH_REDIRECT && AUTH_REDIRECT.ok && !AUTH_REDIRECT.recovery) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   const s = readSession();
-  if (!s) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  if (!s) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   AUTH = { ...AUTH, session: s, user: s.user || null };
   if (!authValid()) { const ok = await authRefresh(); if (!ok) { writeSession(null); return; } }
   AUTH = { ...AUTH, ready: true };
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
+  prechargerDemarrage();
   _emitAuth();
+};
+// ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
+// Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait
+// sonde de schéma → (rendu d'AppCoeur, ~600 ms de processeur) → comptes →
+// (rendu, ~350 ms) → ventes. Les comptes et les ventes ne dépendent d'aucun rendu :
+// ils partent ici, dès que la porte sait qu'AppCoeur va monter, et AppCoeur /
+// `loadOrders` reprennent les MÊMES lectures (mêmes fonctions, même `cachedRow`).
+// ⚠️ Les gardes ne bougent pas — on part aux mêmes conditions qu'AppCoeur :
+//   · avec une session : le jeton du vendeur (`sbAuth`), quelle que soit la base ;
+//   · sans session : seulement si la porte laisse passer (accès direct) ET que la
+//     sonde a MESURÉ une base non cloisonnée pendant cette ouverture — jamais sur
+//     un repli, jamais une lecture anonyme sur une base cloisonnée ;
+//   · rien pendant une récupération de mot de passe (la porte montre la connexion).
+// Un échec rend `null` comme avant (`fetchVintedAccounts`) : AppCoeur dit la panne,
+// jamais « aucun compte ». Le préchargement n'est repris qu'une fois, par le même
+// vendeur, dans les 30 s ; sinon AppCoeur relit.
+let _prechargeComptes = null;   // { at, qui, promesse }
+const prechargerDemarrage = () => {
+  try {
+    if (typeof window === 'undefined' || _prechargeComptes) return;
+    if (MULTI_USER) {
+      if (RECOVERY_PENDING) return;
+      const session = !!(AUTH.session && AUTH.session.access_token && AUTH.user);
+      if (!session) {
+        const direct = (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+        if (!(direct && SCHEMA_MESURE && !CLOISONNE)) return;
+      }
+    }
+    const qui = (AUTH.user && AUTH.user.id) || 'local';
+    const promesse = fetchVintedAccounts();
+    // Les commandes de TOUS les comptes en une lecture, EN MÊME TEMPS que la liste
+    // des comptes (on ne connaît pas encore leurs identifiants). ⚠️ Au premier
+    // rendu, le processeur est pris par AppCoeur : une lecture lancée « dès que
+    // la liste arrive » ne partait qu'après lui (mesuré : +500 ms au téléphone).
+    // `strict` : une page ratée vaut « pas su » (null), jamais une demi-liste.
+    const famille = lireTout('id=like.harvest_*_orders_*&select=id,data,updated_at,cap:data->>capturedAt', { strict: true }).catch(() => null);
+    _prechargeComptes = { at: Date.now(), qui, promesse };
+    // Dès que la liste arrive, chaque compte LIÉ reçoit SA part — exactement les
+    // lignes que `fetchHarvestOrdersBrut(uid)` aurait rendues (même préfixe) —
+    // dans `cachedRow('o:uid')`, où `loadOrders` la retrouve. Un compte retiré
+    // n'est jamais servi (on ne part que de la liste). Famille illisible ⇒ la
+    // lecture par compte d'avant, dans la même entrée de cache.
+    promesse.then((list) => {
+      if (!Array.isArray(list)) return;
+      for (const a of list) {
+        const uid = a && a.vinted_user_id; if (!uid) continue;
+        const pre = `harvest_${uid}_orders_`;
+        try { cachedRow(`o:${uid}`, () => famille.then((rows) => Array.isArray(rows) ? rows.filter((r) => String(r && r.id).startsWith(pre)) : fetchHarvestOrdersBrut(uid))).catch(() => {}); } catch (_) {}
+      }
+    }).catch(() => {});
+  } catch (_) { _prechargeComptes = null; }
+};
+const prendrePrechargeComptes = () => {
+  const e = _prechargeComptes; _prechargeComptes = null;
+  if (!e || (Date.now() - e.at) > 30000) return null;
+  if (e.qui !== ((AUTH.user && AUTH.user.id) || 'local')) return null;
+  return e.promesse;
 };
 // Renouvellement périodique tant que l'app est ouverte.
 if (MULTI_USER && typeof window !== 'undefined') {
@@ -42065,7 +42129,7 @@ function AppCoeur() {
   useEffect(()=>{
     let stop=false;
     (async()=>{
-      const list=await fetchVintedAccounts();
+      const list=await (prendrePrechargeComptes() || fetchVintedAccounts());
       if(stop) return;
       setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
       noterPanneBase(list===null);             // depuis quand ? (pour dire le bon geste au 3ᵉ jour)
