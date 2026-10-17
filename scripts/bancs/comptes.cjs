@@ -117,36 +117,52 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const brut=await pg.evaluate(()=>document.body.innerText||'');
     const lu = sonde ? await sonde(pg) : null;
     const L=brut.split('\n').map(x=>x.trim());
-    const k=L.findIndex(x=>x.startsWith('État des comptes'));
-    const tete=k<0?'':L.slice(k,k+6).join(' · ');
+    // ⚠️ (17 oct.) L'en-tête « État des comptes · N à jour · N en panne » n'existe
+    //    plus : Julien a tranché le 16 octobre (« juste s'il est actif ou banni »),
+    //    la fraîcheur n'est plus une alerte mais une ligne grise sur la carte
+    //    (`h.ago`). L'en-tête « Tes comptes : » porte ses comptes dans des
+    //    attributs (`data-comptes-actifs`, `data-comptes-bannis`) — on lit CEUX-LÀ.
+    const tete = await pg.evaluate(()=>{ const e=document.querySelector('[data-comptes-actifs]'); return e ? (e.parentElement.innerText||'').replace(/\n/g,' · ') : ''; });
+    const attr = await pg.evaluate(()=>{ const a=document.querySelector('[data-comptes-actifs]'), b=document.querySelector('[data-comptes-bannis]');
+      return { actifs: a ? Number(a.getAttribute('data-comptes-actifs')) : null, bannis: b ? Number(b.getAttribute('data-comptes-bannis')) : 0 }; });
     const n=(re)=>{ const m=re.exec(tete); return m?+m[1]:0; };
     const q=L.findIndex(x=>x===parUid[vieux]);
     const carte=q<0?'':L.slice(q,q+5).join(' · ');
     await ctx.close();
     return { tete, carte, errs, txt:brut, lu,
-      panne:n(/(\d+) en panne/), exclu:n(/(\d+) exclus? —/), aJour:n(/(\d+) à jour/), rafr:n(/(\d+) à rafraîchir/) };
+      actifs:attr.actifs, bannis:attr.bannis, exclu:n(/(\d+) masqués? — ton choix/) };
   };
 
   const av = await lire(null);        // personne de masqué : l'état de référence
   const ap = await lire(vieux);       // le compte est mis de côté par Julien
-  console.log(`    sans masque : ${av.panne} en panne · ${av.exclu} exclu(s)`);
-  console.log(`    masqué      : ${ap.panne} en panne · ${ap.exclu} exclu(s)`);
-  console.log(`    sa carte    : ${ap.carte}`);
+  console.log(`    sans masque : ${av.actifs} actif(s) · ${av.bannis} banni(s) · ${av.exclu} masqué(s)`);
+  console.log(`    masqué      : ${ap.actifs} actif(s) · ${ap.bannis} banni(s) · ${ap.exclu} masqué(s)`);
+  console.log(`    sa carte    : ${av.carte}  →  masqué : ${ap.carte}`);
 
-  dit(av.panne >= 1, 'la base sert bien au moins un compte en panne',
-    `sinon ce banc ne prouve rien — « ${parUid[vieux]} », capté il y a ${VIEILLI_J} j, doit sortir en panne`);
-  // ⚠️ LE CŒUR : masquer un compte le SORT des pannes.
-  dit(ap.panne === av.panne - 1,
-    "un compte exclu ne compte plus parmi les comptes en panne",
-    `${av.panne} avant, ${ap.panne} après — attendu ${av.panne - 1}`);
-  dit(ap.exclu === 1, "et il est compté à part, comme un choix",
+  // ⚠️ (17 oct.) « EN PANNE » N'EXISTE PLUS — DÉCISION DE JULIEN, PAS UN OUBLI.
+  //    16 octobre : « juste s'il est actif ou banni, l'extension doit évaluer
+  //    l'état du compte ». Une capture vieille n'est plus une ALERTE, c'est une
+  //    ligne grise sur la carte (`acctHealth` → `ago`). Ce banc exigeait donc
+  //    une pastille rouge qu'on a retirée exprès. Ce qu'il doit encore prouver :
+  //    (1) l'app VOIT le compte figé — sa carte dit son âge réel, lu sur
+  //        `capturedAt` (jamais sur `updated_at`, qui ment) ;
+  //    (2) masquer le sort des comptes actifs et le compte À PART, comme un choix ;
+  //    (3) masqué, il reste nommé, et on ne lui réclame plus rien.
+  const ageVu = /capté il y a (\d+) j/.exec(av.carte);
+  dit(!!ageVu && Math.abs(+ageVu[1] - VIEILLI_J) <= 1,
+    "l'app voit le compte figé : sa carte dit son âge réel",
+    `« ${parUid[vieux]} », capté il y a ${VIEILLI_J} j — carte : ${av.carte || '(introuvable)'}`);
+  dit(av.actifs != null && ap.actifs === av.actifs - 1,
+    "un compte masqué ne compte plus parmi les comptes actifs",
+    `${av.actifs} avant, ${ap.actifs} après — attendu ${av.actifs != null ? av.actifs - 1 : '?'}`);
+  dit(ap.exclu === 1 && av.exclu === 0, "et il est compté à part, comme un choix",
     `« ${ap.tete.slice(0, 110)} »`);
   // ⚠️ MAIS IL RESTE VISIBLE. Un compte écarté en silence serait pire que
   //    l'alerte qu'on vient de retirer.
   dit(/Exclu de l'app|Masqué/i.test(ap.carte),
     "et sa carte dit qu'il est hors de l'app, pas qu'il est cassé",
     ap.carte || '(carte introuvable)');
-  dit(!/Pas capté/i.test(ap.carte),
+  dit(!/Pas capté|capté il y a/i.test(ap.carte),
     "elle ne lui réclame plus une capture qu'il ne veut pas",
     ap.carte);
   dit(av.errs.length===0 && ap.errs.length===0, "aucune erreur d'app",
@@ -190,14 +206,21 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     // libellé n'est plus en capitales, « ANNONCES EN LIGNE » n'existe plus dans
     // le rendu), l'écran Annonces dans sa ligne `data-ann-resume`.
     const nAnn = (t) => { const m=/(\d+)\s+en ligne/.exec(t||''); return m?+m[1]:null; };
-    const nDash = (t) => { const m=/^\s*(\d+)\s*$/.exec(t||''); return m?+m[1]:null; };
+    // ⚠️ (17 oct.) Quand des annonces sont « à confirmer » (lecture de plus de
+    //    24 h), le tableau de bord écrit honnêtement « ≥ N » : N est ce qu'il SAIT
+    //    en ligne, et il le dit minorant (§5). On lit N, et on garde le « ≥ ».
+    const approxDash = (t) => /^\s*≥/.test(t||'');
+    const nDash = (t) => { const m=/^\s*(?:≥\s*)?(\d+)\s*$/.exec(t||''); return m?+m[1]:null; };
     const lu5 = (pg) => pg.evaluate(() => ({
       ann: ((document.querySelector('[data-ann-resume] b')||{}).textContent)||null,
-      dash: ((document.querySelector('[data-dash-stat="online"] .vrm-display')||{}).textContent)||null }));
+      // (17 oct.) Statistiques : le nombre vit dans le <b> de la ligne
+      // « annonces en ligne » du repli « Stock et volume » (plus de `.vrm-display`).
+      dash: ((document.querySelector('[data-dash-stat="online"] b')||{}).textContent)||null }));
     const a5 = await lire(exclu2, 'cat_annonces', true, lu5);
     const d5 = await lire(exclu2, 'dashboard', true, lu5);
     const na = nAnn(a5.lu && a5.lu.ann), nd = nDash(d5.lu && d5.lu.dash);
-    console.log(`    Annonces ${na===null?'—':na} · Tableau de bord ${nd===null?'—':nd}`);
+    const ndApprox = approxDash(d5.lu && d5.lu.dash);
+    console.log(`    Annonces ${na===null?'—':na} · Tableau de bord ${nd===null?'—':(ndApprox?'≥ ':'')+nd}`);
     dit(na!==null && nd!==null, 'les deux ecrans annoncent un nombre d\'annonces en ligne');
     if(na!==null && nd!==null)
       dit(na===nd, 'et le MEME, des le premier ecran ouvert',
