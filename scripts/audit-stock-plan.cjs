@@ -85,6 +85,7 @@ async function audit(src, bavard) {
     const metal = { build: 'metal', cases: 'pile', rows: 5, h3d: 1.25 };
     dit(R.capaciteCase(metal, { rows: 5, h3d: 1.25 }, 3.4) === 2, 'une étagère métal tient 2 boîtes empilées par case', String(R.capaciteCase(metal, { rows: 5, h3d: 1.25 }, 3.4)));
     dit(R.capaciteCase({ cases: 'cintre' }, {}, 3.4) === 1, 'un cintre porte UN numéro');
+    dit(R.capaciteCase({ build: 'metal', bacs: true, cases: 'pile', h3d: 1.25 }, { rows: 2, h3d: 1.25 }, 3.4) === 1, 'une étagère À BACS tient UN bac par case, même haute', String(R.capaciteCase({ build: 'metal', bacs: true, cases: 'pile', h3d: 1.25 }, { rows: 2, h3d: 1.25 }, 3.4)));
     dit(R.capaciteCase({ build: 'table', cases: 'pile', h3d: 0.5 }, {}, 3.4) >= 5, 'une table tient une pile de plusieurs boîtes');
   });
   essaie('posé sur', () => {

@@ -134,12 +134,15 @@ export const placerSansTraverser = (cx, cy, w, h, obstacles, poly) => {
 //    DANS la case, retirer celle du dessous fait descendre celles du dessus,
 //    mais rien ne tombe d'un plateau à l'autre (le plateau les tient).
 //  · 'cintre' — un portant : un numéro par cintre, rien ne tombe.
+// Une étagère À BACS (`ft.bacs`) est un plateau dont chaque case tient UN bac
+// numéroté : bijoux, accessoires, petits objets — une case, un numéro.
 export const BOITE_H = 0.145, BOITE_JEU = 0.008;    // une boîte à chaussures
 export const modeCase = (ft) => (ft && ft.cases) || 'colonne';
 export const capaciteCase = (ft, it, wallH = 3.4) => {
   const m = modeCase(ft);
   if (m === 'cintre') return 1;
   if (m !== 'pile') return 1;
+  if (ft.bacs) return 1;                              // un bac par case (petits objets, accessoires)
   if (ft.build === 'table') return Math.max(1, Math.min(12, Math.floor((Math.max(1.2, wallH * 0.7) - (ft.h3d || 0.5) * 1.5) / (BOITE_H + BOITE_JEU))));
   const rows = Math.max(1, (it && it.rows) || ft.rows || 1);
   const ht = Math.max(0.35, ((it && it.h3d) != null ? it.h3d : ft.h3d) * 1.5);

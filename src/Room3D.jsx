@@ -12,6 +12,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
   const dataRef = React.useRef({ items });
   const moveRef = React.useRef(canMove); moveRef.current = canMove; // lu en direct par les handlers
   const cbRef = React.useRef({}); cbRef.current = { onCellTap, onPileTap, onSelect, onOpen, onMove }; // callbacks à jour
+  const selRef = React.useRef({}); selRef.current = { sel, hi }; // lu par la mise en page des étiquettes
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const [amb, setAmb] = useState(() => load('vrm_garage_ambiance', 'clair')); // univers 3D choisi (par appareil)
@@ -226,15 +227,22 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         mkSkirt(room.h, -room.w / 2 + 0.025, 0, false); mkSkirt(room.h, room.w / 2 - 0.025, 0, false);
       }
       // étiquette (sprite texte)
-      const makeLabel = (text) => {
-        const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
-        x.fillStyle = 'rgba(0,0,0,0.62)'; x.beginPath(); x.roundRect ? x.roundRect(4, 12, 248, 40, 10) : x.rect(4, 12, 248, 40); x.fill();
-        x.fillStyle = '#fff'; x.font = 'bold 26px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText(String(text).slice(0, 20), 128, 33);
+      // (17 oct.) La plaque est TAILLÉE AU TEXTE (elle faisait toujours 256 px de
+      // large, même pour « Table ») : c'est sa vraie largeur qui sert à juger un
+      // chevauchement à l'écran (`placerEtiquettes`, plus bas).
+      const makeLabel = (text, lMin = 80) => {
+        const t = String(text).slice(0, 36); const police = 'bold 26px system-ui,sans-serif';
+        const c = document.createElement('canvas'); let x = c.getContext('2d'); x.font = police;
+        // Un pictogramme se mesure mal selon la police de repli : marge de 15 %.
+        const lw = Math.min(460, Math.max(lMin, Math.ceil(x.measureText(t).width * 1.15) + 36));
+        c.width = lw; c.height = 64; x = c.getContext('2d');
+        x.fillStyle = 'rgba(0,0,0,0.66)'; x.beginPath(); x.roundRect ? x.roundRect(2, 12, lw - 4, 40, 12) : x.rect(2, 12, lw - 4, 40); x.fill();
+        x.fillStyle = '#fff'; x.font = police; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(t, lw / 2, 33);
         const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
         // ⚠️ Une étiquette n'est pas une cible : son rectangle (transparent sur
         //    les bords) recouvrait les cartons de devant et volait leurs clics.
-        sp.scale.set(2.4, 0.6, 1); sp.raycast = () => {}; return sp;
+        sp.scale.set(0.6 * lw / 64, 0.6, 1); sp.raycast = () => {}; sp.userData.etiquette = { ratio: lw / 64 }; sp.renderOrder = 10; return sp;
       };
       // CARTON numéroté (boîte à chaussures) — le NUMÉRO est imprimé EN GROS
       // sur la face avant, le dessus et les côtés → lisible directement dans la
@@ -379,7 +387,10 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           const epaules = box(Math.min(0.36, pasC * 0.9), 0.012, 0.012, a.length ? flatMat('#8a6f57', 0.6) : ghostM); epaules.position.set(cx, barY - 0.07, 0); epaules.rotation.y = Math.PI / 2; g.add(epaules);
           if (a.length) {
             const vet = box(0.03, 0.62, Math.min(0.42, d * 0.85), flatMat(habits[c % habits.length], 0.92)); vet.position.set(cx, barY - 0.07 - 0.32, 0); vet.userData = { cell: key, num: a[0], idx: 0 }; g.add(vet);
-            const tag = makeColis(a[0], 0.012, 0.12, 0.12); tag.position.set(cx, barY - 0.07 - 0.12, Math.min(0.21, d * 0.42) + 0.01); tag.rotation.y = Math.PI / 2; tag.userData = { cell: key, num: a[0], idx: 0 }; g.add(tag);
+            // (17 oct.) L'étiquette du cintre FACE à soi : elle était tournée d'un quart
+            // de tour — de face on n'en voyait que la tranche (1,2 cm), donc aucun
+            // numéro. Elle pend devant le vêtement, sa face numérotée vers l'avant.
+            const tagW = Math.min(0.22, pasC * 0.94); const tag = makeColis(a[0], tagW, tagW * 0.75, 0.008); tag.position.set(cx, barY - 0.07 - 0.16, Math.min(0.21, d * 0.42) + 0.012); tag.userData = { cell: key, num: a[0], idx: 0 }; g.add(tag);
           } else {
             const gh = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.55, Math.min(0.4, d * 0.8)), ghostM); gh.position.set(cx, barY - 0.07 - 0.29, 0); gh.userData = { cell: key, ghost: true }; g.add(gh);
           }
@@ -711,7 +722,11 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             // alors sur le libellé de son type, jamais sur le mot « undefined ».
             const nom = String(it.name || (FURN_TYPES[it.type] || {}).label || 'Meuble');
             const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + nom + (cnt ? ` (${cnt})` : ''));
-            lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
+            lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; lab.userData.cnt = cnt; g.add(lab);
+            // La PUCE : le seul nombre de paires, qui prend la place de l'étiquette
+            // quand celle-ci ne tient pas (grande pièce vue de loin) — on voit encore
+            // quels meubles portent des paires sans rien lire par-dessus.
+            if (cnt) { const pu = makeLabel(String(cnt), 52); pu.position.set(0, ht + 0.55, 0); pu.userData.itemId = it.id; pu.userData.cnt = cnt; pu.userData.puce = true; pu.visible = false; g.add(pu); }
           }
           // La grille peint elle-même ses cartons. Les AUTRES meubles de rangement
           // (commode, étagère, casiers, armoire) deviennent eux aussi une grille de
@@ -731,8 +746,26 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             const cols = Math.max(1, it.cols || 1), rows = estTable ? 1 : Math.max(1, it.rows || 1);
             const cellW = w / cols, cellH = estTable ? Math.max(0.6, (room.wallH || 3.4) * 0.7 - ht) : ht / rows;
             const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145, pas = bh + 0.008;
-            const cap = Math.max(1, Math.floor((cellH - 0.04) / pas));
+            const enBacs = !!(FURN_TYPES[it.type] || {}).bacs;
+            const cap = enBacs ? 1 : Math.max(1, Math.floor((cellH - 0.04) / pas));
             const ghostM = new THREE.MeshStandardMaterial({ color: shade(base, 26), roughness: 0.95, transparent: true, opacity: 0.18, depthWrite: false });
+            if (enBacs) {
+              // (17 oct.) ÉTAGÈRE À BACS : chaque case tient UN bac ouvert, son
+              // numéro sur une étiquette en façade — pour ce qui ne tient pas dans
+              // une boîte à chaussures (bijoux, accessoires, petits objets).
+              const bacW = Math.max(0.12, cellW * 0.86), bacH = Math.max(0.1, Math.min(0.32, cellH - 0.07)), bacD = Math.min(d * 0.8, 0.4);
+              for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                const key = r + '_' + c; const num = ((it.slots || {})[key] || []).map(v => String(v)).filter(Boolean)[0];
+                const cx = -w / 2 + (c + 0.5) * cellW, cbY = Math.max(0, ht - (r + 1) * cellH) + 0.025, z = d / 2 - bacD / 2 - 0.015;
+                if (num) {
+                  const bac = new THREE.Group(); bac.userData = { cell: key, num, idx: 0 };
+                  const plast = flatMat(shade(base, -18), 0.55); const ep = 0.012;
+                  [[bacW, ep, bacD, 0, ep / 2, 0], [bacW, bacH, ep, 0, bacH / 2, -bacD / 2 + ep / 2], [ep, bacH, bacD, -bacW / 2 + ep / 2, bacH / 2, 0], [ep, bacH, bacD, bacW / 2 - ep / 2, bacH / 2, 0], [bacW, bacH * 0.72, ep, 0, bacH * 0.36, bacD / 2 - ep / 2]].forEach(([a, b, cc, x0, y0, z0]) => { const pan = box(a, b, cc, plast); pan.position.set(x0, y0, z0); pan.userData = { cell: key, num, idx: 0 }; bac.add(pan); });
+                  const tag = makeColis(num, Math.min(bacW * 0.7, 0.2), Math.min(bacH * 0.5, 0.11), 0.006); tag.position.set(0, bacH * 0.36, bacD / 2 + 0.002); tag.userData = { cell: key, num, idx: 0 }; bac.add(tag);
+                  bac.position.set(cx, cbY, z); g.add(bac);
+                } else { const gh = new THREE.Mesh(new THREE.BoxGeometry(bacW, bacH, bacD), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bacH / 2, z); g.add(gh); }
+              }
+            } else
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
               const key = r + '_' + c; const arr = ((it.slots || {})[key] || []).map(v => String(v)).filter(Boolean);
               const cx = -w / 2 + (c + 0.5) * cellW;
@@ -829,7 +862,9 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       const topView = () => {
         controls.target.set(0, 0, 0);
         const d = Math.min(controls.maxDistance, Math.max(room.w, room.h) * 1.25);
-        camera.position.set(0.001, d, 0.001); controls.update();
+        // Nord en haut, comme le plan d'« Aménager la pièce » (avec 0,001 / 0,001
+        // la pièce apparaissait de biais, tournée de 45°).
+        camera.position.set(0.001, d, 0.02); controls.update();
       };
       // Recentrer : remet la vue immersive de départ.
       const resetView = () => { camera.position.copy(homePos); controls.target.copy(homeTgt); controls.update(); };
@@ -1083,7 +1118,75 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       renderer.domElement.addEventListener('pointerleave', surSortie);
       window.addEventListener('pointerup', surRelache);
       curseur('grab');
-      let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
+      // ── LES ÉTIQUETTES RESTENT LISIBLES (17 oct.) ─────────────────────────
+      // Julien : sur une grande pièce, la vue du dessus était illisible — les
+      // étiquettes (taille fixe EN MÈTRES) se recouvraient en un tas noir, et
+      // au loin elles tombaient à quelques pixels. Désormais :
+      //  · TAILLE À L'ÉCRAN CONSTANTE : la plaque est remise à l'échelle à
+      //    chaque image pour faire `PX` pixels de haut, où qu'on soit ;
+      //  · AUCUN CHEVAUCHEMENT : on les pose par ordre d'importance (le meuble
+      //    choisi ou cherché d'abord, puis ceux qui portent le plus de paires,
+      //    puis les plus proches) ; une étiquette qui en recouvrirait une déjà
+      //    posée est MASQUÉE — elle revient dès qu'on zoome ou qu'on tourne.
+      // Pure présentation : aucune donnée, aucun numéro n'est touché.
+      const PX_ETIQ = sourisFine ? 22 : 19, MARGE_ETIQ = 4;
+      const vEtiq = new THREE.Vector3(), pEtiq = new THREE.Vector3();
+      let cleEtiq = '', etiqVisibles = 0, etiqTotal = 0, etiqRects = [];
+      const placerEtiquettes = () => {
+        const cv = renderer.domElement, Wp = cv.clientWidth || 1, Hp = cv.clientHeight || 1;
+        const liste = [];
+        furnGroup.children.forEach(g => g.children.forEach(o => { if (o.isSprite && o.userData && o.userData.etiquette) liste.push(o); }));
+        // ⚠️ La clé porte l'IDENTITÉ des étiquettes : une reconstruction (une paire
+        //    rangée) recrée des plaques à leur taille par défaut — en mètres — avec
+        //    le même nombre de meubles ; sans ça elles restaient géantes de près.
+        const cle = camera.position.toArray().map(v => v.toFixed(3)).join(',') + '|' + controls.target.toArray().map(v => v.toFixed(3)).join(',') + '|' + Wp + 'x' + Hp + '|' + liste.map(o => o.id).join(',') + '|' + (selRef.current.sel || '') + '|' + ((selRef.current.hi || {}).itemId || '');
+        if (cle === cleEtiq) return; cleEtiq = cle;
+        const tanV = Math.tan((camera.fov * Math.PI / 180) / 2);
+        const haut = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion), droite = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const ecran = (v) => { const q = v.clone().project(camera); return [(q.x + 1) / 2 * Wp, (1 - q.y) / 2 * Hp, q.z]; };
+        const { sel: sSel, hi: sHi } = selRef.current; const hiId = sHi && sHi.itemId;
+        liste.forEach(o => {
+          o.getWorldPosition(vEtiq);
+          // profondeur le long de l'axe de la caméra (c'est elle qui fixe la taille projetée)
+          const prof = Math.max(0.05, pEtiq.copy(vEtiq).sub(camera.position).dot(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)));
+          // La PLAQUE occupe 40/64 de la hauteur du dessin : c'est elle qui fait PX.
+          const hM = (PX_ETIQ / 0.625) * 2 * prof * tanV / Hp, ratio = o.userData.etiquette.ratio || 4;
+          o.scale.set(hM * ratio, hM, 1);
+          // Ce qui est MESURÉ à l'écran (pas recalculé de la formule) : le banc juge ça.
+          const demiH = hM * 0.3125, demiW = hM * ratio * 0.5;
+          const [x0, y0, z0] = ecran(vEtiq), [, yH] = ecran(vEtiq.clone().addScaledVector(haut, demiH)), [xD] = ecran(vEtiq.clone().addScaledVector(droite, demiW));
+          const id = o.userData.itemId;
+          o.userData._px = { x: x0, y: y0, w: Math.abs(xD - x0) * 2, h: Math.abs(y0 - yH) * 2, z: z0, dist: prof, rang: (id === sSel || id === hiId) ? 1e9 : (o.userData.cnt || 0) };
+        });
+        // D'abord les étiquettes, puis les puces des meubles dont l'étiquette n'a
+        // pas trouvé de place.
+        const tri = (a, b) => (b.userData._px.rang - a.userData._px.rang) || (a.userData._px.dist - b.userData._px.dist);
+        const etiqs = liste.filter(o => !o.userData.puce).sort(tri), puces = liste.filter(o => o.userData.puce).sort(tri);
+        const posees = [], aEtiquette = new Set();
+        const poser = (o) => {
+          const q = o.userData._px; const r = { x: q.x - q.w / 2, y: q.y - q.h / 2, w: q.w, h: q.h };
+          const dedans = q.z < 1 && r.x + r.w > 0 && r.x < Wp && r.y + r.h > 0 && r.y < Hp;
+          const recouvre = posees.some(p => r.x < p.x + p.w + MARGE_ETIQ && p.x < r.x + r.w + MARGE_ETIQ && r.y < p.y + p.h + MARGE_ETIQ && p.y < r.y + r.h + MARGE_ETIQ);
+          o.visible = dedans && !recouvre;
+          if (o.visible) posees.push({ ...r, id: o.userData.itemId, puce: !!o.userData.puce });
+          return o.visible;
+        };
+        // Une étiquette ne s'étale pas sur la place d'un AUTRE meuble qui porte des
+        // paires (sa puce) : en rangée serrée, on garde un nombre par meuble plutôt
+        // qu'un nom qui en cache cinq. Le meuble choisi ou cherché passe toujours.
+        const zonePuce = (o) => { const q = o.userData._px; return { x: q.x - q.w / 2, y: q.y - q.h / 2, w: q.w, h: q.h, id: o.userData.itemId }; };
+        const zones = puces.filter(o => o.userData._px.z < 1).map(zonePuce);
+        etiqs.forEach(o => {
+          const q = o.userData._px, r = { x: q.x - q.w / 2, y: q.y - q.h / 2, w: q.w, h: q.h };
+          const empiete = q.rang < 1e9 && zones.some(z => z.id !== o.userData.itemId && r.x < z.x + z.w && z.x < r.x + r.w && r.y < z.y + z.h && z.y < r.y + r.h);
+          if (empiete) { o.visible = false; return; }
+          if (poser(o)) aEtiquette.add(o.userData.itemId);
+        });
+        puces.forEach(o => { if (aEtiquette.has(o.userData.itemId)) { o.visible = false; return; } poser(o); });
+        etiqVisibles = posees.filter(p => !p.puce).length; etiqTotal = etiqs.length; etiqRects = posees;
+        try { el.dataset.etiquettes = etiqVisibles + '/' + etiqTotal; } catch (_) {}
+      };
+      let raf; const animate = () => { controls.update(); try { placerEtiquettes(); } catch (_) {} renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => {
         const w = el.clientWidth || W, h = el.clientHeight || H;
         renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -1238,9 +1341,26 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           project: (itemId, quoi = {}) => {
             const ms = maillages(itemId, quoi); if (!ms.length) return null;
             const b = new THREE.Box3(); ms.forEach((o) => { o.updateWorldMatrix(true, true); o.traverse((m) => { if (m.isMesh) b.expandByObject(m); }); });
-            const c = b.getCenter(new THREE.Vector3()).project(camera); const r = renderer.domElement.getBoundingClientRect();
+            // `avant` : le centre de la FACE AVANT du carton (ce qu'on voit et qu'on touche).
+            const m0 = ms[0], prof = m0.geometry && m0.geometry.parameters && m0.geometry.parameters.depth;
+            const c = (quoi.avant && prof ? new THREE.Vector3(0, 0, prof / 2).applyMatrix4(m0.matrixWorld) : b.getCenter(new THREE.Vector3())).project(camera); const r = renderer.domElement.getBoundingClientRect();
             return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height };
           },
+          // La face NUMÉROTÉE d'une étiquette (face +Z d'un carton) regarde-t-elle la
+          // caméra ? 1 = de face, 0 = de profil (on ne voit que sa tranche).
+          faceNum: (itemId, quoi = {}) => {
+            const ms = maillages(itemId, quoi).filter(m => Array.isArray(m.material) && m.material[4] && m.material[4].map);
+            if (!ms.length) return null;
+            const m = ms[0]; m.updateWorldMatrix(true, false);
+            const n = new THREE.Vector3(0, 0, 1).transformDirection(m.matrixWorld);
+            const pos = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld);
+            const versCam = camera.position.clone().sub(pos).normalize();
+            const q = new THREE.Box3().setFromObject(m), r = renderer.domElement.getBoundingClientRect();
+            const coins = [[q.min.x, q.min.y, q.min.z], [q.max.x, q.max.y, q.max.z], [q.min.x, q.max.y, q.max.z], [q.max.x, q.min.y, q.min.z]].map(([a, b, c]) => new THREE.Vector3(a, b, c).project(camera));
+            const xs = coins.map(c => (c.x + 1) / 2 * r.width), ys = coins.map(c => (1 - c.y) / 2 * r.height);
+            return { dot: n.dot(versCam), lg: Math.max(...xs) - Math.min(...xs), ht: Math.max(...ys) - Math.min(...ys) };
+          },
+          etiquettes: () => ({ visibles: etiqVisibles, total: etiqTotal, puces: etiqRects.filter(r => r.puce).length, px: PX_ETIQ, rects: etiqRects.map(r => ({ ...r })) }),
           contour: (quel) => { const c = contours[quel]; return c && c.visible ? { x: c.position.x, y: c.position.y, z: c.position.z, sx: c.scale.x, sy: c.scale.y, sz: c.scale.z } : null; },
         };
       } catch (_) {}
@@ -1356,7 +1476,13 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
     if (fait) { e.preventDefault(); e.stopPropagation(); }
   };
 
-  if (err) return fallback || <RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={onOpen} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} C={C} />;
+  // (17 oct.) SANS WebGL, une pièce en L, en U, en T ou à main levée était
+  // redessinée en RECTANGLE (la perspective ne sait faire que ça) : on voyait
+  // des meubles « dans » un coin qui n'existe pas. Une forme libre se dessine
+  // donc vue du dessus, coins compris ; le rectangle garde sa perspective.
+  if (err) return fallback || (formeLibre
+    ? <PlanSecours items={items} poly={poly} hi={hi} sel={sel} cibles={cibles} onOpen={onOpen} colorOf={colorOf} emojiOf={emojiOf} storedCount={storedCount} C={C} FURN_TYPES={FURN_TYPES} />
+    : <RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={onOpen} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} C={C} />);
   return (
     <div data-noswipe="1" data-stock3d="" tabIndex={0} role="application" onKeyDown={surTouche3D}
       onPointerDown={(e) => { try { if (e.target && e.target.tagName === 'CANVAS') e.currentTarget.focus({ preventScroll: true }); } catch (_) {} }}
@@ -1397,17 +1523,22 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
                 groupes qui se chevauchaient (relevé en capture). Cadrage à
                 gauche, navigation à droite : chacun garde sa place quelle que
                 soit la largeur. */}
-            <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
+            {/* (17 oct.) Sur un téléphone, les deux grappes se chevauchaient
+                (« De face » passait sous ◀). Elles partagent une rangée et, si
+                elles n'y tiennent pas, la navigation remonte d'un cran. */}
+            <div data-commandes-3d="" style={{ position: 'absolute', left: 8, right: 8, bottom: 8, display: 'flex', flexWrap: 'wrap-reverse', justifyContent: 'space-between', alignItems: 'flex-end', gap: 6, pointerEvents: 'none' }}>
+            <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
               {enDessus && <button type="button" data-revenir-3d="" onPointerDown={stop} onClick={() => { call('revenir3D'); setEnDessus(false); }} title="Revenir à la vue en 3D" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Revenir à la vue en 3D">↩ 3D</button>}
               {sel && <button type="button" onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
-            <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto', marginLeft: 'auto' }}>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('rotateView', 22)} title="Tourner à droite" style={btn} aria-label="Tourner la vue à droite">▶</button>
+            </div>
             </div>
           </>
         );
@@ -1467,6 +1598,39 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
         );
       })}
       <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble</span>
+    </div>
+  );
+}
+
+// Vue du dessus de SECOURS (sans WebGL) : la vraie forme de la pièce, chaque
+// meuble à sa place et à sa taille, son nom et le nombre de paires qu'il porte.
+// Toucher un meuble l'ouvre, comme en 3D. Lecture seule : on ne déplace rien
+// ici (« Aménager la pièce » a son propre plan).
+function PlanSecours({ items, poly, hi, sel, cibles, onOpen, colorOf, emojiOf, storedCount, C, FURN_TYPES }) {
+  const W = Math.max(...poly.map(q => q[0])), H = Math.max(...poly.map(q => q[1]));
+  const marge = 0.4;
+  const ciblesIds = new Set((cibles || []).map(c => c && c.itemId).filter(Boolean));
+  return (
+    <div data-noswipe="1" data-plan-secours="" style={{ position: 'relative', width: '100%', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.bg }}>
+      <svg viewBox={`${-marge} ${-marge} ${W + marge * 2} ${H + marge * 2}`} style={{ display: 'block', width: '100%', maxHeight: 'min(52vh, 460px)', aspectRatio: `${W + marge * 2} / ${H + marge * 2}` }}>
+        <polygon data-plan-secours-forme={poly.length} points={poly.map(q => q.join(',')).join(' ')} fill={C.card} stroke={C.text} strokeWidth="0.07" strokeLinejoin="round" />
+        {items.map(it => {
+          const ft = FURN_TYPES[it.type] || {};
+          const odd = Math.abs(Math.round((it.rot || 0) / (Math.PI / 2))) % 2 === 1;
+          const w = odd ? it.h : it.w, h = odd ? it.w : it.h, cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+          const cherche = (hi && hi.itemId === it.id) || ciblesIds.has(it.id), choisi = sel === it.id;
+          const n = storedCount(it); const nom = String(it.name || ft.label || 'Meuble').slice(0, 16);
+          const fs = Math.max(0.14, Math.min(0.3, h * 0.42, (w * 0.9) / Math.max(1, (nom.length + (n ? 4 : 0)) * 0.56)));
+          return (
+            <g key={it.id} data-plan-secours-meuble={it.id} onClick={() => onOpen && onOpen(it.id)} style={{ cursor: 'pointer' }}>
+              <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx="0.05" fill={ft.deco ? C.card2 : colorOf(it)} fillOpacity={ft.deco ? 0.9 : 0.85}
+                stroke={cherche ? C.accent : choisi ? C.text : 'rgba(0,0,0,0.35)'} strokeWidth={cherche || choisi ? 0.09 : 0.03} />
+              {!ft.deco && w > 0.45 && <text x={cx} y={cy + fs * 0.36} textAnchor="middle" fontSize={fs} fontWeight="700" fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.5)', strokeWidth: 0.035 }}>{nom}{n ? ` (${n})` : ''}</text>}
+            </g>
+          );
+        })}
+      </svg>
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 10, color: C.muted, fontWeight: 700 }}>Vue du dessus · touche un meuble</span>
     </div>
   );
 }

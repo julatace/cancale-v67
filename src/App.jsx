@@ -20387,12 +20387,7 @@ async function generateFacturXPdf(inv, ent){
 }
 
 /* ── Garage ──────────────────────────────────────────── */
-// ── « Mon local en photo » ────────────────────────────────────────────────
-// L'utilisateur photographie son VRAI local (mur d'étagères, commode…), pose des
-// repères numérotés sur l'image, et retrouve une paire d'un coup d'œil : la
-// recherche surligne l'endroit exact sur SA photo. Rangé dans sa propre ligne
-// Supabase (vrm_local) pour ne pas gonfler la synchro principale ; miroir
-// localStorage pour l'affichage instantané. Simple, visuel, sans 3D ni scan.
+// Réduit une photo prise sur l'appareil (JPEG, côté le plus long ≤ maxDim).
 const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resolve) => {
   try {
     const img = new Image();
@@ -20410,155 +20405,10 @@ const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resol
     img.src = url;
   } catch (_) { resolve(null); }
 });
-const loadLocalPlan = async () => {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_local&select=data`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
-};
-const saveLocalPlan = async (data) => {
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify(withOwner({ id: 'vrm_local', data })),
-    });
-  } catch (_) {}
-};
-function LocalPhoto({ locate, onLocateConsumed }) {
-  const [photos, setPhotos] = useState(() => (load('vrm_local_plan', { photos: [] }).photos) || []);
-  const [active, setActive] = useState(0);
-  const [placing, setPlacing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [highlight, setHighlight] = useState(null); // { photoIdx, pinId } | { notFound:true }
-  const [selPin, setSelPin] = useState(null);        // pin sélectionné (pour retirer)
-  const [busy, setBusy] = useState(false);
-  const fileRef = React.useRef(null);
-  const imgWrapRef = React.useRef(null);
+// (17 oct.) « Mon local en photo » (`LocalPhoto`, la ligne `vrm_local`) n'est
+// plus rendu nulle part depuis que le Stock ne garde que la pièce : retiré.
+// La ligne reste en base (rien n'est effacé) ; `compressImage` sert ailleurs.
 
-  useEffect(() => { (async () => {
-    const cloud = await loadLocalPlan();
-    if (cloud && Array.isArray(cloud.photos)) { setPhotos(cloud.photos); save('vrm_local_plan', cloud); }
-  })(); }, []);
-
-  const persist = (next) => { setPhotos(next); const data = { photos: next }; save('vrm_local_plan', data); saveLocalPlan(data); };
-
-  const doSearch = (q) => {
-    const t = String(q).trim().toLowerCase(); setSelPin(null);
-    if (!t) { setHighlight(null); return; }
-    for (let pi = 0; pi < photos.length; pi++) {
-      const hit = (photos[pi].pins || []).find(p => String(p.numero).trim().toLowerCase() === t);
-      if (hit) { setActive(pi); setHighlight({ photoIdx: pi, pinId: hit.id }); return; }
-    }
-    setHighlight({ notFound: true });
-  };
-  useEffect(() => {
-    if (locate != null && String(locate).trim() !== '') { setSearch(String(locate)); doSearch(String(locate)); onLocateConsumed && onLocateConsumed(); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locate, photos.length]);
-  // Défile jusqu'au repère surligné.
-  useEffect(() => { if (highlight && highlight.pinId && imgWrapRef.current) { setTimeout(() => { try { imgWrapRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }, 80); } }, [highlight]);
-
-  const addPhoto = async (file) => {
-    if (!file) return; setBusy(true);
-    const data = await compressImage(file); setBusy(false);
-    if (!data) { toast('Impossible de lire cette image. Réessaie avec une autre photo.'); return; }
-    const p = { id: 'ph' + Date.now(), name: `Zone ${photos.length + 1}`, img: data, pins: [] };
-    const next = [...photos, p]; persist(next); setActive(next.length - 1);
-  };
-  const renamePhoto = async (idx) => { const nom = await askText({ desc: 'Nom de cette zone (ex : Étagère du fond, Commode d\'entrée) :', value: photos[idx].name || '' }); if (nom == null) return; persist(photos.map((p, i) => i === idx ? { ...p, name: nom.trim() || p.name } : p)); };
-  const removePhoto = async (idx)=>{ if (!await askConfirm('Supprimer cette photo et tous ses repères ?')) return; const next = photos.filter((_, i) => i !== idx); persist(next); setActive(a => Math.max(0, Math.min(a, next.length - 1))); setHighlight(null); setSelPin(null); };
-
-  const onImgClick = async (e) => {
-    if (!placing) return;
-    const r = imgWrapRef.current?.getBoundingClientRect(); if (!r) return;
-    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire rangée à cet endroit :', value: '' }) || '').trim();
-    if (!numero) return;
-    const pin = { id: 'pn' + Date.now(), numero, x, y };
-    persist(photos.map((p, i) => i === active ? { ...p, pins: [...(p.pins || []), pin] } : p));
-    setPlacing(false); setHighlight({ photoIdx: active, pinId: pin.id });
-  };
-  const removePin = (pinId) => { persist(photos.map((p, i) => i === active ? { ...p, pins: (p.pins || []).filter(pp => pp.id !== pinId) } : p)); setSelPin(null); setHighlight(null); };
-
-  const cur = photos[active];
-  const pinColor = (isHi) => isHi ? '#e5484d' : (C.accent || '#0aa');
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <style>{`@keyframes vrmpulse{0%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.35);}100%{transform:translate(-50%,-50%) scale(1);}}`}</style>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; addPhoto(f); }} style={{ display: 'none' }} />
-
-      {photos.length === 0 ? (
-        <div style={{ border: `1.5px dashed ${C.accent}66`, background: `${C.accent}08`, borderRadius: 16, padding: '22px 18px', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
-          <div style={{ fontSize: 15, fontWeight: 900, color: C.text, marginBottom: 6 }}>Prends ton local en photo</div>
-          <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, maxWidth: 340, margin: '0 auto 14px' }}>
-            1. Photographie ton mur d'étagères, ta commode…<br />
-            2. Pose des <b>numéros</b> aux endroits où sont rangées tes paires.<br />
-            3. Cherche un N° → l'app te montre <b>l'endroit exact sur ta photo</b>.
-          </div>
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 800, padding: '12px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>{busy ? 'Chargement…' : '📷 Ajouter une photo'}</button>
-        </div>
-      ) : (<>
-        {/* Recherche */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → l'app te montre où"
-            inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHighlight(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px', fontFamily: 'inherit' }}><Icon name="close" size={15}/></button>}
-        </div>
-        {highlight && highlight.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucun repère « {search} » sur tes photos. Pose-le avec « 📍 Placer un numéro ».</div>}
-        {highlight && highlight.pinId && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===highlight.pinId); return p ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{p.numero} → <b>{cur.name}</b> (surligné sur la photo)</div> : null; })()}
-
-        {/* Sélecteur de photos (zones) */}
-        {photos.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-            {photos.map((p, i) => (
-              <button type="button" key={p.id} onClick={() => { setActive(i); setHighlight(null); setSelPin(null); }} style={{ flexShrink: 0, border: `1px solid ${i === active ? C.accent : C.border}`, background: i === active ? C.accent : C.card, color: i === active ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{p.name} · {(p.pins || []).length}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Barre d'actions */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" onClick={() => setPlacing(v => !v)} style={{ border: 'none', borderRadius: 10, background: placing ? C.warn : C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>{placing ? '✋ Touche la photo…' : '📍 Placer un numéro'}</button>
-          <button type="button" onClick={() => renamePhoto(active)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>✎ Renommer</button>
-          <button type="button" onClick={() => fileRef.current?.click()} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>➕ Photo</button>
-          <button className="vrm-icon-control" type="button" aria-label="Supprimer cette photo" onClick={() => removePhoto(active)} title="Supprimer cette photo" style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 12.5, fontWeight: 700, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit' }}><Icon name="trash" size={16}/></button>
-        </div>
-        {placing && <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 700 }}>Touche l'endroit de la photo où est rangée la paire, puis tape son N°.</div>}
-
-        {/* La photo + repères */}
-        {cur && (
-          <div ref={imgWrapRef} onClick={onImgClick} style={{ position: 'relative', width: '100%', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: placing ? 'crosshair' : 'default', lineHeight: 0, background: C.surface }}>
-            <img src={cur.img} alt={cur.name} style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
-            {(cur.pins || []).map(p => {
-              const isHi = highlight && highlight.pinId === p.id;
-              const isSel = selPin === p.id;
-              return (
-                <div key={p.id}
-                  onClick={ev => { if (placing) return; ev.stopPropagation(); setSelPin(s => s === p.id ? null : p.id); setHighlight({ photoIdx: active, pinId: p.id }); }}
-                  style={{ position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%,-50%)', minWidth: 26, height: 26, borderRadius: 999, background: pinColor(isHi), color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 7px', border: `2px solid #fff`, boxShadow: '0 1px 6px rgba(0,0,0,0.4)', cursor: placing ? 'crosshair' : 'pointer', zIndex: isHi || isSel ? 5 : 2, animation: isHi ? 'vrmpulse 1s ease-in-out 2' : 'none', pointerEvents: placing ? 'none' : 'auto' }}>
-                  {p.numero}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {/* Pin sélectionné → retirer */}
-        {selPin && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===selPin); return p ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 13px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: C.text, flex: 1 }}>📍 Repère N°{p.numero}</span>
-            <button type="button" onClick={() => removePin(p.id)} style={{ border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Retirer</button>
-          </div>
-        ) : null; })()}
-        <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Touche un repère pour le retirer. Ajoute plusieurs photos (une par meuble/mur) via « ➕ Photo ». Tes photos sont sauvegardées et te suivent sur tes appareils.</div>
-      </>)}
-    </div>
-  );
-}
 // ── « Plan du local » : pièce virtuelle vue de dessus ──────────────────────
 // Personnalise ta pièce (murs), pose des meubles (commode, étagère, table,
 // boîtes, penderie), déplace-les, puis ouvre chaque meuble EN VUE DE FACE pour
@@ -20596,6 +20446,7 @@ const saveRoomPlan = async (data) => {
 const FURN_TYPES = {
   metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#9aa3ad', h3d: 1.25, build: 'metal', cases: 'pile' },
   bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
+  bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#9aa3ad', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
   pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
@@ -21855,7 +21706,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
+        <div data-meuble-choisi={selItem.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
           <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
           {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
               Le garage savait ranger, pas MONTRER. On voit maintenant chaque
@@ -22467,7 +22318,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         ))}
       </nav>
 
-      {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
 
