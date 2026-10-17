@@ -218,12 +218,16 @@ function besoinBordereauTexte(status) {
   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false;
   return true;
 }
+// `needs_action` + un statut qui dit que le colis a déjà bougé (déposé,
+// expédié, livré…) : c'est l'action « marquer le retour reçu » d'un LITIGE, pas
+// un envoi (17 oct., la vente nB546). MÊME RÈGLE que l'app (`COLIS_DEJA_BOUGE`).
+const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
 export function aExpedier(o) {
   if (!o) return false;
   const s = String(o.status || '');
   if (PAS_UN_ENVOI.test(s)) return false;
   const t = String(o.transaction_user_status || '').toLowerCase();
-  if (t === 'needs_action') return true;
+  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
   return besoinBordereauTexte(s);
 }

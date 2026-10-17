@@ -3823,7 +3823,37 @@ const fetchCapturedLabelMetas = async (uid) => {
 // requête la plus coûteuse de la base (`pg_stat_statements`). Même adresse ⇒
 // `lecturesPartagees` n'en fait partir qu'un. Chaque fonction garde SA règle
 // (« pas su » : `{}` pour l'un, `null` pour l'autre), rien d'autre ne change.
-const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at';
+const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title';
+// ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
+// Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
+// LITIGE et elle réapparaît dans les colis à faire ». Mesuré (lecture seule) :
+// la LISTE des ventes (`orders_sold`) disait « colis déposé en bureau de Poste
+// ou point relais » + `needs_action` — c'est le statut du COLIS DE RETOUR, et
+// l'action attendue est « marquer comme reçu », pas « expédier ». Le DÉTAIL de
+// la transaction, lui, disait « Retour initié » (status 440, une réclamation
+// ouverte). Même famille pour une vente ANNULÉE après la création du bordereau
+// (status 520 « Annulée », expédition « Bordereau envoyé au vendeur ») : la
+// liste peut rester en retard, la transaction le sait.
+// Codes MESURÉS sur 1 280 transactions : 1 conversation · 220 paiement échoué ·
+// 230 payée · 430 suspendue (vérification) · 440 retour initié · 450 finalisée ·
+// 500/510/520 annulée. ⇒ 220 ou ≥ 430 : AUCUN colis à poster, quoi que dise la
+// liste (ce sont des états terminaux ou bloquants, jamais un retour à
+// « à expédier »). Un code inconnu entre 231 et 429 ne décide rien : la liste
+// tranche. Rempli par toute lecture de la famille (partagée, §vitesse) ;
+// vide = « pas su » = rien n'est caché de plus qu'avant.
+const TXN_ETATS = new Map();
+const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
+const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
+const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
+const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
+// Une expédition qui a déjà bougé (le colis est parti, ou revient).
+const SS_PARTI = /exp[ée]di|achemin|livr|d[ée]pos|r[ée]clam|retour|remis|relais|transit/i;
+// Annulée AVANT tout envoi : la transaction est annulée (≥ 500) et son
+// expédition n'avait pas bougé (« Bordereau envoyé au vendeur », ou rien).
+// Mesuré : 9 des 12 « Annulée » (520) sont dans ce cas — un bordereau existait,
+// la paire n'est jamais partie. Un bordereau reçu n'est donc PAS une preuve
+// d'envoi pour ces ventes-là.
+const txnAnnuleeAvantEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && e.s >= 500 && !SS_PARTI.test(e.ss)); };
 const fetchTxnItemIds = async () => {
   try {
     // `meta` : la base y range les petits champs à chaque écriture — lire la
@@ -3831,6 +3861,7 @@ const fetchTxnItemIds = async () => {
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
     const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return {};
+    noterEtatsTxn(rows);
     const map = {};
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
@@ -3850,6 +3881,7 @@ const fetchVersementsVinted = async () => {
   try {
     const rows = await lireTout(TXN_META_SELECT);
     if (rows === null) return null;
+    noterEtatsTxn(rows);
     const map = {};
     for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
     return map;
@@ -4697,12 +4729,24 @@ const tusDe = (o) => String((o && o.transaction_user_status) || '').toLowerCase(
 // surveiller — pas une vente qui n'a pas eu lieu. Même partition que les
 // étiquettes « Retournée » / « Retour en cours » (`venteStage`).
 const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(String((o && o.status) || ''));
+// ⚠️ `needs_action` VEUT DIRE « UNE ACTION », PAS « EXPÉDIE » (17 oct.).
+// Mesuré : la vente en litige nB546 portait `needs_action` avec le statut
+// « colis déposé en bureau de Poste ou point relais » — le colis de RETOUR,
+// l'action attendue étant « marquer comme reçu ». Un statut qui dit que le colis
+// a déjà bougé (déposé, expédié, en transit, livré, non réclamé) n'est jamais un
+// colis à poster, quel que soit le champ machine. Les 14 autres `needs_action`
+// de sa base (« Bordereau envoyé au vendeur », « Le paiement a été validé ») ne
+// sont pas touchés. MÊME RÈGLE dans le widget et l'extension (§11).
+const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
 const aExpedier = (o) => {
   if (!o) return false;
   const s = String(o.status || '');
   if (PAS_UN_ENVOI.test(s)) return false;
+  // Le détail de la transaction, plus frais que la liste (litige, retour,
+  // suspension, annulation, finalisée) : jamais un colis à poster.
+  if (o.transaction_id != null && txnBloqueEnvoi(o.transaction_id)) return false;
   const t = tusDe(o);
-  if (t === 'needs_action') return true;
+  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
   return needsBordereau(s);
 };
@@ -4719,6 +4763,15 @@ function etapeVente(o, { poste = () => false, expediee = null } = {}) {
   if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
   // `expediee` inconnu (la recherche n'a ni les bordereaux ni les emails) : le
   // texte de Vinted tranche — « Remboursement » ou non. Jamais deviné au-delà.
+  // La transaction le dit annulée alors que la liste ne l'a pas encore vu
+  // (« Bordereau envoyé au vendeur ») : c'est une vente annulée (17 oct.).
+  const annuleeTxn = o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id);
+  if (annuleeTxn) return { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie. Son bordereau ne sert plus." };
+  // Litige : la liste montre le statut du colis de RETOUR (« déposé en point
+  // relais ») — la transaction dit ce qui se passe vraiment (17 oct.).
+  const et = o.transaction_id != null ? etatTxn(o.transaction_id) : null;
+  if (et && et.s === 440) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour (litige) : rien à expédier. La paire doit te revenir — marque-la reçue sur Vinted quand elle arrive." };
+  if (et && et.s === 430) return { label: 'Suspendue', color: C.warn, step: 0, aide: "Vinted vérifie cette transaction (litige ou contrôle) : rien à expédier tant que ce n'est pas réglé." };
   if (classifyOrderStatus(o.status) === 'cancelled') return (expediee ? expediee(o) : /rembours/i.test(s))
     ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
     : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
@@ -27341,6 +27394,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // n° de transaction, jamais par titre (§24).
   const venteExpediee = (o) => {
     const tx = String(o && o.transaction_id || ''); if (!tx) return false;
+    // Annulée avant tout envoi (la transaction le dit) : un bordereau reçu
+    // n'est pas une preuve d'envoi — la paire n'est jamais partie (17 oct.).
+    if (txnAnnuleeAvantEnvoi(tx)) return false;
     if (/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test(o.status || '')) return true;
     if (labelsCaptes[tx]) return true;
     return (emailBords || []).some(b => String(b.transaction || '') === tx);
