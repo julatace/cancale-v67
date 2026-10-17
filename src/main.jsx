@@ -147,7 +147,13 @@ if ('serviceWorker' in navigator) {
               try {
                 const s = JSON.parse(localStorage.getItem('vrm_session') || 'null');
                 if (!s || !s.access_token) return '';
-                if (!s.expires_at || Number(s.expires_at) > Date.now() + 30000) return s.access_token;
+                // Double vérification (16 octobre) : tant que le code n'est pas
+                // passé (ou qu'on ne sait pas encore s'il en faut un), aucun
+                // abonnement — sinon le mot de passe seul abonnerait ce
+                // téléphone aux ventes du compte. On attend, comme un jeton expiré.
+                const aal = (() => { try { const p = s.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); return JSON.parse(atob(p + '='.repeat((4 - p.length % 4) % 4))).aal; } catch (_) { return null; } })();
+                const mfaOk = aal === 'aal2' || (Array.isArray(s.totp) && !s.totp.length);
+                if (mfaOk && (!s.expires_at || Number(s.expires_at) > Date.now() + 30000)) return s.access_token;
               } catch (_) { return ''; }
               await new Promise((r) => setTimeout(r, 5000));
             }

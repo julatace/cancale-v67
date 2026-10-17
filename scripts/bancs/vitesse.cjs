@@ -43,7 +43,7 @@ srv.listen(PORT);
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 
-async function ouvrir(b, vp, tab, attendre, frappe) {
+async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -52,6 +52,13 @@ async function ouvrir(b, vp, tab, attendre, frappe) {
   if (vp.width < 600 && CPU > 1) { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
   const req = [];
   const t0 = Date.now();
+  // L'histoire du héros de Ma journée : à quel moment il apparaît, avec quelle
+  // valeur (un héros qui apparaît tôt avec un FAUX chiffre ne compte pas).
+  await pg.addInitScript((t0) => {
+    window.__heros = [];
+    const note = () => { const e = document.querySelector('[data-vendu-mois]'); const v = e ? e.getAttribute('data-vendu-mois') : null; const l = window.__heros[window.__heros.length - 1]; if (!l || l.v !== v) window.__heros.push({ t: Date.now() - t0, v }); };
+    document.addEventListener('DOMContentLoaded', () => new MutationObserver(note).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-vendu-mois'] }));
+  }, t0);
   await pg.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     const url = rq.url();
@@ -62,6 +69,14 @@ async function ouvrir(b, vp, tab, attendre, frappe) {
       return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     }
     const h = await rq.allHeaders();
+    // `couperFamille` : la lecture de TOUTES les commandes en une fois (le
+    // préchargement du démarrage) échoue — l'app doit retomber sur la lecture
+    // par compte et rendre EXACTEMENT le même écran.
+    if (opts.couperFamille && /id=like\.harvest_\*_orders_\*&select=id,data/.test(decodeURIComponent(url))) {
+      req.push({ m: 'GET', url, range: h.range || '', debut, fin: debut + RTT, octets: 0, pdf: 0, coupe: true });
+      await new Promise((r) => setTimeout(r, RTT));
+      return route.fulfill({ status: 503, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>503</html>' });
+    }
     const rep = repondre(url, h.range, base);
     const body = JSON.stringify(rep.body);
     const pdf = (body.match(/JVBERi0x*/g) || []).reduce((a, s) => a + s.length, 0);
@@ -104,8 +119,10 @@ async function ouvrir(b, vp, tab, attendre, frappe) {
       return { t, max: Math.max(...t), moy: Math.round(t.reduce((a, x) => a + x, 0) / t.length), apres };
     }, frappe);
   }
+  const heros = await pg.evaluate(() => window.__heros || []).catch(() => []);
+  if (DETAIL) console.log('    héros :', JSON.stringify(heros));
   await ctx.close();
-  return { req, utile, errs, lu, frappes };
+  return { req, utile, errs, lu, frappes, heros };
 }
 
 function bilan(nom, r) {
@@ -124,6 +141,11 @@ function bilan(nom, r) {
   const profondeur = tri.length ? Math.max(...prof) : 0;
   const fin = gets.length ? Math.max(...gets.map((x) => x.fin)) : 0;
   const dec = (x) => decodeURIComponent(x.url);
+  // La chaîne jusqu'aux VENTES (ce que le héros de Ma journée attend) : à quelle
+  // profondeur part la lecture des commandes (par compte, ou toutes à la fois)
+  // qui a servi. Avant le 16 octobre : sonde → comptes → commandes = 3.
+  const estVentes = (x) => !x.coupe && /id=like\.harvest_[^&]*_orders_[%*]&select=id,data/.test(dec(x));
+  const profVentes = tri.reduce((m, x, i) => (estVentes(x) && (r.utile == null || x.debut < r.utile) ? Math.max(m, prof[i]) : m), 0);
   // Balayages complets de la famille des transactions (la requête la plus
   // coûteuse de la base, `pg_stat_statements`) : on compte la PREMIÈRE page.
   const txn = gets.filter((x) => /id=like\.harvest_[%*]_txn_[%*]/.test(dec(x)) && (!x.range || /^0-/.test(x.range))).length;
@@ -133,7 +155,8 @@ function bilan(nom, r) {
     for (const x of tri) console.log(`      ${String(x.debut).padStart(6)}→${String(x.fin).padStart(6)} ${String(Math.round(x.octets / 1024)).padStart(5)} Ko ${decodeURIComponent(x.url.replace(/^https?:\/\/[^/]+\/rest\/v1\//, '')).slice(0, 170)} ${x.range}`);
     for (const [k, n] of doublons) console.log(`      ×${n} ${decodeURIComponent(k).slice(0, 170)}`);
   }
-  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte };
+  if (profVentes) console.log(`     ventes lues au ${profVentes}ᵉ aller-retour à la suite · héros ${JSON.stringify(r.heros || [])}`);
+  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes };
 }
 
 // ⚠️ PLAFONDS MESURÉS le 16 octobre (base inventée, 7 comptes). Avant les
@@ -183,6 +206,28 @@ const ECRANS = [
         // (une projection, partagée) et la preuve de vente (une autre). Avant : 2 à 7.
         dit(m.txn <= 2, `${vp.width} px · ${tab} : la famille des transactions balayée deux fois au plus`, `${m.txn}`);
         dit(m.supprParCompte === 0, `${vp.width} px · ${tab} : les suppressions lues en une lecture, pas une par compte`, `${m.supprParCompte}`);
+        if (tab === 'journee') {
+          // ── LE PREMIER ÉCRAN : la chaîne sonde → comptes → ventes (16 octobre) ──
+          // Les ventes partent EN MÊME TEMPS que les comptes (le préchargement du
+          // démarrage), plus après eux : au plus deux allers-retours à la suite
+          // (la sonde de schéma, puis comptes + ventes). Avant : 3, et au
+          // téléphone le rendu d'AppCoeur s'intercalait (~600 ms de processeur).
+          dit(m.profVentes > 0 && m.profVentes <= 2, `${vp.width} px · journee : les ventes partent au plus au 2ᵉ aller-retour (sonde, puis comptes ET ventes)`, `${m.profVentes}ᵉ`);
+          const h = r.heros.filter((x) => x.v != null);
+          const finale = (r.lu.texte.match(/Vendu en [^\n]*\n+([^\n]+)/) || [])[1] || '';
+          dit(h.length >= 1 && h.every((x) => x.v === h[0].v), `${vp.width} px · journee : le héros apparaît UNE fois, avec sa valeur finale (jamais un chiffre provisoire)`, JSON.stringify(r.heros));
+          // Le même écran quand la lecture de toutes les commandes échoue : l'app
+          // retombe sur la lecture par compte (le chemin d'avant) et doit rendre
+          // EXACTEMENT le même texte — la preuve que la part servie à chaque
+          // compte est celle qu'il aurait lue lui-même.
+          const r2 = await ouvrir(b, vp, tab, att, null, { couperFamille: true });
+          const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+          const a = norm(r.lu.texte), c = norm(r2.lu.texte);
+          let i = 0; while (i < a.length && a[i] === c[i]) i++;
+          dit(!r2.errs.length && !r2.lu.tombe && a === c, `${vp.width} px · journee : texte rendu IDENTIQUE, préchargement ou lecture par compte`, a === c ? `${a.length} caractères` : `écart au caractère ${i} : « ${a.slice(Math.max(0, i - 40), i + 60)} » ≠ « ${c.slice(Math.max(0, i - 40), i + 60)} »`);
+          const h2 = r2.heros.filter((x) => x.v != null);
+          dit(h.length && h2.length && h[h.length - 1].v === h2[h2.length - 1].v, `${vp.width} px · journee : même « vendu ce mois » par les deux chemins`, `${h.length ? h[h.length - 1].v : '—'} / ${h2.length ? h2[h2.length - 1].v : '—'}${finale ? ' · ' + finale.slice(0, 30) : ''}`);
+        }
       }
     }
     if (process.env.VITESSE_JSON) fs.writeFileSync(process.env.VITESSE_JSON, JSON.stringify(res, null, 1));

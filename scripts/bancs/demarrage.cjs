@@ -14,13 +14,23 @@
 //  Ce banc sert la VRAIE forme d'une base cloisonnée : avec le jeton du vendeur
 //  on lit ses lignes, avec la clé publique on reçoit `[]` (200, pas d'erreur).
 //  Aucune fixture : tout est synthétique.
+//
+//  ⚠️ (17 octobre) Le bandeau bleu « N nouvelles ventes » a été RETIRÉ de l'app
+//  à la demande de Julien (16 oct., #537 : « la barre de Ma journée dit déjà
+//  colis, messages et prix »). L'annonce d'une nouvelle vente passe désormais
+//  par la NOTIFICATION du navigateur (`pushNotif`, si « Alertes dans l'app » est
+//  allumé). Le banc lisait le texte du bandeau : il était rouge sur un code
+//  intact (§6.3). Il juge maintenant la MÊME règle sur ce qui annonce vraiment :
+//  les notifications émises (un faux `Notification`, permission accordée) ET
+//  tout texte rendu — une seule « N nouvelles ventes », où qu'elle apparaisse,
+//  compte comme une annonce.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4502;
+const PORT = Number(process.env.BANC_PORT) || 4502;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 
 const JETON = 'jeton-de-banc';
@@ -47,6 +57,16 @@ const ecouter = () => new Promise((res, rej) => {
 async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } = {}) {
   const pg = await ctx.newPage();
   const lus = { anonymes: 0 };
+  // La notification du navigateur : permission accordée, chaque annonce notée
+  // dans le stockage de la page (lue avant la fermeture).
+  await pg.addInitScript(() => {
+    try { localStorage.setItem('vinted_notif_enabled', 'true'); } catch (_) {}
+    window.__notifs = [];
+    function FausseNotif(titre, o) { window.__notifs.push({ titre: String(titre), corps: String((o && o.body) || '') }); }
+    FausseNotif.permission = 'granted';
+    FausseNotif.requestPermission = () => Promise.resolve('granted');
+    try { Object.defineProperty(window, 'Notification', { value: FausseNotif, configurable: true, writable: true }); } catch (_) { window.Notification = FausseNotif; }
+  });
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
@@ -73,11 +93,14 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
   await pg.waitForTimeout(sondeKO ? 9000 : 6000);
   const txt = await pg.evaluate(() => document.body.innerText);
   const etape = await pg.evaluate(() => { const e = document.querySelector('[data-etape]'); return e ? e.getAttribute('data-etape') : null; });
-  const nouv = (/(\d+) nouvelles? ventes?/.exec(txt) || [])[1];
+  const notifs = await pg.evaluate(() => window.__notifs || []).catch(() => []);
+  const compte = (t) => { const m = /(\d+) nouvelles? ventes?/.exec(t || ''); return m ? Number(m[1]) : 0; };
+  // Une annonce, où qu'elle soit : le texte rendu OU une notification émise.
+  const nouv = Math.max(compte(txt), notifs.reduce((n, x) => n + compte(x.titre + ' ' + x.corps), 0));
   const seen = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vinted_notif_seen_ventes')||'null')||[]).length; } catch(_) { return -1; } }).catch(()=>-2);
   if (process.env.DEBUG) console.log('   [debug]', JSON.stringify(lus.urls||[]), 'seen', seen, (txt.match(/.*nouvelle.*/g)||[]).slice(0,3));
   await pg.close();
-  return { txt, etape, nouv: nouv ? Number(nouv) : 0, erreurs, anonymes: lus.anonymes };
+  return { txt, etape, nouv, notifs, erreurs, anonymes: lus.anonymes };
 }
 
 (async () => {
@@ -109,6 +132,9 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
       dit(c.nouv === 0, 'ouverture suivante, les mêmes 300 ventes : AUCUNE « nouvelle vente »', c.nouv + ' annoncée(s)');
       const d = await ouvrir(ctx, { nVentes: 301 });
       dit(d.nouv === 1, 'l\'autre sens : une vraie nouvelle vente est bien annoncée (1)', d.nouv + ' annoncée(s)');
+      dit(d.notifs.filter((x) => /nouvelles? ventes?/.test(x.titre + ' ' + x.corps)).length === 1, '…et annoncée UNE fois (une seule notification)', JSON.stringify(d.notifs).slice(0, 160));
+      const e = await ouvrir(ctx, { nVentes: 301 });
+      dit(e.nouv === 0, 'ouverture suivante, la même vente : plus annoncée (le « déjà vu » a été posé)', e.nouv + ' annoncée(s)');
       await ctx.close();
     }
     // ── 3. Une sonde lente au démarrage d'un appareil déjà connu ────────────

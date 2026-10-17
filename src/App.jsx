@@ -554,6 +554,11 @@ const writeSession = (s) => {
 const SCHEMA_MEMO = 'schema_cloisonne';
 let CLOISONNE = (() => { try { return localStorage.getItem(SCHEMA_MEMO) === '1'; } catch (_) { return false; } })();
 let SB_CONFLICT = CLOISONNE ? 'owner,id' : 'id';
+// La sonde a-t-elle RÉPONDU pendant cette ouverture ? (vrai seulement sur une
+// réponse mesurée, 2xx ou 400 ; jamais sur un « pas su »). Sert au préchargement
+// du démarrage : une lecture sans session n'y part que sur une base MESURÉE non
+// cloisonnée, jamais sur un repli.
+let SCHEMA_MESURE = false;
 const sondeSchema = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
@@ -572,6 +577,7 @@ const detectSchema = async () => {
   }
   if (v !== null) {
     CLOISONNE = v;
+    SCHEMA_MESURE = true;
     try { if (v) localStorage.setItem(SCHEMA_MEMO, '1'); else localStorage.removeItem(SCHEMA_MEMO); } catch (_) {}
   }
   // Pas su et rien de mémorisé : on garde la valeur courante (le repli
@@ -606,6 +612,10 @@ const withOwner = (row) => {
   const base = Object.assign({ updated_at: new Date().toISOString() }, row);
   return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
 };
+
+// Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
+// la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 const authCall = async (path, body) => {
   try {
@@ -651,7 +661,99 @@ const sessionFrom = (j) => ({
   refresh_token: j.refresh_token,
   expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
   user: j.user ? { id: j.user.id, email: j.user.email } : (AUTH.user || null),
+  // Double vérification (16 octobre) : les facteurs TOTP VÉRIFIÉS de ce compte,
+  // lus dans la réponse de GoTrue (son `user` les porte — `factors`, absent
+  // quand il n'y en a aucun). Sans `user` dans la réponse, on garde ce qu'on
+  // savait. `undefined` = jamais lu (session d'avant cette fonction) : la porte
+  // le relit avant de laisser entrer (`etatMfa`).
+  totp: j.user ? totpVerifies(j.user) : (AUTH.session ? AUTH.session.totp : undefined),
 });
+// ══════════════════════════════════════════════════════════════════════════
+// DOUBLE VÉRIFICATION DE CONNEXION (TOTP) — retenue par Julien le 11 octobre
+// ══════════════════════════════════════════════════════════════════════════
+// FACULTATIVE : rien ne change pour qui ne l'active pas. L'API MFA native de
+// GoTrue (Supabase Auth), appelée à la main comme le reste de l'auth :
+//   POST /factors (totp) → QR + clé · POST /factors/{id}/challenge ·
+//   POST /factors/{id}/verify (rend une session `aal2`) · DELETE /factors/{id}
+//   (exige `aal2`) · GET /user (porte `factors`).
+// Le niveau se lit dans le jeton (`aal`). Un compte qui a un facteur VÉRIFIÉ et
+// une session `aal1` passe par l'écran du code AVANT que le cœur de l'app ne
+// monte : aucune donnée n'est lue, l'extension ne reçoit aucune session, le
+// téléphone ne s'abonne à aucune notification.
+// ⚠️ TROIS ÉTATS, et « pas su » n'enferme personne dehors : GoTrue injoignable
+//    ⇒ on le dit, on propose de réessayer, on ne déconnecte jamais.
+const totpVerifies = (u) => (Array.isArray(u && u.factors) ? u.factors : [])
+  .filter((f) => f && f.factor_type === 'totp' && f.status === 'verified' && f.id)
+  .map((f) => String(f.id));
+const aalDuJeton = (tok) => {
+  try {
+    const p = String(tok || '').split('.')[1];
+    if (!p) return null;
+    const b = p.replace(/-/g, '+').replace(/_/g, '/');
+    const j = JSON.parse(atob(b + '='.repeat((4 - (b.length % 4)) % 4)));
+    return typeof j.aal === 'string' ? j.aal : null;
+  } catch (_) { return null; }
+};
+// 'ok' (entrer) · 'code' (demander le code) · 'verifier' (on ne sait pas encore
+// s'il en faut un : session rangée avant cette fonction, ou lien email).
+const etatMfa = (s) => {
+  if (!s || !s.access_token) return 'ok';
+  if (aalDuJeton(s.access_token) === 'aal2') return 'ok';
+  if (Array.isArray(s.totp)) return s.totp.length ? 'code' : 'ok';
+  return 'verifier';
+};
+const mfaPasse = () => etatMfa(AUTH.session) === 'ok';
+// Un appel à GoTrue avec le jeton de la session. Rend { ok, status, json } ;
+// `status: 0` = injoignable (réseau, délai) — le « pas su ».
+const mfaAppel = async (methode, chemin, corps) => {
+  const tok = AUTH.session && AUTH.session.access_token;
+  if (!tok) return { ok: false, status: 401, json: {} };
+  try {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), 12000) : null;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/${chemin}`, {
+      method: methode,
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, ...(corps ? { 'Content-Type': 'application/json' } : {}) },
+      ...(corps ? { body: JSON.stringify(corps) } : {}),
+      ...(ctl ? { signal: ctl.signal } : {}),
+    });
+    if (t) clearTimeout(t);
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, json: json || {} };
+  } catch (_) { return { ok: false, status: 0, json: {} }; }
+};
+// GoTrue répond par un 5xx (ou pas du tout) : on ne sait pas. Un 4xx, lui, est
+// une réponse (code faux, défi expiré…).
+const mfaInjoignable = (r) => !r || r.status === 0 || r.status >= 500;
+// Les facteurs du compte, relus chez GoTrue. `null` = pas su.
+const mfaLireFacteurs = async () => {
+  const r = await mfaAppel('GET', 'user');
+  if (!r.ok) return null;
+  const tous = Array.isArray(r.json.factors) ? r.json.factors : [];
+  return { verifies: tous.filter((f) => f && f.factor_type === 'totp' && f.status === 'verified'), enAttente: tous.filter((f) => f && f.factor_type === 'totp' && f.status !== 'verified'), user: r.json };
+};
+// Défi + vérification d'un code. Rend { ok } · { ok:false, faux:true } (code
+// refusé) · { ok:false, passu:true } (injoignable). Réussi : la session passe en
+// `aal2` (GoTrue rend de nouveaux jetons) et elle est rangée.
+const mfaVerifierCode = async (factorId, code) => {
+  const c = String(code || '').replace(/\D/g, '');
+  if (c.length !== 6) return { ok: false, faux: true, message: 'Le code fait 6 chiffres.' };
+  const d = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/challenge`, {});
+  if (!d.ok || !d.json.id) return mfaInjoignable(d) ? { ok: false, passu: true } : { ok: false, faux: false, message: d.json.msg || d.json.message || `Erreur ${d.status}` };
+  const v = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/verify`, { challenge_id: d.json.id, code: c });
+  if (!v.ok) {
+    if (mfaInjoignable(v)) return { ok: false, passu: true };
+    return { ok: false, faux: true, message: 'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.' };
+  }
+  if (!v.json.access_token) return { ok: false, passu: true };
+  // Le facteur qu'on vient de vérifier EST vérifié, même si la fiche rendue
+  // par GoTrue l'a lue juste avant (première activation).
+  const s2 = sessionFrom(v.json);
+  s2.totp = Array.from(new Set([...(Array.isArray(s2.totp) ? s2.totp : []), String(factorId)]));
+  writeSession(s2);
+  return { ok: true };
+};
+
 const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.session.expires_at > Date.now() + 60000);
 
 const authSignIn  = async (email, password) => {
@@ -860,7 +962,7 @@ const consumeAuthRedirect = async () => {
     cleanAuthUrl();
     AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
-    writeSession({ ...sess, user: me });
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
     return { ok: true, recovery: type === 'recovery' };
   }
@@ -873,7 +975,9 @@ const fetchMe = async (token) => {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
     if (!res.ok) return null;
     const j = await res.json();
-    return { id: j.id, email: j.email };
+    // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
+    // dans la session par l'appelant — jamais dans `user`.
+    return { id: j.id, email: j.email, _totp: totpVerifies(j) };
   } catch (_) { return null; }
 };
 
@@ -986,17 +1090,78 @@ const authBoot = async () => {
   // trois essais servent justement les jours où la base traîne.
   if (CLOISONNE) detectSchema();
   else await Promise.race([detectSchema(), new Promise(r => setTimeout(r, 6000))]);
-  if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
   if (AUTH_REDIRECT && AUTH_REDIRECT.ok && !AUTH_REDIRECT.recovery) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   const s = readSession();
-  if (!s) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  if (!s) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   AUTH = { ...AUTH, session: s, user: s.user || null };
   if (!authValid()) { const ok = await authRefresh(); if (!ok) { writeSession(null); return; } }
   AUTH = { ...AUTH, ready: true };
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
+  prechargerDemarrage();
   _emitAuth();
+};
+// ── LE PREMIER ÉCRAN N'ATTEND PLUS SON PROPRE RENDU (16 octobre) ─────────────
+// Mesuré au banc `vitesse.cjs` (téléphone, processeur ×4) : Ma journée enchaînait
+// sonde de schéma → (rendu d'AppCoeur, ~600 ms de processeur) → comptes →
+// (rendu, ~350 ms) → ventes. Les comptes et les ventes ne dépendent d'aucun rendu :
+// ils partent ici, dès que la porte sait qu'AppCoeur va monter, et AppCoeur /
+// `loadOrders` reprennent les MÊMES lectures (mêmes fonctions, même `cachedRow`).
+// ⚠️ Les gardes ne bougent pas — on part aux mêmes conditions qu'AppCoeur :
+//   · avec une session : le jeton du vendeur (`sbAuth`), quelle que soit la base ;
+//   · sans session : seulement si la porte laisse passer (accès direct) ET que la
+//     sonde a MESURÉ une base non cloisonnée pendant cette ouverture — jamais sur
+//     un repli, jamais une lecture anonyme sur une base cloisonnée ;
+//   · rien pendant une récupération de mot de passe (la porte montre la connexion).
+// Un échec rend `null` comme avant (`fetchVintedAccounts`) : AppCoeur dit la panne,
+// jamais « aucun compte ». Le préchargement n'est repris qu'une fois, par le même
+// vendeur, dans les 30 s ; sinon AppCoeur relit.
+let _prechargeComptes = null;   // { at, qui, promesse }
+const prechargerDemarrage = () => {
+  try {
+    if (typeof window === 'undefined' || _prechargeComptes) return;
+    if (MULTI_USER) {
+      if (RECOVERY_PENDING) return;
+      const session = !!(AUTH.session && AUTH.session.access_token && AUTH.user);
+      // Double vérification pas encore passée : la porte du code est fermée,
+      // aucune donnée du vendeur ne se lit avant (AppCoeur relira après le code).
+      if (session && !mfaPasse()) return;
+      if (!session) {
+        const direct = (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+        if (!(direct && SCHEMA_MESURE && !CLOISONNE)) return;
+      }
+    }
+    const qui = (AUTH.user && AUTH.user.id) || 'local';
+    const promesse = fetchVintedAccounts();
+    // Les commandes de TOUS les comptes en une lecture, EN MÊME TEMPS que la liste
+    // des comptes (on ne connaît pas encore leurs identifiants). ⚠️ Au premier
+    // rendu, le processeur est pris par AppCoeur : une lecture lancée « dès que
+    // la liste arrive » ne partait qu'après lui (mesuré : +500 ms au téléphone).
+    // `strict` : une page ratée vaut « pas su » (null), jamais une demi-liste.
+    const famille = lireTout('id=like.harvest_*_orders_*&select=id,data,updated_at,cap:data->>capturedAt', { strict: true }).catch(() => null);
+    _prechargeComptes = { at: Date.now(), qui, promesse };
+    // Dès que la liste arrive, chaque compte LIÉ reçoit SA part — exactement les
+    // lignes que `fetchHarvestOrdersBrut(uid)` aurait rendues (même préfixe) —
+    // dans `cachedRow('o:uid')`, où `loadOrders` la retrouve. Un compte retiré
+    // n'est jamais servi (on ne part que de la liste). Famille illisible ⇒ la
+    // lecture par compte d'avant, dans la même entrée de cache.
+    promesse.then((list) => {
+      if (!Array.isArray(list)) return;
+      for (const a of list) {
+        const uid = a && a.vinted_user_id; if (!uid) continue;
+        const pre = `harvest_${uid}_orders_`;
+        try { cachedRow(`o:${uid}`, () => famille.then((rows) => Array.isArray(rows) ? rows.filter((r) => String(r && r.id).startsWith(pre)) : fetchHarvestOrdersBrut(uid))).catch(() => {}); } catch (_) {}
+      }
+    }).catch(() => {});
+  } catch (_) { _prechargeComptes = null; }
+};
+const prendrePrechargeComptes = () => {
+  const e = _prechargeComptes; _prechargeComptes = null;
+  if (!e || (Date.now() - e.at) > 30000) return null;
+  if (e.qui !== ((AUTH.user && AUTH.user.id) || 'local')) return null;
+  return e.promesse;
 };
 // Renouvellement périodique tant que l'app est ouverte.
 if (MULTI_USER && typeof window !== 'undefined') {
@@ -1056,7 +1221,9 @@ if (MULTI_USER && typeof window !== 'undefined') {
     const a = !!(AUTH.session && AUTH.user);
     __sessionAvait = a;
     // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
-    if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
+    // ⚠️ Double vérification : pas avant le code — sinon le mot de passe seul
+    //    donnerait une session à l'extension (`mfaPasse`).
+    if (a && mfaPasse()) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
   });
 }
 
@@ -2529,10 +2696,12 @@ const estOctetsPdf = (u) => !!(u && u.length >= 4 && u[0] === 0x25 && u[1] === 0
 // capture, deux requêtes séparées pouvaient rendre la transaction d'une capture
 // et le PDF de la suivante — le N° d'une paire tamponné sur l'étiquette d'une
 // autre (revue du 5 octobre). Une seule lecture = une seule version de la ligne.
-const lirePdfLigne = async (rowId, avec = '') => {
+// `entetes` : des en-têtes de plus — l'écran de l'équipe y passe `x-vrm-equipe`
+// (la base ne lui montre les lignes du vendeur que dans une requête qui le dit).
+const lirePdfLigne = async (rowId, avec = '', entetes) => {
   if (!rowId) return { absent: true };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=b:data->>pdfB64${avec ? ',' + avec : ''}`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=b:data->>pdfB64${avec ? ',' + avec : ''}`, { headers: sbAuth(entetes) });
     if (!res.ok) return null;
     const rows = await res.json();
     if (!Array.isArray(rows)) return null;
@@ -5219,7 +5388,7 @@ const lireSansSouris = () => {
 // `undefined` pas encore lu · `null` lecture ratée (pas su) · `{absent:true}`
 // aucun signe de vie jamais · objet = le dernier signe de vie.
 let __relais = undefined, __relaisEnVol = null, __relaisMinuteur = null;
-const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user);
+const relaisUtile = () => typeof window !== 'undefined' && lireSansSouris() && !__vmrExtReady && !!(AUTH.session && AUTH.user) && mfaPasse();
 async function lireRelais() {
   if (__relaisEnVol) return __relaisEnVol;
   __relaisEnVol = (async () => {
@@ -5584,6 +5753,8 @@ if (typeof window !== 'undefined') {
 }
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
+  // Double vérification pas encore passée : l'extension n'a rien à recevoir.
+  if (!mfaPasse()) return;
   // 5.165 : deux extensions répondent ⇒ on ne donne rien (on ne saurait pas
   // laquelle garder, et l'ancienne exécuterait encore les commandes).
   await sondageConnu();
@@ -9951,6 +10122,99 @@ function LiensLegaux() {
   );
 }
 
+// ── L'ÉCRAN DU CODE (double vérification) ─────────────────────────────────
+// Monté par `App` À LA PLACE du cœur : rien n'est lu tant qu'il est là.
+// `etatMfa` = 'verifier' : la session ne dit pas encore si un code est demandé
+// (rangée avant cette fonction, ou arrivée par un lien email) — on demande à
+// GoTrue. 'code' : on demande le code. Dans les deux cas, « pas su » (GoTrue
+// injoignable) se DIT, avec « Réessayer » ; on ne déconnecte jamais tout seul.
+function PorteMfa({ session }) {
+  const etat = etatMfa(session);
+  const [passu, setPassu] = React.useState(false);
+  const [code, setCode] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [essai, setEssai] = React.useState(0);
+  // 'verifier' : relire les facteurs, puis ranger la réponse dans la session.
+  React.useEffect(() => {
+    if (etat !== 'verifier') return;
+    let mort = false;
+    setPassu(false);
+    (async () => {
+      const f = await mfaLireFacteurs();
+      if (mort) return;
+      if (!f) { setPassu(true); return; }
+      const cur = AUTH.session;
+      if (!cur || cur.access_token !== session.access_token) return;
+      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)) });
+    })();
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etat, essai, session.access_token]);
+  // « Pas su » : on réessaie aussi tout seul, toutes les 15 s (le bouton reste).
+  React.useEffect(() => {
+    if (etat !== 'verifier' || !passu) return;
+    const t = setTimeout(() => setEssai((n) => n + 1), 15000);
+    return () => clearTimeout(t);
+  }, [etat, passu, essai]);
+  const envoyer = async (e) => {
+    e && e.preventDefault();
+    if (busy) return;
+    setErr(''); setPassu(false);
+    const id = Array.isArray(session.totp) ? session.totp[0] : '';
+    if (!id) { setEssai((n) => n + 1); return; }
+    setBusy(true);
+    const r = await mfaVerifierCode(id, code);
+    setBusy(false);
+    if (r.ok) return;            // la session passe en aal2 : `App` monte le cœur
+    if (r.passu) { setPassu(true); return; }
+    setErr(r.message || 'Code refusé.'); setCode('');
+  };
+  const contact = contactEmail();
+  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'13px 14px', fontSize:22, letterSpacing:6, textAlign:'center',
+    background:C.card, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
+  const lien = { background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer', fontFamily:'inherit', padding:'10px 4px', minHeight:44, textDecoration:'underline' };
+  return (
+    <div data-porte-mfa={etat} data-mfa-passu={passu ? '1' : '0'} style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
+      <div style={{width:'100%',maxWidth:380}}>
+        <div style={{textAlign:'center',marginBottom:22}}><VrmLogo size={64}/></div>
+        <form onSubmit={envoyer} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
+          {etat === 'verifier' ? (<>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:6}}>{passu ? 'Vérification impossible pour l’instant' : 'Vérification de ta connexion…'}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>
+              {passu
+                ? <>Je n'ai pas pu savoir si ton compte demande un code de vérification : le service de connexion ne répond pas. Tu n'es pas déconnecté et rien n'est perdu — réessaie dans un instant.</>
+                : <>Je regarde si ton compte demande un code de vérification.</>}
+            </div>
+            {passu && <button type="button" data-mfa-reessayer="" onClick={() => setEssai((n) => n + 1)} style={{marginTop:14,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>}
+          </>) : (<>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>Code de ton app d'authentification</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
+              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.
+            </div>
+            <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
+              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
+            {err && <div data-mfa-erreur="" style={{fontSize:12.5,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
+            {passu && <div data-mfa-injoignable="" style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginTop:10,lineHeight:1.45}}>Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Tu n'es pas déconnecté — réessaie dans un instant.</div>}
+            <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6}
+              style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
+              {busy ? 'Vérification…' : passu ? 'Réessayer' : 'Valider'}
+            </button>
+            <div data-mfa-perdu="" style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
+              <b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
+                ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
+                : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.
+            </div>
+          </>)}
+        </form>
+        <div style={{textAlign:'center',marginTop:8}}>
+          <button type="button" data-mfa-deconnexion="" onClick={() => { authSignOut(); location.reload(); }} style={lien}>Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen() {
   // Trois états : `undefined` = on sonde · `true` = la clé publique lit encore
   // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
@@ -11969,10 +12233,25 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     const el = refPiste.current && refPiste.current.querySelector('[aria-current="page"]');
     if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {} }
   }, [sub]);
+  // (16 octobre, revue) eBay a six sections : quand elles ne tiennent pas, le
+  // bord qui cache une section s'estompe — un bord coupé net ne dit pas qu'il
+  // en reste. Mesuré sur la piste (rien n'est supposé), eBay seulement.
+  const [bords, setBords] = React.useState({ g: false, d: false });
+  React.useEffect(() => {
+    if (!dark) return undefined;
+    const el = refPiste.current; if (!el) return undefined;
+    const mesure = () => { const g = el.scrollLeft > 2, d = el.scrollLeft + el.clientWidth < el.scrollWidth - 2; setBords((b) => (b.g === g && b.d === d) ? b : { g, d }); };
+    mesure();
+    el.addEventListener('scroll', mesure, { passive: true });
+    window.addEventListener('resize', mesure);
+    return () => { el.removeEventListener('scroll', mesure); window.removeEventListener('resize', mesure); };
+  }, [dark, sections.length]);
+  const masque = dark && (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
   return (
     <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
       <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
-        style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent }}>
+        data-seg-deborde={dark ? ((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined : undefined}
+        style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent, ...(masque ? { WebkitMaskImage: masque, maskImage: masque } : null) }}>
         {sections.map(([id,label,point])=>{ const on = sub===id; return (
           <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
             <span>{label}</span>
@@ -13727,11 +14006,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
                   {listePaires.slice(0, 120).map(p => (
-                    <button key={p.id} type="button" onClick={() => choisirPaire(p)} style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
-                        <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
+                        <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           return ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}</b> : null; })()}</span>
                       </span>
@@ -13938,13 +14217,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -13959,9 +14238,12 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       if (Number.isFinite(p) && p > 0) prix[id] = p;
       if (uid) compte[id] = uid;
       if (it.photo && it.photo.url) couv[id] = it.photo.url;
+      // Titre de l'annonce Vinted : repli quand la fiche N° n'en porte pas (le
+      // choix de paire écrivait « — »). Même identifiant, aucune ressemblance.
+      if (typeof it.title === 'string' && it.title.trim()) titre[id] = it.title.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre };
 };
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
@@ -13984,7 +14266,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -14006,7 +14288,8 @@ function useEbayPaires(comptes) {
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
         const dsc = String((details[id] && details[id].description) || '').trim();
         const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
-        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        const titreP = String(f.title || titreMap[String(id)] || '').trim();
+        out.push({ id: String(id), num: n, title: titreP, taille: extractSize(titreP) || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
@@ -14420,7 +14703,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const statut=etat.label;
 
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
-          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':'neutral'}>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
+          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
       })}
     </div>
@@ -14765,17 +15048,20 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div className="vrm-display" data-ebay-prix={prixVuN != null ? prixVuN.toFixed(2) : ''} style={{ fontSize: 16, fontWeight: 800, color: E.text }}>{euro(prixCarte)}</div>
-          <div style={{ fontSize: 10.5, color: E.accentSoft, marginTop: 2, fontWeight: 600 }}>{open ? 'masquer ▲' : 'détails ▼'}</div>
+          {/* (16 octobre, revue) « détails ▼ » est remplacé par le bouton « ⋯ »
+              de la rangée d'actions ; ce bloc vide garde la forme que la
+              feuille de style de la carte attend (prix, puis une ligne). */}
+          <div aria-hidden="true" />
         </div>
       </div>
-      {/* ── Les deux gestes, visibles sans déplier : relier (quand le lien
-          manque) et l'offre aux observateurs (quand eBay en accepte une). ── */}
-      {(!numero || eligible === true) && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 14px 11px 14px' }}>
-          {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à une paire</button>}
-          {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff' }}>{obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'}</button>}
-        </div>
-      )}
+      {/* ── (16 octobre, revue) UNE rangée d'actions : le geste principal
+          (relier quand le lien manque, sinon l'offre aux observateurs), les
+          autres en lien texte, la règle d'offre sur la même rangée, et « ⋯ »
+          pour le reste (modifier, détails). Avant : deux ou trois boutons
+          pleine hauteur empilés par carte. ── */}
+      <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
+      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à une paire</button>}
+      {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
       {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
           états — « pas su » n'affiche AUCUN montant et ne dit pas « aucune ».
           La raison d'un « pas su » se dit UNE fois au-dessus de la liste (§7). */}
@@ -14797,20 +15083,23 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           : (et.etat === 'aucune' && et.refuse != null && et.offresActives === true ? <>eBay refuse sous {eurEbay(et.refuse)}</>
             : (seuilMontre ? <>eBay montre un seuil dès {eurEbay(et.lu.accepte)} — activées ou non : pas montré{url ? <> · <a href={url} target="_blank" rel="noreferrer" data-regle-offres-inconnues-lien={it.itemId} onClick={(ev) => ev.stopPropagation()} style={{ color: E.accentSoft, fontWeight: 700, textDecoration: 'none' }}>Voir sur eBay ↗</a></> : null}</>
               : (et.etat === 'pas-su' ? '—' : null)));
-        const btnR = { ...btnE, padding: '6px 10px', fontSize: 12, opacity: (gesteBloque || envoiRegle) ? 0.45 : 1, cursor: (gesteBloque || envoiRegle) ? 'default' : 'pointer' };
+        const btnR = { ...btnE, border: 'none', background: 'transparent', color: E.accentSoft, padding: '6px 2px', fontSize: 12.5, fontWeight: 700, opacity: (gesteBloque || envoiRegle) ? 0.45 : 1, cursor: (gesteBloque || envoiRegle) ? 'default' : 'pointer' };
         return (
-          <div {...attrs} style={{ padding: '0 14px 10px 14px', fontSize: 12.5, color: E.muted, lineHeight: 1.45 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div {...attrs} style={{ order: 2, flex: '1 1 100%', minWidth: 0, fontSize: 12.5, color: E.muted, lineHeight: 1.45 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: (montant === '—' || montant == null) ? 'nowrap' : 'wrap' }}>
               {montant != null && <span style={{ minWidth: 0 }}>Offres reçues : {montant}</span>}
               {et.etat === 'connue'
                 ? <button type="button" data-regle-modifier={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Modifier</button>
-                : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Définir une règle d'offre</button>}
-              {bloquee && regleEngage(et) && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, padding: '6px 10px', fontSize: 12, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
+                : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={{ ...btnR, whiteSpace: 'nowrap' }}>Définir une règle</button>}
+              {bloquee && regleEngage(et) && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnR, opacity: (envoiRegle || enLot) ? 0.45 : 1, cursor: (envoiRegle || enLot) ? 'default' : 'pointer' }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
             </div>
             {bloquee && bloquee.t && <div data-regle-bloquee-texte={bloquee.k} style={{ fontSize: 11.5, color: E.warn, marginTop: 4 }}>{bloquee.t}</div>}
           </div>
         );
       })()}
+      <button type="button" data-ebay-carte-plus={it.itemId} aria-label={open ? "Masquer les détails de l'annonce" : "Plus d'actions et détails de l'annonce"} aria-expanded={open} onClick={() => setOpen((o) => !o)}
+        style={{ ...btnE, order: 1, marginLeft: 'auto', border: 'none', background: 'transparent', color: E.muted, padding: '6px 10px', fontSize: 18, lineHeight: 1, minWidth: 44 }}>{open ? '×' : '⋯'}</button>
+      </div>
       {regleOuverte && et && (
         <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
@@ -15017,7 +15306,9 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
         const coche = choix.has(d.id);
         return (
           <div key={d.id} data-brouillon={d.id} data-brouillon-etat={etat} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
-            <input type="checkbox" checked={coche} onChange={() => basculer(d.id)} data-brouillon-choix={d.id} aria-label={`Choisir ${d.titre || 'ce brouillon'}`} style={{ width: 20, height: 20, marginTop: 14, flexShrink: 0, accentColor: E.accent }} />
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, margin: '2px -8px 0 -10px', flexShrink: 0, cursor: 'pointer' }}>
+              <input type="checkbox" checked={coche} onChange={() => basculer(d.id)} data-brouillon-choix={d.id} aria-label={`Choisir ${d.titre || 'ce brouillon'}`} style={{ width: 22, height: 22, margin: 0, accentColor: E.accent }} />
+            </label>
             <PhotoVente src={couverture(d)} size={48} />
             <div style={{ flex: '1 1 auto', minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: E.text, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d.numero ? <b>N°{cleNum(d.numero)} · </b> : null}{d.titre || '(sans titre)'}</div>
@@ -15031,7 +15322,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
               <button type="button" data-brouillon-modifier={d.id} onClick={() => onModifier && onModifier(d)} style={btn}>Modifier</button>
-              <button type="button" data-brouillon-supprimer={d.id} onClick={() => supprimer(d)} aria-label="Supprimer ce brouillon" style={btn}>Supprimer</button>
+              <button type="button" data-brouillon-supprimer={d.id} onClick={() => supprimer(d)} aria-label="Supprimer ce brouillon" style={{ ...btn, borderColor: 'transparent', color: E.danger }}>Supprimer</button>
             </div>
           </div>
         );
@@ -16491,7 +16782,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         remettreBrouillon(itemId);
       }} />
   </>);
-  const outils = (<>{publier}{outilsSuite}</>);
+  // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
+  // alertes : c'est le geste qu'on vient faire ici. `outils` ne garde que la suite.
+  const outils = outilsSuite;
   // Annuler la programmation d'une paire vendue sur Vinted : la réponse d'eBay
   // est dite telle quelle (l'annulation par l'API n'est pas garantie).
   const annulerVendue = async (d) => {
@@ -16754,16 +17047,20 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const lienVente = (v) => v.conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(v.conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(v.tx)}`;
     return (
       <div data-ebay-ventes-sans-preuve={nSansPreuve} data-ebay-sans-preuve-geste={cap} data-ebay-sans-preuve-promesse={promet ? '1' : '0'} data-ebay-sans-preuve-blocage={blocage ? blocage.code : ''} style={{ ...bloc(), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
-        <b>{nSansPreuve} vente{un ? '' : 's'} Vinted en cours pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</b> (sur {noms.join(', ')}) : l'anti double vente ne {un ? 'la' : 'les'} voit pas encore — si la paire est aussi en vente ici, VRM ne peut pas te dire de la retirer. {geste}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+        {/* (16 octobre, revue) Un titre court, une ligne de pourquoi, le geste ;
+            puis une liste dont chaque ligne a la MÊME forme (titre à gauche, lien
+            texte à droite) — avant, les liens étaient des boutons placés de deux
+            façons selon la longueur du titre. */}
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: E.text }}>{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce <span style={{ fontWeight: 500, color: E.muted }}>· {noms.join(', ')}</span></div>
+        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginTop: 3 }}>Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay. {geste}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6 }}>
           {sansPreuve.map((v) => (
-            <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{v.titre || `vente n° ${v.tx}`}{parCompte.size > 1 ? <span style={{ color: E.muted, fontWeight: 500 }}> · {nom(v.uid)}</span> : null}</span>
-              <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ ...lienE, textDecoration: 'none' }}>ouvrir sur Vinted ↗</a>
+            <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, minHeight: 44, borderTop: `1px solid ${E.border}` }}>
+              <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.titre || `vente n° ${v.tx}`}{parCompte.size > 1 ? <span style={{ color: E.muted, fontWeight: 500 }}> · {nom(v.uid)}</span> : null}{v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx} style={{ color: E.muted, fontWeight: 500, fontSize: 11.5 }}> · bordereau déjà là (Ventes)</span>}</span>
               {aBouton(v) && (
                 <BoutonBordereau uid={v.uid} tx={String(v.tx)} conv={v.conv} login={nom(v.uid)} aGenerer pdf={false} sansRepli onFait={() => setPreuveRelue((n) => n + 1)} />
               )}
-              {v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx} style={{ color: E.muted, fontSize: 11.5 }}>bordereau déjà là (Ventes)</span>}
+              <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 12.5, fontWeight: 700, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' }}>ouvrir sur Vinted ↗</a>
             </div>
           ))}
         </div>
@@ -16771,15 +17068,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     );
   })();
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // Les annonces du compte affiché (ou de tous) — l'union reste derrière pour
   // ce qui protège (`dv`, `pris`, `dejaSurEbay`).
   const itemsVue = items.filter((a) => dansVue(a));
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -16941,11 +17238,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   return wrap(<>
     {head(itemsVue.length)}
     <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
+    {publier}
     {alertes}
     {ligneComptesIllisibles}
     {lignePasSu}
     {ligneSansPreuve}
-    {publier}
     {blocEngagement}
     {lignePasSuRegle}
     {!blocEngagement && !lignePasSuRegle && porteToutes && <div style={{ margin: '0 2px 10px' }}>{porteToutes}</div>}
@@ -20221,6 +20518,8 @@ function CountUpEuro({ value }) {
 // initial. `C`, `Icon`, `load`, `save` lui sont passés en props. Rendu
 // derrière <Suspense> à l'ouverture du Stock.
 const Room3D = React.lazy(() => import('./Room3D.jsx'));
+// Studio photo (fonction n°33) : chargé au clic, jamais à l'ouverture de l'app.
+const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
 // Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
@@ -26107,6 +26406,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  const [studioOpen, setStudioOpen] = useState(false); // « Studio photo » (cadre guide + détourage local)
   const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
   // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
   // NB : offOpen existe déjà plus bas pour le FORMULAIRE d'ajout — d'où un nom
@@ -33561,6 +33861,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
@@ -36583,6 +36884,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (§11) : on ne recalcule rien ici.
           ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
           comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {studioOpen && (
+        <React.Suspense fallback={null}>
+          <StudioPhoto C={C} base={STUDIO_BASE} onClose={()=>setStudioOpen(false)}
+            paires={Object.entries(porteursNum).map(([num, p]) => ({ num, cle: num, titre: (p && p[0] && p[0].titre) || '' }))
+              .sort((a, b) => { const x = parseInt(a.num, 10), y = parseInt(b.num, 10); return (isNaN(x) ? 1e9 : x) - (isNaN(y) ? 1e9 : y) || String(a.num).localeCompare(String(b.num)); })} />
+        </React.Suspense>
+      )}
       {inventOpen && (()=>{
         const lignes = Object.entries(porteursNum)
           .map(([num, p]) => ({ num, n: parseInt(num, 10), p }))
@@ -38483,6 +38791,7 @@ const PUSH_CATS = [
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
+  { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
@@ -38878,6 +39187,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     { id:'profil', titre:null, items:[
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
     ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
+    AUTH.user && { id:'equipe', titre:'Équipe', items:[
+      { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
+    ]},
     AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
       { id:'abonnement', type:'panneau', ic:'wallet', lib:'Abonnement et factures', el:<MonAbonnement/> },
     ]},
@@ -38885,6 +39197,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
+      // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
@@ -39140,6 +39454,150 @@ async function fermerMonCompte(confirmation) {
     return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
   } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
 }
+// ── DOUBLE VÉRIFICATION — le panneau de Réglages → Mon compte → Connexion ──
+// Trois états pour la lecture des facteurs : `undefined` en cours · `null` pas
+// su (GoTrue injoignable : on le dit, « Réessayer ») · l'objet lu.
+// « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
+// Désactiver demande une confirmation ET un code (la session repasse en aal2,
+// ce que GoTrue exige pour supprimer un facteur vérifié).
+const qrEnSrc = (q) => {
+  const t = String(q || '').trim();
+  if (/^data:image\/svg\+xml/i.test(t)) return t;
+  if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
+  return '';
+};
+function DoubleVerification() {
+  const [f, setF] = React.useState(undefined);
+  const [essai, setEssai] = React.useState(0);
+  // { etape: 'qr', id, qr, secret } · { etape: 'off' } (confirmation de désactivation)
+  const [cours, setCours] = React.useState(null);
+  const [code, setCode] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);   // { t, ton: 'ok'|'err'|'passu' }
+  React.useEffect(() => {
+    let mort = false; setF(undefined);
+    mfaLireFacteurs().then((x) => { if (!mort) setF(x); });
+    return () => { mort = true; };
+  }, [essai]);
+  const actif = f && f.verifies.length ? f.verifies[0] : null;
+  const relire = () => setEssai((n) => n + 1);
+  const btn = (primaire, off) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
+    borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.55 : 1, fontFamily:'inherit' });
+  const champ = { width:150, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:18, letterSpacing:4, textAlign:'center', background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
+  const txt = { fontSize:12.5, color:C.muted, lineHeight:1.55 };
+  const PASSU = "Le service de connexion ne répond pas — rien n'a changé. Réessaie dans un instant.";
+
+  const activer = async () => {
+    if (busy) return;
+    setBusy(true); setMsg(null);
+    // Un essai d'activation laissé en plan (facteur non vérifié) bloquerait le
+    // suivant : on le retire d'abord (un facteur non vérifié ne protège rien).
+    for (const x of (f && f.enAttente) || []) { await mfaAppel('DELETE', `factors/${encodeURIComponent(x.id)}`); }
+    const r = await mfaAppel('POST', 'factors', { factor_type: 'totp', friendly_name: 'VRM ' + new Date().toISOString().slice(0, 16), issuer: 'VRM' });
+    setBusy(false);
+    const t = r.json && r.json.totp;
+    if (!r.ok || !r.json.id || !t) {
+      if (mfaInjoignable(r)) setMsg({ t: PASSU, ton: 'passu' });
+      else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
+      return;
+    }
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrEnSrc(t.qr_code), secret: String(t.secret || '') });
+  };
+  const annulerActivation = async () => {
+    const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
+    if (id) await mfaAppel('DELETE', `factors/${encodeURIComponent(id)}`);
+    relire();
+  };
+  const confirmerActivation = async () => {
+    if (busy || !cours) return;
+    setBusy(true); setMsg(null);
+    const r = await mfaVerifierCode(cours.id, code);
+    setBusy(false);
+    if (r.passu) { setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Rien n'est activé pour l'instant — réessaie.", ton: 'passu' }); return; }
+    if (!r.ok) { setMsg({ t: (r.message || 'Code refusé.') + ' Rien n’est activé.', ton: 'err' }); setCode(''); return; }
+    setCours(null); setCode('');
+    setMsg({ t: 'Double vérification activée. À ta prochaine connexion, VRM te demandera le code de ton app après ton mot de passe.', ton: 'ok' });
+    relire();
+  };
+  const desactiver = async () => {
+    if (busy || !actif) return;
+    setBusy(true); setMsg(null);
+    const v = await mfaVerifierCode(String(actif.id), code);
+    if (!v.ok) {
+      setBusy(false);
+      if (v.passu) setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. La double vérification reste activée — réessaie.", ton: 'passu' });
+      else { setMsg({ t: (v.message || 'Code refusé.') + ' La double vérification reste activée.', ton: 'err' }); setCode(''); }
+      return;
+    }
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(actif.id)}`);
+    setBusy(false); setCode('');
+    if (d.ok) {
+      const cur = AUTH.session;
+      if (cur) writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== String(actif.id)) });
+      setCours(null);
+      setMsg({ t: 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.', ton: 'ok' });
+    } else if (mfaInjoignable(d)) {
+      setMsg({ t: "Je ne sais pas si elle a été désactivée : le service de connexion n'a pas répondu. Je relis son état.", ton: 'passu' });
+    } else {
+      setMsg({ t: `Le service de connexion a refusé la désactivation (erreur ${d.status}). Elle reste activée.`, ton: 'err' });
+    }
+    relire();
+  };
+
+  const bandeau = msg && (
+    <div data-mfa-message={msg.ton} style={{fontSize:12.5,lineHeight:1.5,marginTop:10,borderRadius:8,padding:'9px 11px',
+      color: msg.ton === 'err' ? C.danger : C.text,
+      background: msg.ton === 'passu' ? `${C.warn}12` : msg.ton === 'err' ? `${C.danger}0f` : `${C.text}0a`,
+      border: `1px solid ${msg.ton === 'passu' ? C.warn + '44' : msg.ton === 'err' ? C.danger + '33' : C.border}`}}>{msg.t}</div>
+  );
+  const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
+  return (
+    <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
+      {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
+      {f === null && (<>
+        <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
+        <button type="button" data-mfa-relire="" onClick={relire} style={{...btn(false),marginTop:10}}>Réessayer</button>
+      </>)}
+      {f && !actif && !cours && (<>
+        <div style={txt}>
+          <b style={{color:C.text}}>Désactivée.</b> Facultatif : une fois activée, VRM te demande, après ton mot de passe, un code à 6 chiffres affiché par une app d'authentification sur ton téléphone (Google Authenticator, Microsoft Authenticator, Authy, ou les mots de passe de l'iPhone). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.
+        </div>
+        <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+      </>)}
+      {cours && cours.etape === 'qr' && (<>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Dans ton app d'authentification, ajoute un compte en scannant ce code :</div>
+        {cours.qr
+          ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
+          : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
+        <div style={txt}>Tu es sur ce téléphone et ne peux pas scanner ? Choisis « saisir une clé » dans l'app et recopie :</div>
+        <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+          <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
+          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} style={btn(true, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Confirmer'}</button>
+          <button type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
+        </div>
+      </>)}
+      {actif && !cours && (<>
+        <div style={txt}>
+          <b style={{color:C.text}}>Activée{actif.created_at ? ` depuis le ${new Date(actif.created_at).toLocaleDateString('fr-FR')}` : ''}.</b> À chaque connexion, VRM demande le code de ton app d'authentification après ton mot de passe.
+          {' '}Si tu perds ton téléphone, elle ne se retire pas depuis l'app : désactive-la ici AVANT de changer de téléphone.
+        </div>
+        <button type="button" data-mfa-desactiver="" onClick={() => { setCours({ etape: 'off' }); setCode(''); setMsg(null); }} style={{...btn(false),marginTop:10}}>Désactiver…</button>
+      </>)}
+      {actif && cours && cours.etape === 'off' && (<>
+        <div style={txt}>Pour désactiver la double vérification, tape le code actuel de ton app. Ton mot de passe suffira ensuite pour te connecter.</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+          <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
+          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={desactiver} style={btn(false, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Désactiver'}</button>
+          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} style={btn(false, busy)}>Garder</button>
+        </div>
+      </>)}
+      {bandeau}
+    </div>
+  );
+}
+
 function FermerCompte() {
   const [ouvert, setOuvert] = React.useState(false);
   // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
@@ -39509,6 +39967,404 @@ function AbonnementRequis({ info }) {
           <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, minHeight: 0 }}>Se déconnecter</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LE MODE ÉQUIPE (fonction n°37, migration 016) — l'aide qui prépare les colis
+// ══════════════════════════════════════════════════════════════════════════
+// Le vendeur invite une personne (par son email) ; une fois l'invitation
+// acceptée, elle voit les colis à expédier, imprime les bordereaux et lit les
+// codes de retrait du vendeur — et RIEN d'autre. Ce n'est pas l'écran qui le
+// garantit : c'est la BASE (RLS, liste blanche, projection sans montant). L'écran
+// ne fait que lire ce que la base lui laisse lire.
+// ⚠️ TROIS ÉTATS PARTOUT : `undefined` en cours · `null` pas su · l'objet lu —
+//    plus `{ nonInstalle: true }` quand la base n'a pas la 016 (« le mode équipe
+//    n'est pas encore activé sur ta base », jamais une erreur brute).
+// ⚠️ L'AIDE NE PAIE PAS : son écran est aiguillé AVANT `PorteAbonnement`. C'est
+//    l'abonnement du VENDEUR qui compte (la base le vérifie à chaque lecture).
+// ⚠️ UN VENDEUR QUI EST AUSSI MEMBRE D'UNE AUTRE ÉQUIPE GARDE SA PROPRE APP : les
+//    lignes de l'autre ne lui sont visibles que dans une requête qui le DEMANDE
+//    (en-tête `x-vrm-equipe`), et l'écran de l'équipe ne s'ouvre que sur son clic.
+const EQUIPE_NON_INSTALLE_TXT = "Le mode équipe n'est pas encore activé sur ta base.";
+async function lireEquipe() {
+  try {
+    const r = await fetch('/api/compte?mode=equipe', { headers: enTeteSession(), cache: 'no-store' });
+    const j = await r.json().catch(() => null);
+    if (j && j.erreur === 'non-installe') return { nonInstalle: true };
+    if (!r.ok || !j || j.ok !== true || !Array.isArray(j.equipe) || !Array.isArray(j.invitations) || !Array.isArray(j.membreDe)) return null;
+    return { equipe: j.equipe, invitations: j.invitations, membreDe: j.membreDe, aBoutique: typeof j.aBoutique === 'boolean' ? j.aBoutique : null };
+  } catch (_) { return null; }
+}
+// Rend `{ ok: true, ... }` ou `{ ok: false, message }` — jamais un succès supposé.
+async function actionEquipe(action, extra) {
+  try {
+    const r = await fetch('/api/compte?mode=equipe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action, ...(extra || {}) }) });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && j.ok === true) return j;
+    return { ok: false, message: (j && j.message) || "La base n'a pas répondu — rien n'a changé. Réessaie dans un instant." };
+  } catch (_) { return { ok: false, message: "Pas de connexion — rien n'a changé. Réessaie dans un instant." }; }
+}
+// Le choix de CET appareil : '' = ma propre boutique (choisi), un identifiant
+// de vendeur = l'écran de son équipe, `null` = jamais choisi.
+const cleVueEquipe = (uid) => `vrm_equipe_vue_${uid}`;
+const cleCacheEquipe = (uid) => `vrm_equipe_cache_${uid}`;
+const lireVueEquipe = (uid) => { try { const v = localStorage.getItem(cleVueEquipe(uid)); return v === null ? null : String(v); } catch (_) { return null; } };
+const choisirVueEquipe = (uid, v) => {
+  try { localStorage.setItem(cleVueEquipe(uid), String(v || '')); } catch (_) {}
+  try { window.dispatchEvent(new Event('vrm-equipe')); } catch (_) {}
+};
+const lireCacheEquipe = (uid) => { try { const j = JSON.parse(localStorage.getItem(cleCacheEquipe(uid)) || 'null'); return j && Array.isArray(j.membreDe) ? j : null; } catch (_) { return null; } };
+
+// L'aiguillage, AVANT la porte de l'abonnement :
+//   · l'appareil a choisi l'écran d'un vendeur dont il est membre ⇒ ses colis ;
+//   · jamais choisi, AUCUNE boutique à lui (lu, pas supposé) ⇒ l'équipe dont il
+//     est membre, ou ses invitations à accepter ;
+//   · sinon ⇒ sa propre app, exactement comme avant.
+// La dernière liste connue est gardée sur l'appareil pour décider tout de suite
+// (pas d'éclair de sa boutique vide) ; la base tranche dès qu'elle répond.
+function PorteEquipe({ uid, children }) {
+  const [lu, setLu] = React.useState(undefined);
+  const [cache, setCache] = React.useState(() => lireCacheEquipe(uid));
+  const [vue, setVue] = React.useState(() => lireVueEquipe(uid));
+  const relire = React.useCallback(() => {
+    lireEquipe().then((x) => {
+      setLu(x);
+      if (x && !x.nonInstalle) {
+        const c = { membreDe: x.membreDe.map((m) => ({ id: m.id, vendeur: m.vendeur, de: m.de || '' })), aBoutique: x.aBoutique };
+        setCache(c);
+        try { localStorage.setItem(cleCacheEquipe(uid), JSON.stringify(c)); } catch (_) {}
+      } else if (x && x.nonInstalle) {
+        const c = { membreDe: [], aBoutique: null, nonInstalle: true };
+        setCache(c);
+        try { localStorage.setItem(cleCacheEquipe(uid), JSON.stringify(c)); } catch (_) {}
+      }
+    });
+  }, [uid]);
+  React.useEffect(() => { relire(); }, [relire]);
+  // ⚠️ LA TOUTE PREMIÈRE OUVERTURE SUR CET APPAREIL (rien en cache) : on attend
+  //    la réponse de la base, au plus 2,5 s, avant de monter sa propre app —
+  //    sinon un aide verrait d'abord une boutique VIDE (« installe l'extension »)
+  //    et ses écrans liraient leurs lignes pour rien. Ensuite le cache décide
+  //    tout de suite, pour tout le monde (aucune attente de plus pour un vendeur).
+  const [attente, setAttente] = React.useState(() => lireCacheEquipe(uid) === null);
+  React.useEffect(() => {
+    if (!attente) return undefined;
+    const t = setTimeout(() => setAttente(false), 2500);
+    return () => clearTimeout(t);
+  }, [attente]);
+  React.useEffect(() => { if (lu !== undefined) setAttente(false); }, [lu]);
+  React.useEffect(() => {
+    const f = () => { setVue(lireVueEquipe(uid)); relire(); };
+    window.addEventListener('vrm-equipe', f);
+    return () => window.removeEventListener('vrm-equipe', f);
+  }, [uid, relire]);
+  const src = lu && !lu.nonInstalle ? lu : (lu === undefined || lu === null ? cache : null);
+  const membres = (src && src.membreDe) || [];
+  const propre = () => { choisirVueEquipe(uid, ''); };
+  if (vue) {
+    const m = membres.find((x) => x.vendeur === vue);
+    if (m) return <ColisEquipe key={m.vendeur} vendeur={m.vendeur} de={m.de} onPropre={propre}/>;
+    // La base a répondu : il n'est plus membre (révoqué, ou il a quitté).
+    if (lu && !lu.nonInstalle) return <EquipeSansAcces onPropre={propre}/>;
+    if (lu && lu.nonInstalle) return <EquipeSansAcces nonInstalle onPropre={propre}/>;
+    // Pas su et rien en cache : sa propre app (le défaut), la base tranchera.
+  }
+  if (vue === null && src && src.aBoutique === false) {
+    if (membres.length) return <ColisEquipe key={membres[0].vendeur} vendeur={membres[0].vendeur} de={membres[0].de} onPropre={propre}/>;
+    if (lu && !lu.nonInstalle && lu.invitations.length) return <InvitationsEquipe invitations={lu.invitations} uid={uid} onPropre={propre} onFait={relire}/>;
+  }
+  if (attente && lu === undefined) return <div data-equipe-attente="" style={{ minHeight: '100vh', background: C.bg }}/>;
+  return children;
+}
+
+const cadreEquipe = () => ({ minHeight: '100vh', background: C.bg, padding: '20px 16px 40px', boxSizing: 'border-box' });
+const boiteEquipe = () => ({ maxWidth: 760, margin: '0 auto' });
+function TeteEquipe({ titre, sous, onPropre }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+      <img src="/logo-vrm-96.png" alt="VRM" width="36" height="36" style={{ borderRadius: 8, display: 'block' }}/>
+      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.3 }}>{titre}</div>
+        {sous && <div style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{sous}</div>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" data-equipe-propre="" onClick={onPropre} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ma propre boutique</button>
+        <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: '8px 4px' }}>Se déconnecter</button>
+      </div>
+    </div>
+  );
+}
+function EquipeSansAcces({ nonInstalle, onPropre }) {
+  return (
+    <div data-equipe-sans-acces={nonInstalle ? 'non-installe' : 'revoque'} style={cadreEquipe()}>
+      <div style={boiteEquipe()}>
+        <TeteEquipe titre="Colis de l'équipe" onPropre={onPropre}/>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', fontSize: 14, color: C.text, lineHeight: 1.55 }}>
+          {nonInstalle ? EQUIPE_NON_INSTALLE_TXT : "Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée (ou tu l'as quittée). Plus rien de sa boutique n'est lisible d'ici."}
+        </div>
+      </div>
+    </div>
+  );
+}
+function InvitationsEquipe({ invitations, uid, onPropre, onFait }) {
+  const [occupe, setOccupe] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const accepter = async (inv) => {
+    setOccupe(inv.id); setMsg('');
+    const r = await actionEquipe('accepter', { id: inv.id });
+    setOccupe('');
+    if (!r.ok) { setMsg(r.message); return; }
+    onFait();
+  };
+  return (
+    <div data-equipe-invitations="" style={cadreEquipe()}>
+      <div style={boiteEquipe()}>
+        <TeteEquipe titre="Tu es invité dans une équipe" onPropre={onPropre}/>
+        {invitations.map((inv) => (
+          <div key={inv.id} data-invitation={inv.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{inv.de || 'Un vendeur'} t'invite à préparer ses colis</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
+            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => accepter(inv)} style={{ marginTop: 12, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '11px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {occupe === inv.id ? 'Acceptation…' : 'Accepter'}
+            </button>
+          </div>
+        ))}
+        {msg && <div data-equipe-msg="" style={{ fontSize: 13, color: C.warn, marginTop: 6 }}>{msg}</div>}
+      </div>
+    </div>
+  );
+}
+// Ce qu'un membre voit et ne voit pas — UNE phrase, pour l'invitation et pour
+// le panneau du vendeur (§11). Elle dit la règle de la base (016), rien de plus.
+const CE_QUE_VOIT_UN_MEMBRE = "Un membre voit les colis à expédier et peut imprimer leurs bordereaux, et il voit les codes de retrait des achats. Il ne voit aucun montant (ni prix, ni ventes, ni argent), ni les réglages, ni les comptes Vinted, ni les messages des acheteurs — et il ne peut rien modifier.";
+
+// ── L'ÉCRAN DU MEMBRE : les colis du vendeur, et rien d'autre ─────────────
+// Chaque lecture porte l'en-tête `x-vrm-equipe` (la base ne montre les lignes
+// du vendeur que dans une requête qui le DEMANDE) ET `owner=eq.<vendeur>` (ses
+// lignes à lui, même s'il est vendeur de son côté). Rien d'autre n'est lu :
+// ni `main`, ni les comptes Vinted, ni les transactions — la liste des ventes
+// vient de la projection SANS MONTANT `vrm_equipe_colis`.
+async function lireColisEquipe(vendeur) {
+  const h = sbAuth({ 'x-vrm-equipe': vendeur });
+  const own = `owner=eq.${encodeURIComponent(vendeur)}`;
+  const lit = async (chemin, init) => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { ...(init || {}), headers: { ...h, ...((init && init.headers) || {}) } });
+      const t = await r.text().catch(() => '');
+      if (r.status === 404 || /PGRST202/.test(t)) return { absent: true };
+      if (!r.ok) return null;
+      try { return { v: t === '' ? null : JSON.parse(t) }; } catch (_) { return null; }
+    } catch (_) { return null; }
+  };
+  const champsBord = ['uid','modele','numero','article','filename','dateLimite','receivedAt','transaction'].map(c => `${c}:meta->>${c}`).join(',');
+  const [p, bords, labels, relais, tracks] = await Promise.all([
+    lit('rpc/vrm_equipe_colis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_vendeur: vendeur }) }),
+    lit(`app_data?${own}&id=like.email_bord_*&select=id,${champsBord}`),
+    lit(`app_data?${own}&id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,item:meta->>item`),
+    lit(`app_data?${own}&id=eq.panel_colis_relais&select=data`),
+    lit(`app_data?${own}&id=like.email_track_*&select=id,data`),
+  ]);
+  if (p && p.absent) return { nonInstalle: true };
+  if (!p) return null;
+  if (p.v === null) return { sansAcces: true };       // plus membre actif (ou accès du vendeur coupé)
+  const v = p.v || {};
+  const liste = (x) => (x && !x.absent && Array.isArray(x.v) ? x.v : null);
+  return {
+    ventes: Array.isArray(v.ventes) ? v.ventes : [], achats: Array.isArray(v.achats) ? v.achats : [],
+    comptes: (v.comptes && typeof v.comptes === 'object') ? v.comptes : {},
+    postes: new Set((Array.isArray(v.postes) ? v.postes : []).map(String)),
+    retires: new Set((Array.isArray(v.retires) ? v.retires : []).map(String)),
+    bords: liste(bords), labels: liste(labels),
+    relais: (() => { const l = liste(relais); return l === null ? null : ((l[0] && l[0].data) || {}); })(),
+    tracks: (() => { const l = liste(tracks); return l === null ? null : l.map((r) => reclassifyTrack(r && r.data)).filter(Boolean); })(),
+  };
+}
+// Imprimer un bordereau de l'équipe : les octets lus AVEC l'en-tête, tamponnés
+// du N° que porte la ligne de l'email (le vendeur, lui, l'a numérotée) — le
+// membre ne lit jamais `main`, il ne recalcule donc aucun numéro.
+async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
+  const lu = await lirePdfLigne(row, '', { 'x-vrm-equipe': vendeur });
+  if (!lu || !lu.octets) { libererOngletPdf(); return { ok: false, message: messagePdfManquant(lu) }; }
+  try {
+    const PL = await import('pdf-lib');
+    const { PDFDocument, rgb, StandardFonts } = PL;
+    const pdf = await PDFDocument.load(lu.octets);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const reg = await pdf.embedFont(StandardFonts.Helvetica);
+    drawBordereauStamp(pdf, rgb, bold, reg, numero || '', titre || '');
+    posePrefsImpression(PL, pdf);
+    const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
+    return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
+  } catch (_) { libererOngletPdf(); return { ok: false, message: "Ce PDF n'a pas pu être lu." }; }
+}
+function ColisEquipe({ vendeur, de, onPropre }) {
+  const [d, setD] = React.useState(undefined);
+  const [msg, setMsg] = React.useState({});
+  const [lien, setLien] = React.useState({});
+  const charger = React.useCallback(() => { setD(undefined); lireColisEquipe(vendeur).then(setD); }, [vendeur]);
+  React.useEffect(() => { charger(); }, [charger]);
+  const titreEcran = 'Colis à préparer';
+  const sous = de ? `Pour ${de}` : null;
+  const carte = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 10 };
+  const h3 = { fontSize: 13, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '.04em', margin: '22px 0 10px' };
+  let corps;
+  if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 14, color: C.muted }}>Lecture des colis…</div>;
+  else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
+  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 14, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
+  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 14, color: C.text, lineHeight: 1.55 }}>Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée, ou l'abonnement du vendeur n'est plus actif. Plus rien de sa boutique n'est lisible d'ici.</div>;
+  else {
+    const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
+    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && (isAtRelayStatus(o.status) || tusDe(o) === 'needs_action'));
+    const labelsTx = new Map(); (d.labels || []).forEach((l) => { const m = /_label_([A-Za-z0-9]+)$/.exec(l.id || ''); const tx = (m && m[1] !== 'latest' && m[1] === String(l.tx || m[1])) ? m[1] : ''; if (tx && !labelsTx.has(tx)) labelsTx.set(tx, l.id); });
+    const bordsTx = new Map(); (d.bords || []).forEach((b) => { if (b && b.filename && b.filename !== 'None' && b.transaction && !bordsTx.has(String(b.transaction))) bordsTx.set(String(b.transaction), b); });
+    const compte = (o) => d.comptes[String(o.uid || '')] || '';
+    const plusieurs = new Set([...ventes, ...achats].map(compte)).size > 1;
+    const tracks = (d.tracks || []).filter((t) => t.status === 'available' && (() => { const x = new Date(t.receivedAt); return isNaN(x) || (Date.now() - x.getTime()) / 86400000 <= PICKUP_MAX_DAYS; })());
+    const imprimer = async (o, row, numero) => {
+      const k = String(o.transaction_id);
+      setMsg((m) => ({ ...m, [k]: 'Préparation…' }));
+      const r = await imprimerBordereauEquipe(vendeur, row, numero, o.title || '');
+      setMsg((m) => ({ ...m, [k]: r.ok ? '' : r.message }));
+      if (r.ok && !r.ouvert) setLien((l) => ({ ...l, [k]: r.url }));
+    };
+    corps = (<>
+      {(d.bords === null || d.labels === null || d.relais === null || d.tracks === null) && (
+        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Une partie des colis n'a pas pu être lue (bordereaux ou codes) — ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
+      )}
+      <div style={h3}>À expédier · {ventes.length}</div>
+      {!ventes.length && <div data-equipe-vide="ventes" style={{ fontSize: 14, color: C.muted }}>Aucun colis à expédier pour l'instant.</div>}
+      {ventes.map((o) => {
+        const k = String(o.transaction_id);
+        const lab = labelsTx.get(k); const b = bordsTx.get(k);
+        const row = lab || (b && b.id) || null;
+        const numero = b && b.numero && b.numero !== 'None' ? String(b.numero) : '';
+        return (
+          <div key={k} data-equipe-vente={k} style={{ ...carte, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            {o.photo ? <PhotoVinted src={o.photo} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: C.bg }}/> : null}
+            <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{numero ? `N°${numero} · ` : ''}{o.title || 'Article'}</div>
+              <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', b && b.dateLimite ? `à poster avant le ${b.dateLimite}` : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
+              {msg[k] && <div data-equipe-msg={k} style={{ fontSize: 12.5, color: C.warn, marginTop: 4 }}>{msg[k]}</div>}
+              {lien[k] && <a href={lien[k]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accent, fontWeight: 600 }}>Ouvrir le bordereau</a>}
+            </div>
+            {row
+              ? <button type="button" data-imprime="1" data-equipe-imprimer={k} onClick={() => imprimer(o, row, numero)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flex: '0 1 auto', maxWidth: 260 }}>🖨 Imprimer le bordereau</button>
+              : <span data-equipe-sans-bordereau={k} style={{ fontSize: 12.5, color: C.muted }}>{d.bords === null || d.labels === null ? 'Bordereau pas encore vérifié' : 'Bordereau pas encore reçu'}</span>}
+          </div>
+        );
+      })}
+      <div style={h3}>À retirer · {achats.length}</div>
+      {!achats.length && <div data-equipe-vide="achats" style={{ fontSize: 14, color: C.muted }}>Aucun colis à retirer pour l'instant.</div>}
+      {achats.map((o) => {
+        const k = String(o.transaction_id);
+        const r = (d.relais && d.relais[k]) || null;
+        const code = r ? codeRetrait(r.code) : '';
+        const qr = r ? qrImage(r) : null;
+        return (
+          <div key={k} data-equipe-achat={k} style={carte}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{o.title || 'Article'}</div>
+            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', r && r.lieu ? r.lieu : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
+            {code
+              ? <div data-equipe-code={k} style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div>
+              : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>{d.relais === null ? 'Code pas encore vérifié' : 'Code pas encore lu — il est dans la conversation Vinted de cet achat.'}</div>}
+            {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
+          </div>
+        );
+      })}
+      {tracks.length > 0 && (<>
+        <div style={h3}>Codes reçus par email · {tracks.length}</div>
+        {tracks.map((t, i) => {
+          const code = codeRetrait(t.code); const qr = qrImage(t);
+          return (
+            <div key={(t.suivi || '') + i} data-equipe-track="" style={carte}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${t.lieu}` : ''}</div>
+              {t.limite && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {t.limite}</div>}
+              {code ? <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
+              {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
+            </div>
+          );
+        })}
+      </>)}
+    </>);
+  }
+  return (
+    <div data-colis-equipe={vendeur} style={cadreEquipe()}>
+      <div style={boiteEquipe()}>
+        <TeteEquipe titre={titreEcran} sous={sous} onPropre={onPropre}/>
+        {corps}
+      </div>
+    </div>
+  );
+}
+
+// ── RÉGLAGES → MON COMPTE → ÉQUIPE ─────────────────────────────────────────
+function EquipeSetting() {
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const [lu, setLu] = React.useState(undefined);
+  const [email, setEmail] = React.useState('');
+  const [occupe, setOccupe] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const relire = React.useCallback(() => { lireEquipe().then(setLu); }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  const agir = async (cle, action, extra, ok) => {
+    setOccupe(cle); setMsg('');
+    const r = await actionEquipe(action, extra);
+    setOccupe('');
+    if (!r.ok) { setMsg(r.message); return; }
+    if (ok) ok(r);
+    relire();
+    try { window.dispatchEvent(new Event('vrm-equipe')); } catch (_) {}
+  };
+  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
+  const ligne = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0', borderTop: `1px solid ${C.border}` };
+  if (lu === undefined) return <div data-equipe-reglage="chargement" style={{ fontSize: 13, color: C.muted }}>Lecture de ton équipe…</div>;
+  if (lu === null) return (
+    <div data-equipe-reglage="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} style={{ ...bouton(false), marginLeft: 6 }}>Réessayer</button>
+    </div>
+  );
+  if (lu.nonInstalle) return <div data-equipe-reglage="non-installe" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
+  const vivants = lu.equipe.filter((x) => x.statut !== 'revoquee');
+  const inviter = async () => {
+    const e = email.trim();
+    if (!e) { setMsg("Tape l'adresse email de la personne qui t'aide."); return; }
+    await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : ''); });
+  };
+  return (
+    <div data-equipe-reglage="lu" style={{ fontSize: 13, color: C.text }}>
+      <div style={{ color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email de la personne" aria-label="Email à inviter" data-equipe-email=""
+          style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
+        <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} style={bouton(true)}>{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
+      </div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun email n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse, la confirme, et l'invitation l'attend à l'ouverture.</div>
+      {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
+      {vivants.length > 0 && <div style={{ marginTop: 12 }}>
+        {vivants.map((x) => (
+          <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée, pas encore acceptée'}</span></span>
+            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: 'Retirer cette personne ?', desc: `${x.email} ne verra plus tes colis, tout de suite.`, ok: 'Retirer', cancel: 'Annuler', danger: true })) agir(x.id, 'revoquer', { id: x.id }); }} style={bouton(false)}>Retirer</button>
+          </div>
+        ))}
+      </div>}
+      {(lu.invitations.length > 0 || lu.membreDe.length > 0) && <div style={{ marginTop: 14 }}>
+        {lu.invitations.map((inv) => (
+          <div key={inv.id} data-invitation={inv.id} style={ligne}>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{inv.de || 'Un vendeur'}</b> t'invite à préparer ses colis</span>
+            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })} style={bouton(true)}>Accepter</button>
+          </div>
+        ))}
+        {lu.membreDe.map((m) => (
+          <div key={m.id} data-membre-de={m.vendeur} style={ligne}>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}>Tu prépares les colis de <b>{m.de || 'un vendeur'}</b>{m.acces === false ? <span style={{ color: C.muted }}> · son abonnement n'est plus actif</span> : null}</span>
+            <button type="button" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }} style={bouton(true)}>Ouvrir ses colis</button>
+            <button type="button" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }} style={bouton(false)}>Quitter</button>
+          </div>
+        ))}
+      </div>}
     </div>
   );
 }
@@ -41121,8 +41977,16 @@ export default function App() {
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  // Double vérification (16 octobre) : un compte qui l'a activée et une session
+  // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
+  // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
+  if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
-  return (MULTI_USER && authState.user) ? <PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement> : coeur;
+  // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
+  // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
+  return (MULTI_USER && authState.user)
+    ? <PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe>
+    : coeur;
 }
 
 function AppCoeur() {
@@ -41724,7 +42588,7 @@ function AppCoeur() {
   useEffect(()=>{
     let stop=false;
     (async()=>{
-      const list=await fetchVintedAccounts();
+      const list=await (prendrePrechargeComptes() || fetchVintedAccounts());
       if(stop) return;
       setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
       noterPanneBase(list===null);             // depuis quand ? (pour dire le bon geste au 3ᵉ jour)
@@ -42714,6 +43578,10 @@ function AppCoeur() {
   // devient vrai et la porte se referme toute seule, sans changement de code.
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  // Double vérification (16 octobre) : un compte qui l'a activée et une session
+  // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
+  // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
+  if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
 
   return (
     <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-faint':C.faint,'--vrm-hair':C.hair,'--vrm-bar':C.bar,'--vrm-accent':C.accent,'--vrm-card2':C.card2,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}

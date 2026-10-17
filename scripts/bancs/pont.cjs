@@ -236,8 +236,18 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
   if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
-  if (session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // Le faux GoTrue, APRÈS le fourre-tout des hôtes externes (qui laisse passer
+  // vers le vrai réseau) : Playwright prend la DERNIÈRE route en premier (§6.6).
+  // Posé avant, il n'était jamais atteint — rouge depuis la double vérification
+  // (`PorteMfa` relit `GET /user` pour une session qui ne dit pas `totp`, et
+  // reste sur « pas su » : rien ne monte, aucune session n'est envoyée).
+  // `GET /user` rend la VRAIE forme : la fiche utilisateur, pas une session (§6.3).
+  if (session) await pg.route('**/auth/v1/**', (r) => {
+    const chemin = new URL(r.request().url()).pathname.replace(/^.*\/auth\/v1\//, '');
+    const corps = chemin === 'user' ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated' } : { ...SESSION, expires_in: 3600 };
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) });
+  });
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

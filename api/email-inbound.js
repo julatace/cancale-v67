@@ -26,6 +26,8 @@ import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres, PROPRIET
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
+import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -368,13 +370,29 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
 }
 
 async function createProInvoice(sale, acc, cfg, now) {
+  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
+  // ⚠️⚠️ REVUE DU 17 OCTOBRE (`scripts/audit-routes-revue.cjs`, A et B).
+  //  · Le MÊME email revient (un 503 est fait pour ça, le script Gmail renvoie
+  //    tout le fil) : la facture déjà émise recevait un NOUVEAU numéro et
+  //    repassait « à envoyer » — le script l'envoyait une seconde fois à
+  //    l'acheteur. Une facture émise ne change plus jamais de numéro.
+  //  · Compteur ILLISIBLE : `null` valait 0, la route émettait « FA-AAAA-0001 »
+  //    (déjà donné) et RÉÉCRIVAIT le compteur à 1 — toutes les factures
+  //    suivantes reprenaient des numéros déjà émis. Pas su ⇒ aucune facture, et
+  //    la route répond 503 (l'email reviendra).
+  const deja = await supabaseLireRow(`email_invoice_${key}`);
+  if (!deja.lu) { marquerEcritureRatee(); return null; }
+  if (deja.data && deja.data.number) return { number: deja.data.number, status: deja.data.status || 'draft', deja: true };
+  const cpt = await supabaseLireRow('vrm_invoice_counter');
+  if (!cpt.lu) { marquerEcritureRatee(); return null; }
+  const lu = cpt.data == null ? 0 : parseInt(cpt.data, 10);
+  if (!Number.isFinite(lu) || lu < 0) { marquerEcritureRatee(); return null; }
   // Numéro séquentiel : compteur partagé dans Supabase (jamais réutilisé).
-  const counter = (parseInt(await supabaseGetRow('vrm_invoice_counter'), 10) || 0) + 1;
-  await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]);
+  const counter = lu + 1;
+  if (!(await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]))) return null;
   const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
   const dateStr = new Date().toLocaleDateString('fr-FR');
   const html = buildInvoiceHtml(cfg, sale, number, dateStr);
-  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
   const status = cfg.autoSend ? 'queued' : 'draft';
   await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
     type: 'facture_pro', number, status,
@@ -609,9 +627,79 @@ export async function numeroDEmail(numeroLu, titre, viaTitre) {
   else out = numeroDuTitreApresCoupure(lu, titre, mk, lu ? await fichesVendeur() : {});
   if (!out.numero && viaTitre && mk !== undefined) {
     const n = await findNumeroByTitle(viaTitre.title, viaTitre.size);
-    if (n && !(arch && estArchive(n, arch))) out.numero = n;
+    // `parTitre` : retrouvé par RESSEMBLANCE de titre, pas lu dans l'email. Bon
+    // pour tamponner un bordereau, jamais pour affirmer une double vente (§5).
+    if (n && !(arch && estArchive(n, arch))) { out.numero = n; out.parTitre = true; }
   }
   return out;
+}
+
+// ── DOUBLE VENTE, APP FERMÉE (api/_lib/double-vente.js) ────────────────────
+// Lit, pour CE vendeur, ses annonces eBay actives et ses annonces Leboncoin, en
+// colonnes projetées (jamais `select=data`, §4.4), paginé (§4.5). Chaque
+// plateforme rend une Map (lu) ou `null` (pas su ⇒ elle ne dit RIEN).
+// ⚠️ Base cloisonnée sans vendeur résolu ⇒ pas su : une lecture sans filtre
+//    d'owner rendrait les annonces de TOUS les vendeurs.
+async function lirePagine(requete) {
+  const out = []; const page = 1000;
+  for (let from = 0; from < 100000; from += page) {
+    let r;
+    try { r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    catch (_) { return null; }
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    out.push(...j);
+    if (j.length < page) break;
+  }
+  return out;
+}
+// Objet lu (objet), absent (`null`), ou forme inconnue (`undefined` = pas su).
+const objetJson = (v) => {
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return undefined; } }
+  if (v == null) return null;
+  return typeof v === 'object' && !Array.isArray(v) ? v : undefined;
+};
+export async function lireAnnoncesAilleurs() {
+  const cl = await baseCloisonnee();
+  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
+  const [mainL, reg, ebayL, lbcL, ventesL] = await Promise.all([
+    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens'),
+    lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
+    lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
+    lirePagine('id=eq.lbc_listings&select=items:data->items'),
+    lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
+  ]);
+  // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
+  if (!mainL) return { ebay: null, lbc: null };
+  const mk = mainL[0] ? objetJson(mainL[0].mk) : null;
+  if (mk === undefined) return { ebay: null, lbc: null };
+  const liens = mainL[0] ? objetJson(mainL[0].liens) : null;
+  let ebay = null;
+  if (reg && ebayL) {
+    const ids = comptesActifs(normaliserRegistre(reg[0] || null)).map((c) => 'ebay_listings' + c.suffixe);
+    ebay = annoncesEbayParNumero(ebayL, ids, mk);
+  }
+  let lbc = null;
+  if (lbcL && ventesL && liens !== undefined) {
+    const items = lbcL[0] ? objetJson(lbcL[0].items) : null;
+    const ventes = ventesL[0] ? objetJson(ventesL[0].ventes) : null;
+    if (items !== undefined && ventes !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk);
+  }
+  return { ebay, lbc };
+}
+// Une vente Vinted vient d'être apprise : la paire est-elle PROUVÉE en vente
+// ailleurs ? Rien sans N°, rien sur « pas su », rien en rejeu en lot, rien si
+// la catégorie est coupée (on ne lit même pas) ; une seule fois (pushOnce).
+async function notifierDoubleVente(numero, titre) {
+  try {
+    if ((contexteVendeur.getStore() || {}).silence) return;
+    if (!numerosDeVente(numero).length) return;
+    if (!(await pushCategorieActive('doublevente'))) return;
+    const { ebay, lbc } = await lireAnnoncesAilleurs();
+    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc), titre);
+    if (notif) await pushOnce(notif, 'doublevente');
+  } catch (_) {}
 }
 
 // Prix d'achat d'une paire d'après le titre de l'annonce (pour le Copilote
@@ -1454,8 +1542,9 @@ export async function traiterEmail(req, res) {
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       // N° absent du titre de l'annonce ? On le retrouve dans les annonces
       // numérotées de l'app (correspondance de titre, jamais si ambigu).
+      let numeroLu = '';
       { const jn = await numeroDEmail(data.numero, data.article, { title: data.modele || data.article, size: data.taille });
-        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
+        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; numeroLu = jn.parTitre ? '' : jn.numero; }
       // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
       // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
       let pdfTamponneB64 = null, posKnown = false;
@@ -1479,6 +1568,7 @@ export async function traiterEmail(req, res) {
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
       try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
+      await notifierDoubleVente(numeroLu, data.modele || data.article);
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -1585,15 +1675,20 @@ export async function traiterEmail(req, res) {
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
       try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}
+      await notifierDoubleVente(data.numero, data.designation);
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
       // l'email contient l'adresse email de l'acheteur (comptes Pro).
       let facture = null;
       try {
         if (data.email) {
-          const cfg = await supabaseGetRow('vrm_pro_facture');
+          // Réglage ILLISIBLE ≠ « facturation coupée » : sans ça, la facture
+          // n'était jamais faite et l'email acquitté. Pas su ⇒ 503, il reviendra.
+          const cfgLu = await supabaseLireRow('vrm_pro_facture');
+          if (!cfgLu.lu) marquerEcritureRatee();
+          const cfg = cfgLu.lu ? cfgLu.data : null;
           if (cfg && cfg.actif) {
             facture = await createProInvoice(data, acc, cfg, now);
-            try { await pushOnce({
+            if (facture && !facture.deja) try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
               tag: `inv-${facture.number}`, url: '/?tab=invoices',

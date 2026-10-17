@@ -129,6 +129,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      'StudioPhoto :: ph.img': 'photo prise par le vendeur dans le studio, data:image/jpeg fabriquée par le canvas (jamais une adresse Vinted)',
+      'StudioPhoto :: ph.detoure': 'la même photo détourée dans le navigateur, data:image/webp|png (jamais une adresse Vinted)',
       'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
       'PhotoVente :: secours': 'octets raster du secours serveur, convertis en data:image (type et taille vérifiés)',
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
@@ -142,7 +144,9 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Comptabilite :: qi': 'QR de retrait (transporteur)',
       'Comptabilite :: qrView.img': 'QR de retrait (transporteur)',
       'SettingsScreen :: customLogo': 'logo choisi sur l’appareil (data:)',
+      'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
       'AbonnementRequis :: "/logo-vrm-96.png"': 'logo de l’app',
+      'TeteEquipe :: "/logo-vrm-96.png"': 'logo de l’app (écran des colis de l’équipe, mode équipe)',
       'ProFactureSetting :: cfg.logo': 'logo de facture choisi sur l’appareil (data:)',
       'AppCoeur :: logoSrc': 'logo de l’app ou logo choisi (data:)',
       'Fenetre :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',

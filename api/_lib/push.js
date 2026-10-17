@@ -104,6 +104,7 @@ export const PUSH_DEFAUT = {
   expedier: true,   // colis à poster (rappel quotidien)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
+  doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
   suivi:    false,  // « en transit », « livré » : rien à faire
   achat:    false,  // tu viens de l'acheter, tu le sais
   message:  false,  // le badge de l'app suffit

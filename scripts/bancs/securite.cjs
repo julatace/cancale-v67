@@ -34,7 +34,8 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
   r.end(fs.readFileSync(p));
 });
-srv.listen(4489);
+const PORT_BANC = Number(process.env.BANC_PORT) || 4489;
+srv.listen(PORT_BANC);
 const HTML522 = '<!DOCTYPE html><html><head><title>522: Connection timed out</title></head><body>Connection timed out</body></html>';
 
 let ko = 0;
@@ -109,7 +110,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       ? r2.fulfill({ status: 522, contentType: 'text/html', headers: cors, body: HTML522 })
       : r2.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: '{"mailer_autoconfirm":true}' })));
     await pg.route('**/api/**', (r2) => r2.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"serviceKey":true,"owner":true,"pret":true}' }));
-    await pg.goto('http://localhost:4489/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await pg.goto('http://localhost:'+PORT_BANC+'/?tab=settings', { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5200);
     const bloc = await pg.evaluate(() => {
       const t = [...document.querySelectorAll('div')].find((d) => /Sécurité des données/.test(d.textContent || '') && (d.textContent || '').length < 2600);

@@ -4559,12 +4559,11 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
-### Le mode équipe : migration 016 (fonction n°37, 16 octobre) — PAS APPLIQUÉE, PAS D'ÉCRAN
+### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17
 Retenue le 11 octobre : le vendeur invite un aide qui voit les colis à expédier
 et à retirer, les codes de retrait, imprime les bordereaux — et RIEN d'autre.
-**Livré : la migration prouvée et un plan d'écran. L'app n'est pas touchée**
-(trois autres agents modifient `App.jsx` en ce moment ; l'aiguillage du membre
-touche le démarrage et la porte d'abonnement — à faire seul, avec son banc).
+**Livré le 16 : la migration prouvée. Le 17 : la route, les écrans et leur banc**
+(section « L'écran du mode équipe » ci-dessous).
 Fichier : `supabase/migrations/016-equipe.sql` (la 015 est réservée à l'horloge
 de l'agent eBay).
 - **Une table** `vrm_equipe` (vendeur, email, membre, rôle `colis`, statut
@@ -4628,27 +4627,85 @@ de l'agent eBay).
   à l'installation et refuse sinon) ; l'en-tête `x-vrm-equipe` dans
   `request.headers` de SA PostgREST (forme `noter_ecriture`, pas essayé) ; banc
   sur Postgres 16, production en 17.6.
-- **Plan d'écran (pas fait)** :
-  1. `api/compte.js?mode=equipe` (logique dans `api/_lib/equipe.js`, aucune
-     13ᵉ fonction) : GET → `rpc/vrm_equipe_lister` avec le jeton du vendeur ;
-     POST `{action: inviter|revoquer|accepter}`. Fonction absente (404 PGRST202)
-     ⇒ 503 « pas encore installé », jamais « équipe vide ».
-  2. Réglages → Mon compte → « Équipe » (`src/Equipe.jsx`, monté d'une ligne) :
-     inviter par email, lister (statut), révoquer ; côté invité : ses
-     invitations (« Accepter ») et « membre de X — Ouvrir ses colis ».
-  3. `ColisEquipe` (écran seul, Colis uniquement) : lectures avec l'en-tête
-     `x-vrm-equipe` ET `owner=eq.<vendeur>`, `rpc/vrm_equipe_colis`, `aExpedier`
-     de l'app, impression par `lirePdfLigne`. Aiguillage dans `App` AVANT
-     `PorteAbonnement` (un aide ne paie pas) : membre connu en cache ⇒
-     `ColisEquipe`, avec « Ouvrir ma propre boutique ».
-  4. `api/compte.js` mode `fermer` : appeler `vrm_equipe_effacer` (vendeur ET
-     membre). Banc à 390/1512 px sur faux PostgREST qui applique la règle.
 - **Gestes de Julien** : (1) Supabase → Authentication : **confirmation d'email
   obligatoire** (sinon l'adresse « confirmée » ne prouve rien) ; (2) lancer
   l'essai annulé (`essai.sql`) dans l'outil SQL, lire la ligne `essai` ; (3)
   appliquer la 016 VRM fermé ; (4) `--verifier` ⇒ `ok: true`. Rien ne change
-  pour personne tant qu'aucune invitation n'est acceptée et que l'écran n'existe
-  pas.
+  pour personne tant qu'aucune invitation n'est acceptée (l'écran, sans la 016,
+  dit « le mode équipe n'est pas encore activé sur ta base »).
+
+#### L'écran du mode équipe (17 octobre)
+- **Route** : `api/compte.js?mode=equipe` (logique `api/_lib/equipe.js`, toujours
+  **12 fonctions**). GET → `rpc/vrm_equipe_lister` + `aBoutique` (a-t-il au moins
+  un compte Vinted à lui, lu avec SON jeton) ; POST `{action: inviter | accepter
+  | revoquer | quitter}`. Tout part avec le **jeton de l'appelant**, jamais la clé
+  de service. Trois états : 200 · **503 `non-installe`** (fonction absente,
+  PGRST202 ⇒ « Le mode équipe n'est pas encore activé sur ta base. », jamais une
+  erreur brute ni une équipe vide) · **503 `pas-su`** · 400/409 refus réel dit en
+  clair (adresse invalide, la sienne, plafond de 5, adresse pas confirmée…).
+  ⚠️ **Aucun email d'invitation n'est envoyé** (pas de SMTP) : le panneau le dit,
+  le vendeur prévient la personne.
+- **Fermer mon compte** appelle `vrm_equipe_effacer` (clé de service, `sbCle`)
+  APRÈS les compteurs et AVANT les photos : base sans la 016 ⇒ 0, rien à effacer ;
+  base muette ⇒ fermeture INCOMPLÈTE, dite, compte de connexion gardé.
+- **Réglages → Mon compte → Équipe** (`EquipeSetting`) : ce qu'un membre voit et
+  ne voit pas (`CE_QUE_VOIT_UN_MEMBRE`, une phrase pour le panneau et
+  l'invitation, §11), inviter par email, la liste (membre / invitée), « Retirer »
+  (confirmé) ; côté invité : « Accepter », et « Tu prépares les colis de X —
+  Ouvrir ses colis · Quitter ».
+- **L'aiguillage** (`PorteEquipe`, dans `App`, **AVANT `PorteAbonnement`** : un aide
+  ne paie pas, c'est l'abonnement du VENDEUR que la base vérifie) :
+  · l'appareil a choisi l'écran d'un vendeur (`vrm_equipe_vue_{uid}`) ⇒ ses colis ;
+  · jamais choisi + **aucune boutique à lui** (lu, pas supposé) ⇒ l'équipe, ou ses
+    invitations à accepter ;
+  · sinon ⇒ sa propre app, exactement comme avant. **Un vendeur qui est aussi
+    membre garde sa propre app** et ouvre l'équipe sur son clic ; « Ma propre
+    boutique » le ramène.
+  · Choisi mais plus membre (révoqué / quitté) ⇒ « Tu n'as plus accès », rien de
+    la boutique du vendeur. Base sans la 016 ⇒ la phrase prévue.
+  · ⚠️ La liste est mise en cache sur l'appareil (`vrm_equipe_cache_{uid}`) : seule
+    la TOUTE PREMIÈRE ouverture sur un appareil attend la réponse (2,5 s au plus)
+    — sans ça un aide voyait d'abord une boutique vide et ses écrans lisaient
+    ses lignes pour rien (vu au banc : `txn`, `billing`, `main`…). Ensuite, aucune
+    attente pour personne. `AppCoeur` ne monte toujours qu'avec une session.
+- **`ColisEquipe`** : chaque lecture porte `x-vrm-equipe: <vendeur>` ET
+  `owner=eq.<vendeur>` ; la liste des ventes/achats vient de `rpc/vrm_equipe_colis`
+  (aucun montant) ; « à expédier » = `aExpedier` de l'app moins les coches
+  « posté » ; « à retirer » = `isAtRelayStatus` / `needs_action` moins les
+  « retirés », avec le code (`panel_colis_relais`, `codeRetrait`) et le QR ;
+  les codes reçus par email (`email_track_*`, disponibles, ≤ 14 j). Impression :
+  `lirePdfLigne(row, '', {'x-vrm-equipe'})` (nouveau 3ᵉ paramètre), tamponnée du
+  N° que porte la ligne `email_bord_*` — le membre ne lit jamais `main`, il ne
+  recalcule aucun numéro (un bordereau capté sans email part avec le titre seul).
+  Trois états : chargement · pas su (une ligne, « Réessayer ») · non installé ·
+  plus d'accès (projection `null`) · lu ; une lecture partielle est dite une fois.
+  `lecturesPartagees` met `x-vrm-equipe` dans sa clé.
+- **Preuves** : banc `scripts/bancs/equipe.cjs` (port 5011, `BANC_PORT`), faux
+  PostgREST qui applique la règle de la 016 (liste blanche, en-tête, adhésion
+  active, aucune règle sur `vinted_accounts`), faux GoTrue, le VRAI
+  `api/compte.js` exécuté, 390 et 1512 px — **76 contrôles** : l'aide arrive sur
+  les colis (pas de porte d'abonnement), ne voit que la vente à poster (ni la
+  finalisée, ni celle cochée « posté »), le code de retrait, AUCUN montant ;
+  aucune requête de son navigateur vers `main`, `vinted_accounts`, `_txn_`,
+  `_billing`, `orders_*`, `email_sale_*` ; chaque lecture porte l'en-tête ET
+  `owner=eq.` ; l'impression lit le PDF avec l'en-tête et ouvre le bordereau ;
+  invitation retirée ⇒ plus rien ; base sans la 016 ⇒ la phrase (écran et
+  Réglages) ; le vendeur garde son app (aucune requête avec l'en-tête), invite et
+  retire ; accepter d'un clic ouvre les colis ; une vendeuse-membre garde SA
+  boutique, ouvre celle de V sur son clic, sans mélange. **35 rouges sur le build
+  d'avant** (ed52842, §6.1) ; mutation « lecture sans `x-vrm-equipe` » ⇒ 8
+  rouges. `audit-fermer-compte.cjs` : +3 contrôles (équipe effacée chez lui seul,
+  base sans la 016, base muette ⇒ incomplet).
+- **Non mesuré** : que la passerelle de Supabase laisse passer l'en-tête
+  personnalisé `x-vrm-equipe` depuis le navigateur (CORS : le greffon Kong
+  renvoie par défaut les en-têtes demandés — non vérifié, supabase.co est bloqué
+  d'ici) ; si elle le refusait, l'écran dirait « pas pu lire » (jamais « aucun
+  colis ») et la lecture devrait passer par la route. Le thème sombre n'est pas
+  appliqué sur l'écran d'équipe (monté hors d'`AppCoeur`).
+- **Gestes de Julien** (en plus de ceux de la migration) : rien d'autre. Une fois
+  la 016 appliquée : Réglages → Mon compte → Équipe → inviter l'adresse de son
+  aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
+  arrive directement sur « Colis à préparer ».
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
@@ -9362,9 +9419,213 @@ profileur de Chrome sur un build non minifié.
   `preparerLigneVente` (sinon ligne périmée).
 - **Pas fait, mesuré** : (2) le composant
   qui porte Ventes/Achats/Annonces/Ma journée se rend ~23 fois au démarrage (une
-  par arrivée de données) ; (3) le premier écran attend la sonde de schéma, puis
-  les comptes, puis les ventes : trois allers-retours à la suite ; (4) le code
-  de l'app (518 Ko compressés).
+  par arrivée de données) ; (3) ~~sonde → comptes → ventes à la suite~~ (fait,
+  ci-dessous) ; (4) le code de l'app (518 Ko compressés).
+- **La chaîne du premier écran raccourcie (16 octobre)** : au téléphone, le rendu
+  d'AppCoeur (~600 ms de processeur ×4) s'intercalait entre la sonde et les
+  comptes, puis ~350 ms avant les ventes. `prechargerDemarrage` (appelé par
+  `authBoot` quand la porte sait qu'AppCoeur monte) lance les comptes ET les
+  commandes de tous les comptes en UNE lecture (`lireTout … strict`) ; chaque
+  compte LIÉ reçoit sa part dans `cachedRow('o:uid')` (mêmes lignes que
+  `fetchHarvestOrdersBrut`), famille illisible ⇒ lecture par compte. Gardes
+  inchangées : session = son jeton ; sans session seulement accès direct + base
+  MESURÉE non cloisonnée (`SCHEMA_MESURE`) ; rien pendant une récupération ;
+  échec ⇒ `null` (panne dite). Ventes lues au 2ᵉ aller-retour au lieu du 4ᵉ-5ᵉ
+  (`vitesse.cjs`, 2 rouges sur l'avant) ; Ma journée 52 → 46 lectures ; texte
+  identique (même build : famille coupée vs servie ; entre builds : `VITESSE_TEXTES`).
+  Le temps au héros (~2,3–3,4 s → ~1,9–2,1 s au téléphone) varie trop sur la
+  machine partagée pour un plafond.
+
+### Double vérification de connexion (TOTP, 16 octobre)
+Retenue par Julien le 11 octobre (n° 17). **Facultative** : Réglages → Mon
+compte → Connexion → « Double vérification ». Rien ne change pour qui ne
+l'active pas.
+- **L'API MFA native de GoTrue, à la main** (comme le reste de l'auth, aucune
+  bibliothèque) : `POST /factors` (totp) → QR (`data:image/svg+xml`, affiché en
+  `<img>`, jamais en HTML) + clé à recopier ; `challenge` + `verify` (rend des
+  jetons `aal2`) ; `DELETE /factors/{id}` ; `GET /user` (porte `factors`).
+  Helpers : `totpVerifies`, `aalDuJeton`, `etatMfa`, `mfaPasse`, `mfaAppel`,
+  `mfaVerifierCode`, `mfaLireFacteurs`.
+- **La session porte `totp`** (les facteurs TOTP VÉRIFIÉS), lu dans le `user` de
+  chaque réponse de jeton (mot de passe, renouvellement, PKCE, lien email par
+  `fetchMe`). `etatMfa` : `aal2` ⇒ entrer · `totp` non vide ⇒ le code · `[]` ⇒
+  entrer · absent (session rangée avant cette fonction) ⇒ on relit `/user`.
+- **La porte vit dans `App`, AVANT le cœur** (`PorteMfa`) : tant que le code
+  n'est pas passé, `AppCoeur` ne monte pas, aucune lecture au nom du vendeur ;
+  ni l'extension (`assurerSessionExtension`), ni le relais du téléphone
+  (`relaisUtile`), ni l'abonnement aux notifications (`main.jsx`) ne partent.
+  Vaut pour une session restaurée au rechargement.
+- **« Activée » ne s'écrit qu'après un premier code juste.** Désactiver :
+  confirmation + code (la session repasse en `aal2`, ce que GoTrue exige pour
+  supprimer un facteur vérifié).
+- **Personne enfermé dehors** : GoTrue injoignable ⇒ « le service de connexion
+  ne répond pas », « Réessayer » (et nouvel essai seul toutes les 15 s quand on
+  ne sait pas s'il faut un code) ; jamais de déconnexion automatique. Téléphone
+  perdu : l'écran dit que ça ne se retire pas d'ici et donne l'adresse de
+  contact (`src/contact.js` — vide aujourd'hui ⇒ « adresse de contact à venir »).
+  Aucune procédure inventée.
+- **L'extension** : sa session (`/api/compte?mode=session-extension`, lien
+  magique) est en `aal1`, et c'est sans effet sur ce qu'elle fait — RLS ne
+  regarde pas `aal`. Elle n'est simplement plus fabriquée avant le code.
+  Extension NON modifiée, pas de bump.
+- ⚠️ **Limite à connaître** : la double vérification protège l'APP (l'écran),
+  pas l'API. Une session `aal1` (mot de passe seul) lit encore la base en
+  direct : RLS n'exige pas `aal2`. L'exiger (règle restrictive `aal = aal2`
+  quand un facteur existe) couperait l'extension, dont la session est `aal1`.
+  À trancher plus tard, avec une session extension en `aal2`.
+- Preuves : banc `bancs/double-verification.cjs` (port 4981, faux GoTrue à la
+  forme documentée, 390 tactile + 1512 px) — sans MFA comme avant (connexion et
+  session d'avant), activation (QR, clé, code faux refusé, « activée » après),
+  désactivation (code faux, DELETE en `aal2`), connexion protégée (zéro lecture
+  au nom du vendeur avant le code, rechargement compris, code faux refusé),
+  GoTrue injoignable (ni « activée », ni déconnexion). **63 contrôles** ; sur le
+  build d'avant (§6.1, banc copié dans l'arbre de 0969738) **20 rouges** — les 8
+  verts sont les cas « sans double vérification », comme attendu. Le banc ne
+  compte que les lectures faites AVEC le jeton du vendeur (les sondes anonymes
+  de l'écran de connexion ne lisent rien de lui). `audit-photos-vinted` admet
+  le `<img>` du QR (source fermée : `qrEnSrc`). ⚠️ `demarrage.cjs` sort 1 rouge
+  (« une vraie nouvelle vente est annoncée ») — **déjà rouge sur 0969738**, sans
+  lien avec cette passe.
+- **Non mesuré** : le vrai GoTrue de production (formes tirées de la doc
+  Supabase) ; que TOTP soit activé dans le projet (Authentication → MFA —
+  **geste de Julien : vérifier**, rien n'a été écrit en production) ; « mot de
+  passe oublié » sur un compte protégé (`PUT /user` en `aal1` : GoTrue peut le
+  refuser, l'erreur est affichée, puis le code est demandé) ; un compte qui
+  active la double vérification sur un appareil voit ses AUTRES sessions `aal1`
+  demander le code au renouvellement suivant de leur jeton (≤ 1 h).
+
+---
+
+### Studio photo : cadre guide + détourage DANS le navigateur (fonction n°33, 17 octobre)
+Retenue le 11 octobre (« studio photo + détourage »), sous §2.9 : rien de payant
+sur la clé de Julien. Annonces → « ⋯ Outils » → **Studio photo**
+(`src/StudioPhoto.jsx`, `src/studioPhoto.js`, chargés au clic par `React.lazy`).
+- **Le cadre** : on choisit une paire PRÉSENTE (la liste de l'inventaire
+  physique, `porteursNum` — jamais un numéro tapé), la caméra s'ouvre
+  (`getUserMedia`, caméra arrière) dans une zone 3:4 avec un gabarit SVG (bord,
+  ligne de sol, axe). La photo prise est exactement ce que montre le cadre,
+  rangée dans `studio_photos_{N°}` (une ligne par paire, 12 photos au plus,
+  lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien et le dit).
+  Caméra refusée ou absente ⇒ la phrase le dit et le champ fichier
+  (`capture=environment`) prend le relais, recadré au même format.
+- **VRM ne publie rien sur Vinted** : « Enregistrer » télécharge la photo, il
+  l'ajoute lui-même dans l'app Vinted (l'écran le dit).
+- **Le détourage, local, sans clé, sans envoi** : modèle **U²-Netp**
+  (`public/modeles/u2netp.onnx`, 4,6 Mo, servi par VRM, chargé au clic).
+  ⚠️ **LICENCES vérifiées à la source le 16 octobre** : U²-Net = **Apache 2.0**
+  (fichier LICENSE de github.com/xuebinqin/U-2-Net) ; conversion ONNX de rembg =
+  **MIT** (sha256 `309c8469…`) ; moteur **onnxruntime-web 1.22.0 = MIT**, chargé
+  depuis cdn.jsdelivr.net au clic. Notices dans `public/modeles/LICENCES-u2netp.txt`.
+  **Écartés** : `@imgly/background-removal` (AGPL), RMBG-1.4 (non commercial),
+  le paquet npm `@rmbg/model-u2netp` (aucune licence déclarée). L'originale est
+  TOUJOURS gardée à côté de la détourée ; aucune route ajoutée (12 fonctions).
+- **Décision** : le chemin Photoroom existant (`api/_lib/detourage.js`,
+  `PHOTOROOM_POUR`) n'est pas touché ; la clé PAR VENDEUR (modèle Super PDP)
+  n'a pas été écrite, le détourage local la rend non nécessaire pour ce studio.
+  Extension non touchée.
+- **Preuves** : banc `scripts/bancs/studio-photo.cjs` (port 4991, données
+  inventées, fausse caméra Chromium, 390 tactile et 1512) — **55 contrôles** :
+  cadre par-dessus la caméra, photo rangée pour la BONNE paire et au format
+  3:4, détourée avec transparence (≈ 75 % transparent / 23 % opaque sur
+  l'image de la fausse caméra), aucune requête payante (Photoroom, POST
+  `/api/ai`, `mode=detourage`), rien du moteur avant le clic, seul hôte
+  extérieur cdn.jsdelivr.net, caméra refusée ⇒ repli + phrase, lecture KO ⇒
+  rien écrit. **Rouge sur le build d'avant** (le studio n'existe pas, 2 KO) ;
+  deux mutations (alpha forcé à 255, lecture ratée lue « vide ») ⇒ **4 rouges**.
+  Le moteur est servi au banc depuis une copie locale (`BANC_ORT_DIR`, sinon
+  téléchargé une fois par curl dans le dossier temporaire).
+- **Non mesuré** : la QUALITÉ sur de vraies chaussures (aucune photo réelle
+  joignable d'ici — u2netp est léger, bords doux : l'écran demande de vérifier) ;
+  Safari iOS réel (getUserMedia en PWA, encodage WebP — repli PNG prévu) ; le
+  temps de calcul sur un vrai téléphone (≈ 16 Mo téléchargés au premier
+  détourage) ; le poids des lignes `studio_photos_*` dans la sauvegarde
+  complète (elles y entrent, comme toute donnée captée).
+
+### Double vente, app fermée : la notification part du serveur (17 octobre)
+Fonction n°2 retenue le 11 octobre. L'alerte « vendue sur Vinted → encore en
+vente sur eBay / Leboncoin » ne se calculait que VRM ouvert. `api/email-inbound`
+envoie maintenant une notification dès qu'une vente Vinted arrive par email
+(bordereau, « ton article s'est vendu »), **si et seulement si** la paire est
+PROUVÉE en vente ailleurs. Règle pure : `api/_lib/double-vente.js`.
+- **Identité par le N° seulement** (§5) : le N° LU dans l'email (après le
+  jugement 013 de `numeroDEmail`). Le N° retrouvé par ressemblance de titre
+  (`findNumeroByTitle`, `parTitre`) sert à tamponner le bordereau, **jamais** à
+  affirmer une double vente.
+- **eBay** : SKU `VRM-{n°}` d'une annonce de `ebay_listings*` (comptes eBay
+  actifs du registre, `comptesActifs`), traduit par la carte 013 PAR ANNONCE
+  (`numeroExterne`, `ebayAnnonces`) — la règle de `numEbayLu`.
+  **Leboncoin** : annonce à lui (`annonceLbcALui`, comptes prouvés par ses
+  ventes), pas morte, pas vendue sur Leboncoin, clé = lien posé à la main ou
+  référence VRM (réf / CustomRef), traduite par `lbcAnnonces`. ⚠️ Plus strict que
+  l'app, exprès : le « nXXX » d'un TITRE Leboncoin n'est pas retenu (ressemblance,
+  et ancien numéro possible après la remise à zéro).
+- **Pas su ⇒ rien** : marqueur 013, registre eBay, annonces eBay, annonces ou
+  ventes Leboncoin illisibles ⇒ la plateforme concernée ne dit rien ; base
+  cloisonnée sans vendeur résolu ⇒ rien (une lecture sans filtre lirait tous les
+  vendeurs). Rejeu en lot (`silence`) ⇒ rien.
+- **Une seule fois** : `pushOnce` (mémo `push_dedup`, lire-fusionner-réécrire
+  gardé). Clé = N° + annonces rencontrées (`dv-230-ebay:1111`) : le bordereau et
+  l'email « vendu » d'une MÊME vente, ou un email rejoué, ne sonnent qu'une fois.
+  ⚠️ Décision : pas la transaction — l'email « vendu » n'en porte pas, et les
+  deux emails d'une vente doivent tomber sur la même clé.
+- **Contenu** : « ⚠️ Vendue sur Vinted — N°230 encore en vente sur eBay » /
+  « {paire} — N°230 est encore en vente sur eBay : retire-la… », ouvre
+  `?tab=ebay_annonces` (ou `?tab=leboncoin`). Rien n'est retiré tout seul.
+- **Préférence `doublevente`**, activée par défaut, la même dans `PUSH_CATS` (app)
+  et `PUSH_DEFAUT` (serveur) — `audit-bilan-semaine.cjs` compare les deux.
+  Abonnement coupé ⇒ rien (`sendPushToAll`). Aucun cron, toujours 12 fonctions.
+- **Coût** : la lecture des annonces ne part que pour une vente qui porte un N°
+  et une catégorie active. Projetées (`data->items`, jamais `select=data`), mais
+  `lbc_listings` pèse ~226 Ko : quelques ventes par jour, accepté.
+- **Preuves** : banc `scripts/bancs/double-vente-push.cjs` (la vraie route, base
+  cloisonnée à deux vendeurs, faux Web Push, 26 contrôles) — **11 rouges** sur
+  l'avant (§6.1, copié dans l'arbre d'avant) ; `--mutation=titre` (N° par titre
+  compté) 1 rouge, `--mutation=passu` (lecture ratée = vide) 2 rouges,
+  `--mutation=dedup` (envoi direct) 1 rouge.
+- **Non mesuré** : la forme réelle des lignes `ebay_listings` / `lbc_listings` en
+  production (lues telles que la synchro et l'extension les écrivent) ; un
+  `ebay_listings` incomplet ne fait que MANQUER une alerte (le sens sûr) ; une
+  annonce retirée d'eBay à la main sans synchro reste « en vente » jusqu'à la
+  synchro suivante (fausse alerte possible, le temps d'une synchro).
+- **Julien** : rien — la catégorie est activée d'office (Réglages →
+  Notifications pour la couper).
+
+### Revue adverse des routes serveur (17 octobre)
+Toutes les routes `api/*.js` et `api/_lib/*.js` relues, chaque défaut REPRODUIT
+en exécutant la vraie route (`scripts/audit-routes-revue.cjs`, un processus neuf
+par scénario, fausse base à état) : **15 rouges sur le code d'avant, 0 après**.
+- ⚠️⚠️ **Facture Pro : un compteur illisible émettait « FA-AAAA-0001 » et
+  remettait le compteur à 1** (toutes les factures suivantes reprenaient des
+  numéros déjà émis) ; et **le même email renvoyé** (un 503 est fait pour ça)
+  donnait à la facture déjà émise un NOUVEAU numéro et la repassait « à
+  envoyer » — le script Gmail l'envoyait une seconde fois à l'acheteur.
+  `createProInvoice` relit d'abord `email_invoice_{clé}` (déjà émise ⇒ rendue
+  telle quelle), lit compteur et réglage en trois états ; pas su ⇒ aucune
+  facture et 503.
+- ⚠️⚠️ **`duVendeur` (owner.js) lisait SANS filtre de vendeur quand la sonde de
+  cloisonnement hoquetait** (`null` valait « une seule boutique »). Chemin
+  réel : le rejeu d'un email mis de côté (`email-rattacher` → `traiterEmail`) —
+  journal, fiches, mémo d'un AUTRE vendeur lus avec la clé de service, puis
+  réécrits chez celui-ci. Seul un « non » mesuré lit sans filtre.
+- ⚠️⚠️ **Le widget aussi** : sonde ratée ⇒ lectures sans filtre, et la clé de A
+  servait les ventes de B (prouvé : `salesMonth=2` au lieu de 1). Trois états,
+  `null` ⇒ 503 (le défaut corrigé le 4 octobre dans push.js et ship-reminders).
+- **§2.9 : `/api/ai` dépensait la clé du serveur (celle de Julien) pour tout
+  vendeur connecté**, et la faisait passer DEVANT la clé que le vendeur
+  apportait. Clé du vendeur d'abord ; clé du serveur pour `VRM_OWNER_UID` seul ;
+  sinon `no-key` (l'app retombe sur ses suggestions calculées).
+- `/api/vinted-refresh` disait « refreshed » (200) quand l'écriture des jetons
+  renouvelés échouait — l'ancien jeton étant consommé chez Vinted. Rend
+  `refreshed_not_saved` et 502. (Route sans appelant aujourd'hui.)
+- **Pas retenus, notés** : l'action eBay `exchange` échange un code SANS
+  state/nonce (aucun appelant dans l'app, et un code ne fuit pas vers un tiers :
+  à retirer un jour) ; `PHOTOROOM_POUR=tous` ouvrirait la clé Photoroom de
+  Julien aux abonnés payants — c'est un réglage à poser exprès, éteint, mais il
+  contredit §2.9 s'il est posé ; la notification de suppression de compte eBay
+  (`mode=deletion`, POST) n'efface rien ; `harvestOrders` du widget lit
+  `select=id,data` sur `orders_*` (repli quand le résumé manque) ;
+  `vinted-connect` ne vérifie pas un `accessToken` encore valide auprès de
+  Vinted (il ne touche que les lignes du vendeur lui-même).
 
 ---
 
@@ -9380,7 +9641,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **93 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **85 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -9702,8 +9963,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 93 audits
-scripts/bancs/                  les 84 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 94 audits
+scripts/bancs/                  les 85 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

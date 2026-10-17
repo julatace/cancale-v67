@@ -101,7 +101,10 @@ const ouvrir = async (b, vp, prenom, ventesKO = false) => {
       }
       return { ...r, updated_at: cap, cap: r.data.capturedAt };
     };
-    if (ventesKO && /orders_(sold|%)/.test(u)) return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
+    // (16 oct.) Toutes les FORMES de lecture des commandes échouent, y compris la
+    // lecture de tous les comptes à la fois du préchargement (`orders_*`) — sinon
+    // le banc ne simule plus la panne qu'il décrit (§6.3).
+    if (ventesKO && /orders_(sold|%|\*)/.test(u)) return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
