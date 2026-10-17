@@ -31,9 +31,15 @@ export const contexteVendeur = new AsyncLocalStorage();
 export const proprietaireCourant = () => (contexteVendeur.getStore() || {}).owner || '';
 // Filtre PostgREST du vendeur courant, à n'ajouter QUE si la base sait séparer
 // (sinon un filtre sur une colonne inconnue fait échouer la lecture en 400).
+// ⚠️ « Pas su » (`null` : la sonde a hoqueté) FILTRE quand même (revue du
+//    17 octobre, `audit-routes-revue.cjs` C) : seul un « non » mesuré (colonne
+//    absente, une seule boutique) lit sans filtre. Avant, une sonde ratée
+//    pendant le rejeu d'un email mis de côté faisait lire, avec la clé de
+//    service, le journal et les fiches d'un AUTRE vendeur — puis les réécrire
+//    chez celui-ci. Au pire, filtrer fait échouer la lecture (« pas su »).
 export async function duVendeur(url, cloisonnee) {
   const owner = proprietaireCourant();
-  if (!owner || !(await cloisonnee())) return url;
+  if (!owner || (await cloisonnee()) === false) return url;
   return url + (url.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(owner)}`;
 }
 
