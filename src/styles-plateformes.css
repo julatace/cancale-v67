@@ -52,7 +52,8 @@
 .vrm-pourquoi { display: inline; }
 .vrm-pourquoi > summary {
   display: inline-flex; align-items: center; justify-content: center; list-style: none; cursor: pointer;
-  min-width: 44px; min-height: 44px; margin: -12px -10px; color: var(--vrm-muted); font-size: 13px;
+  width: 32px; min-height: 44px; margin: -12px -6px -12px 0; vertical-align: middle;
+  color: var(--vrm-muted); font-size: 14px; font-weight: 400;
 }
 .vrm-pourquoi > summary::-webkit-details-marker { display: none; }
 .vrm-pourquoi > summary::marker { content: ''; }

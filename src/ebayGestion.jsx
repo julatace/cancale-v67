@@ -194,3 +194,35 @@ function EbayBenefice({order,costs,onCosts,theme:C}){
  if(!b.entry)return <p style={{fontSize:11,color:C.muted}}>{b.raison}</p>;
  return <details style={{fontSize:12}}><summary style={{cursor:'pointer'}}>{order.orderPaymentStatus==='PAID'?'Bénéfice de l’article':'Bénéfice prévisionnel'} : {b.benefice==null?'à compléter':montant(b.benefice,'EUR')+(b.complet?'':' estimé')}</summary><p style={{color:C.muted}}>Article : {montant(b.prixArticle,'EUR')} · {b.commissionAuto!=null?`Commission eBay lue : ${montant(b.commissionAuto,'EUR')}`:'Commission eBay non fournie : renseigne-la si tu la connais.'}</p><label style={S.label}>Prix d’achat<input aria-label="Prix d’achat eBay" inputMode="decimal" defaultValue={costs.buyPrice || ''} key={costs.buyPrice || ''} style={S.input} onBlur={ev=>{const v=ev.target.value.trim();if(v && centimes(v)==null){ev.target.setCustomValidity('Indique un montant valide en euros.');ev.target.reportValidity();return;}ev.target.setCustomValidity('');onCosts({buyPrice:v});}} onInput={ev=>ev.target.setCustomValidity('')}/></label><CoutsVente entry={b.entry} readonlyKeys={b.commissionAuto!=null?['commission']:[]} onSave={patch=>onCosts({...patch,...(patch.fraisComplets===true && b.commissionAuto!=null?{commissionLueConfirmee:b.commissionAuto}:{})})} theme={C}/></details>;
 }
+
+// (17 octobre) ÉVALUATIONS À LAISSER — Julien : « toutes les fonctionnalités
+// d'eBay dans l'app ». eBay ne permet au vendeur qu'une évaluation POSITIVE
+// envers son acheteur : un commentaire (80 caractères au plus), sur SON clic et
+// après confirmation ; la route relit la vente chez eBay avant d'écrire. Rien
+// n'est laissé tout seul. Une réponse sans issue claire est « incertaine ».
+const COMMENTAIRE_EVAL='Merci pour cet achat, paiement rapide. Je recommande !';
+export function EbayEvaluations({compte='principal',headers,confirm,theme:C}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
+ const S=styleUI(C),[rows,setRows]=useState(undefined),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[textes,setTextes]=useState({}),[faits,setFaits]=useState({});
+ async function charger(){setBusy(true);setMessage('');try{const j=await call('evaluations',{},headers);if(!Array.isArray(j.evaluations))throw new Error('Les évaluations ne sont pas lisibles.');setRows(j.evaluations);}catch(e){setRows(null);setMessage(e.message);}finally{setBusy(false);}}
+ useEffect(()=>{charger();},[]);
+ async function evaluer(e){const k=e.itemId+':'+e.transactionId,t=String(textes[k] ?? COMMENTAIRE_EVAL).trim();
+  if(!t || t.length>80){setMessage('Un commentaire de 80 caractères au plus.');return;}
+  if(!await confirm({title:`Évaluer ${e.buyer} ?`,desc:`${e.titre || 'Vente '+e.itemId}\nÉvaluation positive : « ${t} »\n\nUne évaluation laissée sur eBay ne se modifie plus.`,ok:'Laisser l’évaluation',cancel:'Annuler'}))return;
+  setBusy(true);setMessage('');
+  try{await call('evaluer',{itemId:e.itemId,transactionId:e.transactionId,buyer:e.buyer,commentaire:t,confirme:true},headers,{write:true});setFaits(f=>({...f,[k]:'fait'}));}
+  catch(x){setFaits(f=>({...f,[k]:x.reason==='incertain'?'incertain':''}));setMessage(x.message);}
+  finally{setBusy(false);}
+ }
+ return <section className="vrm-ebay-evaluations" data-ebay-evaluations={rows===undefined?'en-cours':rows===null?'pas-su':rows.length}>
+  <div style={{display:'flex',alignItems:'center',gap:8,margin:'18px 0 10px'}}><h3 style={{margin:0,fontSize:15,color:C.text}}>Évaluations à laisser{Array.isArray(rows)&&rows.length?` · ${rows.length}`:''}</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
+  <Erreur message={message}/>
+  {rows===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture des ventes à évaluer…</p>}
+  {Array.isArray(rows) && !rows.length && <p style={{fontSize:12,color:C.muted}}>Aucune évaluation à laisser pour l’instant.</p>}
+  <div style={{display:'grid',gap:8}}>{(rows||[]).map(e=>{const k=e.itemId+':'+e.transactionId,f=faits[k];return <article key={k} data-ebay-evaluation={k} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card}}>
+   <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>{e.titre || `Annonce ${e.itemId}`}</b><div style={{fontSize:11.5,color:C.muted,marginTop:3}}>Acheteur : {e.buyer}</div>
+   {f==='fait'?<p role="status" style={{fontSize:12,margin:'8px 0 0'}}>Évaluation laissée, confirmée par eBay.</p>:f==='incertain'?<p role="status" style={{fontSize:12,margin:'8px 0 0',color:C.warn}}>Je ne sais pas si elle est partie : regarde sur eBay avant de recommencer.</p>:
+   <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}><input aria-label={`Commentaire pour ${e.buyer}`} maxLength={80} value={textes[k] ?? COMMENTAIRE_EVAL} onChange={ev=>setTextes(t=>({...t,[k]:ev.target.value}))} style={{...S.input,flex:'1 1 200px',fontSize:16}}/><button type="button" disabled={busy} onClick={()=>evaluer(e)} style={{...S.button,minHeight:44}}>Évaluer (positive)</button></div>}
+  </article>;})}</div>
+ </section>;
+}

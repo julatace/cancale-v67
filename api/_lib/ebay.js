@@ -165,7 +165,14 @@ async function identiteEbay(token) {
     const eias = ((/<EIASToken>([\s\S]*?)<\/EIASToken>/.exec(user) || [])[1] || '').trim();
     const pseudo = pseudoPropre((/<UserID>([\s\S]*?)<\/UserID>/.exec(user) || [])[1] || '');
     if (eias.length < 8) return null;
-    return { cle: cleCompteDe(eias), pseudo };
+    // (17 octobre) PRO OU PARTICULIER — `User.SellerInfo.SellerBusinessType`
+    // (doc d'eBay : Commercial · Private · Undefined). ⚠️ NON MESURÉ sur ses
+    // comptes. Seuls « Commercial » et « Private » disent quelque chose ;
+    // absent ou « Undefined » ⇒ '' (pas su : jamais « particulier » par défaut).
+    const seller = (/<SellerInfo>([\s\S]*?)<\/SellerInfo>/.exec(user) || [])[1] || '';
+    const bt = ((/<SellerBusinessType>([\s\S]*?)<\/SellerBusinessType>/.exec(seller) || [])[1] || '').trim().toLowerCase();
+    const type = bt === 'commercial' ? 'pro' : bt === 'private' ? 'particulier' : '';
+    return { cle: cleCompteDe(eias), pseudo, type };
   } catch (_) { return null; }
 }
 
@@ -187,6 +194,9 @@ function normaliserRegistre(d) {
     ajouteLe: Number(e.ajouteLe) || null,
     vuLe: Number(e.vuLe) || null,
     deconnecteLe: Number(e.deconnecteLe) || null,
+    // Pro / particulier lu chez eBay (GetUser). '' = demandé, eBay ne l'a pas
+    // dit ; absent (undefined) = jamais demandé.
+    ...(e.type === 'pro' || e.type === 'particulier' || e.type === '' ? { type: e.type, typeLuLe: Number(e.typeLuLe) || null } : {}),
   })).filter((e) => e.principal || e.cle);
   return { comptes, absent: d === null };
 }
@@ -306,10 +316,10 @@ async function rangerConnexion(code, owner, opts = {}) {
   }
   const meme = entrees.find((x) => x.cle && x.cle === id.cle);
   if (meme) {
-    const entree = { ...meme, pseudo: id.pseudo || meme.pseudo, vuLe: maintenant, deconnecteLe: null };
+    const entree = { ...meme, pseudo: id.pseudo || meme.pseudo, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant };
     return ranger(suffixeCompte(meme), (l) => poser(l, entree), entree, false);
   }
-  const nouvelle = (principal) => ({ cle: id.cle, pseudo: id.pseudo, principal, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null });
+  const nouvelle = (principal) => ({ cle: id.cle, pseudo: id.pseudo, principal, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant });
   if (refP && !princ) {
     // Le principal est relié mais son identité n'a jamais été apprise :
     // l'apprendre AVANT de décider (sinon on ne sait pas si c'est le même).
@@ -318,7 +328,7 @@ async function rangerConnexion(code, owner, opts = {}) {
     if (idP && idP.cle === id.cle) return ranger('', (l) => poser(l, nouvelle(true)), nouvelle(true), false);
     if (idP) {
       if (autres.some((x) => x.cle === idP.cle)) return REFUS_PRINCIPAL;
-      const p = { cle: idP.cle, pseudo: idP.pseudo, principal: true, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null };
+      const p = { cle: idP.cle, pseudo: idP.pseudo, principal: true, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: idP.type, typeLuLe: maintenant };
       const n = nouvelle(false);
       return ranger(suffixeCompte(n), (l) => poser(poser(l, p), n), n, true);
     }
@@ -346,7 +356,36 @@ async function apprendrePrincipal(owner, token) {
   if (!id || reg.comptes.some((x) => x.cle === id.cle)) return null;
   const t = Date.now();
   return modifierComptes(owner, (l) => l.some((x) => x.principal || x.cle === id.cle) ? null
-    : [{ cle: id.cle, pseudo: id.pseudo, principal: true, ajouteLe: t, vuLe: t, deconnecteLe: null }, ...l]);
+    : [{ cle: id.cle, pseudo: id.pseudo, principal: true, ajouteLe: t, vuLe: t, deconnecteLe: null, type: id.type, typeLuLe: t }, ...l]);
+}
+
+// (17 octobre) Pro ou particulier pour les comptes déjà reliés AVANT que VRM le
+// demande : une question à eBay par compte (GetUser, une LECTURE), seulement si
+// jamais demandé, ou si eBay ne l'avait pas dit il y a plus de 7 jours. Le
+// registre se modifie en comparer-et-échanger ; un compte qui a changé
+// entre-temps n'est pas touché. Rend true si quelque chose a été rangé.
+const TYPE_RELECTURE_MS = 7 * 24 * 3600 * 1000;
+async function apprendreTypes(owner, reg) {
+  if (!reg || !Array.isArray(reg.comptes)) return null;
+  const t0 = Date.now();
+  const aLire = comptesActifs(reg).filter((c) => c.type === undefined || (c.type === '' && !(c.typeLuLe && t0 - c.typeLuLe < TYPE_RELECTURE_MS)));
+  if (!aLire.length) return null;
+  const lus = [];
+  for (const c of aLire.slice(0, 3)) {
+    const at = await accessToken(owner, suffixeCompte(c));
+    if (!at.ok) continue;
+    const id = await identiteEbay(at.token);
+    // L'identité doit être CELLE du compte (la clé) — sinon on ne range rien.
+    if (!id || (c.cle && id.cle !== c.cle)) continue;
+    lus.push({ ref: c.principal ? '' : c.cle, principal: !!c.principal, type: id.type });
+  }
+  if (!lus.length) return null;
+  const w = await modifierComptes(owner, (l) => {
+    let change = false;
+    const out = l.map((e) => { const x = lus.find((y) => (y.principal && e.principal) || (!y.principal && e.cle === y.ref)); if (!x) return e; change = true; return { ...e, type: x.type, typeLuLe: Date.now() }; });
+    return change ? out : null;
+  });
+  return w === true;
 }
 
 // Le compte désigné par une requête (`compte` : absent ⇒ principal, sinon sa
@@ -593,5 +632,5 @@ function seuilTropBas(accepte, prix) {
 }
 
 export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
-  COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
+  COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };
