@@ -10574,18 +10574,25 @@ const jobEnCours = (job) => !!(job && CMD_ACTIVE.includes(job.etape) && (job.viv
 // générer, ou rien qui bloque → rien du tout (pas de bandeau permanent).
 function RaisonBordereauxGrises({ ventes }) {
   useExtVivante();
-  const [aideOuverte,setAideOuverte]=React.useState(false);
   const sansSouris = useSansSouris();
   const n = (ventes || []).length;
   const r = n ? raisonExtGlobale(sansSouris) : null;
   const montre = !!(r && r.code !== 'verif');
   // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
   // ne la répète pas (§7, `useVoixExt`).
-  useVoixExt(montre && aideOuverte ? r.code : null);
+  useVoixExt(montre ? r.code : null);
   if (n && !r && relaisVivant()) return <LigneRelais quoi={`${n} bordereau${n > 1 ? 'x' : ''} à générer :`}/>;
   if (!montre) return null;
+  // ⚠️ LA RAISON D'UN BOUTON GRISÉ RESTE VISIBLE (16 octobre). Le compactage
+  //    du 13 octobre l'avait rangée DANS « Bordereaux et impression », replié :
+  //    « Générer le bordereau » et « Tout générer » grisés, « Lecture seule »
+  //    en haut, et plus aucun mot sur l'écran pour dire pourquoi — ni
+  //    « extension pas détectée », ni « Vinted demande de ralentir —
+  //    réessaie dans 14 min » (vu au rendu, banc tout-generer). Grisé jamais
+  //    caché, la raison dite UNE fois. Seul le repli (« sur Vinted ») reste
+  //    dans le dépliant : c'est de l'aide, pas l'état.
   return (
-    <details className="vrm-label-help" onToggle={ev=>setAideOuverte(ev.currentTarget.open)}><summary>Bordereaux et impression</summary><div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+    <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>
@@ -10600,9 +10607,9 @@ function RaisonBordereauxGrises({ ventes }) {
         {/* ⚠️ Aucune promesse sur le retour du PDF : il dépend de la réception
             des emails de chaque vendeur, que l'app ne peut pas vérifier d'ici
             (revue du 5 octobre). On donne le geste, pas la suite. */}
-        <span style={{ display: 'block', color: C.muted, marginTop: 3 }}>Tu peux aussi le générer et l'imprimer directement sur Vinted (lien « sur Vinted » de chaque vente).</span>
+        <details className="vrm-label-help" style={{ marginTop: 3, marginBottom: 0 }}><summary>Bordereaux et impression</summary><span style={{ display: 'block', color: C.muted }}>Tu peux aussi le générer et l'imprimer directement sur Vinted (lien « sur Vinted » de chaque vente).</span></details>
       </span>
-    </div></details>
+    </div>
   );
 }
 // `sansRepli` : la ligne qui l'accueille porte DÉJÀ le lien vers la vente sur

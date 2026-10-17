@@ -73,7 +73,7 @@ async function brancher(p){
    shipped:{txId:11,isSeller:true,title:'Colis en route',parcelStatus:'in_transit',label:{voucherUrl:'https://example.test/old.pdf'}},
    finished:{txId:12,isSeller:true,title:'Colis finalisé',stepStatus:'done',stepLabel:'Terminé',label:{voucherUrl:'https://example.test/final.pdf'}}};
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
-  b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};
@@ -115,7 +115,7 @@ async function brancher(p){
    await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
-   check(await p.locator('.vrm-market-heading img').evaluate(e=>e.complete && e.naturalWidth>0),'logo local chargé '+nom);
+   check(await p.waitForFunction(()=>{const e=document.querySelector('.vrm-market-heading img');return !!e && e.complete && e.naturalWidth>0;},null,{timeout:8000}).then(()=>true,()=>false),'logo local chargé '+nom);
    const summary=p.locator('.vrm-platform-summary');check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
    for(const width of [320,390,1512]){
@@ -131,7 +131,9 @@ async function brancher(p){
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
     if(width===1512){
-      check(await p.locator('.vrm-main').evaluate(e=>innerWidth-e.getBoundingClientRect().right<60),'contenu utilise la largeur jusqu’au bord droit '+nom);
+      // ⚠️ Jugé sur un ÉTAT observé (la mise en page après le redimensionnement), borné à 5 s — une mesure
+      //    prise à l'instant du redimensionnement tombait sous charge (45) sur un code intact.
+      check(await p.waitForFunction(()=>{const m=document.querySelector('.vrm-main');return !!m && innerWidth-m.getBoundingClientRect().right<60;},null,{timeout:5000}).then(()=>true,()=>false),'contenu utilise la largeur jusqu’au bord droit '+nom);
       if(nom==='eBay')check(await p.locator('.vrm-ebay-sales').evaluate(e=>document.querySelector('.vrm-main').getBoundingClientRect().right-e.getBoundingClientRect().right<60),'ventes eBay utilisent également la largeur disponible');
       const header=await p.locator('.vrm-app-header').boundingBox(), titre=await p.locator('.vrm-market-heading').boundingBox();
       check(header.y+header.height<=titre.y, 'en-tête séparé du contenu, sans recouvrir les chiffres '+nom);
@@ -239,7 +241,10 @@ async function brancher(p){
   await p.setViewportSize({width:390,height:844});await p.waitForTimeout(200);
   const send=p.getByRole('button',{name:'Envoyer',exact:true});check((await send.count()===0 || await send.isDisabled()) && await p.getByText('Vinted ne permet pas de répondre dans cette conversation.',{exact:true}).isVisible(),'conversation sans réponse autorisée bloquée et expliquée');
   if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'messages-vinted-390.png')});}
-  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible(),'indicateurs financiers prioritaires');
+  // ⚠️ Statistiques « premium » (8571f14, 16 octobre) : la rangée `.vrm-finance-overview` est devenue UNE carte
+  //    héros (`data-stats-carte="hero"` : CA finalisé en très gros, bénéfice et marge dessous). La règle jugée
+  //    reste « les indicateurs financiers d'abord » : la carte héros est visible et vient AVANT l'objectif.
+  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible() && await p.locator('[data-stats-carte="hero"]').evaluate(e=>{const g=document.querySelector('.vrm-finance-goal');return !!g && e.getBoundingClientRect().top<g.getBoundingClientRect().top && /CA finalis/i.test(e.innerText);}),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();
   check(await p.getByRole('progressbar',{name:'Progression vers l’objectif du mois'}).getAttribute('aria-valuemax')==='2000','objectif réel saisi avec progression accessible');
   check(await p.locator('.vrm-finance-goal').evaluate(e=>e.getBoundingClientRect().top<document.querySelector('.vrm-finance-stock').getBoundingClientRect().top),'objectif placé avant les détails du stock');
@@ -292,6 +297,9 @@ async function brancher(p){
   await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  // La liste des tâches arrive APRÈS l'en-tête (lecture de l'agent) : on attend la ligne (état observé, borné),
+  // `isVisible` ne patiente pas.
+  await p.getByText('Paire à négocier',{exact:true}).waitFor({timeout:10000}).catch(()=>{});
   check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'agent montre le titre de la paire');
   await p.getByLabel('Rechercher une tâche eBay').fill('absent');check(await p.getByText('Aucune tâche ne correspond à cette recherche.',{exact:true}).isVisible(),'recherche des tâches sans résultat expliquée');
   await p.getByLabel('Rechercher une tâche eBay').fill('négocier');check(await p.getByText('Paire à négocier',{exact:true}).isVisible(),'recherche des tâches retrouve la paire');
@@ -309,7 +317,7 @@ async function brancher(p){
 
   await p.getByRole('button',{name:/Étudier l’offre/}).click();await p.getByRole('heading',{name:'Offres eBay',exact:true}).waitFor();
   check(await p.getByText('Autre offre eBay',{exact:true}).count()===0,'raccourci ouvre uniquement l’offre visée');
-  await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).isVisible(),'retour à toutes les offres');
+  await p.getByRole('button',{name:'Voir toutes les offres',exact:true}).click();check(await p.getByText('Autre offre eBay',{exact:true}).waitFor({timeout:5000}).then(()=>true,()=>false),'retour à toutes les offres');
   await p.locator('.vrm-platform-tabs').getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('button',{name:/Message de la paire/}).click();await p.getByRole('dialog',{name:'Conversation eBay',exact:true}).waitFor();
   check(await p.getByLabel('Réponse au message eBay').inputValue()==='Merci pour votre message','raccourci ouvre le bon message et retrouve le brouillon refusé');
@@ -383,7 +391,10 @@ async function brancher(p){
    {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}},
    {id:'email_track_pickup4',data:{id:'pickup4',carrier:'mondial',status:'available',lieu:'Relais Nord',artTitle:'Colis sans code',suivi:'TRACK-MISSING',receivedAt:maintenant}});
   await p.goto(base+'/?tab=cat_achats');await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
-  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
+  // Juste après un redimensionnement, la page n'a pas toujours fini de se recomposer (mesuré : 326 px à 320,
+  // puis 320 une fraction de seconde plus tard). On attend qu'elle tienne (borné à 3 s) : une page qui déborde
+  // pour de bon reste rouge.
+  for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});await p.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth,null,{timeout:3000}).catch(()=>{});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retraits sans débordement '+width);}
   check(await p.locator('.vrm-pickup-card').count()===4, 'quatre colis à retirer, sans mélange des codes');
   check(await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).isVisible(),'identifiant de consigne visible séparément');
   check(await p.getByRole('button',{name:'Copier code d’ouverture 004567',exact:true}).isVisible(),'code d’ouverture visible séparément');
