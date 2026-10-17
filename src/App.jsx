@@ -1,4 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -1390,14 +1391,54 @@ function SheetShell({ onClose, children, maxWidth = 460 }) {
 // paires réellement présentes — photo, N°, titre, pointure.
 // ⚠️ La saisie libre reste possible (une paire hors app, un carton de matériel),
 // mais elle n'est plus le chemin par défaut.
-function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
+// ── L'APERÇU DU MEUBLE OÙ L'ON RANGE (17 oct.) ─────────────────────────────
+// Julien : « quand il met par exemple table et l'endroit où l'on peut mettre une
+// paire à ranger, que ça fasse un petit carré sur le côté avec une vue du meuble
+// ou de l'endroit où on range ». Un dessin vu de FACE, tiré des données du
+// meuble (ses cases, ce qu'elles portent) — la case visée en couleur d'accent.
+function ApercuMeuble({ it, cellKey, mode, cap, size = 132 }) {
+  const nr = Math.max(1, it.rows || 1), nc = Math.max(1, it.cols || 1);
+  const ft = FURN_TYPES[it.type] || {};
+  const table = ft.build === 'table', portant = mode === 'cintre';
+  const W = 120, H = table ? 80 : 120, pad = 8;
+  const iw = W - pad * 2, ih = (table ? 30 : H - pad * 2);
+  const cw = iw / nc, ch = table ? ih : ih / nr;
+  const [rk, ck] = String(cellKey).split('_').map(Number);
+  const cases = [];
+  for (let r = 0; r < (table ? 1 : nr); r++) for (let c = 0; c < nc; c++) {
+    const key = r + '_' + c; const a = numsCase((it.slots || {})[key]); const vise = r === rk && c === ck;
+    const x = pad + c * cw, y = table ? pad + 6 : pad + r * ch;
+    const n = Math.min(a.length, Math.max(1, cap || 1));
+    cases.push(
+      <g key={key}>
+        <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="2.5" fill={vise ? C.accent : 'transparent'} fillOpacity={vise ? 0.18 : 0} stroke={vise ? C.accent : C.border} strokeWidth={vise ? 2 : 1} strokeDasharray={a.length || vise ? '' : '3 2'} />
+        {portant
+          ? (a.length ? <text x={x + cw / 2} y={y + ch / 2 + 3} textAnchor="middle" fontSize="8.5" fontWeight="700" fill={C.text}>{a[0]}</text> : null)
+          : Array.from({ length: n }, (_, i) => { const bh = Math.min(10, (ch - 6) / Math.max(1, cap || 1)); return <rect key={i} x={x + cw * 0.2} y={y + ch - 3 - (i + 1) * (bh + 1)} width={cw * 0.6} height={bh} rx="1.5" fill={C.muted} fillOpacity="0.45" />; })}
+      </g>
+    );
+  }
+  return (
+    <svg data-apercu-meuble={it.id} data-apercu-case={cellKey} role="img" aria-label={`${it.name || ft.label || 'Meuble'} vu de face, la case où ranger en couleur`} viewBox={`0 0 ${W} ${H}`} width={size} height={size * H / W} style={{ flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+      {portant && <line x1={pad} x2={W - pad} y1={pad + 4} y2={pad + 4} stroke={C.muted} strokeWidth="2" />}
+      {table && <><rect x={pad} y={pad + 6 + ch} width={iw} height="5" rx="1.5" fill={C.muted} fillOpacity="0.7" /><rect x={pad + 4} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /><rect x={W - pad - 8} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /></>}
+      {!table && !portant && <rect x={pad} y={pad} width={iw} height={ih} fill="none" stroke={C.muted} strokeOpacity="0.6" strokeWidth="1.5" rx="2" />}
+      {cases}
+    </svg>
+  );
+}
+
+function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
   const [q, setQ] = React.useState('');
   const f = q.trim().toLowerCase();
   const liste = !f ? paires : paires.filter(p =>
     String(p.numero).includes(f) || (p.title || '').toLowerCase().includes(f) || String(p.taille || '').toLowerCase().includes(f));
   return (
     <SheetShell onClose={onClose}>
-      <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger une paire</div>
+      <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:apercu?6:0}}>
+        {apercu && <ApercuMeuble {...apercu} />}
+        <div style={{flex:1,minWidth:0}}>
+      <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger un article</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
         {paires.length} paire{paires.length>1?'s':''} pas encore rangée{paires.length>1?'s':''}
@@ -1408,6 +1449,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
         {paires.length > 0 && !paires[0].sur && (
           <><br/><span style={{color:C.warn}}>Les plus récentes en tête — ouvre une fois l'écran Annonces pour n'avoir que tes paires en stock.</span></>
         )}
+      </div>
+        </div>
       </div>
       {paires.length > 6 && (
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="N°, marque, pointure…" inputMode="search"
@@ -20499,25 +20542,39 @@ const saveRoomPlan = async (data) => {
     if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
   } catch (_) {}
 };
-// Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
-// `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
+// Catalogue de rangements.
+// (17 oct.) Julien : « des étagères en métal avec des barres, en bois, des
+// portants pour les cintres, des tables… enlève aussi les autres types de
+// rangement ». La palette ne propose plus que des meubles qui servent à TOUTES
+// les niches Vinted (chaussures, vêtements, sacs, livres) ; les anciens types
+// restent ICI, cachés (`hidden`), parce qu'une pièce déjà construite les porte
+// — ses numéros rangés ne doivent pas disparaître (mesuré chez lui : grilles,
+// étagère, commode, tables, pile). Ils se dessinent et se lisent comme avant.
+// `cases` = la physique d'une case (src/stockRegles.js) : 'pile' (un plateau
+// tient ses boîtes, elles s'empilent DANS la case), 'cintre' (un numéro par
+// cintre), sinon 'colonne' (mur de boîtes : une case vidée fait tomber la
+// colonne). `build` = quel constructeur 3D utiliser.
 const FURN_TYPES = {
-  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode' },
-  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere' },
-  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere' },
-  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille' },
-  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
-  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
-  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
-  pile:    { label: 'Pile de boîtes', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#9aa3ad', h3d: 1.25, build: 'metal', cases: 'pile' },
+  bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
+  cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
+  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
+  pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true, structure: true },
+  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
+  // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
+  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode', hidden: true },
+  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere', hidden: true },
+  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere', hidden: true },
+  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },
+  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },
+  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie', hidden: true },
+  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie', hidden: true },
   carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },
-  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7, build: 'table' },
-  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
-  bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
-  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle' },
-  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
-  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
-  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
+  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites', hidden: true },
+  bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate', hidden: true },
+  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle', hidden: true },
+  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic', hidden: true },
   // ── DÉCOR ────────────────────────────────────────────────────────────────
   // Julien : « je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans ».
   // Ces objets ne rangent RIEN (`deco: true`) : ils ne portent pas de case, ne
@@ -20585,7 +20642,12 @@ const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
 function normalizePlan(p) {
-  const mk = (r) => ({ id: r.id || 'r' + Math.random().toString(36).slice(2, 8), name: r.name || 'Pièce', room: { ...ROOM_DEFAULT, ...(r.room || {}) }, items: Array.isArray(r.items) ? r.items : [] });
+  // (17 oct.) Une TABLE d'avant n'avait qu'une case invisible : on lui donne des
+  // places sur son plateau, d'après sa largeur — seulement si elle est VIDE
+  // (rien à déplacer, rien à perdre).
+  const migre = (it) => (it && it.type === 'table' && !Object.keys(it.slots || {}).length && !(it.cols > 1))
+    ? { ...it, rows: 1, cols: Math.max(1, Math.floor(((Number(it.w) || 2) * 0.92) / 0.56)) } : it;
+  const mk = (r) => ({ id: r.id || 'r' + Math.random().toString(36).slice(2, 8), name: r.name || 'Pièce', room: { ...ROOM_DEFAULT, ...(r.room || {}) }, items: Array.isArray(r.items) ? r.items.map(migre) : [] });
   if (p && Array.isArray(p.rooms) && p.rooms.length) {
     const rooms = p.rooms.map(mk);
     const active = p.active && rooms.some(r => r.id === p.active) ? p.active : rooms[0].id;
@@ -20609,11 +20671,17 @@ function normalizePlan(p) {
 const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
 const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
 const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+// La physique d'une case (src/stockRegles.js) : 'colonne' (mur de boîtes, la
+// colonne tombe), 'pile' (un plateau tient ses boîtes empilées), 'cintre'.
+const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4) }; };
 // GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
 // trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
 // (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
-const graviteCases = (slots, nr, nc) => {
+// ⚠️ Seulement pour un MUR de boîtes : sur un plateau (étagère, table) rien ne
+//    tombe d'un plateau à l'autre — chaque case garde sa pile.
+const graviteCases = (slots, nr, nc, mode) => {
   const out = {};
+  if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
   for (let c = 0; c < nc; c++) {
     const pleins = [];
     for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
@@ -20628,17 +20696,31 @@ const meublesDuPlan = (plan) => {
   const out = [];
   ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
     if (!meubleACases(it)) return;
-    const { nr, nc } = dimsMeuble(it);
-    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, vue: graviteCases(it.slots, nr, nc) });
+    const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode) });
   }));
   return out;
 };
 // La position d'une case dite en français (la 3D écrit la même chose).
-const nomCase = (nr, key) => { const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r; return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`; };
+const nomCase = (nr, key, mode, it) => {
+  const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
+  const ft = FURN_TYPES[it && it.type] || {};
+  if (mode === 'cintre') return `cintre ${c + 1}`;
+  if (mode === 'pile' && ft.build === 'table') return `plateau · place ${c + 1}`;
+  if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
+  return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
+};
 // La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
 // en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
+// Sur un plateau : la case la plus basse qui a encore de la place.
 const premiereCaseLibre = (plan) => {
   for (const m of meublesDuPlan(plan)) {
+    if (m.mode === 'pile' || m.mode === 'cintre') {
+      for (let r = m.nr - 1; r >= 0; r--) for (let c = 0; c < m.nc; c++) {
+        const key = r + '_' + c; if ((m.vue[key] || []).length < m.cap) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
+      }
+      continue;
+    }
     for (let c = 0; c < m.nc; c++) {
       let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
       if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
@@ -20651,10 +20733,10 @@ const ouEstNumero = (plan, num) => {
   const t = cleNum(num); if (!t) return null;
   for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
     if (meubleACases(it)) {
-      const { nr, nc } = dimsMeuble(it); const vue = graviteCases(it.slots, nr, nc);
-      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k) };
+      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode);
+      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k, mode, it) };
     }
-    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile' };
+    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile', pileIdx: it.nums.findIndex(v => cleNum(v) === t) };
     if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
   }
   return null;
@@ -20663,19 +20745,27 @@ const ouEstNumero = (plan, num) => {
 // case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
 // déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
 // ou une colonne pleine. Rend { plan, ou } ou { erreur }.
+// Sur un plateau, il s'empile DANS la case choisie (tant qu'elle a la place).
 const rangerNumeroDansPlan = (plan, itemId, key, num) => {
   const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
   const deja = ouEstNumero(plan, v);
   if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
-  let res = null;
+  let res = null, plein = false;
   const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
     if (it.id !== itemId || !meubleACases(it)) return it;
     const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
     if (!(c >= 0 && c < nc)) return it;
+    const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    if (mode === 'pile' || mode === 'cintre') {
+      const slots = empilerDansCase(graviteCases(it.slots, nr, nc, mode), key, v, cap);
+      if (!slots) { plein = true; return it; }
+      res = { itemName: it.name, roomName: rm.name, key, nom: nomCase(nr, key, mode, it) };
+      return { ...it, slots };
+    }
     const vue = graviteCases(it.slots, nr, nc);
-    let plein = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) plein++;
-    if (plein >= nr) return it;
-    const k = (nr - 1 - plein) + '_' + c;
+    let nPleins = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) nPleins++;
+    if (nPleins >= nr) return it;
+    const k = (nr - 1 - nPleins) + '_' + c;
     const slots = { ...vue, [k]: [v] };
     // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
     let grow = {};
@@ -20692,20 +20782,114 @@ const rangerNumeroDansPlan = (plan, itemId, key, num) => {
     res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
     return { ...it, slots };
   }) }));
-  if (!res) return { erreur: 'Cette colonne est pleine — choisis une autre case.' };
+  if (!res) return { erreur: plein ? 'Cette case est pleine — choisis une autre case.' : 'Cette colonne est pleine — choisis une autre case.' };
   return { plan: { ...plan, rooms }, ou: res };
 };
 // Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
+// Ceux du dessus descendent (la colonne d'un mur de boîtes, ou la pile d'un plateau).
 const libererNumeroDuPlan = (plan, itemId, num) => {
   const t = cleNum(num); let fait = false;
   const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
     if (it.id !== itemId || !meubleACases(it)) return it;
-    const { nr, nc } = dimsMeuble(it); const slots = {};
+    const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const slots = {};
     for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
-    return fait ? { ...it, slots: graviteCases(slots, nr, nc) } : it;
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode) } : it;
   }) }));
   return fait ? { ...plan, rooms } : null;
 };
+// Le bouton « Où sont-elles ? » de l'onglet Colis : il pose ici les numéros à
+// aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
+// DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
+const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
+
+// ── LA PIÈCE VUE DU DESSUS (17 oct.) ────────────────────────────────────────
+// Julien : « je veux avoir la possibilité quand on crée la pièce de la créer avec
+// une vue du dessus… on doit pouvoir faire la forme que l'on veut à notre
+// entrepôt, chambre ». Un plan d'architecte : on tire les COINS (calés tous les
+// 25 cm), on en ajoute au milieu d'un mur (+), on en retire un ; on glisse un
+// meuble. Rien ne s'écrit pendant le geste — seulement au lâcher, et la règle
+// (src/stockRegles.js) refuse une forme qui se recoupe ou un meuble qui sortirait.
+function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }) {
+  const svgRef = React.useRef(null);
+  const [edit, setEdit] = React.useState(null);        // { type:'coin'|'meuble', i|id, pts|pos }
+  const [coinSel, setCoinSel] = React.useState(null);
+  const W = Math.max(...poly.map(q => q[0])), H = Math.max(...poly.map(q => q[1]));
+  const marge = 0.6;
+  const vb = `${-marge} ${-marge} ${W + marge * 2} ${H + marge * 2}`;
+  const pts = edit && edit.type === 'coin' ? edit.pts : poly;
+  const versPlan = (e) => {
+    const svg = svgRef.current; if (!svg) return null;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const m = svg.getScreenCTM(); if (!m) return null;
+    const p = pt.matrixTransform(m.inverse()); return [p.x, p.y];
+  };
+  const finir = () => {
+    const ed = edit; setEdit(null);
+    if (!ed || !ed.bouge) return;
+    if (ed.type === 'coin') onPoly(ed.pts);
+    else if (ed.type === 'meuble' && ed.pos) onMove(ed.id, ed.pos[0], ed.pos[1]);
+  };
+  const deplacer = (e) => {
+    if (!edit) return; const p = versPlan(e); if (!p) return;
+    if (edit.type === 'coin') {
+      const np = edit.pts.slice(); np[edit.i] = [caler(Math.max(-3, Math.min(W + 3, p[0]))), caler(Math.max(-3, Math.min(H + 3, p[1])))];
+      setEdit({ ...edit, pts: np, bouge: true });
+    } else {
+      const it = items.find(o => o.id === edit.id); if (!it) return;
+      setEdit({ ...edit, pos: [caler(p[0] - edit.off[0]), caler(p[1] - edit.off[1])], bouge: true });
+    }
+    if (e.cancelable) e.preventDefault();
+  };
+  const formes = [['rectangle', 'Rectangle'], ['L', 'En L'], ['U', 'En U'], ['T', 'En T']];
+  const ciblesIds = new Set((cibles || []).map(c => c.itemId));
+  const bouton = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 11px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' };
+  return (
+    <div data-plan-dessus="" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 650, color: C.text, marginRight: 4 }}>Vue du dessus</span>
+        {formes.map(([k, l]) => <button key={k} type="button" data-forme={k} onClick={() => onPoly(FORMES[k](W, H))} style={bouton}>{l}</button>)}
+        {coinSel != null && poly.length > 3 && <button type="button" data-coin-retirer="" onClick={() => { const np = poly.filter((_, i) => i !== coinSel); setCoinSel(null); onPoly(np); }} style={{ ...bouton, color: C.warn }}>Retirer ce coin</button>}
+      </div>
+      <svg ref={svgRef} viewBox={vb} data-plan-svg="" style={{ width: '100%', maxHeight: 360, aspectRatio: `${W + marge * 2} / ${H + marge * 2}`, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, touchAction: 'none', userSelect: 'none' }}
+        onPointerMove={deplacer} onPointerUp={finir} onPointerLeave={finir} onPointerCancel={finir}>
+        {/* grille au mètre */}
+        {Array.from({ length: Math.floor(W) + 1 }, (_, i) => <line key={'gx' + i} x1={i} x2={i} y1={0} y2={H} stroke={C.border} strokeWidth="0.01" />)}
+        {Array.from({ length: Math.floor(H) + 1 }, (_, i) => <line key={'gy' + i} x1={0} x2={W} y1={i} y2={i} stroke={C.border} strokeWidth="0.01" />)}
+        <polygon data-plan-forme="" points={pts.map(q => q.join(',')).join(' ')} fill={C.card} stroke={C.text} strokeWidth="0.08" strokeLinejoin="round" />
+        {/* les meubles */}
+        {items.map(it => {
+          const ft = FURN_TYPES[it.type] || {};
+          const pos = edit && edit.type === 'meuble' && edit.id === it.id && edit.pos ? edit.pos : [it.x, it.y];
+          const odd = Math.abs(Math.round((it.rot || 0) / (Math.PI / 2))) % 2 === 1;
+          const w = odd ? it.h : it.w, h = odd ? it.w : it.h, cx = pos[0] + it.w / 2, cy = pos[1] + it.h / 2;
+          const choisi = sel === it.id, cible = ciblesIds.has(it.id);
+          return (
+            <g key={it.id} data-plan-meuble={it.id} style={{ cursor: 'grab' }}
+              onPointerDown={(e) => { e.stopPropagation(); onSelect(it.id); const p = versPlan(e); if (!p) return; try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (_) {} setEdit({ type: 'meuble', id: it.id, off: [p[0] - it.x, p[1] - it.y], pos: null }); }}>
+              <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx="0.06"
+                fill={ft.deco ? C.card2 : (it.color || ft.color || '#999')} fillOpacity={ft.deco ? 0.9 : 0.85}
+                stroke={cible ? C.accent : choisi ? C.text : 'rgba(0,0,0,0.35)'} strokeWidth={cible || choisi ? 0.09 : 0.03} />
+              {w > 0.7 && <text x={cx} y={cy + 0.12} textAnchor="middle" fontSize={Math.min(0.32, w / 6)} fontWeight="700" fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.45)', strokeWidth: 0.04 }}>{String(it.name || ft.label || '').slice(0, 18)}</text>}
+            </g>
+          );
+        })}
+        {/* « + » au milieu de chaque mur : ajouter un coin */}
+        {!edit && pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.8) return null;
+          return <g key={'m' + i} data-coin-ajouter={i} style={{ cursor: 'copy' }} onPointerDown={(e) => { e.stopPropagation(); const np = pts.slice(); np.splice(i + 1, 0, [caler(mx), caler(my)]); setCoinSel(i + 1); onPoly(np); }}>
+            <circle cx={mx} cy={my} r="0.2" fill={C.card} stroke={C.muted} strokeWidth="0.04" /><text x={mx} y={my + 0.1} textAnchor="middle" fontSize="0.3" fill={C.muted} style={{ pointerEvents: 'none' }}>+</text></g>; })}
+        {/* les coins : on les tire */}
+        {pts.map((q, i) => (
+          <circle key={'c' + i} data-coin={i} cx={q[0]} cy={q[1]} r={coinSel === i ? 0.24 : 0.19} fill={coinSel === i ? C.accent : C.text} stroke={C.card} strokeWidth="0.05" style={{ cursor: 'move' }}
+            onPointerDown={(e) => { e.stopPropagation(); setCoinSel(i); try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (_) {} setEdit({ type: 'coin', i, pts: pts.slice() }); }} />
+        ))}
+        {/* les cotes du mur */}
+        {pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) return null; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+          return <text key={'l' + i} x={mx} y={my - 0.28} textAnchor="middle" fontSize="0.26" fill={C.muted} style={{ pointerEvents: 'none' }}>{(Math.round(L * 100) / 100).toLocaleString('fr-FR')} m</text>; })}
+      </svg>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Tire un coin pour donner sa forme à la pièce, « + » au milieu d'un mur pour en ajouter un. Glisse un meuble pour le placer : il ne traverse ni un mur ni un autre meuble.</div>
+    </div>
+  );
+}
 
 function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
@@ -20732,6 +20916,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const activeRoom = plan.rooms.find(r => r.id === plan.active) || plan.rooms[0];
   const items = activeRoom.items || [];
   const room = activeRoom.room || ROOM_DEFAULT;
+  // (17 oct.) LA FORME DE LA PIÈCE et ce qui ne se traverse pas (src/stockRegles.js).
+  const poly = polyDe(room);
+  // Ce qui occupe le SOL : on ne pose rien à travers. Un tapis se marche dessus,
+  // un cadre et une fenêtre sont au mur ; ce qui est posé SUR un meuble n'est pas au sol.
+  const occupeLeSol = (o) => { const ft = FURN_TYPES[o.type] || {}; return !['tapis', 'cadre', 'fenetre'].includes(ft.build) && !(Number(o.lift) > 0); };
+  const obstaclesPour = (list, ...ids) => list.filter(o => !ids.includes(o.id) && occupeLeSol(o)).map(empreinte);
+  // Une place libre pour `it` près de (cx, cy) — ou null s'il n'y en a pas.
+  const placeLibre = (list, it, cx, cy) => { const ef = empreinte(it); return placerSansTraverser(cx != null ? cx : ef.cx, cy != null ? cy : ef.cy, ef.w, ef.h, obstaclesPour(list, it.id), poly); };
+  // Après une modification de la DISPOSITION, la 3D passe en vue du dessus pour
+  // qu'on la relise (Julien : « une petite animation à une vue 2D du dessus »).
+  const [dispo, setDispo] = useState(0);
+  const signalerDisposition = () => setDispo(Date.now());
   // Modifie la pièce active (patch = objet fusionné, ou fonction (room)=>patch).
   const patchRoom = (patch) => persist({ ...plan, rooms: plan.rooms.map(r => r.id === activeRoom.id ? { ...r, ...(typeof patch === 'function' ? patch(r) : patch) } : r) });
   const setItems = (updater) => patchRoom(r => ({ items: typeof updater === 'function' ? updater(r.items || []) : updater }));
@@ -20771,11 +20967,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       if (startStr == null) return;
       const start = Math.max(1, parseInt(startStr, 10) || (mx + 1));
       const cell = t.cell, w = +(cols * cell).toFixed(2);
+      let pasDePlace = false;
       setItems(list => {
         const n = list.length, gx = 0.7 + (n % 5) * 1.1, gy = 0.7 + (Math.floor(n / 5) % 5) * 1.1;
-        return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols, rows, start, x: Math.min(room.w - w, gx), y: Math.min(room.h - cell, gy), w, h: cell, slots: {} }];
+        const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols, rows, start, x: Math.min(room.w - w, gx), y: Math.min(room.h - cell, gy), w, h: cell, slots: {} };
+        const pl = placeLibre(list, neuf);
+        if (!pl) { pasDePlace = true; return list; }
+        neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - cell / 2).toFixed(2);
+        return [...list, neuf];
       });
-      setSel(id); return;
+      if (pasDePlace) { toast('Plus de place libre au sol pour ces cartons.'); return; }
+      setSel(id); signalerDisposition(); return;
     }
     // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
     // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
@@ -20802,15 +21004,25 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     // et la HAUTEUR par défaut monte jusqu'au plafond (empilage réaliste).
     const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
     const rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    let pasDePlace = false;
     setItems(list => {
       // On répartit chaque nouveau meuble sur une petite grille pour qu'il
       // n'apparaisse PAS empilé au même endroit (sinon il semble « disparaître »
       // derrière un meuble déjà là — c'était le cas de la porte).
+      // (17 oct.) Et il ne se pose JAMAIS en travers d'un autre ni hors de la
+      // pièce : on cherche la place libre la plus proche (src/stockRegles.js).
       const n = list.length, gx = 0.6 + (n % 4) * 1.5, gy = 0.6 + (Math.floor(n / 4) % 4) * 1.5;
-      const x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
-      return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} }];
+      let x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
+      const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} };
+      if (!t.deco || t.structure) {
+        const pl = placeLibre(list, neuf);
+        if (!pl) { pasDePlace = true; return list; }
+        neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - h / 2).toFixed(2);
+      }
+      return [...list, neuf];
     });
-    setSel(id);
+    if (pasDePlace) { toast('Plus de place libre dans la pièce pour ce meuble — agrandis la pièce ou déplace un meuble.'); return; }
+    setSel(id); signalerDisposition();
   };
   // Contrôles de la GRILLE personnalisable : nb de colonnes, de rangées, taille
   // des cases. Le footprint (w/h) reste synchronisé pour que le glisser colle.
@@ -20895,6 +21107,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     cz = Math.max(-room.h / 2 + effH / 2, Math.min(room.h / 2 - effH / 2, cz));
     const x = Math.round((cx + room.w / 2 - it.w / 2) * 2) / 2, y = Math.round((cz + room.h / 2 - it.h / 2) * 2) / 2;
     updateItem(it.id, { x, y, rot, wall: next });
+    signalerDisposition();
   };
   // Clic sur une grille en 3D. 1er tap = la SÉLECTIONNER (fait apparaître les
   // réglages : nb de boîtes en largeur/hauteur, taille…). Tap suivant sur une
@@ -20912,9 +21125,33 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     }
     return out;
   };
-  const fillCell = async (itemId, cellKey) => {
+  const fillCell = async (itemId, cellKey, quoi) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
+    // (17 oct.) PLATEAU (étagère, table) ou PORTANT : on touche une BOÎTE précise
+    // (la modifier, ou la sortir — celles du dessus descendent) ou la place
+    // libre au-dessus de la pile (y ranger une paire).
+    const cz = casesDe(it, room.wallH);
+    if (cz.mode === 'pile' || cz.mode === 'cintre') {
+      const pile = numsCase((it.slots || {})[cellKey]);
+      if (quoi && quoi.num != null && !quoi.ghost) {
+        const v = await askText({ numeric: clavierNum() === 'numeric', desc: `Numéro de cette boîte (laisse VIDE pour la sortir — celles du dessus descendent) :`, value: String(quoi.num) });
+        if (v == null) return;
+        const t = String(v).trim();
+        if (!t) { sortirDeCase(itemId, cellKey, String(quoi.num)); return; }
+        if (t === String(quoi.num)) return;
+        const ou = dejaPoseOu(t);
+        if (ou) { toast(`N°${t} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+        const idx = pile.indexOf(String(quoi.num)); if (idx < 0) return;
+        const neuve = pile.slice(); neuve[idx] = t;
+        updateItem(itemId, { slots: { ...(it.slots || {}), [cellKey]: neuve } });
+        return;
+      }
+      if (pile.length >= cz.cap) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
+      if (aRanger.length) { setRanger({ itemId, cellKey }); return; }
+      poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger ici :', value: '' }));
+      return;
+    }
     const cur = ((it.slots || {})[cellKey] || [])[0] || '';
     // ⚠️ CASE VIDE → on CHOISIT une paire, on ne tape plus un numéro de mémoire.
     // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
@@ -20958,6 +21195,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       }
     }
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
+    const cz = casesDe(it, room.wallH);
+    if (cz.mode === 'pile' || cz.mode === 'cintre') {
+      if (saisie == null) return;
+      const v = String(saisie).trim(); if (!v) return;
+      const ou = dejaPoseOu(v);
+      if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+      const slots = empilerDansCase(it.slots, cellKey, v, cz.cap);
+      if (!slots) { toast('Cette case est pleine — choisis une autre case.'); return; }
+      updateItem(itemId, { slots });
+      setDepot({ itemId, cellKey, num: v, at: Date.now() });
+      return;
+    }
     const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
     const cur = (slots[cellKey] || [])[0] || '';
@@ -20991,7 +21240,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
-  const setRoom = (dw, dh) => patchRoom(r => ({ room: { ...r.room, w: Math.max(4, Math.min(20, r.room.w + dw)), h: Math.max(4, Math.min(20, r.room.h + dh)) } }));
+  const setRoom = (dw, dh) => {
+    const w = Math.max(2, Math.min(30, room.w + dw)), h = Math.max(2, Math.min(30, room.h + dh));
+    if (!estRectangle(room)) { toast('Ta pièce a une forme libre : tire ses coins dans le plan vu du dessus.'); return; }
+    const p2 = [[0, 0], [w, 0], [w, h], [0, h]];
+    if (items.some(o => !['cadre', 'fenetre'].includes((FURN_TYPES[o.type] || {}).build) && !rectDans(empreinte(o).cx, empreinte(o).cy, empreinte(o).w, empreinte(o).h, p2))) { toast('Un meuble serait hors de la pièce — déplace-le d\'abord.'); return; }
+    patchRoom(r => ({ room: { ...r.room, w, h } })); signalerDisposition();
+  };
   const updateItem = (id, patch) => setItems(list => list.map(it => it.id === id ? { ...it, ...patch } : it));
   // Déplacement d'un élément depuis la 3D. Une BOÎTE se cale sur la grille-sol
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
@@ -21000,30 +21255,29 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // Empreinte au sol effective (largeur/profondeur) selon la rotation du meuble.
   const effFoot = (w, h, rot) => { const odd = Math.abs(Math.round((rot || 0) / (Math.PI / 2))) % 2 === 1; return { w: odd ? h : w, h: odd ? w : h }; };
   const moveItem = (id, x, y, rot, stackOn, lift) => {
+    let refuse = false, bougeMeuble = false;
     setItems(list => {
       const it = list.find(o => o.id === id); if (!it) return list;
       if (!(FURN_TYPES[it.type] || {}).box) {
-        const build = (FURN_TYPES[it.type] || {}).build;
-        if (build === 'pile') return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
-        // MEUBLE : anti-chevauchement — s'il retombe sur un autre meuble, on le POUSSE
-        // au plus court jusqu'à ne plus se chevaucher (arrangement naturel).
-        const ef = effFoot(it.w, it.h, rot);
-        let cx = x + it.w / 2, cy = y + it.h / 2;
-        const obstacles = list.filter(o => o.id !== id && !(FURN_TYPES[o.type] || {}).box && (FURN_TYPES[o.type] || {}).build !== 'pile' && !(o.lift > 0)).map(o => { const of = effFoot(o.w, o.h, o.rot); return { cx: o.x + o.w / 2, cy: o.y + o.h / 2, w: of.w, h: of.h }; });
-        for (let iter = 0; iter < 12; iter++) {
-          let bumped = false;
-          for (const s of obstacles) {
-            const ox = (ef.w + s.w) / 2 - Math.abs(cx - s.cx), oy = (ef.h + s.h) / 2 - Math.abs(cy - s.cy);
-            if (ox > 0.003 && oy > 0.003) { // chevauchement → pousser selon l'axe le plus court
-              if (ox < oy) cx += (cx < s.cx ? -ox : ox); else cy += (cy < s.cy ? -oy : oy);
-              bumped = true;
-            }
-          }
-          if (!bumped) break;
+        const ft = FURN_TYPES[it.type] || {};
+        const liftFinal = lift != null ? lift : it.lift;
+        // (17 oct.) RIEN NE TRAVERSE UN MEUBLE, RIEN NE SORT DE LA PIÈCE.
+        // Une pile POSÉE sur un meuble garde la place visée sur lui ; tout le
+        // reste (meubles, cartons au sol) est poussé jusqu'à la place libre la
+        // plus proche — et s'il n'y en a aucune, il reste où il était.
+        const ef = empreinte({ ...it, x, y, rot });
+        let cx = ef.cx, cy = ef.cy;
+        if (!(ft.pile && Number(liftFinal) > 0)) {
+          const pl = placerSansTraverser(cx, cy, ef.w, ef.h, obstaclesPour(list, id), poly);
+          if (!pl) { refuse = true; return list.slice(); }   // nouvelle référence : la 3D le redessine à l'ancienne place
+          cx = pl.cx; cy = pl.cy;
         }
-        cx = Math.max(ef.w / 2, Math.min(room.w - ef.w / 2, cx)); cy = Math.max(ef.h / 2, Math.min(room.h - ef.h / 2, cy));
         const fx = +(cx - it.w / 2).toFixed(2), fy = +(cy - it.h / 2).toFixed(2);
-        return list.map(o => o.id === id ? { ...o, x: fx, y: fy, rot, lift: lift != null ? lift : o.lift } : o);
+        bougeMeuble = true;
+        // Ce qui est POSÉ sur un meuble le suit quand il bouge.
+        const dx = fx - it.x, dy = fy - it.y;
+        return list.map(o => o.id === id ? { ...o, x: fx, y: fy, rot, lift: liftFinal }
+          : (!ft.pile && (dx || dy) && estPoseSur(o, it) ? { ...o, x: +(o.x + dx).toFixed(2), y: +(o.y + dy).toFixed(2) } : o));
       }
       let sx, sy;
       const tgt = stackOn ? list.find(o => o.id === stackOn && (FURN_TYPES[o.type] || {}).box) : null;
@@ -21048,6 +21302,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       });
       return updated.map(o => (FURN_TYPES[o.type] || {}).box ? { ...o, lvl: lvlOf[o.id] != null ? lvlOf[o.id] : (o.lvl || 0) } : o);
     });
+    if (refuse) toast('Pas de place ici sans traverser un meuble ou un mur — il reste où il était.');
+    else if (bougeMeuble) signalerDisposition();
   };
   // Recompacte les niveaux d'une liste de boîtes par colonne (la boîte `topId`
   // finit en haut de sa colonne, `bottomId` en bas).
@@ -21115,8 +21371,36 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     }
     setStackSrc(null); setPutOnSrc(null); setSel(id);
   };
-  const removeItem = async (id)=>{ if (!await askConfirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
-  const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
+  // (17 oct.) Retirer un meuble : ce qui était POSÉ dessus redescend au sol
+  // (gravité), à la place libre la plus proche — jamais à travers un autre meuble.
+  const removeItem = async (id)=>{
+    if (!await askConfirm('Supprimer ce meuble et son rangement ?')) return;
+    setItems(list => {
+      const it = list.find(o => o.id === id); const reste = list.filter(o => o.id !== id);
+      if (!it) return reste;
+      let out = reste;
+      reste.forEach(o => {
+        if (!estPoseSur(o, it)) return;
+        const pose = { ...o, lift: 0 };
+        const pl = placeLibre(out.filter(q => q.id !== o.id), pose);
+        out = out.map(q => q.id === o.id ? (pl ? { ...pose, x: +(pl.cx - o.w / 2).toFixed(2), y: +(pl.cy - o.h / 2).toFixed(2) } : pose) : q);
+      });
+      return out;
+    });
+    setSel(null); setOpenItem(null); signalerDisposition();
+  };
+  const dupItem = (it) => {
+    const id = 'f' + Date.now(); let pasDePlace = false;
+    setItems(list => {
+      const copy = { ...it, id, slots: {}, nums: Array.isArray(it.nums) ? [] : it.nums, lift: 0, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) };
+      const pl = placeLibre(list, copy);
+      if (!pl) { pasDePlace = true; return list; }
+      copy.x = +(pl.cx - it.w / 2).toFixed(2); copy.y = +(pl.cy - it.h / 2).toFixed(2);
+      return [...list, copy];
+    });
+    if (pasDePlace) { toast('Plus de place libre pour un meuble de plus.'); return; }
+    setSel(id); signalerDisposition();
+  };
 
   const onDown = (e, it) => { e.stopPropagation(); setSel(it.id); const p = e.touches ? e.touches[0] : e; drag.current = { id: it.id, sx: p.clientX, sy: p.clientY, ox: it.x, oy: it.y, moved: false }; };
   const onMove = (e) => {
@@ -21249,6 +21533,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const sortirDeCase = (itemId, cellKey, numero) => {
     const ecrire = () => {
       const it = items.find(x => x.id === itemId); if (!it) return;
+      const cz = casesDe(it, room.wallH);
+      if (cz.mode === 'pile' || cz.mode === 'cintre') {
+        // Ceux du DESSUS descendent d'un cran (la 3D les fait tomber).
+        const r = retirerDeCase(it.slots, cellKey, numero);
+        if (r) updateItem(itemId, { slots: r.slots });
+        setSortie(null); toast(`N°${numero} sorti du stock.`); return;
+      }
       const slots = { ...(it.slots || {}) };
       const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
@@ -21256,7 +21547,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       setSortie(null);
       toast(`N°${numero} sorti du stock.`);
     };
-    setSortie({ itemId, cellKey, at: Date.now(), fini: ecrire });
+    setSortie({ itemId, cellKey, num: String(numero), at: Date.now(), fini: ecrire });
   };
 
   // Ajoute/retire un N° dans une case (empilable).
@@ -21285,6 +21576,45 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     return { boxes, freeCells, furn };
   }, [items]);
 
+  // ── LES PAIRES À ALLER CHERCHER (bouton de l'onglet Colis) ───────────────
+  // Les numéros vendus à expédier, posés par Colis : on les colore dans la 3D et
+  // on dit où est chacun — ou qu'il n'est rangé nulle part (jamais deviné).
+  const [aChercher, setAChercher] = useState(() => {
+    const d = DEMANDE_STOCK_CHERCHE;
+    if (Array.isArray(d.nums) && d.nums.length && Date.now() - d.at < 120000) { const n = d.nums; d.nums = null; return n; }
+    return null;
+  });
+  const chercheLoc = useMemo(() => aChercher ? aChercher.map(n => ({ numero: String(n), ou: ouEstNumero(plan, n) })) : null, [aChercher, plan]);
+  const cibles3D = useMemo(() => (chercheLoc || []).filter(x => x.ou && x.ou.roomId === activeRoom.id).map(x => ({ itemId: x.ou.itemId, cell: x.ou.key, pileIdx: x.ou.pileIdx, num: x.numero })), [chercheLoc, activeRoom.id]);
+  // Changer la DIMENSION d'un meuble (largeur, profondeur, pivot) : refusé s'il
+  // traverserait un autre meuble ou un mur.
+  const changerDimensions = (it, patch) => {
+    const essai = { ...it, ...patch };
+    const pl = placeLibre(items, essai);
+    if (!pl) { toast('Pas la place pour ce changement sans traverser un meuble ou un mur.'); return; }
+    updateItem(it.id, { ...patch, x: +(pl.cx - essai.w / 2).toFixed(2), y: +(pl.cy - essai.h / 2).toFixed(2) });
+    signalerDisposition();
+  };
+  // Plateaux d'une étagère, places d'une table, cintres d'un portant : on ne
+  // retire JAMAIS une rangée ou une colonne qui porte un numéro (il serait perdu).
+  const changerCases = (it, dCols, dRows) => {
+    const { nr, nc } = dimsMeuble(it); const ft = FURN_TYPES[it.type] || {};
+    const cols = Math.max(1, Math.min(16, nc + dCols)), rows = Math.max(1, Math.min(10, nr + dRows));
+    const slots = it.slots || {};
+    if (cols < nc && Object.keys(slots).some(k => +k.split('_')[1] >= cols && numsCase(slots[k]).length)) { toast('Cette case porte encore un numéro — sors-le d\'abord.'); return; }
+    let neuf = { ...slots };
+    if (rows !== nr) {
+      // La rangée ajoutée ou retirée est celle du HAUT (r = 0) : les plateaux du
+      // bas gardent leurs boîtes.
+      if (rows < nr && Object.keys(slots).some(k => +k.split('_')[0] === 0 && numsCase(slots[k]).length)) { toast('Le plateau du haut porte encore un numéro — sors-le d\'abord.'); return; }
+      neuf = {}; for (const k in slots) { const [r, c] = k.split('_').map(Number); const nrr = r + (rows - nr); if (nrr >= 0) neuf[nrr + '_' + c] = slots[k]; }
+    }
+    const patch = { cols, rows, slots: neuf };
+    if (ft.build === 'metal') patch.h3d = +(rows * 0.375 / 1.5).toFixed(3);          // un plateau = 37,5 cm : la contenance par case ne bouge pas
+    if (ft.build === 'portant' || ft.build === 'metal' || ft.build === 'table') { const w = ft.build === 'table' ? Math.max(it.w, +(cols * 0.6).toFixed(2)) : +(cols * (ft.build === 'portant' ? 0.19 : 0.6)).toFixed(2); patch.w = Math.max(0.6, w); }
+    changerDimensions(it, patch);
+  };
+
   if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -21294,15 +21624,34 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           tout l'écran de configuration avant de voir son stock. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
+      {chercheLoc && (
+        <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 650, color: C.text }}>
+              {chercheLoc.length} paire{chercheLoc.length > 1 ? 's' : ''} à aller chercher
+              <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
+            </span>
+            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les paires à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+          </div>
+          {chercheLoc.map(x => (
+            <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
+              <b>N°{x.numero}</b>{' '}
+              {x.ou
+                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button type="button" onClick={() => switchRoom(x.ou.roomId)} style={{ border: 'none', background: 'transparent', color: C.accent, padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>ouvrir cette pièce</button></> : null}</>
+                : <>— rangée nulle part dans le stock</>}
+            </div>
+          ))}
+        </div>
+      )}
       {/* (16 oct.) UNE PIÈCE VIDE NE SE TAIT PAS : la scène 3D sans meuble ne dit
           rien de ce qu'il faut faire. On dit le geste, et le bouton y mène. */}
       {items.length === 0 && (
         <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
-            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Ajoute un meuble à cases (grille de boîtes, étagère, casiers) : tu y ranges tes paires, et VRM retrouve chacune par son numéro.</span>
+            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dessine ta pièce vue du dessus, puis ajoute une étagère, une table ou un portant : tu y ranges tes articles, et VRM retrouve chacun par son numéro.</span>
           </span>
           <button type="button" data-piece-vide-geste="" onClick={() => { const d = refAmenager.current; if (d) { d.open = true; try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
         </div>
@@ -21311,7 +21660,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {ranger && (
         <RangerSheet
           paires={aRanger}
-          cellNom={(() => { const p = String(ranger.cellKey).split('_'); const it = items.find(x => x.id === ranger.itemId); const nr = it ? Math.max(1, it.rows || 1) : 1; return `colonne ${(+p[1]) + 1} · ${nr - (+p[0])}ᵉ depuis le bas`; })()}
+          apercu={(() => { const it = items.find(x => x.id === ranger.itemId); return it ? { it, cellKey: ranger.cellKey, mode: casesDe(it, room.wallH).mode, cap: casesDe(it, room.wallH).cap } : null; })()}
+          cellNom={(() => { const it = items.find(x => x.id === ranger.itemId); if (!it) return ''; const nr = Math.max(1, it.rows || 1); const cz = casesDe(it, room.wallH); return `${it.name || ''} · ${nomCase(nr, ranger.cellKey, cz.mode, it)}`; })()}
           onPick={(p) => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, p.numero); }}
           onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger dans cette case :', value: '' })); }}
           onClose={() => setRanger(null)}
@@ -21376,7 +21726,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
           const groupes = [
             ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
-            ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
+            ['Murs',      tous.filter(([, t]) =>  t.structure), "Portes et fenêtres : elles se collent au mur."],
+            ['Décor',     tous.filter(([, t]) =>  t.deco && !t.structure), "Pour que la pièce ressemble à la tienne. Ne range rien."],
           ];
           return groupes.map(([titre, liste, aide]) => liste.length ? (
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -21387,6 +21738,16 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             </div>
           ) : null);
         })()}
+        {/* (17 oct.) LA PIÈCE VUE DU DESSUS : sa forme (on tire les coins) et ses meubles. */}
+        <PlanDessus room={room} poly={poly} items={items} sel={sel} onSelect={(id) => setSel(id)} cibles={cibles3D}
+          onPoly={(np) => { const n = normaliserPoly(np); if (!n) { toast('Cette forme ne fait pas une pièce (elle se recoupe, ou fait moins d\'1 m²).'); return; }
+            // Le plan se décale si un coin passe sous 0 : tout ce qui est posé suit, rien ne bouge par rapport aux murs.
+            const bouges = items.map(o => ({ ...o, x: +(o.x - n.dx).toFixed(2), y: +(o.y - n.dy).toFixed(2) }));
+            const dehors = bouges.filter(o => !rectDans(empreinte(o).cx, empreinte(o).cy, empreinte(o).w, empreinte(o).h, n.poly) && !['cadre', 'fenetre'].includes((FURN_TYPES[o.type] || {}).build));
+            if (dehors.length) { toast(`${dehors.length} meuble${dehors.length > 1 ? 's seraient' : ' serait'} hors de la pièce (« ${dehors[0].name} ») — déplace-${dehors.length > 1 ? 'les' : 'le'} d'abord.`); return; }
+            const estRect = n.poly.length === 4 && n.poly.every(([x, y]) => (x === 0 || x === n.w) && (y === 0 || y === n.h));
+            patchRoom(r => ({ room: { ...r.room, w: n.w, h: n.h, poly: estRect ? undefined : n.poly }, items: bouges })); signalerDisposition(); }}
+          onMove={(id, x, y) => moveItem(id, x, y, (items.find(o => o.id === id) || {}).rot || 0)} />
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
@@ -21494,11 +21855,31 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
             {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
-            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
+            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && !(FURN_TYPES[selItem.type] || {}).cases && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
             </>}
           </div>
+          {/* (17 oct.) ÉTAGÈRE, TABLE, PORTANT : combien de cases, de plateaux, de cintres. */}
+          {(FURN_TYPES[selItem.type] || {}).cases && (()=>{
+            const ft = FURN_TYPES[selItem.type]; const { nr, nc } = dimsMeuble(selItem); const cz = casesDe(selItem, room.wallH);
+            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, minWidth: 36, minHeight: 36, cursor: 'pointer', lineHeight: 1 };
+            const pas = (lib, val, moins, plus, cle) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} data-reglage={cle}>
+                <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{lib}</span>
+                <button className="vrm-icon-control" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
+                <b style={{ fontSize: 14, minWidth: 18, textAlign: 'center' }}>{val}</b>
+                <button className="vrm-icon-control" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
+              </span>);
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                {ft.build === 'metal' && pas('Plateaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
+                <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
+                <span style={{ flex: '1 1 100%', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Touche une place libre (en transparence) pour y ranger un article ; touche une boîte pour changer son numéro ou la sortir — celles du dessus descendent.</span>
+              </div>
+            );
+          })()}
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
           {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
@@ -21532,14 +21913,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
           {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            <button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
-            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            </>}
+            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           </>}
           <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
           <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
@@ -21626,13 +22008,15 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   const aLiberer = useMemo(() => {
     if (!sur) return [];
     const out = [];
-    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key), numero: v }); })));
+    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key, m.mode, m.it), numero: v }); })));
     return out.sort((a, b) => triNum(a.numero, b.numero));
   }, [sur, meubles, presents]);
   const partiesCles = useMemo(() => new Set(aLiberer.map(x => cleNum(x.numero))), [aLiberer]);
   const prochaine = useMemo(() => premiereCaseLibre(plan), [plan]);
   const totalCases = meubles.reduce((s, m) => s + m.nr * m.nc, 0);
-  const casesLibres = meubles.reduce((s, m) => s + (m.nr * m.nc - Object.keys(m.vue).length), 0);
+  // Une case « libre » : vide (mur de boîtes, cintre) ou qui a encore de la place (plateau).
+  const libresDe = (m) => m.mode === 'pile' ? Array.from({ length: m.nr * m.nc }, (_, i) => (m.vue[Math.floor(i / m.nc) + '_' + (i % m.nc)] || []).length < m.cap).filter(Boolean).length : (m.nr * m.nc - Object.keys(m.vue).length);
+  const casesLibres = meubles.reduce((s, m) => s + libresDe(m), 0);
   const hit = q.trim() ? ouEstNumero(plan, q) : null;
   const hitRef = React.useRef(null);
   const hitCle = hit ? hit.itemId + ':' + hit.key : '';
@@ -21746,12 +22130,14 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
         {/* ── Colonne droite : le stock vu de face, meuble par meuble ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }} data-rgt-plan="">
-          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble à cases dans ta pièce. Ajoute une grille de boîtes, une étagère ou des casiers dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
+          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble pour ranger dans ta pièce. Ajoute une étagère, une table ou un portant dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
           {meubles.map((m, mi) => {
             const pleines = Object.keys(m.vue).length;
             const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
             // La case où une boîte atterrit dans chaque colonne (gravité).
-            const basLibre = {}; for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
+            const basLibre = {};
+            if (m.mode === 'pile' || m.mode === 'cintre') { for (let r = 0; r < m.nr; r++) for (let c = 0; c < m.nc; c++) { const k = r + '_' + c; if ((m.vue[k] || []).length < m.cap) basLibre[k] = true; } }
+            else for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
             return (
               <React.Fragment key={m.it.id}>
                 {enTete && <div className="vrm-label" style={{ color: C.muted, marginTop: mi ? 4 : 0 }}>{m.roomName}</div>}
@@ -21767,7 +22153,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                         const a = m.vue[key] || [];
                         const estHit = !!(hit && hit.itemId === m.it.id && hit.key === key);
                         const estProchaine = !!(sur && aRanger.length && prochaine && prochaine.itemId === m.it.id && prochaine.key === key);
-                        const cliquable = !!(placer && sur && !a.length && basLibre[key]);
+                        const cliquable = !!(placer && sur && (m.mode === 'pile' ? true : !a.length) && basLibre[key]);
                         const partie = !!(a.length && a.some(v => partiesCles.has(cleNum(v))));
                         const vientDetre = !!(flash && flash.itemId === m.it.id && flash.key === key && a.length);
                         const accent = estHit || estProchaine || cliquable;
@@ -21777,8 +22163,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           <div key={key} ref={estHit ? hitRef : null} className="vrm-rgt-case"
                             data-case={`${m.it.id}:${key}`} data-num={a[0] || ''} data-hi={estHit ? '1' : undefined} data-prochaine-case={estProchaine ? '1' : undefined} data-cliquable={cliquable ? '1' : undefined} data-partie={partie ? '1' : undefined}
                             role={cliquable || a.length ? 'button' : undefined} tabIndex={cliquable || a.length ? 0 : undefined}
-                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key)}` : nomCase(m.nr, key)}
-                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); }}
+                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key, m.mode, m.it)}` : nomCase(m.nr, key, m.mode, m.it)}
+                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[a.length - 1]); }}
                             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); } }}
                             style={{ height: 'var(--rgt-h)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', cursor: cliquable || a.length ? 'pointer' : 'default',
                               border: `${accent ? 2 : 1}px ${trait} ${bord}`,
@@ -21796,7 +22182,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
               </React.Fragment>
             );
           })}
-          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : les boîtes tombent en bas de chaque colonne. Touche une case pleine pour la retrouver.</div>}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne. Touche une case pleine pour la retrouver.</div>}
         </div>
       </div>
     </div>
