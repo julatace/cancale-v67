@@ -3674,6 +3674,13 @@ const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+
 // (`needsBordereau`) — un statut inconnu compte comme à expédier : mieux vaut
 // proposer un colis que le cacher.
 const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
+// ⚠️ 17 octobre — la Nike Air Max 1 nB546 (tx 22592792923) en LITIGE revenait
+//    dans « à faire » : Vinted la liste « La livraison n'a pas encore eu lieu -
+//    colis déposé en bureau de Poste ou point relais » avec `needs_action` — le
+//    colis de RETOUR ; sa transaction dit 440 « Retour initié ». `needs_action`
+//    ne vaut « à expédier » que si le texte ne dit pas que le colis a DÉJÀ
+//    bougé. Le MÊME texte que l'app (`COLIS_DEJA_BOUGE`, §11 — audit-statuts).
+const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
 function besoinBordereauTexte(status) {
   const s = String(status || '').toLowerCase();
   if (!s) return true;
@@ -3689,7 +3696,7 @@ function A_EXPEDIER(o) {
   const s = String(o.status || '');
   if (PAS_UN_ENVOI.test(s)) return false;
   const t = String(o.transaction_user_status || '').toLowerCase();
-  if (t === 'needs_action') return true;
+  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
   return besoinBordereauTexte(s);
 }
