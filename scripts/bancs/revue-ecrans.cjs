@@ -6,9 +6,10 @@
 // clair ET sombre, et à 1512 px. Demande de Julien (16 octobre) : « ça fait
 // encore trop vibe-codé ».
 //
-// Ce banc ne juge pas : il PRODUIT des captures et des MESURES pour une revue
-// humaine (§6.2 : regarder la capture fait partie du test). Il ne sort en
-// échec que si un écran tombe (garde-fou, erreur de page).
+// Ce banc PRODUIT surtout des captures et des MESURES pour une revue humaine
+// (§6.2 : regarder la capture fait partie du test). Il sort en échec si un
+// écran tombe (garde-fou, erreur de page), ou si un des défauts VUS en revue
+// revient (`JUGES`, plus bas : chacun rouge sur le code d'avant).
 //
 // Données INVENTÉES (aucune donnée réelle : il vit dans le dépôt, public).
 // Mesures par écran (JSON) : cibles tactiles < 44 px, éléments qui sortent à
@@ -34,6 +35,11 @@ const TAILLES = (process.env.TAILLES || '390c,390s,1512c').split(',');
 // ── Données inventées ───────────────────────────────────────────────────────
 const maintenant = new Date(2026, 9, 15, 15, 30, 0);
 const il = (n, h = 12) => { const d = new Date(maintenant); d.setHours(h, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
+// Formes RÉELLES des dates limites (§6.3) : « jj/mm/aaaa » dans un email de
+// bordereau (`joursAvantLimiteFr`), « aaaa-mm-jj » dans un email de suivi (`joursAvant`).
+const p2 = (n) => String(n).padStart(2, '0');
+const jourFr = (d) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
+const jourIso = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 const ts = (j) => Math.floor(il(j).getTime() / 1000);
 const cap = maintenant.toISOString();
 const UID = '111', UID2 = '222';
@@ -110,8 +116,8 @@ const PDF_B64 = (() => { try { return fs.readFileSync(path.join(__dirname, 'bord
 const LIGNES = [
   { id: 'main', data: MAIN },
   { id: 'panel_colis_relais', data: RELAIS },
-  { id: 'email_track_mondialrelay_MR1234567', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '7731', lieu: 'Tabac de la Houle', carrier: 'mondialrelay', suivi: 'MR1234567', receivedAt: il(1).toISOString(), limite: il(-3).toISOString() } },
-  { id: 'email_bord_banc_7001', data: { transaction: '7001', filename: 'bordereau-7001.pdf', article: VENTES[0].title, receivedAt: il(0, 10).toISOString(), dateLimite: il(-5).toISOString(), pdfB64: PDF_B64 } },
+  { id: 'email_track_mondialrelay_MR1234567', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '7731', lieu: 'Tabac de la Houle', carrier: 'mondialrelay', suivi: 'MR1234567', receivedAt: il(1).toISOString(), limite: jourIso(il(-3)) } },
+  { id: 'email_bord_banc_7001', data: { transaction: '7001', filename: 'bordereau-7001.pdf', article: VENTES[0].title, receivedAt: il(0, 10).toISOString(), dateLimite: jourFr(il(-5)), pdfB64: PDF_B64 } },
   { id: `harvest_${UID}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
   { id: `harvest_${UID2}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: [] } } },
   { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: ACHATS } } },
@@ -165,7 +171,17 @@ const projette = (row, sel) => {
   return out;
 };
 
-const ouvrir = async (b, taille, tab) => {
+// Mode équipe (16 oct.) : la boutique a une aide et une invitation en cours ;
+// pour l'écran `ColisEquipe`, la session est MEMBRE de l'équipe d'un vendeur.
+const VENDEUR_EQ = '99999999-8888-7777-6666-555555555555';
+const EQUIPE = { ok: true, equipe: [
+  { id: 'e1', email: 'aide@exemple.test', statut: 'actif', role: 'colis', invite_le: il(6).toISOString() },
+  { id: 'e2', email: 'nouvelle@exemple.test', statut: 'invitee', role: 'colis', invite_le: il(1).toISOString() },
+], invitations: [], membreDe: [], aBoutique: true };
+const EQUIPE_MEMBRE = { ok: true, equipe: [], invitations: [], membreDe: [{ id: 'e9', vendeur: VENDEUR_EQ, de: 'vendeur@exemple.test' }], aBoutique: false };
+const COLIS_EQ = { ventes: VENTES.slice(0, 3).map((o) => ({ ...o, uid: UID })), achats: [{ ...ACHATS[0], uid: UID }], comptes: { [UID]: 'boutique_demo' }, postes: [], retires: [] };
+
+const ouvrir = async (b, taille, tab, opt = {}) => {
   const tel = taille.startsWith('390'), sombre = taille.endsWith('s');
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
@@ -174,13 +190,14 @@ const ouvrir = async (b, taille, tab) => {
   // Le Stock 3D boucle sur requestAnimationFrame : sous l'horloge simulée la
   // capture n'aboutit jamais. Il garde l'heure réelle.
   if (tab !== 'garage') await pg.clock.install({ time: maintenant });
-  await pg.addInitScript(([d, s]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {} }, [sombre, SESSION]);
+  await pg.addInitScript(([d, s, m]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vrm_bascule_mineral_v1', '1'); if (m) { localStorage.setItem('vrm_equipe_vue_' + s.user.id, m.vendeur); localStorage.setItem('vrm_equipe_cache_' + s.user.id, JSON.stringify({ membreDe: [m], aBoutique: false })); } } catch (_) {} }, [sombre, SESSION, opt.membre ? EQUIPE_MEMBRE.membreDe[0] : null]);
   await pg.route(/^https?:\/\/[^/]*(vinted\.net|img\.test)\//i, (r) => { const m = /\/b(\d+)\/|\/e(\d+)\.jpg/.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1] || m[2]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net|img\.test)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user, ...SESSION.user }) }));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'content-range': `0-${Math.max(0, (d.length || 1) - 1)}/${d.length || 0}` }, body: JSON.stringify(d) });
+    if (/\/rpc\/vrm_equipe_colis/.test(u)) return j(COLIS_EQ);
     if (route.request().method() !== 'GET') return j([], 201);
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
@@ -199,6 +216,7 @@ const ouvrir = async (b, taille, tab) => {
     const j = (d, st) => r.fulfill({ status: st || 200, contentType: 'application/json', body: JSON.stringify(d) });
     if (/mode=abonnement/.test(u)) return j(ABO);
     if (/mode=factures/.test(u)) return j(FACTURES);
+    if (/mode=equipe/.test(u)) return j(opt.membre ? EQUIPE_MEMBRE : EQUIPE);
     if (/\/api\/ebay/.test(u)) {
       if (r.request().method() !== 'POST') return j({ ok: true, ready: true, canConsent: true });
       let body = {}; try { body = JSON.parse(r.request().postData() || '{}'); } catch (_) {}
@@ -323,8 +341,60 @@ const ECRANS = [
   { nom: 'recherche', tab: 'journee', n: 1, avant: async (pg) => { await pg.click('[aria-label="Rechercher une paire"]', { timeout: 4000 }); await pg.waitForTimeout(500); await pg.keyboard.type('nike'); await pg.waitForTimeout(900); } },
   { nom: 'ebay-vendre', tab: 'plat_ebay', n: 3, avant: async (pg) => { await sec('annonces')(pg); await pg.click('[data-poster="ebay"]', { timeout: 4000 }); await pg.waitForTimeout(900); } },
   { nom: 'prixachat', tab: 'settings', n: 2, avant: async (pg) => { await pg.getByText("Compléter les prix d'achat", { exact: false }).first().click({ timeout: 4000 }); await pg.waitForTimeout(1800); } },
+  { nom: 'studio', tab: 'plat_vinted', n: 1, avant: async (pg) => { await sec('annonces')(pg); await pg.click('[aria-label="Outils"]', { timeout: 4000 }); await pg.getByText('Studio photo', { exact: true }).first().click({ timeout: 4000 }); await pg.waitForTimeout(2500); } },
+  { nom: 'colisequipe', tab: 'journee', membre: true, n: 2 },
   { nom: 'bordereau', tab: 'plat_vinted', n: 2, avant: async (pg) => { await sec('ventes')(pg); await pg.click('[data-bouton-bord]', { timeout: 4000 }); await pg.waitForTimeout(1500); } },
 ];
+
+// ── Défauts vus aux revues visuelles : un contrôle par défaut ─────────────────
+// Second tour (17 oct.) — chacun ROUGE sur le build d'avant, vert après.
+const JUGES = {
+  // Ma journée comptait « 1 à retirer » (colis vus par Vinted seuls : les
+  // emails de suivi n'étaient pas lus sur cet écran) ; Achats en montre 2.
+  journee: async (pg) => {
+    await pg.waitForTimeout(1500);
+    const n = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return t ? t.getAttribute('data-n') : null; });
+    return n === '2' ? null : `tuile « À retirer » = ${n} — l'écran Achats en montre 2`;
+  },
+  // Sans ligne URSSAF publiée, l'échéance écrivait « CA finalisé 0,00 € ·
+  // À payer 0,00 € » sous le « — » de la même carte (ancienne archive vide).
+  statistiques: async (pg) => {
+    const v = await pg.evaluate(() => { const l = [...document.querySelectorAll('span')].find((e) => e.textContent.trim() === 'CA finalisé'); return l && l.nextElementSibling ? l.nextElementSibling.innerText.trim() : null; });
+    return v === '—' ? null : `échéance URSSAF sans ligne publiée : « CA finalisé ${v} » (attendu « — »)`;
+  },
+  // « 249,5 € » sur une carte d'annonce.
+  'vinted-annonces': async (pg) => {
+    const p = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce] [data-prix]')].map((e) => e.innerText.trim()).filter((t) => /\d,\d(?!\d)/.test(t)));
+    return p.length ? `prix à une décimale : ${p.join(', ')}` : null;
+  },
+  // L'écran d'un membre d'équipe : photos cassées (objet en `src`), date
+  // brute « aaaa-mm-jj », et resté CLAIR dans une app réglée en sombre.
+  colisequipe: async (pg, taille) => {
+    await pg.waitForTimeout(800);
+    const r = await pg.evaluate(() => {
+      const z = document.querySelector('[data-colis-equipe]'); if (!z) return { absent: true };
+      const imgs = [...z.querySelectorAll('img')];
+      const cassees = imgs.filter((i) => i.complete && i.naturalWidth === 0).length;
+      const brut = (z.innerText.match(/\d{4}-\d{2}-\d{2}/g) || []);
+      const c = getComputedStyle(z).backgroundColor.match(/\d+/g).map(Number);
+      return { n: imgs.length, cassees, brut, lum: (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255 };
+    });
+    if (r.absent) return 'écran « Colis à préparer » pas rendu';
+    const pb = [];
+    if (!r.n || r.cassees) pb.push(`${r.cassees}/${r.n} photo(s) cassée(s)`);
+    if (r.brut.length) pb.push(`date brute ${r.brut.join(', ')}`);
+    if (taille.endsWith('s') && r.lum > 0.3) pb.push(`fond clair (${r.lum.toFixed(2)}) en mode sombre`);
+    return pb.length ? pb.join(' · ') : null;
+  },
+};
+// Sous-écrans de Réglages (téléphone).
+const JUGES_SOUS = {
+  // « Photo de couverture » débordait sur « Toutes les photos » à 390 px.
+  detourage: async (pg) => {
+    const d = await pg.evaluate(() => [...document.querySelectorAll('[data-detourage-choix]')].filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => `${b.innerText.trim()} ${b.clientWidth}/${b.scrollWidth}px`));
+    return d.length ? `segment qui déborde : ${d.join(' ; ')}` : null;
+  },
+};
 
 let ko = 0;
 (async () => {
@@ -344,26 +414,29 @@ let ko = 0;
         if (b) await b.close().catch(() => {});
         b = await lancer();
         try {
-          const { ctx, pg, errs, tel } = await ouvrir(b, taille, e.tab);
+          const { ctx, pg, errs, tel } = await ouvrir(b, taille, e.tab, { membre: !!e.membre });
           if (e.avant) await e.avant(pg);
           const m = await mesurer(pg, tel);
           m.shots = await captures(pg, cle, tel, e.n || (tel ? 4 : 2));
           if (tel && !e.n) m.fin = await finDePage(pg);
           m.erreurs = errs;
+          if (JUGES[e.nom]) { const pb = await JUGES[e.nom](pg, taille).catch((x) => 'contrôle mort : ' + String(x.message || x).slice(0, 120)); if (pb) { ko++; console.log(`❌ ${cle} : ${pb}`); } else console.log(`   ✓ ${cle} : contrôle de revue vert`); m.juge = pb || 'ok'; }
           if (m.tombe || errs.length) { ko++; console.log(`❌ ${cle} : ${m.tombe ? 'garde-fou' : errs.join(' | ').slice(0, 160)}`); }
           else console.log(`✅ ${cle} · ${m.shots.length} capture(s) · ${m.petits.length} petites cibles · ${m.coupes.length} coupés · ${m.emojis.length} emojis`);
           rapport[cle] = m;
           // Sous-écrans de Réglages (téléphone) : un par ligne qui ouvre.
-          if (e.nom === 'reglages' && tel) {
+          if ((e.nom === 'reglages' || e.nom === 'moncompte') && tel) {
             const ids = await pg.evaluate(() => [...document.querySelectorAll('[data-sous-ouvrir]')].map((x) => x.getAttribute('data-sous-ouvrir')));
+            if (e.nom === 'moncompte') ids.splice(0, ids.length, ...ids.filter((x) => ['equipe', 'double'].includes(x)));
             for (const id of ids) {
               await pg.evaluate(() => { const r = document.querySelector('[data-sous-retour]'); if (r) r.click(); });
               await pg.waitForTimeout(300);
               await pg.evaluate((id) => { const x = document.querySelector(`[data-sous-ouvrir="${id}"]`); if (x) x.click(); }, id);
               await pg.waitForTimeout(900);
               const ms = await mesurer(pg, tel);
-              ms.shots = await captures(pg, `reglages_${id}-${taille}`, tel, 3);
-              rapport[`reglages_${id}-${taille}`] = ms;
+              if (JUGES_SOUS[id]) { const pb = await JUGES_SOUS[id](pg).catch((x) => 'contrôle mort : ' + String(x.message || x).slice(0, 120)); if (pb) { ko++; console.log(`❌ ${e.nom}_${id}-${taille} : ${pb}`); } else console.log(`   ✓ ${e.nom}_${id}-${taille} : contrôle de revue vert`); }
+              ms.shots = await captures(pg, `${e.nom}_${id}-${taille}`, tel, 3);
+              rapport[`${e.nom}_${id}-${taille}`] = ms;
               console.log(`   ↳ sous-écran ${id} · ${ms.petits.length} petites cibles`);
             }
           }
