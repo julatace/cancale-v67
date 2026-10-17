@@ -58,3 +58,55 @@
 .vrm-pourquoi > summary::-webkit-details-marker { display: none; }
 .vrm-pourquoi > summary::marker { content: ''; }
 .vrm-pourquoi[open] > div { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--vrm-muted); font-weight: 400; }
+
+/* ── Les paires à publier ailleurs (Leboncoin) — 17 octobre ───────────────
+   Julien : « j'aime pas le visuel quand j'ai les propositions des paires à
+   publier sur les autres plateformes ». Une CARTE par paire : la photo en
+   grand, le N° et le prix lisibles d'un coup d'œil, ce qui manque en pastilles
+   neutres (l'ambre seulement pour ce qui bloque), les gestes en bas. Deux à
+   trois colonnes sur ordinateur, une sur téléphone. */
+.vrm-apub-grille { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 8px; }
+@media (min-width: 760px) { .vrm-apub-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .vrm-apub-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+.vrm-apub-carte {
+  min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line);
+  box-shadow: 0 1px 1px rgba(16,21,27,.03), 0 6px 18px rgba(16,21,27,.04);
+}
+:root[data-theme="dark"] .vrm-apub-carte { box-shadow: none; }
+.vrm-apub-carte[data-apub-jumelle] { opacity: .72; }
+.vrm-apub-haut { display: flex; gap: 12px; min-width: 0; }
+.vrm-apub-photo {
+  width: 84px; height: 84px; flex-shrink: 0; border-radius: 10px; object-fit: cover;
+  background: var(--vrm-bg); border: 1px solid var(--vrm-line);
+  display: flex; align-items: center; justify-content: center; color: var(--vrm-muted);
+}
+.vrm-apub-corps { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.vrm-apub-ligne1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.vrm-apub-num {
+  flex-shrink: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; color: var(--vrm-ink);
+  padding: 2px 7px; border-radius: 6px; background: var(--vrm-bg); border: 1px solid var(--vrm-line);
+  font-variant-numeric: tabular-nums;
+}
+.vrm-apub-prix { margin-left: auto; flex-shrink: 0; font-size: 15px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
+.vrm-apub-titre {
+  font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--vrm-ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.vrm-apub-pastilles { display: flex; flex-wrap: wrap; gap: 5px; }
+.vrm-apub-pastille {
+  font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px;
+  color: var(--vrm-muted); background: var(--vrm-bg); border: 1px solid var(--vrm-line); white-space: nowrap;
+}
+.vrm-apub-pastille[data-ton="bloque"] { color: #A15C00; background: rgba(161,92,0,.08); border-color: rgba(161,92,0,.30); }
+:root[data-theme="dark"] .vrm-apub-pastille[data-ton="bloque"] { color: #FFB23E; background: rgba(255,178,62,.12); border-color: rgba(255,178,62,.30); }
+.vrm-apub-vignettes { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 1px; }
+.vrm-apub-vignettes > * { width: 40px; height: 40px; flex-shrink: 0; border-radius: 7px; object-fit: cover; background: var(--vrm-bg); border: 1px solid var(--vrm-line); }
+.vrm-apub-plus { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: var(--vrm-muted); border-style: dashed !important; }
+.vrm-apub-jumelle { font-size: 12px; line-height: 1.45; color: var(--vrm-muted); }
+.vrm-apub-gestes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: auto; padding-top: 2px; border-top: 1px solid var(--vrm-line); padding-top: 10px; }
+.vrm-apub-lien { font-size: 12px; font-weight: 600; color: var(--vrm-muted); text-decoration: underline; text-underline-offset: 2px; background: none; border: none; padding: 0; min-height: 0; cursor: pointer; font-family: inherit; }
+.vrm-apub-groupe { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; }
+.vrm-apub-groupe-titre { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--vrm-muted); }
+.vrm-apub-groupe-n { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+.vrm-apub-groupe-note { font-size: 12px; color: var(--vrm-muted); line-height: 1.45; margin-top: 3px; }
