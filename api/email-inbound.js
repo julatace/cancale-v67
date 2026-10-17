@@ -370,13 +370,29 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
 }
 
 async function createProInvoice(sale, acc, cfg, now) {
+  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
+  // ⚠️⚠️ REVUE DU 17 OCTOBRE (`scripts/audit-routes-revue.cjs`, A et B).
+  //  · Le MÊME email revient (un 503 est fait pour ça, le script Gmail renvoie
+  //    tout le fil) : la facture déjà émise recevait un NOUVEAU numéro et
+  //    repassait « à envoyer » — le script l'envoyait une seconde fois à
+  //    l'acheteur. Une facture émise ne change plus jamais de numéro.
+  //  · Compteur ILLISIBLE : `null` valait 0, la route émettait « FA-AAAA-0001 »
+  //    (déjà donné) et RÉÉCRIVAIT le compteur à 1 — toutes les factures
+  //    suivantes reprenaient des numéros déjà émis. Pas su ⇒ aucune facture, et
+  //    la route répond 503 (l'email reviendra).
+  const deja = await supabaseLireRow(`email_invoice_${key}`);
+  if (!deja.lu) { marquerEcritureRatee(); return null; }
+  if (deja.data && deja.data.number) return { number: deja.data.number, status: deja.data.status || 'draft', deja: true };
+  const cpt = await supabaseLireRow('vrm_invoice_counter');
+  if (!cpt.lu) { marquerEcritureRatee(); return null; }
+  const lu = cpt.data == null ? 0 : parseInt(cpt.data, 10);
+  if (!Number.isFinite(lu) || lu < 0) { marquerEcritureRatee(); return null; }
   // Numéro séquentiel : compteur partagé dans Supabase (jamais réutilisé).
-  const counter = (parseInt(await supabaseGetRow('vrm_invoice_counter'), 10) || 0) + 1;
-  await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]);
+  const counter = lu + 1;
+  if (!(await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]))) return null;
   const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
   const dateStr = new Date().toLocaleDateString('fr-FR');
   const html = buildInvoiceHtml(cfg, sale, number, dateStr);
-  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
   const status = cfg.autoSend ? 'queued' : 'draft';
   await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
     type: 'facture_pro', number, status,
@@ -1665,10 +1681,14 @@ export async function traiterEmail(req, res) {
       let facture = null;
       try {
         if (data.email) {
-          const cfg = await supabaseGetRow('vrm_pro_facture');
+          // Réglage ILLISIBLE ≠ « facturation coupée » : sans ça, la facture
+          // n'était jamais faite et l'email acquitté. Pas su ⇒ 503, il reviendra.
+          const cfgLu = await supabaseLireRow('vrm_pro_facture');
+          if (!cfgLu.lu) marquerEcritureRatee();
+          const cfg = cfgLu.lu ? cfgLu.data : null;
           if (cfg && cfg.actif) {
             facture = await createProInvoice(data, acc, cfg, now);
-            try { await pushOnce({
+            if (facture && !facture.deja) try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
               tag: `inv-${facture.number}`, url: '/?tab=invoices',

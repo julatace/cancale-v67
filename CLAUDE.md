@@ -9590,6 +9590,43 @@ PROUVÉE en vente ailleurs. Règle pure : `api/_lib/double-vente.js`.
 - **Julien** : rien — la catégorie est activée d'office (Réglages →
   Notifications pour la couper).
 
+### Revue adverse des routes serveur (17 octobre)
+Toutes les routes `api/*.js` et `api/_lib/*.js` relues, chaque défaut REPRODUIT
+en exécutant la vraie route (`scripts/audit-routes-revue.cjs`, un processus neuf
+par scénario, fausse base à état) : **15 rouges sur le code d'avant, 0 après**.
+- ⚠️⚠️ **Facture Pro : un compteur illisible émettait « FA-AAAA-0001 » et
+  remettait le compteur à 1** (toutes les factures suivantes reprenaient des
+  numéros déjà émis) ; et **le même email renvoyé** (un 503 est fait pour ça)
+  donnait à la facture déjà émise un NOUVEAU numéro et la repassait « à
+  envoyer » — le script Gmail l'envoyait une seconde fois à l'acheteur.
+  `createProInvoice` relit d'abord `email_invoice_{clé}` (déjà émise ⇒ rendue
+  telle quelle), lit compteur et réglage en trois états ; pas su ⇒ aucune
+  facture et 503.
+- ⚠️⚠️ **`duVendeur` (owner.js) lisait SANS filtre de vendeur quand la sonde de
+  cloisonnement hoquetait** (`null` valait « une seule boutique »). Chemin
+  réel : le rejeu d'un email mis de côté (`email-rattacher` → `traiterEmail`) —
+  journal, fiches, mémo d'un AUTRE vendeur lus avec la clé de service, puis
+  réécrits chez celui-ci. Seul un « non » mesuré lit sans filtre.
+- ⚠️⚠️ **Le widget aussi** : sonde ratée ⇒ lectures sans filtre, et la clé de A
+  servait les ventes de B (prouvé : `salesMonth=2` au lieu de 1). Trois états,
+  `null` ⇒ 503 (le défaut corrigé le 4 octobre dans push.js et ship-reminders).
+- **§2.9 : `/api/ai` dépensait la clé du serveur (celle de Julien) pour tout
+  vendeur connecté**, et la faisait passer DEVANT la clé que le vendeur
+  apportait. Clé du vendeur d'abord ; clé du serveur pour `VRM_OWNER_UID` seul ;
+  sinon `no-key` (l'app retombe sur ses suggestions calculées).
+- `/api/vinted-refresh` disait « refreshed » (200) quand l'écriture des jetons
+  renouvelés échouait — l'ancien jeton étant consommé chez Vinted. Rend
+  `refreshed_not_saved` et 502. (Route sans appelant aujourd'hui.)
+- **Pas retenus, notés** : l'action eBay `exchange` échange un code SANS
+  state/nonce (aucun appelant dans l'app, et un code ne fuit pas vers un tiers :
+  à retirer un jour) ; `PHOTOROOM_POUR=tous` ouvrirait la clé Photoroom de
+  Julien aux abonnés payants — c'est un réglage à poser exprès, éteint, mais il
+  contredit §2.9 s'il est posé ; la notification de suppression de compte eBay
+  (`mode=deletion`, POST) n'efface rien ; `harvestOrders` du widget lit
+  `select=id,data` sur `orders_*` (repli quand le résumé manque) ;
+  `vinted-connect` ne vérifie pas un `accessToken` encore valide auprès de
+  Vinted (il ne touche que les lignes du vendeur lui-même).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -9604,7 +9641,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **93 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **85 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -9926,7 +9963,7 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 93 audits
+scripts/audit-*.cjs             les 94 audits
 scripts/bancs/                  les 85 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
