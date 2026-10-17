@@ -1303,6 +1303,15 @@ const SYNC_KEYS = [
   // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
   // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
   'vrm_paires_dorment',
+  // Le CA déclaré mois par mois : PUBLIÉ par l'écran Ventes (son propriétaire,
+  // §11), CONSOMMÉ par le tableau de bord et la carte « Résultat » de
+  // Comptabilité. (17 octobre) Il ne vivait que dans le navigateur qui avait
+  // ouvert Ventes : sur un autre appareil, Comptabilité disait « ton CA déclaré
+  // arrive sur cet appareil » — rien ne l'y amenait — juste sous un « Reçu »
+  // chiffré. Synchronisé, il arrive avec le nuage. Aucune règle ne change.
+  // Il porte aussi l'argent REÇU par mois (`recu`), CONSOMMÉ par le widget de
+  // l'iPhone (api/widget.js) — qui ne le recalcule plus sur les emails.
+  'vinted_urssaf_mois',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -24844,14 +24853,30 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // absente/pas encore publiée ⇒ `null` (on n'invente pas de recettes).
   // ⚠️ Ce n'est PAS le bénéfice : le coût d'achat des paires n'est pas déduit
   // ici (il n'est pas saisi, §2.5, et il vit dans Statistiques).
-  const recettesAnnee = (() => {
-    try {
-      const v = load('vinted_urssaf_mois', null);
-      if (!v || !Array.isArray(v.mois)) return null;
-      return v.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee))
-        .reduce((s, m) => s + (Number(m.ca) || 0), 0);
-    } catch (_) { return null; }
-  })();
+  // ⚠️ (17 octobre) TROIS ÉTATS, ET LA LIGNE SE RELIT QUAND ELLE CHANGE. Elle
+  // était lue une fois au rendu : sur un appareil qui n'avait jamais ouvert
+  // Ventes, la carte disait « ton CA déclaré arrive sur cet appareil » — rien ne
+  // l'y amenait (la ligne n'était pas synchronisée) — pendant que la carte « CA
+  // par période », juste en dessous, chiffrait déjà le reçu du mois. La ligne
+  // est maintenant synchronisée (elle arrive avec le nuage) et la carte la relit
+  // à l'arrivée du nuage et à chaque publication :
+  //   `encours` (nuage pas encore arrivé) · `passu` (nuage arrivé, jamais
+  //   publiée : « — » et où elle se calcule) · `lu`.
+  const lireLigneCa = () => { try { const v = load('vinted_urssaf_mois', null); return v && Array.isArray(v.mois) ? v : null; } catch (_) { return null; } };
+  const [ligneCa, setLigneCa] = React.useState(lireLigneCa);
+  const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => { setNuagePret(true); setLigneCa(lireLigneCa()); }), []);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_urssaf_mois') setLigneCa(lireLigneCa()); };
+    const g = (e) => { if (e && e.key === 'vinted_urssaf_mois') setLigneCa(lireLigneCa()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  }, []);
+  const etatCa = ligneCa ? 'lu' : (nuagePret ? 'passu' : 'encours');
+  const caAt = ligneCa && Number(ligneCa.at) > 0 ? Number(ligneCa.at) : null;
+  const recettesAnnee = ligneCa
+    ? ligneCa.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee)).reduce((s, m) => s + (Number(m.ca) || 0), 0)
+    : null;
   const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
   // ⚠️ (revue des chiffres, 17 octobre) LA COUVERTURE DE LA MÊME LIGNE. Ce CA
   // se présentait comme complet alors que la ligne publiée peut dire « eBay :
@@ -24859,13 +24884,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // ce que la carte URSSAF du tableau de bord dit, sur la MÊME ligne. Un total
   // partiel qui se présente comme complet est pire qu'un total absent (§5).
   const couvertureCa = (() => {
-    try {
-      const v = load('vinted_urssaf_mois', null);
-      if (!v || !Array.isArray(v.mois)) return null;
-      const pasSu = Object.entries(v.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
-      const ad = v.aDater && Number(v.aDater.n) > 0 ? { n: Number(v.aDater.n), ca: Number(v.aDater.ca) || 0 } : null;
-      return { pasSu, aDater: ad };
-    } catch (_) { return null; }
+    if (!ligneCa) return null;
+    const pasSu = Object.entries(ligneCa.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
+    const ad = ligneCa.aDater && Number(ligneCa.aDater.n) > 0 ? { n: Number(ligneCa.aDater.n), ca: Number(ligneCa.aDater.ca) || 0 } : null;
+    return { pasSu, aDater: ad };
   })();
   const caPartiel = !!(couvertureCa && couvertureCa.pasSu.length);
 
@@ -24958,7 +24980,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
       <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)}>
+        <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
           {recettesAnnee == null ? (
             <div>
@@ -24967,7 +24989,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
               <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
-                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre {lienBtn('Ventes', 'cat_ventes')} une fois, et tes charges y seront déduites.
+                {etatCa === 'encours'
+                  ? 'Je lis ton CA déclaré…'
+                  : <>Ton CA déclaré n'a encore été calculé sur aucun de tes appareils : il se calcule dans {lienBtn('Ventes', 'cat_ventes')}. Ouvre-le une fois, et tes charges y seront déduites ici.</>}
               </div>
             </div>
           ) : (
@@ -27255,9 +27279,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const k in parAd) parAd[k].ca = r2(parAd[k].ca);
       const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)), par: parAd };
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: 'nonRelie' };
+      // L'argent REÇU par mois (date de VERSEMENT), par `recuDuMois` — la règle
+      // même de « Reçu en {mois} » sur Ma journée. Le widget de l'iPhone le LIT
+      // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
+      const recu = {};
+      for (const ymR of new Set(lignes.filter(l => l && l.ts).map(l => ymDeTs(l.ts)))) recu[ymR] = r2(recuDuMois(lignes, ymR));
       const avant = load('vinted_urssaf_mois', null);
-      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare };
-      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare }) === JSON.stringify(charge);
+      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu };
+      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
   }, [sales.items, sales.failedUids, declarables, lbcLu, ebayCmd, declUrssaf]);
@@ -29081,7 +29110,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })();
     return()=>{stop=true;};
   },[sales.items,listings.items,txnItem,curSub,photosVentesForcees]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
+  // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
+  // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -31432,7 +31464,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Prix Vinted formaté proprement : l'API renvoie « 88.0 » / « 95.0 » (chaîne),
   // qui s'affichait tel quel (« 88.0 € »). On formate en français sans zéro
   // inutile : « 88 € », « 158,99 € ».
-  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{maximumFractionDigits:2})} ${cur(c)}`;
+  // « 249,5 € » se lisait inachevé (revue visuelle du 17 oct.) : des centimes
+  // s'écrivent sur deux chiffres, un prix rond reste rond.
+  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{minimumFractionDigits:Number.isInteger(Number(p))?0:2,maximumFractionDigits:2})} ${cur(c)}`;
 
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
@@ -40098,9 +40132,6 @@ const lireCacheEquipe = (uid) => { try { const j = JSON.parse(localStorage.getIt
 // La dernière liste connue est gardée sur l'appareil pour décider tout de suite
 // (pas d'éclair de sa boutique vide) ; la base tranche dès qu'elle répond.
 function PorteEquipe({ uid, children }) {
-  // Monté hors d'AppCoeur : le thème choisi (`vinted_dark`) doit valoir AUSSI
-  // pour l'écran d'équipe. AppCoeur le repose lui-même quand il est rendu.
-  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   const [lu, setLu] = React.useState(undefined);
   const [cache, setCache] = React.useState(() => lireCacheEquipe(uid));
   const [vue, setVue] = React.useState(() => lireVueEquipe(uid));
@@ -40318,7 +40349,10 @@ function ColisEquipe({ vendeur, de, onPropre }) {
         const numero = b && b.numero && b.numero !== 'None' ? String(b.numero) : '';
         return (
           <div key={k} data-equipe-vente={k} style={{ ...carte, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            {o.photo ? <PhotoVinted src={o.photo} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: C.bg }}/> : null}
+            {/* ⚠️ `o.photo` est un OBJET Vinted ({url, …}) : posé tel quel en
+                `src`, l'image était CASSÉE (revue visuelle du 17 oct.). La même
+                lecture que partout ailleurs (`orderPhoto`, §11). */}
+            {orderPhoto(o) ? <PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: C.bg }}/> : null}
             <div style={{ flex: '1 1 180px', minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{numero ? `N°${numero} · ` : ''}{o.title || 'Article'}</div>
               <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', b && b.dateLimite ? `à poster avant le ${b.dateLimite}` : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
@@ -40356,7 +40390,9 @@ function ColisEquipe({ vendeur, de, onPropre }) {
           return (
             <div key={(t.suivi || '') + i} data-equipe-track="" style={carte}>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${t.lieu}` : ''}</div>
-              {t.limite && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {t.limite}</div>}
+              {/* « aaaa-mm-jj » s'écrivait tel quel (revue visuelle du 17 oct.) :
+                  la date se lit comme sur l'écran Achats ; illisible ⇒ rien. */}
+              {joursAvant(t.limite) != null && <div data-equipe-limite="" style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {new Date(String(t.limite) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>}
               {code ? <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
               {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
             </div>
@@ -41241,7 +41277,9 @@ function SecuriteSetting() {
   return (
     <div style={{border:`1px solid ${proteges || sondeInconnue ? C.border : C.warn + '66'}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
+        {/* Le titre du sous-écran (téléphone) le dit déjà : caché là par CSS (§7) ;
+            le verdict à côté reste. Sur ordinateur, c'est le seul titre du panneau. */}
+        <div className="vrm-titre-panneau" style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
         <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn,background:(sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
           {st === null ? 'vérification…' : sondeInconnue ? 'pas encore vérifié' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
@@ -42050,6 +42088,12 @@ function RegimeSetting({ nu = false }) {
 export default function App() {
   const [authState,setAuthState]=useState(AUTH);
   React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
+  // ⚠️ LE THÈME CHOISI VAUT AUSSI POUR LES ÉCRANS D'AVANT LE CŒUR (revue
+  //    visuelle du 17 oct.) : `C` n'était réassigné que dans `AppCoeur`, donc
+  //    l'écran « Colis à préparer » d'un membre d'équipe (et la porte de la
+  //    double vérification) restaient CLAIRS dans une app réglée en sombre —
+  //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
+  C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
@@ -42386,8 +42430,7 @@ function AppCoeur() {
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
-  const [notifItems,setNotifItems]=useState([]); // centre de notifications (actions du jour)
-  const [notifOpen,setNotifOpen]=useState(false);
+  const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     ...ENTREPRISE_VIDE,
@@ -43917,24 +43960,9 @@ function AppCoeur() {
         </div>
         );
       })()}
-      {/* Centre de notifications : les actions du moment, chacune ouvre le bon onglet. */}
-      {notifOpen && (
-        <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
-            <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>🔔 Notifications</div>
-            {notifItems.length===0 ? (
-              <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
-            ) : notifItems.map((it,i)=>(
-              <button type="button" key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                <span style={{fontSize:20}}>{it.icon}</span>
-                <span style={{flex:1,fontSize:13,fontWeight:600,color:C.text}}>{it.text}</span>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
+          l'ouvrait plus (`setNotifOpen(true)` n'existait nulle part). `notifItems`
+          reste : Ma journée, le tableau de bord et le Collectif le rendent. */}
       {/* Les bandeaux bleus « N ventes / messages » sont retirés (Julien, 16 oct.) :
           la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.

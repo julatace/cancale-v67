@@ -17,7 +17,14 @@
 //      Comptabilité ; REÇU du mois identique sur Ma journée et Comptabilité ;
 //      le CA déclaré de l'année (Comptabilité) = la somme des mois publiés ;
 //   C. eBay illisible : la ligne publiée le dit ; le CA déclaré de Comptabilité
-//      ne se présente pas comme complet (il nomme eBay).
+//      ne se présente pas comme complet (il nomme eBay) ;
+//   D. (17 octobre) Comptabilité ouverte EN PREMIER sur un appareil qui n'a
+//      jamais ouvert Ventes : la carte « Résultat » disait « ton CA déclaré
+//      arrive sur cet appareil » sous un « Reçu » chiffré — rien ne l'y
+//      amenait. Ligne publiée ailleurs (dans le nuage) ⇒ la carte la lit ;
+//      jamais publiée ⇒ « pas su » (aucun montant), puis elle se relit dès
+//      qu'une publication arrive. Jugé sur `data-compta-ca-etat` /
+//      `data-compta-ca`, jamais sur la phrase.
 const path=require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -105,7 +112,8 @@ async function page(b, opts={}){
     if(opts.ebayKO && /ebay_orders/.test(u)) return route.fulfill({status:522,contentType:'text/html',body:'<html>522</html>'});
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
-    const eq=/id=eq\.([^&]*)/.exec(u); if(eq) return j(rows.filter(r=>r.id===eq[1]).map(r=>projette(r,S)));
+    const eq=/id=eq\.([^&]*)/.exec(u); if(eq&&eq[1]==='main'&&opts.main) return j([projette({id:'main',data:opts.main},S)]);
+    if(eq) return j(rows.filter(r=>r.id===eq[1]).map(r=>projette(r,S)));
     const lk=/id=like\.([^&]*)/.exec(u); if(lk){ const re=new RegExp('^'+lk[1].replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$'); return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S))); }
     return j([]);
   });
@@ -204,6 +212,35 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       const r=await pg.evaluate(()=>{ const e=document.querySelector('[data-compta-resultat]'); const cv=document.querySelector('[data-compta-couverture]'); return { ca:e?e.getAttribute('data-compta-ca'):null, couv:cv?cv.getAttribute('data-compta-couverture'):null, txt:e?(e.innerText||''):'' }; });
       dit(r.ca!=null && r.ca!=='','le CA déclaré de l’année est affiché (ce qu’on sait)',`${r.ca}`);
       dit((r.couv||'').split(',').includes('eBay'),'et il n’est pas présenté comme complet : il nomme eBay, non lu',`couverture=${r.couv} · ${r.txt.replace(/\n/g,' | ').slice(0,160)}`);
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+
+    console.log('\n── D. Comptabilité ouverte en premier (appareil qui n’a jamais ouvert Ventes)');
+    // Une ligne publiée par un AUTRE appareil (forme de la publication de
+    // l'écran Ventes), rangée dans le nuage : montants inventés.
+    const an=maintenant.getFullYear();
+    const LIGNE={ mois:[{ ym:`${an}-01`, n:2, ca:80.5, par:{} },{ ym:`${an}-02`, n:1, ca:19.5, par:{} },{ ym:`${an-1}-12`, n:4, ca:500, par:{} }], aDater:{ n:0, ca:0, par:{} }, ecartees:0, sources:{ Vinted:'lu', Leboncoin:'lu', eBay:'lu', Vestiaire:'nonRelie' }, declare:'lu', at:Date.now()-3600e3 };
+    const lireRes=(pg)=>pg.evaluate(()=>{ const e=document.querySelector('[data-compta-resultat]'); return e?{ etat:e.getAttribute('data-compta-ca-etat'), ca:e.getAttribute('data-compta-ca') }:null; });
+    await essaie('D1',async()=>{
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_urssaf_mois:LIGNE } });
+      await aller(pg,'compta','[data-compta-resultat]',4000);
+      const r=await lireRes(pg);
+      dit(!!r && r.etat==='lu' && Number(r.ca)===100,'ligne publiée sur un autre appareil : la carte Résultat la lit (CA de l’année = 100)',JSON.stringify(r));
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+    await essaie('D2',async()=>{
+      const { ctx, pg, errs }=await page(b,{ main:{ vrm_prenom:'' } });
+      await aller(pg,'compta','[data-compta-resultat]',4000);
+      const r=await lireRes(pg);
+      dit(!!r && r.etat==='passu' && r.ca==='','jamais publiée : « pas su », aucun montant',JSON.stringify(r));
+      // Une publication arrive (l'écran Ventes d'un autre onglet, ou le
+      // nuage) : la carte se relit sans qu'on change d'écran.
+      await pg.evaluate((l)=>{ localStorage.setItem('vinted_urssaf_mois',JSON.stringify(l)); window.dispatchEvent(new CustomEvent('vrm:save',{ detail:{ k:'vinted_urssaf_mois' } })); },LIGNE);
+      await pg.waitForTimeout(600);
+      const r2=await lireRes(pg);
+      dit(!!r2 && r2.etat==='lu' && Number(r2.ca)===100,'dès qu’une publication arrive, la carte la lit sans changer d’écran',JSON.stringify(r2));
       dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
       await ctx.close();
     });
