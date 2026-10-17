@@ -833,6 +833,25 @@ const RA = {};
     const o2 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
     const ecritL = o2.journal.some((x) => x.ou === 'base' && /ebay_listings/.test(x.corps));
     dit(o2.code === 200 && o2.corps.listes === null && !ecritL, 'liste rangée illisible ⇒ le retrait est dit fait, la liste n\'est PAS réécrite depuis une lecture ratée', `listes=${o2.corps && o2.corps.listes} · écrite=${ecritL}`);
+    // (17 octobre) Deux retraits qui se croisent : lire-fusionner-réécrire la
+    // liste entière faisait revenir l'annonce terminée par l'autre. Latence sur
+    // la base pour que les deux lectures précèdent les deux écritures.
+    const f0 = global.fetch, fautesC = [];
+    global.fetch = async (url, opts = {}) => { if (/ebay_listings/.test(decodeURIComponent(String(url)) + String(opts.body || ''))) await new Promise((r) => setTimeout(r, 120)); return f0(url, opts); };
+    try {
+      for (const ecart of [0, 60]) {
+        remettre(); remettreBase();
+        lignes.push({ owner: J, id: 'ebay_listings', data: { items: [{ itemId: '110000000001', sku: 'VRM-22' }, { itemId: '110000000002', sku: '' }, { itemId: '110000000003', sku: '' }], capturedAt: 5 } });
+        const [a, b] = await Promise.all([
+          app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true }),
+          new Promise((r) => setTimeout(r, ecart)).then(() => app(JWT_J, { action: 'retirer', itemId: '110000000002', confirme: true })),
+        ]);
+        const L2 = lignes.find((x) => x.owner === J && x.id === 'ebay_listings');
+        const ids2 = L2 && L2.data && Array.isArray(L2.data.items) ? L2.data.items.map((x) => x.itemId) : [];
+        if (a.code !== 200 || b.code !== 200 || ids2.join(',') !== '110000000003') fautesC.push(`à ${ecart} ms : ${a.code}/${b.code} · reste ${ids2.join(',')}`);
+      }
+    } finally { global.fetch = f0; }
+    dit(fautesC.length === 0, 'deux retraits simultanés : les DEUX annonces terminées sortent de ebay_listings (aucune ne revient)', fautesC.join(' ; '));
   });
   await essaie('modifier : réponse sans Ack', async () => {
     remettre(); mode.trading = 'reseau';

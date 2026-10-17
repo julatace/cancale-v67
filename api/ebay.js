@@ -1290,12 +1290,17 @@ const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
 // Retire une annonce de la liste rangée `ebay_listings`. Trois issues : true
 // (retirée), false (l'écriture a échoué), null (pas su : lecture ratée, ou
 // aucune liste rangée) — on n'écrit jamais depuis une lecture ratée.
+// (17 octobre) Comparer-et-échanger : une synchro qui réécrit la liste pendant
+// un retrait ne remet plus l'annonce terminée, et deux retraits simultanés ne
+// s'effacent plus l'un l'autre.
 async function sortirDesAnnonces(itemId, ctx) {
-  const id = ligneDe('ebay_listings', ctx);
-  const d = await lireDonnee(id, ctx.owner);
-  if (d === undefined || !d || !Array.isArray(d.items)) return null;
-  if (!d.items.some((x) => x && String(x.itemId) === itemId)) return true;
-  return storeData(id, { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, ctx.owner);
+  let sansListe = false;
+  const r = await modifierDonnee(ligneDe('ebay_listings', ctx), ctx.owner, (d) => {
+    sansListe = !d || !Array.isArray(d.items);
+    if (sansListe || !d.items.some((x) => x && String(x.itemId) === itemId)) return undefined;
+    return { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) };
+  });
+  return (r === true && sansListe) ? null : r;
 }
 async function handleRetirer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
