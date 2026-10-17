@@ -91,7 +91,7 @@ const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
-srv.listen(4403);
+srv.listen(Number(process.env.BANC_PORT) || 4403);
 
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ────────────
 const chemin=(obj,ch)=>ch.split('->').reduce((o,k)=>{ if(o==null) return null;
@@ -194,7 +194,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     await p.waitForTimeout(1500);
   };
   await brancher(pg);
-  await pg.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
+  await pg.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=cat_bord',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(1000);
   await attendPublie(pg, 30000);
   await pg.screenshot({path:SC+'/z-colis.png',fullPage:true});
@@ -283,17 +283,17 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const ctx = await b2.newContext({viewport:{width:1512,height:950}});
     const p2 = await ctx.newPage();
     await brancher(p2);
-    await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
+    await p2.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=journee',{waitUntil:'domcontentloaded'});
     await attendCarte(p2, 20000);
     const av = lit(await texteRendu(p2));
     // Une publication restée d'avant (nuage, passage précédent) ne doit pas
     // tenir lieu de celle de CETTE ouverture : on l'efface, Colis doit republier.
     await p2.evaluate(()=>{ try { localStorage.removeItem('vrm_colis_prets'); } catch (_) {} });
-    await p2.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
+    await p2.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=cat_bord',{waitUntil:'domcontentloaded'});
     await p2.waitForTimeout(1000);
     await attendPublie(p2, 30000);
     const colis = lit(await p2.evaluate(()=>document.body.innerText||''));
-    await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
+    await p2.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=journee',{waitUntil:'domcontentloaded'});
     await attendCarte(p2, 20000);
     const ap = lit(await texteRendu(p2));
     console.log(`    accueil seul : ${av?(av.approx?'au moins ':'')+av.n:'—'} · Colis : ${colis?colis.n:'—'} · accueil ensuite : ${ap?(ap.approx?'au moins ':'')+ap.n:'—'}`);
@@ -361,7 +361,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const ctx = await b2.newContext({viewport:{width:1512,height:950}});
     const p3 = await ctx.newPage();
     await brancher(p3, /_label_|email_bord/);
-    await p3.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
+    await p3.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=cat_bord',{waitUntil:'domcontentloaded'});
     const lire = (t) => { const l=(t.split('\n').find(x=>/bordereaux? prêts? à imprimer/.test(x))||'');
       const m=/((?:au moins )?)(\d+) bordereaux? prêts? à imprimer/.exec(l); const a=/(\d+) en attente de bordereau/.exec(l);
       return m ? { ligne:l.trim(), n:+m[2], approx:!!m[1].trim(), att:a?+a[1]:0 } : null; };

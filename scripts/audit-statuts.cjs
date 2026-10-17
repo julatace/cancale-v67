@@ -79,7 +79,7 @@ const VENTES = [
 const ACHAT_RELAIS = { status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action' };
 
 const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
-const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
+const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'TXN_ETATS', 'noterEtatsTxn', 'etatTxn', 'txnBloqueEnvoi', 'SS_PARTI', 'txnAnnuleeAvantEnvoi', 'COLIS_DEJA_BOUGE', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
 const app = charge('src/App.jsx', APP_NOMS);
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
 // Depuis le 16 octobre la règle des étiquettes vit au niveau module
@@ -93,7 +93,7 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   shippedSuivis: new Set(), soldByTxn: {},
 }));
 const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
-const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'aExpedier'], {});
+const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'COLIS_DEJA_BOUGE', 'aExpedier'], {});
 
 // La réponse « à expédier ? » de chacun. Sur le code d'avant, la règle unique
 // n'existe pas : on mesure alors ce que chaque écran faisait vraiment.
@@ -226,6 +226,37 @@ essaie('(h) dédoublonnage des colis à retirer', () => {
   const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), code.indexOf('\n', iExtra)) : '';
   dit(iExtra >= 0 && !/normTitle\(/.test(avantExtra), 'les colis à retirer ne sont jamais fusionnés sur une ressemblance de TITRE', avantExtra ? '' : 'pickupUnion introuvable');
   dit(/codeRetrait|normCode/.test(avantExtra) && /colisRelais/.test(avantExtra), '… mais sur le CODE de retrait lu des deux côtés (email et conversation Vinted)');
+});
+
+// (i) LITIGE ET ANNULATION (17 oct., la vente nB546). Formes MESURÉES sur sa
+// base (lecture seule) : la liste des ventes porte le statut du colis de RETOUR
+// avec `needs_action` ; le détail de la transaction dit « Retour initié » (440).
+// Une vente annulée après son bordereau : transaction 520, expédition
+// « Bordereau envoyé au vendeur », liste parfois encore en retard.
+const LITIGE = { transaction_id: 22592792923, status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action' };
+essaie('(i) litige', () => {
+  dit(appA(LITIGE) === false && colisA(LITIGE) === false, 'une vente en LITIGE (« colis déposé… » + `needs_action`, le colis de retour) n\'est jamais un colis à poster dans l\'app ni dans Colis', JSON.stringify([appA(LITIGE), colisA(LITIGE)]));
+  dit(widA(LITIGE) === false, '… ni dans le widget (et donc les rappels du matin, qui lisent sa règle)', String(widA(LITIGE)));
+  if (ext.COLIS_DEJA_BOUGE) dit(extA(LITIGE) === false, '… ni dans l\'extension (résumé du widget et des rappels)', String(extA(LITIGE)));
+  else console.log('⚠️  extension pas encore alignée (`COLIS_DEJA_BOUGE` absent de background.js) — chantier 5 : à porter, puis ce contrôle devient bloquant');
+  // L'autre sens : un vrai colis à poster reste à poster.
+  const vrai = { transaction_id: 1, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' };
+  dit(appA(vrai) && widA(vrai), 'l\'autre sens : « Bordereau envoyé au vendeur » + `needs_action` reste à poster', JSON.stringify([appA(vrai), widA(vrai)]));
+});
+essaie('(j) état de la transaction', () => {
+  if (!app.noterEtatsTxn) { dit(false, 'le registre des états de transaction existe (`noterEtatsTxn`)'); return; }
+  app.TXN_ETATS.clear();
+  const annulee = { transaction_id: 23240441861, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' };
+  dit(appA(annulee) === true, 'sans état de transaction lu (« pas su »), la liste décide : rien n\'est caché de plus qu\'avant');
+  app.noterEtatsTxn([{ tx: '23240441861', s: '520', ss: 'Bordereau envoyé au vendeur' }, { tx: '22592792923', s: '440', ss: '' }, { tx: '7', s: '230', ss: 'Bordereau envoyé au vendeur' }, { tx: '8', s: '520', ss: 'Commande livrée ! ' }]);
+  dit(appA(annulee) === false, 'une vente ANNULÉE (transaction 520) sort des colis à poster même si la liste dit encore « Bordereau envoyé »');
+  const lab = (o) => appComp.venteStage(o).label;
+  dit(lab(annulee) === 'Annulée', 'elle s\'affiche « Annulée » (jamais « Remboursée, la paire est partie » : son expédition n\'avait pas bougé)', lab(annulee));
+  dit(app.txnAnnuleeAvantEnvoi('8') === false, 'annulée APRÈS livraison (520 + « Commande livrée ») n\'est pas « annulée avant l\'envoi »');
+  dit(lab(LITIGE) === 'Retour en cours', 'le litige s\'affiche « Retour en cours » (pas « Au relais »)', lab(LITIGE));
+  const paye = { transaction_id: 7, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' };
+  dit(appA(paye) === true, 'une transaction payée (230) ne cache rien');
+  app.TXN_ETATS.clear();
 });
 
 console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'}`);
