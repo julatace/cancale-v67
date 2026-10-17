@@ -226,3 +226,105 @@ export function EbayEvaluations({compte='principal',headers,confirm,theme:C}){
   </article>;})}</div>
  </section>;
 }
+
+// ── (17 octobre) APRÈS LA VENTE : retours, annulations, promotion, achats ──────
+// Chaque geste : un clic, une confirmation qui DIT la conséquence d'argent, puis
+// le serveur relit l'état chez eBay avant d'écrire. Trois issues : fait (dit par
+// eBay) · refusé (la raison d'eBay) · incertain (« regarde sur eBay »).
+const euros=m=>!m?'':m.currency==='EUR'?`${String(m.value).replace('.',',')} €`:`${m.value} ${m.currency}`;
+const MOTIFS_RETOUR={DOES_NOT_FIT:'ne convient pas (taille)',NOT_AS_DESCRIBED:'pas conforme à l’annonce',DEFECTIVE_ITEM:'défectueux',WRONG_ITEM:'mauvais article',ORDERED_ACCIDENTALLY:'commandé par erreur',CHANGED_MIND:'a changé d’avis',ARRIVED_DAMAGED:'arrivé abîmé',FOUND_BETTER_PRICE:'moins cher ailleurs',MISSING_PARTS:'incomplet'};
+const issueTexte=(f,C)=>f==='fait'?<p role="status" style={{fontSize:12,margin:'8px 0 0'}}>Fait, confirmé par eBay.</p>:f==='incertain'?<p role="status" style={{fontSize:12,margin:'8px 0 0',color:C.warn}}>Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.</p>:null;
+export function EbayRetours({compte='principal',headers,confirm,theme:C,onCommandeAnnulee}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
+ const S=styleUI(C),[ret,setRet]=useState(undefined),[ann,setAnn]=useState(undefined),[message,setMessage]=useState(''),[raisons,setRaisons]=useState({}),[busy,setBusy]=useState(false),[faits,setFaits]=useState({}),[motifs,setMotifs]=useState({});
+ async function charger(){setBusy(true);setMessage('');
+  const [r,a]=await Promise.all([call('retours',{},headers).then(j=>({ok:j.retours}),e=>({ko:e})),call('annulations',{},headers).then(j=>({ok:j.annulations}),e=>({ko:e}))]);
+  setRet(r.ok || null);setAnn(a.ok || null);setRaisons({r:r.ko?.message || '',a:a.ko?.message || ''});setBusy(false);}
+ useEffect(()=>{charger();},[]);
+ async function agir(k,action,payload,dialog){if(!await confirm(dialog))return;setBusy(true);setMessage('');
+  try{const j=await call(action,{...payload,confirme:true},headers,{write:true});setFaits(f=>({...f,[k]:'fait'}));if(action==='decannulation' && payload.decision==='accepter'){onCommandeAnnulee&&onCommandeAnnulee(j.orderId,j.commandeRangee);if(j.commandeRangee!==true)setMessage('Annulation acceptée par eBay. La commande sortira des colis à faire à la prochaine synchro eBay.');}}
+  catch(x){setFaits(f=>({...f,[k]:x.reason==='incertain'?'incertain':''}));setMessage(x.message);}finally{setBusy(false);}}
+ const ouverts=Array.isArray(ret)?ret.filter(r=>!/^(CLOSED|RETURN_CLOSED|REFUND_ISSUED|CLOSED_WITH_REFUND)$/i.test(r.etat)):ret;
+ const aDecider=Array.isArray(ann)?ann.filter(c=>/^(CANCEL_REQUESTED|CANCEL_PENDING)$/i.test(c.etat)):ann;
+ const carte={border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card};
+ return <section data-ebay-retours={ouverts===undefined?'en-cours':ouverts===null?'pas-su':ouverts.length} data-ebay-annulations={aDecider===undefined?'en-cours':aDecider===null?'pas-su':aDecider.length}>
+  <div style={{display:'flex',alignItems:'center',gap:8,margin:'18px 0 10px'}}><h3 style={{margin:0,fontSize:15,color:C.text}}>Retours et annulations</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
+  <Erreur message={message}/>
+  {(ouverts===undefined || aDecider===undefined) && <p style={{fontSize:12,color:C.muted}}>Lecture des demandes…</p>}
+  {aDecider===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="annulations">Annulations : {raisons.a || 'pas pu les lire.'}</p>}
+  {ouverts===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="retours">Retours : {raisons.r || 'pas pu les lire.'}</p>}
+  {Array.isArray(ouverts) && Array.isArray(aDecider) && !ouverts.length && !aDecider.length && <p style={{fontSize:12,color:C.muted}}>Aucune demande de retour ni d’annulation en cours.</p>}
+  <div style={{display:'grid',gap:8}}>
+   {(aDecider||[]).map(c=>{const k='c:'+c.cancelId,f=faits[k];return <article key={k} data-ebay-annulation={c.cancelId} style={carte}>
+    <b style={{fontSize:13}}>Annulation demandée · commande {c.orderId}</b>
+    <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{c.acheteur?`Acheteur : ${c.acheteur}`:''}{c.montant?` · ${euros(c.montant)} à rembourser`:''}{c.date?` · ${heureCourte(c.date)}`:''}</div>
+    {issueTexte(f,C) || <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+     <button type="button" disabled={busy} data-geste="annulation-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'accepter'},{title:'Accepter l’annulation ?',desc:`Commande ${c.orderId}${c.acheteur?' · '+c.acheteur:''}\n\neBay rembourse l’acheteur${c.montant?' ('+euros(c.montant)+')':''} et la vente est annulée : n’expédie pas la paire. Elle sort de tes colis à faire.`,ok:'Accepter l’annulation',cancel:'Annuler'})}>Accepter l’annulation</button>
+     <button type="button" disabled={busy} data-geste="annulation-refuser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'decannulation',{cancelId:c.cancelId,orderId:c.orderId,decision:'refuser'},{title:'Refuser l’annulation ?',desc:`Commande ${c.orderId}\n\nLa vente est maintenue : tu dois expédier la paire.`,ok:'Refuser',cancel:'Annuler'})}>Refuser</button>
+    </div>}
+   </article>;})}
+   {(ouverts||[]).map(r=>{const k='r:'+r.returnId,f=faits[k],attend=String(r.etat).toUpperCase()==='RETURN_REQUESTED';return <article key={k} data-ebay-retour={r.returnId} style={carte}>
+    <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>Retour · {r.titre || 'annonce '+r.itemId}</b>
+    <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{r.acheteur?`Acheteur : ${r.acheteur}`:''}{r.motif?` · ${MOTIFS_RETOUR[r.motif] || r.motif}`:''}{r.remboursementPrevu?` · ${euros(r.remboursementPrevu)} à rembourser`:''}</div>
+    {r.commentaire && <p style={{fontSize:12,margin:'6px 0 0',overflowWrap:'anywhere'}}>« {r.commentaire} »</p>}
+    {issueTexte(f,C) || (attend ? <div style={{display:'grid',gap:8,marginTop:8}}>
+     <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      <button type="button" disabled={busy} data-geste="retour-accepter" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'deciderretour',{returnId:r.returnId,decision:'ACCEPT'},{title:'Accepter le retour ?',desc:`${r.titre || r.itemId}\n\nL’acheteur renvoie la paire. Tu devras le rembourser${r.remboursementPrevu?' ('+euros(r.remboursementPrevu)+')':''} à réception.`,ok:'Accepter le retour',cancel:'Annuler'})}>Accepter le retour</button>
+      <button type="button" disabled={busy} data-geste="retour-refuser" style={{...S.button,minHeight:44}} onClick={()=>{const t=String(motifs[k]||'').trim();if(!t){setMessage('Écris pourquoi tu refuses : eBay le transmet à l’acheteur.');return;}agir(k,'deciderretour',{returnId:r.returnId,decision:'DECLINE',commentaire:t},{title:'Refuser le retour ?',desc:`${r.titre || r.itemId}\nMotif : « ${t} »\n\nL’acheteur peut demander à eBay d’intervenir.`,ok:'Refuser le retour',cancel:'Annuler'});}}>Refuser</button>
+     </div>
+     <input aria-label="Motif du refus" maxLength={1000} placeholder="Motif si tu refuses" value={motifs[k]||''} onChange={e=>setMotifs(m=>({...m,[k]:e.target.value}))} style={{...S.input,fontSize:16}}/>
+    </div> : r.remboursementPrevu && !r.rembourse ? <div style={{marginTop:8}}>
+     <button type="button" disabled={busy} data-geste="retour-rembourser" style={{...S.button,minHeight:44}} onClick={()=>agir(k,'rembourserretour',{returnId:r.returnId,montantVu:r.remboursementPrevu.value,devise:r.remboursementPrevu.currency},{title:`Rembourser ${euros(r.remboursementPrevu)} ?`,desc:`${r.titre || r.itemId}${r.acheteur?' · '+r.acheteur:''}\n\n${euros(r.remboursementPrevu)} partent vers l’acheteur. Un remboursement ne se reprend pas.`,ok:`Rembourser ${euros(r.remboursementPrevu)}`,cancel:'Annuler'})}>Rembourser {euros(r.remboursementPrevu)}</button>
+    </div> : <p style={{fontSize:12,margin:'8px 0 0',color:C.muted}}>{r.rembourse?`Remboursé (${euros(r.rembourse)}).`:`En cours chez eBay (${r.etat || 'état inconnu'}).`}</p>)}
+   </article>;})}
+  </div>
+ </section>;
+}
+
+export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
+ const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
+ const S=styleUI(C),[data,setData]=useState(undefined),[message,setMessage]=useState(''),[raison,setRaison]=useState(''),[busy,setBusy]=useState(false),[taux,setTaux]=useState({});
+ async function charger(){setBusy(true);try{const j=await call('promotion',{},headers);setData(j);setRaison('');}catch(e){setData(null);setRaison(e.message);}finally{setBusy(false);}}
+ useEffect(()=>{charger();},[]);
+ async function geste(action,payload,dialog){if(!await confirm(dialog))return;setBusy(true);setMessage('');
+  try{await call(action,{...payload,confirme:true},headers,{write:true});setMessage('Fait, confirmé par eBay.');await charger();}
+  catch(x){setMessage(x.reason==='incertain'?'Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.':x.message);setBusy(false);}}
+ const promues=new Map((data?.promues||[]).map(p=>[p.listingId,p]));
+ const lignes=data?(Array.isArray(data.annonces)?data.annonces:[...promues.keys()].map(id=>({itemId:id,titre:''}))):[];
+ const FRAIS='Un frais prélevé par eBay UNIQUEMENT si la paire se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.';
+ return <section data-ebay-promotion={data===undefined?'en-cours':data===null?'pas-su':promues.size}>
+  <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Promotion des annonces</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
+  <p style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>{FRAIS}</p>
+  <Erreur message={message}/>
+  {data===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture de la promotion…</p>}
+  {data===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="promotion">{raison || 'Je n’ai pas pu lire ta promotion eBay.'}</p>}
+  {data && !lignes.length && <p style={{fontSize:12,color:C.muted}}>Aucune annonce eBay en ligne à promouvoir.</p>}
+  <div style={{display:'grid',gap:8}}>{lignes.map(a=>{const p=promues.get(a.itemId),t=taux[a.itemId] ?? (p?String(p.taux).replace('.',','):'5');return <article key={a.itemId} data-ebay-promo={a.itemId} data-promue={p?'oui':'non'} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card}}>
+   <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>{a.titre || 'Annonce '+a.itemId}</b>
+   <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{p?`Promue à ${String(p.taux).replace('.',',')} %`:'Pas promue'}</div>
+   <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
+    <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.muted}}>Taux <input aria-label={`Taux pour ${a.titre || a.itemId}`} inputMode="decimal" value={t} onChange={e=>setTaux(x=>({...x,[a.itemId]:e.target.value}))} style={{...S.input,width:70,fontSize:16}}/> %</label>
+    {!p && <button type="button" disabled={busy} data-geste="promouvoir" style={{...S.button,minHeight:44}} onClick={()=>geste('promouvoir',{listingId:a.itemId,taux:t},{title:`Promouvoir à ${t} % ?`,desc:`${a.titre || a.itemId}\n\n${FRAIS}`,ok:'Promouvoir',cancel:'Annuler'})}>Promouvoir</button>}
+    {p && <button type="button" disabled={busy || String(t).replace(',','.')===String(p.taux)} data-geste="changer-taux" style={{...S.button,minHeight:44}} onClick={()=>geste('changertaux',{listingId:a.itemId,taux:t,tauxVu:p.taux},{title:`Passer à ${t} % ?`,desc:`${a.titre || a.itemId}\nTaux actuel : ${String(p.taux).replace('.',',')} %\n\n${FRAIS}`,ok:'Changer le taux',cancel:'Annuler'})}>Changer le taux</button>}
+    {p && <button type="button" disabled={busy} data-geste="arreter-promo" style={{...S.button,minHeight:44}} onClick={()=>geste('arreterpromo',{listingId:a.itemId},{title:'Arrêter la promotion ?',desc:`${a.titre || a.itemId}\n\nL’annonce reste en ligne, sans promotion.`,ok:'Arrêter',cancel:'Annuler'})}>Arrêter</button>}
+   </div>
+  </article>;})}</div>
+ </section>;
+}
+
+export function EbayAchats({compte='principal',headers,theme:C}){
+ const call=(action,payload,headers)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers);
+ const S=styleUI(C),[rows,setRows]=useState(undefined),[raison,setRaison]=useState(''),[busy,setBusy]=useState(false);
+ async function charger(){setBusy(true);try{const j=await call('achats',{},headers);setRows(Array.isArray(j.achats)?j.achats:null);setRaison('');}catch(e){setRows(null);setRaison(e.message);}finally{setBusy(false);}}
+ useEffect(()=>{charger();},[]);
+ return <section data-ebay-achats={rows===undefined?'en-cours':rows===null?'pas-su':rows.length}>
+  <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Achats eBay · 60 derniers jours</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
+  {rows===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture de tes achats…</p>}
+  {rows===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="achats">{raison || 'Je n’ai pas pu lire tes achats eBay.'}</p>}
+  {Array.isArray(rows) && !rows.length && <p style={{fontSize:12,color:C.muted}}>Aucun achat eBay sur les 60 derniers jours.</p>}
+  <div style={{display:'grid',gap:8}}>{(rows||[]).map((a,i)=><article key={a.itemId+':'+i} data-ebay-achat={a.itemId} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card}}>
+   <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>{a.titre || 'Annonce '+a.itemId}</b>
+   <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{a.prix && Number.isFinite(Number(a.prix))?euros({value:Number(a.prix).toFixed(2),currency:a.devise || 'EUR'}):''}{a.vendeur?` · vendeur ${a.vendeur}`:''}{a.date?` · ${heureCourte(a.date)}`:''}</div>
+  </article>)}</div>
+ </section>;
+}

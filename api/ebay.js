@@ -24,6 +24,7 @@ import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 
 import crypto from 'crypto';
 import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
+import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
@@ -1663,6 +1664,13 @@ async function handleModifierAnnonceGestion(b,ctx){
 // ── PILOTAGE PAR L'APP (défaut) ─────────────────────────────────────────────
 const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeCommandes,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
+// (17 octobre) Après la vente : retours, annulations, promotion, achats.
+// Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
+// échanger) : elle sort aussitôt des colis à faire, sans attendre la synchro.
+const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,
+  lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),titre:String(x.title||''),prix:x.price??null})).filter(x=>x.itemId):[];},
+  marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
+});
 
 async function handleApp(req, res) {
   if (req.method === 'GET') {
@@ -1775,6 +1783,17 @@ async function handleApp(req, res) {
       // l'évaluation positive (sur clic + confirmation, journalisée).
       evaluations:(ctx)=>gestionEbay.evaluations(b,ctx),
       evaluer:(ctx)=>gestionEbay.evaluer(b,ctx),
+      // (17 octobre) Retours, annulations, promotion, achats (après la vente).
+      retours:(ctx)=>apresVenteEbay.retours(b,ctx),
+      annulations:(ctx)=>apresVenteEbay.annulations(b,ctx),
+      deciderretour:(ctx)=>apresVenteEbay.deciderRetour(b,ctx),
+      rembourserretour:(ctx)=>apresVenteEbay.rembourserRetour(b,ctx),
+      decannulation:(ctx)=>apresVenteEbay.deciderAnnulation(b,ctx),
+      promotion:(ctx)=>apresVenteEbay.promotion(b,ctx),
+      promouvoir:(ctx)=>apresVenteEbay.promouvoir(b,ctx),
+      changertaux:(ctx)=>apresVenteEbay.changerTaux(b,ctx),
+      arreterpromo:(ctx)=>apresVenteEbay.arreterPromotion(b,ctx),
+      achats:(ctx)=>apresVenteEbay.achats(b,ctx),
       repondreoffre:(ctx)=>gestionEbay.repondreOffre(b,ctx),
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
@@ -1802,7 +1821,7 @@ async function handleApp(req, res) {
     const rc = await resoudreCompte(b.compte, owner);
     if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
     const ctx={owner,compte:rc.compte};
-    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer']);
+    const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
     const r = commerciales.has(action) && b.confirme===true
       ? await executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
       : await ACTIONS[action](ctx);

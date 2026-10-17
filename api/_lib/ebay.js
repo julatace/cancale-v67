@@ -24,6 +24,9 @@ const SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.account',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.finances',
+  // (17 octobre) La promotion des annonces (Marketing API). Comme `sell.finances`,
+  // il n'arrive qu'au PROCHAIN consentement ; sans lui l'écran dit « reconnecte ».
+  'https://api.ebay.com/oauth/api_scope/sell.marketing',
 ].join(' ');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
