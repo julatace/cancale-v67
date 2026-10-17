@@ -234,19 +234,23 @@ par la limite : à refaire** (catalogue `lbc_catalogue` fdata/fforms, ses dépô
 - **La maquette** `docs/design/maquette-style-2026-10-15.webp` à appliquer à
   TOUTE l'app, **sans changer la disposition des boutons** (règle §7 : une
   seule couleur d'accent, rare). En DERNIER.
-- L'arriéré (définitions complètes dans `PASSATION-2026-10-16.md`) :
-  propositions retenues #113 (fiche « republier cette paire »), #114 (app plus
-  rapide sur iPhone, écrans chargés à la demande — en dernier), #116 (codes hors
-  ligne, rappel veille, fiche à l'arrivée d'un achat, plan des paires qui
-  dorment, bénéfice réel, récap comptable, réponses rapides, double
-  vérification), #117 (achats à vérifier avant la date limite, retour → stock,
-  favoris sans vente → remise native, boost rentable ?, compte qui vend le
-  mieux, ce qui part vite), #118 (badge bonne affaire, saisonnalité, photo
-  d'étiquette → fiche, studio photo + détourage, saisie vocale, traduction,
-  acheteurs fidèles, mode équipe), #21 (plusieurs milliers d'utilisateurs),
-  #79 (revue complète), #81 (Vestiaire : publier avec détourage).
-
----
+- L'arriéré, vérifié (détail : `PASSATION-2026-10-16.md` §4 à §6) :
+  - **construit avant le 12 oct. et jamais fusionné** (dans les bundles de
+    `docs/passation/`) : litiges qui font sonner le téléphone, synchro de `main`
+    par morceaux, copie quotidienne des numéros, « Tes connexions », pointage du
+    stock carton par carton, coffre, fiche Chrome Web Store ;
+  - **eBay** : CA eBay = « l'argent que tu reçois » (décidé le 3 oct., PAS codé),
+    anti double vente VRM fermé (agent eBay, migration 015), pause stock 0,
+    commandes eBay dans Colis, retours/litiges, offres reçues remises en tête de
+    Messages (régression du 13 oct.) ;
+  - **propositions du 11 oct. restantes** : 2 (double vente app fermée), 10
+    (rappel la veille — attention au 2ᵉ cron), 17 (2FA, avec chemin de
+    récupération), 33 (studio photo, sans la clé de Julien), 37 (mode équipe),
+    5 (vitesse, en dernier). Déjà livrées : 1, 3, 4, 6, 9, 11, 13-16, 21, 22, 24,
+    25, 34, 35. Mesurées impossibles : 18, 23 ;
+  - #21 (plusieurs milliers d'utilisateurs), #79 (revue complète), #81
+    (Vestiaire : publier avec détourage), adresse de réception PROUVÉE (bloquant
+    avant d'ouvrir VRM à des inconnus).
 
 ## 7. Décisions de Julien à NE PAS défaire
 - **Réponse automatique aux messages Vinted : RETIRÉE** (15 oct.) — l'extension
