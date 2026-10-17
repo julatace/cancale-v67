@@ -1,5 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, estPoseSur, caler } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -20932,10 +20932,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // un numéro décale toute la suite → les boîtes du dessus DESCENDENT.
   const pileNums = (it) => (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: Math.max(1, it.cols || 1) * Math.max(1, it.rows || 5) }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
   const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = pileNums(it); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; nums.push(t); pileSet(it, nums); };
-  const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (nums.length <= 1) return; nums.pop(); pileSet(it, nums); };
-  const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (pileNums(it)[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
+  // Changer la hauteur RE-EMPILE les colonnes : c'est un rangement voulu, les
+  // places vides ('') disparaissent.
+  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = cartonsDePile(pileNums(it)); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, nums, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
+  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; const n2 = ajouterAPile(nums, t); if (n2) pileSet(it, n2); };
+  const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (cartonsDePile(nums).length <= 1) return; while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); nums.pop(); while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); pileSet(it, nums); };
+  const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (cartonsDePile(pileNums(it))[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; let k = 0; const nums = pileNums(it).map((v) => String(v || '').trim() ? String(st + k++) : ''); updateItem(it.id, { nums, start: st }); };
   // Toucher une boîte de la pile (pile déjà sélectionnée) → changer SON numéro
   // (on peut mettre n'importe quel numéro, pas forcément dans l'ordre), ou la
   // retirer si on laisse vide (les boîtes du dessus descendent).
@@ -20946,7 +20948,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const v = await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', value: nums[idx] });
     if (v == null) return;
     const t = String(v).trim();
-    if (!t) { nums.splice(idx, 1); pileSet(it, nums); return; }
+    // ⚠️ (17 oct.) Seuls les cartons du DESSUS, dans la MÊME colonne, descendent
+    //    (`retirerDePile`) — avant, toute la pile se décalait d'un rang.
+    if (!t) { const n2 = retirerDePile(nums, idx, Math.max(1, it.rows || 5)); if (n2) pileSet(it, n2); return; }
     nums[idx] = t; updateItem(itemId, { nums });
   };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
@@ -21013,7 +21017,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const out = {};
     for (let c = 0; c < nc; c++) {
       const vals = [];
-      for (let r = 0; r < nr; r++) { const a = slots[r + '_' + c]; if (a && a.length && String(a[0]).trim()) vals.push(String(a[0])); }
+      // ⚠️ TOUS les numéros d'une case (une ancienne case pouvait en porter
+      //    plusieurs) : n'en garder que le premier en PERDAIT.
+      for (let r = 0; r < nr; r++) { (slots[r + '_' + c] || []).forEach(v => { if (String(v).trim()) vals.push(String(v)); }); }
       let r = nr - 1;
       for (let i = vals.length - 1; i >= 0; i--) { out[r + '_' + c] = [vals[i]]; r--; }
     }
@@ -21437,7 +21443,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const slots = { ...(it.slots || {}) };
       const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
-      updateItem(itemId, { slots: compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) });
+      // Seul un MUR de boîtes (la grille) fait tomber sa colonne. Une ancienne
+      // étagère ou commode a des plateaux / tiroirs : rien ne passe de l'un à
+      // l'autre — seuls ceux du dessus, dans la même case, descendent.
+      const mur = (FURN_TYPES[it.type] || {}).build === 'grille';
+      updateItem(itemId, { slots: mur ? compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) : slots });
       setSortie(null);
       toast(`N°${numero} sorti du stock.`);
     };
@@ -21458,7 +21468,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     items.forEach(it => {
       const ft = FURN_TYPES[it.type] || {};
       if (ft.box) { boxes += 1; return; }                 // boîte à empiler = 1 boîte
-      if (ft.build === 'pile') { boxes += pileNums(it).length; furn += 1; return; }
+      if (ft.build === 'pile') { boxes += cartonsDePile(pileNums(it)).length; furn += 1; return; }
       furn += 1;
       if (GRID.includes(it.type)) {
         const cells = Math.max(1, it.cols || 1) * Math.max(1, it.rows || 1);
@@ -21504,11 +21514,28 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       neuf = {}; for (const k in slots) { const [r, c] = k.split('_').map(Number); const nrr = r + (rows - nr); if (nrr >= 0) neuf[nrr + '_' + c] = slots[k]; }
     }
     const patch = { cols, rows, slots: neuf };
-    if (ft.build === 'metal') patch.h3d = +(rows * 0.375 / 1.5).toFixed(3);          // un plateau = 37,5 cm : la contenance par case ne bouge pas
+    // Un plateau garde SA hauteur (réglée par « Hauteur d'un niveau », 37,5 cm
+    // par défaut) : la contenance par case ne bouge pas.
+    if (ft.build === 'metal') patch.h3d = +(rows * hauteurNiveau(it) / 1.5).toFixed(3);
     if (ft.build === 'portant' || ft.build === 'metal' || ft.build === 'table') { const w = ft.build === 'table' ? Math.max(it.w, +(cols * 0.6).toFixed(2)) : +(cols * (ft.build === 'portant' ? 0.19 : 0.6)).toFixed(2); patch.w = Math.max(0.6, w); }
     changerDimensions(it, patch);
   };
 
+  // (17 oct.) Julien : « pouvoir régler la hauteur des étagères, la largeur, la
+  // profondeur ». Une étagère : hauteur d'UN niveau (tous les plateaux égaux),
+  // le nombre de niveaux à côté. Refusé si une case contient plus de boîtes
+  // que le nouveau niveau n'en tient (elles seraient cachées) — jamais en silence.
+  const hauteurNiveau = (it) => { const nr = Math.max(1, it.rows || 1); return (h3dOf(it) * 1.5) / nr; };
+  const changerNiveau = (it, delta) => {
+    const ft = FURN_TYPES[it.type] || {}; const nr = Math.max(1, it.rows || 1);
+    const niv = Math.max(ft.bacs ? 0.14 : 0.2, Math.min(0.8, +(hauteurNiveau(it) + delta).toFixed(3)));
+    const h3d = +(nr * niv / 1.5).toFixed(3);
+    if (nr * niv > (room.wallH || 3.4) - 0.1) { toast('Plus haut que le plafond de la pièce.'); return; }
+    const cap = capaciteCase(ft, { ...it, h3d }, room.wallH || 3.4);
+    const plein = Object.values(it.slots || {}).some(a => numsCase(a).length > cap);
+    if (plein) { toast(`Un niveau de ${Math.round(niv * 100)} cm ne tient plus toutes les boîtes déjà rangées — sors-en d'abord.`); return; }
+    updateItem(it.id, { h3d });
+  };
   if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -21774,7 +21801,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               </span>);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                {ft.build === 'metal' && pas('Plateaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'metal' && pas('Niveaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'metal' && pas('Hauteur d’un niveau', `${Math.round(hauteurNiveau(selItem) * 100)} cm`, () => changerNiveau(selItem, -0.05), () => changerNiveau(selItem, 0.05), 'niveau')}
+                {pas('Largeur', `${Math.round(selItem.w * 100)} cm`, () => changerDimensions(selItem, { w: +Math.max(0.4, selItem.w - 0.1).toFixed(2) }), () => changerDimensions(selItem, { w: +Math.min(room.w, selItem.w + 0.1).toFixed(2) }), 'largeur')}
+                {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
                 <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
                 <span style={{ flex: '1 1 100%', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Touche une place libre (en transparence) pour y ranger un article ; touche une boîte pour changer son numéro ou la sortir — celles du dessus descendent.</span>
@@ -21801,7 +21831,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
           {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
-            const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
+            const nums = pileNums(selItem), total = cartonsDePile(nums).length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(nums.length / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
@@ -21821,8 +21851,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
             <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
             </>}
-            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button></>}
           </>}
           <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
           <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>

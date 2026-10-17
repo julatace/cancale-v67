@@ -44,11 +44,16 @@ const PLAN_NICHES = { rooms: [{ id: 'r1', name: 'Boutique', room: { w: 8, h: 6, 
   { id: 'm1', type: 'metal', name: 'Étagère baskets', x: 6.3, y: 0.1, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25, slots: { '4_0': ['401', '402'] } },
   { id: 't1', type: 'table', name: 'Table', x: 2, y: 3.5, w: 2, h: 1, rows: 1, cols: 3, h3d: 0.5, slots: {} },
 ] }], active: 'r1' };
+const PLAN_PILE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'p1', type: 'pile', name: 'Cartons au sol', x: 2, y: 2, w: 1.5, h: 0.5, rows: 3, cols: 3, cell: 0.5, h3d: 0.34, nums: ['1', '2', '3', '4', '5', '6', '7', '8', '9'], lift: 0 },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
 const PRESENTS = { nums: ['700', '401', '402', '501', '801'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
 
 let ko = 0;
+// `SEUL=VI,II` ne lance que ces sections (le banc complet prend plusieurs minutes).
+const fait = (k) => !process.env.SEUL || process.env.SEUL.split(',').includes(k);
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi + ' — le contrôle a pu s’exécuter', String(e && e.message || e).split('\n')[0].slice(0, 160)); return null; } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.onnx': 'application/octet-stream' };
@@ -118,7 +123,7 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
   try {
     // ── I. SANS WebGL ───────────────────────────────────────────────────────
     bSans = await chromium.launch({ executablePath: CHROME, args: ['--disable-3d-apis', '--disable-webgl', '--disable-gpu', '--no-sandbox', '--no-proxy-server'] });
-    await essaie('I. pièce en L sans WebGL', async () => {
+    if (fait('I')) await essaie('I. pièce en L sans WebGL', async () => {
       const { ctx, pg, errs } = await ouvrir(bSans, { width: 1512, height: 950 }, PLAN_L);
       const ok = await pg.waitForSelector('[data-plan-secours]', { timeout: 40000 }).then(() => true).catch(() => false);
       dit(ok, 'I. sans WebGL, une pièce en L se dessine VUE DU DESSUS');
@@ -132,7 +137,7 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(errs.length === 0, 'aucune erreur d’app (sans WebGL)', errs.join(' | ').slice(0, 200));
       await ctx.close();
     });
-    await essaie('I. pièce rectangle sans WebGL (l’autre sens)', async () => {
+    if (fait('I')) await essaie('I. pièce rectangle sans WebGL (l’autre sens)', async () => {
       const { ctx, pg } = await ouvrir(bSans, { width: 1512, height: 950 }, PLAN_RECT);
       await pg.waitForFunction(() => /Vue depuis l'entrée|Vue du dessus · touche/.test(document.body.innerText), null, { timeout: 40000 }).catch(() => {});
       const r = await pg.evaluate(() => ({ plan: !!document.querySelector('[data-plan-secours]'), persp: /Vue depuis l'entrée/.test(document.body.innerText) }));
@@ -144,7 +149,7 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
     b = await chromium.launch({ executablePath: CHROME, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     // ── II. GRANDE PIÈCE, VUE DU DESSUS ─────────────────────────────────────
-    await essaie('II. étiquettes lisibles', async () => {
+    if (fait('II')) await essaie('II. étiquettes lisibles', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_GRAND);
       dit(await attendre3D(pg), 'II. la 3D de la grande pièce se monte');
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' }));
@@ -174,7 +179,7 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
     });
 
     // ── III & IV. PORTANT ET BACS (1512) ────────────────────────────────────
-    await essaie('III/IV. portant et bacs', async () => {
+    if (fait('III')) await essaie('III/IV. portant et bacs', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES);
       dit(await attendre3D(pg), 'III. la 3D de la boutique se monte');
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' }));
@@ -206,8 +211,43 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await ctx.close();
     });
 
+    // ── VI. PILE DE CARTONS : RETIRER CELUI DU BAS (« ça décolle tout ») ────
+    if (fait('VI')) await essaie('VI. pile : retirer le carton du bas', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_PILE);
+      dit(await attendre3D(pg), 'VI. la 3D de la pile se monte');
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' }));
+      await pg.waitForTimeout(1500);
+      let p = await sonde(pg, 'boite', 'p1', '5'); await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(900);   // choisit la pile
+      p = await sonde(pg, 'boite', 'p1', '1'); await pg.mouse.click(p.x, p.y);
+      const feuille = await pg.waitForFunction(() => /Numéro de cette boîte/.test(document.body.innerText), null, { timeout: 8000 }).then(() => true).catch(() => false);
+      const val = feuille ? await pg.$eval('form input', (i) => i.value) : '';
+      dit(feuille && val === '1', 'VI. toucher le carton du BAS ouvre SA feuille (N°1)', val);
+      const nums = ['2', '3', '4', '5', '6', '7', '8', '9'];
+      const avant = {}; for (const n of nums) avant[n] = await sonde(pg, 'boite', 'p1', n);
+      // On vide le champ, on valide, puis on relève les positions PENDANT l'animation.
+      await pg.evaluate(() => { const i = document.querySelector('form input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); i.form.requestSubmit(); });
+      const montee = await pg.evaluate(async ([liste, av]) => {
+        const el = document.querySelector('[data-stock3d] > div'); const pire = {};
+        for (let t = 0; t < 40; t++) { for (const n of liste) { const q = el.__vrmProbe.boite('p1', n); if (q && av[n]) { const d = q.yMonde - av[n].yMonde; if (!(n in pire) || d > pire[n]) pire[n] = d; } } await new Promise((r) => setTimeout(r, 25)); }
+        return pire;
+      }, [nums, avant]);
+      const sauts = Object.entries(montee).filter(([, d]) => d > 0.01).map(([n, d]) => `N°${n} +${d.toFixed(2)} m`);
+      dit(sauts.length === 0, 'VI. pendant l’animation, AUCUN carton ne monte', sauts.join(', '));
+      const ap = await attendrePlan(pg, (q) => (item(q, 'p1').nums || []).indexOf('1') < 0);
+      dit(JSON.stringify(item(ap, 'p1').nums) === '["2","3","","4","5","6","7","8","9"]', 'VI. donnée : seule la colonne du carton retiré a bougé', JSON.stringify(item(ap, 'p1').nums));
+      await pg.waitForTimeout(900);
+      const apres = {}; for (const n of nums) apres[n] = await sonde(pg, 'boite', 'p1', n);
+      const bouges = ['4', '5', '6', '7', '8', '9'].filter((n) => !apres[n] || !avant[n] || Math.abs(apres[n].x - avant[n].x) > 1.5 || Math.abs(apres[n].yMonde - avant[n].yMonde) > 0.005);
+      dit(bouges.length === 0, 'VI. les autres colonnes n’ont pas bougé d’un pixel', bouges.join(','));
+      const desc = ['2', '3'].every((n) => apres[n] && avant[n] && avant[n].yMonde - apres[n].yMonde > 0.3 && avant[n].yMonde - apres[n].yMonde < 0.7);
+      dit(desc, 'VI. les deux cartons du dessus sont descendus d’UN cran', ['2', '3'].map((n) => apres[n] && avant[n] ? (avant[n].yMonde - apres[n].yMonde).toFixed(2) : '?').join(', '));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-finitions-pile.png') });
+      dit(errs.length === 0, 'aucune erreur d’app (pile)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
     // ── V. AU DOIGT, 390 px ─────────────────────────────────────────────────
-    await essaie('V. au doigt', async () => {
+    if (fait('V')) await essaie('V. au doigt', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, PLAN_NICHES);
       dit(await attendre3D(pg), 'V. la 3D se monte à 390 px');
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' }));

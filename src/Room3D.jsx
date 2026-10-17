@@ -492,6 +492,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         const cols = Math.max(1, Math.ceil(nums.length / rows));
         for (let i = 0; i < nums.length; i++) {
           const cc = Math.floor(i / rows), rr = i % rows; // cc = colonne, rr = niveau (0=bas)
+          if (!String(nums[i] == null ? '' : nums[i]).trim()) continue;   // place vide en haut d'une colonne
           const bx = makeColis(String(nums[i]), s, s, s);
           bx.position.set(-((cols - 1) / 2) * cell + cc * cell, rr * cell + s / 2, 0);
           bx.userData = { pileIdx: i, num: String(nums[i]) };
@@ -635,12 +636,13 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         if (!chutes.length) return;
         try { el.parentElement && (el.parentElement.dataset.chute = String(chutes.length)); } catch (_) {}
         chutes.forEach(c => { c.o.position.y = c.de; });
-        const t0 = performance.now(), dur = 300;
+        const t0 = performance.now(), dur = 240;
         if (chuteRAF) cancelAnimationFrame(chuteRAF);
         const pas = () => {
           const k = Math.min(1, (performance.now() - t0) / dur);
-          // chute accélérée, petit rebond à l'arrivée — un objet qui se pose
-          const e = k < 0.8 ? (k / 0.8) * (k / 0.8) : 1 - Math.sin(((k - 0.8) / 0.2) * Math.PI) * 0.06;
+          // (17 oct.) une chute COURTE qui se pose : accélérée, sans rebond
+          // (« rien qui saute »).
+          const e = k * k;
           chutes.forEach(c => { c.o.position.y = c.de + (c.a - c.de) * e; });
           if (k < 1) chuteRAF = requestAnimationFrame(pas); else { chuteRAF = 0; chutes.forEach(c => { c.o.position.y = c.a; }); }
         };
@@ -1359,6 +1361,14 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             const coins = [[q.min.x, q.min.y, q.min.z], [q.max.x, q.max.y, q.max.z], [q.min.x, q.max.y, q.max.z], [q.max.x, q.min.y, q.min.z]].map(([a, b, c]) => new THREE.Vector3(a, b, c).project(camera));
             const xs = coins.map(c => (c.x + 1) / 2 * r.width), ys = coins.map(c => (1 - c.y) / 2 * r.height);
             return { dot: n.dot(versCam), lg: Math.max(...xs) - Math.min(...xs), ht: Math.max(...ys) - Math.min(...ys) };
+          },
+          // Où est à l'écran le carton qui porte CE numéro (dans ce meuble).
+          boite: (itemId, num) => {
+            const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
+            let m = null; g.traverse((o) => { if (!m && o.isMesh && o.userData && String(o.userData.num) === String(num)) m = o; });
+            if (!m) return null; m.updateWorldMatrix(true, false);
+            const c = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).project(camera), r = renderer.domElement.getBoundingClientRect();
+            return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height, yMonde: new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).y };
           },
           etiquettes: () => ({ visibles: etiqVisibles, total: etiqTotal, puces: etiqRects.filter(r => r.puce).length, px: PX_ETIQ, rects: etiqRects.map(r => ({ ...r })) }),
           contour: (quel) => { const c = contours[quel]; return c && c.visible ? { x: c.position.x, y: c.position.y, z: c.position.z, sx: c.scale.x, sy: c.scale.y, sz: c.scale.z } : null; },
