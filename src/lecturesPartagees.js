@@ -34,7 +34,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 export const FENETRE_MS = 2000;
-const ENTETES_CLE = ['authorization', 'apikey', 'range', 'range-unit', 'prefer', 'accept', 'accept-profile'];
+const ENTETES_CLE = ['authorization', 'apikey', 'range', 'range-unit', 'prefer', 'accept', 'accept-profile', 'x-vrm-equipe'];
 
 const lireEntete = (h, nom) => {
   if (!h) return '';
