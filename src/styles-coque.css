@@ -159,6 +159,35 @@
 .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary)[open] > summary::after { transform: translateY(-2px) rotate(45deg); }
 @media (prefers-reduced-motion: reduce) { .vrm-main :is(.vrm-repli, .vrm-quick-settings, .vrm-ann-stock-tools, .vrm-label-help, .vrm-platform-summary) > summary::after { transition: none; } }
 
+/* Les deux volets de l'écran Statistiques (activité, stock) portent des chiffres
+   DANS leur ligne : ils gardent leur texte en ligne, mais perdent le triangle du
+   navigateur pour le même chevron que les autres replis (revue du 17 oct.). */
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary { list-style: none; position: relative; padding-right: 22px !important; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; flex-wrap: wrap; }
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::-webkit-details-marker { display: none; }
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::marker { content: ''; }
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::after {
+  content: ''; position: absolute; right: 6px; top: 50%; width: 7px; height: 7px; margin-top: -5px;
+  border-right: 1.75px solid var(--vrm-muted); border-bottom: 1.75px solid var(--vrm-muted);
+  transform: rotate(-45deg); transition: transform .18s var(--vrm-ease-out, ease);
+}
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock)[open] > summary::after { transform: translateY(-2px) rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::after { transition: none; } }
+
+/* Le filet : tout autre repli sans forme à lui (pas de classe, pas de
+   `list-style` posé, pas une icône étiquetée) perdait encore le triangle du
+   navigateur — vu au rendu sur Ventes, Achats, Compta, Réglages, Comptes liés
+   (revue du 17 oct.). Même chevron, posé après le libellé. */
+.vrm-main details > summary:not([class]):not([style*="list-style"]):not([aria-label]) { list-style: none; cursor: pointer; }
+.vrm-main details > summary:not([class]):not([style*="list-style"]):not([aria-label])::-webkit-details-marker { display: none; }
+.vrm-main details > summary:not([class]):not([style*="list-style"]):not([aria-label])::marker { content: ''; }
+.vrm-main details > summary:not([class]):not([style*="list-style"]):not([aria-label])::after {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 2px 2px 8px; vertical-align: middle;
+  border-right: 1.6px solid var(--vrm-muted); border-bottom: 1.6px solid var(--vrm-muted);
+  transform: rotate(-45deg); transition: transform .18s var(--vrm-ease-out, ease);
+}
+.vrm-main details[open] > summary:not([class]):not([style*="list-style"]):not([aria-label])::after { transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .vrm-main details > summary:not([class]):not([style*="list-style"]):not([aria-label])::after { transition: none; } }
+
 /* ── LE CHOIX DU COMPTE : une rangée de réglage, pas un formulaire ─────── */
 .vrm-compte-choix { padding: 0 16px 12px; min-width: 0; }
 .vrm-compte-ligne {
