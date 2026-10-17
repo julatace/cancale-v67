@@ -116,6 +116,18 @@ const attendre3D = async (pg) => pg.waitForFunction(() => { const e = document.q
 const sonde = (pg, fn, ...a) => pg.evaluate(([fn, a]) => { const el = document.querySelector('[data-stock3d] > div'); return el && el.__vrmProbe && el.__vrmProbe[fn] ? el.__vrmProbe[fn](...a) : null; }, [fn, a]);
 const cliquerTexte = (pg, re) => pg.evaluate((src) => { const b = [...document.querySelectorAll('button')].reverse().find((x) => new RegExp(src).test(x.textContent) && x.getBoundingClientRect().width > 0); if (!b) return false; b.click(); return true; }, typeof re === 'string' ? re : re.source);
 const cliquerSel = (pg, sel) => pg.evaluate((s) => { const b = document.querySelector(s); if (!b) return false; b.click(); return true; }, sel);
+
+// Glisser une vignette « À ranger » (souris ou doigt) jusqu'à un point de l'écran.
+const glisserVignette = (pg, num, x, y, type) => pg.evaluate(async ([num, x, y, type]) => {
+  const attends = (ms) => new Promise((r) => setTimeout(r, ms));
+  const el = document.querySelector(`[data-paire-a-ranger="${num}"]`); if (!el) return false;
+  const r = el.getBoundingClientRect(); const a = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  const ev = (t, cible, q) => cible.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, clientX: q.x, clientY: q.y, pointerId: 9, pointerType: type, isPrimary: true, button: 0, buttons: t === 'pointerup' ? 0 : 1 }));
+  ev('pointerdown', el, a); await attends(60);
+  for (let k = 1; k <= 8; k++) { ev('pointermove', document, { x: a.x + (x - a.x) * k / 8, y: a.y + (y - a.y) * k / 8 }); await attends(30); }
+  ev('pointerup', document, { x, y }); return true;
+}, [num, x, y, type]);
+const visible = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, sel);
 const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 (async () => {
@@ -246,13 +258,119 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await ctx.close();
     });
 
+    // ── VII. LA BARRE DU STOCK : deux modes, la recherche, les dimensions ───
+    if (fait('VII')) await essaie('VII. barre et modes', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES);
+      dit(await attendre3D(pg), 'VII. la 3D se monte');
+      dit(await visible(pg, '[data-stock-barre]'), 'VII. une barre au-dessus de la pièce (mode + recherche)');
+      dit(await pg.evaluate(() => { const b = document.querySelector('[data-mode-stock="ranger"]'); return !!b && b.getAttribute('aria-pressed') === 'true'; }), 'VII. on arrive en mode « Ranger »');
+      dit(!(await visible(pg, '[data-amenager]')), 'VII. en mode Ranger, les outils d’aménagement sont rangés');
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      dit(await pg.evaluate(() => { const d = document.querySelector('[data-amenager]'); return !!d && d.open && d.getBoundingClientRect().height > 0; }), 'VII. « Aménager » ouvre les outils de la pièce');
+      dit(!(await visible(pg, '[data-bande-a-ranger]')), 'VII. en mode Aménager, la bande « À ranger » se tait');
+      // dimensions de l'étagère (mode Aménager)
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      let p = await sonde(pg, 'project', 'm1', { cell: '4_0', num: '401' }); await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-reglage="niveau"]', { timeout: 8000 });
+      const av = item(await plan(pg), 'm1');
+      await cliquerSel(pg, '[data-reglage="niveau"] button[aria-label$="plus"]');
+      let q = await attendrePlan(pg, (x) => item(x, 'm1').h3d !== av.h3d);
+      const niv = (o) => o.h3d * 1.5 / o.rows;
+      dit(Math.abs(niv(item(q, 'm1')) - 0.425) < 0.002, 'VII. « Hauteur d’un niveau + » monte chaque niveau de 5 cm', `${(niv(av) * 100).toFixed(1)} → ${(niv(item(q, 'm1')) * 100).toFixed(1)} cm`);
+      for (let k = 0; k < 6; k++) { await cliquerSel(pg, '[data-reglage="niveau"] button[aria-label$="moins"]'); await pg.waitForTimeout(250); }
+      q = await plan(pg); const m = item(q, 'm1');
+      dit(JSON.stringify((m.slots || {})['4_0']) === '["401","402"]', 'VII. un niveau trop bas pour les boîtes déjà rangées est REFUSÉ (rien n’est caché ni retiré)', `niveau ${(niv(m) * 100).toFixed(1)} cm · ${JSON.stringify(m.slots)}`);
+      dit(await pg.evaluate(() => /ne tient plus toutes les boîtes/.test(document.body.innerText)), 'VII. et le refus est DIT');
+      const w0 = m.w, h0 = m.h;
+      await cliquerSel(pg, '[data-reglage="largeur"] button[aria-label$="plus"]'); await pg.waitForTimeout(300);
+      await cliquerSel(pg, '[data-reglage="profondeur"] button[aria-label$="plus"]');
+      q = await attendrePlan(pg, (x) => item(x, 'm1').h !== h0);
+      dit(Math.abs(item(q, 'm1').w - (w0 + 0.1)) < 0.011 && Math.abs(item(q, 'm1').h - (h0 + 0.05)) < 0.011, 'VII. largeur +10 cm, profondeur +5 cm', `${w0}×${h0} → ${item(q, 'm1').w}×${item(q, 'm1').h}`);
+      await pg.screenshot({ path: path.join(CAPT, 'stock-finitions-amenager.png') });
+      await cliquerSel(pg, '[data-mode-stock="ranger"]'); await pg.waitForTimeout(400);
+      dit(!(await visible(pg, '[data-reglage="niveau"]')) && !(await visible(pg, '[data-amenager]')), 'VII. revenu en Ranger : plus aucun réglage de meuble à l’écran');
+      // recherche
+      await pg.fill('[data-stock-barre] input', '402');
+      dit(await pg.waitForSelector('[data-trouve-num="402"]', { timeout: 6000 }).then(() => true).catch(() => false), 'VII. chercher « 402 » dit le meuble et la case');
+      dit(await pg.evaluate(() => /Étagère baskets/.test((document.querySelector('[data-trouve-num]') || {}).textContent || '')), 'VII. … en nommant le bon meuble');
+      dit(errs.length === 0, 'aucune erreur d’app (barre)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── VIII. RANGER EN MOINS DE GESTES ─────────────────────────────────────
+    if (fait('VIII')) await essaie('VIII. ranger : un geste', async () => {
+      let { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES);
+      dit(await attendre3D(pg), 'VIII. la 3D se monte');
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(1500);
+      // a) une place libre d'un meuble PAS choisi : un seul toucher ouvre « Ranger »
+      let p = await sonde(pg, 'project', 'm1', { cell: '4_1' }); await pg.mouse.click(p.x, p.y);
+      dit(await pg.waitForSelector('[data-apercu-meuble="m1"]', { timeout: 6000 }).then(() => true).catch(() => false), 'VIII. une place libre se touche d’UN geste, sans choisir le meuble avant');
+      await ctx.close();
+      // b) une boîte occupée d'un meuble pas choisi : le premier toucher ne fait que choisir
+      ({ ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES));
+      await attendre3D(pg); await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(1500);
+      p = await sonde(pg, 'project', 'b1', { cell: '3_0', num: '801' }); await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(900);
+      dit(!(await pg.evaluate(() => /Numéro de cette boîte|N° de la boîte/.test(document.body.innerText))), 'VIII. l’autre sens : une boîte déjà rangée ne s’ouvre pas d’un toucher (on ne change pas un numéro par mégarde)');
+      // c) la vignette N°700 + « Ranger ici » (prochaine place libre)
+      dit(await visible(pg, '[data-paire-a-ranger="700"]'), 'VIII. la bande « À ranger » montre la paire N°700');
+      dit(await pg.evaluate(() => !document.querySelector('[data-paire-a-ranger="401"]')), 'VIII. une paire déjà rangée (401) n’y est pas');
+      await pg.click('[data-paire-a-ranger="700"]');
+      dit(await pg.waitForSelector('[data-paire-prete="700"]', { timeout: 4000 }).then(() => true).catch(() => false), 'VIII. toucher la vignette la prépare et propose la prochaine place');
+      const avant = await plan(pg);
+      await pg.click('[data-ranger-prochaine]');
+      const q = await attendrePlan(pg, (x) => JSON.stringify(x).includes('"700"'));
+      const ou = q.rooms[0].items.flatMap((o) => Object.entries(o.slots || {}).filter(([, a]) => (a || []).includes('700')).map(([k]) => o.id + ':' + k));
+      dit(ou.length === 1 && ou[0] === 'b1:3_1', 'VIII. « Ranger ici » la pose à la prochaine place libre du meuble choisi — le bac à côté', ou.join(','));
+      const autres = (x) => JSON.stringify(x.rooms[0].items.map((o) => ({ id: o.id, s: Object.fromEntries(Object.entries(o.slots || {}).map(([k, a]) => [k, (a || []).filter((v) => v !== '700')]).filter(([, a]) => a.length)) })));
+      dit(autres(q) === autres(avant), 'VIII. rien d’autre n’a bougé');
+      await ctx.close();
+      // d) glisser-déposer À LA SOURIS sur une place de l'étagère
+      ({ ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES));
+      await attendre3D(pg); await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(1500);
+      p = await sonde(pg, 'project', 'm1', { cell: '4_1' });
+      dit(await glisserVignette(pg, '700', p.x, p.y, 'mouse'), 'VIII. la vignette se prend à la souris');
+      let s2 = (item(await attendrePlan(pg, (x) => (item(x, 'm1').slots || {})['4_1']), 'm1') || {}).slots || {};
+      dit(JSON.stringify(s2['4_1']) === '["700"]', 'VIII. glisser-déposer à la SOURIS : posée là où on la lâche', JSON.stringify(s2));
+      dit(errs.length === 0, 'aucune erreur d’app (ranger 1512)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+      // e) au DOIGT, 390 px : glisser jusque sur la table
+      ({ ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, PLAN_NICHES));
+      await attendre3D(pg); await pg.waitForTimeout(800);
+      await pg.evaluate(() => document.querySelector('[data-bande-a-ranger]').scrollIntoView({ block: 'start' })); await pg.waitForTimeout(600);
+      p = await sonde(pg, 'project', 't1', { cell: '0_1' });
+      const dansEcran = p && p.y > 0 && p.y < 844;
+      if (!dansEcran) { await pg.evaluate(() => window.scrollBy(0, 200)); await pg.waitForTimeout(500); p = await sonde(pg, 'project', 't1', { cell: '0_1' }); }
+      dit(await glisserVignette(pg, '700', p.x, p.y, 'touch'), 'VIII. la vignette se prend au doigt (390 px)');
+      s2 = (item(await attendrePlan(pg, (x) => JSON.stringify(item(x, 't1').slots || {}).includes('700')), 't1') || {}).slots || {};
+      dit(JSON.stringify(s2).includes('"700"'), 'VIII. glisser-déposer au DOIGT : posée sur la table', JSON.stringify(s2));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-finitions-ranger-390.png') });
+      const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      dit(deb <= 1, 'VIII. aucun débordement horizontal à 390 px (bande « À ranger » comprise)', `${deb} px`);
+      dit(errs.length === 0, 'aucune erreur d’app (ranger 390)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+      // f) toucher la vignette puis une place : posée SANS feuille
+      ({ ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, PLAN_NICHES));
+      await attendre3D(pg); await pg.waitForTimeout(800);
+      await pg.evaluate(() => document.querySelector('[data-bande-a-ranger]').scrollIntoView({ block: 'start' })); await pg.waitForTimeout(500);
+      await pg.tap('[data-paire-a-ranger="700"]'); await pg.waitForSelector('[data-paire-prete="700"]', { timeout: 4000 });
+      await pg.evaluate(() => document.querySelector('[data-stock-barre]').scrollIntoView({ block: 'start' })); await pg.waitForTimeout(400);
+      await pg.screenshot({ path: path.join(CAPT, 'stock-finitions-barre-390.png') });
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(600);
+      p = await sonde(pg, 'project', 'c1', { cell: '0_4' }); await pg.touchscreen.tap(p.x, p.y);
+      s2 = (item(await attendrePlan(pg, (x) => (item(x, 'c1').slots || {})['0_4']), 'c1') || {}).slots || {};
+      dit(JSON.stringify(s2['0_4']) === '["700"]', 'VIII. vignette touchée puis un cintre libre : le N° y est accroché, sans feuille à remplir', JSON.stringify(s2));
+      dit(!(await pg.evaluate(() => !!document.querySelector('[data-apercu-meuble]'))), 'VIII. … et aucune feuille ne s’est ouverte');
+      dit(errs.length === 0, 'aucune erreur d’app (vignette puis place)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
     // ── V. AU DOIGT, 390 px ─────────────────────────────────────────────────
     if (fait('V')) await essaie('V. au doigt', async () => {
       const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, PLAN_NICHES);
       dit(await attendre3D(pg), 'V. la 3D se monte à 390 px');
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' }));
       await pg.waitForTimeout(1500);
-      let p = await sonde(pg, 'project', 'm1', { cell: '4_1' }); await pg.touchscreen.tap(p.x, p.y); await pg.waitForTimeout(900);
+      let p = await sonde(pg, 'project', 'm1', { cell: '4_0', num: '401', avant: true }); await pg.touchscreen.tap(p.x, p.y); await pg.waitForTimeout(900);
       dit(await pg.waitForSelector('[data-meuble-choisi="m1"]', { timeout: 8000 }).then(() => true).catch(() => false), 'V. toucher l’étagère la choisit');
       await cliquerSel(pg, '[data-stock3d] button[aria-label="Se mettre en face du meuble"]'); await pg.waitForTimeout(2200);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500);
@@ -277,7 +395,7 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(!!e3 && e3.rects.length > 0 && e3.rects.every((r) => Math.abs(r.h - e3.px) < 1), 'V. après deux reconstructions (poser, retirer), les étiquettes gardent leur taille à l’écran', e3 ? e3.rects.map((r) => r.h.toFixed(1)).join(',') : 'sonde absente');
       await pg.screenshot({ path: path.join(CAPT, 'stock-finitions-doigt-390.png') });
       // déplacer la table dans le plan, au doigt, jusque sur le portant
-      await pg.evaluate(() => { const d = document.querySelector('[data-amenager]'); if (d) d.open = true; });
+      dit(await cliquerSel(pg, '[data-mode-stock="amenager"]'), 'V. le mode « Aménager » se choisit au doigt');
       await pg.waitForSelector('[data-plan-svg]', { timeout: 8000 });
       const avant = await plan(pg); const t0 = item(avant, 't1'), c = item(avant, 'c1');
       // Un doigt qui glisse (événements « touch » espacés : React doit voir la

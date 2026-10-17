@@ -20942,6 +20942,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // (on peut mettre n'importe quel numéro, pas forcément dans l'ordre), ou la
   // retirer si on laisse vide (les boîtes du dessus descendent).
   const pileTap = async (itemId, idx) => {
+    // Une paire choisie dans « À ranger » se pose sur la pile d'un geste.
+    if (pairePrete) { const it0 = items.find(o => o.id === itemId); if (it0) { setSel(itemId); const n = pairePrete; setPairePrete(null); ajouterDansPile(it0, n); } return; }
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne la pile
     const it = items.find(o => o.id === itemId); if (!it) return;
     const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return;
@@ -21026,8 +21028,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     return out;
   };
   const fillCell = async (itemId, cellKey, quoi) => {
-    if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
+    // (17 oct.) Une PLACE LIBRE se touche d'un seul geste (le meuble est choisi
+    // au passage) ; une boîte déjà là demande d'abord de choisir le meuble (on ne
+    // modifie pas un numéro par mégarde).
     const it = items.find(x => x.id === itemId); if (!it) return;
+    const placeVide = quoi ? (quoi.ghost || quoi.num == null) : !numsCase((it.slots || {})[cellKey]).length;
+    if (sel !== itemId) { setSel(itemId); if (!placeVide) return; }
     // (17 oct.) PLATEAU (étagère, table) ou PORTANT : on touche une BOÎTE précise
     // (la modifier, ou la sortir — celles du dessus descendent) ou la place
     // libre au-dessus de la pile (y ranger une paire).
@@ -21048,6 +21054,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         return;
       }
       if (pile.length >= cz.cap) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
+      if (pairePrete) { rangerPaire(pairePrete, itemId, cellKey); return; }
       if (aRanger.length) { setRanger({ itemId, cellKey }); return; }
       poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger ici :', value: '' }));
       return;
@@ -21057,6 +21064,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
     // rangée ailleurs, passait sans un mot. La feuille ne propose que des paires
     // réellement chez lui et pas encore posées.
+    if (!cur && pairePrete) { rangerPaire(pairePrete, itemId, cellKey); return; }
     if (!cur && aRanger.length) { setRanger({ itemId, cellKey }); return; }
     poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
   };
@@ -21462,6 +21470,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // Occupation de la pièce : combien de boîtes rangées, combien de places libres,
   // combien de meubles → un vrai tableau de bord de rangement en un coup d'œil.
   const refAmenager = React.useRef(null);   // le dépliant « Aménager la pièce », ouvert par le geste de la pièce vide
+  // (17 oct.) DEUX MODES, séparés : RANGER (le quotidien — poser, retrouver,
+  // sortir des paires ; les meubles sont verrouillés) et AMÉNAGER (dessiner la
+  // pièce, ajouter, régler et déplacer les meubles). Une barre en tête les sépare.
+  const [edition, setEdition] = useState(false);
+  const [pairePrete, setPairePrete] = useState(null);   // un N° choisi dans « À ranger », en attente d'une place
+  const viseurRef = React.useRef(null);                 // ce qui est sous le doigt dans la 3D (glisser-déposer)
+  const refFantome = React.useRef(null);                // la vignette qui suit le doigt pendant un glisser
   const capacity = useMemo(() => {
     const GRID = ['grille', 'commode', 'etagere', 'casier', 'armoire'];
     let boxes = 0, freeCells = 0, furn = 0;
@@ -21536,6 +21551,63 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     if (plein) { toast(`Un niveau de ${Math.round(niv * 100)} cm ne tient plus toutes les boîtes déjà rangées — sors-en d'abord.`); return; }
     updateItem(it.id, { h3d });
   };
+  React.useEffect(() => { const d = refAmenager.current; if (d && d.open !== edition) d.open = edition; setMoveMode(edition); if (edition) setPairePrete(null); }, [edition]);
+  // La prochaine place libre de la pièce : le meuble choisi d'abord, puis les
+  // autres dans l'ordre. Ne décide aucun numéro — seulement OÙ.
+  const prochainePlace = (prefId) => {
+    const ordre = [...items].sort((a, b) => (b.id === prefId ? 1 : 0) - (a.id === prefId ? 1 : 0));
+    for (const it of ordre) {
+      const ft = FURN_TYPES[it.type] || {}; const p = prochainePlaceMeuble(it, ft, room.wallH || 3.4);
+      if (p) return { itemId: it.id, cellKey: p.cell, nom: `${it.name || ft.label} · ${nomCase(Math.max(1, it.rows || 1), p.cell, modeCase(ft), it)}` };
+    }
+    return null;
+  };
+  const ajouterDansPile = (it, numero) => {
+    const v = String(numero || '').trim(); if (!v) return;
+    const ou = dejaPoseOu(v); if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+    const n2 = ajouterAPile(pileNums(it), v); if (n2) { pileSet(it, n2); toast(`N°${v} posé sur « ${it.name} ».`); }
+  };
+  const rangerPaire = (numero, itemId, cellKey) => {
+    const it = items.find(o => o.id === itemId); if (!it) return;
+    setPairePrete(null); setSel(itemId);
+    if ((FURN_TYPES[it.type] || {}).build === 'pile') { ajouterDansPile(it, numero); return; }
+    poserDansCase(itemId, cellKey, numero);
+  };
+  // Lâcher une paire dans la 3D : sur une place libre → là ; sur un meuble plein
+  // à cet endroit ou sur son cadre → sa prochaine place libre. Jamais un décor.
+  const deposerSur = (numero, x, y) => {
+    const v = viseurRef.current && viseurRef.current(x, y); if (!v || !v.id) return false;
+    const it = items.find(o => o.id === v.id); if (!it) return false; const ft = FURN_TYPES[it.type] || {};
+    if (ft.deco || ft.box) { toast('Ici on ne range rien — dépose-la sur une étagère, une table, un portant ou une pile.'); return true; }
+    if (ft.build === 'pile') { setPairePrete(null); setSel(it.id); ajouterDansPile(it, numero); return true; }
+    const cz = casesDe(it, room.wallH); let cell = v.cell != null ? v.cell : null;
+    if (cell != null && numsCase((it.slots || {})[cell]).length >= (cz.mode === 'colonne' ? 1 : cz.cap)) cell = null;
+    if (cell == null) { const p = prochainePlaceMeuble(it, ft, room.wallH || 3.4); if (!p) { toast(`« ${it.name} » est plein — choisis un autre meuble.`); return true; } cell = p.cell; }
+    rangerPaire(numero, it.id, cell); return true;
+  };
+  // Glisser une vignette « À ranger » (souris ou doigt). Un simple toucher la
+  // CHOISIT (elle attend alors qu'on touche une place) ; un glisser jusque dans
+  // la pièce la RANGE là où on la lâche.
+  const debutGlisser = (e, p) => {
+    if (e.button != null && e.button !== 0) return;
+    const x0 = e.clientX, y0 = e.clientY; let bouge = false;
+    const f = refFantome.current;
+    const suivre = (ev) => {
+      if (!bouge && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { bouge = true; if (f) { f.textContent = `N°${p.numero}`; f.style.display = 'block'; } }
+      if (bouge && f) f.style.transform = `translate(${Math.round(ev.clientX - 28)}px, ${Math.round(ev.clientY - 46)}px)`;
+      if (bouge && ev.cancelable) ev.preventDefault();
+    };
+    const fin = (ev) => {
+      window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule);
+      if (f) f.style.display = 'none';
+      if (!bouge) { setPairePrete(x => x === p.numero ? null : p.numero); return; }
+      const cible = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (cible && cible.closest && cible.closest('[data-stock3d] canvas') ? deposerSur(p.numero, ev.clientX, ev.clientY) : false) return;
+      toast('Lâche la paire sur une étagère, une table, un portant ou une pile dans la pièce.');
+    };
+    const annule = () => { window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule); if (f) f.style.display = 'none'; };
+    window.addEventListener('pointermove', suivre, { passive: false }); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', annule);
+  };
   if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -21544,8 +21616,62 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
           tout l'écran de configuration avant de voir son stock. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
+      {/* (17 oct.) LA BARRE DU STOCK : le mode (ranger / aménager) et la recherche
+          d'un numéro, au même endroit, au-dessus de la pièce. */}
+      <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
+          options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
+        <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
+          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+        </div>
+      </div>
+      {hi && hi.notFound && <div style={{ fontSize: 12.5, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ». Range-le : choisis-le dans « À ranger » puis touche une place libre.</div>}
+      {hi && hi.itemId && (()=>{
+        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
+        let pos=null;
+        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=nomCase(nr, hi.cell, casesDe(it, room.wallH).mode, it); }
+        return <div data-trouve-num={search} style={{ fontSize: 13, color: C.text, fontWeight: 600, lineHeight:1.4 }}>N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <> · {pos}</> : null}</div>;
+      })()}
+      {/* (17 oct.) « À RANGER » : les paires présentes qui n'ont pas de place.
+          Toucher une vignette la choisit (la prochaine place libre est proposée,
+          ou on touche une place dans la pièce) ; la glisser dans la pièce la
+          range là où on la lâche. Mode Ranger seulement. */}
+      {!edition && aRanger.length > 0 && aRanger[0].sur && (()=>{
+        const pp = pairePrete ? prochainePlace(sel) : null;
+        return (
+          <div data-bande-a-ranger={aRanger.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
+              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} paire{aRanger.length > 1 ? 's' : ''} · touche-en une, ou glisse-la dans la pièce</span>
+            </div>
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {aRanger.slice(0, 60).map(p => {
+                const on = pairePrete === p.numero;
+                return (
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
+                    {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
+                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {pairePrete && (
+              <div data-paire-prete={pairePrete} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: C.text }}>
+                <span style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
+                </span>
+                {pp && <button type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 600, padding: '0 14px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger ici</button>}
+                <button type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              </div>
+            )}
+            <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
+          </div>
+        );
+      })()}
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
       {chercheLoc && (
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -21574,7 +21700,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
             <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dessine ta pièce vue du dessus, puis ajoute une étagère, une table ou un portant : tu y ranges tes articles, et VRM retrouve chacun par son numéro.</span>
           </span>
-          <button type="button" data-piece-vide-geste="" onClick={() => { const d = refAmenager.current; if (d) { d.open = true; try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
+          <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
         </div>
       )}
 
@@ -21588,18 +21714,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           onClose={() => setRanger(null)}
         />
       )}
-      {/* Recherche */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
-      </div>
-      {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{
-        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
-        let pos=null;
-        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=`colonne ${c+1} · ${nr-r}ᵉ boîte depuis le bas`; }
-        return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
-      })()}
+
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       {/* (16 oct.) UNE pièce : pas de pastille « Ma pièce » sélectionnée — l'onglet
@@ -21627,15 +21742,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           de construction (meubles, dimensions, murs, déplacement) part donc
           derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
           recherche. */}
-      <details ref={refAmenager} data-amenager="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
+      <details ref={refAmenager} data-amenager="" onToggle={(e) => { const o = e.currentTarget.open; if (o !== edition) setEdition(o); }} style={{ display: edition ? 'block' : 'none', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
         {/* ⚠️ `listStyle:none` retire le triangle du navigateur : sans repère
             ajouté, plus rien ne dit que ça s'ouvre. On pose donc un chevron. */}
-        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }} onClick={(e) => { e.preventDefault(); setEdition(false); }} title="Revenir au rangement">
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
-            <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajouter des meubles, changer les dimensions, déplacer</span>
+            <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajoute un meuble, règle-le, glisse-le à sa place. Les numéros rangés ne bougent pas.</span>
           </span>
-          <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, fontSize: 15, lineHeight: 1 }}>›</span>
+          <span style={{ flexShrink: 0, color: C.accent, fontSize: 13, fontWeight: 600 }}>Terminer</span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 13px 13px' }}>
         {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
@@ -21775,6 +21890,20 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
+          {!edition && (()=>{
+            const ft = FURN_TYPES[selItem.type] || {};
+            const p = ft.build === 'pile' ? null : prochainePlaceMeuble(selItem, ft, room.wallH || 3.4);
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
+                {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
+                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche un carton pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
+                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
+                <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
+              </div>
+            );
+          })()}
+          {edition && (<>
           {/* Personnalisation : couleur + hauteur */}
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
@@ -21807,7 +21936,6 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
                 <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
-                <span style={{ flex: '1 1 100%', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Touche une place libre (en transparence) pour y ranger un article ; touche une boîte pour changer son numéro ou la sortir — celles du dessus descendent.</span>
               </div>
             );
           })()}
@@ -21857,6 +21985,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
           <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+          </>)}
         </div>
       )}
       {/* ⚠️ MODE D'EMPLOI PERMANENT → DÉPLIANT. Ce paragraphe de cinq lignes
@@ -22341,7 +22470,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','box','Ranger']].map(([v,ic,l])=>(
+        {[['plan','home','Ma pièce'],['ranger','grid','Liste des cases']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>

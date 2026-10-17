@@ -6,7 +6,7 @@
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
 
-function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
+function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
@@ -1409,9 +1409,13 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       };
       const marquer = (quoi) => { const h = quoi || {}; poserContour(contours.sel, h.sel ? maillages(h.sel) : null); poserContour(contours.hi, h.hi && h.hi.itemId ? maillages(h.hi.itemId, h.hi) : null); poserCibles(h.cibles); };
       st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie, marquer, versDessus, revenir3D };
+      // (17 oct.) Glisser-déposer une paire depuis la bande « À ranger » : l'app
+      // demande ce qui est sous le doigt (le meuble, la case) au moment du lâcher.
+      if (viseurRef) viseurRef.current = (x, y) => { try { return viser(x, y); } catch (_) { return null; } };
       try { el.parentElement && (el.parentElement.dataset.vue = '3d'); } catch (_) {}
       setLoading(false);
       cleanup = () => {
+        if (viseurRef) viseurRef.current = null;
         cancelAnimationFrame(raf); if (flyRAF) cancelAnimationFrame(flyRAF); if (chuteRAF) cancelAnimationFrame(chuteRAF); if (rafSurvol) cancelAnimationFrame(rafSurvol); if (tapDiffere) clearTimeout(tapDiffere);
         el.removeEventListener('pointerdown', pd, true);
         window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
