@@ -87,12 +87,18 @@ async function refreshOne(acc) {
   return { access_token: newAccess, refresh_token: newRefresh };
 }
 
+// Rend VRAI seulement si la base a confirmé. Vinted vient de CONSOMMER
+// l'ancien refresh_token : une écriture ratée annoncée « refreshed » laissait le
+// compte cassé sans un mot (revue du 17 octobre, `audit-routes-revue.cjs` F).
 async function persist(acc, tokens, filtre) {
-  await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
+  try {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
     method: 'PATCH',
     headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() }),
   });
+  return !!(r && r.ok);
+  } catch (_) { return false; }
 }
 
 export default async function handler(req, res) {
@@ -112,10 +118,14 @@ export default async function handler(req, res) {
       const exp = jwtExp(acc.access_token);
       if (exp && exp - now > REFRESH_MARGIN_S) { summary.push({ id: acc.vinted_user_id, action: 'still_valid' }); continue; }
       const tokens = await refreshOne(acc);
-      if (tokens) { await persist(acc, tokens, filtre); summary.push({ id: acc.vinted_user_id, action: 'refreshed' }); }
+      if (tokens) {
+        if (await persist(acc, tokens, filtre)) summary.push({ id: acc.vinted_user_id, action: 'refreshed' });
+        else summary.push({ id: acc.vinted_user_id, action: 'refreshed_not_saved' });
+      }
       else { summary.push({ id: acc.vinted_user_id, action: 'refresh_failed' }); }
     }
-    res.status(200).json({ ok: true, count: accounts.length, summary });
+    const nonRange = summary.some((x) => x.action === 'refreshed_not_saved');
+    res.status(nonRange ? 502 : 200).json({ ok: !nonRange, count: accounts.length, summary });
   } catch (err) {
     res.status(500).json({ error: 'Echec du refresh global', detail: String(err) });
   }
