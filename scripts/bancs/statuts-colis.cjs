@@ -163,27 +163,6 @@ async function sain(pg, ecran) {
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
 
-// La cloche : on l'ouvre et on lit le NOMBRE de la ligne « ventes à expédier ».
-// ⚠️ La cloche de l'en-tête a été retirée le 13 octobre (13f6c89, « écrans
-// revendeurs simplifiés ») : son contenu (`notifItems`, le centre de
-// notifications) se lit désormais dans la liste « À faire » de l'écran
-// Collectif — la MÊME source (§11). On lit donc cette liste ; la page doit
-// déjà être sur `?tab=collectif`. On attend un état OBSERVÉ (la ligne affiche
-// le nombre attendu), borné : une ligne restée à 3 (le défaut d'origine) sort
-// rouge au bout du délai.
-async function lireCloche(pg, attendu) {
-  const lire = () => pg.evaluate(() => {
-    for (const bt of document.querySelectorAll('button')) {
-      const m = /^\s*(\d+)\s+ventes?\s+à\s+expédier/.exec(bt.innerText || '');
-      if (m && !/eBay/.test(bt.innerText)) return Number(m[1]);
-    }
-    return 0;      // aucune ligne : zéro colis annoncé
-  });
-  const fin = Date.now() + 12000;
-  let n = await lire();
-  while (n !== attendu && Date.now() < fin) { await pg.waitForTimeout(250); n = await lire(); }
-  return n;
-}
 
 // Les lignes de vente/d'achat rendues : titre (attribut `title`, la donnée
 // servie) → étape affichée (premier élément de la ligne d'infos).
@@ -256,9 +235,9 @@ async function filtre(pg, nom) {
         dit(j.n === 2, 'Ma journée : « Expédier N colis » (tuile « À envoyer ») vaut 2', 'lu ' + j.n);
         dit(!!j.pub && j.pub.total === 2, 'Ma journée publie 2 colis à poster pour la cloche', JSON.stringify(j.pub));
         await sain(pg, 'Ma journée');
-        await pg.goto(`http://localhost:${PORT}/?tab=collectif`, { waitUntil: 'domcontentloaded' });
-        const n = await lireCloche(pg, 2);
-        dit(n === 2, 'la cloche (après Ma journée) annonce 2 ventes à expédier', 'lu ' + n);
+        // (17 oct.) L'écran Collectif — dernier lecteur rendu de la cloche — est
+        // retiré : son nombre « ventes à expédier » n'est plus affiché nulle
+        // part ; la tuile de Ma journée (ci-dessus) est LA voix.
       });
 
       // ── 4. VENTES ────────────────────────────────────────────────────────
@@ -334,13 +313,14 @@ async function filtre(pg, nom) {
         // Ouvert directement sur Collectif (sa liste « À faire » = la cloche
         // d'avant) : recharger après coup remplirait le navigateur et le nuage
         // n'arriverait plus en dernier — le cas que ce contrôle vise.
-        await n2.pg.goto(`http://localhost:${PORT}/?tab=collectif`, { waitUntil: 'domcontentloaded' });
-        await n2.pg.waitForTimeout(5500);
-        const pub = await n2.pg.evaluate(() => localStorage.getItem('vrm_colis_aposter'));
-        dit(pub == null, 'appareil neuf : aucun nombre publié (la cloche est sur son repli)', String(pub));
-        const n = await lireCloche(n2.pg, 2);
-        dit(n === 2, 'la cloche (appareil neuf, le nuage arrive en dernier) annonce 2 ventes à expédier — le colis coché « posté » n’en est pas', 'lu ' + n);
-        await sain(n2.pg, 'Collectif');
+        // (17 oct.) Collectif retiré : l'appareil neuf est jugé sur Ma journée,
+        // la tuile « À envoyer » (le nuage arrive en dernier).
+        await n2.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        const lireTuile = () => n2.pg.evaluate(() => { const t = document.querySelector('[data-tuile="envoyer"]'); const v = t ? t.getAttribute('data-n') : null; return v === null || v === '' ? null : Number(v); });
+        const fin = Date.now() + 12000; let n = await lireTuile();
+        while (n !== 2 && Date.now() < fin) { await n2.pg.waitForTimeout(250); n = await lireTuile(); }
+        dit(n === 2, 'appareil neuf (le nuage arrive en dernier) : « À envoyer » vaut 2 — le colis coché « posté » n’en est pas', 'lu ' + n);
+        await sain(n2.pg, 'Ma journée (appareil neuf)');
         dit(n2.errs.length === 0, 'aucune erreur de page (tableau de bord)', n2.errs.join(' | ').slice(0, 200));
         await n2.ctx.close();
       });

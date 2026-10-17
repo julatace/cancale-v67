@@ -95,7 +95,7 @@ const PORT_VV=Number(process.env.BANC_PORT)||4322; srv.listen(PORT_VV);
 // `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
 // Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
 // (l'ancienne appli) etaient dans le meme angle mort.
-const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
@@ -135,14 +135,15 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='', heroTxt=null;
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='', vintedTxt='', heroTxt=null;
     for(const t of TABS){
       await pg.goto('http://localhost:'+PORT_VV+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
       // « À faire » du Collectif (`notifItems`) se calcule APRÈS les lectures (ventes eBay comprises) : 2,2 s ne
       // suffisent pas sous charge (rouge vu chez d'autres agents, vert seul). On attend l'état OBSERVÉ — la ligne
       // eBay —, borné à 12 s : si elle ne vient jamais, le contrôle plus bas reste rouge.
-      if(t==='collectif') await pg.waitForFunction(()=>/eBay à expédier/.test(document.body.innerText||''),null,{timeout:12000}).catch(()=>{});
+      // (17 oct.) Collectif est retiré : « À faire » vit sur Ma journée.
+      if(t==='journee') await pg.waitForFunction(()=>/eBay à expédier/.test(document.body.innerText||''),null,{timeout:12000}).catch(()=>{});
       // `SHOTS=dossier` : une capture par écran et par taille (pour REGARDER, §6.2).
       if(process.env.SHOTS){ try{ fs.mkdirSync(process.env.SHOTS,{recursive:true}); await pg.screenshot({path:require('path').join(process.env.SHOTS,`${t}-${W}.png`),fullPage:true}); }catch(_){} }
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
@@ -154,7 +155,9 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
         // La carte héros du « finalisé » porte la notion qu'elle mesure
         // (`data-notion="finalise-vinted"`) : on juge SON texte, pas la page.
         heroTxt=await pg.evaluate(()=>{ const e=document.querySelector('[data-stats-carte="hero"]'); return e ? (e.innerText||'') : null; }); }
-      if(t==='collectif') collTxt=r.txt;
+      if(t==='journee') collTxt=r.txt;
+      // Le résumé est replié au téléphone (`<details>`) : on lit son CONTENU.
+      if(t==='plat_vinted') vintedTxt=await pg.evaluate(()=>{ const e=document.querySelector('.vrm-summary-strip'); return e ? (e.textContent||'') : ''; });
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
       // pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
@@ -246,11 +249,12 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // est un colis à envoyer, exactement comme une vente Vinted (« tout
     // centralisé », §11). Sur le code d'avant, notifItems ignorait eBay →
     // cette ligne n'existe pas (§6.1).
-    dit(/eBay à expédier/.test(collTxt),'une vente eBay payée non expédiée remonte dans « À faire »',collTxt?'':'Collectif non lu');
+    dit(/eBay à expédier/.test(collTxt),'une vente eBay payée non expédiée remonte dans « À faire » (Ma journée)',collTxt?'':'Ma journée non lue');
     // ── Argent à virer sur le Collectif : le chiffre qui compte pour un
     // revendeur (ce qu'il peut sortir), publié par liveStats (§11). Sur le
     // code d'avant, la carte n'existait pas (§6.1).
-    dit(/Argent à virer/i.test(collTxt) && /disponible à virer/i.test(collTxt),'le solde Vinted « disponible à virer » est sur le Collectif',collTxt?'':'Collectif non lu');
+    // (17 oct.) Collectif retiré : le solde vit dans le résumé de l'onglet Vinted.
+    dit(/Disponible\s*[\d—]/i.test(vintedTxt),'le solde Vinted « disponible » est dans le résumé de l’onglet Vinted',vintedTxt||'résumé Vinted introuvable');
     await pg.close();
   }
   await b.close(); srv.close();
