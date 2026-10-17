@@ -1309,6 +1309,8 @@ const SYNC_KEYS = [
   // ouvert Ventes : sur un autre appareil, Comptabilité disait « ton CA déclaré
   // arrive sur cet appareil » — rien ne l'y amenait — juste sous un « Reçu »
   // chiffré. Synchronisé, il arrive avec le nuage. Aucune règle ne change.
+  // Il porte aussi l'argent REÇU par mois (`recu`), CONSOMMÉ par le widget de
+  // l'iPhone (api/widget.js) — qui ne le recalcule plus sur les emails.
   'vinted_urssaf_mois',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
@@ -27277,9 +27279,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const k in parAd) parAd[k].ca = r2(parAd[k].ca);
       const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)), par: parAd };
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: 'nonRelie' };
+      // L'argent REÇU par mois (date de VERSEMENT), par `recuDuMois` — la règle
+      // même de « Reçu en {mois} » sur Ma journée. Le widget de l'iPhone le LIT
+      // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
+      const recu = {};
+      for (const ymR of new Set(lignes.filter(l => l && l.ts).map(l => ymDeTs(l.ts)))) recu[ymR] = r2(recuDuMois(lignes, ymR));
       const avant = load('vinted_urssaf_mois', null);
-      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare };
-      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare }) === JSON.stringify(charge);
+      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu };
+      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
   }, [sales.items, sales.failedUids, declarables, lbcLu, ebayCmd, declUrssaf]);
