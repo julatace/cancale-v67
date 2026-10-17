@@ -17866,21 +17866,23 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // est resté au défaut, jamais un choix fait pendant le chargement.
   useEffect(() => onCloudReady(() => setUrssafFreq(v => v === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : v)), []);
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
+  // ⚠️⚠️ (revue des chiffres, 17 octobre) Le « CA finalisé » de la prochaine
+  //    échéance retombait sur l'ARCHIVE (`encaissees`, vide depuis juillet 2026)
+  //    quand aucune ligne n'était publiée sur cet appareil : « CA finalisé
+  //    0,00 € · À payer ≈ 0,00 € » juste sous la carte du mois qui, elle, disait
+  //    « — · ce chiffre se calcule sur l'écran Ventes ». Le même défaut que la
+  //    phrase URSSAF du 8 septembre, sur la ligne d'en dessous. Et sa liste de
+  //    dépendances oubliait `urssafMois` : une ligne publiée après le montage ne
+  //    le recalculait jamais. Une seule source (la ligne publiée par Ventes,
+  //    §11) ; sans elle, `null` — un tiret, jamais un zéro.
   const urssafPeriodCA=useMemo(()=>{
-    if(!urssafDue) return 0;
-    if (urssafMois) {
-      // Un mois publié tombe dans la période si son 1er jour y est.
-      return urssafMois.reduce((s,m)=>{
-        const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
-        return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+m.ca : s;
-      },0);
-    }
-    return encaissees.filter(v=>{
-      const p=(v.receiveDate||'').trim().split('/'); if(p.length!==3) return false;
-      const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
-      return d>=urssafDue.periodStart && d<=urssafDue.periodEnd;
-    }).reduce((s,v)=>s+ +v.sellPrice,0);
-  },[encaissees,urssafDue]);
+    if(!urssafDue || !urssafMois) return null;
+    // Un mois publié tombe dans la période si son 1er jour y est.
+    return Math.round(urssafMois.reduce((s,m)=>{
+      const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
+      return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+(Number(m.ca)||0) : s;
+    },0)*100)/100;
+  },[urssafMois,urssafDue]);
 
   const bestDayCA=useMemo(()=>[...days].sort((a,b)=>b[1].ca-a[1].ca)[0],[days]);
   const bestDayProfit=useMemo(()=>[...days].sort((a,b)=>b[1].profit-a[1].profit)[0],[days]);
@@ -18394,8 +18396,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
               n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
               doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
+          {/* ⚠️ (revue des chiffres, 17 octobre) « sur N vendues ce mois-ci »
+              présentait les finalisées comme une PARTIE des vendues. Depuis le
+              3 octobre elles sont comptées au mois du VERSEMENT : une vente
+              faite le mois dernier et versée ce mois-ci est dedans, sans être
+              « vendue ce mois-ci » (banc chiffres-croises : « 3 sur 4 » quand
+              2 seulement des 4 en font partie). Deux notions côte à côte, chacune
+              son mot — jamais « sur ». */}
           <Chiffre lib="Ventes finalisées" val={moisCourantN!=null?moisCourantN:'—'} couleur={moisCourantN!=null?C.text:C.muted}
-            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN ? `sur ${liveStats.ventesMois} vendue${liveStats.ventesMois>1?'s':''} ce mois-ci` : null}/>
+            sous={moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois!==moisCourantN ? <span data-mois-vendues={liveStats.ventesMois}>argent versé ce mois · {liveStats.ventesMois} vente{liveStats.ventesMois>1?'s':''} faite{liveStats.ventesMois>1?'s':''} ce mois-ci</span> : null}/>
           {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
               raison en clair — il n'est pas développeur. */}
           <Chiffre lib="Bénéfice" val={liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)} couleur={C.muted}
@@ -18454,8 +18463,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
                   <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
-                  <span>CA finalisé</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}><Mt v={urssafPeriodCA}/></span>
-                  <span>À payer ≈</span><span style={{color:C.text,fontWeight:700,textAlign:'right'}}><Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></span>
+                  <span>CA finalisé</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={urssafPeriodCA}/>}</span>
+                  <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/>}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
@@ -18805,8 +18814,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               </tbody>
             </table>
           </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+          {/* ⚠️ (revue des chiffres, 17 octobre) Cette phrase disait « ventes que
+              Vinted a marquées finalisées, à leur date de vente » — sous un
+              tableau qui lit la ligne publiée par Ventes (`vinted_urssaf_mois`) :
+              TOUTES plateformes, datée au VERSEMENT depuis le 3 octobre, et au
+              mois de déclaration quand il l'a notée. La carte du mois, au-dessus,
+              disait le contraire sur le même écran. La phrase qui explique un
+              chiffre vient de la même source que lui (§5) : `data-regle` dit
+              laquelle a produit les lignes. */}
+          <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
+            {urssafMois
+              ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </Card>
       )}
@@ -24801,6 +24820,21 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     } catch (_) { return null; }
   })();
   const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
+  // ⚠️ (revue des chiffres, 17 octobre) LA COUVERTURE DE LA MÊME LIGNE. Ce CA
+  // se présentait comme complet alors que la ligne publiée peut dire « eBay :
+  // pas pu lire » ou porter des ventes finalisées sans date (dans aucun mois) —
+  // ce que la carte URSSAF du tableau de bord dit, sur la MÊME ligne. Un total
+  // partiel qui se présente comme complet est pire qu'un total absent (§5).
+  const couvertureCa = (() => {
+    try {
+      const v = load('vinted_urssaf_mois', null);
+      if (!v || !Array.isArray(v.mois)) return null;
+      const pasSu = Object.entries(v.sources || {}).filter(([, e]) => e === 'pasSu').map(([k]) => k);
+      const ad = v.aDater && Number(v.aDater.n) > 0 ? { n: Number(v.aDater.n), ca: Number(v.aDater.ca) || 0 } : null;
+      return { pasSu, aDater: ad };
+    } catch (_) { return null; }
+  })();
+  const caPartiel = !!(couvertureCa && couvertureCa.pasSu.length);
 
   // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
   const auj = new Date().toISOString().slice(0, 10);
@@ -24905,14 +24939,20 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             </div>
           ) : (
             <div>
-              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{fmt(resultatAnnee)}</div>
+              <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -0.8, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{caPartiel ? <span style={{ fontSize: 15, fontWeight: 600, color: C.muted }}>au moins </span> : null}{fmt(resultatAnnee)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? 'au moins ' : ''}{fmt(recettesAnnee)}</span>
                 <span>CA déclaré</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                 <span>de charges{charges.aboTotal > 0 ? ` (dont ${fmt(charges.aboTotal)} d'abonnements)` : ''}</span>
               </div>
+              {couvertureCa && (caPartiel || couvertureCa.aDater) && (
+                <div data-compta-couverture={couvertureCa.pasSu.join(',')} data-compta-adater={couvertureCa.aDater ? String(couvertureCa.aDater.n) : '0'} style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
+                  {caPartiel && <div>Sans {couvertureCa.pasSu.join(' ni ')} : {couvertureCa.pasSu.length > 1 ? 'leurs' : 'ses'} ventes n'ont pas pu être lues — ce CA est un minimum.</div>}
+                  {couvertureCa.aDater && <div>{couvertureCa.aDater.n} vente{couvertureCa.aDater.n > 1 ? 's' : ''} finalisée{couvertureCa.aDater.n > 1 ? 's' : ''} sans date de versement ({fmt(couvertureCa.aDater.ca)}) : dans aucun mois pour l'instant.</div>}
+                </div>
+              )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
                 Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 13)}) — ce n'est donc pas encore ton bénéfice net.
               </div>
