@@ -20869,7 +20869,7 @@ function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }
               <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx="0.06"
                 fill={ft.deco ? C.card2 : (it.color || ft.color || '#999')} fillOpacity={ft.deco ? 0.9 : 0.85}
                 stroke={cible ? C.accent : choisi ? C.text : 'rgba(0,0,0,0.35)'} strokeWidth={cible || choisi ? 0.09 : 0.03} />
-              {w > 0.7 && <text x={cx} y={cy + 0.12} textAnchor="middle" fontSize={Math.min(0.32, w / 6)} fontWeight="700" fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.45)', strokeWidth: 0.04 }}>{String(it.name || ft.label || '').slice(0, 18)}</text>}
+              {w > 0.7 && (() => { const nom = String(it.name || ft.label || '').slice(0, 18); const fs = Math.min(0.32, h * 0.6, (w * 0.92) / Math.max(1, nom.length * 0.56)); return <text x={cx} y={cy + fs * 0.36} textAnchor="middle" fontSize={fs} fontWeight="700" fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.45)', strokeWidth: 0.04 }}>{nom}</text>; })()}
             </g>
           );
         })}
@@ -20883,8 +20883,12 @@ function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }
             onPointerDown={(e) => { e.stopPropagation(); setCoinSel(i); try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (_) {} setEdit({ type: 'coin', i, pts: pts.slice() }); }} />
         ))}
         {/* les cotes du mur */}
-        {pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) return null; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-          return <text key={'l' + i} x={mx} y={my - 0.28} textAnchor="middle" fontSize="0.26" fill={C.muted} style={{ pointerEvents: 'none' }}>{(Math.round(L * 100) / 100).toLocaleString('fr-FR')} m</text>; })}
+        {pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) return null;
+          // La cote se pose DEHORS, au tiers du mur : ni sur le « + » du milieu, ni dans la pièce.
+          let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L; const tx = a[0] + (b[0] - a[0]) / 3, ty = a[1] + (b[1] - a[1]) / 3;
+          const dedans = (x, y) => { let d = false; for (let k = 0, j = pts.length - 1; k < pts.length; j = k++) { const [xi, yi] = pts[k], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) d = !d; } return d; };
+          if (dedans(tx + nx * 0.1, ty + ny * 0.1)) { nx = -nx; ny = -ny; }
+          return <text key={'l' + i} x={tx + nx * 0.34} y={ty + ny * 0.34 + 0.09} textAnchor="middle" fontSize="0.26" fill={C.muted} style={{ pointerEvents: 'none' }}>{(Math.round(L * 100) / 100).toLocaleString('fr-FR')} m</text>; })}
       </svg>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Tire un coin pour donner sa forme à la pièce, « + » au milieu d'un mur pour en ajouter un. Glisse un meuble pour le placer : il ne traverse ni un mur ni un autre meuble.</div>
     </div>
@@ -21747,7 +21751,14 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             if (dehors.length) { toast(`${dehors.length} meuble${dehors.length > 1 ? 's seraient' : ' serait'} hors de la pièce (« ${dehors[0].name} ») — déplace-${dehors.length > 1 ? 'les' : 'le'} d'abord.`); return; }
             const estRect = n.poly.length === 4 && n.poly.every(([x, y]) => (x === 0 || x === n.w) && (y === 0 || y === n.h));
             patchRoom(r => ({ room: { ...r.room, w: n.w, h: n.h, poly: estRect ? undefined : n.poly }, items: bouges })); signalerDisposition(); }}
-          onMove={(id, x, y) => moveItem(id, x, y, (items.find(o => o.id === id) || {}).rot || 0)} />
+          onMove={(id, x, y) => {
+            // Une PILE glissée dans le plan se pose SUR le meuble à surface qu'elle
+            // vise (une table…), sinon AU SOL — jamais en l'air au-dessus du vide.
+            const it = items.find(o => o.id === id) || {}; const ft = FURN_TYPES[it.type] || {};
+            let lift;
+            if (ft.pile) { const essai = { ...it, x, y, lift: 1 }; const sous = items.find(o => o.id !== id && isSurface(o) && estPoseSur(essai, o)); lift = sous ? furnTop(sous) : 0; }
+            moveItem(id, x, y, it.rot || 0, null, lift);
+          }} />
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
