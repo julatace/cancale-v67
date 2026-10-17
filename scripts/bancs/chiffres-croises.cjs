@@ -149,7 +149,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
     console.log('\n── A. Appareil neuf : aucune ligne publiée');
     await essaie('A',async()=>{
       const { ctx, pg, errs }=await page(b);
-      await aller(pg,'dashboard','[data-stats-carte="mois"]',3000);
+      await aller(pg,'compta','[data-stats-carte="mois"]',3000);
       const e=await lireEcheance(pg);
       const carteTiret=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); return c?!c.querySelector('[data-urssaf-declare]'):null; });
       dit(carteTiret===true,'la carte du mois n’a pas de source (elle dit où ça se calcule)',`${carteTiret}`);
@@ -167,7 +167,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       const { ctx, pg, errs }=await page(b);
       const pub=await publier(pg);
       dit(!!(pub&&Array.isArray(pub.mois)),'l’écran Ventes publie sa ligne');
-      await aller(pg,'dashboard','[data-stats-carte="mois"]',3000);
+      await aller(pg,'compta','[data-stats-carte="mois"]',3000);
       const e=await lireEcheance(pg);
       // Sans attribut (build d'avant) : la période se lit dans le libellé rendu.
       let de=e.de?new Date(e.de):null, a=e.a?new Date(e.a):null;
@@ -188,6 +188,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       // finalisées dont 1 vendue le mois dernier, 4 vendues ce mois-ci).
       const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); return m?{ n:Number(m[1]), sous:m[2] }:null; });
       dit(!!carte && !/\bsur \d+ vendue/.test(carte.sous),'les finalisées (au versement) ne sont pas écrites « sur N vendues ce mois-ci »',JSON.stringify(carte));
+      await aller(pg,'dashboard','[data-dash-stat="caMois"]',3000);
       const dashMois=await pg.evaluate(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e?Number(e.getAttribute('data-dash-cents')):null; });
       await aller(pg,'journee','[data-vendu-mois]',2500);
       const j=await pg.evaluate(()=>({ v:(document.querySelector('[data-vendu-mois]')||{getAttribute:()=>null}).getAttribute('data-vendu-mois'), r:(document.querySelector('[data-recu-mois]')||{getAttribute:()=>null}).getAttribute('data-recu-mois') }));
