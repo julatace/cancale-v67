@@ -9267,6 +9267,53 @@ profileur de Chrome sur un build non minifié.
 
 ---
 
+### Studio photo : cadre guide + détourage DANS le navigateur (fonction n°33, 17 octobre)
+Retenue le 11 octobre (« studio photo + détourage »), sous §2.9 : rien de payant
+sur la clé de Julien. Annonces → « ⋯ Outils » → **Studio photo**
+(`src/StudioPhoto.jsx`, `src/studioPhoto.js`, chargés au clic par `React.lazy`).
+- **Le cadre** : on choisit une paire PRÉSENTE (la liste de l'inventaire
+  physique, `porteursNum` — jamais un numéro tapé), la caméra s'ouvre
+  (`getUserMedia`, caméra arrière) dans une zone 3:4 avec un gabarit SVG (bord,
+  ligne de sol, axe). La photo prise est exactement ce que montre le cadre,
+  rangée dans `studio_photos_{N°}` (une ligne par paire, 12 photos au plus,
+  lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien et le dit).
+  Caméra refusée ou absente ⇒ la phrase le dit et le champ fichier
+  (`capture=environment`) prend le relais, recadré au même format.
+- **VRM ne publie rien sur Vinted** : « Enregistrer » télécharge la photo, il
+  l'ajoute lui-même dans l'app Vinted (l'écran le dit).
+- **Le détourage, local, sans clé, sans envoi** : modèle **U²-Netp**
+  (`public/modeles/u2netp.onnx`, 4,6 Mo, servi par VRM, chargé au clic).
+  ⚠️ **LICENCES vérifiées à la source le 16 octobre** : U²-Net = **Apache 2.0**
+  (fichier LICENSE de github.com/xuebinqin/U-2-Net) ; conversion ONNX de rembg =
+  **MIT** (sha256 `309c8469…`) ; moteur **onnxruntime-web 1.22.0 = MIT**, chargé
+  depuis cdn.jsdelivr.net au clic. Notices dans `public/modeles/LICENCES-u2netp.txt`.
+  **Écartés** : `@imgly/background-removal` (AGPL), RMBG-1.4 (non commercial),
+  le paquet npm `@rmbg/model-u2netp` (aucune licence déclarée). L'originale est
+  TOUJOURS gardée à côté de la détourée ; aucune route ajoutée (12 fonctions).
+- **Décision** : le chemin Photoroom existant (`api/_lib/detourage.js`,
+  `PHOTOROOM_POUR`) n'est pas touché ; la clé PAR VENDEUR (modèle Super PDP)
+  n'a pas été écrite, le détourage local la rend non nécessaire pour ce studio.
+  Extension non touchée.
+- **Preuves** : banc `scripts/bancs/studio-photo.cjs` (port 4991, données
+  inventées, fausse caméra Chromium, 390 tactile et 1512) — **55 contrôles** :
+  cadre par-dessus la caméra, photo rangée pour la BONNE paire et au format
+  3:4, détourée avec transparence (≈ 75 % transparent / 23 % opaque sur
+  l'image de la fausse caméra), aucune requête payante (Photoroom, POST
+  `/api/ai`, `mode=detourage`), rien du moteur avant le clic, seul hôte
+  extérieur cdn.jsdelivr.net, caméra refusée ⇒ repli + phrase, lecture KO ⇒
+  rien écrit. **Rouge sur le build d'avant** (le studio n'existe pas, 2 KO) ;
+  deux mutations (alpha forcé à 255, lecture ratée lue « vide ») ⇒ **4 rouges**.
+  Le moteur est servi au banc depuis une copie locale (`BANC_ORT_DIR`, sinon
+  téléchargé une fois par curl dans le dossier temporaire).
+- **Non mesuré** : la QUALITÉ sur de vraies chaussures (aucune photo réelle
+  joignable d'ici — u2netp est léger, bords doux : l'écran demande de vérifier) ;
+  Safari iOS réel (getUserMedia en PWA, encodage WebP — repli PNG prévu) ; le
+  temps de calcul sur un vrai téléphone (≈ 16 Mo téléchargés au premier
+  détourage) ; le poids des lignes `studio_photos_*` dans la sauvegarde
+  complète (elles y entrent, comme toute donnée captée).
+
+---
+
 ## 6. Comment on vérifie (et pourquoi ça compte)
 
 **La méthode : mesurer la vraie base AVANT de coder.** La moitié des « bugs »

@@ -607,6 +607,10 @@ const withOwner = (row) => {
   return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
 };
 
+// Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
+// la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
+
 const authCall = async (path, body) => {
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
@@ -20111,6 +20115,8 @@ function CountUpEuro({ value }) {
 // initial. `C`, `Icon`, `load`, `save` lui sont passés en props. Rendu
 // derrière <Suspense> à l'ouverture du Stock.
 const Room3D = React.lazy(() => import('./Room3D.jsx'));
+// Studio photo (fonction n°33) : chargé au clic, jamais à l'ouverture de l'app.
+const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
 // Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
@@ -25944,6 +25950,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  const [studioOpen, setStudioOpen] = useState(false); // « Studio photo » (cadre guide + détourage local)
   const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
   // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
   // NB : offOpen existe déjà plus bas pour le FORMULAIRE d'ajout — d'où un nom
@@ -33389,6 +33396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
@@ -36415,6 +36423,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (§11) : on ne recalcule rien ici.
           ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
           comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {studioOpen && (
+        <React.Suspense fallback={null}>
+          <StudioPhoto C={C} base={STUDIO_BASE} onClose={()=>setStudioOpen(false)}
+            paires={Object.entries(porteursNum).map(([num, p]) => ({ num, cle: num, titre: (p && p[0] && p[0].titre) || '' }))
+              .sort((a, b) => { const x = parseInt(a.num, 10), y = parseInt(b.num, 10); return (isNaN(x) ? 1e9 : x) - (isNaN(y) ? 1e9 : y) || String(a.num).localeCompare(String(b.num)); })} />
+        </React.Suspense>
+      )}
       {inventOpen && (()=>{
         const lignes = Object.entries(porteursNum)
           .map(([num, p]) => ({ num, n: parseInt(num, 10), p }))
