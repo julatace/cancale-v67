@@ -277,11 +277,22 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-finance-goal > div { margin-bottom:0 !important; padding:16px !important; }
 .vrm-finance-goal [role="progressbar"] { height:6px !important; }
 @media(max-width:767px) {
- .vrm-ann-toolbar { display:grid !important; grid-template-columns:minmax(0,1fr) 44px auto; gap:8px !important; }
- .vrm-ann-search { grid-column:1 / -1; }
- .vrm-ann-toolbar > select { grid-column:1; grid-row:2; min-width:0; width:100%; font-size:12px !important; }
- .vrm-ann-toolbar > button { grid-column:2; grid-row:2; }
- .vrm-ann-toolbar > div:last-child { grid-column:3; grid-row:2; }
+ /* Revue du 16 octobre : la barre tenait sur DEUX rangées (recherche, puis
+    tri · micro · Outils), et ~560 px de commandes passaient avant la première
+    annonce. UNE rangée : recherche · micro · tri (icône, la liste native
+    s'ouvre au doigt) · Outils (« ⋯ », son nom reste dans aria-label). */
+ .vrm-ann-toolbar { display:grid !important; grid-template-columns:minmax(0,1fr) 44px 44px 44px; gap:6px !important; }
+ .vrm-ann-search { grid-column:1; grid-row:1; min-width:0; height:44px; box-sizing:border-box; }
+ .vrm-ann-toolbar > button { grid-column:2; grid-row:1; width:44px !important; height:44px !important; min-width:0 !important; padding:0 !important; }
+ .vrm-ann-toolbar > select.vrm-ann-tri { grid-column:3; grid-row:1; width:44px !important; height:44px !important; min-width:0; padding:0 !important; -webkit-appearance:none; appearance:none; color:transparent !important; text-indent:-999px; overflow:hidden; background:var(--vrm-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%237a7f88' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4'/%3E%3C/svg%3E") center / 18px no-repeat !important; }
+ .vrm-ann-toolbar > select.vrm-ann-tri option { color:var(--vrm-ink); }
+ .vrm-ann-toolbar > .vrm-ann-outils { grid-column:4; grid-row:1; }
+ .vrm-ann-toolbar > .vrm-ann-outils > button { width:44px; height:44px; padding:0 !important; font-size:18px !important; line-height:1; }
+ .vrm-ann-outils-mot { display:none; }
+ /* Les vues rapides : une rangée qui défile au doigt, jamais deux. */
+ .vrm-ann-workbar .vrm-stock-views { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+ .vrm-ann-workbar .vrm-stock-views::-webkit-scrollbar { display:none; }
+ .vrm-ann-workbar .vrm-stock-views button { flex:0 0 auto; white-space:nowrap; min-height:40px; }
  .vrm-ann-card .vrm-ann-price-line { align-items:center !important; margin:0; }
  .vrm-ann-card .vrm-ann-price-line > span:last-child { padding:0 4px !important; }
 }
@@ -976,8 +987,10 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-ventes-liste .vrm-cout-label { font-size:13px !important; margin-right:4px; }
 /* Le coût inconnu : deux gestes TERTIAIRES (texte, pas de cadre) — ils restent
    visibles (règle des ventes), sans peser autant que le bordereau. */
-.vrm-ventes-liste .vrm-cout-rangee > button { height:44px !important; padding:0 8px !important; border:0 !important; background:transparent !important; border-radius:8px !important; font-size:13px !important; font-weight:600 !important; color:var(--vrm-ink) !important; box-shadow:none !important; }
-.vrm-ventes-liste .vrm-cout-rangee > button + button { color:var(--vrm-muted) !important; }
+/* Revue du 16 octobre : la rangée disait trois choses en trois styles (gras
+   encre, gris, gris + chevron). UNE seule forme pour les trois liens de la
+   rangée secondaire — même taille, même graisse, même gris que « Modifier ». */
+.vrm-ventes-liste .vrm-cout-rangee > button { height:44px !important; padding:0 8px !important; border:0 !important; background:transparent !important; border-radius:8px !important; font-size:13px !important; font-weight:500 !important; color:var(--vrm-muted) !important; box-shadow:none !important; }
 .vrm-ventes-liste .vrm-sale-footer { margin:0 0 0 auto !important; flex:0 1 auto; gap:4px 12px; }
 .vrm-ventes-liste .vrm-sale-footer:has(.vrm-sale-details[open]) { flex-basis:100%; margin-left:0 !important; }
 .vrm-ventes-liste .vrm-sale-details > summary {

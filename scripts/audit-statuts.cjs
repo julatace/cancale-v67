@@ -82,7 +82,9 @@ const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
 const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
 const app = charge('src/App.jsx', APP_NOMS);
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
-const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {
+// Depuis le 16 octobre la règle des étiquettes vit au niveau module
+// (`etapeVente`, `etapeAchat`, `phaseAchat`) : on la charge avant ses enveloppes.
+const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat', 'venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {
   C, INV_STATUS: { online: { color: '#f' } },
   venteExpediee: () => false,
   // `venteStage` lit aussi « coché posté à la main » (une vente cochée porte
