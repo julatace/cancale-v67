@@ -9,7 +9,7 @@ import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 // échouait (« exceeded_serverless_functions_per_deployment »), et la prod
 // restait bloquée sur l'ancienne version. On route donc par `?mode=` :
 //   • (défaut)        → pilotage par l'app : GET santé, POST authurl/apptoken/
-//                       exchange/status/sync/finances/pubinfo/pubverify/publish/
+//                       status/sync/finances/pubinfo/pubverify/publish/
 //                       revise, et (5 octobre) sku · offreinfo · offre · retirer,
 //                       puis programmer · programmees · deprogrammer ·
 //                       reprogrammer · limites (le planificateur) ;
@@ -1708,11 +1708,9 @@ async function handleApp(req, res) {
       res.status(r.status).json(r.ok ? { ok: true, works: true, expires_in: r.expires_in || null } : { ok: false, error: r.error, detail: r.detail || '' });
       return;
     }
-    if (action === 'exchange') {
-      const r = await rangerConnexion(String(b.code || '').trim(), owner, { ajout: b.ajout === true });
-      res.status(r.status).json(r.ok ? { ok: true, connected: true, compte: r.compte || null, nouveau: !!r.nouveau } : { ok: false, reason: r.reason, error: r.error, detail: r.detail || '' });
-      return;
-    }
+    // (17 octobre) `exchange` retiré : il rangeait les jetons d'un code reçu
+    // SANS le state signé ni le nonce du retour de consentement — la garde que
+    // `callback` exige. Aucun appelant dans l'app ; le seul chemin est le retour.
     if (action === 'status') {
       const has = await hasRefresh(owner, '');
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }

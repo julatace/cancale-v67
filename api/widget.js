@@ -57,9 +57,18 @@ function scoped(path) {
   const o = proprietaireCourant();
   return o ? path + (path.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}` : path;
 }
+// Trois réponses, jamais deux : 200 → oui · 400 (colonne absente) → non · le
+// reste → PAS SU (`null`). ⚠️ Une sonde ratée valait « une seule boutique »
+// (revue du 17 octobre, `audit-routes-revue.cjs` D) : toutes les lectures
+// partaient SANS filtre de vendeur, avec la clé de service — le défaut corrigé
+// le 4 octobre dans push.js et ship-reminders, resté ici.
 async function cloisonnee() {
-  try { return (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
-  catch (_) { return false; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) return true;
+    if (r.status === 400) return false;
+    return null;
+  } catch (_) { return null; }
 }
 // Comparaison à durée constante (évite de deviner la clé au temps de réponse).
 function memeToken(a, b) {
@@ -80,7 +89,12 @@ function memeToken(a, b) {
 // l'app) est servi, sinon son widget tomberait avant qu'il récupère l'adresse.
 // Rend `null` APRÈS avoir répondu lui-même (503/401) quand il faut s'arrêter.
 async function ownerDuToken(req, res) {
-  if (!(await cloisonnee())) return ''; // une seule boutique : rien ne change
+  const cl = await cloisonnee();
+  if (cl === null) {
+    res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+    return null;
+  }
+  if (!cl) return ''; // une seule boutique : rien ne change
   let mains;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token`, { headers: HEADERS });
@@ -175,12 +189,13 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
 }
 async function harvestOrders(kind, vivants) {
   try {
-    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,data`));
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,my_orders:data->payload->my_orders`));
     if (!j) return null;
     const out = {};
     for (const row of j) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
-      const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
+      // Projeté (§4.4) : seule la liste des commandes voyage, jamais la ligne entière.
+      const items = Array.isArray(row.my_orders) ? row.my_orders : [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
     return Object.values(out);

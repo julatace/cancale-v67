@@ -135,8 +135,15 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
   const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.test' } };
   await pg.addInitScript((sess) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, session ? SESSION : null);
   await pg.addInitScript(PONTS, { ponts, connecte: '111', vrm });
-  if (session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  // Le faux GoTrue APRÈS le fourre-tout des hôtes externes : Playwright prend la
+  // DERNIÈRE route en premier (§6.6) — posé avant, il n'était jamais atteint, et
+  // `PorteMfa` restait sur « pas su ». `GET /user` rend la fiche utilisateur (§6.3).
+  if (session) await pg.route('**/auth/v1/**', (r) => {
+    const chemin = new URL(r.request().url()).pathname.replace(/^.*\/auth\/v1\//, '');
+    const corps = chemin === 'user' ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated' } : { ...SESSION, expires_in: 3600 };
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) });
+  });
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

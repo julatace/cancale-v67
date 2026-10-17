@@ -35,17 +35,25 @@ export default async function handler(req, res) {
 
   const b = req.body || {};
   const cleServeur = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-  const key = cleServeur || b.key;
-  if (!key) { res.status(200).json({ ok: false, reason: 'no-key' }); return; }
-  // ⚠️ LA CLÉ DU SERVEUR SE PAIE : la route était ouverte à tous, donc le jour
-  //    où Julien pose AI_API_KEY, n'importe qui pouvait la dépenser. Elle exige
-  //    la session d'un vendeur (et un abonnement en règle, la règle de la base).
-  //    Une clé apportée par l'appareil lui-même ne coûte rien à personne d'autre.
-  if (cleServeur) {
+  // ⚠️⚠️ §2.9 (revue du 17 octobre, `audit-routes-revue.cjs` E) : la clé du
+  //    SERVEUR est celle de Julien, payée à l'usage. Elle servait à tout
+  //    vendeur connecté — et passait même DEVANT la clé que le vendeur
+  //    apportait. Désormais : la clé du vendeur d'abord ; la clé du serveur
+  //    pour le seul propriétaire de l'installation (`VRM_OWNER_UID`, la règle
+  //    du détourage) ; personne d'autre — « no-key », l'app retombe sur ses
+  //    suggestions calculées. Jamais un repli sur sa clé.
+  const cleVendeur = typeof b.key === 'string' && b.key.trim() ? b.key.trim() : '';
+  let key = cleVendeur;
+  if (!key && cleServeur) {
+    // LA CLÉ DU SERVEUR SE PAIE : session exigée (et un abonnement en règle).
     const u = await utilisateurDe(req);
-    if (!u) { res.status(401).json({ ok: false, reason: 'session', message: 'Connecte-toi à VRM pour utiliser l\'assistant.' }); return; }
+    if (!u) { res.status(401).json({ ok: false, reason: 'session', message: "Connecte-toi à VRM pour utiliser l'assistant." }); return; }
     if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
+    const proprio = String(process.env.VRM_OWNER_UID || '');
+    if (proprio && u.id === proprio) key = cleServeur;
+    else { res.status(200).json({ ok: false, reason: 'no-key', message: "L'assistant IA a besoin de TA clé. VRM n'utilise pas la sienne pour toi." }); return; }
   }
+  if (!key) { res.status(200).json({ ok: false, reason: 'no-key' }); return; }
 
   // ── MODE « aide à la réponse » (spec Messaging Intelligence) : on analyse le
   //    message d'un ACHETEUR et on propose des réponses NATURELLES. L'humain
