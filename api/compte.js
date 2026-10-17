@@ -391,8 +391,8 @@ async function checkout(req, res) {
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],
-    success_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=merci`,
-    cancel_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=annule`,
+    success_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=merci`,
+    cancel_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
     client_reference_id: u.id,
     metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe },
     subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe } },
@@ -437,7 +437,7 @@ async function portail(req, res) {
   const ligne = await ligneDe(req);
   if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   if (!ligne || !ligne.client_stripe) return repondre(res, 404, { erreur: 'aucun', message: "Tu n'as pas encore d'abonnement." });
-  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=compte` });
+  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=abonnement` });
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir la page de gestion. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
 }

@@ -38971,11 +38971,15 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const ongletsCompte = MULTI_USER && !!AUTH.user;
   const [vue, setVueBrute] = React.useState(() => {
     // Retour de Stripe (paiement, page de gestion) : on revient sur le compte.
-    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'compte') return 'compte';
-    try { return localStorage.getItem('vrm_reglages_vue') === 'compte' ? 'compte' : 'reglages'; } catch (_) { return 'reglages'; }
+    // (17 oct., Julien : « prépare dans les paramètres un onglet abonnement »)
+    // Le retour de Stripe (paiement, page de gestion) ouvre l'onglet Abonnement.
+    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement') return 'abonnement';
+    if (RETOUR_VUE === 'compte') return 'compte';
+    try { const v = localStorage.getItem('vrm_reglages_vue'); return v === 'compte' || v === 'abonnement' ? v : 'reglages'; } catch (_) { return 'reglages'; }
   });
   const voirCompte = !ongletsCompte || vue === 'compte';
   const voirReglages = !ongletsCompte || vue === 'reglages';
+  const voirAbonnement = ongletsCompte && !!AUTH.user && vue === 'abonnement';
 
   // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
   // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
@@ -39044,8 +39048,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     if (!g || !g.items.some(Boolean)) return null;
     const items = g.items.filter(Boolean);
     // Téléphone : tout en lignes. Ordinateur : les lignes, puis les panneaux dépliés.
+    // Un groupe « brut » (l'onglet Abonnement) se rend tel quel, sans liste.
     let corps;
-    if (etroit) corps = liste(items);
+    if (g.brut) corps = items.map((it) => <React.Fragment key={it.id}>{it.el}</React.Fragment>);
+    else if (etroit) corps = liste(items);
     else {
       const blocs = []; let courant = [];
       items.forEach((it) => {
@@ -39204,8 +39210,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
     ]},
+    // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'abonnement', titre:'Abonnement', items:[
-      { id:'abonnement', type:'panneau', ic:'wallet', lib:'Abonnement et factures', el:<MonAbonnement/> },
+      { id:'abonnement-lien', type:'nav', ic:'wallet', lib:'Abonnement et factures', desc:'Statut, prix, carte, factures, résiliation', onClick:()=>setVue('abonnement') },
     ]},
     { id:'connexion', titre:'Connexion', items:[
       { id:'moyens', type:'panneau', ic:'link', lib:'Moyens de connexion', el:moyensConnexion },
@@ -39226,11 +39233,14 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'conditions', type:'panneau', nu:true, ic:'doc', lib:'Données et conditions', el:donnees },
     ]},
   ];
-  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : [])].filter(Boolean)
+  // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
+  // carte, factures, résilier) — le MÊME composant qu'avant (§11).
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/></div> }] }];
+  const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = etroit && sous ? panneaux.find((it) => it.id === sous) : null;
-  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : 'Réglages';
+  const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : vue === 'abonnement' ? 'Abonnement' : 'Réglages';
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
   // Toujours présent en multi-vendeurs, y compris quand on est entré par la
@@ -39279,7 +39289,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
-            {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
+            {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
               <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
                 style={{background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?'0 1px 2px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04)':'none'}}>
                 {l}

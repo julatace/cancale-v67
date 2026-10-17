@@ -90,7 +90,7 @@ const srv = http.createServer((q, r) => {
 // `fx` : la réponse de ?mode=factures — un objet, ou 'panne' (502).
 // `compte` : cliquer l'onglet « Mon compte » après le chargement.
 // `fermer` : la réponse de ?mode=fermer — `{ status, body }`.
-async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '', fermer = null, largeur = 1512 }) {
+async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, onglet = 'abonnement', extra = '', fermer = null, largeur = 1512 }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
   const pg = await ctx.newPage();
@@ -140,8 +140,11 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}${extra}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
   if (tab === 'settings' && compte) {
-    const onglet = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
-    if (await onglet.count()) { await onglet.first().click(); await pg.waitForTimeout(1200); }
+    // (17 oct.) L'abonnement a son onglet ; « Mon compte » garde l'identité,
+    // la connexion et « Fermer mon compte ».
+    let o = pg.locator(`[data-onglets-reglages] [data-vue="${onglet}"]`);
+    if (!(await o.count())) o = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
+    if (await o.count()) { await o.first().click(); await pg.waitForTimeout(1200); }
   }
   return { ctx, pg, erreurs, appels };
 }
@@ -228,23 +231,26 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await ctx.close();
     });
 
-    console.log('\n── Deux onglets : « Réglages » et « Mon compte »');
+    console.log('\n── Trois onglets : « Réglages », « Mon compte » et « Abonnement »');
     await essaie('onglets', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false });
       const onglets = await pg.evaluate(() => [...document.querySelectorAll('[data-onglets-reglages] [data-vue]')].map((b) => b.innerText.trim()));
       const aboAvant = await etatCarte(pg);
       const reglagesAvant = await pg.evaluate(() => /Comptes Vinted/i.test(document.body.innerText));
-      dit(onglets.length === 2 && /réglages/i.test(onglets[0]) && /compte/i.test(onglets[1]), 'les Paramètres ont deux onglets', onglets.join(' · '));
+      dit(onglets.length === 3 && /réglages/i.test(onglets[0]) && /compte/i.test(onglets[1]) && /abonnement/i.test(onglets[2]), 'les Paramètres ont trois onglets, dont « Abonnement »', onglets.join(' · '));
       dit(!aboAvant && reglagesAvant, '  par défaut « Réglages » : les réglages de l’app, pas l’abonnement', `abonnement=${aboAvant} réglages=${reglagesAvant}`);
       await pg.locator('[data-onglets-reglages] [data-vue="compte"]').click(); await pg.waitForTimeout(1200);
       const apres = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null,
         email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /mot de passe/i.test(document.body.innerText) }));
-      dit(apres.abo === 'actif' && apres.email && apres.mdp && !apres.reglages, '  « Mon compte » regroupe : identité, abonnement, connexion — et pas les réglages de l’app', JSON.stringify(apres));
+      dit(!apres.abo && apres.email && apres.mdp && !apres.reglages, '  « Mon compte » regroupe : identité, connexion — ni l’abonnement (son onglet), ni les réglages de l’app', JSON.stringify(apres));
+      await pg.locator('[data-onglets-reglages] [data-vue="abonnement"]').click(); await pg.waitForTimeout(1200);
+      const abo = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null, reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /Changer mon mot de passe/i.test(document.body.innerText) }));
+      dit(abo.abo === 'actif' && !abo.reglages && !abo.mdp, '  « Abonnement » porte la carte de l’abonnement, et elle seule', JSON.stringify(abo));
       await ctx.close();
     });
     await essaie('lien direct', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false, extra: '&vue=compte' });
-      dit((await etatCarte(pg)) === 'actif', '`?vue=compte` (retour de Stripe) ouvre directement « Mon compte »');
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false, extra: '&vue=abonnement&abonnement=merci' });
+      dit((await etatCarte(pg)) === 'actif', 'le retour de Stripe (`?vue=abonnement&abonnement=merci`) ouvre directement « Abonnement »');
       await ctx.close();
     });
 
@@ -376,7 +382,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     const ouvrirFermer = async (pg) => { const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
     const etatFermer = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-fermer-compte] [data-fermer-etat]'); return e ? e.getAttribute('data-fermer-etat') : null; });
     await essaie('contact', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif });
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, onglet: 'compte' });
       // (un banc ne meurt pas : sans src/contact.js — le code d'avant — la ligne
       //  Contact est simplement absente, et le contrôle le dit en rouge)
       let constante = ''; try { constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim(); } catch (_) { constante = ''; }
@@ -385,7 +391,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await ctx.close();
     });
     await essaie('fermer : vendeur', async () => {
-      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif, onglet: 'compte' });
       dit(await pg.evaluate(() => !!document.querySelector('[data-fermer-compte]')), '« Fermer mon compte » existe dans Mon compte');
       await ouvrirFermer(pg);
       dit((await etatFermer(pg)) === 'possible', 'un vendeur abonné peut fermer son compte');
@@ -404,7 +410,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     });
     await essaie('fermer : incomplet', async () => {
       const message = 'Fermeture INCOMPLÈTE. Fait : 3 données effacées. Pas encore effacé : tes comptes Vinted, ton compte de connexion.';
-      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, fermer: { status: 502, body: { ok: false, message } } });
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, onglet: 'compte', fermer: { status: 502, body: { ok: false, message } } });
       await ouvrirFermer(pg);
       await pg.fill('[data-fermer-confirmation]', 'vendeuse@exemple.test'); await pg.waitForTimeout(200);
       await pg.locator('[data-fermer-bouton]').click(); await pg.waitForTimeout(1200);
@@ -413,14 +419,14 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await ctx.close();
     });
     await essaie('fermer : propriétaire', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.proprietaire });
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.proprietaire, onglet: 'compte' });
       await ouvrirFermer(pg);
       const b = await pg.evaluate(() => !!document.querySelector('[data-fermer-bouton]'));
       dit((await etatFermer(pg)) === 'proprietaire' && !b, 'le propriétaire de l’installation : expliqué, AUCUN bouton (sa boutique ne s’efface pas d’un clic)');
       await ctx.close();
     });
     await essaie('fermer : pas su', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: 'panne' });
+      const { ctx, pg } = await ouvrir(nav, { abo: 'panne', onglet: 'compte' });
       await ouvrirFermer(pg);
       const b = await pg.evaluate(() => !!document.querySelector('[data-fermer-bouton]'));
       dit((await etatFermer(pg)) === 'pas-su' && !b, 'compte illisible : aucun bouton tant qu’on ne sait pas s’il est le propriétaire');
