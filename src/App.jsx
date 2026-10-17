@@ -38791,6 +38791,7 @@ const PUSH_CATS = [
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
+  { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },

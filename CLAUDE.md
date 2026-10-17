@@ -9541,6 +9541,55 @@ sur la clé de Julien. Annonces → « ⋯ Outils » → **Studio photo**
   détourage) ; le poids des lignes `studio_photos_*` dans la sauvegarde
   complète (elles y entrent, comme toute donnée captée).
 
+### Double vente, app fermée : la notification part du serveur (17 octobre)
+Fonction n°2 retenue le 11 octobre. L'alerte « vendue sur Vinted → encore en
+vente sur eBay / Leboncoin » ne se calculait que VRM ouvert. `api/email-inbound`
+envoie maintenant une notification dès qu'une vente Vinted arrive par email
+(bordereau, « ton article s'est vendu »), **si et seulement si** la paire est
+PROUVÉE en vente ailleurs. Règle pure : `api/_lib/double-vente.js`.
+- **Identité par le N° seulement** (§5) : le N° LU dans l'email (après le
+  jugement 013 de `numeroDEmail`). Le N° retrouvé par ressemblance de titre
+  (`findNumeroByTitle`, `parTitre`) sert à tamponner le bordereau, **jamais** à
+  affirmer une double vente.
+- **eBay** : SKU `VRM-{n°}` d'une annonce de `ebay_listings*` (comptes eBay
+  actifs du registre, `comptesActifs`), traduit par la carte 013 PAR ANNONCE
+  (`numeroExterne`, `ebayAnnonces`) — la règle de `numEbayLu`.
+  **Leboncoin** : annonce à lui (`annonceLbcALui`, comptes prouvés par ses
+  ventes), pas morte, pas vendue sur Leboncoin, clé = lien posé à la main ou
+  référence VRM (réf / CustomRef), traduite par `lbcAnnonces`. ⚠️ Plus strict que
+  l'app, exprès : le « nXXX » d'un TITRE Leboncoin n'est pas retenu (ressemblance,
+  et ancien numéro possible après la remise à zéro).
+- **Pas su ⇒ rien** : marqueur 013, registre eBay, annonces eBay, annonces ou
+  ventes Leboncoin illisibles ⇒ la plateforme concernée ne dit rien ; base
+  cloisonnée sans vendeur résolu ⇒ rien (une lecture sans filtre lirait tous les
+  vendeurs). Rejeu en lot (`silence`) ⇒ rien.
+- **Une seule fois** : `pushOnce` (mémo `push_dedup`, lire-fusionner-réécrire
+  gardé). Clé = N° + annonces rencontrées (`dv-230-ebay:1111`) : le bordereau et
+  l'email « vendu » d'une MÊME vente, ou un email rejoué, ne sonnent qu'une fois.
+  ⚠️ Décision : pas la transaction — l'email « vendu » n'en porte pas, et les
+  deux emails d'une vente doivent tomber sur la même clé.
+- **Contenu** : « ⚠️ Vendue sur Vinted — N°230 encore en vente sur eBay » /
+  « {paire} — N°230 est encore en vente sur eBay : retire-la… », ouvre
+  `?tab=ebay_annonces` (ou `?tab=leboncoin`). Rien n'est retiré tout seul.
+- **Préférence `doublevente`**, activée par défaut, la même dans `PUSH_CATS` (app)
+  et `PUSH_DEFAUT` (serveur) — `audit-bilan-semaine.cjs` compare les deux.
+  Abonnement coupé ⇒ rien (`sendPushToAll`). Aucun cron, toujours 12 fonctions.
+- **Coût** : la lecture des annonces ne part que pour une vente qui porte un N°
+  et une catégorie active. Projetées (`data->items`, jamais `select=data`), mais
+  `lbc_listings` pèse ~226 Ko : quelques ventes par jour, accepté.
+- **Preuves** : banc `scripts/bancs/double-vente-push.cjs` (la vraie route, base
+  cloisonnée à deux vendeurs, faux Web Push, 26 contrôles) — **11 rouges** sur
+  l'avant (§6.1, copié dans l'arbre d'avant) ; `--mutation=titre` (N° par titre
+  compté) 1 rouge, `--mutation=passu` (lecture ratée = vide) 2 rouges,
+  `--mutation=dedup` (envoi direct) 1 rouge.
+- **Non mesuré** : la forme réelle des lignes `ebay_listings` / `lbc_listings` en
+  production (lues telles que la synchro et l'extension les écrivent) ; un
+  `ebay_listings` incomplet ne fait que MANQUER une alerte (le sens sûr) ; une
+  annonce retirée d'eBay à la main sans synchro reste « en vente » jusqu'à la
+  synchro suivante (fausse alerte possible, le temps d'une synchro).
+- **Julien** : rien — la catégorie est activée d'office (Réglages →
+  Notifications pour la couper).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
