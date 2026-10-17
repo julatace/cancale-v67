@@ -6,7 +6,7 @@
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
 
-function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, fallback, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
+function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
@@ -16,6 +16,10 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   const [loading, setLoading] = useState(true);
   const [amb, setAmb] = useState(() => load('vrm_garage_ambiance', 'clair')); // univers 3D choisi (par appareil)
   const [ambOpen, setAmbOpen] = useState(false); // la liste d'ambiances ne s'ouvre que sur demande
+  const [enDessus, setEnDessus] = useState(false); // la vue est passée au-dessus après un changement de disposition
+  // La forme de la pièce (coins en mètres, cadre 0..w × 0..h). Sans `poly`, le
+  // rectangle d'avant — rendu EXACTEMENT comme avant.
+  const formeLibre = Array.isArray(poly) && poly.length >= 3 && !(poly.length === 4 && poly.every(([x, y]) => (x === 0 || x === room.w) && (y === 0 || y === room.h)));
   const HSCALE = 1.5;
 
   useEffect(() => {
@@ -166,7 +170,15 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const floorTex = makeParquet(room.floorColor || '#c9ab84');
       floorTex.repeat.set(Math.max(1, room.w / 1.6), Math.max(1, room.h / 1.6));
       const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.74, metalness: 0.03 });
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), floorMat);
+      // (17 oct.) Pièce de FORME LIBRE : le sol suit les coins dessinés vu du dessus.
+      let floorGeo;
+      if (formeLibre) {
+        const sh = new THREE.Shape();
+        poly.forEach(([x, y], i) => { const px = x - room.w / 2, py = -(y - room.h / 2); if (i) sh.lineTo(px, py); else sh.moveTo(px, py); });
+        floorGeo = new THREE.ShapeGeometry(sh);
+        floorTex.repeat.set(1 / 1.6, 1 / 1.6);   // la forme porte ses UV en mètres
+      } else floorGeo = new THREE.PlaneGeometry(room.w, room.h);
+      const floor = new THREE.Mesh(floorGeo, floorMat);
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
       const wallH = Math.max(2.4, room.wallH || 3.4);
@@ -187,13 +199,32 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       };
       const wallMat = new THREE.MeshStandardMaterial({ map: makeWall(room.wallColor || '#e4e8ee'), roughness: 0.95, side: THREE.FrontSide });
       const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
-      mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
-      mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
       // Plinthes (bas des murs) → touche « vraie pièce ».
       const skirtMat = new THREE.MeshStandardMaterial({ color: '#f4f5f7', roughness: 0.6 });
       const mkSkirt = (len, x, z, horiz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.05, 0.14, horiz ? 0.05 : len), skirtMat); m.position.set(x, 0.07, z); m.receiveShadow = true; scene.add(m); };
-      mkSkirt(room.w, 0, -room.h / 2 + 0.025, true); mkSkirt(room.w, 0, room.h / 2 - 0.025, true);
-      mkSkirt(room.h, -room.w / 2 + 0.025, 0, false); mkSkirt(room.h, room.w / 2 - 0.025, 0, false);
+      // Le dedans de la pièce (pour orienter chaque mur vers l'intérieur).
+      const dedansPoly = (x, y) => { let d = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) d = !d; } return d; };
+      if (formeLibre) {
+        // Un mur par côté de la forme, tourné vers le DEDANS (FrontSide : un mur
+        // proche ne bouche pas la vue, comme pour le rectangle).
+        poly.forEach((a, i) => {
+          const b = poly[(i + 1) % poly.length];
+          const ax = a[0] - room.w / 2, az = a[1] - room.h / 2, bx = b[0] - room.w / 2, bz = b[1] - room.h / 2;
+          const L = Math.hypot(bx - ax, bz - az); if (L < 0.01) return;
+          const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+          let ry = Math.atan2(-(bz - az), bx - ax);
+          // normale de la face avant après rotation : (sin ry, 0, cos ry)
+          if (!dedansPoly(mx + Math.sin(ry) * 0.05 + room.w / 2, mz + Math.cos(ry) * 0.05 + room.h / 2)) ry += Math.PI;
+          mkWall(L, mx, mz, ry);
+          const sk = new THREE.Mesh(new THREE.BoxGeometry(L, 0.14, 0.05), skirtMat);
+          sk.position.set(mx + Math.sin(ry) * 0.025, 0.07, mz + Math.cos(ry) * 0.025); sk.rotation.y = ry; sk.receiveShadow = true; scene.add(sk);
+        });
+      } else {
+        mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
+        mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
+        mkSkirt(room.w, 0, -room.h / 2 + 0.025, true); mkSkirt(room.w, 0, room.h / 2 - 0.025, true);
+        mkSkirt(room.h, -room.w / 2 + 0.025, 0, false); mkSkirt(room.h, room.w / 2 - 0.025, 0, false);
+      }
       // étiquette (sprite texte)
       const makeLabel = (text) => {
         const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
@@ -296,6 +327,65 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         for (let i = 0; i < cn; i++) { const cx = -w / 2 + t + (i + 0.5) * ((w - 2 * t) / cn); const ch = ht * 0.5 * (0.8 + ((i * 7) % 5) / 10); const cl = box((w - 2 * t) / cn * 0.72, ch, d * 0.5, flatMat(cols[i % cols.length], 0.9)); cl.position.set(cx, ht * 0.86 - ch / 2, 0); g.add(cl); }
         return g;
       };
+      // (17 oct.) ÉTAGÈRE MÉTAL : quatre montants en cornière, des plateaux, des
+      // barres en croix au dos et sur les côtés — l'étagère de garage. En bois :
+      // deux joues pleines et des plateaux épais, sans croix.
+      const buildMetal = (w, d, ht, base, rows, bois) => {
+        const g = new THREE.Group(); const n = Math.max(1, rows || 4);
+        if (bois) {
+          const m = woodMat(base), t = 0.04;
+          [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, d, m); s.position.set(px, ht / 2, 0); g.add(s); });
+          const back = box(w, ht, 0.015, woodMat(shade(base, -10))); back.position.set(0, ht / 2, -d / 2 + 0.008); g.add(back);
+          for (let i = 0; i <= n; i++) { const yy = Math.min(ht - 0.015, Math.max(0.015, (i / n) * ht)); const sh = box(w - 2 * t, 0.03, d - 0.02, m); sh.position.set(0, yy, 0.005); g.add(sh); }
+          return g;
+        }
+        const acier = new THREE.MeshStandardMaterial({ color: base, metalness: 0.65, roughness: 0.38 });
+        const plat = new THREE.MeshStandardMaterial({ color: shade(base, 18), metalness: 0.45, roughness: 0.5 });
+        const p = 0.035;
+        [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const m = box(p, ht, p, acier); m.position.set(sx * (w / 2 - p / 2), ht / 2, sz * (d / 2 - p / 2)); g.add(m); });
+        for (let i = 0; i <= n; i++) {
+          const yy = Math.min(ht - 0.012, Math.max(0.03, (i / n) * ht));
+          const sh = box(w - 0.01, 0.022, d - 0.01, plat); sh.position.set(0, yy, 0); g.add(sh);
+          const lip = box(w, 0.04, 0.012, acier); lip.position.set(0, yy, d / 2 - 0.006); g.add(lip);   // le bord plié du plateau
+        }
+        // barres en croix (dos + côtés), entre deux plateaux sur deux
+        const barre = (x1, y1, z1, x2, y2, z2) => { const L = Math.hypot(x2 - x1, y2 - y1, z2 - z1); const c = cyl(0.007, 0.007, L, acier, 6); c.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2); c.lookAt(x2, y2, z2); c.rotateX(Math.PI / 2); g.add(c); };
+        for (let i = 0; i < n; i += 2) {
+          const y0 = (i / n) * ht + 0.03, y1 = Math.min(ht, ((i + 1) / n) * ht);
+          barre(-w / 2 + p, y0, -d / 2 + 0.01, w / 2 - p, y1, -d / 2 + 0.01); barre(w / 2 - p, y0, -d / 2 + 0.01, -w / 2 + p, y1, -d / 2 + 0.01);
+          [-1, 1].forEach(sx => { barre(sx * (w / 2 - 0.01), y0, -d / 2 + p, sx * (w / 2 - 0.01), y1, d / 2 - p); });
+        }
+        return g;
+      };
+      // PORTANT À CINTRES : deux pieds à roulettes, une barre, et pour chaque
+      // place un cintre — avec un vêtement et l'étiquette de son NUMÉRO quand il
+      // porte quelque chose, en transparence quand il est libre (on le touche
+      // pour y ranger). Chaque cintre porte sa case (`cell`) pour le clic.
+      const buildPortant = (w, d, ht, base, cols, slots) => {
+        const g = new THREE.Group(); const acier = new THREE.MeshStandardMaterial({ color: base, metalness: 0.7, roughness: 0.32 });
+        const nc = Math.max(1, cols || 6), barY = ht - 0.04;
+        [-1, 1].forEach(sx => {
+          const pied = box(0.03, ht, 0.03, acier); pied.position.set(sx * (w / 2 - 0.02), ht / 2, 0); g.add(pied);
+          const base2 = box(0.04, 0.03, d * 0.9, acier); base2.position.set(sx * (w / 2 - 0.02), 0.04, 0); g.add(base2);
+          [-1, 1].forEach(sz => { const roue = cyl(0.03, 0.03, 0.025, metalMat, 10); roue.rotation.z = Math.PI / 2; roue.position.set(sx * (w / 2 - 0.02), 0.03, sz * d * 0.42); g.add(roue); });
+        });
+        const rail = cyl(0.014, 0.014, w - 0.02, acier, 10); rail.rotation.z = Math.PI / 2; rail.position.set(0, barY, 0); g.add(rail);
+        const ghostM = new THREE.MeshStandardMaterial({ color: '#9aa3ad', roughness: 0.9, transparent: true, opacity: 0.22, depthWrite: false });
+        const habits = ['#4f6fc9', '#c94f4f', '#4fae8f', '#d4a24b', '#8a5fb0', '#5f7f9b'];
+        const pasC = (w - 0.08) / nc;
+        for (let c = 0; c < nc; c++) {
+          const cx = -w / 2 + 0.04 + (c + 0.5) * pasC, key = '0_' + c, a = ((slots || {})[key] || []).map(v => String(v)).filter(Boolean);
+          const crochet = cyl(0.004, 0.004, 0.06, metalMat, 5); crochet.position.set(cx, barY - 0.03, 0); g.add(crochet);
+          const epaules = box(Math.min(0.36, pasC * 0.9), 0.012, 0.012, a.length ? flatMat('#8a6f57', 0.6) : ghostM); epaules.position.set(cx, barY - 0.07, 0); epaules.rotation.y = Math.PI / 2; g.add(epaules);
+          if (a.length) {
+            const vet = box(0.03, 0.62, Math.min(0.42, d * 0.85), flatMat(habits[c % habits.length], 0.92)); vet.position.set(cx, barY - 0.07 - 0.32, 0); vet.userData = { cell: key, num: a[0], idx: 0 }; g.add(vet);
+            const tag = makeColis(a[0], 0.012, 0.12, 0.12); tag.position.set(cx, barY - 0.07 - 0.12, Math.min(0.21, d * 0.42) + 0.01); tag.rotation.y = Math.PI / 2; tag.userData = { cell: key, num: a[0], idx: 0 }; g.add(tag);
+          } else {
+            const gh = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.55, Math.min(0.4, d * 0.8)), ghostM); gh.position.set(cx, barY - 0.07 - 0.29, 0); gh.userData = { cell: key, ghost: true }; g.add(gh);
+          }
+        }
+        return g;
+      };
       const buildTable = (w, d, ht, base) => {
         const g = new THREE.Group(); const m = woodMat(base); const top = box(w, 0.08, d, m); top.position.y = ht; g.add(top);
         const lg = 0.09; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const l = box(lg, ht, lg, m); l.position.set(sx * (w / 2 - lg), ht / 2, sz * (d / 2 - lg)); g.add(l); });
@@ -351,7 +441,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           if (arr.length) { cellMesh = makeColis(arr[0], bw, bh, bd); }
           else { cellMesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), key === firstEmpty ? nextM : ghostM); cellMesh.receiveShadow = true; } // emplacement vide (bleu = prochaine place)
           cellMesh.position.set(cx, cy, 0);
-          cellMesh.userData = { cell: key }; // pour remplir la case au clic
+          cellMesh.userData = arr.length ? { cell: key, num: String(arr[0]) } : { cell: key }; // pour remplir la case au clic
           g.add(cellMesh);
         }
         return g;
@@ -511,7 +601,43 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
+      // ── LA GRAVITÉ, VUE (17 oct.) ──────────────────────────────────────────
+      // « Si on enlève celui du dessous, celui du dessus descend naturellement. »
+      // Avant de reconstruire, on note la hauteur de chaque boîte numérotée ;
+      // après, toute boîte du MÊME meuble et du MÊME numéro qui se retrouve plus
+      // bas TOMBE jusqu'à sa nouvelle place, au lieu d'y sauter.
+      let chuteRAF = 0;
+      const notePositions = () => {
+        const m = new Map();
+        furnGroup.children.forEach(gr => gr.traverse(o => { const u = o.userData || {}; if (o.isMesh && u.num != null && !u.ghost) m.set(`${gr.userData.itemId}|${u.num}`, { y: o.position.y, gx: gr.position.x, gy: gr.position.y, gz: gr.position.z }); }));
+        return m;
+      };
+      const fairTomber = (avant) => {
+        if (reduitChute || !avant || !avant.size) return;
+        const chutes = [];
+        furnGroup.children.forEach(gr => gr.traverse(o => {
+          const u = o.userData || {}; if (!o.isMesh || u.num == null || u.ghost) return;
+          const p = avant.get(`${gr.userData.itemId}|${u.num}`);
+          if (!p || Math.abs(p.gx - gr.position.x) > 1e-3 || Math.abs(p.gz - gr.position.z) > 1e-3 || Math.abs(p.gy - gr.position.y) > 1e-3) return;
+          if (p.y - o.position.y > 0.02) chutes.push({ o, de: p.y, a: o.position.y });
+        }));
+        if (!chutes.length) return;
+        try { el.parentElement && (el.parentElement.dataset.chute = String(chutes.length)); } catch (_) {}
+        chutes.forEach(c => { c.o.position.y = c.de; });
+        const t0 = performance.now(), dur = 300;
+        if (chuteRAF) cancelAnimationFrame(chuteRAF);
+        const pas = () => {
+          const k = Math.min(1, (performance.now() - t0) / dur);
+          // chute accélérée, petit rebond à l'arrivée — un objet qui se pose
+          const e = k < 0.8 ? (k / 0.8) * (k / 0.8) : 1 - Math.sin(((k - 0.8) / 0.2) * Math.PI) * 0.06;
+          chutes.forEach(c => { c.o.position.y = c.de + (c.a - c.de) * e; });
+          if (k < 1) chuteRAF = requestAnimationFrame(pas); else { chuteRAF = 0; chutes.forEach(c => { c.o.position.y = c.a; }); }
+        };
+        chuteRAF = requestAnimationFrame(pas);
+      };
+      const reduitChute = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
       const buildFurniture = () => {
+        const avant = notePositions();
         colisCache.clear(); // textures des cartons régénérées à chaque reconstruction
         while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); disposeMat(m.material); }); }
         (dataRef.current.items || []).forEach(it => {
@@ -534,6 +660,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           switch (shape) {
             case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
             case 'etagere': g = buildEtagere(w, d, ht, base, it.rows); break;
+            case 'metal': g = buildMetal(w, d, ht, base, nr, !!(FURN_TYPES[it.type] || {}).bois); break;
+            case 'portant': g = buildPortant(w, d, ht, base, nc, it.slots); break;
             case 'armoire': g = buildArmoire(w, d, ht, base); break;
             case 'penderie': g = buildPenderie(w, d, ht, base); break;
             case 'table': g = buildTable(w, d, ht, base); break;
@@ -591,7 +719,31 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           // TAPPABLE pour modifier le numéro), chaque case vide = boîte fantôme
           // translucide TAPPABLE (pour y déposer un N°) — comme la grille. → on voit
           // la superposition des numéros et on édite au doigt sur TOUT rangement.
-          if (!isGrid && !isBox) {
+          const physique = (FURN_TYPES[it.type] || {}).cases;
+          if (physique === 'pile') {
+            // (17 oct.) PLATEAU : chaque case porte une PILE de boîtes (index 0 en
+            // bas). Retirer celle du dessous fait descendre les autres — la
+            // reconstruction les replace, l'animation de chute les fait tomber.
+            // Au-dessus de chaque pile qui a encore de la place : une boîte en
+            // transparence, qu'on touche pour ranger. Une TABLE porte ses piles
+            // SUR son plateau, pas dessous.
+            const estTable = shape === 'table';
+            const cols = Math.max(1, it.cols || 1), rows = estTable ? 1 : Math.max(1, it.rows || 1);
+            const cellW = w / cols, cellH = estTable ? Math.max(0.6, (room.wallH || 3.4) * 0.7 - ht) : ht / rows;
+            const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145, pas = bh + 0.008;
+            const cap = Math.max(1, Math.floor((cellH - 0.04) / pas));
+            const ghostM = new THREE.MeshStandardMaterial({ color: shade(base, 26), roughness: 0.95, transparent: true, opacity: 0.18, depthWrite: false });
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+              const key = r + '_' + c; const arr = ((it.slots || {})[key] || []).map(v => String(v)).filter(Boolean);
+              const cx = -w / 2 + (c + 0.5) * cellW;
+              const cbY = estTable ? ht + 0.04 : Math.max(0, ht - (r + 1) * cellH) + 0.025;   // dessus du plateau
+              const z = estTable ? 0 : d / 2 - bd / 2 - 0.015;
+              arr.slice(0, cap).forEach((num, i) => { const m = makeColis(num, bw, bh, bd); m.userData = { cell: key, num, idx: i }; m.position.set(cx, cbY + bh / 2 + i * pas, z); g.add(m); });
+              if (arr.length < cap) { const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bh / 2 + arr.length * pas, z); g.add(gh); }
+            }
+          } else if (physique === 'cintre') {
+            // le portant dessine lui-même ses cintres
+          } else if (!isGrid && !isBox) {
             const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
             const cellW = w / cols, cellH = ht / rows;
             const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
@@ -610,6 +762,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           }
           furnGroup.add(g);
         });
+        fairTomber(avant);
       };
       buildFurniture();
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -694,6 +847,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const WALL_TYPES = { grille: 1, porte: 1, fenetre: 1 };
       const SNAP = 1.7;
       const snapWall = (cx, cz, w, h) => {
+        if (formeLibre) return snapMurLibre(cx, cz, w, h);
         const hW = room.w / 2, hH = room.h / 2;
         const dN = cz + hH, dS = hH - cz, dW = cx + hW, dE = hW - cx, m = Math.min(dN, dS, dW, dE);
         if (m > SNAP) return null; // trop loin d'un mur → on laisse libre
@@ -709,6 +863,24 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         ncz = Math.max(-hH + effH / 2, Math.min(hH - effH / 2, ncz));
         return { x: Math.round((ncx + hW - w / 2) * 2) / 2, y: Math.round((ncz + hH - h / 2) * 2) / 2, rot };
       };
+      // Pièce de forme libre : on se colle au mur DROIT le plus proche (horizontal
+      // ou vertical sur le plan), face au dedans de la pièce. La place finale
+      // est revérifiée par l'app (aucun meuble à travers un mur ou un autre).
+      const snapMurLibre = (cx, cz, w, h) => {
+        let best = null;
+        poly.forEach((a, i) => {
+          const b = poly[(i + 1) % poly.length];
+          const ax = a[0] - room.w / 2, az = a[1] - room.h / 2, bx = b[0] - room.w / 2, bz = b[1] - room.h / 2;
+          const horiz = Math.abs(az - bz) < 1e-3, vert = Math.abs(ax - bx) < 1e-3; if (!horiz && !vert) return;
+          if (horiz) { if (cx < Math.min(ax, bx) - 0.2 || cx > Math.max(ax, bx) + 0.2) return; const d = Math.abs(cz - az); if (d <= SNAP && (!best || d < best.d)) { const dedans = dedansPoly(cx + room.w / 2, az + room.h / 2 + 0.05); best = { d, horiz: true, pos: az, rot: dedans ? 0 : Math.PI, sgn: dedans ? 1 : -1 }; } }
+          else { if (cz < Math.min(az, bz) - 0.2 || cz > Math.max(az, bz) + 0.2) return; const d = Math.abs(cx - ax); if (d <= SNAP && (!best || d < best.d)) { const dedans = dedansPoly(ax + room.w / 2 + 0.05, cz + room.h / 2); best = { d, horiz: false, pos: ax, rot: dedans ? Math.PI / 2 : -Math.PI / 2, sgn: dedans ? 1 : -1 }; } }
+        });
+        if (!best) return null;
+        const odd = Math.abs(Math.sin(best.rot)) > 0.5; const effW = odd ? h : w, effH = odd ? w : h;
+        let ncx = cx, ncz = cz;
+        if (best.horiz) ncz = best.pos + best.sgn * effH / 2; else ncx = best.pos + best.sgn * effW / 2;
+        return { x: Math.round((ncx + room.w / 2 - w / 2) * 4) / 4, y: Math.round((ncz + room.h / 2 - h / 2) * 4) / 4, rot: best.rot };
+      };
       const pd = (e) => {
         // ⚠️ SEUL LE BOUTON GAUCHE « TAPE ». Un clic droit sans bouger (le début
         //    d'un déplacement de vue) ouvrait la saisie d'une case — et, sur un
@@ -719,12 +891,12 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         const hits = ray.intersectObjects(furnGroup.children, true);
         if (!hits.length) { drag = null; return; } // vide → OrbitControls tourne
         // case de grille (remplir au clic) ou boîte de pile (retirer au clic)
-        let cellKey = null, pileIdx = null, probe = hits[0].object;
-        while (probe && cellKey == null && pileIdx == null) { if (probe.userData && probe.userData.cell != null) cellKey = probe.userData.cell; else if (probe.userData && probe.userData.pileIdx != null) pileIdx = probe.userData.pileIdx; probe = probe.parent; }
+        let cellKey = null, pileIdx = null, quoi = null, probe = hits[0].object;
+        while (probe && cellKey == null && pileIdx == null) { if (probe.userData && probe.userData.cell != null) { cellKey = probe.userData.cell; quoi = { num: probe.userData.num != null ? String(probe.userData.num) : null, idx: probe.userData.idx, ghost: !!probe.userData.ghost }; } else if (probe.userData && probe.userData.pileIdx != null) pileIdx = probe.userData.pileIdx; probe = probe.parent; }
         let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) { drag = null; return; }
         const canDrag = !!moveRef.current;
         const gp = ray.ray.intersectPlane(ground, hitPt);
-        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, type: o.userData.type, cell: cellKey, pileIdx, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
+        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, type: o.userData.type, cell: cellKey, quoi, pileIdx, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
         if (canDrag) { // on garde la main : OrbitControls NE reçoit PAS ce geste
           controls.enabled = false;
           try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
@@ -794,7 +966,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           }
           // tap : case de grille → remplir · boîte de pile → retirer · sinon sélectionner
           const agir = () => {
-            if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
+            if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell, d.quoi);
             else if (d.pileIdx != null && cb.onPileTap) cb.onPileTap(d.id, d.pileIdx);
             else (cb.onSelect || cb.onOpen) && (cb.onSelect || cb.onOpen)(d.id);
           };
@@ -997,12 +1169,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // la boîte n'existe qu'à ce moment-là. Pure animation → un échec ne
       // casse rien, le rangement est déjà enregistré.
       let depotRAF = 0;
-      const animerDepot = (itemId, cellKey) => {
+      const animerDepot = (itemId, cellKey, numVise) => {
         try {
           const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
           if (!g) return;
           let cible = null;
-          g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && o.isMesh) cible = o; });
+          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && String(o.userData.num) === String(numVise) && o.isMesh) cible = o; });
+          if (!cible) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && !o.userData.ghost && o.isMesh) cible = o; });
           if (!cible) return;
           const yFin = cible.position.y;
           const haut = yFin + 1.15;
@@ -1036,12 +1209,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // voit partir (elle monte et s'efface) au lieu de disparaître d'un coup.
       // ⚠️ Appelée AVANT l'écriture : la boîte doit encore exister. Le rendu
       // suivant la retire pour de bon.
-      const animerSortie = (itemId, cellKey, fini) => {
+      const animerSortie = (itemId, cellKey, fini, numVise) => {
         try {
           const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
           if (!g) { fini && fini(); return; }
           let cible = null;
-          g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && o.isMesh) cible = o; });
+          if (numVise != null) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && String(o.userData.num) === String(numVise) && o.isMesh) cible = o; });
+          if (!cible) g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && !o.userData.ghost && o.isMesh) cible = o; });
           if (!cible) { fini && fini(); return; }
           const y0 = cible.position.y;
           const mats = Array.isArray(cible.material) ? cible.material : [cible.material];
@@ -1070,11 +1244,45 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           contour: (quel) => { const c = contours[quel]; return c && c.visible ? { x: c.position.x, y: c.position.y, z: c.position.z, sx: c.scale.x, sy: c.scale.y, sz: c.scale.z } : null; },
         };
       } catch (_) {}
-      const marquer = (quoi) => { const h = quoi || {}; poserContour(contours.sel, h.sel ? maillages(h.sel) : null); poserContour(contours.hi, h.hi && h.hi.itemId ? maillages(h.hi.itemId, h.hi) : null); };
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie, marquer };
+      // (17 oct.) LES PAIRES À ALLER CHERCHER : un contour d'accent par paire
+      // (bouton de l'onglet Colis), posé sur SON carton — pas sur tout le meuble.
+      const contoursCibles = [];
+      const poserCibles = (liste) => {
+        while (contoursCibles.length) { const c = contoursCibles.pop(); scene.remove(c); }
+        (liste || []).forEach(q => { if (!q || !q.itemId) return; const c = faireContour(1, 0.28); poserContour(c, maillages(q.itemId, { cell: q.cell, pileIdx: q.pileIdx, num: q.num })); if (c.visible) contoursCibles.push(c); else scene.remove(c); });
+        try { el.parentElement && (el.parentElement.dataset.cibles = String(contoursCibles.length)); } catch (_) {}
+      };
+      // (17 oct.) VUE DU DESSUS ANIMÉE : après un changement de disposition, la
+      // caméra monte à la verticale de la pièce pour qu'on relise le plan. Sortie
+      // douce, ~600 ms ; immédiate si le système demande moins de mouvement.
+      const versDessus = (instant) => {
+        try {
+          const d = Math.min(controls.maxDistance, Math.max(cadre0.d * 0.95, Math.max(room.w, room.h) * 1.2));
+          const destTgt = new THREE.Vector3(0, 0, 0), destPos = new THREE.Vector3(0.001, d, 0.02);
+          const startPos = camera.position.clone(), startTgt = controls.target.clone();
+          const t0 = performance.now(), dur = (reduit || instant) ? 0 : 620;
+          const ease = t => 1 - Math.pow(1 - t, 3);
+          if (flyRAF) cancelAnimationFrame(flyRAF);
+          const step = () => {
+            const k = dur > 0 ? Math.min(1, (performance.now() - t0) / dur) : 1, e = ease(k);
+            camera.position.lerpVectors(startPos, destPos, e); controls.target.lerpVectors(startTgt, destTgt, e); controls.update();
+            if (k < 1) flyRAF = requestAnimationFrame(step); else { flyRAF = 0; try { el.parentElement && (el.parentElement.dataset.vue = 'dessus'); } catch (_) {} }
+          };
+          step();
+        } catch (_) {}
+      };
+      const revenir3D = () => {
+        const startPos = camera.position.clone(), startTgt = controls.target.clone(); const t0 = performance.now(), dur = reduit ? 0 : 520;
+        if (flyRAF) cancelAnimationFrame(flyRAF);
+        const step = () => { const k = dur > 0 ? Math.min(1, (performance.now() - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 3); camera.position.lerpVectors(startPos, homePos, e); controls.target.lerpVectors(startTgt, homeTgt, e); controls.update(); if (k < 1) flyRAF = requestAnimationFrame(step); else { flyRAF = 0; try { el.parentElement && (el.parentElement.dataset.vue = '3d'); } catch (_) {} } };
+        step();
+      };
+      const marquer = (quoi) => { const h = quoi || {}; poserContour(contours.sel, h.sel ? maillages(h.sel) : null); poserContour(contours.hi, h.hi && h.hi.itemId ? maillages(h.hi.itemId, h.hi) : null); poserCibles(h.cibles); };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie, marquer, versDessus, revenir3D };
+      try { el.parentElement && (el.parentElement.dataset.vue = '3d'); } catch (_) {}
       setLoading(false);
       cleanup = () => {
-        cancelAnimationFrame(raf); if (flyRAF) cancelAnimationFrame(flyRAF); if (rafSurvol) cancelAnimationFrame(rafSurvol); if (tapDiffere) clearTimeout(tapDiffere);
+        cancelAnimationFrame(raf); if (flyRAF) cancelAnimationFrame(flyRAF); if (chuteRAF) cancelAnimationFrame(chuteRAF); if (rafSurvol) cancelAnimationFrame(rafSurvol); if (tapDiffere) clearTimeout(tapDiffere);
         el.removeEventListener('pointerdown', pd, true);
         window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
         try { renderer.domElement.removeEventListener('pointermove', surMouvement); renderer.domElement.removeEventListener('pointerleave', surSortie); } catch (_) {}
@@ -1096,12 +1304,12 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   // déclaration — c'est ce qui garantit l'enchaînement.
   useEffect(() => {
     if (!depot || !depot.at || loading) return;
-    try { st.current.animerDepot && st.current.animerDepot(depot.itemId, depot.cellKey); } catch (_) {}
+    try { st.current.animerDepot && st.current.animerDepot(depot.itemId, depot.cellKey, depot.num); } catch (_) {}
   }, [depot && depot.at, loading]);
   // La sortie : on anime, PUIS on prévient (c'est l'appelant qui écrit).
   useEffect(() => {
     if (!sortie || !sortie.at || loading) return;
-    try { st.current.animerSortie ? st.current.animerSortie(sortie.itemId, sortie.cellKey, sortie.fini) : (sortie.fini && sortie.fini()); }
+    try { st.current.animerSortie ? st.current.animerSortie(sortie.itemId, sortie.cellKey, sortie.fini, sortie.num) : (sortie.fini && sortie.fini()); }
     catch (_) { sortie.fini && sortie.fini(); }
   }, [sortie && sortie.at, loading]);
   // Surlignage : un contour d'accent sur le meuble choisi, un contour plus marqué
@@ -1110,13 +1318,23 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   cbRef.current.sel = sel;
   useEffect(() => {
     if (!st.current.marquer) return;
-    try { st.current.marquer({ sel, hi }); } catch (_) {}
+    try { st.current.marquer({ sel, hi, cibles }); } catch (_) {}
     // Vole vers la boîte cherchée — seulement quand la CIBLE change (pas à chaque
     // reconstruction de meubles), pour ne pas secouer la caméra sans raison.
     const target = hi && hi.itemId ? `${hi.itemId}|${hi.cell || ''}|${hi.pileIdx == null ? '' : hi.pileIdx}` : null;
     if (target && target !== flownRef.current && st.current.flyTo) { st.current.flyTo(hi.itemId, { cell: hi.cell, pileIdx: hi.pileIdx, num: hi.num }); }
     flownRef.current = target;
-  }, [hi, sel, loading, items]);
+  }, [hi, sel, loading, items, cibles]);
+  // Une disposition qui vient de changer ⇒ vue du dessus (une seule fois par
+  // changement ; aussi juste après un remontage — la forme de la pièce change
+  // la scène entière).
+  const dessusFait = useRef(0);
+  useEffect(() => {
+    if (loading || !vueDessus || vueDessus === dessusFait.current) return;
+    if (Date.now() - vueDessus > 4000) { dessusFait.current = vueDessus; return; }
+    dessusFait.current = vueDessus;
+    try { st.current.versDessus && st.current.versDessus(); setEnDessus(true); } catch (_) {}
+  }, [vueDessus, loading]);
   // ── CLAVIER : la vue se pilote aussi sans souris ─────────────────────────────
   // Aucune touche ne faisait rien sur la 3D. La zone prend le focus au clic et
   // garde ses touches (stopPropagation : le raccourci global ← / → change
@@ -1182,6 +1400,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
+              {enDessus && <button type="button" data-revenir-3d="" onPointerDown={stop} onClick={() => { call('revenir3D'); setEnDessus(false); }} title="Revenir à la vue en 3D" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Revenir à la vue en 3D">↩ 3D</button>}
               {sel && <button type="button" onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
             <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>

@@ -36,6 +36,10 @@ const MUTATIONS = {
   lecture: [[`      if (rows === null) { noterDiag('etat_compte_lecture_ratee'); return false; }   // pas su : on n'écrit rien (§5)`, ``]],
   // le moindre champ « vrai » ferait « banni » (ressemblance au lieu du champ explicite)
   champ: [[`  if (u.is_account_banned === true) return`, `  if (u.is_account_banned === true || u.account_status) return`]],
+  // (17 oct.) un profil sans le champ `business` serait lu « particulier »
+  propasu: [[`  if (u.business === false && (ba == null) && (baid == null || baid === 0 || baid === '')) return false;`, `  if (!u.business) return false;`]],
+  // un profil illisible effacerait le type déjà connu
+  proefface: [[`      const proNeuf = typeof pro === 'boolean' ? pro : proConnu;`, `      const proNeuf = pro;`]],
 };
 function sourceAJuger() {
   const src = cheminSource();
@@ -154,6 +158,40 @@ const profil = (banni) => ({ status: 200, body: { user: { id: 9001, login: 'comp
     dit(n === 1, '/users/current lu UNE fois (celle de la moisson)', `n=${n}`);
     const autres = f.j.vinted.filter((r) => /ban|status|account/i.test(r.chemin) && !/\/users\/current/.test(r.chemin));
     dit(!autres.length, 'aucun chemin « état du compte » inventé', autres.map((r) => r.chemin).join(', '));
+  });
+
+  console.log('\n── 10. Compte PRO ou particulier (17 oct.) — lu dans le MÊME profil');
+  const proDe = (f, uid = UID) => { const d = f.lignes[ROW]; return d && d.comptes && d.comptes[uid] ? d.comptes[uid].pro : undefined; };
+  const prof = (u) => ({ status: 200, body: { user: Object.assign({ id: 9001, login: 'compte_banc', is_account_banned: false }, u) } });
+  await essaie('pro', async () => {
+    const f = monter({ profil: prof({ business: true, business_account: { id: 77, name: 'Boutique banc' }, business_account_id: 77 }) });
+    await f.ctx.runActive(); await attendre();
+    dit(proDe(f) === true, '`business: true` + compte pro rattaché ⇒ pro: true', `pro=${proDe(f)}`);
+    const g = monter({ profil: prof({ business: false, business_account: null, business_account_id: null }) });
+    await g.ctx.runActive(); await attendre();
+    dit(proDe(g) === false, '`business: false`, aucun compte pro ⇒ pro: false (particulier)', `pro=${proDe(g)}`);
+    const h = monter({ profil: prof({ business_account_id: 55 }) });
+    await h.ctx.runActive(); await attendre();
+    dit(proDe(h) === true, 'un compte pro rattaché suffit (business absent) ⇒ pro: true', `pro=${proDe(h)}`);
+    const i = monter({ profil: prof({}) });
+    await i.ctx.runActive(); await attendre();
+    dit(proDe(i) === undefined, 'aucun des trois champs ⇒ pas su : RIEN n\'est écrit pour le type (jamais « particulier » par défaut)', `pro=${proDe(i)}`);
+    const avant = { comptes: { [UID]: { etat: 'actif', at: new Date().toISOString(), preuve: 'champ profil is_account_banned', pro: true, proAt: new Date().toISOString() } } };
+    const j = monter({ profil: prof({}), lignes: { [ROW]: avant } });
+    await j.ctx.runActive(); await attendre();
+    dit(proDe(j) === true, 'un profil sans les champs n\'efface pas un « pro » déjà lu', `pro=${proDe(j)}`);
+    const avant2 = { comptes: { [UID]: { etat: 'actif', at: new Date().toISOString(), preuve: 'champ profil is_account_banned', pro: false } } };
+    const k = monter({ profil: prof({ business: true }), lignes: { [ROW]: avant2 } });
+    await k.ctx.runActive(); await attendre();
+    dit(proDe(k) === true && etatDe(k) === 'actif', 'passer pro dans l\'heure est écrit tout de suite (le type a changé)', `pro=${proDe(k)} état=${etatDe(k)}`);
+  });
+
+  console.log('\n── 11. L\'app et l\'extension lisent le type avec la MÊME règle (§11)');
+  await essaie('meme regle', async () => {
+    const corps = (src) => { const i = src.indexOf('function typeCompteVinted('); if (i < 0) return null; const j = src.indexOf('\n}\n', i); return src.slice(i, j + 2); };
+    const ext = corps(fs.readFileSync(SRC, 'utf8'));
+    const app = corps(fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8'));
+    dit(!!ext && !!app && ext === app, '`typeCompteVinted` est le même texte dans l\'app et l\'extension', !ext ? 'absente de l\'extension' : !app ? 'absente de l\'app' : 'les deux textes diffèrent');
   });
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);

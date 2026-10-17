@@ -1,4 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -56,7 +57,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.184.0';
+const EXT_ATTENDUE = '5.185.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -316,7 +317,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -328,6 +329,19 @@ const extSait = (quoi) => {
   return cmpVersion(v, EXT_CAPACITES[quoi] || EXT_ATTENDUE) < 0 ? 'retard' : 'ok';
 };
 const extSaitLireCodes = () => extSait('codes');
+// ── COMPTE PRO OU PARTICULIER (17 octobre). La MÊME règle, texte pour texte,
+//    que l'extension (`typeCompteVinted`, background.js — §11 ; audit-etat-compte
+//    compare les deux). Lue dans le profil `users/current` que l'extension range
+//    déjà (`harvest_{uid}_profile`) : true · false · null (pas su).
+function typeCompteVinted(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return null;
+  const ba = u.business_account;
+  const baid = u.business_account_id;
+  if (u.business === true || (ba && typeof ba === 'object') || (baid != null && baid !== 0 && baid !== '')) return true;
+  if (u.business === false && (ba == null) && (baid == null || baid === 0 || baid === '')) return false;
+  return null;
+}
 // Ce qu'une version VUE (la dernière capture, d'un autre appareil) ne sait pas
 // encore faire, en mots — tiré de la MÊME table (§11), jamais une liste écrite à
 // la main qui dérive dès qu'EXT_ATTENDUE avance (revue du 9 octobre : « c'est
@@ -340,7 +354,8 @@ const CAPACITES_DITES = [
   ['lbcfiche', 'publier sur Leboncoin l\'annonce corrigée dans la fiche de VRM'],
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
-  ['detourage', 'détourer tes photos'],
+  ['lbcpack', 'voir si tu as un pack photo Leboncoin'],
+  ['annulee', 'retirer tout seul le bordereau d\'une vente annulée'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -1258,7 +1273,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -1390,14 +1405,54 @@ function SheetShell({ onClose, children, maxWidth = 460 }) {
 // paires réellement présentes — photo, N°, titre, pointure.
 // ⚠️ La saisie libre reste possible (une paire hors app, un carton de matériel),
 // mais elle n'est plus le chemin par défaut.
-function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
+// ── L'APERÇU DU MEUBLE OÙ L'ON RANGE (17 oct.) ─────────────────────────────
+// Julien : « quand il met par exemple table et l'endroit où l'on peut mettre une
+// paire à ranger, que ça fasse un petit carré sur le côté avec une vue du meuble
+// ou de l'endroit où on range ». Un dessin vu de FACE, tiré des données du
+// meuble (ses cases, ce qu'elles portent) — la case visée en couleur d'accent.
+function ApercuMeuble({ it, cellKey, mode, cap, size = 132 }) {
+  const nr = Math.max(1, it.rows || 1), nc = Math.max(1, it.cols || 1);
+  const ft = FURN_TYPES[it.type] || {};
+  const table = ft.build === 'table', portant = mode === 'cintre';
+  const W = 120, H = table ? 80 : 120, pad = 8;
+  const iw = W - pad * 2, ih = (table ? 30 : H - pad * 2);
+  const cw = iw / nc, ch = table ? ih : ih / nr;
+  const [rk, ck] = String(cellKey).split('_').map(Number);
+  const cases = [];
+  for (let r = 0; r < (table ? 1 : nr); r++) for (let c = 0; c < nc; c++) {
+    const key = r + '_' + c; const a = numsCase((it.slots || {})[key]); const vise = r === rk && c === ck;
+    const x = pad + c * cw, y = table ? pad + 6 : pad + r * ch;
+    const n = Math.min(a.length, Math.max(1, cap || 1));
+    cases.push(
+      <g key={key}>
+        <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="2.5" fill={vise ? C.accent : 'transparent'} fillOpacity={vise ? 0.18 : 0} stroke={vise ? C.accent : C.border} strokeWidth={vise ? 2 : 1} strokeDasharray={a.length || vise ? '' : '3 2'} />
+        {portant
+          ? (a.length ? <text x={x + cw / 2} y={y + ch / 2 + 3} textAnchor="middle" fontSize="8.5" fontWeight="700" fill={C.text}>{a[0]}</text> : null)
+          : Array.from({ length: n }, (_, i) => { const bh = Math.min(10, (ch - 6) / Math.max(1, cap || 1)); return <rect key={i} x={x + cw * 0.2} y={y + ch - 3 - (i + 1) * (bh + 1)} width={cw * 0.6} height={bh} rx="1.5" fill={C.muted} fillOpacity="0.45" />; })}
+      </g>
+    );
+  }
+  return (
+    <svg data-apercu-meuble={it.id} data-apercu-case={cellKey} role="img" aria-label={`${it.name || ft.label || 'Meuble'} vu de face, la case où ranger en couleur`} viewBox={`0 0 ${W} ${H}`} width={size} height={size * H / W} style={{ flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+      {portant && <line x1={pad} x2={W - pad} y1={pad + 4} y2={pad + 4} stroke={C.muted} strokeWidth="2" />}
+      {table && <><rect x={pad} y={pad + 6 + ch} width={iw} height="5" rx="1.5" fill={C.muted} fillOpacity="0.7" /><rect x={pad + 4} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /><rect x={W - pad - 8} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /></>}
+      {!table && !portant && <rect x={pad} y={pad} width={iw} height={ih} fill="none" stroke={C.muted} strokeOpacity="0.6" strokeWidth="1.5" rx="2" />}
+      {cases}
+    </svg>
+  );
+}
+
+function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
   const [q, setQ] = React.useState('');
   const f = q.trim().toLowerCase();
   const liste = !f ? paires : paires.filter(p =>
     String(p.numero).includes(f) || (p.title || '').toLowerCase().includes(f) || String(p.taille || '').toLowerCase().includes(f));
   return (
     <SheetShell onClose={onClose}>
-      <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger une paire</div>
+      <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:apercu?6:0}}>
+        {apercu && <ApercuMeuble {...apercu} />}
+        <div style={{flex:1,minWidth:0}}>
+      <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger un article</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
         {paires.length} paire{paires.length>1?'s':''} pas encore rangée{paires.length>1?'s':''}
@@ -1408,6 +1463,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
         {paires.length > 0 && !paires[0].sur && (
           <><br/><span style={{color:C.warn}}>Les plus récentes en tête — ouvre une fois l'écran Annonces pour n'avoir que tes paires en stock.</span></>
         )}
+      </div>
+        </div>
       </div>
       {paires.length > 6 && (
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="N°, marque, pointure…" inputMode="search"
@@ -7103,7 +7160,11 @@ const relevePage = (PL, ctx, flux, ressources, ctm, out, prof) => {
         const g = _mulM(tm, cur), larg = 0.5 * taille * txt.length;
         const p = [_apM(g, 0, -taille * 0.25), _apM(g, larg, -taille * 0.25), _apM(g, 0, taille * 0.85), _apM(g, larg, taille * 0.85)];
         const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
-        out.push({ x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys),
+        // `d` = le SENS de lecture sur la page (vecteur de la ligne de base) :
+        // c'est lui qui dit dans quel sens tourner une étiquette couchée pour
+        // qu'elle se lise droite sur le rouleau 10×15 — même quand la police n'a
+        // pas de table ToUnicode (les octets sont illisibles, la matrice non).
+        out.push({ x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys), d: [g[0], g[1]],
                    s: txt.replace(/\\(\d{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8))).replace(/\\(.)/g, '$1') });
       }
     }
@@ -7126,10 +7187,17 @@ const relevePage = (PL, ctx, flux, ressources, ctm, out, prof) => {
       let sub = null; try { sub = o.dict && o.dict.get(PL.PDFName.of('Subtype')); } catch (_) {}
       if (sub && sub.asString && sub.asString() === '/Image') {
         const p = [_apM(cur, 0, 0), _apM(cur, 1, 0), _apM(cur, 0, 1), _apM(cur, 1, 1)];
-        out.push({ x: Math.min(...p.map((q) => q[0])), y: Math.min(...p.map((q) => q[1])), X: Math.max(...p.map((q) => q[0])), Y: Math.max(...p.map((q) => q[1])), s: '' });
+        out.push({ x: Math.min(...p.map((q) => q[0])), y: Math.min(...p.map((q) => q[1])), X: Math.max(...p.map((q) => q[0])), Y: Math.max(...p.map((q) => q[1])), s: '', img: true });
       } else {
         let mm = [1, 0, 0, 1, 0, 0];
         try { const ma = o.dict.get(PL.PDFName.of('Matrix')); if (ma && ma.asArray) mm = ma.asArray().map((n) => n.asNumber()); } catch (_) {}
+        // Le cadre d'un Form XObject (`BBox`), en coordonnées de PAGE, rangé À
+        // PART (`out.formes`) : mis dans `out`, ce pavé compterait comme un aplat
+        // et fausserait la carte d'occupation. Il ne sert qu'à reconnaître une
+        // étiquette posée telle quelle par le transporteur (10×15 cm).
+        try { const bb = o.dict.get(PL.PDFName.of('BBox')); if (bb && bb.asArray) { const v = bb.asArray().map((n) => n.asNumber()); const g2 = _mulM(mm, cur);
+          const q = [_apM(g2, v[0], v[1]), _apM(g2, v[2], v[1]), _apM(g2, v[0], v[3]), _apM(g2, v[2], v[3])];
+          (out.formes || (out.formes = [])).push({ x: Math.min(...q.map((z) => z[0])), y: Math.min(...q.map((z) => z[1])), X: Math.max(...q.map((z) => z[0])), Y: Math.max(...q.map((z) => z[1])) }); } } catch (_) {}
         let res2 = null; try { res2 = ctx.lookup(o.dict.get(PL.PDFName.of('Resources'))); } catch (_) {}
         relevePage(PL, ctx, fluxDe(ref), res2 || ressources, _mulM(mm, cur), out, prof + 1);
       }
@@ -7194,6 +7262,35 @@ const _couperSelon = (dans, W, H, axe) => {
   return { ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) };
 };
 
+// ── LE ROULEAU THERMIQUE : 100 × 150 mm, rien d'autre ──────────────────────
+// Une étiquette thermique fait 10×15 cm (en Europe ; 4×6 pouces = 101,6×152,4
+// mm ailleurs). La page produite pour une imprimante thermique a EXACTEMENT ce
+// format, en portrait, et l'étiquette y est posée entière, mise à l'échelle
+// sans jamais être rognée.
+const MM_PT = 72 / 25.4;
+const ETIQ_TH = { w: 100 * MM_PT, h: 150 * MM_PT };      // 283,46 × 425,20 pt
+const TAILLES_ETIQUETTE = [[100, 150], [101.6, 152.4]];   // mm : 10×15 cm · 4×6 pouces
+const estTailleEtiquette = (w, h) => {
+  const a = Math.min(w, h) / MM_PT, b = Math.max(w, h) / MM_PT;
+  return TAILLES_ETIQUETTE.some(([x, y]) => Math.abs(a - x) <= x * 0.04 && Math.abs(b - y) <= y * 0.04);
+};
+// Le sens de lecture DANS la zone : une étiquette couchée (plus large que
+// haute) doit être tournée pour tenir sur le rouleau ; on la tourne du côté
+// qui remet son texte à l'endroit. `sens` = 90 (sens inverse des aiguilles) ou
+// -90 (sens des aiguilles) ; sans texte pour le dire, -90.
+const avecSens = (z, dans) => {
+  if (!z || !z.ok || z.w <= z.h) return z ? { ...z, sens: null } : z;
+  let monte = 0, descend = 0;
+  for (const o of dans || []) {
+    if (!o.d || o.X < z.x || o.x > z.x + z.w || o.Y < z.y || o.y > z.y + z.h) continue;
+    const [dx, dy] = o.d, n = Math.hypot(dx, dy) || 1;
+    if (dy / n > 0.7) monte++; else if (dy / n < -0.7) descend++;
+  }
+  // Un texte qui MONTE (lu de bas en haut) se remet droit en tournant la page
+  // dans le sens des aiguilles d'une montre ; un texte qui DESCEND, dans l'autre.
+  return { ...z, sens: descend > monte ? 90 : -90 };
+};
+
 // OÙ EST L'ÉTIQUETTE SUR CETTE PAGE ? `{ok:true, x,y,w,h}` ou `{ok:false, raison}`.
 // Mesuré sur ses 148 bordereaux : **144 isolés (97 %)**, 4 mises en page distinctes,
 // et la zone est IDENTIQUE d'un bordereau à l'autre pour une mise en page donnée.
@@ -7205,19 +7302,49 @@ const zoneEtiquette = (PL, page) => {
     const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
       if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
       if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
-    relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);
     const { width: W, height: H } = page.getSize();
+    // ① LA PAGE EST DÉJÀ UNE ÉTIQUETTE (10×15 cm ou 4×6 pouces) : rien à
+    // découper, elle part entière sur le rouleau — c'est la mise en page même
+    // du transporteur, aucun code-barres ne peut y être coupé.
+    if (estTailleEtiquette(W, H)) return { ok: true, x: 0, y: 0, w: W, h: H, part: 1, via: 'page', sens: null };
+    relevePage(PL, ctx, fluxDe(c), res, [1, 0, 0, 1, 0, 0], out, 0);
     // ⚠️ Un FOND pleine page remplit toute la carte d'occupation et efface la
     // séparation : une marque qui couvre plus de la moitié de la feuille n'est
     // pas du contenu.
     const dans = out.filter((o) => o.X >= -2 && o.x <= W + 2 && o.Y >= -2 && o.y <= H + 2)
                     .filter((o) => (o.X - o.x) * (o.Y - o.y) <= W * H * 0.5);
-    if (dans.length < 10) return { ok: false, raison: 'ce PDF ne contient aucun texte lisible' };
+    const parObjets = () => {
+      // ② DERNIER REPÈRE : L'ÉTIQUETTE POSÉE TELLE QUELLE PAR LE TRANSPORTEUR.
+      // Mesuré le 17 octobre sur ses 93 bordereaux : le seul qui partait encore
+      // entier (envoi international Mondial Relay → An Post, PDF « FPDF ») ne
+      // porte AUCUN mot lisible, mais pose ses DEUX étiquettes en images de
+      // 100×150 mm exactement, côte à côte — et les deux doivent aller sur le
+      // colis (« ne recouvrez pas les codes-barres des transporteurs partenaires »).
+      // Une image (ou un Form XObject) au format exact d'une étiquette EST une
+      // étiquette : on la prend entière, à ses bords, donc rien n'y est coupé.
+      // On ne devine rien d'autre : deux objets qui se chevauchent, ou un objet
+      // hors de la page, et on retombe sur « la page part entière ».
+      const objets = [...dans.filter((o) => o.img), ...((out.formes || []).filter((o) => o.X >= -2 && o.x <= W + 2 && o.Y >= -2 && o.y <= H + 2))]
+        .filter((o) => estTailleEtiquette(o.X - o.x, o.Y - o.y) && o.x >= -2 && o.y >= -2 && o.X <= W + 2 && o.Y <= H + 2);
+      const etiquettes = [];
+      for (const o of objets) {
+        const r = { x: Math.max(0, o.x), y: Math.max(0, o.y), w: Math.min(W, o.X) - Math.max(0, o.x), h: Math.min(H, o.Y) - Math.max(0, o.y) };
+        const doublon = etiquettes.find((e) => Math.abs(e.x - r.x) < 3 && Math.abs(e.y - r.y) < 3 && Math.abs(e.w - r.w) < 3 && Math.abs(e.h - r.h) < 3);
+        if (doublon) continue;
+        if (etiquettes.some((e) => r.x < e.x + e.w - 2 && e.x < r.x + r.w - 2 && r.y < e.y + e.h - 2 && e.y < r.y + r.h - 2)) { etiquettes.length = 0; break; }
+        etiquettes.push(r);
+      }
+      if (!etiquettes.length) return null;
+      etiquettes.sort((a, b) => (b.y - a.y) || (a.x - b.x));    // de haut en bas, puis de gauche à droite
+      const liste = etiquettes.map((e) => avecSens({ ok: true, ...e, part: (e.w * e.h) / (W * H) }, dans));
+      return { ...liste[0], via: 'objet', etiquettes: liste };
+    };
+    if (dans.length < 10) return parObjets() || { ok: false, raison: 'ce PDF ne contient aucun texte lisible' };
     // ⚠️ LA COUPURE N'EST PAS TOUJOURS VERTICALE : Chronopost coupe en colonnes,
     // Mondial Relay tantôt en colonnes, tantôt en bandes (notice en haut).
     const cand = [_couperSelon(dans, W, H, 'x'), _couperSelon(dans, W, H, 'y')].filter(Boolean);
     const bons = cand.filter((z) => z.ok);
-    if (bons.length) { bons.sort((a, b) => a.part - b.part); return bons[0]; }
+    if (bons.length) { bons.sort((a, b) => a.part - b.part); return avecSens(bons[0], dans); }
     // ⚠️ REPLI : LE CADRE. Ces bordereaux-là encadrent leur étiquette d'un
     // rectangle tracé — un repère qui ne dépend d'aucune police.
     const dedans = (r, o) => o.x >= r.x - 2 && o.X <= r.x + r.w + 2 && o.y >= r.y - 2 && o.Y <= r.y + r.h + 2;
@@ -7245,8 +7372,9 @@ const zoneEtiquette = (PL, page) => {
         x = Math.min(x, o.x); y = Math.min(y, o.y); X = Math.max(X, o.X); Y = Math.max(Y, o.Y);
       }
       x = Math.max(0, x - M); y = Math.max(0, y - M); X = Math.min(W, X + M); Y = Math.min(H, Y + M);
-      if ((X - x) * (Y - y) <= W * H * 0.92) return { ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) };
+      if ((X - x) * (Y - y) <= W * H * 0.92) return avecSens({ ok: true, x, y, w: X - x, h: Y - y, part: (X - x) * (Y - y) / (W * H) }, dans);
     }
+    const o2 = parObjets(); if (o2) return o2;
     return { ok: false, raison: (cand[0] && cand[0].echec) || 'aucune séparation nette entre l’étiquette et la fiche' };
   } catch (_) { return { ok: false, raison: 'ce bordereau n’a pas pu être analysé' }; }
 };
@@ -7264,17 +7392,293 @@ const posePrefsImpression = (PL, doc) => {
   } catch (_) { /* vieux lecteur : rien de perdu, la page part quand même */ }
 };
 
-// Le « tout petit SKU en bas » de l'impression thermique : sur une étiquette de
-// 10×15 cm il n'y a pas la place d'un cartouche — juste le numéro du carton, en
-// bas à gauche, sur un fond blanc pour rester lisible sur un aplat.
-const drawSkuThermique = (page, rgb, bold, numero, zone) => {
+// ── L'IMPRESSION THERMIQUE AU POINT (17 octobre) ───────────────────────────
+// Avant, la page « thermique » gardait les dimensions de la ZONE découpée
+// (152×103 mm couchée, 103×153 mm debout…) : c'est le pilote de l'imprimante
+// qui décidait de la tourner, de la réduire ou d'en rogner un bord — et le
+// « tout petit SKU » était posé PAR-DESSUS l'étiquette, à 4 pt du bord, là où
+// un code-barres pouvait se trouver.
+// Maintenant chaque étiquette devient UNE page de 100 × 150 mm exactement,
+// en portrait :
+//   • tournée si elle est couchée, du côté qui remet son texte à l'endroit ;
+//   • mise à l'échelle pour tenir ENTIÈRE dans une marge de 2,5 mm (la tête
+//     d'une imprimante thermique n'imprime pas jusqu'au bord), jamais rognée,
+//     jamais agrandie de plus de 25 % ;
+//   • le N° dans une bande réservée SOUS l'étiquette — il ne recouvre plus rien.
+// Une page qui porte deux étiquettes (envoi international : celle de Mondial
+// Relay ET celle du transporteur partenaire) en donne deux.
+const TH_MARGE = 2.5 * MM_PT, TH_BANDE = 5 * MM_PT;
+// La géométrie, à part (et pure) : `audit-impression.cjs` la vérifie seule.
+const placementThermique = (r, sens, avecNum) => {
+  const bande = avecNum ? TH_BANDE : 0;
+  const tourne = r.w > r.h;
+  const lw = tourne ? r.h : r.w, lh = tourne ? r.w : r.h;          // une fois tournée
+  const dispoW = ETIQ_TH.w - 2 * TH_MARGE, dispoH = ETIQ_TH.h - 2 * TH_MARGE - bande;
+  const s = Math.min(dispoW / lw, dispoH / lh, 1.25);
+  const dw = lw * s, dh = lh * s;
+  const x0 = (ETIQ_TH.w - dw) / 2, y0 = TH_MARGE + bande + (dispoH - dh) / 2;
+  const angle = !tourne ? 0 : (sens === 90 ? 90 : -90);
+  // Le point d'ancrage de `drawPage` selon la rotation (pdf-lib tourne autour
+  // du coin bas-gauche de l'objet posé).
+  const x = angle === 90 ? x0 + dw : x0, y = angle === -90 ? y0 + dh : y0;
+  return { x, y, s, angle, boite: { x: x0, y: y0, w: dw, h: dh }, bande };
+};
+// Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
+// 100×150 chacune. Rend le nombre de pages ajoutées.
+const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
   const n = numero == null ? '' : String(numero).trim();
-  if (!n) return false;
-  const t = `N° ${n}`, taille = 11, larg = t.length * taille * 0.62 + 10;
-  const x = zone.x + 4, y = zone.y + 4;
-  page.drawRectangle({ x, y, width: larg, height: taille + 7, color: rgb(1, 1, 1), borderColor: rgb(0, 0, 0), borderWidth: 0.8 });
-  page.drawText(t, { x: x + 5, y: y + 5, size: taille, font: bold, color: rgb(0, 0, 0) });
-  return true;
+  const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
+  let k = 0;
+  for (const r of rects) {
+    const emb = await out.embedPage(page, { left: r.x, bottom: r.y, right: r.x + r.w, top: r.y + r.h });
+    const pl = placementThermique(r, r.sens != null ? r.sens : z.sens, !!n);
+    const p = out.addPage([ETIQ_TH.w, ETIQ_TH.h]);
+    p.drawPage(emb, { x: pl.x, y: pl.y, xScale: pl.s, yScale: pl.s, rotate: PL.degrees(pl.angle) });
+    if (n) {
+      const t = `N° ${n}`, taille = 9.5, larg = bold.widthOfTextAtSize(t, taille);
+      p.drawText(t, { x: (ETIQ_TH.w - larg) / 2, y: TH_MARGE + (TH_BANDE - taille) / 2 + 1, size: taille, font: bold, color: PL.rgb(0, 0, 0) });
+    }
+    k++;
+  }
+  return k;
+};
+// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
+// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
+const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
+// UN bordereau posé dans `out`, la même règle pour les trois chemins
+// d'impression (une vente, un lot, Leboncoin) :
+//   thermique + étiquette reconnue ⇒ pages 100×150 (et les pages suivantes du
+//   PDF, une déclaration en douane par exemple, telles quelles) ;
+//   sinon ⇒ la page entière, tamponnée du N° à son emplacement appris.
+// Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
+  const { rgb, StandardFonts } = PL;
+  const first = src.getPages()[0];
+  const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  if (thermique && z.ok) {
+    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
+    const n = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras);
+    const reste = src.getPageIndices().slice(1);
+    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
+    return { isole: true, etiquettes: n, raison: '' };
+  }
+  const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+  const sReg = await src.embedFont(StandardFonts.Helvetica);
+  drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
+  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '' };
+};
+
+// ── QUEL TYPE DE BORDEREAU EST-CE ? ──────────────────────────────────────────
+// Pour les aperçus de Réglages seulement — l'impression, elle, ne dépend
+// JAMAIS du type (elle repère l'étiquette sur la page, `zoneEtiquette`). Mesuré
+// le 17 octobre sur ses 93 bordereaux : les mots du transporteur sont lisibles
+// sur Chronopost (43+4), Colissimo (3) et la plupart des Mondial Relay ; les
+// autres se reconnaissent à leur créateur (« MondialRelay … ») ou à l'étiquette
+// partenaire posée au format exact (envoi international). Rien d'autre n'est
+// deviné : sans repère, c'est « autre mise en page », avec ses dimensions.
+const TYPES_BORDEREAU = [
+  ['mondialrelay', 'Mondial Relay · InPost'],
+  ['international', 'Mondial Relay · envoi international'],
+  ['chronopost', 'Chronopost · Shop2Shop'],
+  ['colissimo', 'Colissimo'],
+  ['vintedgo', 'Vinted Go'],
+  ['relaiscolis', 'Relais Colis'],
+  ['ups', 'UPS'],
+  ['dpd', 'DPD'],
+];
+const typeBordereau = (PL, doc) => {
+  try {
+    const page = doc.getPages()[0], ctx = doc.context, out = [];
+    let res = null; try { res = ctx.lookup(page.node.get(PL.PDFName.of('Resources'))); } catch (_) {}
+    const fluxDe = (ref) => { try { const o = ctx.lookup(ref); if (!o) return '';
+      if (o instanceof PL.PDFRawStream) return new TextDecoder('latin1').decode(PL.decodePDFRawStream(o).decode());
+      if (o.asArray) return o.asArray().map((r) => fluxDe(r)).join('\n'); return ''; } catch (_) { return ''; } };
+    relevePage(PL, ctx, fluxDe(page.node.get(PL.PDFName.of('Contents'))), res, [1, 0, 0, 1, 0, 0], out, 0);
+    const mots = out.filter((o) => o.s).map((o) => o.s).join(' ').toLowerCase();
+    let createur = ''; try { createur = String(doc.getCreator() || '') + ' ' + String(doc.getProducer() || ''); } catch (_) {}
+    const { width: W, height: H } = page.getSize();
+    const sens = W > H ? 'paysage' : 'portrait';
+    const objetEtiquette = [...out.filter((o) => o.img), ...(out.formes || [])].some((o) => estTailleEtiquette(o.X - o.x, o.Y - o.y));
+    let t = '';
+    // Chronopost AVANT Colissimo : ses étiquettes citent La Poste (sa maison
+    // mère) — mesuré, 4 Shop2Shop étaient rangés en « Colissimo » sinon.
+    if (/chronopost|shop2shop/.test(mots)) t = 'chronopost';
+    else if (/colissimo/.test(mots)) t = 'colissimo';
+    else if (/vinted\s*go/.test(mots)) t = 'vintedgo';
+    else if (/relais\s*colis/.test(mots)) t = 'relaiscolis';
+    else if (/\bups\b/.test(mots)) t = 'ups';
+    else if (/\bdpd\b/.test(mots)) t = 'dpd';
+    else if (/hermes|an\s*post|\bgls\b/.test(mots)) t = 'international';
+    else if (/mondial\s*relay|inpost/.test(mots) || /mondialrelay/i.test(createur)) t = 'mondialrelay';
+    else if (objetEtiquette) t = 'international';
+    return { type: t || 'autre', cle: `${t || 'autre'}·${sens}`, sens, W, H };
+  } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
+};
+const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
+
+// Le lecteur de PDF des APERÇUS (pdf.js), chargé au premier aperçu demandé —
+// jamais avant, et seulement pour dessiner : l'impression n'en a pas besoin.
+// Version figée (pdfjs-dist 3.11.174, Mozilla, licence Apache 2.0).
+const PDFJS_V = '3.11.174';
+const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/`;
+let _pdfjs = null;
+const chargerPdfjs = () => _pdfjs || (_pdfjs = new Promise((ok, ko) => {
+  try {
+    if (window.pdfjsLib) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js'; return ok(window.pdfjsLib); }
+    const sc = document.createElement('script'); sc.src = PDFJS_BASE + 'pdf.min.js'; sc.async = true;
+    sc.onload = () => { const L = window.pdfjsLib; if (!L) { _pdfjs = null; return ko(new Error('pdf.js')); } L.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js'; ok(L); };
+    sc.onerror = () => { _pdfjs = null; ko(new Error('pdf.js')); };
+    document.head.appendChild(sc);
+  } catch (e) { _pdfjs = null; ko(e); }
+}));
+// Dessine la page 1..n d'un PDF (octets) dans un canvas, avec un cadre en
+// pointillés autour de `zone` (coordonnées PDF) — « ce qui part en thermique ».
+const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = null } = {}) => {
+  const L = await chargerPdfjs();
+  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets }).promise;
+  const pg = await d.getPage(page);
+  const v0 = pg.getViewport({ scale: 1 });
+  const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
+  const v = pg.getViewport({ scale: sc });
+  canvas.width = Math.round(v.width); canvas.height = Math.round(v.height);
+  canvas.style.width = `${Math.round(v.width / dpr)}px`; canvas.style.height = `${Math.round(v.height / dpr)}px`;
+  const c2 = canvas.getContext('2d'); c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
+  await pg.render({ canvasContext: c2, viewport: v }).promise;
+  if (zone) {
+    const H = v0.height;
+    c2.save(); c2.strokeStyle = '#2458E6'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
+  }
+  return d.numPages;
+};
+
+function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
+  const ref = React.useRef(null);
+  const [etat, setEtat] = React.useState('charge');   // charge · ok · ko
+  React.useEffect(() => {
+    let vivant = true;
+    setEtat('charge');
+    dessinerPdf(ref.current, octets, { page, largeur, zone }).then(() => { if (vivant) setEtat('ok'); }).catch(() => { if (vivant) setEtat('ko'); });
+    return () => { vivant = false; };
+  }, [octets, page, largeur, zone]);
+  const ouvrir = () => { try { const u = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' })); window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000); } catch (_) {} };
+  return (
+    <figure data-apercu={etat} style={{margin:0,display:'flex',flexDirection:'column',gap:6,alignItems:'flex-start'}}>
+      <figcaption style={{fontSize:11.5,fontWeight:600,color:C.muted}}>{label}</figcaption>
+      <canvas ref={ref} aria-label={label} style={{display: etat === 'ko' ? 'none' : 'block', borderRadius:8, border:`1px solid ${C.border}`, background:'#fff', maxWidth:'100%'}}/>
+      {etat === 'charge' && <span style={{fontSize:11.5,color:C.muted}}>Je dessine l’aperçu…</span>}
+      {etat === 'ko' && <span style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>Je n’ai pas pu dessiner l’aperçu ici. <button type="button" onClick={ouvrir} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Ouvrir le PDF</button></span>}
+    </figure>
+  );
+}
+
+// ── RÉGLAGES → IMPRIMANTE ET BORDEREAUX (17 octobre) ────────────────────────
+// Julien : « dans les paramètres, imprimante thermique et normale ; tous les
+// types de bordereau avec une visualisation pour chaque type collecté par
+// l'app ». Le choix est LE réglage `vrm_imprimante` — le même que les deux
+// pastilles de l'écran Colis (§11 : un réglage, deux portes).
+// Les aperçus se calculent sur SES bordereaux, dans son navigateur, au clic :
+// ils lisent des PDF (≈ 70 Ko chacun), donc rien ne part tant qu'il ne le
+// demande pas, et jamais plus de `APERCU_MAX` (§4.4).
+const APERCU_MAX = 24;
+const ImprimanteSetting = ({ nu = false }) => {
+  const [mode, setMode] = React.useState(imprimanteChoisie);
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setMode(imprimanteChoisie()); }), []);
+  const choisir = (v) => { touche.current = true; const m = imprMode(v); setMode(m); save('vrm_imprimante', m); };
+  const [ap, setAp] = React.useState(null);   // null = pas demandé · {etat:'charge'|'pasSu'|'vide'|'lu', ...}
+  const charger = async () => {
+    setAp({ etat: 'charge' });
+    const [emails, captes] = await Promise.all([
+      lireTout('id=like.email_bord_*&meta->>_pdf=eq.true&select=id,at:meta->>receivedAt'),
+      lireTout('id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,at:meta->>capturedAt'),
+    ]);
+    if (emails === null && captes === null) { setAp({ etat: 'pasSu' }); return; }
+    // Un bordereau peut être là deux fois (capté par l'extension ET reçu par
+    // email) : la transaction le dit, on n'en garde qu'un.
+    const vus = new Set(), lignes = [];
+    for (const r of [...(captes || []), ...(emails || [])].sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')))) {
+      if (/_label_latest$/.test(r.id)) continue;
+      const tx = (r.id.match(/(\d{6,})$/) || [])[1] || r.id;
+      if (vus.has(tx)) continue; vus.add(tx); lignes.push(r);
+    }
+    if (!lignes.length) { setAp({ etat: 'vide', partiel: emails === null || captes === null }); return; }
+    const PL = await import('pdf-lib');
+    const types = new Map(); let lus = 0, rates = 0;
+    for (const r of lignes.slice(0, APERCU_MAX)) {
+      const lu = await lirePdfLigne(r.id);
+      if (!lu || !lu.octets) { if (lu === null) rates++; continue; }
+      let doc; try { doc = await PL.PDFDocument.load(lu.octets); } catch (_) { continue; }
+      lus++;
+      const ty = typeBordereau(PL, doc);
+      const z = zoneEtiquette(PL, doc.getPages()[0]);
+      const e = types.get(ty.cle) || { ...ty, n: 0, isoles: 0, raisons: new Set(), exemple: null };
+      e.n++; if (z.ok) e.isoles++; else e.raisons.add(z.raison || 'mise en page inconnue');
+      if (!e.exemple) {
+        // Les deux impressions, faites par LE code d'impression (`poserBordereau`),
+        // avec un N° d'exemple — ce qu'on voit est ce qui sortira.
+        const fabrique = async (thermique) => { const src = await PL.PDFDocument.load(lu.octets); const out = await PL.PDFDocument.create();
+          // le N° tombe là où il tombera vraiment : l'emplacement appris pour ce format
+          const { width: fw, height: fh } = src.getPages()[0].getSize();
+          const pos = (load('vinted_bordereau_formats', {}) || {})[bordereauFormatKey(fw, fh)] || smartDefaultBordPos(fw, fh);
+          const r1 = await poserBordereau(PL, out, src, { numero: '123', title: '', pos, thermique }); return { octets: await out.save(), r1, pages: out.getPageCount() }; };
+        const normale = await fabrique(false), thermique = await fabrique(true);
+        e.exemple = { normale, thermique, zone: z.ok ? z : null };
+      }
+      types.set(ty.cle, e);
+    }
+    const sens = new Set([...types.values()].map((e) => e.type + '|' + e.sens));
+    const doubles = new Set([...types.values()].filter((e) => [...sens].filter((k) => k.startsWith(e.type + '|')).length > 1).map((e) => e.type));
+    setAp({ etat: 'lu', lus, rates, total: lignes.length, types: [...types.values()].sort((a, b) => b.n - a.n), doubles, partiel: emails === null || captes === null });
+  };
+  const vus = ap && ap.etat === 'lu' ? new Set(ap.types.map((e) => e.type)) : new Set();
+  return (
+    <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
+      <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
+        options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
+      <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+        {mode === 'thermique'
+          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° en petit sous l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
+          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° tamponné à l’emplacement appris. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
+      </div>
+      <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
+        {!ap && <>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>Pour chaque type que l’app a reçu, ce qui sortira sur une imprimante normale et sur une thermique. Calculé sur tes {APERCU_MAX} derniers bordereaux.</div>
+          <button type="button" data-apercus-voir onClick={charger} style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'0 16px',minHeight:44,fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir les aperçus</button>
+        </>}
+        {ap && ap.etat === 'charge' && <div data-apercus="charge" style={{fontSize:12.5,color:C.muted,marginTop:6}}>Je lis tes bordereaux…</div>}
+        {ap && ap.etat === 'pasSu' && <div data-apercus="passu" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>La base n’a pas répondu : je n’ai pas pu lire tes bordereaux. <button type="button" onClick={charger} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Réessayer</button></div>}
+        {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Aucun bordereau avec son PDF pour l’instant : les aperçus apparaîtront avec ta prochaine vente.'}</div>}
+        {ap && ap.etat === 'lu' && <div data-apercus="lu" style={{marginTop:6}}>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5}} data-apercus-compte={ap.lus}>
+            D’après tes {ap.lus} derniers bordereaux{ap.total > ap.lus + ap.rates ? ` (sur ${ap.total})` : ''}.{ap.rates > 0 ? ` ${ap.rates} n’ont pas pu être lus (la base n’a pas répondu).` : ''}{ap.partiel ? ' Une partie de la liste n’a pas pu être lue.' : ''} Le N° montré est un exemple.
+          </div>
+          {ap.types.map((e) => (
+            <div key={e.cle} data-apercu-type={e.type} data-apercu-isoles={e.isoles} data-apercu-n={e.n} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontSize:13.5,fontWeight:600,color:C.text}}>{e.type === 'autre' ? `Autre mise en page (${Math.round(e.W / MM_PT)} × ${Math.round(e.H / MM_PT)} mm)` : nomTypeBordereau(e.type)}{ap.doubles.has(e.type) ? (e.sens === 'paysage' ? ' · page couchée' : ' · page debout') : ''}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>
+                {e.n} bordereau{e.n > 1 ? 'x' : ''} · {e.isoles === e.n ? (e.n > 1 ? 'étiquette repérée sur tous' : 'étiquette repérée') : e.isoles === 0 ? <>étiquette <b style={{color:C.text}}>non repérée</b> : en thermique la page part entière ({[...e.raisons].join(' · ')})</> : <>étiquette repérée sur {e.isoles} — les autres partent entières en thermique ({[...e.raisons].join(' · ')})</>}
+              </div>
+              <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:10,alignItems:'flex-start'}}>
+                <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>
+                {Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
+                  <ApercuPdf key={i} octets={e.exemple.thermique.octets} page={i + 1} largeur={e.exemple.thermique.r1.isole ? 120 : 180}
+                    label={e.exemple.thermique.r1.isole ? `Thermique · 10×15${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
+                ))}
+              </div>
+            </div>
+          ))}
+          {(() => { const jamais = TYPES_BORDEREAU.filter(([k]) => !vus.has(k)); return jamais.length ? (
+            <div data-apercus-jamais={jamais.map(([k]) => k).join(',')} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:12,color:C.muted,lineHeight:1.5}}>
+              <b style={{color:C.text}}>Pas encore vus</b> dans tes derniers bordereaux : {jamais.map(([, l]) => l).join(' · ')}. Pas d’aperçu inventé : il apparaîtra avec le premier reçu. En thermique, l’app les découpera si elle repère l’étiquette, sinon la page partira entière.
+            </div>) : null; })()}
+        </div>}
+      </div>
+    </div>
+  );
 };
 
 // ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
@@ -7320,23 +7724,25 @@ const ouvrirPdfOnglet = (url) => {
     return !!w;
   } catch (_) { return false; }
 };
-const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
-  const { PDFDocument, rgb, StandardFonts } = PL;
-  const pdf = await PDFDocument.load(pdfArrayBuffer);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const hasNum = drawBordereauStamp(pdf, rgb, bold, reg, numero, title, pos);
+  const { PDFDocument } = PL;
+  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
+  const src = await PDFDocument.load(pdfArrayBuffer);
+  const pdf = await PDFDocument.create();
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique });
+  const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
-  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
+  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const ouvert = ouvrirPdfOnglet(url);
-  return { url, filename, printed: ouvert, ouvert };
+  return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
+           entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [] };
 };
 // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
@@ -7347,33 +7753,20 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
-  const thermique = imprMode(opts.imprimante) === 'thermique';
-  let count = 0, nInv = 0, isoles = 0;
+  const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
+  let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   for (const it of items) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
-      const first = src.getPages()[0];
-      const { width, height } = first.getSize();
+      const { width, height } = src.getPages()[0].getSize();
       const pos = resolvePos ? resolvePos(width, height) : null;
-      // On tamponne dans le PDF source (avec des polices embarquées dans out via
-      // copyPages : pdf-lib ré-embarque les ressources à la copie).
-      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
-      const sReg = await src.embedFont(StandardFonts.Helvetica);
-      // IMPRIMANTE THERMIQUE : on ne garde que l'étiquette. Si on ne SAIT pas où
-      // elle est, la page part ENTIÈRE — jamais un code-barres coupé au hasard.
-      const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
-      if (thermique && z.ok) {
-        drawSkuThermique(first, rgb, sBold, it.numero, z);
-        first.setMediaBox(z.x, z.y, z.w, z.h);
-        first.setCropBox(z.x, z.y, z.w, z.h);
-        isoles++;
-      } else {
-        if (thermique) entiers.push({ titre: it.title || '', raison: z.raison || '' });
-        drawBordereauStamp(src, rgb, sBold, sReg, it.numero, it.title, pos);
-      }
-      const pages = await out.copyPages(src, src.getPageIndices());
-      pages.forEach(p => out.addPage(p));
+      // IMPRIMANTE THERMIQUE : l'étiquette seule, sur des pages 100×150. Si on
+      // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
+      // coupé au hasard (`poserBordereau`, la même règle partout).
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique });
+      if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
+      else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
       count++;
       // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
       if (it.invBytes) {
@@ -7389,7 +7782,7 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url);
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, entiers };
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -12695,7 +13088,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
-            {bordResult.pdfBuf && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
+            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
@@ -20171,25 +20565,39 @@ const saveRoomPlan = async (data) => {
     if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
   } catch (_) {}
 };
-// Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
-// `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
+// Catalogue de rangements.
+// (17 oct.) Julien : « des étagères en métal avec des barres, en bois, des
+// portants pour les cintres, des tables… enlève aussi les autres types de
+// rangement ». La palette ne propose plus que des meubles qui servent à TOUTES
+// les niches Vinted (chaussures, vêtements, sacs, livres) ; les anciens types
+// restent ICI, cachés (`hidden`), parce qu'une pièce déjà construite les porte
+// — ses numéros rangés ne doivent pas disparaître (mesuré chez lui : grilles,
+// étagère, commode, tables, pile). Ils se dessinent et se lisent comme avant.
+// `cases` = la physique d'une case (src/stockRegles.js) : 'pile' (un plateau
+// tient ses boîtes, elles s'empilent DANS la case), 'cintre' (un numéro par
+// cintre), sinon 'colonne' (mur de boîtes : une case vidée fait tomber la
+// colonne). `build` = quel constructeur 3D utiliser.
 const FURN_TYPES = {
-  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode' },
-  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere' },
-  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere' },
-  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille' },
-  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
-  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
-  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
-  pile:    { label: 'Pile de boîtes', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#9aa3ad', h3d: 1.25, build: 'metal', cases: 'pile' },
+  bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
+  cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
+  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
+  pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true, structure: true },
+  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
+  // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
+  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode', hidden: true },
+  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere', hidden: true },
+  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere', hidden: true },
+  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },
+  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },
+  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie', hidden: true },
+  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie', hidden: true },
   carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },
-  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7, build: 'table' },
-  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
-  bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
-  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle' },
-  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
-  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
-  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
+  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites', hidden: true },
+  bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate', hidden: true },
+  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle', hidden: true },
+  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic', hidden: true },
   // ── DÉCOR ────────────────────────────────────────────────────────────────
   // Julien : « je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans ».
   // Ces objets ne rangent RIEN (`deco: true`) : ils ne portent pas de case, ne
@@ -20257,7 +20665,12 @@ const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
 function normalizePlan(p) {
-  const mk = (r) => ({ id: r.id || 'r' + Math.random().toString(36).slice(2, 8), name: r.name || 'Pièce', room: { ...ROOM_DEFAULT, ...(r.room || {}) }, items: Array.isArray(r.items) ? r.items : [] });
+  // (17 oct.) Une TABLE d'avant n'avait qu'une case invisible : on lui donne des
+  // places sur son plateau, d'après sa largeur — seulement si elle est VIDE
+  // (rien à déplacer, rien à perdre).
+  const migre = (it) => (it && it.type === 'table' && !Object.keys(it.slots || {}).length && !(it.cols > 1))
+    ? { ...it, rows: 1, cols: Math.max(1, Math.floor(((Number(it.w) || 2) * 0.92) / 0.56)) } : it;
+  const mk = (r) => ({ id: r.id || 'r' + Math.random().toString(36).slice(2, 8), name: r.name || 'Pièce', room: { ...ROOM_DEFAULT, ...(r.room || {}) }, items: Array.isArray(r.items) ? r.items.map(migre) : [] });
   if (p && Array.isArray(p.rooms) && p.rooms.length) {
     const rooms = p.rooms.map(mk);
     const active = p.active && rooms.some(r => r.id === p.active) ? p.active : rooms[0].id;
@@ -20281,11 +20694,17 @@ function normalizePlan(p) {
 const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
 const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
 const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+// La physique d'une case (src/stockRegles.js) : 'colonne' (mur de boîtes, la
+// colonne tombe), 'pile' (un plateau tient ses boîtes empilées), 'cintre'.
+const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4) }; };
 // GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
 // trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
 // (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
-const graviteCases = (slots, nr, nc) => {
+// ⚠️ Seulement pour un MUR de boîtes : sur un plateau (étagère, table) rien ne
+//    tombe d'un plateau à l'autre — chaque case garde sa pile.
+const graviteCases = (slots, nr, nc, mode) => {
   const out = {};
+  if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
   for (let c = 0; c < nc; c++) {
     const pleins = [];
     for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
@@ -20300,17 +20719,31 @@ const meublesDuPlan = (plan) => {
   const out = [];
   ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
     if (!meubleACases(it)) return;
-    const { nr, nc } = dimsMeuble(it);
-    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, vue: graviteCases(it.slots, nr, nc) });
+    const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode) });
   }));
   return out;
 };
 // La position d'une case dite en français (la 3D écrit la même chose).
-const nomCase = (nr, key) => { const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r; return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`; };
+const nomCase = (nr, key, mode, it) => {
+  const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
+  const ft = FURN_TYPES[it && it.type] || {};
+  if (mode === 'cintre') return `cintre ${c + 1}`;
+  if (mode === 'pile' && ft.build === 'table') return `plateau · place ${c + 1}`;
+  if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
+  return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
+};
 // La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
 // en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
+// Sur un plateau : la case la plus basse qui a encore de la place.
 const premiereCaseLibre = (plan) => {
   for (const m of meublesDuPlan(plan)) {
+    if (m.mode === 'pile' || m.mode === 'cintre') {
+      for (let r = m.nr - 1; r >= 0; r--) for (let c = 0; c < m.nc; c++) {
+        const key = r + '_' + c; if ((m.vue[key] || []).length < m.cap) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
+      }
+      continue;
+    }
     for (let c = 0; c < m.nc; c++) {
       let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
       if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
@@ -20323,10 +20756,10 @@ const ouEstNumero = (plan, num) => {
   const t = cleNum(num); if (!t) return null;
   for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
     if (meubleACases(it)) {
-      const { nr, nc } = dimsMeuble(it); const vue = graviteCases(it.slots, nr, nc);
-      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k) };
+      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode);
+      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k, mode, it) };
     }
-    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile' };
+    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile', pileIdx: it.nums.findIndex(v => cleNum(v) === t) };
     if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
   }
   return null;
@@ -20335,19 +20768,27 @@ const ouEstNumero = (plan, num) => {
 // case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
 // déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
 // ou une colonne pleine. Rend { plan, ou } ou { erreur }.
+// Sur un plateau, il s'empile DANS la case choisie (tant qu'elle a la place).
 const rangerNumeroDansPlan = (plan, itemId, key, num) => {
   const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
   const deja = ouEstNumero(plan, v);
   if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
-  let res = null;
+  let res = null, plein = false;
   const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
     if (it.id !== itemId || !meubleACases(it)) return it;
     const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
     if (!(c >= 0 && c < nc)) return it;
+    const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    if (mode === 'pile' || mode === 'cintre') {
+      const slots = empilerDansCase(graviteCases(it.slots, nr, nc, mode), key, v, cap);
+      if (!slots) { plein = true; return it; }
+      res = { itemName: it.name, roomName: rm.name, key, nom: nomCase(nr, key, mode, it) };
+      return { ...it, slots };
+    }
     const vue = graviteCases(it.slots, nr, nc);
-    let plein = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) plein++;
-    if (plein >= nr) return it;
-    const k = (nr - 1 - plein) + '_' + c;
+    let nPleins = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) nPleins++;
+    if (nPleins >= nr) return it;
+    const k = (nr - 1 - nPleins) + '_' + c;
     const slots = { ...vue, [k]: [v] };
     // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
     let grow = {};
@@ -20364,20 +20805,118 @@ const rangerNumeroDansPlan = (plan, itemId, key, num) => {
     res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
     return { ...it, slots };
   }) }));
-  if (!res) return { erreur: 'Cette colonne est pleine — choisis une autre case.' };
+  if (!res) return { erreur: plein ? 'Cette case est pleine — choisis une autre case.' : 'Cette colonne est pleine — choisis une autre case.' };
   return { plan: { ...plan, rooms }, ou: res };
 };
 // Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
+// Ceux du dessus descendent (la colonne d'un mur de boîtes, ou la pile d'un plateau).
 const libererNumeroDuPlan = (plan, itemId, num) => {
   const t = cleNum(num); let fait = false;
   const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
     if (it.id !== itemId || !meubleACases(it)) return it;
-    const { nr, nc } = dimsMeuble(it); const slots = {};
+    const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const slots = {};
     for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
-    return fait ? { ...it, slots: graviteCases(slots, nr, nc) } : it;
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode) } : it;
   }) }));
   return fait ? { ...plan, rooms } : null;
 };
+// Le bouton « Où sont-elles ? » de l'onglet Colis : il pose ici les numéros à
+// aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
+// DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
+const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
+
+// ── LA PIÈCE VUE DU DESSUS (17 oct.) ────────────────────────────────────────
+// Julien : « je veux avoir la possibilité quand on crée la pièce de la créer avec
+// une vue du dessus… on doit pouvoir faire la forme que l'on veut à notre
+// entrepôt, chambre ». Un plan d'architecte : on tire les COINS (calés tous les
+// 25 cm), on en ajoute au milieu d'un mur (+), on en retire un ; on glisse un
+// meuble. Rien ne s'écrit pendant le geste — seulement au lâcher, et la règle
+// (src/stockRegles.js) refuse une forme qui se recoupe ou un meuble qui sortirait.
+function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }) {
+  const svgRef = React.useRef(null);
+  const [edit, setEdit] = React.useState(null);        // { type:'coin'|'meuble', i|id, pts|pos }
+  const [coinSel, setCoinSel] = React.useState(null);
+  const W = Math.max(...poly.map(q => q[0])), H = Math.max(...poly.map(q => q[1]));
+  const marge = 0.6;
+  const vb = `${-marge} ${-marge} ${W + marge * 2} ${H + marge * 2}`;
+  const pts = edit && edit.type === 'coin' ? edit.pts : poly;
+  const versPlan = (e) => {
+    const svg = svgRef.current; if (!svg) return null;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const m = svg.getScreenCTM(); if (!m) return null;
+    const p = pt.matrixTransform(m.inverse()); return [p.x, p.y];
+  };
+  const finir = () => {
+    const ed = edit; setEdit(null);
+    if (!ed || !ed.bouge) return;
+    if (ed.type === 'coin') onPoly(ed.pts);
+    else if (ed.type === 'meuble' && ed.pos) onMove(ed.id, ed.pos[0], ed.pos[1]);
+  };
+  const deplacer = (e) => {
+    if (!edit) return; const p = versPlan(e); if (!p) return;
+    if (edit.type === 'coin') {
+      const np = edit.pts.slice(); np[edit.i] = [caler(Math.max(-3, Math.min(W + 3, p[0]))), caler(Math.max(-3, Math.min(H + 3, p[1])))];
+      setEdit({ ...edit, pts: np, bouge: true });
+    } else {
+      const it = items.find(o => o.id === edit.id); if (!it) return;
+      setEdit({ ...edit, pos: [caler(p[0] - edit.off[0]), caler(p[1] - edit.off[1])], bouge: true });
+    }
+    if (e.cancelable) e.preventDefault();
+  };
+  const formes = [['rectangle', 'Rectangle'], ['L', 'En L'], ['U', 'En U'], ['T', 'En T']];
+  const ciblesIds = new Set((cibles || []).map(c => c.itemId));
+  const bouton = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 11px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' };
+  return (
+    <div data-plan-dessus="" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 650, color: C.text, marginRight: 4 }}>Vue du dessus</span>
+        {formes.map(([k, l]) => <button key={k} type="button" data-forme={k} onClick={() => onPoly(FORMES[k](W, H))} style={bouton}>{l}</button>)}
+        {coinSel != null && poly.length > 3 && <button type="button" data-coin-retirer="" onClick={() => { const np = poly.filter((_, i) => i !== coinSel); setCoinSel(null); onPoly(np); }} style={{ ...bouton, color: C.warn }}>Retirer ce coin</button>}
+      </div>
+      <svg ref={svgRef} viewBox={vb} data-plan-svg="" style={{ width: '100%', maxHeight: 360, aspectRatio: `${W + marge * 2} / ${H + marge * 2}`, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, touchAction: 'none', userSelect: 'none' }}
+        onPointerMove={deplacer} onPointerUp={finir} onPointerLeave={finir} onPointerCancel={finir}>
+        {/* grille au mètre */}
+        {Array.from({ length: Math.floor(W) + 1 }, (_, i) => <line key={'gx' + i} x1={i} x2={i} y1={0} y2={H} stroke={C.border} strokeWidth="0.01" />)}
+        {Array.from({ length: Math.floor(H) + 1 }, (_, i) => <line key={'gy' + i} x1={0} x2={W} y1={i} y2={i} stroke={C.border} strokeWidth="0.01" />)}
+        <polygon data-plan-forme="" points={pts.map(q => q.join(',')).join(' ')} fill={C.card} stroke={C.text} strokeWidth="0.08" strokeLinejoin="round" />
+        {/* les meubles */}
+        {items.map(it => {
+          const ft = FURN_TYPES[it.type] || {};
+          const pos = edit && edit.type === 'meuble' && edit.id === it.id && edit.pos ? edit.pos : [it.x, it.y];
+          const odd = Math.abs(Math.round((it.rot || 0) / (Math.PI / 2))) % 2 === 1;
+          const w = odd ? it.h : it.w, h = odd ? it.w : it.h, cx = pos[0] + it.w / 2, cy = pos[1] + it.h / 2;
+          const choisi = sel === it.id, cible = ciblesIds.has(it.id);
+          return (
+            <g key={it.id} data-plan-meuble={it.id} style={{ cursor: 'grab' }}
+              onPointerDown={(e) => { e.stopPropagation(); onSelect(it.id); const p = versPlan(e); if (!p) return; try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (_) {} setEdit({ type: 'meuble', id: it.id, off: [p[0] - it.x, p[1] - it.y], pos: null }); }}>
+              <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx="0.06"
+                fill={ft.deco ? C.card2 : (it.color || ft.color || '#999')} fillOpacity={ft.deco ? 0.9 : 0.85}
+                stroke={cible ? C.accent : choisi ? C.text : 'rgba(0,0,0,0.35)'} strokeWidth={cible || choisi ? 0.09 : 0.03} />
+              {w > 0.7 && (() => { const nom = String(it.name || ft.label || '').slice(0, 18); const fs = Math.min(0.32, h * 0.6, (w * 0.92) / Math.max(1, nom.length * 0.56)); return <text x={cx} y={cy + fs * 0.36} textAnchor="middle" fontSize={fs} fontWeight="700" fill="#fff" style={{ pointerEvents: 'none', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.45)', strokeWidth: 0.04 }}>{nom}</text>; })()}
+            </g>
+          );
+        })}
+        {/* « + » au milieu de chaque mur : ajouter un coin */}
+        {!edit && pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.8) return null;
+          return <g key={'m' + i} data-coin-ajouter={i} style={{ cursor: 'copy' }} onPointerDown={(e) => { e.stopPropagation(); const np = pts.slice(); np.splice(i + 1, 0, [caler(mx), caler(my)]); setCoinSel(i + 1); onPoly(np); }}>
+            <circle cx={mx} cy={my} r="0.2" fill={C.card} stroke={C.muted} strokeWidth="0.04" /><text x={mx} y={my + 0.1} textAnchor="middle" fontSize="0.3" fill={C.muted} style={{ pointerEvents: 'none' }}>+</text></g>; })}
+        {/* les coins : on les tire */}
+        {pts.map((q, i) => (
+          <circle key={'c' + i} data-coin={i} cx={q[0]} cy={q[1]} r={coinSel === i ? 0.24 : 0.19} fill={coinSel === i ? C.accent : C.text} stroke={C.card} strokeWidth="0.05" style={{ cursor: 'move' }}
+            onPointerDown={(e) => { e.stopPropagation(); setCoinSel(i); try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (_) {} setEdit({ type: 'coin', i, pts: pts.slice() }); }} />
+        ))}
+        {/* les cotes du mur */}
+        {pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) return null;
+          // La cote se pose DEHORS, au tiers du mur : ni sur le « + » du milieu, ni dans la pièce.
+          let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L; const tx = a[0] + (b[0] - a[0]) / 3, ty = a[1] + (b[1] - a[1]) / 3;
+          const dedans = (x, y) => { let d = false; for (let k = 0, j = pts.length - 1; k < pts.length; j = k++) { const [xi, yi] = pts[k], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) d = !d; } return d; };
+          if (dedans(tx + nx * 0.1, ty + ny * 0.1)) { nx = -nx; ny = -ny; }
+          return <text key={'l' + i} x={tx + nx * 0.34} y={ty + ny * 0.34 + 0.09} textAnchor="middle" fontSize="0.26" fill={C.muted} style={{ pointerEvents: 'none' }}>{(Math.round(L * 100) / 100).toLocaleString('fr-FR')} m</text>; })}
+      </svg>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Tire un coin pour donner sa forme à la pièce, « + » au milieu d'un mur pour en ajouter un. Glisse un meuble pour le placer : il ne traverse ni un mur ni un autre meuble.</div>
+    </div>
+  );
+}
 
 function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
@@ -20404,6 +20943,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const activeRoom = plan.rooms.find(r => r.id === plan.active) || plan.rooms[0];
   const items = activeRoom.items || [];
   const room = activeRoom.room || ROOM_DEFAULT;
+  // (17 oct.) LA FORME DE LA PIÈCE et ce qui ne se traverse pas (src/stockRegles.js).
+  const poly = polyDe(room);
+  // Ce qui occupe le SOL : on ne pose rien à travers. Un tapis se marche dessus,
+  // un cadre et une fenêtre sont au mur ; ce qui est posé SUR un meuble n'est pas au sol.
+  const occupeLeSol = (o) => { const ft = FURN_TYPES[o.type] || {}; return !['tapis', 'cadre', 'fenetre'].includes(ft.build) && !(Number(o.lift) > 0); };
+  const obstaclesPour = (list, ...ids) => list.filter(o => !ids.includes(o.id) && occupeLeSol(o)).map(empreinte);
+  // Une place libre pour `it` près de (cx, cy) — ou null s'il n'y en a pas.
+  const placeLibre = (list, it, cx, cy) => { const ef = empreinte(it); return placerSansTraverser(cx != null ? cx : ef.cx, cy != null ? cy : ef.cy, ef.w, ef.h, obstaclesPour(list, it.id), poly); };
+  // Après une modification de la DISPOSITION, la 3D passe en vue du dessus pour
+  // qu'on la relise (Julien : « une petite animation à une vue 2D du dessus »).
+  const [dispo, setDispo] = useState(0);
+  const signalerDisposition = () => setDispo(Date.now());
   // Modifie la pièce active (patch = objet fusionné, ou fonction (room)=>patch).
   const patchRoom = (patch) => persist({ ...plan, rooms: plan.rooms.map(r => r.id === activeRoom.id ? { ...r, ...(typeof patch === 'function' ? patch(r) : patch) } : r) });
   const setItems = (updater) => patchRoom(r => ({ items: typeof updater === 'function' ? updater(r.items || []) : updater }));
@@ -20443,11 +20994,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       if (startStr == null) return;
       const start = Math.max(1, parseInt(startStr, 10) || (mx + 1));
       const cell = t.cell, w = +(cols * cell).toFixed(2);
+      let pasDePlace = false;
       setItems(list => {
         const n = list.length, gx = 0.7 + (n % 5) * 1.1, gy = 0.7 + (Math.floor(n / 5) % 5) * 1.1;
-        return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols, rows, start, x: Math.min(room.w - w, gx), y: Math.min(room.h - cell, gy), w, h: cell, slots: {} }];
+        const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols, rows, start, x: Math.min(room.w - w, gx), y: Math.min(room.h - cell, gy), w, h: cell, slots: {} };
+        const pl = placeLibre(list, neuf);
+        if (!pl) { pasDePlace = true; return list; }
+        neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - cell / 2).toFixed(2);
+        return [...list, neuf];
       });
-      setSel(id); return;
+      if (pasDePlace) { toast('Plus de place libre au sol pour ces cartons.'); return; }
+      setSel(id); signalerDisposition(); return;
     }
     // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
     // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
@@ -20474,15 +21031,25 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     // et la HAUTEUR par défaut monte jusqu'au plafond (empilage réaliste).
     const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
     const rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    let pasDePlace = false;
     setItems(list => {
       // On répartit chaque nouveau meuble sur une petite grille pour qu'il
       // n'apparaisse PAS empilé au même endroit (sinon il semble « disparaître »
       // derrière un meuble déjà là — c'était le cas de la porte).
+      // (17 oct.) Et il ne se pose JAMAIS en travers d'un autre ni hors de la
+      // pièce : on cherche la place libre la plus proche (src/stockRegles.js).
       const n = list.length, gx = 0.6 + (n % 4) * 1.5, gy = 0.6 + (Math.floor(n / 4) % 4) * 1.5;
-      const x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
-      return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} }];
+      let x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
+      const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} };
+      if (!t.deco || t.structure) {
+        const pl = placeLibre(list, neuf);
+        if (!pl) { pasDePlace = true; return list; }
+        neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - h / 2).toFixed(2);
+      }
+      return [...list, neuf];
     });
-    setSel(id);
+    if (pasDePlace) { toast('Plus de place libre dans la pièce pour ce meuble — agrandis la pièce ou déplace un meuble.'); return; }
+    setSel(id); signalerDisposition();
   };
   // Contrôles de la GRILLE personnalisable : nb de colonnes, de rangées, taille
   // des cases. Le footprint (w/h) reste synchronisé pour que le glisser colle.
@@ -20567,6 +21134,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     cz = Math.max(-room.h / 2 + effH / 2, Math.min(room.h / 2 - effH / 2, cz));
     const x = Math.round((cx + room.w / 2 - it.w / 2) * 2) / 2, y = Math.round((cz + room.h / 2 - it.h / 2) * 2) / 2;
     updateItem(it.id, { x, y, rot, wall: next });
+    signalerDisposition();
   };
   // Clic sur une grille en 3D. 1er tap = la SÉLECTIONNER (fait apparaître les
   // réglages : nb de boîtes en largeur/hauteur, taille…). Tap suivant sur une
@@ -20584,9 +21152,33 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     }
     return out;
   };
-  const fillCell = async (itemId, cellKey) => {
+  const fillCell = async (itemId, cellKey, quoi) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
+    // (17 oct.) PLATEAU (étagère, table) ou PORTANT : on touche une BOÎTE précise
+    // (la modifier, ou la sortir — celles du dessus descendent) ou la place
+    // libre au-dessus de la pile (y ranger une paire).
+    const cz = casesDe(it, room.wallH);
+    if (cz.mode === 'pile' || cz.mode === 'cintre') {
+      const pile = numsCase((it.slots || {})[cellKey]);
+      if (quoi && quoi.num != null && !quoi.ghost) {
+        const v = await askText({ numeric: clavierNum() === 'numeric', desc: `Numéro de cette boîte (laisse VIDE pour la sortir — celles du dessus descendent) :`, value: String(quoi.num) });
+        if (v == null) return;
+        const t = String(v).trim();
+        if (!t) { sortirDeCase(itemId, cellKey, String(quoi.num)); return; }
+        if (t === String(quoi.num)) return;
+        const ou = dejaPoseOu(t);
+        if (ou) { toast(`N°${t} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+        const idx = pile.indexOf(String(quoi.num)); if (idx < 0) return;
+        const neuve = pile.slice(); neuve[idx] = t;
+        updateItem(itemId, { slots: { ...(it.slots || {}), [cellKey]: neuve } });
+        return;
+      }
+      if (pile.length >= cz.cap) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
+      if (aRanger.length) { setRanger({ itemId, cellKey }); return; }
+      poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger ici :', value: '' }));
+      return;
+    }
     const cur = ((it.slots || {})[cellKey] || [])[0] || '';
     // ⚠️ CASE VIDE → on CHOISIT une paire, on ne tape plus un numéro de mémoire.
     // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
@@ -20630,6 +21222,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       }
     }
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
+    const cz = casesDe(it, room.wallH);
+    if (cz.mode === 'pile' || cz.mode === 'cintre') {
+      if (saisie == null) return;
+      const v = String(saisie).trim(); if (!v) return;
+      const ou = dejaPoseOu(v);
+      if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+      const slots = empilerDansCase(it.slots, cellKey, v, cz.cap);
+      if (!slots) { toast('Cette case est pleine — choisis une autre case.'); return; }
+      updateItem(itemId, { slots });
+      setDepot({ itemId, cellKey, num: v, at: Date.now() });
+      return;
+    }
     const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
     const cur = (slots[cellKey] || [])[0] || '';
@@ -20663,7 +21267,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
-  const setRoom = (dw, dh) => patchRoom(r => ({ room: { ...r.room, w: Math.max(4, Math.min(20, r.room.w + dw)), h: Math.max(4, Math.min(20, r.room.h + dh)) } }));
+  const setRoom = (dw, dh) => {
+    const w = Math.max(2, Math.min(30, room.w + dw)), h = Math.max(2, Math.min(30, room.h + dh));
+    if (!estRectangle(room)) { toast('Ta pièce a une forme libre : tire ses coins dans le plan vu du dessus.'); return; }
+    const p2 = [[0, 0], [w, 0], [w, h], [0, h]];
+    if (items.some(o => !['cadre', 'fenetre'].includes((FURN_TYPES[o.type] || {}).build) && !rectDans(empreinte(o).cx, empreinte(o).cy, empreinte(o).w, empreinte(o).h, p2))) { toast('Un meuble serait hors de la pièce — déplace-le d\'abord.'); return; }
+    patchRoom(r => ({ room: { ...r.room, w, h } })); signalerDisposition();
+  };
   const updateItem = (id, patch) => setItems(list => list.map(it => it.id === id ? { ...it, ...patch } : it));
   // Déplacement d'un élément depuis la 3D. Une BOÎTE se cale sur la grille-sol
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
@@ -20672,30 +21282,29 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // Empreinte au sol effective (largeur/profondeur) selon la rotation du meuble.
   const effFoot = (w, h, rot) => { const odd = Math.abs(Math.round((rot || 0) / (Math.PI / 2))) % 2 === 1; return { w: odd ? h : w, h: odd ? w : h }; };
   const moveItem = (id, x, y, rot, stackOn, lift) => {
+    let refuse = false, bougeMeuble = false;
     setItems(list => {
       const it = list.find(o => o.id === id); if (!it) return list;
       if (!(FURN_TYPES[it.type] || {}).box) {
-        const build = (FURN_TYPES[it.type] || {}).build;
-        if (build === 'pile') return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
-        // MEUBLE : anti-chevauchement — s'il retombe sur un autre meuble, on le POUSSE
-        // au plus court jusqu'à ne plus se chevaucher (arrangement naturel).
-        const ef = effFoot(it.w, it.h, rot);
-        let cx = x + it.w / 2, cy = y + it.h / 2;
-        const obstacles = list.filter(o => o.id !== id && !(FURN_TYPES[o.type] || {}).box && (FURN_TYPES[o.type] || {}).build !== 'pile' && !(o.lift > 0)).map(o => { const of = effFoot(o.w, o.h, o.rot); return { cx: o.x + o.w / 2, cy: o.y + o.h / 2, w: of.w, h: of.h }; });
-        for (let iter = 0; iter < 12; iter++) {
-          let bumped = false;
-          for (const s of obstacles) {
-            const ox = (ef.w + s.w) / 2 - Math.abs(cx - s.cx), oy = (ef.h + s.h) / 2 - Math.abs(cy - s.cy);
-            if (ox > 0.003 && oy > 0.003) { // chevauchement → pousser selon l'axe le plus court
-              if (ox < oy) cx += (cx < s.cx ? -ox : ox); else cy += (cy < s.cy ? -oy : oy);
-              bumped = true;
-            }
-          }
-          if (!bumped) break;
+        const ft = FURN_TYPES[it.type] || {};
+        const liftFinal = lift != null ? lift : it.lift;
+        // (17 oct.) RIEN NE TRAVERSE UN MEUBLE, RIEN NE SORT DE LA PIÈCE.
+        // Une pile POSÉE sur un meuble garde la place visée sur lui ; tout le
+        // reste (meubles, cartons au sol) est poussé jusqu'à la place libre la
+        // plus proche — et s'il n'y en a aucune, il reste où il était.
+        const ef = empreinte({ ...it, x, y, rot });
+        let cx = ef.cx, cy = ef.cy;
+        if (!(ft.pile && Number(liftFinal) > 0)) {
+          const pl = placerSansTraverser(cx, cy, ef.w, ef.h, obstaclesPour(list, id), poly);
+          if (!pl) { refuse = true; return list.slice(); }   // nouvelle référence : la 3D le redessine à l'ancienne place
+          cx = pl.cx; cy = pl.cy;
         }
-        cx = Math.max(ef.w / 2, Math.min(room.w - ef.w / 2, cx)); cy = Math.max(ef.h / 2, Math.min(room.h - ef.h / 2, cy));
         const fx = +(cx - it.w / 2).toFixed(2), fy = +(cy - it.h / 2).toFixed(2);
-        return list.map(o => o.id === id ? { ...o, x: fx, y: fy, rot, lift: lift != null ? lift : o.lift } : o);
+        bougeMeuble = true;
+        // Ce qui est POSÉ sur un meuble le suit quand il bouge.
+        const dx = fx - it.x, dy = fy - it.y;
+        return list.map(o => o.id === id ? { ...o, x: fx, y: fy, rot, lift: liftFinal }
+          : (!ft.pile && (dx || dy) && estPoseSur(o, it) ? { ...o, x: +(o.x + dx).toFixed(2), y: +(o.y + dy).toFixed(2) } : o));
       }
       let sx, sy;
       const tgt = stackOn ? list.find(o => o.id === stackOn && (FURN_TYPES[o.type] || {}).box) : null;
@@ -20720,6 +21329,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       });
       return updated.map(o => (FURN_TYPES[o.type] || {}).box ? { ...o, lvl: lvlOf[o.id] != null ? lvlOf[o.id] : (o.lvl || 0) } : o);
     });
+    if (refuse) toast('Pas de place ici sans traverser un meuble ou un mur — il reste où il était.');
+    else if (bougeMeuble) signalerDisposition();
   };
   // Recompacte les niveaux d'une liste de boîtes par colonne (la boîte `topId`
   // finit en haut de sa colonne, `bottomId` en bas).
@@ -20787,8 +21398,36 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     }
     setStackSrc(null); setPutOnSrc(null); setSel(id);
   };
-  const removeItem = async (id)=>{ if (!await askConfirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
-  const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
+  // (17 oct.) Retirer un meuble : ce qui était POSÉ dessus redescend au sol
+  // (gravité), à la place libre la plus proche — jamais à travers un autre meuble.
+  const removeItem = async (id)=>{
+    if (!await askConfirm('Supprimer ce meuble et son rangement ?')) return;
+    setItems(list => {
+      const it = list.find(o => o.id === id); const reste = list.filter(o => o.id !== id);
+      if (!it) return reste;
+      let out = reste;
+      reste.forEach(o => {
+        if (!estPoseSur(o, it)) return;
+        const pose = { ...o, lift: 0 };
+        const pl = placeLibre(out.filter(q => q.id !== o.id), pose);
+        out = out.map(q => q.id === o.id ? (pl ? { ...pose, x: +(pl.cx - o.w / 2).toFixed(2), y: +(pl.cy - o.h / 2).toFixed(2) } : pose) : q);
+      });
+      return out;
+    });
+    setSel(null); setOpenItem(null); signalerDisposition();
+  };
+  const dupItem = (it) => {
+    const id = 'f' + Date.now(); let pasDePlace = false;
+    setItems(list => {
+      const copy = { ...it, id, slots: {}, nums: Array.isArray(it.nums) ? [] : it.nums, lift: 0, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) };
+      const pl = placeLibre(list, copy);
+      if (!pl) { pasDePlace = true; return list; }
+      copy.x = +(pl.cx - it.w / 2).toFixed(2); copy.y = +(pl.cy - it.h / 2).toFixed(2);
+      return [...list, copy];
+    });
+    if (pasDePlace) { toast('Plus de place libre pour un meuble de plus.'); return; }
+    setSel(id); signalerDisposition();
+  };
 
   const onDown = (e, it) => { e.stopPropagation(); setSel(it.id); const p = e.touches ? e.touches[0] : e; drag.current = { id: it.id, sx: p.clientX, sy: p.clientY, ox: it.x, oy: it.y, moved: false }; };
   const onMove = (e) => {
@@ -20921,6 +21560,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const sortirDeCase = (itemId, cellKey, numero) => {
     const ecrire = () => {
       const it = items.find(x => x.id === itemId); if (!it) return;
+      const cz = casesDe(it, room.wallH);
+      if (cz.mode === 'pile' || cz.mode === 'cintre') {
+        // Ceux du DESSUS descendent d'un cran (la 3D les fait tomber).
+        const r = retirerDeCase(it.slots, cellKey, numero);
+        if (r) updateItem(itemId, { slots: r.slots });
+        setSortie(null); toast(`N°${numero} sorti du stock.`); return;
+      }
       const slots = { ...(it.slots || {}) };
       const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
@@ -20928,7 +21574,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       setSortie(null);
       toast(`N°${numero} sorti du stock.`);
     };
-    setSortie({ itemId, cellKey, at: Date.now(), fini: ecrire });
+    setSortie({ itemId, cellKey, num: String(numero), at: Date.now(), fini: ecrire });
   };
 
   // Ajoute/retire un N° dans une case (empilable).
@@ -20957,6 +21603,45 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     return { boxes, freeCells, furn };
   }, [items]);
 
+  // ── LES PAIRES À ALLER CHERCHER (bouton de l'onglet Colis) ───────────────
+  // Les numéros vendus à expédier, posés par Colis : on les colore dans la 3D et
+  // on dit où est chacun — ou qu'il n'est rangé nulle part (jamais deviné).
+  const [aChercher, setAChercher] = useState(() => {
+    const d = DEMANDE_STOCK_CHERCHE;
+    if (Array.isArray(d.nums) && d.nums.length && Date.now() - d.at < 120000) { const n = d.nums; d.nums = null; return n; }
+    return null;
+  });
+  const chercheLoc = useMemo(() => aChercher ? aChercher.map(n => ({ numero: String(n), ou: ouEstNumero(plan, n) })) : null, [aChercher, plan]);
+  const cibles3D = useMemo(() => (chercheLoc || []).filter(x => x.ou && x.ou.roomId === activeRoom.id).map(x => ({ itemId: x.ou.itemId, cell: x.ou.key, pileIdx: x.ou.pileIdx, num: x.numero })), [chercheLoc, activeRoom.id]);
+  // Changer la DIMENSION d'un meuble (largeur, profondeur, pivot) : refusé s'il
+  // traverserait un autre meuble ou un mur.
+  const changerDimensions = (it, patch) => {
+    const essai = { ...it, ...patch };
+    const pl = placeLibre(items, essai);
+    if (!pl) { toast('Pas la place pour ce changement sans traverser un meuble ou un mur.'); return; }
+    updateItem(it.id, { ...patch, x: +(pl.cx - essai.w / 2).toFixed(2), y: +(pl.cy - essai.h / 2).toFixed(2) });
+    signalerDisposition();
+  };
+  // Plateaux d'une étagère, places d'une table, cintres d'un portant : on ne
+  // retire JAMAIS une rangée ou une colonne qui porte un numéro (il serait perdu).
+  const changerCases = (it, dCols, dRows) => {
+    const { nr, nc } = dimsMeuble(it); const ft = FURN_TYPES[it.type] || {};
+    const cols = Math.max(1, Math.min(16, nc + dCols)), rows = Math.max(1, Math.min(10, nr + dRows));
+    const slots = it.slots || {};
+    if (cols < nc && Object.keys(slots).some(k => +k.split('_')[1] >= cols && numsCase(slots[k]).length)) { toast('Cette case porte encore un numéro — sors-le d\'abord.'); return; }
+    let neuf = { ...slots };
+    if (rows !== nr) {
+      // La rangée ajoutée ou retirée est celle du HAUT (r = 0) : les plateaux du
+      // bas gardent leurs boîtes.
+      if (rows < nr && Object.keys(slots).some(k => +k.split('_')[0] === 0 && numsCase(slots[k]).length)) { toast('Le plateau du haut porte encore un numéro — sors-le d\'abord.'); return; }
+      neuf = {}; for (const k in slots) { const [r, c] = k.split('_').map(Number); const nrr = r + (rows - nr); if (nrr >= 0) neuf[nrr + '_' + c] = slots[k]; }
+    }
+    const patch = { cols, rows, slots: neuf };
+    if (ft.build === 'metal') patch.h3d = +(rows * 0.375 / 1.5).toFixed(3);          // un plateau = 37,5 cm : la contenance par case ne bouge pas
+    if (ft.build === 'portant' || ft.build === 'metal' || ft.build === 'table') { const w = ft.build === 'table' ? Math.max(it.w, +(cols * 0.6).toFixed(2)) : +(cols * (ft.build === 'portant' ? 0.19 : 0.6)).toFixed(2); patch.w = Math.max(0.6, w); }
+    changerDimensions(it, patch);
+  };
+
   if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -20966,15 +21651,34 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           tout l'écran de configuration avant de voir son stock. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
+      {chercheLoc && (
+        <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 650, color: C.text }}>
+              {chercheLoc.length} paire{chercheLoc.length > 1 ? 's' : ''} à aller chercher
+              <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
+            </span>
+            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les paires à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+          </div>
+          {chercheLoc.map(x => (
+            <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
+              <b>N°{x.numero}</b>{' '}
+              {x.ou
+                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button type="button" onClick={() => switchRoom(x.ou.roomId)} style={{ border: 'none', background: 'transparent', color: C.accent, padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>ouvrir cette pièce</button></> : null}</>
+                : <>— rangée nulle part dans le stock</>}
+            </div>
+          ))}
+        </div>
+      )}
       {/* (16 oct.) UNE PIÈCE VIDE NE SE TAIT PAS : la scène 3D sans meuble ne dit
           rien de ce qu'il faut faire. On dit le geste, et le bouton y mène. */}
       {items.length === 0 && (
         <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
-            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Ajoute un meuble à cases (grille de boîtes, étagère, casiers) : tu y ranges tes paires, et VRM retrouve chacune par son numéro.</span>
+            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dessine ta pièce vue du dessus, puis ajoute une étagère, une table ou un portant : tu y ranges tes articles, et VRM retrouve chacun par son numéro.</span>
           </span>
           <button type="button" data-piece-vide-geste="" onClick={() => { const d = refAmenager.current; if (d) { d.open = true; try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
         </div>
@@ -20983,7 +21687,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {ranger && (
         <RangerSheet
           paires={aRanger}
-          cellNom={(() => { const p = String(ranger.cellKey).split('_'); const it = items.find(x => x.id === ranger.itemId); const nr = it ? Math.max(1, it.rows || 1) : 1; return `colonne ${(+p[1]) + 1} · ${nr - (+p[0])}ᵉ depuis le bas`; })()}
+          apercu={(() => { const it = items.find(x => x.id === ranger.itemId); return it ? { it, cellKey: ranger.cellKey, mode: casesDe(it, room.wallH).mode, cap: casesDe(it, room.wallH).cap } : null; })()}
+          cellNom={(() => { const it = items.find(x => x.id === ranger.itemId); if (!it) return ''; const nr = Math.max(1, it.rows || 1); const cz = casesDe(it, room.wallH); return `${it.name || ''} · ${nomCase(nr, ranger.cellKey, cz.mode, it)}`; })()}
           onPick={(p) => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, p.numero); }}
           onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger dans cette case :', value: '' })); }}
           onClose={() => setRanger(null)}
@@ -21048,7 +21753,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
           const groupes = [
             ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
-            ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
+            ['Murs',      tous.filter(([, t]) =>  t.structure), "Portes et fenêtres : elles se collent au mur."],
+            ['Décor',     tous.filter(([, t]) =>  t.deco && !t.structure), "Pour que la pièce ressemble à la tienne. Ne range rien."],
           ];
           return groupes.map(([titre, liste, aide]) => liste.length ? (
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -21059,6 +21765,23 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             </div>
           ) : null);
         })()}
+        {/* (17 oct.) LA PIÈCE VUE DU DESSUS : sa forme (on tire les coins) et ses meubles. */}
+        <PlanDessus room={room} poly={poly} items={items} sel={sel} onSelect={(id) => setSel(id)} cibles={cibles3D}
+          onPoly={(np) => { const n = normaliserPoly(np); if (!n) { toast('Cette forme ne fait pas une pièce (elle se recoupe, ou fait moins d\'1 m²).'); return; }
+            // Le plan se décale si un coin passe sous 0 : tout ce qui est posé suit, rien ne bouge par rapport aux murs.
+            const bouges = items.map(o => ({ ...o, x: +(o.x - n.dx).toFixed(2), y: +(o.y - n.dy).toFixed(2) }));
+            const dehors = bouges.filter(o => !rectDans(empreinte(o).cx, empreinte(o).cy, empreinte(o).w, empreinte(o).h, n.poly) && !['cadre', 'fenetre'].includes((FURN_TYPES[o.type] || {}).build));
+            if (dehors.length) { toast(`${dehors.length} meuble${dehors.length > 1 ? 's seraient' : ' serait'} hors de la pièce (« ${dehors[0].name} ») — déplace-${dehors.length > 1 ? 'les' : 'le'} d'abord.`); return; }
+            const estRect = n.poly.length === 4 && n.poly.every(([x, y]) => (x === 0 || x === n.w) && (y === 0 || y === n.h));
+            patchRoom(r => ({ room: { ...r.room, w: n.w, h: n.h, poly: estRect ? undefined : n.poly }, items: bouges })); signalerDisposition(); }}
+          onMove={(id, x, y) => {
+            // Une PILE glissée dans le plan se pose SUR le meuble à surface qu'elle
+            // vise (une table…), sinon AU SOL — jamais en l'air au-dessus du vide.
+            const it = items.find(o => o.id === id) || {}; const ft = FURN_TYPES[it.type] || {};
+            let lift;
+            if (ft.pile) { const essai = { ...it, x, y, lift: 1 }; const sous = items.find(o => o.id !== id && isSurface(o) && estPoseSur(essai, o)); lift = sous ? furnTop(sous) : 0; }
+            moveItem(id, x, y, it.rot || 0, null, lift);
+          }} />
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
           <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
@@ -21166,11 +21889,31 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
             {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
-            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
+            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && !(FURN_TYPES[selItem.type] || {}).cases && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button type="button" key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
             </>}
           </div>
+          {/* (17 oct.) ÉTAGÈRE, TABLE, PORTANT : combien de cases, de plateaux, de cintres. */}
+          {(FURN_TYPES[selItem.type] || {}).cases && (()=>{
+            const ft = FURN_TYPES[selItem.type]; const { nr, nc } = dimsMeuble(selItem); const cz = casesDe(selItem, room.wallH);
+            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, minWidth: 36, minHeight: 36, cursor: 'pointer', lineHeight: 1 };
+            const pas = (lib, val, moins, plus, cle) => (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} data-reglage={cle}>
+                <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{lib}</span>
+                <button className="vrm-icon-control" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
+                <b style={{ fontSize: 14, minWidth: 18, textAlign: 'center' }}>{val}</b>
+                <button className="vrm-icon-control" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
+              </span>);
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                {ft.build === 'metal' && pas('Plateaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
+                <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
+                <span style={{ flex: '1 1 100%', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Touche une place libre (en transparence) pour y ranger un article ; touche une boîte pour changer son numéro ou la sortir — celles du dessus descendent.</span>
+              </div>
+            );
+          })()}
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
           {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
@@ -21204,14 +21947,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
           {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-            <button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
-            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+            <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            </>}
+            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           </>}
           <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
           <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
@@ -21298,13 +22042,15 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   const aLiberer = useMemo(() => {
     if (!sur) return [];
     const out = [];
-    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key), numero: v }); })));
+    meubles.forEach(m => Object.entries(m.vue).forEach(([key, a]) => a.forEach(v => { if (!presents.has(cleNum(v))) out.push({ itemId: m.it.id, itemName: m.it.name, roomName: m.roomName, key, nom: nomCase(m.nr, key, m.mode, m.it), numero: v }); })));
     return out.sort((a, b) => triNum(a.numero, b.numero));
   }, [sur, meubles, presents]);
   const partiesCles = useMemo(() => new Set(aLiberer.map(x => cleNum(x.numero))), [aLiberer]);
   const prochaine = useMemo(() => premiereCaseLibre(plan), [plan]);
   const totalCases = meubles.reduce((s, m) => s + m.nr * m.nc, 0);
-  const casesLibres = meubles.reduce((s, m) => s + (m.nr * m.nc - Object.keys(m.vue).length), 0);
+  // Une case « libre » : vide (mur de boîtes, cintre) ou qui a encore de la place (plateau).
+  const libresDe = (m) => m.mode === 'pile' ? Array.from({ length: m.nr * m.nc }, (_, i) => (m.vue[Math.floor(i / m.nc) + '_' + (i % m.nc)] || []).length < m.cap).filter(Boolean).length : (m.nr * m.nc - Object.keys(m.vue).length);
+  const casesLibres = meubles.reduce((s, m) => s + libresDe(m), 0);
   const hit = q.trim() ? ouEstNumero(plan, q) : null;
   const hitRef = React.useRef(null);
   const hitCle = hit ? hit.itemId + ':' + hit.key : '';
@@ -21418,12 +22164,14 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
         {/* ── Colonne droite : le stock vu de face, meuble par meuble ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }} data-rgt-plan="">
-          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble à cases dans ta pièce. Ajoute une grille de boîtes, une étagère ou des casiers dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
+          {meubles.length === 0 && <div style={{ ...carte, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun meuble pour ranger dans ta pièce. Ajoute une étagère, une table ou un portant dans <b style={{ color: C.text }}>Ma pièce → Aménager la pièce</b>.</div>}
           {meubles.map((m, mi) => {
             const pleines = Object.keys(m.vue).length;
             const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
             // La case où une boîte atterrit dans chaque colonne (gravité).
-            const basLibre = {}; for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
+            const basLibre = {};
+            if (m.mode === 'pile' || m.mode === 'cintre') { for (let r = 0; r < m.nr; r++) for (let c = 0; c < m.nc; c++) { const k = r + '_' + c; if ((m.vue[k] || []).length < m.cap) basLibre[k] = true; } }
+            else for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
             return (
               <React.Fragment key={m.it.id}>
                 {enTete && <div className="vrm-label" style={{ color: C.muted, marginTop: mi ? 4 : 0 }}>{m.roomName}</div>}
@@ -21439,7 +22187,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                         const a = m.vue[key] || [];
                         const estHit = !!(hit && hit.itemId === m.it.id && hit.key === key);
                         const estProchaine = !!(sur && aRanger.length && prochaine && prochaine.itemId === m.it.id && prochaine.key === key);
-                        const cliquable = !!(placer && sur && !a.length && basLibre[key]);
+                        const cliquable = !!(placer && sur && (m.mode === 'pile' ? true : !a.length) && basLibre[key]);
                         const partie = !!(a.length && a.some(v => partiesCles.has(cleNum(v))));
                         const vientDetre = !!(flash && flash.itemId === m.it.id && flash.key === key && a.length);
                         const accent = estHit || estProchaine || cliquable;
@@ -21449,8 +22197,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           <div key={key} ref={estHit ? hitRef : null} className="vrm-rgt-case"
                             data-case={`${m.it.id}:${key}`} data-num={a[0] || ''} data-hi={estHit ? '1' : undefined} data-prochaine-case={estProchaine ? '1' : undefined} data-cliquable={cliquable ? '1' : undefined} data-partie={partie ? '1' : undefined}
                             role={cliquable || a.length ? 'button' : undefined} tabIndex={cliquable || a.length ? 0 : undefined}
-                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key)}` : nomCase(m.nr, key)}
-                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); }}
+                            title={a.length ? `N°${a.join(', ')} · ${nomCase(m.nr, key, m.mode, m.it)}` : nomCase(m.nr, key, m.mode, m.it)}
+                            onClick={() => { if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[a.length - 1]); }}
                             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (cliquable) ranger(placer, m.it.id, key); else if (a.length) setQ(a[0]); } }}
                             style={{ height: 'var(--rgt-h)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', cursor: cliquable || a.length ? 'pointer' : 'default',
                               border: `${accent ? 2 : 1}px ${trait} ${bord}`,
@@ -21468,7 +22216,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
               </React.Fragment>
             );
           })}
-          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : les boîtes tombent en bas de chaque colonne. Touche une case pleine pour la retrouver.</div>}
+          {meubles.length > 0 && <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>Vu de face, comme dans la 3D : sur une étagère ou une table les boîtes s'empilent dans leur case ; dans un mur de boîtes elles tombent en bas de la colonne. Touche une case pleine pour la retrouver.</div>}
         </div>
       </div>
     </div>
@@ -21482,7 +22230,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // une application dans l'application »). Le choix reste MÉMORISÉ par appareil :
   // qui préfère la grille la retrouve au prochain passage — on change le point
   // de départ, pas son habitude.
-  const [garageView,setGarageView]=useState(()=>load('vinted_garage_view','plan')); // plan | grid | photo
+  // (17 oct.) Julien : « enlève aussi les autres types de rangement ». Le Stock
+  // n'a plus que la pièce (3D + vue du dessus) et l'assistant « Ranger » ; la
+  // grille de zones et la photo du local ne s'ouvrent plus (mesuré : vides chez
+  // lui). Un choix mémorisé « grille »/« photo » retombe sur la pièce.
+  const [garageView,setGarageView]=useState(()=>{ if (DEMANDE_STOCK_CHERCHE.nums) return 'plan'; const v=load('vinted_garage_view','plan'); return v==='ranger'?'ranger':'plan'; }); // plan | ranger
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
@@ -21692,7 +22444,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','box','Ranger'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+        {[['plan','home','Ma pièce'],['ranger','box','Ranger']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -22284,6 +23036,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // (« 06 12… » et « +33 6 12… » sont le même numéro).
   const telNorm = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.startsWith('33') && d.length === 11 ? '0' + d.slice(2) : d; };
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
+  const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
   const setAcctEmail = (uid, val) => {
     const u = { ...acctEmails, [String(uid)]: val.trim() };
     if (!u[String(uid)]) delete u[String(uid)];
@@ -22311,6 +23064,13 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         }
       });
       if (Object.keys(rep).length) setReput(rep);
+      const typ = {};
+      rows.forEach(r => {
+        const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
+        const t = typeCompteVinted(r.data && r.data.payload);
+        if (uid && typeof t === 'boolean') typ[uid] = t;
+      });
+      if (Object.keys(typ).length) setTypesProfil(typ);
       setAcctEmails(prev => {
         const u = { ...prev }; let changed = false;
         rows.forEach(r => {
@@ -22671,6 +23431,17 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                     {(()=>{ const h=acctHealth(acc); return (<>
                       <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
                       {h.ago && <span style={{fontSize:11,color:C.muted,marginLeft:8}}>{h.ago}</span>}
+                      {(() => {
+                        // Pro / particulier : ce que l'extension a publié d'abord
+                        // (`panel_comptes_etat`, 5.185), sinon le profil capté —
+                        // la même règle. Pas su ⇒ rien (jamais « particulier » par défaut).
+                        const uid = String(acc.vinted_user_id);
+                        const ev = etatExt && etatExt[uid];
+                        const pro = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
+                        if (pro == null) return null;
+                        return <span data-type-compte={pro ? 'pro' : 'particulier'} title={pro ? 'Compte Vinted Pro : Vinted t\'envoie les coordonnées de l\'acheteur, une facture est possible.' : 'Compte particulier : Vinted ne transmet pas les coordonnées de l\'acheteur, aucune facture n\'est faite.'}
+                          style={{display:'inline-flex',alignItems:'center',marginTop:4,marginLeft:8,fontSize:11,fontWeight:600,color:C.text,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 8px'}}>{pro ? 'Pro' : 'Particulier'}</span>;
+                      })()}
                     </>); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
@@ -31397,24 +32168,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const PL = await import('pdf-lib');
       const { PDFDocument, rgb, StandardFonts } = PL;
       const out = await PDFDocument.create();
-      // 1) le bordereau tamponné du N°
+      // 1) le bordereau : tamponné du N°, ou — en thermique — l'étiquette seule
+      //    sur des pages 100×150 (sans la fiche destinataire ni la pub), mais
+      //    seulement si on SAIT où elle est (sinon page entière).
       const src = await PDFDocument.load(buf);
-      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
-      const sReg = await src.embedFont(StandardFonts.Helvetica);
-      // Imprimante thermique : l'étiquette seule, sans la fiche destinataire ni
-      // la pub — mais seulement si on SAIT où elle est (sinon page entière).
-      const zTh = imprMode(imprimante) === 'thermique' ? zoneEtiquette(PL, src.getPages()[0]) : { ok: false };
-      let thermiqueOK = false, thermiqueRaison = '';
-      if (zTh.ok) {
-        drawSkuThermique(src.getPages()[0], rgb, sBold, numero, zTh);
-        src.getPages()[0].setMediaBox(zTh.x, zTh.y, zTh.w, zTh.h);
-        src.getPages()[0].setCropBox(zTh.x, zTh.y, zTh.w, zTh.h);
-        thermiqueOK = true;
-      } else {
-        if (imprMode(imprimante) === 'thermique') thermiqueRaison = zTh.raison || '';
-        drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
-      }
-      (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+      const thermique = imprMode(imprimante) === 'thermique';
+      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique });
+      const thermiqueOK = r1.isole, thermiqueRaison = r1.raison;
       // 2) la facture pro (si elle existe)
       let joined = false;
       if (inv && ent) {
@@ -35336,7 +36096,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
                     {imprimante==='thermique'
-                      ? <>L'étiquette seule, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin.</>
+                      ? <>L'étiquette seule, <b>au format 10 × 15 cm</b>, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin. Aperçus de chaque type : Réglages → Imprimante et bordereaux.</>
                       : <>La page complète, une <b>feuille par bordereau</b>. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d'impression : le PDF le demande, le pilote peut passer outre.</>}
                   </div></details>
                 </div>
@@ -35550,6 +36310,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {lignePostes}
+              {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
+                  les numéros que tu as vendus ». Les N° des colis À FAIRE (pas
+                  les postés), lus sur la ligne elle-même — jamais devinés. */}
+              {(() => {
+                const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
+                if (!nums.length) return null;
+                return (
+                  <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
+                    style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    <Icon name="home" size={16}/>Où sont ces {nums.length} paire{nums.length>1?'s':''} dans le stock
+                  </button>
+                );
+              })()}
               {/* La raison commune des boutons grisés, une fois (§7). */}
               <RaisonBordereauxGrises ventes={ex.filter(e => !estPoste(e) && !aSonPdf(e) && e.o && e.o.transaction_id!=null).map(e => e.o)}/>
               {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Ventes et Achats (§5.63).
@@ -35981,7 +36754,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {bordResult.pdfBuf && !bordResult.batch && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {/* En thermique, le N° est dans la bande réservée sous l'étiquette :
+                il n'y a rien à déplacer — le bouton ne sert qu'à la page entière. */}
+            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && !bordResult.thermique && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
@@ -35992,7 +36767,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px'}}>
                   <div style={{color:C.text,fontWeight:600,marginBottom:ent.length?4:0}}>
-                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {iso>0 ? `${iso} étiquette${iso>1?'s':''} découpée${iso>1?'s':''} au format 10×15 cm (sans la fiche destinataire)` : 'Aucune étiquette n’a pu être isolée'}
+                    {(bordResult.etiquettes||0)>iso ? ` · ${bordResult.etiquettes} pages : un envoi international porte aussi l'étiquette du transporteur partenaire, colle-les toutes` : ''}
                     {ent.length>0 ? ` · ${ent.length} page${ent.length>1?'s':''} entière${ent.length>1?'s':''}` : ''}
                   </div>
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
@@ -39330,7 +40106,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
   const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
-  const valDetourage = (DETOURAGE_MODES.find(([k]) => k === modeDetourageLu()) || [, ''])[1];
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
   const tokWidget = load('vrm_widget_token', '');
@@ -39491,7 +40266,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', val:valNumeros, el:<NumerosSetting nu/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
-      { id:'detourage', type:'panneau', nu:true, ic:'image', lib:'Détourage des photos', val:valDetourage, el:<DetourageSetting nu/> },
+      // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
+      //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
     ]},
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
@@ -39500,6 +40276,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+    ]},
+    { id:'impression', titre:'Impression', items:[
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ]},
     { id:'compta', titre:'Comptabilité', items:[
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', el:<RegimeSetting nu/> },
@@ -40824,85 +41603,11 @@ function NumerosSetting({ nu = false }) {
 }
 
 
-// ══════════════════════════════════════════════════════════════════════════════
-// DÉTOURAGE DES PHOTOS (Photoroom) — juste avant de les attacher à une annonce
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien, 4 octobre : « intègre l'API de Photoroom pour le détourage des photos
-// avant chaque poste ». Le réglage vit ICI (`vrm_detourage`, ligne main) ;
-// l'EXTENSION le lit au moment où elle attache les photos à Leboncoin ou eBay
-// (`detourerPhotos`). Éteint par défaut : chaque photo détourée coûte.
-// Ce que l'écran dit vient de la MÊME source que ce qui se passe (§5, la phrase
-// qui explique un chiffre vient de la même source que lui) : le serveur rend
-// `ready` (la clé est posée ?), `autorise` (ce compte y a droit ?) et le
-// compteur du mois. Trois états, jamais deux : `undefined` en cours · `null`
-// pas su · un objet lu. « Pas su » n'affirme ni que ça marche ni que ça ne
-// marche pas.
-const DETOURAGE_MODES = [['eteint', 'Éteint'], ['couverture', 'Photo de couverture'], ['toutes', 'Toutes les photos']];
-const modeDetourageLu = () => { const v = load('vrm_detourage', 'eteint'); return DETOURAGE_MODES.some(([k]) => k === v) ? v : 'eteint'; };
-function DetourageSetting({ nu = false }) {
-  const [mode, setMode] = React.useState(modeDetourageLu);
-  const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
-  const touche = React.useRef(false);
-  // §5.49 : le nuage arrive après le montage. Pas touché ⇒ on prend ce qu'il dit
-  // (c'est ce que l'extension lira). Touché pendant le chargement ⇒ on garde le
-  // choix ET on le réécrit, pour que ce qui est affiché soit ce qui part au nuage.
-  React.useEffect(() => onCloudReady(() => {
-    if (touche.current) { setMode((m) => { save('vrm_detourage', m); return m; }); return; }
-    setMode(modeDetourageLu());
-  }), []);
-  const [raisonPasSu, setRaisonPasSu] = React.useState('');
-  React.useEffect(() => {
-    let vivant = true;
-    (async () => {
-      try {
-        const r = await fetch('/api/ai?mode=detourage&usage=1', { headers: enTeteSession() });
-        const j = await r.json().catch(() => null);
-        if (!vivant) return;
-        setUsage(r.ok && j && j.ok ? j : null);
-        setRaisonPasSu(!r.ok && j && j.reason ? String(j.reason) : '');
-      } catch (_) { if (vivant) setUsage(null); }
-    })();
-    return () => { vivant = false; };
-  }, []);
-  const cap = extSait('detourage');
-  const reserve = !!usage && usage.autorise === false;
-  const choisir = (v) => { if (reserve) return; touche.current = true; setMode(v); save('vrm_detourage', v); };
-  const etat = usage === undefined ? 'attente' : usage === null ? (raisonPasSu === 'compteur' ? 'compteur' : 'pasSu') : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
-  const actif = mode !== 'eteint';
-  return (
-    <div style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
-      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>}
-      <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Quand l’extension attache tes photos à une annonce <b>Leboncoin</b>, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas. Sur eBay, la mise en vente passe par eBay directement, sans l’extension : ses photos ne sont pas détourées.
-        {/* ⚠️ « Leboncoin ou eBay » était FAUX (revue adverse, 4 octobre) : la seule
-            voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
-            liens Vinted bruts, sans passer par l'extension. */}
-      </div>
-      <Segmente label="Détourage des photos" plein disabled={reserve} value={mode} onChange={choisir} style={{marginTop:10}}
-        options={DETOURAGE_MODES.map(([v, label]) => ({ v, l: label, data: { 'data-detourage-choix': v } }))}/>
-      {/* Ce que dit le serveur — une phrase, celle qui correspond à l'état. */}
-      <div style={{marginTop:9,fontSize:11.5,lineHeight:1.5,color:etat==='sanscle'&&actif?C.warn:C.muted}} data-detourage-phrase>
-        {etat === 'attente' ? 'Je vérifie le service de détourage…'
-          : etat === 'pasSu' ? 'Je n’ai pas pu vérifier le service de détourage. Rouvre cet écran dans un moment.'
-          : etat === 'compteur' ? 'Le compteur du détourage est illisible côté serveur : tant que ça dure, aucune photo n’est détourée (elles partent telles quelles).'
-          : etat === 'reserve' ? 'Le détourage n’est pas encore ouvert à ton compte : tes photos partent telles quelles.'
-          : etat === 'sanscle' ? <>La clé Photoroom n’est pas encore posée sur le serveur&nbsp;: {actif ? 'tant qu’elle manque, tes photos partent telles quelles.' : 'le détourage ne pourra marcher qu’une fois posée.'}</>
-          : <>Ce mois-ci&nbsp;: <b style={{color:C.text}}>{usage.n}</b> photo{usage.n > 1 ? 's' : ''} détourée{usage.n > 1 ? 's' : ''} sur <b style={{color:C.text}}>{usage.plafond}</b> possibles. Environ 2 centimes par photo nouvelle.</>}
-      </div>
-      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
-      {actif && !reserve && cap === 'absente' && (
-        <div style={{marginTop:7,fontSize:11.5,color:C.muted,lineHeight:1.5}} data-detourage-cap="absente">
-          C’est l’extension, dans le Chrome de ton ordinateur, qui détoure au moment de publier — pas cette page.
-        </div>
-      )}
-      {actif && !reserve && cap === 'retard' && (
-        <div style={{marginTop:7,fontSize:11.5,color:C.warn,lineHeight:1.5}} data-detourage-cap="retard">
-          L’extension installée ici ne sait pas encore détourer. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, tes photos partent telles quelles.
-        </div>
-      )}
-    </div>
-  );
-}
+// ⛔ DÉTOURAGE DES PHOTOS : plus de réglage (17 octobre, sa décision — « le
+// détourage ne doit être présent QUE dans Vestiaire Collective, pas du tout pour
+// Leboncoin, ne le mets pas dans les paramètres »). L'extension ne détoure plus
+// rien pour Leboncoin ni eBay ; Vestiaire, qui l'exige, détoure toujours, sans
+// réglage (`photosPourVestiaire`). `vrm_detourage` n'est plus lu nulle part.
 
 // La carte « Les offres, c'est toi qui décides » (Réglages) est RETIRÉE avec
 // l'acceptation automatique des offres (5 octobre, à sa demande) : une carte qui

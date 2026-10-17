@@ -2001,6 +2001,52 @@ la source.*
   deuxième a été corrigée **dans l'app** : une chaîne PDF s'écrit des deux façons,
   et n'en lire qu'une laisse la page muette.
 
+### L'imprimante thermique au point, et un réglage « Imprimante » avec un aperçu par type (17 octobre)
+Julien : « dans les paramètres, imprimante thermique et normale, tous les types
+de bordereau avec une visualisation pour chaque type, et la thermique au point ».
+- **Mesuré d'abord sur ses 93 bordereaux avec PDF** (lecture seule, copie locale
+  dans `scripts/bancs/fx/bordereaux/`, gitignorée) : Chronopost/Shop2Shop 47
+  (paysage 43, debout 4), Mondial Relay · InPost 16, Mondial Relay international
+  27 (étiquette partenaire Hermes/An Post), Colissimo 3. `zoneEtiquette` en
+  isolait **92** ; le 93ᵉ (international « FPDF ») partait entier : AUCUN mot
+  lisible, mais ses DEUX étiquettes sont des images de 100×150 mm exactement.
+- **Thermique** : chaque étiquette devient UNE page de **100 × 150 mm**
+  exactement (`ETIQ_TH`), tournée si elle est couchée (du côté qui remet le texte
+  à l'endroit, lu dans la matrice du texte : `avecSens`), mise à l'échelle ENTIÈRE
+  dans une marge de 2,5 mm (jamais rognée, jamais agrandie de plus de 25 %), le N°
+  dans une bande réservée SOUS l'étiquette (avant : posé par-dessus, à 4 pt du
+  bord, et la page gardait la taille de la zone — le pilote décidait du reste).
+- **Deux repères de plus, sans rien deviner** : une page déjà au format étiquette
+  part entière ; une image ou un Form XObject au format exact d'une étiquette EST
+  une étiquette (deux qui se chevauchent ⇒ page entière). Résultat : **93/93**,
+  94 pages (l'international donne ses deux étiquettes — les deux vont sur le colis).
+- **Une règle pour les trois chemins d'impression** (une vente, un lot,
+  bordereau + facture, et Leboncoin par `annotateAndDownloadBordereau`) :
+  `poserBordereau`. Le réglage est lu par `imprimanteChoisie()` (§11, le même
+  `vrm_imprimante` que les pastilles de Colis). En thermique isolé, plus de
+  « déplacer le N° » (il est dans la bande).
+- **Réglages → Impression → « Imprimante et bordereaux »** (`ImprimanteSetting`) :
+  le choix, une phrase par mode, et « Voir les aperçus » — au CLIC seulement, au
+  plus 24 PDF lus (§4.4), un aperçu normal (zone thermique en pointillés) et
+  thermique par type (`typeBordereau` : mots du transporteur, puis créateur
+  « MondialRelay », puis étiquette partenaire ; sinon « autre mise en page »),
+  fabriqués par `poserBordereau` lui-même, avec un N° d'exemple dit comme tel ;
+  les types jamais reçus sont dits « pas encore vus », sans aperçu inventé. Le
+  dessin passe par pdf.js 3.11.174 chargé au premier aperçu depuis jsdelivr ;
+  injoignable ⇒ « Ouvrir le PDF ».
+- Preuves : `audit-impression.cjs` (vrai code, `new Function` — un tableau né
+  dans un `vm` n'est pas un `Array` pour pdf-lib) **+ section 7 sur ses vrais PDF
+  si présents** : 93 découpés, 0 page hors 100×150, 0 zone hors page ;
+  `--prouve` : **8 rouges** (découpe sans savoir · étiquettes qui se chevauchent
+  prises · page à la taille de la zone). Banc `imprimante.cjs` (390/1512, trois
+  autres états) vert. Sur le code d'avant, les fonctions n'existent pas
+  (11 rouges — pas une preuve en soi) ; la mesure de l'ancien rendu : 92/93 et des
+  pages à la taille de la zone (152×103 mm couchées, 103×153 mm debout).
+- ⚠️ **Non mesuré** : l'impression sur une vraie imprimante thermique (Zebra,
+  Rollo, Phomemo…) — le PDF fait 100×150 mm, mais l'échelle « 100 % » et le
+  papier se choisissent dans la fenêtre d'impression (l'écran le dit) ; Vinted Go,
+  Relais Colis, UPS, DPD seuls jamais vus ; le PDF Leboncoin.
+
 ### ⚠️⚠️ « EST-CE QUE MON EXTENSION EST À JOUR ? » — L'APP NE POUVAIT PAS RÉPONDRE
 Trois sessions de suite ont dû **DEVINER** la version installée (« aucun
 compteur `retrait_*`, donc antérieure à 5.45 ») — et §8 dit noir sur blanc que
@@ -9243,6 +9289,16 @@ lui), vert après.
 - Extension **5.184.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : des corrections.
 
+### Extension 5.185 — pro/particulier, factures Pro, détourage Vestiaire seul, pack photo, marque Leboncoin, vente annulée (17 octobre)
+- **Pro ou particulier (Vinted)** : mesuré, le profil `users/current` (déjà rangé dans `harvest_{uid}_profile`) porte `business`, `business_account`, `business_account_id` — tous ses comptes : `business: false`. Une règle, même texte dans l'app et l'extension (`typeCompteVinted` : true · false · null = pas su, jamais « particulier » par défaut). L'extension la publie dans `panel_comptes_etat.comptes[uid].pro` (un `null` ne remplace jamais un type lu, un changement s'écrit tout de suite) ; Comptes liés affiche « Pro » / « Particulier » (ce que l'extension a publié d'abord, sinon le profil capté). Leboncoin : `lbc_messages.comptes[id].pro` (`is_business_user`) existait déjà. eBay : chantier eBay. Preuves : `audit-etat-compte.cjs` §10-11 (4 rouges sur l'avant, mutations `propasu`/`proefface`), banc `type-compte.cjs` (6 rouges sur l'avant).
+- **Factures acheteurs : compte Vinted PRO seulement** (`api/email-inbound`). Seul l'email d'un compte pro porte « En tant que membre Vinted Pro » et le bloc « Coordonnées de l'acheteur » ; `data.pro` exige la MENTION (une adresse email dans le texte ne suffit pas). L'identité de la facture est le **n° de transaction** (pièce jointe `Formulaire-retour-commande-{tx}.pdf`, sinon « Numéro de la transaction ») ⇒ `email_invoice_tx{tx}` ; sans transaction, l'ancienne clé. `audit-routes-revue.cjs` scénario P (email inventé à la forme de celui transmis par Julien ; 5 rouges sur l'avant).
+- **Détourage : Vestiaire Collective seul**, sur sa décision (« pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). `photosEnOctets`/`photosPourEbay` rendent les photos d'origine, `vrm_detourage` n'est plus lu ni synchronisé, la carte de Réglages est retirée ; `photosPourVestiaire` détoure toutes les photos (aucune publication Vestiaire n'existe encore : rien n'est dépensé). Le Studio photo (Annonces → Outils, détourage local sans clé) n'est PAS touché. `audit-detourage-ext.cjs` (5 rouges sur l'avant), banc `detourage-reglage.cjs` réécrit (6 rouges sur l'avant).
+- **Pack photo Leboncoin** : la page du compte charge `api/usage-consumption-bff/v2/users/me/packages` (mesuré dans `lbc_recon.paths`, corps JAMAIS vu). `noterPackPhoto` écrit `lbc_pack_photo = { actif, at, source:'extension', forme, endpoint }` : un pack nommé « photo » ⇒ true ; liste de packs lisible sans photo (ou vide) ⇒ false ; forme illisible ⇒ AUCUN `actif` (pas su), la forme (clés + types, jamais une valeur) est gardée pour la passe suivante. Le catalogue (`product-catalog`) n'est jamais une preuve. `audit-lbc-pack.cjs` (7 rouges sur l'avant, 3 mutations). ⚠️ Non mesuré : la vraie forme de la réponse — si elle n'a pas de champ nom/type/code, rien ne sera écrit tant qu'on n'aura pas lu `lbc_pack_photo.forme`.
+- **Marque Leboncoin** : mesuré sur son dépôt du 15 oct. (5.177) — Univers/Type/Pointure/État remplis, **Marque vide** (le menu ne montre que 11 marques et filtre à la frappe). `choisirComposantRecherche` TAPE `ad.marque` puis ne clique que l'option EXACTE (casse/accents ignorés) ; rien d'exact ⇒ le texte tapé est effacé, deux essais au plus. La description, elle, était bien posée (466 caractères mesurés). La couleur n'est captée nulle part (ni dressing, ni détail) : laissée à lui. Banc `leboncoin.cjs` (1 rouge sur l'avant).
+- **Litige** : `A_EXPEDIER` porte `COLIS_DEJA_BOUGE` (même texte que l'app, chantier 4) — la nB546 (`needs_action`, « colis déposé… », transaction 440 « Retour initié ») n'est plus à expédier. Le résumé posé pour le widget/rappels retire les transactions 220 / ≥ 430 (`transactionsQuiNeSExpedientPlus`, lecture ratée ⇒ rien n'est retiré).
+- **Vente annulée** : `purgeBordereauxAnnules` (à chaque visite, 20 min de recul) — transaction 500-520 dont l'expédition n'a pas bougé ⇒ PDF retiré de `email_bord_{tx}`, `harvest_{uid}_label_{tx}` et `label_latest` qui la porte, sans attendre 7 jours, métadonnée gardée (`annulee: true`), l'app prévenue (`maj · annulee · tx`). Lecture ratée ⇒ rien. Mesuré : 3 ventes 520 ont encore un bordereau. `audit-purge-bordereaux.cjs` §6-7 (2 rouges sur l'avant ; mutation « expédition jamais bougée » ⇒ 2 rouges).
+- Extension **5.185.0**, zip régénéré, `EXT_ATTENDUE` suivie, `EXT_CAPACITES.lbcpack` / `.annulee`.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9267,11 +9323,13 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
 | `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
-| `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
+| ~~`detourage`~~ | `detourerPhotos` | ⛔ retiré de la table le 17 oct. (5.185) | Leboncoin/eBay ne détourent plus ; Vestiaire seul (`photosPourVestiaire`), sans réglage ni promesse |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
 | `relais` | `traiterRelais` | **5.183.0** (16 oct. — la 5.182 publiée par main, fiche Leboncoin, ne l'a pas) | « sur le téléphone : actions via ton ordinateur » (le relais lit le signe de vie, pas le pont) |
+| `lbcpack` | `noterPackPhoto` | **5.185.0** (17 oct.) | « l'extension voit si tu as un pack photo Leboncoin » (`lbc_pack_photo`) |
+| `annulee` | `purgeBordereauxAnnules` | **5.185.0** (17 oct.) | « le bordereau d'une vente annulée part tout seul » |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 | `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
 | `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
@@ -9733,6 +9791,58 @@ Demande de Julien : graphiques « à points comme Ma journée », les déclarati
 - **Formulaires de Compta** : dépense = « c'est pour quoi » en pastilles (`DEPENSE_CATS`, l'exemple suit la catégorie, « Abonnement » n'y est plus), libellés au-dessus des champs, ajout incomplet dit pourquoi ; abonnement = les plus courants en un clic (`ABONNEMENTS_COURANTS` ; prix rempli pour VRM seul, celui des CGV), « jusqu'au (vide s'il continue) ».
 - **Pack photo Leboncoin facultatif** : section « Packs & options (facultatif) » ; ligne `lbc_pack_photo` = `{actif, at, source:'extension'}` écrite par l'extension (contrat avec le chantier extension) — trois états, affichée « détecté par l'extension », aucun montant inventé.
 - Preuves : banc `stats-compta.cjs` (58 contrôles, deux tailles, données inventées) ; `stats-premium`, `urssaf`, `chiffres-croises` jugent maintenant la carte URSSAF sur l'onglet Compta.
+
+### La pièce du Stock : vue du dessus, forme libre, meubles qui ne se traversent pas (17 octobre)
+Julien : « la créer avec une vue du dessus… la forme que l'on veut… étagères métal,
+bois, portants, tables… si on enlève celui du dessous, celui du dessus descend…
+une petite animation vers une vue 2D du dessus… un bouton dans Colis qui met en
+couleur les numéros vendus ». Les règles vivent dans **`src/stockRegles.js`**
+(pur, exécuté par `audit-stock-plan.cjs`) ; l'écran, la 3D et l'audit les appellent.
+- **Forme libre** : `room.poly` (coins en mètres, cadre 0..w × 0..h, normalisée au
+  coin 0,0 — tout ce qui est posé suit le décalage). Absente = le rectangle d'avant,
+  rendu à l'identique. `PlanDessus` (dans « Aménager la pièce ») : tirer un coin
+  (calé à 25 cm), « + » au milieu d'un mur, retirer un coin, formes Rectangle / L /
+  U / T, cotes des murs ; on glisse aussi les meubles. Une forme qui se recoupe ou
+  de moins d'1 m² est refusée ; une forme qui laisserait un meuble dehors aussi.
+  La 3D (`Room3D`) dessine sol, murs et plinthes de la forme ; « coller au mur »
+  vise le mur DROIT le plus proche.
+- **Meubles** : palette réduite à Étagère métal (montants, plateaux, croix), Étagère
+  bois, Portant à cintres, Table, Cartons au sol, + Murs (porte, fenêtre) et Décor.
+  Les anciens types (grille, commode, étagère d'avant, casiers…) sont `hidden` —
+  **gardés** : sa pièce en porte (mesuré : 2 grilles, 1 étagère, 1 commode, 2 tables,
+  1 pile) et ses numéros rangés ne bougent pas. Les onglets Grille et Photos du
+  Stock sont retirés (mesuré vides chez lui) ; un choix mémorisé retombe sur la pièce.
+  Une table d'avant VIDE reçoit des places sur son plateau (migration sans perte).
+- **Deux physiques de case** (`modeCase`) : `colonne` (mur de boîtes : la colonne
+  tombe, comme avant) et `pile` (plateau : les boîtes s'empilent DANS la case, 2
+  par case sur une étagère métal, plusieurs sur une table ; rien ne tombe d'un
+  plateau à l'autre) ; `cintre` = un numéro par cintre. L'assistant « Ranger » 2D
+  suit les deux.
+- **Non-traversée** (`placerSansTraverser`) : ajouter, déplacer (3D ou plan),
+  dupliquer, pivoter, élargir — poussé jusqu'à la place libre la plus proche, ou
+  refusé et dit (jamais posé en travers, jamais hors de la pièce, coin rentrant
+  d'un L/U compris). Ce qui est POSÉ sur un meuble le suit ; meuble retiré ⇒ ce
+  qui était dessus redescend au sol. Une pile glissée dans le plan se pose sur la
+  table visée, sinon au sol.
+- **Gravité vue** : la 3D note la hauteur de chaque boîte numérotée avant de se
+  reconstruire ; une boîte du même meuble et du même numéro qui se retrouve plus
+  bas TOMBE (300 ms, rien si « réduire les animations »).
+- **Vue du dessus** : après un changement de disposition, la caméra monte à la
+  verticale (~620 ms) ; « ↩ 3D » revient.
+- **Aperçu** : la feuille « Ranger » montre le meuble vu de face, la case visée en
+  accent (`ApercuMeuble`). Toucher une boîte : changer son N° ou la sortir.
+- **Colis → Stock** : « Où sont ces N paires dans le stock » (N° des colis à faire,
+  lus sur la ligne) ouvre le Stock, colore chaque carton (un contour par paire) et
+  dit où est chacun — ou « rangée nulle part » (`DEMANDE_STOCK_CHERCHE`, module).
+- Preuves : `audit-stock-plan.cjs` (32 contrôles, `--prouve` 5/5 mutations au
+  rouge) ; banc `stock-piece.cjs` (port 6311, 1512 + 390 px) **11 rouges sur le
+  build d'avant**, 0 après, et 6 réaffaiblissements de l'app chacun rouge (la pile
+  ne suit plus la table · reste en l'air · pas de chute · Colis sans couleur · sans
+  vue du dessus · meubles qui se traversent). `garage3d`, `rangement`,
+  `compta-stock-ui` restent verts.
+- **Non mesuré** : un vrai téléphone (le WebGL du banc est logiciel) ; la lisibilité
+  de la vue du dessus sur une très grande pièce ; Julien n'a pas encore ouvert sa
+  pièce réelle avec ce code (lecture seule de sa base : 2 pièces, 8 meubles).
 
 ---
 
