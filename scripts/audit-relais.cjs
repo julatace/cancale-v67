@@ -41,7 +41,7 @@ const cmdRow = (cmd, args, extra = {}, rowExtra = {}) => ({ id: nid(), owner: MO
 const replyArgs = (conv = 5501, uid = UID) => ({ uid, method: 'POST', endpoint: `/api/v2/conversations/${conv}/replies`, body: { reply: { body: 'Bonjour', photo_temp_uuids: null } } });
 
 // Un fond avec une base qui connaît `owner` et le PATCH conditionnel.
-function monter({ rel = [], session = true, connecte = UID, lectureFileKO = false, store = null, actions = null } = {}) {
+function monter({ rel = [], session = true, connecte = UID, lectureFileKO = false, store = null, actions = null, patchLent = null } = {}) {
   const st = store || {};
   if (session) st.vrmSession = SESSION; else delete st.vrmSession;
   st.vrmCloisonne = true;
@@ -79,6 +79,10 @@ function monter({ rel = [], session = true, connecte = UID, lectureFileKO = fals
         const r = eq && table[eq[1]];
         let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
         reseau.patch.push({ id: eq && eq[1], cond: cond || null, etat: corps.data && corps.data.etat });
+        // Une base lente sur CETTE écriture (la requête est partie : l'état est
+        // appliqué à l'arrivée, comme une vraie base).
+        const lent = patchLent ? patchLent(corps) : 0;
+        if (lent) await new Promise((res) => setTimeout(res, lent));
         if (!r || (own && r.owner !== own) || (cond && r.data.etat !== cond)) return rep(200, []);
         r.data = corps.data; delete r.metaEtat;
         return rep(200, [{ id: r.id }]);
@@ -229,6 +233,57 @@ const replies = (f) => f.j.vinted.filter((v) => v.methode === 'POST' && /\/repli
     const res = await tick(f);
     dit(replies(f) === 0 && f.table[r.id].data.etat === 'attente', 'la base répond 522 : rien chez Vinted, la commande reste en attente', `réponses=${replies(f)}, ${JSON.stringify(res)}`);
     dit(f.j.diags.includes('relais_lecture_ratee'), 'et c\'est noté au diagnostic', JSON.stringify(f.j.diags));
+  });
+
+  console.log('── 10. Un bordereau qui finit avant que « en cours » soit écrit : la ligne finit « fait »');
+  // Revue du 17 octobre : le PDF déjà prêt chez Vinted finit le job en deux
+  // requêtes, pendant que l'écriture « en-cours » de la ligne traîne dans une
+  // base lente. Elle arrivait APRÈS le « fait » et l'écrasait : le téléphone
+  // restait sur « En cours sur ton ordinateur… » pour toujours.
+  await essaie('fini avant en-cours', async () => {
+    const r = cmdRow('bordereau', { uid: UID, tx: '880010' });
+    const f = monter({ rel: [r], patchLent: (c) => (c.data && c.data.etat === 'en-cours' ? 40 : 0) });
+    const jid = `bord:${UID}:880010`;
+    f.ctx.executerCommande = async () => { setTimeout(() => { f.ctx.majCmd(jid, { etape: 'fait', uid: UID, tx: '880010' }); }, 5); return { accepte: true, jobId: jid, etape: 'file', vivant: true }; };
+    await tick(f);
+    await new Promise((res) => setTimeout(res, 150));
+    dit(f.table[r.id].data.etat === 'fait', 'la ligne dit « fait », jamais « en-cours » par-dessus', JSON.stringify({ etat: f.table[r.id].data.etat, patchs: f.reseau.patch.filter((p) => p.id === r.id).map((p) => p.etat) }));
+  });
+  await essaie('fini avant le lien', async () => {
+    // Le job a fini entre l'accusé et l'inscription du suivi : il doit quand même finir « fait ».
+    const r = cmdRow('bordereau', { uid: UID, tx: '880011' });
+    const f = monter({ rel: [r] });
+    const jid = `bord:${UID}:880011`;
+    f.ctx.executerCommande = async () => { await f.ctx.majCmd(jid, { etape: 'fait', uid: UID, tx: '880011' }); return { accepte: true, jobId: jid, etape: 'file', vivant: true }; };
+    await tick(f);
+    await new Promise((res) => setTimeout(res, 100));
+    dit(f.table[r.id].data.etat === 'fait', 'un job déjà fini au retour de la commande : la ligne dit « fait »', f.table[r.id].data.etat);
+  });
+  await essaie('en cours reste en cours', async () => {
+    const r = cmdRow('bordereau', { uid: UID, tx: '880012' });
+    const f = monter({ rel: [r] });
+    const jid = `bord:${UID}:880012`;
+    f.ctx.executerCommande = async () => { await f.ctx.majCmd(jid, { etape: 'file', uid: UID, tx: '880012' }); return { accepte: true, jobId: jid, etape: 'file', vivant: true }; };
+    await tick(f);
+    await new Promise((res) => setTimeout(res, 50));
+    dit(f.table[r.id].data.etat === 'en-cours', 'l\'autre sens : un job encore en file laisse la ligne « en-cours »', f.table[r.id].data.etat);
+    await f.ctx.majCmd(jid, { etape: 'fait' });
+    await new Promise((res) => setTimeout(res, 50));
+    dit(f.table[r.id].data.etat === 'fait', 'puis « fait » quand il finit', f.table[r.id].data.etat);
+  });
+
+  await essaie('pdf puis fait', async () => {
+    // Deux étapes coup sur coup (« pdf » puis « fait »), la première lente à écrire.
+    const r = cmdRow('bordereau', { uid: UID, tx: '880013' }, { etat: 'en-cours' });
+    let lente = true;
+    const f = monter({ rel: [r], patchLent: (c) => (lente && c.data && c.data.resultat && c.data.resultat.etape === 'pdf' ? 40 : 0) });
+    const jid = `bord:${UID}:880013`;
+    f.store.vrmRelaisJobs = { [jid]: { id: r.id, at: Date.now() } };
+    f.ctx.majCmd(jid, { etape: 'pdf' });
+    await new Promise((res) => setTimeout(res, 5));
+    f.ctx.majCmd(jid, { etape: 'fait' });
+    await new Promise((res) => setTimeout(res, 150));
+    dit(f.table[r.id].data.etat === 'fait', 'une étape lente à écrire ne repasse jamais par-dessus « fait »', JSON.stringify({ etat: f.table[r.id].data.etat, etape: (f.table[r.id].data.resultat || {}).etape }));
   });
 
   console.log(`\n${ok} contrôle(s) conforme(s), ${ko} non conforme(s).`);

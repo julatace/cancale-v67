@@ -9200,6 +9200,43 @@ mon ordinateur] je veux pouvoir faire des actions ». Avant, sur le téléphone,
   signe de vie est celui du DERNIER ; la prise conditionnelle empêche une double
   exécution, mais l'autre ordinateur peut refuser « autre compte »).
 
+### Revue adverse de l'extension (17 octobre, 5.184) — trois défauts reproduits
+Chacun REPRODUIT d'abord en exécutant le vrai `background.js` (`_fond-vm.cjs`,
+harnais des audits), rouge sur 1872a1a (§6.1, arbre archivé, audit lancé depuis
+lui), vert après.
+- ⚠️⚠️ **Le plafond de 20 actions/heure cédait à deux gestes simultanés.**
+  `compterAction` (et `compterLecture`) faisaient lire-ajouter-réécrire dans
+  `chrome.storage.local` sans file : trois réponses lancées ensemble à 19
+  actions partaient TOUTES les trois, et quatre gestes sur un budget vide n'en
+  notaient qu'UN (la suite de l'heure dépassait encore). Le relais du téléphone
+  rend ce cas réel (un geste du téléphone pendant un clic dans l'app). ⇒ une
+  chaîne de promesses (`unCompteurALaFois`) sérialise le compte — ce n'est pas un
+  tampon de données (§4.9), l'état reste dans le stockage.
+  `audit-compteurs-concurrents.cjs` : 4 rouges sur l'avant.
+- ⚠️⚠️ **Une marque Leboncoin ratée publiait la paire deux fois.** `markPosted`
+  (après une publication réussie) et « Déjà publiée » (`lbcMarque`, `ebayMarque`)
+  jetaient le résultat de l'écriture de `vinted_lbc_posted` : base qui hoquette ⇒
+  l'app lisait « fait », la paire restait dans la file, et un nouveau « Publier »
+  (le téléphone par le relais ne voit pas l'état des jobs) ouvrait un SECOND
+  dépôt qui publie tout seul. ⇒ `writePosted`/`markLbcPosted` rendent le vrai
+  résultat ; « Déjà publiée » ratée répond `lecture` ; une publication non notée
+  garde `nonMarquee` sur sa commande, et `publierDepuisApp` retente la marque au
+  clic suivant sans JAMAIS rouvrir de dépôt (`deja-publiee`, même confirmé).
+  `audit-publier-app.cjs` : 4 rouges sur l'avant.
+- **Relais : « en cours » écrasait « fait ».** `traiterRelais` inscrivait le
+  suivi du bordereau AVANT d'écrire « en-cours » : un job rapide (PDF déjà prêt
+  chez Vinted) écrivait « fait » pendant que « en-cours » traînait dans une base
+  lente, et l'écrasait en arrivant — le téléphone restait « En cours sur ton
+  ordinateur… ». Et « pdf » puis « fait » partaient en parallèle. ⇒ « en-cours »
+  d'abord, puis le suivi, puis l'état relu (un job déjà fini est relayé) ;
+  `relaisSuivreJob` passe ses étapes une à une. `audit-relais.cjs` §10 : 3 rouges
+  sur l'avant.
+- Cherché sans rien trouver de confirmé : helpers hors portée (balayage Babel de
+  tous les fichiers de l'extension : 0), balayages non paginés (tous bornés par
+  compte), lire-fusionner-réécrire sans garde de lecture ratée (tous gardés).
+- Extension **5.184.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : des corrections.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
