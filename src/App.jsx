@@ -21,6 +21,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { jetonsStream, demarrerStream } from "./streamFlou.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -8370,6 +8371,7 @@ const streamActif = () => { try { return localStorage.getItem('vrm_stream') === 
 const poserStream = (on) => {
   try { localStorage.setItem('vrm_stream', on ? '1' : '0'); } catch (_) {}
   try { document.documentElement.setAttribute('data-stream', on ? '1' : '0'); } catch (_) {}
+  try { demarrerStream(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:stream', { detail: !!on })); } catch (_) {}
 };
 try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-stream', streamActif() ? '1' : '0'); } catch (_) {}
@@ -8378,6 +8380,28 @@ const useStream = () => {
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
   return on;
 };
+// (17 oct.) L'ENTREPRISE DU VENDEUR, pour l'en-tête : la ligne `vrm_pro_facture`
+// (celle du reçu d'achat, §11), relue au montage et suivie quand « Ton
+// entreprise » (Comptabilité) ou « Facturation Pro » (Réglages) l'écrivent.
+// Trois états : `undefined` en cours · `null` pas su · objet lu.
+const useEntreprise = () => {
+  const [e, setE] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireReglage('vrm_pro_facture').then((d) => { if (!mort) setE(d === null ? null : { nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); }).catch(() => { if (!mort) setE(null); });
+    const suivre = (ev) => { const d = ev && ev.detail; if (d && typeof d === 'object') setE({ nom: String(d.nom || '').trim(), siret: String(d.siret || '').trim() }); };
+    window.addEventListener('vrm:profil-fiscal', suivre);
+    return () => { mort = true; window.removeEventListener('vrm:profil-fiscal', suivre); };
+  }, []);
+  return e;
+};
+// Le nom de l'entreprise, à côté du logo. Rien tant qu'il n'est pas connu (on
+// n'invente pas de nom, §5) ; `vrm-sensible` : le mode stream le floute.
+function NomEntreprise({ entreprise, className }) {
+  const nom = entreprise && entreprise.nom;
+  if (!nom) return null;
+  return <span className={`${className} vrm-sensible`} data-nom-entreprise={nom} title={nom}>{nom}</span>;
+}
 // (16 oct.) Les comptes que la RECHERCHE regarde : liés et pas masqués. Un
 // compte supprimé (plus dans `vinted_accounts`) ou masqué n'y apparaît plus.
 // Liste vide ⇒ `null` (« pas su » : on n'écarte rien).
@@ -9902,12 +9926,12 @@ const NAV_LARGEUR = 160;
 
 // Navigation compacte par plateforme. Les outils partagés restent dans le
 // panneau Gestion à gauche ; les sections Vinted sont dans leur plateforme.
-function SideBar({ tab, setTab }) {
+function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
   return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/></div>
+    <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll">
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
       <section className="vrm-rail-management-group" aria-label="Gestion"><div className="vrm-rail-section-label">Gestion</div><div className="vrm-rail-management">{outils.map(bouton)}</div></section>
@@ -24233,7 +24257,26 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
 // ⚠️ La ligne `vrm_pro_facture` se réécrit ENTIÈRE : lue en trois états
 //    (`lireReglage`), et une lecture ratée n'écrit RIEN (sinon la première
 //    frappe effaçait sa raison sociale et son SIRET).
-const PROFIL_CHAMPS = [['nom', 'Raison sociale / nom commercial', '1 1 100%'], ['siret', 'SIREN ou SIRET', '1 1 200px'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
+// (17 oct., Julien : « je ne sais pas ce que c'est que le profil fiscal » ;
+// « l'utilisateur n'a pas besoin de mettre son nom d'entreprise, il met son
+// numéro de SIRET »). La carte s'appelle « Ton entreprise », le SIRET vient en
+// premier, et le nom (et l'adresse) sont retrouvés au registre public des
+// entreprises (`chercherEntreprise`, par son SIREN EXACT — jamais un nom qui
+// ressemble, §5). Le nom reste modifiable : s'il le change à la main, VRM ne le
+// remplace plus (`nomAuto` garde le nom que VRM a posé).
+const _entreprisesLues = new Map();          // chiffres → réponse (une fois par session)
+async function chercherEntreprise(brut) {
+  const ch = String(brut || '').replace(/\D/g, '');
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide' };
+  if (_entreprisesLues.has(ch)) return _entreprisesLues.get(ch);
+  try {
+    const r = await fetch(`/api/compte?mode=entreprise&siret=${ch}`, { headers: enTeteSession() });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && (j.etat === 'trouve' || j.etat === 'inconnu')) { _entreprisesLues.set(ch, j); return j; }
+    return { etat: 'passu' };
+  } catch (_) { return { etat: 'passu' }; }
+}
+const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise — retrouvé avec ton SIRET", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
 function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
@@ -24261,6 +24304,34 @@ function ProfilFiscalCarte({ onNav }) {
   const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
   React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
   const siren = verifierSiren(cfg && cfg.siret);
+  // Le registre : interrogé quand le numéro est VALIDE (clé de contrôle), une
+  // fois par numéro. Trouvé ⇒ le nom (et l'adresse si elle est vide) sont posés,
+  // sauf s'il a tapé lui-même un autre nom.
+  const [registre, setRegistre] = React.useState(null);   // null · {etat:'encours'|'trouve'|'inconnu'|'passu', …}
+  const chiffres = String((cfg && cfg.siret) || '').replace(/\D/g, '');
+  const cfgRef = React.useRef(cfg); cfgRef.current = cfg;
+  const pret = !!cfg;
+  React.useEffect(() => {
+    if (!pret || siren.etat !== 'ok') { setRegistre(null); return undefined; }
+    let mort = false;
+    setRegistre({ etat: 'encours' });
+    chercherEntreprise(chiffres).then((j) => {
+      if (mort) return;
+      setRegistre(j);
+      const c = cfgRef.current;
+      if (j.etat !== 'trouve' || !c || String(c.siret || '').replace(/\D/g, '') !== chiffres) return;
+      const libre = !String(c.nom || '').trim() || c.nom === c.nomAuto;
+      const next = { ...c };
+      let change = false;
+      if (libre && c.nom !== j.nom) { next.nom = j.nom; next.nomAuto = j.nom; change = true; }
+      if (j.etabTrouve && !String(c.adresse || '').trim() && j.adresse) { next.adresse = j.adresse; change = true; }
+      if (j.etabTrouve && !String(c.codePostal || '').trim() && j.codePostal) { next.codePostal = j.codePostal; change = true; }
+      if (j.etabTrouve && !String(c.ville || '').trim() && j.ville) { next.ville = j.ville; change = true; }
+      if (change) ecrire(next);
+    });
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chiffres, siren.etat, pret]);
   const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -24268,8 +24339,8 @@ function ProfilFiscalCarte({ onNav }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
           <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Profil fiscal</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>L'identité qui part sur tes reçus d'achat et tes factures, et ton régime.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures ; ton régime sert à calculer tes cotisations.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
@@ -24281,13 +24352,17 @@ function ProfilFiscalCarte({ onNav }) {
               {PROFIL_CHAMPS.map(([k, ph, flex]) => (
                 <input key={k} data-profil-champ={k} value={cfg[k] || ''} placeholder={ph} aria-label={ph} inputMode={k === 'siret' || k === 'codePostal' ? 'numeric' : undefined}
                   onChange={(e) => ecrire({ ...cfg, [k]: e.target.value })}
+                  data-profil-auto={k === 'nom' && cfg.nom && cfg.nom === cfg.nomAuto ? '1' : undefined}
                   style={{ ...inp, flex, borderColor: k === 'siret' && siren.etat === 'invalide' ? C.warn : C.border }} />
               ))}
             </div>
-            <div data-siren={siren.etat} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
-              {siren.etat === 'vide' ? 'SIREN (9 chiffres) ou SIRET (14) : il figure sur ton avis de situation INSEE.'
-                : siren.etat === 'ok' ? `${siren.type} valide (clé de contrôle correcte).`
-                : `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`}
+            <div data-siren={siren.etat} data-registre={registre ? registre.etat : undefined} style={{ fontSize: 11, lineHeight: 1.5, color: siren.etat === 'invalide' ? C.warn : C.muted, marginTop: -4 }}>
+              {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres) : il figure sur ton avis de situation INSEE. Le nom de ton entreprise se remplit tout seul.'
+                : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`
+                : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
+                : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
+                : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
+                : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
             </div>
           </>)}
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -40584,6 +40659,7 @@ function ProFactureSetting() {
   const persist = (next) => {
     if (cfg === null) return;                  // pas lu : on n'écrit rien
     setCfg(next); setStatus('enregistrement…');
+    try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: next })); } catch (_) {}
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
@@ -42525,6 +42601,27 @@ function AppCoeur() {
   // comme complet. `ebayCmdTous` garde le détail par compte pour le résumé
   // de l'onglet eBay (le compte choisi, ou tous).
   const comptesEbay = useComptesEbay();
+  // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
+  // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
+  // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
+  // s'écrit dans une phrase (« Actions possibles · … ») est flouté comme les
+  // autres, sans qu'il faille y penser à chaque écran.
+  const streamOn = useStream();
+  const entreprise = useEntreprise();
+  React.useEffect(() => { demarrerStream(streamOn); }, [streamOn]);
+  React.useEffect(() => {
+    const labels = load('vinted_account_labels', {}) || {};
+    const mails = load('vinted_account_emails', {}) || {};
+    const ch = vintedDeChrome(); const rl = etatRelais();
+    jetonsStream('comptes', [
+      ...(vintedAccounts || []).flatMap((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id]]),
+      ...Object.values(mails), ...Object.values(labels),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
+      AUTH.user && AUTH.user.email,
+      entreprise && entreprise.nom, entreprise && entreprise.siret,
+    ]);
+  });
   const [ebayCmdTous,setEbayCmdTous]=useState(undefined);
   useEffect(()=>{ if (comptesEbay === undefined) return; let stop=false; (async()=>{
     if (comptesEbay === null) { setEbayCmdTous(null); setEbayCommandes(null); return; }
@@ -43666,6 +43763,8 @@ function AppCoeur() {
               ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim"/>
               : <VrmLogo key={tab} size={30}/>}
           </div>
+          {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
+          <NomEntreprise entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         <div className="vrm-header-actions">
@@ -44153,7 +44252,7 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab}/>}
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise}/> : <BottomBar tab={tab} setTab={setTab}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
