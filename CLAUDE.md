@@ -9734,6 +9734,58 @@ Demande de Julien : graphiques « à points comme Ma journée », les déclarati
 - **Pack photo Leboncoin facultatif** : section « Packs & options (facultatif) » ; ligne `lbc_pack_photo` = `{actif, at, source:'extension'}` écrite par l'extension (contrat avec le chantier extension) — trois états, affichée « détecté par l'extension », aucun montant inventé.
 - Preuves : banc `stats-compta.cjs` (58 contrôles, deux tailles, données inventées) ; `stats-premium`, `urssaf`, `chiffres-croises` jugent maintenant la carte URSSAF sur l'onglet Compta.
 
+### La pièce du Stock : vue du dessus, forme libre, meubles qui ne se traversent pas (17 octobre)
+Julien : « la créer avec une vue du dessus… la forme que l'on veut… étagères métal,
+bois, portants, tables… si on enlève celui du dessous, celui du dessus descend…
+une petite animation vers une vue 2D du dessus… un bouton dans Colis qui met en
+couleur les numéros vendus ». Les règles vivent dans **`src/stockRegles.js`**
+(pur, exécuté par `audit-stock-plan.cjs`) ; l'écran, la 3D et l'audit les appellent.
+- **Forme libre** : `room.poly` (coins en mètres, cadre 0..w × 0..h, normalisée au
+  coin 0,0 — tout ce qui est posé suit le décalage). Absente = le rectangle d'avant,
+  rendu à l'identique. `PlanDessus` (dans « Aménager la pièce ») : tirer un coin
+  (calé à 25 cm), « + » au milieu d'un mur, retirer un coin, formes Rectangle / L /
+  U / T, cotes des murs ; on glisse aussi les meubles. Une forme qui se recoupe ou
+  de moins d'1 m² est refusée ; une forme qui laisserait un meuble dehors aussi.
+  La 3D (`Room3D`) dessine sol, murs et plinthes de la forme ; « coller au mur »
+  vise le mur DROIT le plus proche.
+- **Meubles** : palette réduite à Étagère métal (montants, plateaux, croix), Étagère
+  bois, Portant à cintres, Table, Cartons au sol, + Murs (porte, fenêtre) et Décor.
+  Les anciens types (grille, commode, étagère d'avant, casiers…) sont `hidden` —
+  **gardés** : sa pièce en porte (mesuré : 2 grilles, 1 étagère, 1 commode, 2 tables,
+  1 pile) et ses numéros rangés ne bougent pas. Les onglets Grille et Photos du
+  Stock sont retirés (mesuré vides chez lui) ; un choix mémorisé retombe sur la pièce.
+  Une table d'avant VIDE reçoit des places sur son plateau (migration sans perte).
+- **Deux physiques de case** (`modeCase`) : `colonne` (mur de boîtes : la colonne
+  tombe, comme avant) et `pile` (plateau : les boîtes s'empilent DANS la case, 2
+  par case sur une étagère métal, plusieurs sur une table ; rien ne tombe d'un
+  plateau à l'autre) ; `cintre` = un numéro par cintre. L'assistant « Ranger » 2D
+  suit les deux.
+- **Non-traversée** (`placerSansTraverser`) : ajouter, déplacer (3D ou plan),
+  dupliquer, pivoter, élargir — poussé jusqu'à la place libre la plus proche, ou
+  refusé et dit (jamais posé en travers, jamais hors de la pièce, coin rentrant
+  d'un L/U compris). Ce qui est POSÉ sur un meuble le suit ; meuble retiré ⇒ ce
+  qui était dessus redescend au sol. Une pile glissée dans le plan se pose sur la
+  table visée, sinon au sol.
+- **Gravité vue** : la 3D note la hauteur de chaque boîte numérotée avant de se
+  reconstruire ; une boîte du même meuble et du même numéro qui se retrouve plus
+  bas TOMBE (300 ms, rien si « réduire les animations »).
+- **Vue du dessus** : après un changement de disposition, la caméra monte à la
+  verticale (~620 ms) ; « ↩ 3D » revient.
+- **Aperçu** : la feuille « Ranger » montre le meuble vu de face, la case visée en
+  accent (`ApercuMeuble`). Toucher une boîte : changer son N° ou la sortir.
+- **Colis → Stock** : « Où sont ces N paires dans le stock » (N° des colis à faire,
+  lus sur la ligne) ouvre le Stock, colore chaque carton (un contour par paire) et
+  dit où est chacun — ou « rangée nulle part » (`DEMANDE_STOCK_CHERCHE`, module).
+- Preuves : `audit-stock-plan.cjs` (32 contrôles, `--prouve` 5/5 mutations au
+  rouge) ; banc `stock-piece.cjs` (port 6311, 1512 + 390 px) **11 rouges sur le
+  build d'avant**, 0 après, et 6 réaffaiblissements de l'app chacun rouge (la pile
+  ne suit plus la table · reste en l'air · pas de chute · Colis sans couleur · sans
+  vue du dessus · meubles qui se traversent). `garage3d`, `rangement`,
+  `compta-stock-ui` restent verts.
+- **Non mesuré** : un vrai téléphone (le WebGL du banc est logiciel) ; la lisibilité
+  de la vue du dessus sur une très grande pièce ; Julien n'a pas encore ouvert sa
+  pièce réelle avec ce code (lecture seule de sa base : 2 pièces, 8 meubles).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
