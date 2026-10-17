@@ -1,0 +1,59 @@
+/* ── Plateformes (Vinted, Leboncoin, eBay) — 17 octobre ───────────────────
+   Julien : « la mise en page est éteinte » pour les trois. Une seule forme
+   pour les trois en-têtes : une TUILE de marque (la marque dans SA couleur,
+   sur un fond pâle de la même teinte) puis le nom. C'est la seule couleur de
+   l'en-tête, et elle est petite (§7 : un accent rare). */
+.vrm-market-heading { gap: 12px; }
+.vrm-plat-tuile {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--plat) 11%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plat) 18%, transparent);
+}
+.vrm-plat-marque {
+  width: 24px; height: 24px; display: block; background: var(--plat);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+/* eBay : son logo est son nom écrit — la tuile s'élargit, et le titre est caché
+   (il le répétait : « deux logos eBay »). */
+.vrm-plat-tuile-mot { width: auto; padding: 0 14px; }
+.vrm-plat-tuile-mot .vrm-plat-marque { width: 64px; height: 28px; }
+:root[data-theme="dark"] .vrm-plat-tuile { background: color-mix(in srgb, var(--plat) 22%, transparent); }
+:root[data-theme="dark"] .vrm-plat-marque { background: color-mix(in srgb, var(--plat) 55%, white); }
+
+/* ── Les ventes, en trois cases, même vides ── */
+.vrm-kpi-ventes { margin: 0 0 14px; }
+.vrm-kpi-ventes-grille {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+}
+.vrm-kpi-ventes-case {
+  min-width: 0; padding: 12px 12px 11px; border-radius: 12px;
+  background: var(--vrm-surface); border: 1px solid var(--vrm-line);
+  box-shadow: 0 1px 1px rgba(16,21,27,.03), 0 6px 18px rgba(16,21,27,.04);
+}
+:root[data-theme="dark"] .vrm-kpi-ventes-case { background: var(--vrm-surface); box-shadow: none; }
+.vrm-kpi-ventes-lib {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--vrm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vrm-kpi-ventes-val {
+  margin-top: 4px; font-size: 20px; font-weight: 700; color: var(--vrm-ink);
+  letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vrm-kpi-ventes-vide { color: var(--vrm-muted); font-weight: 600; }
+.vrm-kpi-ventes-sub { margin-top: 2px; font-size: 11.5px; color: var(--vrm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-kpi-ventes-note { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--vrm-muted); }
+@media (max-width: 380px) { .vrm-kpi-ventes-val { font-size: 17px; } }
+@media (min-width: 1024px) { .vrm-kpi-ventes-grille { gap: 12px; } .vrm-kpi-ventes-case { padding: 14px 16px; } .vrm-kpi-ventes-val { font-size: 24px; } }
+
+/* ── Une explication repliée : un « ⓘ » discret, le texte au clic ── */
+.vrm-pourquoi { display: inline; }
+.vrm-pourquoi > summary {
+  display: inline-flex; align-items: center; justify-content: center; list-style: none; cursor: pointer;
+  min-width: 44px; min-height: 44px; margin: -12px -10px; color: var(--vrm-muted); font-size: 13px;
+}
+.vrm-pourquoi > summary::-webkit-details-marker { display: none; }
+.vrm-pourquoi > summary::marker { content: ''; }
+.vrm-pourquoi[open] > div { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--vrm-muted); font-weight: 400; }

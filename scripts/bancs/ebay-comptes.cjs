@@ -151,7 +151,9 @@ async function ouvrir(b, vp) {
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
 const sousOnglet = async (pg, nom) => { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 8000 }); await pg.waitForTimeout(900); };
 const choisirVue = async (pg, val) => { await pg.selectOption('#vrm-sel-compte-ebay', val); await pg.waitForTimeout(700); };
-const resume=async pg=>{const summary=pg.locator('.vrm-platform-summary');const ferme=!await summary.evaluate(e=>e.open);if(ferme)await summary.locator('summary').click();const texte=await pg.$eval('[data-plat-resume]',e=>e.innerText);if(ferme)await summary.locator('summary').click();return texte;};
+// (17 oct.) Sur « Ventes », le résumé est porté par les trois cases (`data-ventes-kpi`) ;
+// le résumé du haut se tait (§7). Les autres sous-onglets gardent le résumé.
+const resume=async pg=>{if(await pg.$('[data-ventes-kpi]'))return pg.$eval('[data-ventes-kpi]',e=>e.innerText);const summary=pg.locator('.vrm-platform-summary');const ferme=!await summary.evaluate(e=>e.open);if(ferme)await summary.locator('summary').click();const texte=await pg.$eval('[data-plat-resume]',e=>e.innerText);if(ferme)await summary.locator('summary').click();return texte;};
 const ventes = (pg) => pg.$$eval('[data-ebay-vente]', (l) => l.map((e) => ({ id: e.getAttribute('data-ebay-vente'), c: e.getAttribute('data-ebay-compte'), t: e.innerText })));
 const annonces = (pg) => pg.$$eval('[data-ebay-annonce]', (l) => l.map((e) => ({ id: e.getAttribute('data-ebay-annonce'), c: e.getAttribute('data-ebay-compte'), nom: (e.querySelector('[data-ebay-carte-compte]') || {}).textContent || '' })));
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -210,7 +212,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         // N°30 : en vente sur le COMPTE 1. La vue est sur le compte 2 : elle
         // reste bloquée (la garde regarde TOUS les comptes).
         await pg.locator('button', { hasText: 'N°30' }).first().click({ timeout: 8000 });
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        // (17 oct.) Choisir la paire lance l'analyse eBay tout seul ; le bouton ne sert plus qu'en repli.
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '125');
         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
@@ -226,7 +229,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-poster="ebay"]', { timeout: 8000 });
         await pg.click('[data-poster="ebay"]');
         await pg.locator('button', { hasText: 'N°60' }).first().click({ timeout: 8000 });
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        // (17 oct.) Choisir la paire lance l'analyse eBay tout seul ; le bouton ne sert plus qu'en repli.
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '92');
         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});

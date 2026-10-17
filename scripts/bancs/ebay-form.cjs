@@ -26,7 +26,10 @@ const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // Un dressing capté porte TOUJOURS sa date (`storeHarvest` la pose) : sans elle,
 // la règle « en ligne » (11 octobre) ne peut pas dire de quand date la lecture,
 // et la paire passe « à confirmer » (§6.3 : servir la forme réelle).
-const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9, price:{ amount:'87.0', currency_code:'EUR' } }, { id:'222', is_closed:true } ] } } };
+const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9, status:'Neuf sans étiquette', price:{ amount:'87.0', currency_code:'EUR' } }, { id:'222', is_closed:true } ] } } };
+// (17 oct.) Le COFFRE de l'annonce : la marque telle que Vinted l'a enregistrée
+// (le dressing ne la porte pas — mesuré chez Julien : 0 sur 271).
+const COFFRE = [{ id:'coffre_u1_111', brand:'Nike', etat:'Neuf sans étiquette', size:'44', desc:'' }];
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 // Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
 const envoisEbay = []; let avertir = false;
@@ -41,6 +44,7 @@ const envoisEbay = []; let avertir = false;
     if(/\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
+    if(/id=like\.coffre_/.test(u)) return j(COFFRE);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   // IA de rédaction (api/ai) : disponible, et renvoie un titre optimisé.
@@ -147,9 +151,16 @@ const envoisEbay = []; let avertir = false;
   const aiBtn = await pg.$('text=Optimiser le titre avec l\'IA');
   dit(!aiBtn, 'aucun bouton « Optimiser le titre avec l\'IA » (rédaction IA abandonnée le 30 sept.)');
 
-  // Analyser la catégorie → sections + pointure pré-remplie depuis la paire
-  await (await pg.$('text=Trouver la catégorie eBay')).click();
-  await pg.waitForTimeout(900);
+  // (17 oct.) Choisir la paire LANCE l'analyse eBay toute seule (Julien : « la
+  //  marque ne s'est pas remplie toute seule ») — plus de second clic.
+  await pg.waitForTimeout(1200);
+  const auto = envoisEbay.filter(x => x.action === 'pubinfo').length;
+  dit(auto >= 1, 'choisir la paire lance l\'analyse eBay sans second clic (pubinfo envoyé)', 'pubinfo=' + auto);
+  const btnCat = await pg.$('text=Trouver la catégorie eBay');
+  if (btnCat && !auto) { await btnCat.click(); await pg.waitForTimeout(900); }
+  // L'ÉTAT Vinted « Neuf sans étiquette » donne l'état eBay 1500 (dans SA liste).
+  const condVal = await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/^état/i.test(x.textContent.trim())); const s2=l&&l.parentElement&&l.parentElement.querySelector('select'); return s2?s2.value:''; });
+  dit(condVal === '1500', 'l\'état Vinted de la paire (Neuf sans étiquette) choisit l\'état eBay 1500', 'état=' + condVal);
   txt = await T();
   dit(/Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
   // eBay propose d'autres catégories : on peut en choisir une autre (comme eBay).

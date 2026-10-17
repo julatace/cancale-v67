@@ -309,7 +309,8 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
       await essaie('enregistrer en brouillon', async () => {
         await pg.click('[data-poster="ebay"]');
         await pg.locator('button', { hasText: 'N°21' }).first().click({ timeout: 8000 });
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        // (17 oct.) Choisir la paire lance l'analyse eBay tout seul ; le bouton ne sert plus qu'en repli.
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '95');
         await pg.click('[data-publier-brouillon]');
@@ -613,7 +614,8 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         const marque = await pg.$eval('button:has-text("N°21")', (e) => { const b = e.querySelector('[data-paire-deja-ebay]'); return b ? b.getAttribute('data-paire-deja-ebay') + ' · ' + b.textContent : ''; }).catch(() => '');
         dit(/^programmee/.test(marque) && /déjà programmée sur eBay/.test(marque), 'le choix de la paire dit « déjà programmée sur eBay » pour la N°21 (pas seulement les annonces en ligne)', marque);
         await pg.locator('button', { hasText: 'N°21' }).first().click();
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        // (17 oct.) Choisir la paire lance l'analyse eBay tout seul ; le bouton ne sert plus qu'en repli.
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '95');
         let r = await essayerPublier();
@@ -644,7 +646,8 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await versAnnonces(pg);
         await pg.click('[data-poster="ebay"]');
         await pg.locator('button', { hasText: 'N°25' }).first().click({ timeout: 8000 });
-        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        // (17 oct.) Choisir la paire lance l'analyse eBay tout seul ; le bouton ne sert plus qu'en repli.
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '70');
         r = await essayerPublier();

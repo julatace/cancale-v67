@@ -218,10 +218,10 @@ const mesurer = (pg, tel) => pg.evaluate((tel) => {
 
 const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
-  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-plat-resume]', attrs: ['[data-plat-resume]', '[data-section="annonces"]'] },
+  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]'] },
   { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]'] },
   { nom: 'leboncoin-messages', tab: 'plat_leboncoin', section: 'messages', attend: '[data-messages-lbc]', attrs: ['[data-messages-lbc]', '[data-compte-lbc="u1"]'] },
-  { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-plat-resume]', attrs: ['[data-plat-resume]'] },
+  { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"]'] },
   { nom: 'ebay-annonces', tab: 'plat_ebay', section: 'annonces', attend: '[data-ebay-annonce]', attrs: ['[data-ebay-annonce="110000000041"]', '[data-ebay-annonce="110000000099"]'] },
   { nom: 'ebay-compte', tab: 'plat_ebay', section: 'compte', attend: null, attrs: [] },
 ];
