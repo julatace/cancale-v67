@@ -16,6 +16,8 @@
 //
 //  Lancer : npm run build && node scripts/bancs/vitesse.cjs
 //  `VITESSE_DETAIL=1` imprime chaque requête ; `PORT=…` change le port.
+//  `VITESSE_TEXTES=dir` écrit le texte rendu ; `VITESSE_REFERENCE=dir` le compare
+//  à celui d'un autre build (Ma journée).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), http = require('http');
 let chromium;
@@ -43,11 +45,39 @@ srv.listen(PORT);
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 
+// ── LES RENDUS DE L'ÉCRAN AU DÉMARRAGE (17 octobre) ─────────────────────────
+// Le composant qui porte Ma journée, Ventes, Achats et Annonces (`Comptabilite`,
+// ~12 000 lignes) se rendait 14 à 19 fois à l'ouverture de Ma journée : une
+// fois par arrivée de données, ET à chaque rendu de la coque — dont trois pour
+// changer l'icône du nuage (« chargement / sauvegarde / synchronisé ») et deux
+// pour « ventes arrivées » puis « chiffres calculés ». Le crochet des outils de
+// développement (appelé par React à chaque commit, production comprise) compte
+// les commits où CE composant a réellement exécuté sa fonction (drapeau
+// `PerformedWork` sur une fibre neuve — une fibre reprise telle quelle n'a pas
+// été rendue). On le reconnaît à ses props : `only` = l'écran, et `accounts`.
+function crochetRendus(only) {
+  const C = { rendus: 0, dernier: null };
+  window.__vrmRendus = C;
+  const trouver = (f) => { const pile = [f]; while (pile.length) { const x = pile.pop(); if (!x) continue; const p = x.memoizedProps; if (typeof x.type === 'function' && p && p.only === only && 'accounts' in p) return x; if (x.sibling) pile.push(x.sibling); if (x.child) pile.push(x.child); } return null; };
+  window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+    supportsFiber: true, isDisabled: false, renderers: new Map(),
+    inject(r) { const id = this.renderers.size + 1; this.renderers.set(id, r); return id; },
+    checkDCE() {}, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
+    onCommitFiberRoot(_id, root) {
+      let f = null; try { f = trouver(root.current); } catch (_) {}
+      if (!f || f === C.dernier) return;
+      C.dernier = f;
+      if (f.flags & 1) C.rendus++;
+    },
+  };
+}
+
 async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   if (vp.width < 600 && CPU > 1) { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
   const req = [];
@@ -96,7 +126,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const dern = req.length ? Math.max(...req.map((x) => x.fin)) : 0;
     if (Date.now() - t0 - dern > 3000) break;
   }
-  const lu = await pg.evaluate(() => ({ tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: document.body.innerText }));
+  // ⚠️ Sauf la phrase des photos (`data-photos-bloquees`) : le banc coupe les
+  // images, et elle apparaît au bout d'un délai — elle dit le temps écoulé.
+  const lu = await pg.evaluate(() => { let t = document.body.innerText; for (const x of document.querySelectorAll('[data-photos-bloquees]')) t = t.replace(x.innerText, ''); return { tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: t, rendus: window.__vrmRendus ? window.__vrmRendus.rendus : null }; });
   // Ce que coûte une FRAPPE dans la recherche de la liste : chaque lettre de
   // « salomon », jusqu'à l'image suivante peinte (deux rAF).
   let frappes = null;
@@ -172,6 +204,10 @@ function bilan(nom, r) {
 // un temps mesuré dessus varie du simple au double (`perfv.cjs` garde ceux de
 // la frappe sur Ventes).
 const DOUBLONS_MAX = 8;
+// Rendus de Ma journée au démarrage, téléphone ×4 (médiane de trois ouvertures
+// à froid) : 14 à 19 avant le 17 octobre, 11 à 12 après (`BoutonSync`, lectures de la fin
+// lancées avec les ventes). Le plafond ne bloque que le retour du défaut.
+const RENDUS_JOURNEE_MAX = 13;
 const PLAFONDS = { journee: 62, cat_ventes: 82, cat_bord: 82, cat_annonces: 66, cat_achats: 78, cat_msg: 66, dashboard: 60 };
 const ECRANS = [
   ['journee', () => !!document.querySelector('[data-vendu-mois],[data-vendu-pas-su]') || /pas pu s'afficher/.test(document.body.innerText)],
@@ -184,7 +220,7 @@ const ECRANS = [
 ];
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
   const res = {};
   try {
     const seuls = process.env.ECRANS ? process.env.ECRANS.split(',') : null;
@@ -192,7 +228,7 @@ const ECRANS = [
       console.log(`\n── ${vp.width} px (RTT ${RTT} ms, ${DEBIT / 1e6} Mo/s)`);
       for (const [tab, att, frappe] of ECRANS) {
         if (seuls && !seuls.includes(tab)) continue;
-        const r = await ouvrir(b, vp, tab, att, frappe);
+        const r = await ouvrir(b, vp, tab, att, frappe, tab === 'journee' ? { rendus: 'journee' } : {});
         res[vp.width + ':' + tab] = { ...bilan(tab, r), tombe: r.lu.tombe, errs: r.errs, frappes: r.frappes };
         if (r.frappes) console.log(`     frappe « salomon » : ${r.frappes.t.join(' · ')} ms (max ${r.frappes.max})`);
         if (process.env.VITESSE_TEXTES) fs.writeFileSync(path.join(process.env.VITESSE_TEXTES, vp.width + '-' + tab + '.txt'), r.lu.texte);
@@ -207,6 +243,30 @@ const ECRANS = [
         dit(m.txn <= 2, `${vp.width} px · ${tab} : la famille des transactions balayée deux fois au plus`, `${m.txn}`);
         dit(m.supprParCompte === 0, `${vp.width} px · ${tab} : les suppressions lues en une lecture, pas une par compte`, `${m.supprParCompte}`);
         if (tab === 'journee') {
+          // ── LES RENDUS AU DÉMARRAGE (17 octobre) ──
+          // Trois ouvertures à froid (la première est celle mesurée plus haut) :
+          // le nombre de rendus dépend de l'ordre d'arrivée des lectures, on
+          // juge la MÉDIANE. Avant : 14 à 19 (médiane 15-16). Après : 11-12.
+          // ⚠️ Et le texte rendu ne doit pas bouger d'un caractère : un rendu de
+          // moins qui laisserait un chiffre en arrière serait pire (§5).
+          const ns = [r.lu.rendus];
+          for (let k = 0; k < 2; k++) { const rk = await ouvrir(b, vp, tab, att, null, { rendus: 'journee' }); ns.push(rk.lu.rendus); }
+          const tri = ns.filter((n) => n != null).sort((x, y) => x - y);
+          const med = tri.length === ns.length ? tri[1] : null;
+          console.log(`     rendus de Ma journée au démarrage : ${ns.join(' · ')} (médiane ${med ?? '—'})`);
+          dit(med != null && med > 0, `${vp.width} px · journee : le compteur de rendus voit l'écran (sinon le contrôle suivant ne mesurerait rien)`, ns.join('/'));
+          // Le plafond vaut pour le TÉLÉPHONE (processeur ×4) : c'est là que chaque
+          // rendu coûte. Sur ordinateur, sans ralentissement, les lectures arrivent
+          // plus éparpillées et React les regroupe moins (mesuré : 17-21 avant,
+          // 13-16 après) — chiffre imprimé, pas jugé (trop proche pour un seuil).
+          if (vp.width < 600) dit(med != null && med <= RENDUS_JOURNEE_MAX, `${vp.width} px · journee : au plus ${RENDUS_JOURNEE_MAX} rendus de l'écran au démarrage (médiane de 3, téléphone ×${CPU})`, ns.join('/'));
+          if (process.env.VITESSE_REFERENCE) {
+            const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+            let ref = null; try { ref = fs.readFileSync(path.join(process.env.VITESSE_REFERENCE, vp.width + '-' + tab + '.txt'), 'utf8'); } catch (_) {}
+            const a = norm(r.lu.texte), c = norm(ref);
+            let i = 0; while (i < a.length && a[i] === c[i]) i++;
+            dit(ref != null && a === c, `${vp.width} px · journee : texte rendu identique à celui de l'autre build (${process.env.VITESSE_REFERENCE})`, ref == null ? 'pas de référence' : a === c ? `${a.length} caractères` : `écart au caractère ${i} : « ${a.slice(Math.max(0, i - 40), i + 60)} » ≠ « ${c.slice(Math.max(0, i - 40), i + 60)} »`);
+          }
           // ── LE PREMIER ÉCRAN : la chaîne sonde → comptes → ventes (16 octobre) ──
           // Les ventes partent EN MÊME TEMPS que les comptes (le préchargement du
           // démarrage), plus après eux : au plus deux allers-retours à la suite
