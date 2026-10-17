@@ -886,10 +886,46 @@
     }
     return false;
   }
+  // ── LA MARQUE (17 octobre — Julien : « la marque ne s'est pas remplie toute
+  //    seule »). Mesuré sur son dépôt du 15 octobre (`lbc_recon.etapes`, 5.177) :
+  //    Univers, Type, Pointure et État remplis, **Marque vide**. Le menu Marque
+  //    n'est PAS une liste fixe : il n'en montre que 11 (« A Bathing Ape »…
+  //    « Airstep ») et FILTRE à la frappe. `choisirComposant` ouvrait le menu et
+  //    cherchait « Nike » parmi ces 11 — jamais trouvée, donc rien.
+  //    ⇒ On TAPE la marque de la paire (celle que Vinted donne, `ad.marque`),
+  //    on attend la liste filtrée, et on ne clique QUE l'option dont le libellé
+  //    est EXACTEMENT la marque (casse et accents ignorés). Aucune option exacte
+  //    ⇒ on EFFACE ce qu'on a tapé et on laisse vide : un texte libre laissé
+  //    dans le champ ne serait pas une marque choisie, et une marque « à peu
+  //    près » (Nike pour Nike SB) est un attribut faux (§5).
+  const normMarque = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  async function choisirComposantRecherche(motif, valeurExacte) {
+    const cible = normMarque(valeurExacte);
+    if (!cible) return false;
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]')).filter((el) => !DANS_ENTETE(el));
+    for (const box of boxes) {
+      if (!motif.test(labelCombobox(box))) continue;
+      const val = String(box.value || box.getAttribute('data-choisi') || '').trim();
+      if (val) return false;                          // déjà choisie (souvent par Leboncoin lui-même)
+      const ecrivable = box.tagName === 'INPUT' && !box.readOnly;
+      try { box.focus(); box.click(); } catch (_) {}
+      if (ecrivable) setField(box, String(valeurExacte).trim());
+      let opt = null;
+      for (let i = 0; i < 10 && !opt; i++) {          // la liste filtrée arrive (≤ 1,5 s)
+        await new Promise((r) => setTimeout(r, 150));
+        opt = Array.from(document.querySelectorAll('[role="option"]')).find((o) => normMarque(o.textContent) === cible) || null;
+      }
+      if (opt) { try { opt.click(); } catch (_) {} return true; }
+      if (ecrivable) setField(box, '');               // rien d'exact : on n'y laisse pas un texte libre
+      try { box.blur(); } catch (_) {}
+      return false;
+    }
+    return false;
+  }
   // On ne remplit ces menus qu'UNE fois par paire (l'observateur du formulaire
   // rappelle fillNow à chaque mutation — sans ça on ré-ouvrirait le menu en
   // boucle). Réinitialisé par « Re-remplir » (fillNowForce).
-  let _composFaits = new Set(); let _composEnCours = false;
+  let _composFaits = new Set(); let _composEnCours = false; let _essaisMarque = {};
   async function remplirComposants(ad) {
     if (_composEnCours) return 0; _composEnCours = true;
     let k = 0;
@@ -903,9 +939,15 @@
       // exacte ⇒ laissé vide, exprès.
       const etat = String(ad.etat || '').trim();
       if (etat && !_composFaits.has(cle('e')) && await choisirComposant(/[ée]tat|condition/, etat)) { _composFaits.add(cle('e')); k++; }
+      // MARQUE : celle de Vinted, tapée puis choisie par correspondance EXACTE.
+      const marque = String(ad.marque || '').trim();
+      // Deux essais au plus : sans ça on retaperait la marque à chaque seconde
+      // pendant 90 s sous ses doigts (une marque absente de la liste reste absente).
+      if (marque && !_composFaits.has(cle('m')) && (_essaisMarque[cle('m')] = (_essaisMarque[cle('m')] || 0) + 1) <= 2
+          && await choisirComposantRecherche(/marque|brand/, marque)) { _composFaits.add(cle('m')); k++; }
     } catch (_) {}
     _composEnCours = false;
-    if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état)');
+    if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état / marque)');
     return k;
   }
   // ── LA LIVRAISON — Julien, 23 sept. : « active la livraison quand tu
@@ -1291,7 +1333,7 @@
     if (choisirCategorie(ad)) n++;
     // « Re-remplir » relance aussi les menus React et l'enchaînement d'étape
     // (on oublie qu'on les a déjà faits, au cas où on serait revenu en arrière).
-    _composFaits = new Set(); remplirComposants(ad);
+    _composFaits = new Set(); _essaisMarque = {}; remplirComposants(ad);
     if (activerLivraison() === 'active') n++;
     _avanceFaite = new Set(); avancer();
     return n;

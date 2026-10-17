@@ -93,6 +93,14 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<ul id="cbp-menu" role="listbox" hidden><li role="option">39</li><li role="option">40</li><li role="option">40,5</li><li role="option">41</li></ul></div>'
       + '<div><label for="cbe">État*</label><input id="cbe" role="combobox" aria-label="État*" readonly>'
       + '<ul id="cbe-menu" role="listbox" hidden><li role="option">Neuf avec étiquette</li><li role="option">Très bon état</li><li role="option">Bon état</li><li role="option">État satisfaisant</li></ul></div>'
+      // ⚠️ LA MARQUE (mesuré le 15 oct., 5.177) : un menu qui ne montre que 11
+      //    marques (« A Bathing Ape »… « Airstep ») et FILTRE À LA FRAPPE. Nike
+      //    n'y est jamais sans taper. Le champ est écrivable (pas readonly).
+      + '<div><label for="cbm">Marque</label><input id="cbm" role="combobox" aria-label="Marque" type="text">'
+      + '<ul id="cbm-menu" role="listbox" hidden></ul></div>'
+      + '<scr'+'ipt>(function(){var CAT=["A Bathing Ape (BAPE)","Abercrombie & Fitch","Adidas","Airstep","New Balance","Nike","Nike ACG","Salomon"];var cb=document.getElementById("cbm"),mn=document.getElementById("cbm-menu");window.__marqueTape=[];'
+      + 'function rendre(q){mn.innerHTML="";var l=q?CAT.filter(function(c){return c.toLowerCase().indexOf(q.toLowerCase())>=0;}):CAT.slice(0,4);l.forEach(function(c){var li=document.createElement("li");li.setAttribute("role","option");li.textContent=c;li.addEventListener("click",function(){cb.value=c;cb.setAttribute("data-choisi",c);mn.hidden=true;});mn.appendChild(li);});}'
+      + 'cb.addEventListener("click",function(){mn.hidden=false;rendre(cb.value);});cb.addEventListener("input",function(){window.__marqueTape.push(cb.value);mn.hidden=false;setTimeout(function(){rendre(cb.value);},120);});})();</scr'+'ipt>'
       // ⚠️ LA CATÉGORIE = des boutons RADIO (mesuré au rendu, 20 sept.), + un
       //    bouton « Continuer » et un « Publier ». L'extension doit cocher le
       //    bon radio (Chaussures), cliquer Continuer, et JAMAIS Publier (§3/§5).
@@ -107,7 +115,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<div id="livsw" role="switch" aria-checked="false" aria-label="Proposer la livraison">Proposer la livraison</div>'
       + '<label><input type="checkbox" id="news"> Recevoir des offres par email</label>'
       + '<scr'+'ipt>document.getElementById("livsw").addEventListener("click",function(){this.setAttribute("aria-checked",this.getAttribute("aria-checked")==="true"?"false":"true");});</scr'+'ipt>'
-      + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});'
+      + '<scr'+'ipt>document.querySelectorAll("[role=combobox]:not(#cbm)").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});'
       + 'window.__cont=0;window.__pub=0;document.getElementById("continuer").addEventListener("click",function(){window.__cont++;});document.getElementById("publier").addEventListener("click",function(){window.__pub++;});</scr'+'ipt>'
     : depot === 'photoscont'
     // ⚠️ DÉTOURAGE (4 oct.) : le fond rend les photos après jusqu'à 45 s. Une
@@ -137,7 +145,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
 
 // La file servie au panneau : les trois cas de photo, et les trois preuves.
 const QUEUE = [
-  { id: '1001', numero: '401', account: 'julatace3535', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', ville: 'Cancale', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
+  { id: '1001', numero: '401', account: 'julatace3535', marque: 'Salomon', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', ville: 'Cancale', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
   { id: '1002', numero: '402', account: 'julatace3535', title: 'Nike air max 1 clear jade T44', description: 'Réf. VRM-402\n\nBon état.', price: '44.00', category: 'Chaussures', photos: ['https://ex/b1.jpg'], ref: 'VRM-402', vintedUrl: 'https://www.vinted.fr/items/1002' },
   { id: '1003', numero: '403', account: 'llloollllaa', title: 'Autry medalist blanc T36', description: 'Réf. VRM-403', price: '24.00', category: 'Chaussures', photos: [], ref: 'VRM-403', vintedUrl: 'https://www.vinted.fr/items/1003' },
 ];
@@ -476,6 +484,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     return {
       pointure: (document.getElementById('cbp') || {}).getAttribute ? (document.getElementById('cbp').getAttribute('data-choisi') || '') : '',
       etat: (document.getElementById('cbe') || {}).getAttribute ? (document.getElementById('cbe').getAttribute('data-choisi') || '') : '',
+      marque: (document.getElementById('cbm') || {}).getAttribute ? (document.getElementById('cbm').getAttribute('data-choisi') || '') : '',
+      marqueTexte: (document.getElementById('cbm') || {}).value || '',
+      marqueTape: (window.__marqueTape || []).length,
       categorie: lab,
       continuer: window.__cont || 0,
       publier: window.__pub || 0,
@@ -550,6 +561,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!ok.errs.length, 'aucune erreur pendant le remplissage des menus', ok.errs[0] || '');
     dit(ok.pointure === '40', 'la POINTURE est choisie dans le combobox React (clic sur l’option)', 'pointure = « ' + ok.pointure + ' »');
     dit(ok.etat === 'Très bon état', 'l’ÉTAT est choisi par correspondance EXACTE', 'état = « ' + ok.etat + ' »');
+    // ── LA MARQUE (17 oct.) : tapée, puis choisie dans la liste FILTRÉE ──────
+    dit(ok.marque === 'Salomon', 'la MARQUE de la paire est tapée puis choisie dans la liste filtrée (« Salomon »)', 'marque = « ' + ok.marque + ' »');
     dit(/chaussures/i.test(ok.categorie), 'la CATÉGORIE (bouton radio « Mode > Chaussures ») est cochée', 'coché : « ' + ok.categorie + ' »');
     dit(ok.continuer >= 1, 'le bouton « Continuer » est cliqué pour enchaîner l’étape', ok.continuer + ' clic(s)');
     dit(ok.publier === 0, '⚠️ « Publier » n’est JAMAIS cliqué tout seul (§3/§5)', ok.publier + ' clic(s) sur Publier');
@@ -557,7 +570,10 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(ok.livraison === 'true', 'l’interrupteur d’ENVOI éteint est rallumé (livraison activée)', 'aria-checked = « ' + ok.livraison + ' »');
     dit(ok.news === false, 'et RIEN d’autre n’est coché — le leurre « offres par email » reste éteint', 'offres par email cochées : ' + ok.news);
     // Négatif : une valeur qui ne colle à AUCUNE option reste VIDE (§5).
-    const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant' });
+    const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant', marque: 'Nike SB' });
+    dit(ko.marque === '' && ko.marqueTexte === '', '« Nike SB » absente de la liste : AUCUNE marque choisie (pas « Nike » à peu près) et le texte tapé est effacé',
+      'choisie « ' + ko.marque + ' » · champ « ' + ko.marqueTexte + ' »');
+    dit(ko.marqueTape <= 4, 'une marque introuvable n’est pas retapée en boucle (deux essais au plus)', ko.marqueTape + ' frappe(s)');
     dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');
     dit(ko.etat === '', '« Satisfaisant » (≠ « État satisfaisant ») laisse l’état VIDE — mieux vaut un blanc qu’un faux', 'état = « ' + ko.etat + ' »');
   }

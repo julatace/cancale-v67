@@ -92,7 +92,7 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   isShipDone: () => false,
   shippedSuivis: new Set(), soldByTxn: {},
 }));
-const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
+const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'COLIS_DEJA_BOUGE', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
 const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'COLIS_DEJA_BOUGE', 'aExpedier'], {});
 
 // La réponse « à expédier ? » de chacun. Sur le code d'avant, la règle unique
@@ -237,8 +237,9 @@ const LITIGE = { transaction_id: 22592792923, status: "La livraison n'a pas enco
 essaie('(i) litige', () => {
   dit(appA(LITIGE) === false && colisA(LITIGE) === false, 'une vente en LITIGE (« colis déposé… » + `needs_action`, le colis de retour) n\'est jamais un colis à poster dans l\'app ni dans Colis', JSON.stringify([appA(LITIGE), colisA(LITIGE)]));
   dit(widA(LITIGE) === false, '… ni dans le widget (et donc les rappels du matin, qui lisent sa règle)', String(widA(LITIGE)));
-  if (ext.COLIS_DEJA_BOUGE) dit(extA(LITIGE) === false, '… ni dans l\'extension (résumé du widget et des rappels)', String(extA(LITIGE)));
-  else console.log('⚠️  extension pas encore alignée (`COLIS_DEJA_BOUGE` absent de background.js) — chantier 5 : à porter, puis ce contrôle devient bloquant');
+  // Bloquant depuis la 5.185 (chantier 5) : l'extension porte la même règle.
+  dit(!!ext.COLIS_DEJA_BOUGE && extA(LITIGE) === false, '… ni dans l\'extension (résumé du widget et des rappels)', ext.COLIS_DEJA_BOUGE ? String(extA(LITIGE)) : '`COLIS_DEJA_BOUGE` absent de background.js');
+  dit(!!ext.COLIS_DEJA_BOUGE && !!app.COLIS_DEJA_BOUGE && String(ext.COLIS_DEJA_BOUGE) === String(app.COLIS_DEJA_BOUGE), '`COLIS_DEJA_BOUGE` est le MÊME motif dans l\'app et l\'extension (§11)', `${ext.COLIS_DEJA_BOUGE} · ${app.COLIS_DEJA_BOUGE}`);
   // L'autre sens : un vrai colis à poster reste à poster.
   const vrai = { transaction_id: 1, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' };
   dit(appA(vrai) && widA(vrai), 'l\'autre sens : « Bordereau envoyé au vendeur » + `needs_action` reste à poster', JSON.stringify([appA(vrai), widA(vrai)]));

@@ -2,11 +2,12 @@
 //  DÉTOURAGE PHOTOROOM CÔTÉ EXTENSION — `detourerPhotos` (5.156, 4 octobre)
 //
 //  Julien : « intègre l'API de Photoroom pour le détourage des photos avant
-//  chaque poste ». Les photos de Leboncoin ET d'eBay passent toutes par
-//  `photosEnOctets` : c'est là que le fond les détoure, selon le réglage de
-//  l'app (`vrm_detourage`, ligne main). Chaque photo détourée COÛTE : la règle
-//  doit donc être prouvée dans les deux sens — elle détoure quand on le lui
-//  demande, et elle ne dépense RIEN dans tous les autres cas.
+//  chaque poste », puis le 17 octobre : « le détourage doit être présent QUE
+//  dans Vestiaire Collective, pas du tout pour Leboncoin ». Leboncoin et eBay
+//  (`photosEnOctets`, `photosPourEbay`) ne détourent PLUS JAMAIS, quel que soit
+//  l'ancien réglage `vrm_detourage` ; Vestiaire (`photosPourVestiaire`) détoure
+//  TOUTES les photos, sans réglage. Chaque photo détourée COÛTE : la règle est
+//  prouvée dans les deux sens.
 //
 //  ⚠️ §4.10 : on EXÉCUTE le vrai `background.js` dans un `vm` et on COMPTE ce qui
 //  part vers le serveur. Aucune fixture : des octets inventés, un faux serveur.
@@ -105,29 +106,38 @@ function faireCtx({ reglage = 'couverture', mainKO = false, session = true, serv
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   ctx.authToken = async () => (session ? { access_token: 'jeton-du-vendeur' } : null);
   ctx.noterDiag = async (k) => { j.diag.push(k); };
-  ctx.__j = j;
+  ctx.__j = j; ctx.__mode = reglage;
   return ctx;
 }
 const origine = (url) => octets(url).toString('base64');
+// La règle de détourage elle-même (le mode est DONNÉ par l'appelant, plus lu).
+const vc = async (ctx, urls) => ctx.detourerPhotos(await ctx.photosEnOctets(urls, 12), ctx.__mode);
 
 (async () => {
   if (PROUVE) console.log('⚠️  MODE --prouve : règle réaffaiblie, des contrôles doivent rougir.\n');
   const cinq = [CDN(1), CDN(2), CDN(3), CDN(4), CDN(5)];
 
-  // ══ 1. ÉTEINT : aucune dépense, photos intactes ══
-  await essaie('éteint', async () => {
-    for (const [nom, opt] of [['réglage absent', { reglage: 'ABSENT' }], ['réglage « eteint »', { reglage: 'eteint' }], ['valeur inconnue', { reglage: 'oui' }], ['ligne main illisible (522)', { mainKO: true }]]) {
+  // ══ 1. LEBONCOIN ET eBAY : JAMAIS DE DÉTOURAGE (17 oct., sa décision) ══
+  await essaie('leboncoin et ebay', async () => {
+    for (const [nom, opt] of [['ancien réglage « toutes »', { reglage: 'toutes' }], ['ancien réglage « couverture »', { reglage: 'couverture' }], ['réglage absent', { reglage: 'ABSENT' }], ['ligne main illisible (522)', { mainKO: true }]]) {
       const ctx = faireCtx(opt);
       const ph = await ctx.photosEnOctets(cinq, 12);
       dit(ctx.__j.appelsServeur === 0 && ph.length === 5 && ph.every((p, i) => p.b64 === origine(cinq[i]) && p.detoure === undefined),
-        `${nom} ⇒ ZÉRO appel au détourage, photos d'origine intactes`, `appels=${ctx.__j.appelsServeur}`);
+        `Leboncoin, ${nom} ⇒ ZÉRO appel au détourage, photos d'origine intactes`, `appels=${ctx.__j.appelsServeur}`);
+      const ctxE = faireCtx(opt);
+      const phE = await ctxE.photosPourEbay(cinq, 12);
+      dit(ctxE.__j.appelsServeur === 0 && phE.every((p, i) => p.b64 === origine(cinq[i])), `eBay, ${nom} ⇒ ZÉRO appel au détourage`, `appels=${ctxE.__j.appelsServeur}`);
     }
+    // Sans mode donné par l'appelant, la règle ne dépense rien.
+    const ctx = faireCtx({ reglage: 'toutes' });
+    const ph = await ctx.detourerPhotos(await ctx.photosEnOctets(cinq, 12));
+    dit(ctx.__j.appelsServeur === 0 && ph.every((p) => p.detoure === undefined), 'aucun mode donné ⇒ rien n\'est envoyé (le réglage n\'est plus lu)', `appels=${ctx.__j.appelsServeur}`);
   });
 
   // ══ 2. COUVERTURE : une seule photo, la première ══
   await essaie('couverture', async () => {
     const ctx = faireCtx({ reglage: 'couverture' });
-    const ph = await ctx.photosEnOctets(cinq, 12);
+    const ph = await vc(ctx, cinq);
     const j = ctx.__j;
     dit(j.sondes === 1 && j.envois === 1, 'couverture ⇒ UNE photo sondée, UNE envoyée', `sondes=${j.sondes} envois=${j.envois}`);
     dit(ph[0] && ph[0].detoure === true && ph[0].type === 'image/jpeg' && ph[0].b64 === DETOUREE(sha256(octets(cinq[0]))).toString('base64'),
@@ -140,11 +150,11 @@ const origine = (url) => octets(url).toString('base64');
   // ══ 3. L'AFFICHE DU SITE n'est jamais envoyée ══
   await essaie('affiche', async () => {
     const ctx = faireCtx({ reglage: 'couverture' });
-    const ph = await ctx.photosEnOctets([AFFICHE, CDN(1)], 12);
+    const ph = await vc(ctx, [AFFICHE, CDN(1)]);
     dit(ctx.__j.appelsServeur === 0, 'couverture = affiche générique de Vinted ⇒ RIEN n\'est envoyé (on ne paie pas une affiche)', `appels=${ctx.__j.appelsServeur}`);
     dit(ph[0].b64 === origine(AFFICHE) && ph[0].detoure === false && ph[0].detourage === 'pas-une-photo', 'elle reste telle quelle, avec sa raison');
     const ctx2 = faireCtx({ reglage: 'toutes' });
-    const ph2 = await ctx2.photosEnOctets([CDN(1), AFFICHE, CDN(2)], 12);
+    const ph2 = await vc(ctx2, [CDN(1), AFFICHE, CDN(2)]);
     dit(ctx2.__j.envois === 2 && !ctx2.__j.b64Envoyes.includes(origine(AFFICHE)), '« toutes » ⇒ les 2 vraies photos détourées, l\'affiche jamais envoyée', `envois=${ctx2.__j.envois}`);
     dit(ph2[0].detoure === true && ph2[2].detoure === true && ph2[1].detoure === false, 'chacune porte le bon état');
   });
@@ -153,7 +163,7 @@ const origine = (url) => octets(url).toString('base64');
   await essaie('toutes', async () => {
     const huit = [1, 2, 3, 4, 5, 6, 7, 8].map(CDN);
     const ctx = faireCtx({ reglage: 'toutes' });
-    const ph = await ctx.photosEnOctets(huit, 12);
+    const ph = await vc(ctx, huit);
     dit(ph.length === 8 && ph.every((p) => p.detoure === true), '« toutes » ⇒ les 8 photos détourées', `${ph.filter((p) => p.detoure).length}/8`);
     dit(ph.every((p, i) => p.url === huit[i]), 'l\'ordre des photos est gardé (la couverture reste la première)');
     dit(ctx.__j.maxEnVol <= 3, 'jamais plus de 3 envois en même temps à notre serveur', `max=${ctx.__j.maxEnVol}`);
@@ -163,7 +173,7 @@ const origine = (url) => octets(url).toString('base64');
   await essaie('cache', async () => {
     const cache = new Set([sha256(octets(CDN(1)))]);
     const ctx = faireCtx({ reglage: 'couverture', cache });
-    const ph = await ctx.photosEnOctets(cinq, 12);
+    const ph = await vc(ctx, cinq);
     dit(ctx.__j.sondes === 1 && ctx.__j.envois === 0, 'déjà détourée ⇒ la sonde seule, AUCUN octet envoyé', `envois=${ctx.__j.envois}`);
     dit(ph[0].detoure === true && ph[0].detourageCache === true, 'elle revient détourée, depuis le cache');
   });
@@ -178,16 +188,16 @@ const origine = (url) => octets(url).toString('base64');
     ]) {
       const six = [1, 2, 3, 4, 5, 6].map(CDN);
       const ctx = faireCtx(opt);
-      const ph = await ctx.photosEnOctets(six, 12);
+      const ph = await vc(ctx, six);
       dit(ph.length === 6 && ph.every((p, i) => p.b64 === origine(six[i]) && p.detoure === false && p.detourage === raison),
         `${nom} ⇒ les 6 photos d'origine partent, raison « ${raison} »`, ph.map((p) => p.detourage).join(','));
       if (raison !== 'delai') dit(ctx.__j.appelsServeur <= 6, `${nom} ⇒ on n'insiste pas photo après photo`, `appels=${ctx.__j.appelsServeur}`);
     }
     const ctx = faireCtx({ reglage: 'couverture', session: false });
-    const ph = await ctx.photosEnOctets(cinq, 12);
+    const ph = await vc(ctx, cinq);
     dit(ctx.__j.appelsServeur === 0 && ph[0].b64 === origine(cinq[0]) && ph[0].detourage === 'session', 'extension non connectée à VRM ⇒ zéro appel, photo d\'origine, raison « session »');
     const ctxP = faireCtx({ reglage: 'toutes', serveur: 'panne-une' });
-    const phP = await ctxP.photosEnOctets([1, 2, 3].map(CDN), 12);
+    const phP = await vc(ctxP, [1, 2, 3].map(CDN));
     const rate = phP.filter((p) => p.detoure === false);
     dit(rate.length === 1 && rate[0].b64 === origine(rate[0].url) && phP.filter((p) => p.detoure === true).length === 2,
       'Photoroom en panne sur UNE photo ⇒ elle part d\'origine, les deux autres détourées');
@@ -196,15 +206,15 @@ const origine = (url) => octets(url).toString('base64');
   // ══ 7. UNE PHOTO ILLISIBLE NE COÛTE RIEN ══
   await essaie('illisible', async () => {
     const ctx = faireCtx({ reglage: 'couverture', cdnKO: new Set([CDN(1)]) });
-    const ph = await ctx.photosEnOctets(cinq, 12);
+    const ph = await vc(ctx, cinq);
     dit(ph[0].erreur && ph[1].detoure === true && ctx.__j.envois === 1, 'couverture illisible sur le CDN ⇒ la première photo LISIBLE est détourée, une seule');
   });
 
-  // ══ 8. eBAY en hérite (un seul propriétaire de la règle, §11) ══
-  await essaie('ebay', async () => {
-    const ctx = faireCtx({ reglage: 'couverture' });
-    const ph = await ctx.photosPourEbay(cinq, 12);
-    dit(ph[0].detoure === true && ctx.__j.envois === 1, 'les photos eBay passent par la MÊME règle (photosPourEbay)');
+  // ══ 8. VESTIAIRE : toutes les photos, sans réglage ══
+  await essaie('vestiaire', async () => {
+    const ctx = faireCtx({ reglage: 'ABSENT' });
+    const ph = await ctx.photosPourVestiaire(cinq, 12);
+    dit(ph.length === 5 && ph.every((p) => p.detoure === true) && ctx.__j.envois === 5, 'Vestiaire Collective ⇒ les 5 photos détourées (le site l\'exige), sans aucun réglage', `envois=${ctx.__j.envois}`);
   });
 
   console.log(`\n${ok} contrôle(s) vert(s), ${ko} rouge(s).`);
