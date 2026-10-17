@@ -122,6 +122,12 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
     // forme : 522 + HTML) — le cas où l'ancienne coque inventait des zéros.
     const koVentes = (opts.ventesKO || []).find((uid) => new RegExp('harvest_' + uid + '_orders').test(u));
     if (koVentes) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+    // §6.3 : depuis le 16 octobre le démarrage lit les commandes de TOUS les
+    // comptes en une lecture (`prechargerDemarrage`, `harvest_*_orders_*`) ; si
+    // elle échoue, chaque compte est relu à part. Un compte illisible fait donc
+    // d'abord tomber la lecture commune — sinon le banc mesure une panne qui
+    // n'arrive jamais (rouge sur une app intacte).
+    if ((opts.ventesKO || []).length && /harvest_\*_orders_\*/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     if (opts.lbcKO && /lbc_ventes/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     // Dates de versement illisibles : la VRAIE forme d'une panne (522 + HTML).
     if (!versementsLisibles && /_txn_/.test(u) && /like\./.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });

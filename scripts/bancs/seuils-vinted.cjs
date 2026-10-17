@@ -159,6 +159,12 @@ const page = async (b, vp, etat, main) => {
       if (etat.panneTout) return panne();
       if (etat.panne9105 && /harvest_9105_/.test(u)) return panne();
       if (etat.panne9101 && /harvest_9101_/.test(u)) return panne();
+      // §6.3 : le démarrage lit les commandes de TOUS les comptes en une lecture
+      // (`prechargerDemarrage`, `harvest_*_orders_*`, 16 octobre), puis chaque
+      // compte à part si elle échoue. Un compte en panne fait d'abord tomber la
+      // lecture commune — sinon la panne n'arrive jamais et le banc mesure une
+      // fiction (rouge sur une app intacte).
+      if ((etat.panne9105 || etat.panne9101) && /harvest_\*_orders_\*/.test(u)) return panne();
     }
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
     if (etat.delaiMain && /id=eq\.main/.test(u)) await new Promise((r) => setTimeout(r, etat.delaiMain));
@@ -388,8 +394,11 @@ const communs = (r, errs, quoi) => {
         const c = await lit(pg);
         dit(c.lignes && c.lignes.length === 6 && compte(c.txt, 'Lecture des ventes') <= 1 && c.lignes.every((l) => l.etat === 'enCours' && !/Lecture/.test(l.txt)),
           `${q} pendant la lecture : « Lecture des ventes… » UNE fois au plus, « — » sur les lignes`, `${compte(c.txt, 'Lecture des ventes')} fois · ${(c.lignes || []).map((l) => l.etat).join(',')}`);
-        await pg.waitForTimeout(8000);
-        const r = await lit(pg);
+        // Le démarrage lit d'abord TOUS les comptes en une lecture (lente puis
+        // ratée), puis chacun à part (lents aussi) : la panne se voit plus tard
+        // qu'avec une lecture par compte. On attend l'ÉTAT, pas un délai (§6).
+        let r = await lit(pg);
+        for (let i = 0; i < 40 && !(r.lignes && r.lignes.length && r.lignes.every((l) => l.etat !== 'enCours')); i++) { await pg.waitForTimeout(500); r = await lit(pg); }
         dit(r.lignes && r.lignes.length === 6 && r.lignes.every((l) => l.etat === 'pasSu' && l.n === '' && l.txt.length < 40), `${q} panne totale : chaque ligne « — », aucun nombre`, (r.lignes || []).map((l) => `${l.etat}:${l.txt.replace(/\n/g, '|')}`).join(' · ').slice(0, 200));
         dit(r.nPanne === 1 && compte(r.txt, "n'ont pas pu être lues") === 1, `${q} la phrase de panne UNE fois (pas une par compte)`, `${r.nPanne} bloc · ${compte(r.txt, "n'ont pas pu être lues")} phrase(s)`);
         dit(!!(r.total && r.total.etat === 'pasSu' && r.total.n === ''), `${q} le total : « — », jamais 0`, r.total ? `${r.total.etat} · «${r.total.txt.replace(/\n/g, ' | ')}»` : 'absent');

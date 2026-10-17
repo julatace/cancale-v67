@@ -9635,6 +9635,38 @@ PROUVÉE en vente ailleurs. Règle pure : `api/_lib/double-vente.js`.
 - **Julien** : rien — la catégorie est activée d'office (Réglages →
   Notifications pour la couper).
 
+### Revue de cohérence des chiffres entre écrans (17 octobre)
+Même notion, même nombre, sur Ma journée, Statistiques, Compta, carte URSSAF,
+récap mensuel. Rendu sur données inventées (banc `chiffres-croises.cjs`, deux
+comptes, une vente vendue le mois d'avant et versée ce mois, une sans date de
+versement). **Vérifié égal** : vendu du mois (Ma journée = Statistiques =
+Compta), reçu du mois (Ma journée = Compta), CA déclaré de l'année (Compta =
+ligne publiée). **Quatre défauts, corrigés** (aucune règle URSSAF/DAC7 changée) :
+- **A. « Prochaine déclaration » (tableau de bord) écrivait « CA finalisé
+  0,00 € · à payer 0,00 € »** : elle sommait l'ANCIENNE archive (vide depuis
+  juillet). Elle somme maintenant les mois de la ligne publiée
+  (`vinted_urssaf_mois`) qui tombent dans SA période (`nextUrssafDeadline`) ;
+  pas de ligne publiée ⇒ « — », jamais 0. Attributs `data-echeance-*`.
+- **B. La note du récap mensuel disait « à leur date de vente »** au-dessous de
+  chiffres lus dans la ligne publiée (datée au versement) — la phrase qui
+  explique un chiffre doit venir de sa source (§5). `data-recap-regle`.
+- **C. La Compta présentait un CA déclaré complet avec eBay illisible** : il dit
+  « au moins », nomme la plateforme non lue (`sources` de la ligne publiée,
+  `data-compta-couverture`) et les ventes sans date de versement (`aDater`).
+- **D. « Ventes finalisées 3 · sur 4 vendues ce mois-ci »** comparait deux
+  dates différentes (versement / vente) comme une couverture : écrit « argent
+  versé ce mois · 4 ventes faites ce mois-ci » (`data-mois-vendues`).
+- ⚠️ **Deux bancs servaient une forme que le code ne lit plus (§6.3)** :
+  `vendu-recu` et `seuils-vinted` simulaient une panne de compte seulement sur
+  `harvest_{uid}_orders_*` ; `prechargerDemarrage` lit TOUS les comptes en une
+  lecture (`harvest_*_orders_*`) et contournait la panne. La lecture commune
+  tombe aussi maintenant (l'app repasse compte par compte, comme en vrai).
+- Preuves : `chiffres-croises.cjs` (port `BANC_PORT`, 18 contrôles) **5 rouges
+  sur le build d'avant** (§6.1), 0 après ; il juge les nombres par attributs.
+- **Noté, pas touché** : `received` de `api/widget.js` vient des emails de
+  finalisation, pas de `ventesDeclarables` (zone serveur) ; le « Bénéfice
+  estimé » du tableau de bord reste « — » (il ne ment pas, il se tait).
+
 ### Revue adverse des routes serveur (17 octobre)
 Toutes les routes `api/*.js` et `api/_lib/*.js` relues, chaque défaut REPRODUIT
 en exécutant la vraie route (`scripts/audit-routes-revue.cjs`, un processus neuf
@@ -9687,7 +9719,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **85 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **86 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -10009,7 +10041,7 @@ api/                            email-inbound · push · widget · ship-reminder
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
 scripts/audit-*.cjs             les 95 audits
-scripts/bancs/                  les 85 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 87 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
