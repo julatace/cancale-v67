@@ -9844,6 +9844,65 @@ couleur les numéros vendus ». Les règles vivent dans **`src/stockRegles.js`**
   de la vue du dessus sur une très grande pièce ; Julien n'a pas encore ouvert sa
   pièce réelle avec ce code (lecture seule de sa base : 2 pièces, 8 meubles).
 
+### Plateformes plus vivantes, ventes même vides, eBay plus complet (17 octobre)
+Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonces).
+- **En-tête des plateformes** : une tuile de marque (la marque dans SA couleur
+  sur un fond pâle de la même teinte, `COULEUR_PLATEFORME`, masque CSS sur
+  `/brands/*.svg`), puis le nom. Ce sont les seules couleurs de marque de
+  l'écran (§7). **eBay : la tuile seule** — son logo EST son nom écrit, et le
+  titre le répétait (« deux logos eBay »). Le nom reste pour les lecteurs
+  d'écran (`.vrm-sr`). Styles dans `src/styles-plateformes.css`.
+- **Ventes en trois cases, même sans vente** (`KpiVentes`, `data-ventes-kpi`) :
+  Leboncoin (en cours · finalisées · CA finalisé) et eBay (en cours · expédiées ·
+  CA payé). Une case LUE et vide vaut 0 ; une case qu'on ne sait pas vaut « — »
+  (Leboncoin jamais lu, un compte eBay illisible). Sur « Ventes », le résumé du
+  haut se tait : il disait les mêmes montants (§7). Vinted avait déjà les siennes.
+- **Publication eBay pré-remplie depuis la paire** : choisir une paire LANCE
+  l'analyse eBay (catégorie + caractéristiques, une lecture) sans second clic.
+  ⚠️ Mesuré : le dressing Vinted ne porte **pas** la marque (0 sur 271 annonces),
+  c'est pour ça qu'elle ne se remplissait pas. Elle vient du **coffre**
+  (`coffre_{uid}_{id}.brand`, 401 fiches sur 632), lu en scalaires et paginé.
+  L'état Vinted de l'annonce (`status`) donne l'état eBay (`etatEbayDeVinted` :
+  neuf avec étiquette → 1000, neuf sans → 1500, occasion → 3000), seulement vers
+  un état de la liste d'eBay pour la catégorie. Une marque ou une pointure
+  enregistrées par Vinted remplissent aussi un champ eBay en texte libre (un
+  FAIT, jamais une déduction du titre). Sans description captée, la description
+  écrit les faits (`descriptionDeFaits` : titre, marque, pointure, état, VRM-n°),
+  rien d'inventé.
+- **Annonces eBay : moins de texte.** Le pourquoi d'une alerte (double vente,
+  programmée à annuler, deux comptes, annonce pas reliée) est replié derrière un
+  « ⓘ » (`Pourquoi`) ; le titre, les gestes et ce qui dit un risque propre à la
+  donnée (une règle d'offre) restent visibles.
+- **Pro ou particulier, eBay** : `identiteEbay` lit
+  `User.SellerInfo.SellerBusinessType` (Commercial → pro, Private → particulier,
+  sinon « pas su », jamais « particulier » par défaut), rangé dans le registre
+  `ebay_comptes` (`type`, `typeLuLe`) à la connexion, et pour les comptes déjà
+  reliés par `apprendreTypes` (une question par compte, à l'ouverture de
+  « Compte », relue au plus tous les 7 jours si eBay ne l'a pas dit). Affiché à
+  côté du pseudo et dans le sélecteur de compte. ⚠️ **Non mesuré sur ses
+  comptes** (doc d'eBay). `audit-ebay-type-compte.cjs` : 5 rouges sur l'avant.
+- **Évaluations à laisser (eBay → À traiter)** : `GetItemsAwaitingFeedback`
+  (lecture) et `LeaveFeedback` positive (eBay ne permet que celle-là au vendeur),
+  80 caractères, sur clic + confirmation, la vente RELUE avant d'écrire
+  (acheteur différent ou plus en attente ⇒ 409, rien ne part), journalisée comme
+  les autres actions commerciales. ⚠️ Forme XML de la doc, non mesurée.
+  `scripts/bancs/ebay-gestion.mjs` : rouge sur l'avant ; `plateformes-premium.cjs`
+  joue Annuler (rien ne part) puis la confirmation (une fois, les bons champs).
+- **Retirer l'argent** : Vinted → Ventes, « Retirer mon argent » dit le
+  disponible COMPTE PAR COMPTE (`walletParCompte`) et ouvre le porte-monnaie
+  Vinted (`/wallet/balance`, ⚠️ adresse non mesurée). ⚠️⚠️ **VRM ne fait PAS le
+  virement** : son navigateur a vu `POST /api/v2/users/{id}/payouts`
+  (`seen_urls`), jamais la FORME de la demande — envoyer de l'argent sur un
+  contenu deviné est interdit. eBay : le disponible est viré tout seul par eBay ;
+  le bloc le dit et ouvre « Mes versements » (`/sh/fin`, non mesuré).
+- **Inventaire eBay** (ce que la route sait faire) : ventes + expédition et
+  suivi, messages acheteurs (lire, répondre, écrire), offres reçues (accepter,
+  refuser, contre-offre), offre aux observateurs, règle d'offre, annonces
+  (publier, programmer, modifier prix/stock/titre, terminer, relier à une paire),
+  brouillons, finances, retrait automatique, évaluations. **Pas fait** :
+  retours et annulations (Post-Order API : authentification et forme non
+  mesurées), annonces sponsorisées (Marketing API), achats eBay.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10180,7 +10239,7 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 95 audits
+scripts/audit-*.cjs             les 96 audits
 scripts/bancs/                  les 87 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

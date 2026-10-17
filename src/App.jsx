@@ -14,7 +14,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent} from "./ebayGestion.jsx";
+import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -12758,13 +12758,50 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
-// (17 oct., Julien : « pourquoi il y a deux logos eBay quand on est dessus »).
-// Le logo d'eBay EST son nom écrit (« ebay ») : posé devant le titre « eBay »,
-// le nom s'écrivait deux fois. Vinted et Leboncoin ont un pictogramme, eBay
-// n'en a pas : son en-tête ne garde que le titre.
-const LOGO_EST_LE_NOM = new Set(['ebay']);
+// (17 oct.) Julien : « pourquoi il y a deux logos eBay quand on est dessus » —
+// le logo d'eBay EST son nom écrit (« ebay »), et le titre le répétait à côté.
+// Et « la mise en page est éteinte » : chaque plateforme a maintenant sa tuile,
+// la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
+// couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
+// lecteurs d'écran).
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0064D2' };
 function EntetePlateforme({nom,plateforme}) {
-  return <header className="vrm-market-heading" data-entete-plateforme={plateforme}>{!LOGO_EST_LE_NOM.has(plateforme) && <BrandIcon plateforme={plateforme} size={30}/>}<h1>{nom}</h1></header>;
+  const mot = plateforme === 'ebay';
+  const src = {vinted:'/brands/vinted.svg',leboncoin:'/brands/leboncoin.svg',ebay:'/brands/ebay.svg'}[plateforme];
+  return <header className="vrm-market-heading" data-plat-entete={plateforme} data-entete-plateforme={plateforme} style={{ '--plat': COULEUR_PLATEFORME[plateforme] || 'currentColor' }}>
+    <span className={'vrm-plat-tuile' + (mot ? ' vrm-plat-tuile-mot' : '')} aria-hidden="true"><span className="vrm-plat-marque" style={src ? { WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` } : undefined}/></span>
+    <h1 className={mot ? 'vrm-sr' : undefined}>{nom}</h1>
+  </header>;
+}
+// (17 oct.) Julien : « trop de texte, ça rend moche » (écran Annonces eBay). Une
+// explication qui ne change pas d'une fois à l'autre se replie derrière un « ⓘ »
+// au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
+// Ce qui dit un RISQUE propre à la donnée (une règle d'offre, une raison qui
+// distingue une ligne) reste visible — seul le texte fixe se replie.
+function Pourquoi({ children, label = 'Pourquoi ?' }) {
+  return <details className="vrm-pourquoi" data-pourquoi><summary aria-label={label} title={label}>ⓘ</summary><div>{children}</div></details>;
+}
+// (17 oct.) LES VENTES, MÊME QUAND IL N'Y EN A PAS ENCORE — Julien : « même s'il
+// n'y a pas de ventes tu peux faire comme Vinted : ventes en cours, finalisées,
+// le CA… ça fait une mise en forme et ça motive à remplir ces cases ». Les mêmes
+// trois cases sur Leboncoin et eBay. Une case LUE vide vaut 0 ; une case qu'on
+// ne SAIT pas vaut « — » (§5 : pas su n'est pas zéro) ; la ligne du dessous dit
+// comment la remplir.
+function KpiVentes({ tuiles, note, plateforme }) {
+  return (
+    <div className="vrm-kpi-ventes" data-ventes-kpi={plateforme}>
+      <div className="vrm-kpi-ventes-grille">
+        {tuiles.map((t) => (
+          <div key={t.cle} className="vrm-kpi-ventes-case" data-kpi={t.cle} data-kpi-valeur={t.val == null ? '' : String(t.brut != null ? t.brut : t.val)}>
+            <div className="vrm-kpi-ventes-lib">{t.lib}</div>
+            <div className={'vrm-display vrm-kpi-ventes-val' + (t.val == null ? ' vrm-kpi-ventes-vide' : '')}>{t.val == null ? '—' : t.val}</div>
+            {t.sub ? <div className="vrm-kpi-ventes-sub">{t.sub}</div> : null}
+          </div>
+        ))}
+      </div>
+      {note ? <div className="vrm-kpi-ventes-note">{note}</div> : null}
+    </div>
+  );
 }
 // UN contrôle segmenté pour toute l'app (revue du 16 octobre : trois formes,
 // dont des segments BLEUS pleins, contraires au §7). C'est le dessin des
@@ -12840,6 +12877,44 @@ function ResumePlateforme({children,title='Chiffres de la plateforme',className=
   const [open,setOpen]=useState(()=>window.matchMedia('(min-width:768px)').matches);
   useEffect(()=>{const mq=window.matchMedia('(min-width:768px)');const change=()=>setOpen(mq.matches);mq.addEventListener('change',change);return()=>mq.removeEventListener('change',change);},[]);
   return <details className={`vrm-platform-summary ${className}`} open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>{title==='Chiffres de la plateforme'?<><span className="vrm-summary-short">Chiffres</span><span className="vrm-summary-accessible"> de la plateforme</span></>:title}</summary>{children}</details>;
+}
+// (17 oct.) Julien : « un endroit où on peut retirer l'argent du porte-monnaie,
+// si possible ». ⚠️ VRM NE FAIT PAS LE VIREMENT, et c'est une décision : son
+// navigateur a bien vu Vinted appeler `POST /api/v2/users/{id}/payouts`
+// (mesuré dans `seen_urls`), mais jamais la FORME de la demande (montant ? compte
+// bancaire ? confirmation ?) — envoyer de l'argent sur une adresse dont on
+// devine le contenu est exactement ce que ce projet s'interdit. VRM dit donc
+// combien est disponible sur CHAQUE compte, et ouvre son porte-monnaie Vinted :
+// le virement se fait là-bas, en deux clics, sur le compte connecté dans le
+// navigateur. ⚠️ L'adresse de la page (`/wallet/balance`) n'est pas mesurée ici.
+const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
+function RetirerArgent({ liveStats }) {
+  const [ouvert, setOuvert] = useState(false);
+  const liste = liveStats && Array.isArray(liveStats.walletParCompte) ? liveStats.walletParCompte.filter((x) => x.dispo != null) : null;
+  if (!liste) return null;
+  const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
+  return (
+    <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
+      <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
+        <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{total > 0 ? `${fmt(total)} disponible${liste.filter((x) => x.dispo > 0).length > 1 ? ` sur ${liste.filter((x) => x.dispo > 0).length} comptes` : ''}` : 'Rien de disponible pour l\'instant'}</span></span>
+        <span aria-hidden="true" style={{ color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
+      </button>
+      {ouvert && (
+        <div style={{ marginTop: 6 }}>
+          {liste.map((x) => (
+            <div key={x.uid} data-retirer-compte={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
+                <div style={{ fontSize: 11.5, color: C.muted }}>{fmt(x.dispo || 0)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
+              </div>
+              {x.dispo > 0 && <a href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Retirer sur Vinted ↗</a>}
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>Le virement se fait dans ton porte-monnaie Vinted, sur le compte <b>connecté dans ton navigateur</b> — connecte-toi d'abord sur le bon compte. VRM ne déplace jamais ton argent lui-même.</div>
+        </div>
+      )}
+    </div>
+  );
 }
 function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
@@ -13368,13 +13443,47 @@ function BlocEbay({ n, titre: t, right, children }) {
 // seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
 // vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
 // jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
-function autoRemplirAttributs(attributs, { titre, marque, taille }) {
+// (17 oct.) La description quand Vinted n'en a pas été captée : les FAITS de la
+// paire (marque, pointure, état enregistrés par Vinted, son N° de référence),
+// rien d'autre. Une phrase commerciale inventée serait pire qu'un champ court.
+function descriptionDeFaits(p) {
+  if (!p) return '';
+  const l = [];
+  if (p.title) l.push(String(p.title).trim());
+  if (p.marque) l.push(`Marque : ${p.marque}`);
+  if (p.tailleVinted || p.taille) l.push(`Pointure : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
+  if (p.etat) l.push(`État : ${p.etat}`);
+  if (p.num) l.push(`Référence : VRM-${p.num}`);
+  return l.length > 1 ? l.join('\n') : '';
+}
+// (17 oct.) L'ÉTAT eBay à partir de l'état que VINTED a écrit sur l'annonce —
+// seulement vers un état qu'eBay PROPOSE pour cette catégorie (sa liste,
+// `conditions`), jamais deviné : « Neuf avec étiquette » → 1000, « Neuf sans
+// étiquette » → 1500, un état d'occasion (« Très bon état », « Bon état »,
+// « Satisfaisant ») → 3000. Inconnu ou absent de la liste d'eBay ⇒ null.
+function etatEbayDeVinted(etat, conditions) {
+  const e = String(etat || '').toLowerCase();
+  if (!e) return null;
+  const id = /neuf avec/.test(e) ? '1000' : /neuf sans/.test(e) ? '1500' : /(tr[eè]s bon|bon [eé]tat|satisfaisant)/.test(e) ? '3000' : null;
+  if (!id) return null;
+  if (Array.isArray(conditions) && conditions.length && !conditions.some((c) => String(c && c.id) === id)) return null;
+  return id;
+}
+// `faits` : ce que Vinted a ENREGISTRÉ pour la paire (marque, pointure) — pas
+// une déduction. Ils remplissent aussi un champ eBay en texte libre (la marque
+// n'a souvent pas de liste chez eBay) ; une déduction du titre, jamais.
+function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) {
   const out = {};
   const hay = ' ' + String(titre || '').toLowerCase() + ' ';
   const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const a of attributs || []) {
-    if (!a || !Array.isArray(a.valeurs) || !a.valeurs.length) continue;   // texte libre : jamais deviné
+    if (!a) continue;
     const nl = String(a.nom || '').toLowerCase();
+    if (!Array.isArray(a.valeurs) || !a.valeurs.length) {   // texte libre : jamais deviné — seulement un FAIT capté
+      if (/marque|brand/.test(nl) && faits.marque) out[a.nom] = String(faits.marque);
+      else if (/pointure|taille|size/.test(nl) && faits.taille) out[a.nom] = String(faits.taille).replace('.', ',');
+      continue;
+    }
     if (/pointure|taille|size/.test(nl) && taille) {
       const t = String(taille).replace(',', '.');
       const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
@@ -13674,7 +13783,7 @@ const corpsCompteEbay = (ref) => (ref && ref !== 'principal' && CLE_COMPTE_EBAY.
 // identité n'est pas apprise. La MÊME règle que la route (`comptesActifs`, §11).
 function comptesEbayActifs(reg) {
   const l = (reg && Array.isArray(reg.comptes) ? reg.comptes : []).filter((e) => e && typeof e === 'object')
-    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null }))
+    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null, type: (e.type === 'pro' || e.type === 'particulier') ? e.type : '' }))
     .filter((e) => e.principal || e.cle);
   const out = l.filter((e) => !e.deconnecteLe).map((e) => ({ ...e, suffixe: suffixeCompteEbay(e), ref: refCompteEbay(e) }));
   if (!l.some((e) => e.principal)) out.unshift({ cle: '', pseudo: '', principal: true, implicite: true, deconnecteLe: null, ajouteLe: null, suffixe: '', ref: 'principal' });
@@ -13682,6 +13791,9 @@ function comptesEbayActifs(reg) {
 }
 // Le nom à montrer pour un compte : son pseudo eBay, sinon « compte principal ».
 const nomCompteEbay = (c) => (c && c.pseudo) ? c.pseudo : 'compte principal';
+// (17 oct.) Pro ou particulier, tel qu'eBay le dit (GetUser, rangé par la route).
+// Pas su ⇒ rien (jamais « particulier » par défaut).
+const typeCompteEbayTexte = (c) => (c && c.type === 'pro') ? 'Pro' : (c && c.type === 'particulier') ? 'Particulier' : '';
 // Le registre, lu une fois par ouverture (et relu après une connexion ou une
 // déconnexion : `vrm:ebay-comptes`). TROIS états : `undefined` en cours ·
 // `null` pas su (la base n'a pas répondu) · la liste des comptes actifs.
@@ -14246,15 +14358,21 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // (publiée il y a deux minutes : rien n'est encore capté), on demande à
   // l'extension de lire sa page TOUT DE SUITE (`cmd: 'photos'`, sur ce clic).
   const [photosEtat, setPhotosEtat] = React.useState(null);   // null · 'cherche' · 'fait' · {raison}
+  // (17 oct.) Choisir une paire lance l'analyse eBay (catégorie + caractéristiques)
+  // sans attendre un second clic : c'est ELLE qui remplit marque, pointure et
+  // état. Une LECTURE chez eBay (Taxonomy), rien n'est publié.
+  const [autoAnalyse, setAutoAnalyse] = React.useState(0);
   const pairCourante = React.useRef(null);
   const choisirPaire = (p) => {
     pairCourante.current = p.id;
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
-    setDesc(p.desc || '');                                 // sa description Vinted, reprise automatiquement
+    setDesc(p.desc || descriptionDeFaits(p));              // sa description Vinted ; à défaut, ses FAITS captés (jamais inventés)
     if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
+    { const ce = etatEbayDeVinted(p.etat, null); if (ce) setCond(ce); }   // l'état Vinted de la paire (vérifié contre la liste d'eBay à l'analyse)
     setCat(null); setCheck(null);
+    setAutoAnalyse((n) => n + 1);   // la catégorie et ses caractéristiques (marque, pointure, état) se cherchent tout de suite
     setPhotosEtat(null);
     const manque = (p.photos || []).length < Math.max(2, Number(p.nPhotos) || 0);
     if (manque && p.uid && vmrExtPresent()) {
@@ -14300,13 +14418,18 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setCat(c);
     // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
     // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
-    if (conditions && !conditions.some(c => c.id === cond)) {
+    const condVinted = pairSel ? etatEbayDeVinted(pairSel.etat, conditions) : null;
+    if (condVinted) setCond(condVinted);
+    else if (conditions && !conditions.some(c => c.id === cond)) {
       const occ = conditions.find(c => c.id === '3000');
       setCond((occ || conditions[0]).id);
     }
     // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
+    // La marque : celle que VINTED a enregistrée pour la paire d'abord, sinon
+    // celle reconnue dans le titre (une liste de marques, jamais inventée).
     const src = pairSel ? pairSel.title : titre;
-    const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
+    const marqueV = (pairSel && pairSel.marque) || '';
+    const auto = autoRemplirAttributs(attributs, { titre: src, marque: marqueV || extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '', faits: { marque: marqueV, taille: (pairSel && pairSel.tailleVinted) || '' } });
     // Changement de catégorie ⇒ on repart des valeurs prouvées (les anciennes
     // caractéristiques n'ont pas de sens dans la nouvelle catégorie).
     if (fresh) setAsp(auto); else if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
@@ -14322,6 +14445,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
+  React.useEffect(() => { if (autoAnalyse && titre.trim() && !analyse) analyser(); /* eslint-disable-line */ }, [autoAnalyse]);
   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
   // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
@@ -14791,13 +14915,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -14815,9 +14939,12 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       // Titre de l'annonce Vinted : repli quand la fiche N° n'en porte pas (le
       // choix de paire écrivait « — »). Même identifiant, aucune ressemblance.
       if (typeof it.title === 'string' && it.title.trim()) titre[id] = it.title.trim();
+      // (17 oct.) L'ÉTAT écrit par Vinted sur l'annonce (« Très bon état ») —
+      // un fait capté, il sert à pré-remplir l'état eBay (jamais deviné).
+      if (typeof it.status === 'string' && it.status.trim()) etat[id] = it.status.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat };
 };
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
@@ -14840,7 +14967,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -14849,6 +14976,18 @@ function useEbayPaires(comptes) {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
         if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
       } catch (_) { /* réseau : on se contente de la couverture */ }
+      // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
+      // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
+      // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
+      // description. Le dressing, lui, ne porte pas la marque (mesuré : 0 sur
+      // 271 annonces) — c'est pour ça que « la marque ne s'est pas remplie
+      // toute seule ». Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
+      // on fait sans (rien n'est inventé à la place).
+      let coffre = {};
+      try {
+        const rows = await lireTout('id=like.coffre_*&select=id,brand:data->>brand,etat:data->>etat,size:data->>size,desc:data->>desc');
+        for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
+      } catch (_) { coffre = {}; }
       const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
       const vus = new Set(), out = [];
       for (const id in fiches) {
@@ -14860,10 +14999,14 @@ function useEbayPaires(comptes) {
         const cover = f.photo || couvMap[String(id)] || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
-        const dsc = String((details[id] && details[id].description) || '').trim();
+        const cf = coffre[String(id)] || {};
+        const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
         const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
         const titreP = String(f.title || titreMap[String(id)] || '').trim();
-        out.push({ id: String(id), num: n, title: titreP, taille: extractSize(titreP) || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        const marque = String(cf.brand || '').trim();
+        const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
+        const tailleV = String(cf.size || '').trim();
+        out.push({ id: String(id), num: n, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
@@ -15062,6 +15205,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
             <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
               <Icon name="check" size={15}/> <b>Compte eBay relié</b>
+              {Array.isArray(comptesStatut) && comptesStatut.length === 1 && typeCompteEbayTexte(comptesStatut[0]) && <span data-ebay-compte-type={comptesStatut[0].type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(comptesStatut[0])}</span>}
             </div>
             <button type="button" onClick={synchroniser} disabled={syncing}
               style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 10, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
@@ -15079,7 +15223,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 return (
                   <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}</div>
                       <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'état pas lu'}</div>
                       {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
                     </div>
@@ -15127,6 +15271,14 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {item(solde.dispo, 'disponible à virer', C.text)}
                       {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
+                    </div>
+                    {/* (17 oct.) « Retirer l'argent » : sur eBay il n'y a rien à
+                        retirer à la main — eBay verse lui-même le disponible sur
+                        ton compte bancaire, selon ton calendrier de versements.
+                        VRM ne déplace jamais d'argent. (Page non mesurée ici.) */}
+                    <div data-ebay-retirer style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                      <span style={{ flex: '1 1 180px', fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>eBay vire tout seul le disponible sur ton compte bancaire, selon ton calendrier de versements.</span>
+                      <a href="https://www.ebay.fr/sh/fin" target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px', border: `1px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Mes versements ↗</a>
                     </div>
                   </div>
                 );
@@ -15251,7 +15403,23 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
-  if (!orders.length && !cible) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
+  // (17 oct.) Les trois cases, même sans vente (Julien : « ça motive à remplir
+  // ces cases »). Lu et vide ⇒ 0 ; un compte illisible ⇒ « — » (pas su).
+  const plusieursEbay = Array.isArray(comptesEbay) && comptesEbay.length >= 2;
+  const kpi = (() => {
+    const passu = illisibles.length > 0;
+    const enCours = orders.filter((o) => { const e = etatCommandeEbay(o); return e.peutExpedier || e.kind === 'review' || e.kind === 'payment'; });
+    const exp = orders.filter((o) => etatCommandeEbay(o).expedie);
+    const ca = caEbayPayees(orders);
+    const aPayee = orders.some((o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
+    const caVal = passu ? null : (aPayee ? (ca == null ? null : fmt(ca)) : fmt(0));
+    return <KpiVentes plateforme="ebay" tuiles={[
+      { cle: 'encours', lib: 'En cours', val: passu ? null : enCours.length },
+      { cle: 'finalisees', lib: 'Expédiées', val: passu ? null : exp.length },
+      { cle: 'ca', lib: 'CA payé', val: caVal, brut: caVal == null ? null : (aPayee ? ca : 0), sub: plusieursEbay ? (vue === '*' ? `${comptesEbay.length} comptes` : nomCompteEbay(comptesEbay.find((c) => c.ref === vue) || {})) : null },
+    ]} note={passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici." : null}/>;
+  })();
+  if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   const visibles=orders.filter(o=>{
@@ -15262,8 +15430,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   });
   return wrap(<>
     {head}
-    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{orders.length} commande{orders.length > 1 ? 's' : ''}{payees ? ` · ${payees} payée${payees > 1 ? 's' : ''}` : ''}</div>
-    {illisibles.length>0 && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
+    {!cible && kpi}
+    {illisibles.length>0 && cible && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
     {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} doneLabel="Expédiées"/>}
@@ -17407,8 +17575,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {deuxComptesVue.length > 0 && (
       <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
         {deuxComptesVue.map((d) => (
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
@@ -17424,7 +17591,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {dvVue.aAnnulerEbay.length > 0 && (
       <div data-ebay-a-annuler={dvVue.aAnnulerEbay.length} style={bloc(E.warn)}>
         <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} paire{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendue{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmée{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</div>
+        <Pourquoi>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</Pourquoi>
         {dvVue.aAnnulerEbay.map((d) => {
           const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
           return (
@@ -17443,8 +17610,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerEbay.length > 0 && (
       <div data-ebay-a-retirer={dvVue.aRetirerEbay.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbay.length} paire{dvVue.aRetirerEbay.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbay.length} paire{dvVue.aRetirerEbay.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</Pourquoi></div>
         {(() => {
           // Retrait automatique allumé : la raison commune à TOUTES les lignes se
           // dit une fois (§7) ; une raison qui distingue se dit sur sa ligne.
@@ -17477,8 +17643,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.aRetirerVinted.length > 0 && (
       <div data-ebay-retirer-vinted={dvVue.aRetirerVinted.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerVinted.length} paire{dvVue.aRetirerVinted.length > 1 ? 's' : ''} vendue{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted</div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerVinted.length} paire{dvVue.aRetirerVinted.length > 1 ? 's' : ''} vendue{dvVue.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dvVue.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted <Pourquoi>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</Pourquoi></div>
         {dvVue.aRetirerVinted.map((d, i) => (
           <div key={String((d.commande && d.commande.orderId) || i) + d.numero} data-ebay-vendue={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -17863,12 +18028,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     <div className="vrm-ebay-suite">
     {nSans > 0 && (
       <div className="vrm-plat-note" data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
-        Offre aux observateurs : {nElig ? `possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} ; pour ${nSans === 1 ? "l'autre" : `les ${nSans} autres`}, ` : ''}pas d'observateur à qui l'envoyer pour l'instant.
+        {nElig ? `Offre aux observateurs possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} · ` : ''}pas d'observateur à qui l'envoyer pour {nElig ? (nSans === 1 ? "l'autre" : `les ${nSans} autres`) : (nSans === 1 ? 'cette annonce' : `ces ${nSans} annonces`)} pour l'instant.
       </div>
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — et, pour {nonRelieesRegle} qui {nonRelieesRegle > 1 ? 'ont' : 'a'}{nonRelieesPeutEtre ? ' (peut-être)' : ''} une règle d'offre, si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null}. « Relier à une paire » sur sa carte — c'est toi qui choisis.
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.</Pourquoi>
       </div>
     )}
       {outilsSuite}
@@ -44112,6 +44277,9 @@ function AppCoeur() {
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
+        // (17 oct.) Le disponible COMPTE PAR COMPTE, pour « Retirer » (il faut
+        // savoir sur quel compte aller : il en a plusieurs).
+        walletParCompte:(walletEsc&&Array.isArray(walletEsc.parCompte))?walletEsc.parCompte.map(x=>({uid:x.uid,login:(()=>{const a=(vintedAccounts||[]).find(y=>String(y.vinted_user_id)===String(x.uid));return a?String(a.login||''):'';})(),dispo:x.dispo,jours:x.jours})):null,
         walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
@@ -45116,6 +45284,7 @@ function AppCoeur() {
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
           <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
+          {platSub==='ventes' && !baseKO && <div style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
@@ -45137,12 +45306,25 @@ function AppCoeur() {
             const note = (ar.actives && lbcVentes.maj)
               ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
               : null;
+            // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
+            // du haut se tait (le même nombre deux fois sur un écran, §7).
+            if (platSub === 'ventes') return null;
             return (
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
-          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
+          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
+            {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
+              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
+              const v = (n) => (vide && !lu) ? null : n;
+              return <KpiVentes plateforme="leboncoin" tuiles={[
+                { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
+                { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
+                { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
+              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? `Lu sur Leboncoin ${ilYaCourt(lbcVentes.maj)} — ouvre « Mes transactions » avec l'extension pour rafraîchir.` : null)}/>; })()}
+            {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
+          </>}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
@@ -45167,6 +45349,7 @@ function AppCoeur() {
             const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
             const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
+            if (platSub === 'ventes') return null;   // les trois cases de « Ventes » le disent (§7)
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['compte','Compte']]} dark/></div>
@@ -45176,11 +45359,11 @@ function AppCoeur() {
           {Array.isArray(comptesEbay) && comptesEbay.length >= 2 && (
             <ListeComptes id="vrm-sel-compte-ebay" skin={EBAY_SKIN} valeur={ebayVueEff} onChange={setEbayVue}
               attrs={{ 'data-ebay-vue': ebayVueEff }}
-              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) }))} />
+              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') }))} />
           )}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/>}</EbayActionCompte></div>}
+          {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
