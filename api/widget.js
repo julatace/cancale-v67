@@ -245,7 +245,10 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // qu'il a masquées : l'app les sort de « à expédier », le widget les comptait
 // encore — et les annonçait « en retard » une fois la date limite passée
 // (2 colis déjà postés, le 4 octobre).
-const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden'];
+// ⚠️ (17 oct.) `vinted_urssaf_mois` : la ligne que l'écran Ventes PUBLIE (son
+// propriétaire, §11) — le widget y lit l'argent REÇU du mois (`recu`, calculé
+// par `recuDuMois`, la règle même de « Reçu en {mois} » sur Ma journée).
+const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois'];
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
@@ -256,6 +259,50 @@ async function main() {
     return j[0] || {};
   } catch (_) { return null; }
 }
+// ── L'ARGENT REÇU DU MOIS : CONSOMMÉ, JAMAIS RECALCULÉ (17 octobre) ──────────
+// Ce chiffre se calculait ici sur les emails « commande finalisée »
+// (`email_final_*`) pendant que Ma journée dit « Reçu en {mois} » avec la règle
+// du CA déclaré (`ventesDeclarables` → `recuDuMois`, daté au VERSEMENT, toutes
+// plateformes, comptes exclus écartés). Deux règles pour une notion (§11) :
+// l'iPhone pouvait dire un autre montant que l'app.
+// ⇒ Le widget LIT la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`,
+//    champ `recu[mois courant]`). Trois états, jamais deux :
+//    • ligne absente, illisible, d'un autre mois ou de plus de 3 jours, ou
+//      publiée par une app d'avant le champ `recu` ⇒ AUCUN nombre (`null` :
+//      le widget affiche un tiret, jamais 0) et la raison ;
+//    • une source illisible quand l'app l'a publiée (`sources.X === 'pasSu'`)
+//      ⇒ `received` reste `null` (un vieux script l'afficherait comme complet)
+//      et le montant connu part dans `receivedAuMoins`, avec ce qui manque ;
+//    • sinon le montant, et les ventes finalisées pas encore datées à côté
+//      (`receivedADater`, la couverture comme sur l'app).
+// ⚠️ Le seuil de 3 jours : `at` ne bouge que quand la ligne CHANGE (l'app ne
+//    republie pas un contenu identique). Au-delà, on ne sait plus si de
+//    l'argent est arrivé depuis — mieux vaut un tiret qu'un montant périmé.
+export const RECU_MAX_AGE_MS = 3 * 86400000;
+export function recuDuMoisPublie(publie, ym, maintenant = Date.now()) {
+  const vide = (raison) => ({ received: null, receivedAuMoins: null, receivedManque: null, receivedADater: null, receivedAt: null, receivedRaison: raison });
+  if (publie == null) return vide('absente');
+  if (typeof publie !== 'object' || Array.isArray(publie) || !Array.isArray(publie.mois)) return vide('illisible');
+  const at = Number(publie.at);
+  if (!isFinite(at) || at <= 0) return vide('illisible');
+  if (new Date(at).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7) !== ym) return vide('ancienne');
+  if (maintenant - at > RECU_MAX_AGE_MS) return vide('ancienne');
+  // `recu` = { [mois]: montant }, par mois de VERSEMENT. Absent de la ligne :
+  // publiée par une app d'avant ce champ. Le mois absent de `recu` (ligne lue,
+  // de ce mois) : l'app n'y a rien reçu — un vrai zéro, le sien.
+  if (!publie.recu || typeof publie.recu !== 'object' || Array.isArray(publie.recu)) return vide('ancienne-app');
+  const recu = publie.recu[ym] == null ? 0 : Number(publie.recu[ym]);
+  if (!isFinite(recu) || recu < 0) return vide('illisible');
+  const src = (publie.sources && typeof publie.sources === 'object') ? publie.sources : null;
+  if (!src) return vide('illisible');
+  const manque = Object.entries(src).filter(([, v]) => v === 'pasSu').map(([k]) => k);
+  const ad = publie.aDater && publie.aDater.par && publie.aDater.par.Vinted;
+  const aDater = ad && Number(ad.n) > 0 ? { n: Number(ad.n), ca: Math.round(Number(ad.ca) || 0) } : null;
+  const base = { receivedADater: aDater, receivedAt: new Date(at).toISOString(), receivedRaison: null };
+  if (manque.length) return { ...base, received: null, receivedAuMoins: Math.round(recu), receivedManque: manque, receivedRaison: 'partiel' };
+  return { ...base, received: Math.round(recu), receivedAuMoins: null, receivedManque: null };
+}
+
 // Photo des chiffres publiée par l'app elle-même (ligne widget_stats) → source
 // PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
 async function snapshot() {
@@ -302,9 +349,9 @@ export default async function handler(req, res) {
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
     const vivants = await comptesVivants();
-    const [bords, txSold, txBuy, finals, sales, m, snap] = await Promise.all([
+    const [bords, txSold, txBuy, sales, m, snap] = await Promise.all([
       bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
-      rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
+      rows('email_sale_*'), main(), snapshot(),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
     const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
@@ -315,7 +362,7 @@ export default async function handler(req, res) {
     //    qui ne trouve pas `ship` affiche un tiret, jamais « 0 ».
     //    ⚠️ Et la clé du widget vit dans `main` : sans elle, `expected` valait
     //    '' et la route répondait SANS clé. Se taire referme aussi ça.
-    if (m === null || bords === null || finals === null || sales === null
+    if (m === null || bords === null || sales === null
         || sold === null || purchased === null) {
       res.status(503).json({
         erreur: 'base-injoignable',
@@ -384,9 +431,9 @@ export default async function handler(req, res) {
       salesMonth = snap.ventesMois != null ? Number(snap.ventesMois) || 0 : salesMonth;
       moneySource = 'app';
     }
-    // Argent réellement viré ce mois (emails de finalisation) — info secondaire.
-    let receivedMonth = 0;
-    for (const f of finals) { if (String(f.receivedAt || '').slice(0, 7) === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) receivedMonth += n; } }
+    // Argent REÇU ce mois : la ligne publiée par l'app (voir `recuDuMoisPublie`),
+    // plus les emails de finalisation — une seule règle, celle de Ma journée.
+    const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);
 
     res.status(200).json({
       ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
@@ -395,7 +442,7 @@ export default async function handler(req, res) {
       salesMonth,
       moneySource, // 'app' = identique à l'écran de l'app · 'emails' = repli
 
-      received: Math.round(receivedMonth),
+      ...recu,
       pending: snap && snap.enAttente != null ? snap.enAttente : null,
       online: snap && snap.online != null ? snap.online : null,
       unread: snap && snap.unread != null ? snap.unread : null,

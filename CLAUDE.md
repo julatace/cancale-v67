@@ -9627,6 +9627,9 @@ par scénario, fausse base à état) : **15 rouges sur le code d'avant, 0 après
   `vinted-connect` ne vérifie pas un `accessToken` encore valide auprès de
   Vinted (il ne touche que les lignes du vendeur lui-même).
 
+### Le widget lit l'argent REÇU publié par l'app (17 octobre)
+`api/widget.js` calculait `received` sur `email_final_*` ; Ma journée dit « Reçu en {mois} » par `recuDuMois` (§11). L'écran Ventes publie désormais `recu: {[mois de versement]: €}` dans `vinted_urssaf_mois`, devenue **synchronisée** (SYNC_KEYS : le serveur ne voyait pas cette clé, locale à l'appareil) ; le widget la lit par projection de `main` (`recuDuMoisPublie`). Absente, illisible, d'un autre mois, de plus de 3 jours (`at` ne bouge qu'au changement de contenu) ou sans `recu` ⇒ `received: null` + `receivedRaison` ; une source `pasSu` ⇒ `received: null`, `receivedAuMoins` + `receivedManque` (un vieux script l'aurait affiché complet). Plus aucune lecture `email_final_*`. Banc `widget-multi.cjs` : 9 rouges sur l'avant, 4 mutations rouges. ⚠️ Le script Scriptable de l'iPhone n'est pas dans le dépôt : à lui de lire `receivedAuMoins`.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
