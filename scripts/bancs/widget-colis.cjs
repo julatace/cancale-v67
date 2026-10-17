@@ -44,11 +44,13 @@ function poserFetch({ comptes, resume = true }) {
     if (/id=eq\.widget_stats/.test(u)) return J([]);
     if (/id=like\.email_bord_/.test(u)) return J(BORDS);
     if (/id=like\.email_final_|id=like\.email_sale_/.test(u)) return J([]);
+    const proj = (url, lignes) => /my_orders:data/.test(decodeURIComponent(url)) ? lignes.map(r => ({ id: r.id, my_orders: r.data.payload.my_orders })) : lignes;
     if (/orders_sold/.test(u) && /resume/.test(u)) {
       if (!resume) return J([{ id: 'harvest_111_orders_sold', txns: null }, { id: 'harvest_999_orders_sold', txns: null }]);
       return J([{ id: 'harvest_111_orders_sold', txns: ['T1', 'T2', 'T3'] }, { id: 'harvest_999_orders_sold', txns: ['T9'] }]);
     }
-    if (/orders_sold/.test(u)) return J([
+    // §6.3 : la projection `select=…my_orders:data->payload->my_orders` est appliquée.
+    if (/orders_sold/.test(u)) return J(proj(u, [
       { id: 'harvest_111_orders_sold', data: { payload: { my_orders: [
         { transaction_id: 'T1', status: "Bordereau d'envoi commandé", transaction_user_status: 'needs_action' },
         { transaction_id: 'T2', status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' },
@@ -58,7 +60,7 @@ function poserFetch({ comptes, resume = true }) {
       { id: 'harvest_999_orders_sold', data: { payload: { my_orders: [
         { transaction_id: 'T9', status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' },
       ] } } },
-    ]);
+    ]));
     if (/orders_purchased/.test(u) && /resume/.test(u)) return J(resume ? [{ id: 'harvest_111_orders_purchased', txns: [] }] : []);
     if (/orders_purchased/.test(u)) return J([]);
     return J([]);

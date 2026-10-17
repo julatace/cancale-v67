@@ -98,22 +98,14 @@ const noSecret = (o) => { const s = JSON.stringify(o || {}); return !s.includes(
   { const res = faireRes(); await handler({ method: 'POST', body: { action: 'apptoken' } }, res);
     dit(res.code === 502 && res.corps && res.corps.ok === false, 'eBay en panne (5xx) → 502, pas 200'); }
 
-  // ── 6. ÉCHANGE DU CODE → refresh rangé serveur ──────────────────────────────
-  ebayMode = 'ok';
-  { const res = faireRes(); await handler({ method: 'POST', body: { action: 'exchange' } }, res);
-    dit(res.code === 400, 'exchange sans code → 400'); }
-  supaWrites = []; supaWriteOk = true;
+  // ── 6. PLUS D'ÉCHANGE DE CODE HORS DU RETOUR SIGNÉ (17 octobre) ─────────────
+  // `exchange` rangeait les jetons d'un code reçu sans state signé ni nonce. Le
+  // seul chemin est le retour de consentement (banc ebay-callback.cjs).
+  ebayMode = 'ok'; supaWrites = []; supaWriteOk = true; ebayBody = null;
   { const res = faireRes(); await handler({ method: 'POST', body: { action: 'exchange', code: 'C123' } }, res);
-    dit(res.code === 200 && res.corps && res.corps.connected === true, 'exchange OK → connected:true');
-    dit(/grant_type=authorization_code/.test(ebayBody || '') && /redirect_uri=/.test(ebayBody || ''), 'l\'échange envoie authorization_code + redirect_uri');
-    dit(supaWrites.length === 1 && supaWrites[0].includes(REFRESH), 'le refresh_token est RANGÉ côté serveur (Supabase)', supaWrites.length + ' écriture(s)');
-    dit(noSecret(res.corps), 'exchange ne renvoie AUCUN jeton au navigateur'); }
-
-  // ── 7. ON N'ANNONCE « connecté » QUE SI ON A VRAIMENT RANGÉ ─────────────────
-  supaWriteOk = false; supaWrites = [];
-  { const res = faireRes(); await handler({ method: 'POST', body: { action: 'exchange', code: 'C123' } }, res);
-    dit(res.code === 500 && res.corps && res.corps.reason === 'store-failed', 'rangement échoué → 500 honnête, JAMAIS « connecté »', `HTTP ${res.code}`); }
-  supaWriteOk = true;
+    dit(res.code === 400 && res.corps && res.corps.connected !== true, 'exchange refusé (400), jamais « connecté »', `HTTP ${res.code}`);
+    dit(supaWrites.length === 0, 'aucun jeton rangé', supaWrites.length + ' écriture(s)');
+    dit(!/grant_type=authorization_code/.test(ebayBody || ''), 'aucun code échangé chez eBay'); }
 
   // ── 8. ÉTAT DU COMPTE ───────────────────────────────────────────────────────
   supaHasRow = true; supaReadOk = true;
