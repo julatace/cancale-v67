@@ -1471,6 +1471,7 @@ async function storeHarvest(domain, type, id, body) {
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
+  if (type === 'orders_sold' && data.resume) { try { data.resume = retirerDuResume(data.resume, await transactionsQuiNeSExpedientPlus(uid)); } catch (_) {} }
   const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
@@ -3870,6 +3871,28 @@ async function noterRetrait(r, uid) {
   } catch (_) { return null; }
 }
 
+// ── LES TRANSACTIONS QUI NE S'EXPÉDIENT PLUS (17 octobre, besoin du chantier 4).
+//    La liste des ventes peut garder « needs_action » sur une vente dont la
+//    TRANSACTION dit autre chose — codes mesurés : 220 paiement échoué, 430
+//    suspendue, 440 retour (la nB546), 450 finalisée, 500-520 annulée. Le résumé
+//    posé pour le widget et les rappels les exclut. Lecture ratée ⇒ `null` :
+//    on n'exclut RIEN (sur-exclure cacherait un vrai colis à poster).
+function TXN_NE_S_EXPEDIE_PLUS(st) { const n = parseInt(String(st == null ? '' : st), 10); return Number.isFinite(n) && (n === 220 || n >= 430); }
+async function transactionsQuiNeSExpedientPlus(uid) {
+  if (!uid) return null;
+  const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:meta->>status`);
+  if (!Array.isArray(rows)) return null;
+  const out = new Set();
+  for (const r of rows) {
+    const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
+    if (tx && TXN_NE_S_EXPEDIE_PLUS(r.st)) out.add(tx);
+  }
+  return out;
+}
+function retirerDuResume(resume, exclues) {
+  if (!resume || !Array.isArray(resume.txns) || !exclues || typeof exclues.has !== 'function' || !exclues.size) return resume;
+  return Object.assign({}, resume, { txns: resume.txns.filter((tx) => !exclues.has(String(tx))) });
+}
 function resumeCommandes(type, payload) {
   // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
   // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
@@ -3954,6 +3977,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     }
   }
   data.resume = resumeCommandes(type, payload) || undefined;
+  if (type === 'orders_sold' && data.resume) { try { data.resume = retirerDuResume(data.resume, await transactionsQuiNeSExpedientPlus(uid)); } catch (_) {} }
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
   // donc la date de creation de la ligne et faisait passer une moisson de deux
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
@@ -4678,7 +4702,7 @@ async function visiteVinted() {
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
     // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
     // base : il passe quand même.
-    if (await pauseVinted()) { noterDiag('visite_en_pause'); await purgeBordereaux(); return; }
+    if (await pauseVinted()) { noterDiag('visite_en_pause'); await purgeBordereaux(); await purgeBordereauxAnnules(); return; }
     // ⚠️⚠️ 5.165 — SANS SESSION VRM, LA VISITE N'ENVOIE RIEN À VINTED. Le
     //    9 octobre, la visite lisait profil, dressing, ventes, achats, boîte
     //    (vingt requêtes) que la base refusait ensuite en bloc (400, RLS), et
@@ -4706,7 +4730,7 @@ async function visiteVinted() {
     // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
     // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
     // nouvel essai avant 6 h.
-    if (await pauseVinted()) { await purgeBordereaux(); return; }
+    if (await pauseVinted()) { await purgeBordereaux(); await purgeBordereauxAnnules(); return; }
     const genes = await avecVinted(() => genererBordereauxEnAttente(uid));
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
     // Vinted). Elle relit ses bordereaux quand on la prévient.
@@ -4771,7 +4795,7 @@ async function visiteVinted() {
     // ⚠️ MÉNAGE : les PDF des bordereaux de ventes FINALISÉES (livrées depuis
     // longtemps) sont retirés — métadonnée gardée, seul le poids part. Global,
     // borné, cooldown 12 h, fail-safe par sens (voir `purgeBordereaux`).
-    await purgeBordereaux();
+    await purgeBordereaux(); await purgeBordereauxAnnules();
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -6812,6 +6836,76 @@ async function purgeBordereaux() {
     if (n) logActivity(`🧹 ${n} vieux bordereau${n > 1 ? 'x' : ''} allégé${n > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
     if (nl) logActivity(`🧹 ${nl} bordereau${nl > 1 ? 'x' : ''} capté${nl > 1 ? 's' : ''} allégé${nl > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
     return n + nl;
+  } catch (_) { return 0; }
+}
+
+// ═══ VENTE ANNULÉE → SON BORDEREAU PART (17 octobre, 5.185) ════════════════
+// Julien : « j'ai fait une vente et elle a été annulée, l'extension doit être
+// capable de voir que la vente est annulée, supprimer le bordereau et la retirer
+// des colis à faire et des ventes ». Quand la TRANSACTION dit annulée (codes
+// 500-520, mesurés) et que son expédition n'avait PAS bougé (aucun « expédié /
+// acheminement / déposé / livré / remis »), le PDF de son bordereau ne sert plus
+// à rien — l'imprimer enverrait un colis que personne n'a payé. On retire les
+// OCTETS (`email_bord_{tx}`, `harvest_{uid}_label_{tx}`, et `label_latest` s'il
+// porte cette transaction), on GARDE la métadonnée, et on prévient l'app
+// (`maj · annulee`) — sans attendre les 7 jours de la purge des finalisées.
+// ⚠️ DESTRUCTIF, donc fail-safe par sens : lecture ratée ⇒ rien ; une
+//    expédition qui a bougé ⇒ on garde (c'est un retour, pas une annulation
+//    sèche) ; pas de vrais octets ⇒ rien n'est marqué. 20 par passage.
+const ANNUL_COOLDOWN_MS = 20 * 60 * 1000;
+const EXPEDITION_A_BOUGE = /exp[ée]di|achemin|transit|livr|d[ée]pos|remis|r[ée]ceptionn/i;
+const TXN_ANNULEE = (st) => { const n = parseInt(String(st == null ? '' : st), 10); return Number.isFinite(n) && n >= 500 && n < 600; };
+async function purgeBordereauxAnnules() {
+  try {
+    const cd = (await chrome.storage.local.get('vrmPurgeAnnul')).vrmPurgeAnnul || 0;
+    if (Date.now() - Number(cd) < ANNUL_COOLDOWN_MS) return 0;
+    const det = await sbGetTout('app_data?id=like.harvest_*_txn_*&meta->>status=like.5*&select=id,st:meta->>status,sst:meta->>ship_status_title');
+    if (det === null) return 0;                                   // pas su → RIEN
+    const annulees = new Map();                                   // tx → uid
+    for (const r of det) {
+      const m = /^harvest_(\d+)_txn_(\d+)$/.exec(String((r && r.id) || ''));
+      if (!m || !TXN_ANNULEE(r.st)) continue;
+      if (EXPEDITION_A_BOUGE.test(String(r.sst || ''))) continue;  // le colis a bougé : on garde
+      annulees.set(m[2], m[1]);
+    }
+    if (!annulees.size) { await chrome.storage.local.set({ vrmPurgeAnnul: Date.now() }); return 0; }
+    const bords = await sbGetTout('app_data?id=like.email_bord_*&select=id,fn:meta->>filename,pg:meta->>pdfPurged');
+    if (bords === null) return 0;
+    const labels = await sbGetTout('app_data?id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx');
+    if (labels === null) return 0;
+    const cibles = [];
+    for (const r of bords) {
+      const tx = (/^email_bord_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
+      if (!tx || !annulees.has(tx) || !r.fn || r.fn === 'None' || String(r.pg) === 'true') continue;
+      cibles.push({ id: r.id, tx, email: true });
+    }
+    for (const r of labels) {
+      const m = /^harvest_\d+_label_(\d+|latest)$/.exec(String((r && r.id) || ''));
+      if (!m) continue;
+      const tx = m[1] === 'latest' ? String(r.tx || '') : m[1];
+      if (!/^\d+$/.test(tx) || !annulees.has(tx)) continue;
+      if (r.tx && String(r.tx) !== tx) continue;                  // incohérent : doute → on garde
+      cibles.push({ id: r.id, tx, email: false });
+    }
+    let n = 0; const prevenus = new Set();
+    for (const c of cibles.slice(0, PURGE_MAX_PAR_RUN)) {
+      const plein = await sbGet(`app_data?id=eq.${encodeURIComponent(c.id)}&select=data`);
+      if (!Array.isArray(plein)) continue;                        // lecture ratée → on saute
+      const data = plein[0] && plein[0].data;
+      if (!data || typeof data !== 'object') continue;
+      const avaitPdf = (data.pdfB64 && data.pdfB64 !== 'None') || (c.email && data.pdfTamponneB64 && data.pdfTamponneB64 !== 'None');
+      if (!avaitPdf) continue;
+      const neuf = c.email
+        ? { ...data, pdfB64: null, pdfTamponneB64: null, filename: '', pdfPurged: true, pdfPurgedAt: new Date().toISOString(), annulee: true }
+        : { ...data, pdfB64: null, pdfPurged: true, pdfPurgedAt: new Date().toISOString(), annulee: true };
+      const ok = await supabaseUpsert('app_data', [{ id: c.id, data: neuf }], 'id');
+      if (ok === false) { noterDiag('bordereau_annulee_ecriture_ratee'); continue; }
+      n++; noterDiag('bordereau_annulee_purge');
+      if (!prevenus.has(c.tx)) { prevenus.add(c.tx); try { notifierApp({ type: 'maj', quoi: 'annulee', uid: String(annulees.get(c.tx) || ''), tx: c.tx }); } catch (_) {} }
+    }
+    await chrome.storage.local.set({ vrmPurgeAnnul: cibles.length > PURGE_MAX_PAR_RUN ? Date.now() - ANNUL_COOLDOWN_MS + 60000 : Date.now() });
+    if (n) logActivity(`🧹 ${n} bordereau${n > 1 ? 'x' : ''} de vente${prevenus.size > 1 ? 's' : ''} annulée${prevenus.size > 1 ? 's' : ''} retiré${n > 1 ? 's' : ''} (PDF effacé, infos gardées)`);
+    return n;
   } catch (_) { return 0; }
 }
 

@@ -60,9 +60,9 @@ const LABELS = {
   harvest_8_label_latest: { uid: '8', url: 'u8', capturedAt: vieux, pdfB64: PDF },                            // latest sans tx → garder
 };
 
-function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = false, labels = LABELS, finalisees = FINALISEES } = {}) {
-  const journal = { ecrits: [] };
-  const lignes = JSON.parse(JSON.stringify({ ...BORDS, ...labels }));   // copie mutable
+function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = false, labels = LABELS, finalisees = FINALISEES, annulees = [], annulKO = false, bords = BORDS } = {}) {
+  const journal = { ecrits: [], evts: [] };
+  const lignes = JSON.parse(JSON.stringify({ ...bords, ...labels }));   // copie mutable
   journal.stock = [];
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
@@ -85,6 +85,11 @@ function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = fa
       if ((opts.method || 'GET') === 'POST' && /\/rest\/v1\//.test(u)) {
         try { const corps = JSON.parse(opts.body || '[]'); journal.ecrits.push(...corps); for (const r of corps) if (r && r.id) lignes[r.id] = r.data; } catch (_) {}
         return rep('[]', 201);
+      }
+      // Ventes ANNULÉES (filtre serveur meta->>status=like.5*) : { tx, st, sst }
+      if (/id=like\.harvest_\*_txn_\*/.test(u) && /meta->>status=like\.5\*/.test(u)) {
+        if (annulKO) return rep('db down', 522);
+        return rep(JSON.stringify(annulees.map(a => ({ id: `harvest_9_txn_${a.tx}`, st: String(a.st), sst: a.sst || null }))));
       }
       // Ventes finalisées (filtre serveur meta->>status=eq.450)
       if (/id=like\.harvest_\*_txn_\*/.test(u) && /meta->>status=eq\.450/.test(u)) {
@@ -121,6 +126,7 @@ function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = fa
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   ctx.logActivity = async () => {};
   ctx.noterDiag = async () => {};
+  ctx.notifierApp = (e) => { journal.evts.push(e); };
   ctx.__journal = journal; ctx.__lignes = lignes;
   return ctx;
 }
@@ -220,6 +226,62 @@ const ecritPour = (j, id) => j.ecrits.filter(e => e && e.id === id).map(e => e.d
     const cd = (ctx.__journal.stock.filter(o => o && o.vrmPurgeBord).pop() || {}).vrmPurgeBord || 0;
     const prochain = cd + 12 * 3600000 - Date.now();
     dit(prochain > 0 && prochain <= 3600000 + 5000, 'l\'arriéré est repris dans l\'heure, pas dans 12 h', `prochain passage dans ${Math.round(prochain / 60000)} min`);
+  }
+
+  // ── 6. VENTE ANNULÉE (17 oct.) : son bordereau part TOUT DE SUITE ───────────
+  //    Transaction 500-520 (annulée), expédition qui n'a pas bougé ⇒ PDF retiré
+  //    (email_bord ET bordereau capté ET label_latest qui la porte), même récent,
+  //    l'app prévenue. Une expédition qui a bougé, une lecture ratée ⇒ rien.
+  {
+    const recentPdf = new Date(Date.now() - 1 * 3600000).toISOString();
+    const BA = {
+      email_bord_701: { transaction: '701', numero: '91', pdfB64: PDF, pdfTamponneB64: PDF, filename: 'label-701.pdf', receivedAt: recentPdf },  // annulée, rien bougé → PURGE
+      email_bord_702: { transaction: '702', numero: '92', pdfB64: PDF, filename: 'label-702.pdf', receivedAt: recentPdf },  // annulée mais colis déposé → garder
+      email_bord_703: { transaction: '703', numero: '93', pdfB64: PDF, filename: 'label-703.pdf', receivedAt: recentPdf },  // pas annulée → garder
+    };
+    const LA = {
+      harvest_9_label_701: { uid: '9', tx: '701', item: '8001', capturedAt: recentPdf, pdfB64: PDF },
+      harvest_9_label_latest: { uid: '9', tx: '701', item: '8001', capturedAt: recentPdf, pdfB64: PDF },
+      harvest_9_label_702: { uid: '9', tx: '702', capturedAt: recentPdf, pdfB64: PDF },
+    };
+    const ann = [{ tx: '701', st: 510, sst: 'Commande annulée' }, { tx: '702', st: 500, sst: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" }];
+    const ctx = faireCtx({ bords: BA, labels: LA, annulees: ann, finalisees: [] });
+    if (typeof ctx.purgeBordereauxAnnules !== 'function') { ko++; console.log('❌ purgeBordereauxAnnules n\'existe pas (une vente annulée garde son bordereau)'); }
+    else {
+      await essaie('purge (annulée)', () => ctx.purgeBordereauxAnnules());
+      const j = ctx.__journal;
+      const d = ecritPour(j, 'email_bord_701').pop();
+      dit(!!d && d.pdfB64 === null && d.pdfTamponneB64 === null && d.filename === '', 'vente ANNULÉE : le PDF de son email_bord est retiré, même reçu il y a une heure', d ? 'écrit' : 'AUCUNE écriture');
+      if (d) dit(d.transaction === '701' && d.numero === '91' && d.annulee === true, 'la métadonnée est gardée, marquée « annulée »');
+      for (const id of ['harvest_9_label_701', 'harvest_9_label_latest']) { const w = ecritPour(j, id).pop(); dit(!!w && w.pdfB64 === null && w.tx === '701', `${id} : le bordereau capté de la vente annulée est retiré`, w ? '' : 'AUCUNE écriture'); }
+      dit(ecritPour(j, 'email_bord_702').length === 0 && ecritPour(j, 'harvest_9_label_702').length === 0, 'annulée MAIS colis déjà déposé (un retour) → gardé');
+      dit(ecritPour(j, 'email_bord_703').length === 0, 'vente non annulée → pas touchée');
+      dit(j.evts.some(e => e && e.type === 'maj' && e.quoi === 'annulee' && e.tx === '701') && j.evts.filter(e => e && e.quoi === 'annulee').length === 1, 'l\'app est prévenue UNE fois pour la vente annulée (maj · annulee)', JSON.stringify(j.evts));
+    }
+    const k = faireCtx({ bords: BA, labels: LA, annulees: ann, finalisees: [], annulKO: true });
+    if (typeof k.purgeBordereauxAnnules === 'function') {
+      await essaie('purge (annulées illisibles)', () => k.purgeBordereauxAnnules());
+      dit(k.__journal.ecrits.length === 0, 'transactions annulées illisibles (522) → AUCUN bordereau touché', `${k.__journal.ecrits.length} écriture(s)`);
+    }
+    const l = faireCtx({ bords: BA, labels: LA, annulees: ann, finalisees: [], dataKO: 'email_bord_701' });
+    if (typeof l.purgeBordereauxAnnules === 'function') {
+      await essaie('purge (ligne illisible)', () => l.purgeBordereauxAnnules());
+      dit(ecritPour(l.__journal, 'email_bord_701').length === 0, 'ligne du bordereau illisible → sautée (pas de purge à l\'aveugle)');
+    }
+  }
+  // ── 7. LE RÉSUMÉ « À EXPÉDIER » posé pour le widget exclut 220 et ≥ 430 ───────
+  {
+    const ctx = faireCtx();
+    if (typeof ctx.retirerDuResume !== 'function') { ko++; console.log('❌ le résumé « à expédier » ne sait pas exclure les transactions qui ne s\'expédient plus'); }
+    else {
+      const r = ctx.retirerDuResume({ n: 4, txns: ['1', '2', '3', '4'], at: 1 }, new Set(['2', '4']));
+      dit(JSON.stringify(r.txns) === '["1","3"]', 'les transactions 220 / ≥ 430 sortent du résumé', JSON.stringify(r.txns));
+      const r2 = ctx.retirerDuResume({ n: 2, txns: ['1', '2'], at: 1 }, null);
+      dit(JSON.stringify(r2.txns) === '["1","2"]', 'transactions illisibles (null) → on n\'exclut RIEN', JSON.stringify(r2.txns));
+      const codes = [[220, true], [430, true], [440, true], [450, true], [510, true], [400, false], [1, false], [null, false]];
+      const faux = codes.filter(([c, v]) => ctx.TXN_NE_S_EXPEDIE_PLUS(c) !== v);
+      dit(!faux.length, 'codes mesurés : 220, 430, 440, 450, 500-520 exclus ; les autres non', JSON.stringify(faux));
+    }
   }
 
   console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent — un bordereau n\'est allégé que pour une vente finalisée, jamais à l\'aveugle.');
