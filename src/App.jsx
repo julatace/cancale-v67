@@ -4495,6 +4495,63 @@ const aExpedier = (o) => {
   if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
   return needsBordereau(s);
 };
+// ── L'ÉTIQUETTE D'UNE VENTE / D'UN ACHAT, UNE RÈGLE (§11) ─────────────────
+// Sortie des composants le 16 octobre : la recherche globale (dans la coque)
+// affichait le statut BRUT de Vinted pendant que les cartes disaient « À
+// expédier ». Les deux lisent maintenant ces fonctions.
+function etapeVente(o, { poste = () => false, expediee = null } = {}) {
+  const s = o.status || ''; const tus = tusDe(o);
+  // « Commande non réclamée - Retournée à l'expéditeur » n'est PAS un
+  // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
+  // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
+  if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
+  if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
+  // `expediee` inconnu (la recherche n'a ni les bordereaux ni les emails) : le
+  // texte de Vinted tranche — « Remboursement » ou non. Jamais deviné au-delà.
+  if (classifyOrderStatus(o.status) === 'cancelled') return (expediee ? expediee(o) : /rembours/i.test(s))
+    ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+    : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
+  if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
+  // ⚠️ COCHÉ « POSTÉ » À LA MAIN (`isShipDone`) : le colis a quitté
+  // « À expédier » partout (Colis, Ma journée, la cloche, le filtre) et le
+  // filtre « En transit » le montre — mais son étiquette disait encore
+  // « À expédier », sous l'intitulé « En transit » (vu au banc
+  // `statuts-colis.cjs`, 4 octobre). Vinted le confirmera au premier scan.
+  if (aExpedier(o)) return poste(o)
+    ? { label: 'Posté', color: C.blue || C.accent, step: 2, aide: "Tu l'as marqué posté : Vinted confirmera l'envoi au premier passage chez le transporteur." }
+    : { label: 'À expédier', color: C.warn, step: 1 };
+  if (isAtRelayStatus(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
+  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
+  if (/transit|achemin|exp[ée]di[ée]|en\s+route/i.test(s) || tus === 'waiting') return { label: 'En transit', color: C.blue || C.accent, step: 2 };
+  return { label: 'En cours', color: C.muted, step: 1 };
+}
+function phaseAchat(status) {
+  const s = status || '';
+  if (/annul|rembours|refus|litige/i.test(s)) return 'cancelled';
+  // « La livraison n'a pas encore eu lieu... », « en attente de... »,
+  // « Paiement validé » : la commande est EN COURS, pas reçue.
+  if (/pas encore|en attente|suspendu|paiement valid/i.test(s)) return 'pending';
+  // livr[ée] (et pas « livraison ») : « Commande livrée » oui, « la
+  // livraison n'a pas eu lieu » non.
+  if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
+  return 'pending';
+}
+function etapeAchat(o, tk) {
+  const s = o.status || '';
+  // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
+  //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
+  //    c'est une action à faire (générer le bordereau de retour sur Vinted).
+  //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
+  //    l'expéditeur », qui est autre chose.
+  if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
+  if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
+  if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
+  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+  if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
+  return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
+}
 // Délai d'expédition d'une date limite Vinted (« JJ/MM/AAAA ») : jours restants
 // jusqu'à la fin de ce jour-là (négatif = dépassé). Partagé par la carte du
 // bordereau et le rappel de Ma journée (§11).
@@ -7286,6 +7343,10 @@ const generateEtiquetteSku = async (num, o = {}) => {
 // `syncFromSheets` écrasait `vinted_catalog` et `vinted_sales` avec la réponse
 // d'un endpoint fantôme. Trouvées par `scripts/audit-variables.cjs`.
 const fmt  = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',')+' €';
+// Revue du 16 octobre : « 65 € » sur une ligne, « 65,00 € » ou « +12,00€ »
+// juste à côté. UNE forme pour les écrans Ventes et Annonces — l'entier quand
+// le montant est rond, sinon deux décimales, toujours une espace avant €.
+const prixCourt = (n) => { const v = Number(n); if (n == null || n === '' || !isFinite(v)) return '—'; const c = Math.round(v * 100) / 100; return (Number.isInteger(c) ? String(c) : c.toFixed(2).replace('.', ',')) + ' €'; };
 const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
 const tod  = () => new Date().toLocaleDateString('fr-FR');
@@ -11853,7 +11914,7 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
   // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
   // seule l'alerte d'une capture ancienne y a sa place.
   if (jours <= 1 && !siAJour) return null;
-  if (jours <= 1) return <div data-fraicheur-ventes="" style={{fontSize:11.5,color:C.muted}}>✓ Ventes Vinted à jour (captées {jours<1?"aujourd'hui":'hier'}).</div>;
+  if (jours <= 1) return <div data-fraicheur-ventes="" style={{fontSize:11.5,color:C.muted}}>✓ Ventes Vinted à jour ({jours<1?"aujourd'hui":'hier'}).</div>;
   return (
     <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
       {compte
@@ -25840,17 +25901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (purchasePhase(s) === 'completed') return 'recu';
     return 'route';
   };
-  const purchasePhase = (status) => {
-    const s = status || '';
-    if (/annul|rembours|refus|litige/i.test(s)) return 'cancelled';
-    // « La livraison n'a pas encore eu lieu... », « en attente de... »,
-    // « Paiement validé » : la commande est EN COURS, pas reçue.
-    if (/pas encore|en attente|suspendu|paiement valid/i.test(s)) return 'pending';
-    // livr[ée] (et pas « livraison ») : « Commande livrée » oui, « la
-    // livraison n'a pas eu lieu » non.
-    if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
-    return 'pending';
-  };
+  const purchasePhase = phaseAchat;   // la règle : niveau module (§11)
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
@@ -28795,22 +28846,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
-  const achatStage = (o, tk) => {
-    const s = o.status || '';
-    // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
-    //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
-    //    c'est une action à faire (générer le bordereau de retour sur Vinted).
-    //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
-    //    l'expéditeur », qui est autre chose.
-    if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
-    if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
-    if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
-    if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
-    if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || purchasePhase(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
-    if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
-    if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
-    return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
-  };
+  const achatStage = (o, tk) => etapeAchat(o, tk);   // la règle : niveau module (§11)
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
@@ -28891,30 +28927,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ordre : retourné, annulé/remboursé, vendu, À EXPÉDIER (la règle unique
   // `aExpedier`), au relais (`isAtRelayStatus`, la règle partagée), livré (le
   // mot « livré·e » seul, jamais « livraison »), en transit.
-  const venteStage = (o) => {
-    const s = o.status || ''; const tus = tusDe(o);
-    // « Commande non réclamée - Retournée à l'expéditeur » n'est PAS un
-    // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
-    // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
-    if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
-    if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
-    if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
-      ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
-      : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
-    if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
-    // ⚠️ COCHÉ « POSTÉ » À LA MAIN (`isShipDone`) : le colis a quitté
-    // « À expédier » partout (Colis, Ma journée, la cloche, le filtre) et le
-    // filtre « En transit » le montre — mais son étiquette disait encore
-    // « À expédier », sous l'intitulé « En transit » (vu au banc
-    // `statuts-colis.cjs`, 4 octobre). Vinted le confirmera au premier scan.
-    if (aExpedier(o)) return isShipDone(o)
-      ? { label: 'Posté', color: C.blue || C.accent, step: 2, aide: "Tu l'as marqué posté : Vinted confirmera l'envoi au premier passage chez le transporteur." }
-      : { label: 'À expédier', color: C.warn, step: 1 };
-    if (isAtRelayStatus(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
-    if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
-    if (/transit|achemin|exp[ée]di[ée]|en\s+route/i.test(s) || tus === 'waiting') return { label: 'En transit', color: C.blue || C.accent, step: 2 };
-    return { label: 'En cours', color: C.muted, step: 1 };
-  };
+  // La règle vit au niveau module (`etapeVente`, §11) : la recherche globale
+  // dit la MÊME étiquette que la carte (revue du 16 octobre : elle affichait
+  // le statut brut « Le paiement a été validé »).
+  const venteStage = (o) => etapeVente(o, { poste: isShipDone, expediee: venteExpediee });
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
 
@@ -31809,8 +31825,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}>
                   <div className="vrm-display" data-prix-vente={sell!=null?Math.round(sell*100):undefined} style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
-                  {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{fees.toFixed(2).replace('.',',')}€</div>}
+                  {benef!=null && <div data-benef-vente={benef.toFixed(2)} style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{prixCourt(benef)}{!bilan.complet && <small style={{display:'block',fontSize:9,color:C.muted}}>estimé</small>}</div>}
+                  {benef!=null && fees>0 && <div className="vrm-sale-frais" style={{fontSize:9,color:C.muted}}>frais −{prixCourt(fees)}</div>}
                   {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
                       bouton : il imprime si le PDF est là (capté par l'extension,
                       ou reçu par email en secours), sinon il COMMANDE l'extension.
@@ -32605,7 +32621,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       c'est la phrase qui dit ce qu'on peut en faire — exactement
                       ce que §5.83 a fait pour la tuile de Ma journée. */}
                   {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
-                    return (<div className="vrm-pickup-title" style={{color:C.text}}>
+                    /* Revue du 16 octobre : « 2 colis à retirer » sous l'onglet « À
+                       retirer 2 » redisait le même nombre. Sans rien d'autre à
+                       ajouter (hors délai, sans code), le titre ne se dessine plus —
+                       il reste lu par un lecteur d'écran (§7, une fois). */
+                    return (<div className={'vrm-pickup-title'+(hd===0&&sc===0?' vrm-sr':'')} style={{color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
                       {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
@@ -33360,7 +33380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
-            <select aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
+            <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
               <option value="recent">Ordre Vinted</option>
@@ -33376,9 +33396,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 toujours active (voir la déclaration de `autoNum`). */}
             {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
                 ne servent pas tous les jours et encombraient la barre. */}
-            <div style={{position:'relative'}}>
-              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
-                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
+            <div className="vrm-ann-outils" style={{position:'relative'}}>
+              <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
+                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
               {annToolsOpen && (<>
                 <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
                 {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
@@ -34047,19 +34067,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                     </div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
-                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
                     <div data-plateformes style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
                       <MarquePlateforme p="vinted"/>
                       {ailleurs && <MarquePlateforme p="leboncoin"/>}
                       {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
-                      {ailleurs && <span data-aussi-sur style={{fontSize:11,color:C.muted}}>aussi sur Leboncoin</span>}
+                      {/* Revue du 16 octobre : le logo Leboncoin le dit déjà — le texte
+                          qui le redisait ne reste que pour un lecteur d'écran. */}
+                      {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
                     </div>
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
                       <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
-                        titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?fmtE(achat):'—'}</span>}/></span>
-                      {boost>0 && <span><span style={lab}>boost </span><span style={val}>{fmtE(boost)}</span></span>}
+                        titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/></span>
+                      {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                     </div>
                     <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted,marginTop:'auto'}}>
@@ -37336,7 +37358,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-            {detail || (ad.price != null ? `${ad.price} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
+            {detail || (ad.price != null && isFinite(Number(ad.price)) ? `${Number(ad.price).toFixed(2).replace('.', ',')} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
             {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
           </div>
           {msg && <div style={{ fontSize: 11.5, color: C.warn, marginTop: 3 }}>{msg}</div>}
@@ -37466,7 +37488,7 @@ function MessagesLeboncoin() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{(d.comptes[l.id] || {}).pro ? ' · pro' : ''}</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
-                {l.c ? <>relevé {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore relevé — connecte-toi une fois à ce compte sur leboncoin.fr'}
+                {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu — connecte-toi une fois à ce compte sur leboncoin.fr'}
               </div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', opacity: vieux ? 0.55 : 1 }}>
@@ -37809,8 +37831,10 @@ function LeboncoinScreen() {
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
       {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcAccounts && data.lbcAccounts[0]} onClose={() => setFiche(null)} onMarquer={marquer}/>}
       <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0, minWidth: 0 }}>Tes annonces Leboncoin</h2>
-        <button type="button" onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
+        {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
+            au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
+        <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
+        <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
@@ -37960,7 +37984,7 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card className="vrm-lbc-non-reliees">
             <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Clique la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Choisis la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
             {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
@@ -37975,7 +37999,7 @@ function LeboncoinScreen() {
               <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>C'est Leboncoin qui le dit dans ton espace pro : ces annonces sortent mal. Baisse le prix, améliore le titre/les photos, ou passe une option de visibilité.</div>
               {flagged.slice(0, 20).map((a, i) => (
                 <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
-                  {a.subject || '—'}{a.price != null ? ` · ${a.price} €` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
+                  {a.subject || '—'}{a.price != null && isFinite(Number(a.price)) ? ` · ${Number(a.price).toFixed(2).replace('.', ',')} €` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
                   {a.url ? <> · <a href={a.url} target="_blank" rel="noreferrer" style={{ color: C.blue || C.accent, fontWeight: 700 }}>voir</a></> : null}
                 </div>
               ))}
@@ -38043,7 +38067,10 @@ function LeboncoinScreen() {
               {extSait('lbctitre') === 'ok'
                 ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). L'extension y joint la description et les photos, puis publie sans option payante.</>
                 : extSait('lbctitre') === 'absente'
-                  ? <>Voici le titre <b>que l'extension proposera</b> sur Leboncoin (50 caractères max, la taille à la fin). La publication se fait depuis ton ordinateur, avec l'extension.</>
+                  /* Revue du 16 octobre : « la publication se fait depuis ton
+                     ordinateur » était dit ici ET dans la ligne juste dessous
+                     (`RaisonPublication`) — une cause, une phrase (§7). */
+                  ? <>Voici le titre <b>que VRM proposera</b> sur Leboncoin (50 caractères max, la taille à la fin).</>
                   : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
             </div>
             {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
@@ -38088,7 +38115,7 @@ function LeboncoinScreen() {
                       ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
                       : toutes.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
                     {manque > 0 && (
-                      <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 8, fontWeight: 500 }}>rouvrir</span></span>
+                      <span data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`} style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 9, fontWeight: 500 }}>photo{manque > 1 ? 's' : ''}</span><span style={{ fontSize: 9, fontWeight: 500 }}>à récupérer</span></span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
@@ -38105,7 +38132,7 @@ function LeboncoinScreen() {
                 {nues.length > 0 && (<>
                   {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.warn, marginTop: 4 }}>Aucune photo — {nues.length}</div>}
                   <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted : l'extension lit ses photos au passage.
+                    Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.
                   </div>
                   {nues.slice(0, 40).map(Ligne)}
                   {nues.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {nues.length - 40} autres…</div>}
@@ -38118,7 +38145,7 @@ function LeboncoinScreen() {
                 {maigres.length > 0 && (<>
                   {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Une seule photo — {maigres.length}</div>}
                   <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Une annonce Leboncoin avec une seule photo se vend mal. Les autres existent, mais <b>Vinted ne les donne que sur la page de l'annonce</b> : ouvre-la une fois et l'extension lit les autres toute seule. Mesuré chez toi : les annonces déjà ouvertes ont <b>5 photos</b> en moyenne.
+                    Une annonce Leboncoin avec une seule photo se vend mal. Les autres existent, mais <b>Vinted ne les donne que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et les autres arrivent ici toutes seules. Mesuré chez toi : les annonces déjà ouvertes ont <b>5 photos</b> en moyenne.
                   </div>
                   {maigres.slice(0, 40).map(Ligne)}
                   {maigres.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {maigres.length - 40} autres…</div>}
@@ -40632,6 +40659,7 @@ function EmailsSetting() {
 }
 
 function ConnexionsSetting() {
+  const sansSouris = useSansSouris();
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours
   const [capt, setCapt] = useState(null);   // { ts, n }
@@ -40733,7 +40761,7 @@ function ConnexionsSetting() {
           ne « bugue » pas, elle ne capte simplement pas, en silence. */}
       <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
-        d={!ext.on ? <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
+        d={!ext.on ? <>{sansSouris ? <>Sur ton téléphone, rien à faire ici : c'est l'ordinateur où VRM est installé dans Chrome qui fait remonter tes données.</> : <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.</>}{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
            : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions — dans CHAQUE Chrome où elle est installée. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
            : codePerime() ? textePerime()
            : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
@@ -40742,7 +40770,10 @@ function ConnexionsSetting() {
           dépôt n'en portait qu'un, du 30 août, en 4.13, alors que le code était
           en 5.52. `scripts/audit-extension-zip.cjs` vérifie désormais que le
           zip livré porte bien la version du manifeste. */}
-      <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
+      {/* Revue du 16 octobre : sur un téléphone (aucune souris), ce bouton
+          proposait de télécharger un zip et de cliquer ⟳ dans chrome://extensions
+          — des gestes impossibles ici. La phrase du dessus dit où ça se passe. */}
+      {!sansSouris && <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
         <a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
           style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'0 14px',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center',fontFamily:'inherit'}}>
           Télécharger l'extension {EXT_ATTENDUE}
@@ -40750,7 +40781,7 @@ function ConnexionsSetting() {
         <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
           Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, PUIS clique ⟳ sur VRM dans chrome://extensions — dans chaque Chrome où elle est installée (sans ⟳, Chrome garde l'ancien code).
         </span>
-      </div>
+      </div>}
       <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
         etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
         d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5
@@ -42750,12 +42781,19 @@ function AppCoeur() {
         }
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
+        // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
+        // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
+        // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
+        // `etapeAchat`), même forme de date que les cartes.
+        const shipDoneGs = load('vinted_ship_done', {}) || {};
+        const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
+        const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
-            <span style={{fontSize:20}}>🔍</span>
+            <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
             <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
               style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
@@ -42776,8 +42814,8 @@ function AppCoeur() {
                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
                     {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
                     {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
-                    {p.buyPrice && <span>achat {p.buyPrice}€</span>}
-                    {p.price && <span>· {p.price}€</span>}
+                    {p.buyPrice && <span>achat {prixCourt(String(p.buyPrice).replace(',', '.'))}</span>}
+                    {p.price && <span>· {prixCourt(String(p.price).replace(',', '.'))}</span>}
                   </div>
                 </div>
                 <span style={{fontSize:17,color:C.muted}}>›</span>
@@ -42790,7 +42828,7 @@ function AppCoeur() {
                 {thumb(orderPhoto(o),'💸')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'vente'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
+                  <div data-recherche-statut={etapeVente(o, { poste: posteMain }).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeVente(o, { poste: posteMain }).label}{o.date?' · '+jourCourt(o.date):''}</div>
                 </div>
                 <span style={{fontSize:17,color:C.muted}}>›</span>
               </button>
@@ -42802,7 +42840,7 @@ function AppCoeur() {
                 {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                  <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'achat'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
+                  <div data-recherche-statut={etapeAchat(o, null).label} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{etapeAchat(o, null).label}{o.date?' · '+jourCourt(o.date):''}</div>
                 </div>
                 <span style={{fontSize:17,color:C.muted}}>›</span>
               </button>

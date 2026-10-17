@@ -158,7 +158,7 @@ const projette = (row, sel) => {
       dit(!!c.a && !!c.b && !!c.c, 'les trois cartes en ligne sont rendues');
       if (!c.a || !c.b || !c.c) { await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-dbg-' + vp.width + '.png') }); console.log((await pg.evaluate(() => document.body.innerText)).slice(0, 600)); await ctx.close(); continue; }
       dit(/obsidian lilac/.test(c.a.t), 'le TITRE est sur la carte, pas seulement la marque', c.a.t.split('\n').slice(0, 3).join(' · '));
-      dit(/achat\s*25,00/.test(c.a.t) && /boost\s*1,95/.test(c.a.t) && /marge\s*\+22/.test(c.a.t), 'achat, boost et marge sont LIBELLÉS (49 − 25 − 1,95 ≈ +22)', (c.a.t.match(/achat[^\n]*/) || [''])[0]);
+      dit(/achat\s*25(,00)?\s*€/.test(c.a.t) && /boost\s*1,95/.test(c.a.t) && /marge\s*\+22/.test(c.a.t), 'achat, boost et marge sont LIBELLÉS (49 − 25 − 1,95 ≈ +22)', (c.a.t.match(/achat[^\n]*/) || [''])[0]);
       dit(/achat\s*—/.test(c.b.t) && !/achat\s*0,00/.test(c.b.t), 'achat inconnu ⇒ « — », jamais 0');
       dit(c.a.boost && !c.b.boost, '« Boostée » quand Vinted le dit, et rien quand il ne dit rien');
       dit(c.b.aussi && !c.a.aussi, '« Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée');
@@ -180,7 +180,7 @@ const projette = (row, sel) => {
         await pg.waitForTimeout(500);
       } catch (e) { dit(false, 'l’achat se modifie en place (texte cliquable)', String(e.message).slice(0, 80)); }
       const apres = await pg.evaluate(() => (document.querySelector('[data-carte-annonce="9102"]') || {}).innerText || '');
-      dit(/achat\s*30,00/.test(apres), 'cliquer sur « achat — », taper 30, Entrée : la carte dit « achat 30,00 € »', (apres.match(/achat[^\n]*/) || [''])[0]);
+      dit(/achat\s*30(,00)?\s*€/.test(apres), 'cliquer sur « achat — », taper 30, Entrée : la carte dit « achat 30,00 € »', (apres.match(/achat[^\n]*/) || [''])[0]);
       // ── Proposition 9 : la paire qui dort, AUSSI sur eBay — baisse en un clic.
       try {
         // Le repricing vit sous « Conseils & signalements » (replié par défaut).
