@@ -1125,6 +1125,9 @@ const prechargerDemarrage = () => {
     if (MULTI_USER) {
       if (RECOVERY_PENDING) return;
       const session = !!(AUTH.session && AUTH.session.access_token && AUTH.user);
+      // Double vérification pas encore passée : la porte du code est fermée,
+      // aucune donnée du vendeur ne se lit avant (AppCoeur relira après le code).
+      if (session && !mfaPasse()) return;
       if (!session) {
         const direct = (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
         if (!(direct && SCHEMA_MESURE && !CLOISONNE)) return;
