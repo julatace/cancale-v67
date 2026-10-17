@@ -191,6 +191,12 @@ qu'aucune règle n'en désigne une.
 - ⚠️ **LE CA DÉCLARÉ EST DATÉ AU JOUR DU VERSEMENT** (il l'a redemandé le
   3 octobre — voir « dater au versement » plus bas). Les autres écrans
   (Statistiques, Ma journée) restent datés au jour de la vente.
+- **`vinted_urssaf_mois` est synchronisée (17 octobre)**. Elle ne vivait que dans
+  le navigateur qui avait ouvert Ventes : Comptabilité ouverte ailleurs disait
+  « ton CA déclaré arrive sur cet appareil » (rien ne l'y amenait) sous un
+  « Reçu » chiffré. La carte Résultat la relit (nuage, `vrm:save`) et porte
+  `data-compta-ca-etat` = `encours` · `passu` (« — », où elle se calcule) · `lu`.
+  Banc `chiffres-croises.cjs` D : 3 rouges sur l'avant, rouge sous 2 mutations.
 - Le rapport comptable dit « CA des ventes finalisées », **jamais « encaissé »** :
   l'URSSAF demande légalement les recettes encaissées, et l'app ne les connaît pas.
 - ⚠️⚠️ **LA PHRASE QUI EXPLIQUE UN CHIFFRE DOIT VENIR DE LA MÊME SOURCE QUE LUI.**
@@ -9703,6 +9709,13 @@ par scénario, fausse base à état) : **15 rouges sur le code d'avant, 0 après
   `select=id,data` sur `orders_*` (repli quand le résumé manque) ;
   `vinted-connect` ne vérifie pas un `accessToken` encore valide auprès de
   Vinted (il ne touche que les lignes du vendeur lui-même).
+
+### La cloche retirée, « Sécurité des données » une fois (17 octobre)
+- Le panneau « 🔔 Notifications » et `notifOpen` étaient morts (`setNotifOpen(true)` nulle part) : retirés. `notifItems` reste (Ma journée, tableau de bord, Collectif). 26 `tab===` avant et après ; retrait (4 KO identiques sur l'avant, donnée datée), premierjour, journee-premium, demarrage verts.
+- Sous-écran « Sécurité des données » (téléphone) : le titre du panneau se tait (`.vrm-titre-panneau`, CSS), le verdict reste. `reglages-premium.cjs` compte le titre de CHAQUE sous-écran (hors bouton : « Fermer mon compte » s'ouvre en deux temps, exprès) : rouge sur l'avant (2 fois), vert après.
+
+### Le widget lit l'argent REÇU publié par l'app (17 octobre)
+`api/widget.js` calculait `received` sur `email_final_*` ; Ma journée dit « Reçu en {mois} » par `recuDuMois` (§11). L'écran Ventes publie désormais `recu: {[mois de versement]: €}` dans `vinted_urssaf_mois`, devenue **synchronisée** (SYNC_KEYS : le serveur ne voyait pas cette clé, locale à l'appareil) ; le widget la lit par projection de `main` (`recuDuMoisPublie`). Absente, illisible, d'un autre mois, de plus de 3 jours (`at` ne bouge qu'au changement de contenu) ou sans `recu` ⇒ `received: null` + `receivedRaison` ; une source `pasSu` ⇒ `received: null`, `receivedAuMoins` + `receivedManque` (un vieux script l'aurait affiché complet). Plus aucune lecture `email_final_*`. Banc `widget-multi.cjs` : 9 rouges sur l'avant, 4 mutations rouges. ⚠️ Le script Scriptable de l'iPhone n'est pas dans le dépôt : à lui de lire `receivedAuMoins`.
 
 ---
 

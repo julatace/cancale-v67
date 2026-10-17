@@ -77,3 +77,6 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
   button.vrm-set-ligne:hover { background:var(--vrm-set-appui, rgba(15,23,42,.04)); }
 }
 .vrm-set-sans-titre > .vrm-set-panneau > div:first-child > div:first-child { display:none; }
+/* Un panneau dont le titre partage sa ligne avec un verdict (Sécurité des données) :
+   seul le titre se tait dans le sous-écran, le verdict reste. */
+[data-sous-ecran] .vrm-titre-panneau { display:none; }
