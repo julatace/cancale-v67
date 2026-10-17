@@ -17531,7 +17531,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {actions.map((a,i)=>(
-                <button type="button" key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
+                <button type="button" key={i} data-action-tab={a.tab||undefined} data-action-n={a.n!=null?String(a.n):undefined} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
                   <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
                     {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
                   </span>

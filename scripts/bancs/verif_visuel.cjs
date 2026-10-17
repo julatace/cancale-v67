@@ -135,7 +135,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='';
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='', heroTxt=null;
     for(const t of TABS){
       await pg.goto('http://localhost:'+PORT_VV+'/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
@@ -150,7 +150,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
         txt:(document.body.innerText||'')}));
       if(t==='cat_ventes') venteTxt=r.txt;
       if(t==='plat_leboncoin') lbcTxt=r.txt;   // le bloc « Ventes Leboncoin » vit ICI maintenant
-      if(t==='dashboard') dashTxt=r.txt;
+      if(t==='dashboard') { dashTxt=r.txt;
+        // La carte héros du « finalisé » porte la notion qu'elle mesure
+        // (`data-notion="finalise-vinted"`) : on juge SON texte, pas la page.
+        heroTxt=await pg.evaluate(()=>{ const e=document.querySelector('[data-stats-carte="hero"]'); return e ? (e.innerText||'') : null; }); }
       if(t==='collectif') collTxt=r.txt;
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
@@ -225,7 +228,20 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // plateformes » = le global du Collectif. Sur le code d'avant : ni le scope,
     // ni le total (§6.1).
     dit(/Total finalisé/i.test(dashTxt),'la carte « par plateforme » porte le Total (= global du Collectif, §11)',dashTxt?'':'tableau de bord non lu');
-    dit(/CA finalisé[\s\S]{0,80}Vinted, tous comptes/i.test(dashTxt),'le headline « CA finalisé » dit son scope Vinted (pas un total partiel présenté comme complet, §5)');
+    // ⚠️ (17 oct.) On juge la PORTÉE, pas l'orthographe : le titre est devenu
+    //    « Finalisé sur Vinted · depuis le début » et sa note « Vinted seul (tous
+    //    comptes) ». Ce qui doit rester vrai, dans la carte du chiffre elle-même :
+    //    elle dit qu'il s'agit de VINTED SEUL (pas « toutes plateformes »), de TOUS
+    //    ses comptes, et DEPUIS LE DÉBUT — et elle ne se dit pas « encaissé ».
+    {
+      const h = heroTxt || '';
+      const portee = { vinted: /\bVinted\b/.test(h) && /(Vinted seul|sur Vinted|seulement Vinted|Vinted uniquement)/i.test(h),
+        comptes: /tous (tes |les )?comptes/i.test(h), debut: /depuis le d[ée]but/i.test(h),
+        pasGlobal: !/toutes plateformes/i.test(h), pasEncaisse: !/encaiss/i.test(h) };
+      dit(!!heroTxt && Object.values(portee).every(Boolean),
+        'le chiffre « finalisé » dit sa portée : Vinted seul, tous comptes, depuis le début (pas un total partiel présenté comme complet, §5)',
+        heroTxt==null ? 'carte héros introuvable' : Object.entries(portee).filter(([,v])=>!v).map(([k])=>k).join(', ') || '');
+    }
     // ── eBay dans « À faire aujourd'hui » : une vente eBay payée non expédiée
     // est un colis à envoyer, exactement comme une vente Vinted (« tout
     // centralisé », §11). Sur le code d'avant, notifItems ignorait eBay →
