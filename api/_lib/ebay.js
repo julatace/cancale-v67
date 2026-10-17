@@ -194,12 +194,18 @@ function normaliserRegistre(d) {
 // `null` (rien à écrire). Une lecture ratée n'écrit RIEN (« rien lu » ne vaut
 // pas « rien » : repartir de vide effacerait ses autres comptes). Rend true
 // (écrit) · false (écriture ratée) · null (rien écrit : pas su, ou rien à faire).
+// (17 octobre) Comparer-et-échanger (`modifierDonnee`) : deux connexions eBay
+// qui se croisent (un 2e compte relié pendant que le principal apprend son
+// identité) relisaient la même version, et la seconde écrite effaçait
+// l'entrée de la première — un compte relié absent de la liste.
 async function modifierComptes(owner, fn) {
-  const reg = await lireComptes(owner);
-  if (reg === undefined) return null;
-  const neuf = fn(reg.comptes.map((e) => ({ ...e })));
-  if (!neuf) return null;
-  return storeData(COMPTES_ID, { comptes: neuf, maj: Date.now() }, owner);
+  let rien = false;
+  const r = await modifierDonnee(COMPTES_ID, owner, (d) => {
+    const neuf = fn(normaliserRegistre(d).comptes.map((e) => ({ ...e })));
+    rien = !neuf;
+    return neuf ? { comptes: neuf, maj: Date.now() } : undefined;
+  });
+  return (r === true && rien) ? null : r;
 }
 // Les comptes ACTIFS (ni déconnectés) ; le principal est sous-entendu tant que
 // son identité n'est pas apprise. ⚠️ La MÊME règle que l'app

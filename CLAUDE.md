@@ -6655,10 +6655,10 @@ racine, rouge sur 2a34c1c et vert après.
   toujours. `[R-concurrence]` : **3 rouges sur 2a34c1c** (pose + retrait, deux
   poses, deux premières poses sur une ligne absente), 0 après ; mutation
   `sans-cas` (l'écriture sans la version) ⇒ rouge.
-  ⚠️ **Le même motif vit encore ailleurs, et n'est PAS touché** (hors de cette
-  revue) : `modifierComptes` (registre `ebay_comptes`), `sortirDesAnnonces`
-  (`ebay_listings`), les brouillons. `modifierDonnee` est prêt à servir — un
-  geste concurrent y est rare, mais c'est la même famille.
+  ✅ **17 octobre** : `modifierComptes` (registre `ebay_comptes`) et
+  `sortirDesAnnonces` (`ebay_listings`) passent aussi par `modifierDonnee`
+  (audit : « deux retraits simultanés », rouge sur l'avant). Restent les
+  brouillons (écrits par l'app).
 - ⚠️⚠️ **Fermer « Une règle pour toutes » pendant un lot arrêtait le lot en
   silence** — la réponse EN VOL n'était jamais appliquée (la carte disait
   « aucune règle » quand eBay en tenait une), les cartes du lot restaient
