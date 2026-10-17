@@ -88,6 +88,31 @@ const EXT_ATTENDUE = '5.184.0';
 // Un geste qui commence sur un bouton, un lien, un champ ou dans une zone qui
 // défile de côté (photos, rangées de pastilles) n'est JAMAIS un changement
 // d'onglet : il appartient à ce qu'il touche (voir `slideTab`).
+// (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et que je
+// relâche, ça me met dans l'onglet Vinted »). SÉLECTIONNER UN TEXTE N'EST PAS
+// BALAYER. Trois chemins menaient à l'onglet voisin :
+//   · à la souris, glisser SUR un texte pour le surligner passait pour un
+//     balayage (et le code effaçait même la sélection en route) ;
+//   · au doigt, un appui long (qui ouvre la sélection) suivi d'un doigt qui
+//     glisse en relâchant ;
+//   · une sélection encore active au moment de relâcher.
+// ⇒ La souris ne balaie que depuis un endroit SANS texte (`surDuTexte`) ; le
+//    doigt ne balaie que d'un geste rapide (`BALAYAGE_MAX_MS`), sans sélection.
+const BALAYAGE_MAX_MS = 600;
+function surDuTexte(x, y) {
+  try {
+    let noeud = null;
+    if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); noeud = r && r.startContainer; }
+    else if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); noeud = p && p.offsetNode; }
+    if (!noeud || noeud.nodeType !== 3 || !/\S/.test(noeud.nodeValue || '')) return false;
+    const rg = document.createRange(); rg.selectNodeContents(noeud);
+    for (const b of rg.getClientRects()) if (x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2) return true;
+  } catch (_) {}
+  return false;
+}
+function selectionActive() {
+  try { const s = window.getSelection(); return !!(s && !s.isCollapsed && String(s).trim()); } catch (_) { return false; }
+}
 function gesteHorsNavigation(cible) {
   let n = cible;
   for (let k = 0; n && n !== document.body && k < 40; k++, n = n.parentElement) {
@@ -43724,13 +43749,17 @@ function AppCoeur() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
-      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
+      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY,t0:Date.now()};
       }}
       onTouchEnd={e=>{
       const s=swipeStart.current; if(!s) return; swipeStart.current=null;
       const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+      // Un appui long (la sélection de texte) ou une sélection encore active
+      // n'est pas un balayage.
+      if(Date.now()-s.t0>BALAYAGE_MAX_MS || selectionActive()) return;
       slideTab(t.clientX-s.x, t.clientY-s.y, 70);
       }}
+      onTouchCancel={()=>{ swipeStart.current=null; }}
       // À LA SOURIS (ordinateur). Les événements tactiles ci-dessus ne sont
       // JAMAIS émis par une souris : sur ordinateur, glisser ne faisait donc
       // rien du tout. On écoute le pointeur, mais uniquement pour la souris —
@@ -43745,6 +43774,8 @@ function AppCoeur() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
+      // Appuyer sur un texte, c'est commencer à le sélectionner.
+      if(surDuTexte(e.clientX,e.clientY)){ swipeStart.current=null; return; }
       swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
       // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
@@ -43772,7 +43803,11 @@ function AppCoeur() {
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
       }}
-      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
+      // ⚠️ Seulement la SOURIS : au doigt, le navigateur envoie `pointercancel`
+      // dès qu'il prend la main sur le geste — remettre le départ à zéro ici
+      // tuait TOUT balayage au doigt sur Android (vu au banc, 17 oct.). Le doigt
+      // a ses propres événements (touchstart / touchend / touchcancel).
+      onPointerCancel={e=>{ if(e.pointerType!=='mouse') return; swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
