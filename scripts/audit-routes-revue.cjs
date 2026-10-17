@@ -22,6 +22,11 @@
 //      quel vendeur connecté (§2.9), et écrasait même la clé du vendeur.
 //   F. /api/vinted-refresh : jetons renouvelés chez Vinted (l'ancien est
 //      consommé) mais pas rangés en base ⇒ la route répondait 200 « refreshed ».
+//   P. (17 oct.) Facture : SEULEMENT pour un compte Vinted PRO (la mention de
+//      Vinted « membre Vinted Pro » / « Coordonnées de l'acheteur »), identité =
+//      n° de transaction (pièce jointe « Formulaire-retour-commande-{tx} »).
+//      Un compte particulier n'a pas les coordonnées de l'acheteur : jamais de
+//      facture. Email inventé, à la forme de celui que Julien a transmis.
 //
 // §6.1 : copié dans un arbre d'avant et lancé DEPUIS cet arbre, il doit être
 // rouge (RACINE se déduit de __dirname).
@@ -35,7 +40,7 @@ const JWT = (sub) => 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ sub 
 
 if (!process.argv[2]) {
   let ko = 0, ok = 0;
-  for (const sc of ['A', 'A2', 'B', 'C', 'D', 'E', 'F']) {
+  for (const sc of ['A', 'A2', 'B', 'C', 'D', 'E', 'F', 'P']) {
     const r = spawnSync(process.execPath, [__filename, sc], { encoding: 'utf8', timeout: 60000 });
     const out = (r.stdout || '') + (r.stderr ? r.stderr.split('\n').filter((l) => /❌|Error/.test(l)).join('\n') : '');
     process.stdout.write(out);
@@ -115,7 +120,29 @@ const importer = (p) => import('file://' + path.join(RACINE, p));
 
 const VENTE = {
   from: 'no-reply@vinted.fr', to: 'boite@banc.test', subject: 'Ton article s\'est vendu',
-  text: 'acheteur_banc a acheté\nNike Air Max banc\n50,00 €\nAdresse : Jean Banc, 1 rue du Banc 35000 Rennes\nAdresse e-mail : acheteur@banc.test\n',
+  text: 'acheteur_banc a acheté\nNike Air Max banc\n50,00 €\nEn tant que membre Vinted Pro, tu dois envoyer à l\'acheteur 2 documents supplémentaires :\nCoordonnées de l\'acheteur\nAdresse : Jean Banc, 1 rue du Banc 35000 Rennes\nAdresse e-mail : acheteur@banc.test\n',
+  html: '', attachments: [],
+};
+// La forme de l'email d'un compte PRO, telle que Julien l'a transmise (16 oct.),
+// avec des données INVENTÉES. Transféré depuis sa boîte, en-tête compris.
+const VENTE_PRO = (tx, pseudo = 'acheteuse_banc') => ({
+  from: 'boutique@banc.test', to: 'boite@banc.test', subject: 'Fwd: Ton article s\'est vendu !',
+  text: '---------- Message transféré ---------\nDe : L\'équipe Vinted <no-reply@vinted.fr>\nObjet : Ton article s\'est vendu !\n\n'
+    + 'Bonjour boutique_banc,\n\n' + pseudo + ' a acheté\n\nAsics Metaspeed banc - Taille 43,5\n\n30,00 €\n\n'
+    + 'Nous transférerons le paiement sur ton porte-monnaie Vinted une fois la commande terminée.\n'
+    + 'Expédie cette commande au cours des 5 prochains jours.\n'
+    + 'En tant que membre Vinted Pro, tu dois envoyer à l\'acheteur 2 documents supplémentaires :\n'
+    + '• Un formulaire de retour de commande.\n• Une facture. Veille à inclure une facture dans le colis avec l\'article.\n\n'
+    + 'Coordonnées de l\'acheteur\nAdresse :\nMarie Banc, 12 rue Inventée, Lisbonne, 1000-001, PT, Portugal\nAdresse e-mail :\nmarie.banc@exemple.test\n\n'
+    + 'N\'hésite pas à contacter ' + pseudo + ' afin de lui faire savoir quand tu as envoyé l\'article.\n\nL\'équipe Vinted\n',
+  html: '', attachments: [{ filename: `Formulaire-retour-commande-${tx}.pdf`, contentType: 'application/pdf', content: '' }],
+});
+// Un compte PARTICULIER : la même vente, sans mention Pro ni coordonnées.
+const VENTE_PART = {
+  from: 'no-reply@vinted.fr', to: 'boite@banc.test', subject: 'Ton article s\'est vendu !',
+  text: 'Bonjour julien_banc,\n\nacheteur_banc a acheté\n\nNike Air Max banc - Taille 42\n\n50,00 €\n\nNous transférerons le paiement sur ton porte-monnaie Vinted une fois la commande terminée.\n'
+    + 'Expédie cette commande au cours des 5 prochains jours.\nRends-toi dans le fil de conversation entre l\'acheteur et toi pour télécharger ton bordereau d\'envoi.\n'
+    + 'Pour toute question, écris-nous à aide@exemple.test\n',
   html: '', attachments: [],
 };
 const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_invoice_')).map(([, d]) => d);
@@ -166,6 +193,32 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       dit(f2[0] && f2[0].status === 'sent', 'email renvoyé : une facture déjà envoyée ne repasse pas « à envoyer »', f2[0] && f2[0].status);
       dit(base.get(`${A}|vrm_invoice_counter`) === 42, 'email renvoyé : aucun numéro brûlé', `compteur = ${base.get(`${A}|vrm_invoice_counter`)}`);
       dit(res2.code === 200, 'le renvoi est acquitté normalement', `HTTP ${res2.code}`);
+    }
+    if (SC === 'P') {
+      base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: false, prefixe: 'FA' });
+      base.set(`${A}|vrm_invoice_counter`, 10);
+      const inbound = await importer('api/email-inbound.js');
+      const recoit = async (m) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(m)) }, res); return res; };
+      const rp = await recoit(VENTE_PART);
+      dit(rp.code === 200 && factures().length === 0, 'compte PARTICULIER (ni mention Pro, ni coordonnées) : aucune facture, même facturation allumée', `HTTP ${rp.code} · ${factures().length} facture(s)`);
+      const p1 = await recoit(VENTE_PRO('23999999001'));
+      const f = factures();
+      dit(p1.code === 200 && f.length === 1, 'compte PRO : une facture est préparée', `HTTP ${p1.code} · ${f.length} facture(s)`);
+      const x = f[0] || {};
+      dit(x.transaction === '23999999001', 'son identité est le n° de transaction (pièce jointe « Formulaire-retour-commande-… »)', `transaction=${x.transaction}`);
+      dit([...base.keys()].some((k) => k === `${A}|email_invoice_tx23999999001`), 'la ligne de facture est rangée sous la transaction', [...base.keys()].filter((k) => k.includes('email_invoice_')).join(', '));
+      dit(x.buyerName === 'Marie Banc' && /Lisbonne/.test(x.buyerAddress || '') && x.buyerEmail === 'marie.banc@exemple.test',
+        'le nom, l\'adresse et l\'email de l\'acheteur viennent du bloc « Coordonnées de l\'acheteur »', `${x.buyerName} · ${x.buyerAddress} · ${x.buyerEmail}`);
+      dit(x.prix === '30.00' && /Asics Metaspeed banc/.test(x.designation || ''), 'le prix et l\'article sont ceux de la vente (pas l\'en-tête du transfert)', `${x.prix} · ${x.designation}`);
+      await recoit(VENTE_PRO('23999999002'));
+      dit(factures().length === 2, 'une AUTRE vente au même pseudo, prix et titre (autre transaction) a SA facture', `${factures().length} facture(s)`);
+      await recoit(VENTE_PRO('23999999001'));
+      dit(factures().length === 2, 'le même email renvoyé ne fait pas une troisième facture', `${factures().length} facture(s)`);
+      // Une adresse email citée dans l'email d'un particulier n'en fait pas un pro.
+      const leurre = JSON.parse(JSON.stringify(VENTE_PART)); leurre.text += 'Adresse : X, 1 rue Y\nAdresse e-mail : x@exemple.test\n';
+      const nAvant = factures().length;
+      await recoit(leurre);
+      dit(factures().length === nAvant, 'un email SANS la mention de Vinted Pro ne fait pas de facture, même avec une adresse email dedans', `${nAvant} → ${factures().length} facture(s)`);
     }
     if (SC === 'C') {
       // Deux vendeurs ; l'email est rejoué chez B (propriétaire imposé).

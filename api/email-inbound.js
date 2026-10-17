@@ -216,7 +216,23 @@ function extraireNumerosLot(body) {
   return numeros;
 }
 
-function parseSaleEmail({ subject, text, html }) {
+// ── COMPTE VINTED PRO (17 octobre). Seul un compte PRO reçoit, dans l'email de
+//    vente, les coordonnées de l'acheteur — et Vinted le dit en toutes lettres
+//    (forme mesurée sur l'email que Julien a transmis, données inventées au
+//    banc) : « En tant que membre Vinted Pro, tu dois envoyer à l'acheteur 2
+//    documents supplémentaires » puis un bloc « Coordonnées de l'acheteur »
+//    (Adresse : nom, adresse · Adresse e-mail : …), et la pièce jointe
+//    « Formulaire-retour-commande-{n° de transaction}.pdf ». Un compte
+//    particulier n'a NI le bloc NI la mention : aucune facture n'est possible,
+//    et aucune n'est faite.
+const MARQUE_PRO = /membre\s+Vinted\s+Pro|Coordonn[ée]es\s+de\s+l['’]acheteur/i;
+function transactionVentePro(body, attachments) {
+  const noms = (attachments || []).map((a) => String((a && a.filename) || '')).join(' ');
+  let m = noms.match(/Formulaire[-_ ]retour[-_ ]commande[-_ ](\d{6,})/i);
+  if (!m) m = String(body || '').match(/Num[ée]ro\s+de\s+(?:la\s+)?transaction\s*:?\s*(\d{6,})/i);
+  return m ? m[1] : '';
+}
+function parseSaleEmail({ subject, text, html, attachments }) {
   let body = text || '';
   // ⚠️ On ne REMPLACE le texte par la version HTML que si elle apporte
   // vraiment plus. Avant, un email court en texte brut (moins de 100
@@ -224,7 +240,7 @@ function parseSaleEmail({ subject, text, html }) {
   // parfaitement lisible, mais l'analyse échouait et la vente était perdue.
   if (body.length < 100) { const alt = htmlToText(html); if (alt.length > body.length) body = alt; }
   const cleanBody = body.replace(/\t/g, ' ').replace(/ {2,}/g, ' ');
-  const data = { pseudo: '', designation: '', prix: '', numero: '', nomComplet: '', adresse: '', email: '' };
+  const data = { pseudo: '', designation: '', prix: '', numero: '', nomComplet: '', adresse: '', email: '', pro: false, transaction: '' };
   const stripBrackets = s => s.replace(/^\[.*?\]\s*/, '').trim();
 
   const pseudoMatch = cleanBody.match(/(\S+)\s+a\s+achet/i);
@@ -260,6 +276,11 @@ function parseSaleEmail({ subject, text, html }) {
   }
   const emailMatch = cleanBody.match(/Adresse\s*e-mail\s*:\s*([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
   if (emailMatch) data.email = emailMatch[1].trim();
+  // Pro seulement sur la MENTION de Vinted, jamais déduit de la seule présence
+  // d'une adresse email dans le texte (une phrase de l'acheteur citée en
+  // contiendrait une). Le numéro de transaction est l'identité de la facture.
+  data.pro = MARQUE_PRO.test(cleanBody) || MARQUE_PRO.test(htmlToText(html) || '');
+  data.transaction = transactionVentePro(cleanBody, attachments);
 
   return (data.pseudo && data.prix) ? data : null;
 }
@@ -370,7 +391,10 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
 }
 
 async function createProInvoice(sale, acc, cfg, now) {
-  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
+  // L'IDENTITÉ d'une facture est la transaction quand l'email la porte (pièce
+  // jointe « Formulaire-retour-commande-{tx} ») : deux ventes au même pseudo,
+  // prix et titre ne partagent plus une facture. Sans transaction : l'ancienne clé.
+  const key = sale.transaction ? `tx${sale.transaction}` : shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
   // ⚠️⚠️ REVUE DU 17 OCTOBRE (`scripts/audit-routes-revue.cjs`, A et B).
   //  · Le MÊME email revient (un 503 est fait pour ça, le script Gmail renvoie
   //    tout le fil) : la facture déjà émise recevait un NOUVEAU numéro et
@@ -398,7 +422,7 @@ async function createProInvoice(sale, acc, cfg, now) {
     type: 'facture_pro', number, status,
     designation: sale.designation || '', prix: sale.prix || '',
     buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
-    numero: sale.numero || '', pseudo: sale.pseudo || '',
+    numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction || '',
     account: acc.login || '', html, createdAt: now,
   } }]);
   return { number, status };
@@ -1677,10 +1701,11 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
-      // l'email contient l'adresse email de l'acheteur (comptes Pro).
+      // l'email est celui d'un compte Vinted PRO (la mention de Vinted) ET qu'il
+      // porte l'adresse email de l'acheteur. Un compte particulier : jamais.
       let facture = null;
       try {
-        if (data.email) {
+        if (data.pro && data.email) {
           // Réglage ILLISIBLE ≠ « facturation coupée » : sans ça, la facture
           // n'était jamais faite et l'email acquitté. Pas su ⇒ 503, il reviendra.
           const cfgLu = await supabaseLireRow('vrm_pro_facture');
