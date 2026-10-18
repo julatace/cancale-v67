@@ -73,6 +73,22 @@ srv.listen(PORT);
           dit(apres === cur.id && (await actif()) === vinted, `[${tag}] « retour » revient à la section d'avant (${cible.id} → ${cur.id})`, `${apres}`);
         } else dit(false, `[${tag}] sections de Vinted trouvées`, JSON.stringify(sections));
       } else dit(false, `[${tag}] onglet Vinted trouvé`, labels.join(', '));
+      // Une FEUILLE ouverte : « retour » la ferme d'abord, sans changer d'écran.
+      const RECH = 'button[aria-label="Rechercher une paire"]';
+      const ouverte = () => pg.$('button[aria-label="Fermer la recherche"]').then(e => !!e);
+      if (await pg.$(RECH)) {
+        await clic(l1);
+        const avant = await actif();
+        await pg.click(RECH); await pg.waitForTimeout(400);
+        dit(await ouverte(), `[${tag}] la recherche s'ouvre`);
+        await pg.goBack({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(500);
+        dit(!(await ouverte()) && (await actif()) === avant && pg.url().startsWith(base), `[${tag}] « retour » ferme la feuille ouverte, sans changer d'écran`, `${await ouverte()} · ${await actif()} · ${pg.url()}`);
+        // Fermée par ×, son entrée part : le retour suivant change bien d'écran.
+        await pg.click(RECH); await pg.waitForTimeout(400);
+        await pg.click('button[aria-label="Fermer la recherche"]'); await pg.waitForTimeout(500);
+        await pg.goBack({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(500);
+        dit((await actif()) !== avant && pg.url().startsWith(base), `[${tag}] fermée par ×, le « retour » suivant revient à l'écran d'avant (pas un retour à vide)`, `${await actif()}`);
+      } else dit(false, `[${tag}] bouton de recherche trouvé`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a rapporté au lieu de mourir', e.message.slice(0, 200)); }
