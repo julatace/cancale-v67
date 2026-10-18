@@ -1148,3 +1148,50 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   }
   .vrm-tabbar > .vrm-tab:focus-visible { outline:2px solid #FFFFFF; outline-offset:-4px; }
 }
+
+/* Composition mobile : chiffres côte à côte, courbe lisible en pleine largeur. */
+@media(max-width:767px) {
+  .vrm-day-top { grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); align-items:stretch; gap:10px; }
+  .vrm-day-top > .vrm-day-money, .vrm-day-top > .vrm-day-jour { grid-column:1; grid-row:1; }
+  .vrm-day-top > .vrm-day-wallet { grid-column:2; grid-row:1; align-content:center; }
+  .vrm-day-top > .vrm-day-week { grid-column:1 / -1; grid-row:2; }
+  .vrm-day-head { gap:8px; }
+  .vrm-day-money .vrm-day-head .vrm-day-lien { font-size:11px; }
+  .vrm-day-recu { margin-top:10px; padding-top:10px; gap:8px; }
+  .vrm-day-hero-n { margin-top:8px; }
+  .vrm-day-meta { font-size:12px; margin-top:6px; gap:3px 6px; }
+  .vrm-day-week { display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:0 8px; }
+  .vrm-day-week > .vrm-day-head { display:contents; }
+  .vrm-day-week .vrm-day-legende { justify-self:end; font-size:11px; gap:8px; }
+  .vrm-day-week-n { grid-column:1 / -1; font-size:20px; margin:4px 0 0; }
+  .vrm-day-week > div:has(> svg), .vrm-day-week-help { grid-column:1 / -1; }
+  .vrm-day-week-help { color:var(--vrm-muted); font-size:12px; border-top:1px solid var(--vrm-line); margin-top:4px; }
+  .vrm-day-week-help > summary { cursor:pointer; min-height:40px; display:flex; align-items:center; justify-content:space-between; list-style:none; }
+  .vrm-day-week-help > summary::-webkit-details-marker { display:none; }
+  .vrm-day-week-help > summary::after { content:'+'; font-size:18px; }
+  .vrm-day-week-help[open] > summary::after { content:'−'; }
+  .vrm-day-week-help .vrm-day-note { margin:0 0 8px !important; font-size:13px; }
+  .vrm-day-layout .vrm-day-bar > button { flex-direction:row; flex-wrap:wrap; justify-content:center; gap:4px 7px; padding:8px 4px; }
+  .vrm-day-bar-l { flex-basis:100%; text-align:center; }
+  .vrm-ventes-liste .vrm-sale-photo { height:76px !important; }
+  .vrm-ventes-liste .vrm-sale-bas { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 8px; margin:0; }
+  .vrm-ventes-liste .vrm-sale-bas > .vrm-cout-vente { grid-column:1; grid-row:1; }
+  .vrm-ventes-liste .vrm-sale-footer { display:contents; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-invoice { grid-column:1 / -1; grid-row:2; padding:0; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-details { grid-column:2; grid-row:1; margin:0; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-details[open] { grid-column:1 / -1; grid-row:3; }
+  .vrm-ventes-liste .vrm-sale-invoice > button { text-align:left; }
+}
+@media(max-width:767px) {
+  .vrm-ventes-liste .vrm-sale-action [data-bouton-bord] { flex-direction:row !important; flex-wrap:wrap; align-items:center !important; gap:4px 12px !important; }
+  .vrm-ventes-liste .vrm-sale-action [data-bouton-bord] > span { flex-basis:100%; }
+}
+@media(min-width:360px) and (max-width:767px) {
+  .vrm-day-layout .vrm-day-lower { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:start; gap:10px; }
+  .vrm-day-layout .vrm-day-recent .vrm-carrousel { grid-auto-flow:row; grid-auto-columns:auto; grid-template-columns:minmax(0,1fr); margin:0; padding:0; overflow:visible; }
+  .vrm-day-layout .vrm-day-stock { min-width:0; padding:12px !important; }
+  .vrm-day-stock-total { flex-wrap:wrap; gap:4px 8px; margin:8px 0; }
+  .vrm-day-stock-total strong { font-size:28px; }
+  .vrm-day-stock-prices { flex-wrap:wrap; gap:4px; }
+  .vrm-day-stock-links { gap:0 8px; margin-top:8px; padding-top:4px; }
+}

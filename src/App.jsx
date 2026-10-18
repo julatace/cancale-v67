@@ -9335,19 +9335,32 @@ function prenomLisible(v) {
 //    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
 //    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
 //    aux repères.
+// Les explications restent visibles sur ordinateur, accessibles au toucher sur mobile.
+function DayWeekNote({children}) {
+  const [mobile,setMobile]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
+  React.useEffect(()=>{
+    const mq=window.matchMedia('(max-width:767px)');
+    const maj=()=>setMobile(mq.matches);
+    mq.addEventListener('change',maj);
+    return ()=>mq.removeEventListener('change',maj);
+  },[]);
+  return mobile ? <details className="vrm-day-week-help"><summary className="vrm-day-help-toggle">Ventes et versements</summary>{children}</details> : children;
+}
+
 function CourbeSemaine({ jours, hauteur = 176 }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
+  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    const mesure = () => { const mobile = window.matchMedia('(max-width:767px)').matches; const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
     return () => ro.disconnect();
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
+  const H = compact ? 120 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
@@ -33515,11 +33528,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
                 <CourbeSemaine jours={semaine}/>
-                <div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
+                <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
                   Vendu : au jour de la vente · Reçu : au jour du versement.
                   {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
                   {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
-                </div>
+                </div></DayWeekNote>
               </div>
               );
             })()}
