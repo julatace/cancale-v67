@@ -58,7 +58,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.186.0';
+const EXT_ATTENDUE = '5.187.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -647,6 +647,11 @@ const sbAuth = (extra) => {
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
   const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
+  // attendre — la lecture suivante partira avec le jeton frais.
+  if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
+    try { authRefresh({ discret: true }); } catch (_) {}
+  }
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
 };
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
@@ -676,9 +681,9 @@ const authCall = async (path, body) => {
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
-    return { ok: true, json };
-  } catch (e) { return { ok: false, error: 'Pas de connexion internet.' }; }
+    if (!res.ok) return { ok: false, status: res.status, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
+    return { ok: true, status: res.status, json };
+  } catch (e) { return { ok: false, status: 0, error: 'Pas de connexion internet.' }; }
 };
 
 // ── OÙ RAMÈNENT LES LIENS DES EMAILS DE COMPTE (5 octobre) ─────────────────
@@ -699,13 +704,40 @@ const avecRetour = (chemin) => { const r = retourEmail(); return r ? `${chemin}$
 // Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
 // jeton de renouvellement — sinon l'app se déconnecterait toute seule en
 // pleine journée.
-const authRefresh = async () => {
-  const s = AUTH.session;
-  if (!s || !s.refresh_token) return false;
-  const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
-  if (!r.ok) return false;
-  writeSession(sessionFrom(r.json));
-  return true;
+// ⚠️ UN SEUL RENOUVELLEMENT EN VOL (18 octobre). Mesuré dans les journaux de la
+// base le 17 octobre à 21 h 25 : au réveil d'un ordinateur mis en veille, le
+// jeton avait expiré et l'app a fait 104 lectures refusées (401) en cinq
+// minutes, jusqu'au passage suivant de la minuterie de 4 min. Le renouvellement
+// part maintenant au RÉVEIL (retour au premier plan, réseau revenu) et dès
+// qu'une lecture part avec un jeton qui expire (`sbAuth`) ; plusieurs appelants
+// partagent la même demande (deux renouvellements simultanés présenteraient le
+// même jeton de renouvellement).
+let _authRefreshEnVol = null;
+let _authRefreshEchecAt = 0;
+// `{ discret: true }` (une lecture qui part avec un jeton qui expire) : après un
+// échec, pas de nouvel essai avant 15 s — hors ligne, chaque lecture relançait
+// une demande (10 en 5 s au banc `session-reveil.cjs`). Le réveil, la minuterie
+// et l'ouverture, eux, réessaient toujours.
+const authRefresh = (opt) => {
+  if (_authRefreshEnVol) return _authRefreshEnVol;
+  if (opt && opt.discret && Date.now() - _authRefreshEchecAt < 15000) return Promise.resolve(null);
+  _authRefreshEnVol = (async () => {
+    try {
+      const s = AUTH.session;
+      if (!s || !s.refresh_token) return false;
+      const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
+      // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
+      // révoqué, compte supprimé) · null (pas su : réseau coupé, service qui ne
+      // répond pas). Seul un refus déconnecte — une coupure, jamais.
+      if (!r.ok) { _authRefreshEchecAt = Date.now(); return (r.status >= 400 && r.status < 500) ? false : null; }
+      // La session a pu changer pendant la demande (déconnexion, autre compte) :
+      // on ne range pas un jeton renouvelé par-dessus.
+      if (!AUTH.session || AUTH.session.refresh_token !== s.refresh_token) return false;
+      writeSession(sessionFrom(r.json));
+      return true;
+    } finally { _authRefreshEnVol = null; }
+  })();
+  return _authRefreshEnVol;
 };
 const sessionFrom = (j) => ({
   access_token: j.access_token,
@@ -1148,7 +1180,10 @@ const authBoot = async () => {
   const s = readSession();
   if (!s) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   AUTH = { ...AUTH, session: s, user: s.user || null };
-  if (!authValid()) { const ok = await authRefresh(); if (!ok) { writeSession(null); return; } }
+  // ⚠️ Une coupure réseau à l'ouverture ne déconnecte plus (18 octobre) : seul
+  // un REFUS du service (false) efface la session. « Pas su » (null) garde la
+  // session ; la minuterie et le réveil réessaient le renouvellement.
+  if (!authValid()) { const ok = await authRefresh(); if (ok === false) { writeSession(null); return; } }
   AUTH = { ...AUTH, ready: true };
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
   prechargerDemarrage();
@@ -1217,6 +1252,9 @@ const prendrePrechargeComptes = () => {
 // Renouvellement périodique tant que l'app est ouverte.
 if (MULTI_USER && typeof window !== 'undefined') {
   setInterval(() => { if (AUTH.session && !authValid()) authRefresh(); }, 4 * 60 * 1000);
+  // Au réveil : une minuterie ne tourne pas pendant la veille de l'ordinateur.
+  const auReveil = () => { try { if (AUTH.session && !authValid() && (typeof document === 'undefined' || document.visibilityState !== 'hidden')) authRefresh(); } catch (_) {} };
+  try { document.addEventListener('visibilitychange', auReveil); window.addEventListener('focus', auReveil); window.addEventListener('online', auReveil); } catch (_) {}
 }
 
 // L'EXTENSION A BESOIN DE SAVOIR QUI TU ES.
@@ -6763,9 +6801,21 @@ const clavierNum = () => (prefixeNumeros() ? 'text' : 'numeric');
 // Le prochain numéro LIBRE : le premier jamais donné. Sans préfixe, l'entier
 // comme avant (prisInt) ; avec préfixe, dans SA série (prisCles). On n'en
 // libère jamais aucun : la séquence monte, elle compte les paires passées.
+// ⚠️ APRÈS LE PLUS HAUT, JAMAIS DANS UN TROU (18 octobre). On comblait le
+// premier numéro absent du pool. Or un trou n'est pas forcément un numéro
+// libre : pendant la panne de synchronisation du 11 au 18 octobre, des numéros
+// donnés sur un appareil (et écrits sur des cartons) n'ont jamais atteint le
+// pool du nuage — combler les trous les aurait redonnés. Le pool ne connaît
+// que des numéros SERVIS : le suivant vient après le plus haut.
 const prochainLibre = (prisInt, prisCles, pref) => {
-  if (!pref) { let c = 1; while (prisInt.has(c)) c += 1; prisInt.add(c); return String(c); }
-  let c = 1; while (prisCles.has(pref + c)) c += 1; prisCles.add(pref + c); return pref + c;
+  if (!pref) {
+    let c = 1;
+    for (const x of prisInt) { const n = Number(x); if (Number.isFinite(n) && n >= c) c = n + 1; }
+    prisInt.add(c); return String(c);
+  }
+  let c = 1;
+  for (const k of prisCles) { const m = String(k).match(/^([A-Z]{1,3})(\d+)$/); if (m && m[1] === pref && Number(m[2]) >= c) c = Number(m[2]) + 1; }
+  prisCles.add(pref + c); return pref + c;
 };
 
 // Les numéros PHYSIQUEMENT présents (annonce en ligne ou colis pas encore
@@ -6872,7 +6922,7 @@ const verifierVersionNumerotation = () => {
       if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
       else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
     } catch (_) {
-      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu' });
+      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu', essaiAt: Date.now() });
     }
     _verNumEnVol = null;
     return _verNum;
@@ -6886,7 +6936,10 @@ const numerotationPermise = () => {
   if (!isCloudReady()) return false;
   const e = _verNum;
   if (e.etat === 'ok' && Date.now() - e.at < VERSION_FRAICHE_MS) return true;
-  if (e.etat !== 'perime') verifierVersionNumerotation();
+  // ⚠️ Pas plus d'une relecture toutes les 15 s après un échec : sinon chaque
+  // rendu en relançait une (104 lectures refusées en cinq minutes, mesuré le
+  // 17 octobre pendant un jeton expiré).
+  if (e.etat !== 'perime' && !(e.etat === 'passu' && Date.now() - (e.essaiAt || 0) < 15000)) verifierVersionNumerotation();
   return false;
 };
 // Avant d'IMPRIMER (le N° est tamponné sur le bordereau) : on relit si la
@@ -7040,6 +7093,70 @@ const rechargerEnGardantLesSaisies = () => {
 };
 // Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
 // jeter quand la version change, sinon elles parlent de l'ancienne série.
+// ⚠️⚠️ LE CHARGEMENT NE JETTE PLUS LES NUMÉROS DE L'APPAREIL (18 octobre).
+// Mesuré en production : du 11 au 18 octobre, la ligne `main` ne s'enregistrait
+// plus (garde-fou trop lent, réparé par la migration 017). Pendant ce temps,
+// chaque ouverture de l'app RECOPIAIT le nuage par-dessus le navigateur : les
+// numéros donnés sur l'appareil depuis le 11 disparaissaient, et la
+// numérotation automatique redonnait aux mêmes paires des numéros DÉJÀ ÉCRITS
+// sur des cartons — le pool du nuage ne les connaissait pas non plus. Le
+// 18 octobre à 08:26, 36 paires ont été renumérotées d'un coup (la Vapor Pro
+// sous le N°82 d'une Air Max 1 en ligne sur eBay).
+// ⇒ Au chargement, deux clés se FUSIONNENT au lieu d'être remplacées :
+//   · le pool des numéros utilisés : l'UNION (un numéro ne se redonne jamais,
+//     §5 — l'union est toujours sûre) ;
+//   · les fiches : une fiche de l'appareil que le nuage ne connaît pas est
+//     GARDÉE, et un numéro de l'appareil comble une fiche du nuage restée sans
+//     numéro. Le nuage gagne quand les deux en portent un (c'est la donnée
+//     partagée ; deux numéros différents se verront dans la détection des
+//     doublons). Une fiche reprise ailleurs (`repriseDe`) n'est pas ressuscitée.
+// Seulement si l'appareil et le nuage sont dans la MÊME version de numérotation
+// (après une remise à zéro, les copies d'appareil parlent de l'ancienne série).
+// Rend la valeur fusionnée et `ajoute` (ce que le nuage n'avait pas).
+const fusionNumerosAuChargement = (k, nuage, local) => {
+  try {
+    if (k === 'vinted_used_numeros') {
+      if (!Array.isArray(nuage) || !Array.isArray(local)) return { val: nuage, ajoute: 0 };
+      const vus = new Set(nuage.map((x) => cleNum(x)).filter(Boolean));
+      const out = nuage.slice(); let ajoute = 0;
+      for (const x of local) { const c = cleNum(x); if (c && !vus.has(c)) { vus.add(c); out.push(x); ajoute++; } }
+      return { val: out, ajoute };
+    }
+    if (k === 'vinted_annonce_numeros') {
+      if (!nuage || typeof nuage !== 'object' || Array.isArray(nuage) || !local || typeof local !== 'object' || Array.isArray(local)) return { val: nuage, ajoute: 0 };
+      const out = { ...nuage }; let ajoute = 0;
+      const repris = new Set(Object.values(nuage).map((e) => e && e.repriseDe).filter(Boolean).map(String));
+      for (const [id, e] of Object.entries(local)) {
+        if (!e || typeof e !== 'object' || repris.has(String(id))) continue;
+        const c = out[id];
+        const nLocal = String(e.numero == null ? '' : e.numero).trim();
+        if (!c) { out[id] = e; ajoute++; continue; }
+        if (nLocal && !String(c.numero == null ? '' : c.numero).trim()) {
+          out[id] = { ...c, numero: e.numero, numberedAt: e.numberedAt || c.numberedAt, ...(e.auto != null ? { auto: e.auto } : {}), ...(e.manuelAt ? { manuelAt: e.manuelAt } : {}) };
+          ajoute++;
+        }
+      }
+      return { val: out, ajoute };
+    }
+  } catch (_) {}
+  return { val: nuage, ajoute: 0 };
+};
+const CLES_FUSION_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros'];
+// La fenêtre de la panne de synchronisation (la ligne `main` refusée à chaque
+// écriture, du 11 octobre 14:58 à la migration 017 du 18 octobre). Une fiche
+// numérotée AUTOMATIQUEMENT pendant cette fenêtre a pu recevoir un numéro déjà
+// écrit sur un autre carton (voir `fusionNumerosAuChargement`) : elle est
+// listée dans « Numéros à vérifier sur tes cartons » jusqu'à ce qu'il la
+// confirme ou la corrige (`cartonVerifie`). Une donnée datée, pas une règle :
+// rien d'autre ne lit cette fenêtre.
+const PANNE_NUMEROS = { de: '2026-10-11T14:58:00.000Z', a: '2026-10-18T09:30:00.000Z' };
+const ficheAVerifier = (f) => {
+  if (!f || typeof f !== 'object' || !String(f.numero == null ? '' : f.numero).trim() || f.cartonVerifie) return false;
+  if (f.auto === false) return false;
+  const t = String(f.numberedAt || '');
+  if (f.manuelAt && String(f.manuelAt) > PANNE_NUMEROS.a) return false;
+  return t >= PANNE_NUMEROS.de && t <= PANNE_NUMEROS.a;
+};
 const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', 'vrm_local_plan'].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} }); };
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
 // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
@@ -23479,7 +23596,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
         : (
         <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Aucun compte détecté pour l'instant. Installe l'extension « VRM – Vinted Sync »,
+          Aucun compte détecté pour l'instant. Installe l'extension VRM,
           connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
       ))}
@@ -29025,6 +29142,88 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const annAConfirmer = useMemo(() => (listings.aConfirmer || []).filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.aConfirmer, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  // ── NUMÉROS À VÉRIFIER SUR LES CARTONS (18 octobre) ─────────────────────
+  // Les paires en ligne (ou à confirmer) numérotées automatiquement pendant la
+  // panne de synchronisation : leur N° a pu être redonné (`PANNE_NUMEROS`).
+  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer].filter((it) => ficheAVerifier(numeros[it.id])),
+  [annBase, annAConfirmer, numeros]);
+  // Le numéro que porte la paire sur eBay, par IDENTITÉ seulement : un brouillon
+  // eBay préparé depuis CETTE annonce (`pairId`), et la référence (SKU) de
+  // l'annonce eBay qu'il a créée. Jamais un rapprochement par titre (§5).
+  // Les annonces eBay sont listées à part, telles qu'eBay les porte.
+  const [ebayVerif, setEbayVerif] = useState(null);   // null = pas lu · { preuves, annonces } · { ko: true }
+  useEffect(() => {
+    if (!aVerifierCarton.length || ebayVerif) return;
+    let fini = false;
+    (async () => {
+      try {
+        const [rb, rl] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.ebay_brouillons*&select=id,items:data->items`, { headers: sbAuth() }),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.ebay_listings*&select=id,items:data->items`, { headers: sbAuth() }),
+        ]);
+        if (!rb.ok || !rl.ok) throw new Error('lecture');
+        const [lb, ll] = [await rb.json(), await rl.json()];
+        if (!Array.isArray(lb) || !Array.isArray(ll)) throw new Error('forme');
+        const annonces = [];
+        for (const r of ll) for (const x of (Array.isArray(r.items) ? r.items : [])) if (x && x.itemId) annonces.push({ itemId: String(x.itemId), sku: String(x.sku || ''), titre: String(x.title || '') });
+        const skuDe = Object.fromEntries(annonces.map((a) => [a.itemId, a.sku]));
+        const preuves = {};
+        for (const r of lb) {
+          const items = r.items && typeof r.items === 'object' ? Object.values(r.items) : [];
+          for (const b of items) {
+            if (!b || !b.pairId) continue;
+            const sku = b.programme && b.programme.itemId ? skuDe[String(b.programme.itemId)] : '';
+            const n = sku && /^VRM-/i.test(sku) ? sku.replace(/^VRM-/i, '') : (b.numero ? String(b.numero) : '');
+            if (n) preuves[String(b.pairId)] = sku ? `sur eBay sous VRM-${n}` : `préparée pour eBay sous le N°${n}`;
+          }
+        }
+        if (!fini) setEbayVerif({ preuves, annonces: annonces.filter((a) => /^VRM-/i.test(a.sku)) });
+      } catch (_) { if (!fini) setEbayVerif({ ko: true }); }
+    })();
+    return () => { fini = true; };
+  }, [aVerifierCarton.length, ebayVerif]);
+  const marquerCartonVerifie = (id, cle) => {
+    setNumeros((prev) => {
+      const c = prev[id];
+      if (!c || cleNum(c.numero) !== cle) return prev;
+      const u = { ...prev, [id]: { ...c, cartonVerifie: new Date().toISOString() } };
+      save('vinted_annonce_numeros', u); return u;
+    });
+  };
+  const confirmerCarton = async (it) => { marquerCartonVerifie(String(it.id), cleNum((numeros[it.id] || {}).numero)); toast(`N°${(numeros[it.id] || {}).numero} confirmé pour « ${it.title} »`); };
+  const corrigerCarton = async (it, valeur) => {
+    const brut = String(valeur || '').trim();
+    const cle = cleNum(brut);
+    if (!cle || !NUM_OK.test(cle)) { toast('Un numéro, ce sont des chiffres (125) ou 1 à 3 lettres suivies de chiffres (B125).'); return; }
+    const n = /^\d+$/.test(brut) ? brut : cle;
+    const moi = String(it.id), f = numeros[moi] || {};
+    if (cleNum(f.numero) === cle) { marquerCartonVerifie(moi, cle); return; }
+    const autreId = Object.keys(numeros).find((k) => k !== moi && cleNum((numeros[k] || {}).numero) === cle);
+    const autre = autreId ? aVerifierCarton.find((x) => String(x.id) === autreId) : null;
+    if (autre) {
+      // Le N° du carton est aujourd'hui sur une AUTRE paire renumérotée pendant
+      // la panne : son N° est donc probablement faux lui aussi. Elle reçoit un
+      // numéro NEUF (jamais un numéro déjà servi) et reste dans la liste.
+      const prov = String(nextNumero);
+      const ok = await askConfirm({
+        title: `Le N°${n} est sur « ${autre.title} »`,
+        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON carton (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
+        ok: `Oui, le N°${n} est à « ${it.title} »`, cancel: 'Annuler',
+      });
+      if (!ok) return;
+      const now = new Date().toISOString();
+      updatePair(autre, { numero: prov, auto: true, cartonVerifie: null });
+      recordUsed(prov);
+      updatePair(it, { numero: n, manuelAt: now, cartonVerifie: now });
+      recordUsed(n);
+      toast(`N°${n} → « ${it.title} » · « ${autre.title} » passe au N°${prov} (à vérifier)`);
+      return;
+    }
+    // Sinon : le geste habituel du champ N° (il demande quand le numéro a déjà
+    // servi ou qu'une autre paire le porte encore), puis « vérifié » s'il a été posé.
+    await poserNumero(it, brut, f.numero);
+    setTimeout(() => marquerCartonVerifie(moi, cle), 700);
+  };
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
   // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
@@ -35299,6 +35498,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
+          {aVerifierCarton.length > 0 && (
+          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
+            <summary style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier sur tes cartons
+            </summary>
+            <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seul le carton dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui écrit sur le carton. N'imprime pas leur bordereau avant (le N° y est tamponné).
+            </div>
+            {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
+              <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
+                Sur eBay, tes annonces portent les numéros posés à leur publication : {ebayVerif.annonces.map((a) => `${a.sku} « ${a.titre} »`).join(' · ')}.
+              </div>
+            )}
+            {aVerifierCarton.map((it) => (
+              <LigneVerifCarton key={it.id} it={it} fiche={numeros[it.id] || {}} preuve={ebayVerif && ebayVerif.preuves ? ebayVerif.preuves[String(it.id)] : ''}
+                onConfirmer={confirmerCarton} onCorriger={corrigerCarton}/>
+            ))}
+          </details>
+        )}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary>Stock et ajustements</summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
@@ -40082,6 +40300,34 @@ function LeboncoinScreen() {
 // ⚠️ Écrit dans la ligne `push_prefs`, que le SERVEUR lit avant d'envoyer
 //    (api/_lib/push.js). Ce n'est donc pas un filtre d'affichage : la
 //    notification n'est pas envoyée du tout.
+// Une ligne de « Numéros à vérifier sur tes cartons » (écran Annonces).
+function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
+  const [v, setV] = React.useState('');
+  const [occupe, setOccupe] = React.useState(false);
+  const agir = async (f) => { if (occupe) return; setOccupe(true); try { await f(); } finally { setOccupe(false); } };
+  return (
+    <div data-verif-carton={String(it.id)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
+      {it.photo
+        ? <PhotoVinted src={it.photo} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
+        : <div style={{ width: 48, height: 48, borderRadius: 8, background: C.card2, flexShrink: 0 }}/>}
+      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+        <div style={{ fontSize: 12, color: C.muted }}>
+          VRM dit <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
+          {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Le carton dit N°{fiche.numero}</button>
+        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou N° du carton" aria-label={`Numéro écrit sur le carton de ${it.title}`}
+          onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
+          style={{ width: 118, padding: '7px 9px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
+        <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none', background: C.text, color: C.card, fontSize: 12.5, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
+      </div>
+    </div>
+  );
+}
+
 const PUSH_CATS = [
   { id:'vente',    def:true,  titre:'💸 Vendu',            desc:"Une paire vient d'être vendue." },
   { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
@@ -40091,6 +40337,7 @@ const PUSH_CATS = [
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
+  { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
@@ -43928,7 +44175,21 @@ function AppCoeur() {
         //    — on les jette, l'écran concerné les relira.
         const verLocale = versionNumerotation();
         const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
-        SYNC_KEYS.forEach(k => { if (k === 'vinted_accounts') return; if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
+        let ajoutsLocaux = 0;
+        SYNC_KEYS.forEach(k => {
+          if (k === 'vinted_accounts') return;
+          if (cloud[k] === undefined || cloud[k] === null) return;
+          let val = cloud[k];
+          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale) {
+            let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
+            const f = fusionNumerosAuChargement(k, val, loc);
+            val = f.val; ajoutsLocaux += f.ajoute;
+          }
+          try { localStorage.setItem(k, JSON.stringify(val)); } catch (_) {}
+        });
+        // Ce que l'appareil savait et que le nuage n'avait pas repart vers le
+        // nuage dès qu'il est prêt (verrou 1 : la demande attend `markCloudReady`).
+        if (ajoutsLocaux > 0) cloudPush();
         if (verNuage !== verLocale) purgerCopiesNumeros();
         noterInstantaneCharge(cloud);
         noterVersionChargee();

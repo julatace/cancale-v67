@@ -25,7 +25,7 @@ const UNE_HEURE = 3600e3;
 let notesCetteOuverture = 0;
 
 // Ce qui n'est PAS un défaut de l'app.
-const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module/i;
+const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker/i;
 
 // ⚠️ Revue adverse du 4 octobre : la première version laissait passer un login
 //    cité par le navigateur (« reading 'julatace3535' »), un téléphone espacé,

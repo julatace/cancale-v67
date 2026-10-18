@@ -547,6 +547,11 @@ function familleConnue(subject, from) {
   // vente se finalise dans le porte-monnaie, une fois quand il en sort). Aucune
   // action à faire — donc une famille reconnue, pas une alerte.
   if (/transfert bancaire|virement bancaire/i.test(s)) return 'virement du porte-monnaie vers ta banque';
+  // « La commande "…" a été remboursée ! » : un de SES achats annulé, l'argent
+  // revient sur sa carte tout seul. Rien à faire.
+  if (/^La commande .+ a [ée]t[ée] rembours[ée]e/i.test(s)) return "remboursement d'un de tes achats";
+  // Le questionnaire de satisfaction du support Vinted (« Re: »).
+  if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
   return '';
@@ -1893,6 +1898,52 @@ export async function traiterEmail(req, res) {
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
       repondre(res, 200, { ok: true, type: 'favori', de: qui, article });
       return;
+    }
+
+    // 7) VINTED ATTEND UNE RÉPONSE AVANT UNE ÉCHÉANCE (18 octobre).
+    // Mesuré dans sa base : ces emails tombaient dans « aucune règle ne le
+    // reconnaît » — donc aucune notification, alors qu'ils ont une date limite :
+    //  · « L'acheteur souhaite annuler son achat ! » : il faut accepter ou refuser
+    //    dans la conversation (sinon Vinted tranche) ;
+    //  · « {article} - Confirmation requise » : un de SES ACHATS est livré ; il a
+    //    jusqu'à la date écrite pour signaler un problème, ensuite la vente est
+    //    finalisée et plus aucun remboursement n'est possible.
+    // On ne déduit rien : l'article, le pseudo et l'échéance sont LUS dans
+    // l'email (absents ⇒ la notification le dit sans les inventer). L'email est
+    // conservé comme avant (famille connue), seule la notification s'ajoute.
+    {
+      const plat = corpsTexte.replace(/\s+/g, ' ');
+      const annul = /souhaite annuler son achat/i.test(subject);
+      const livre = /Confirmation requise\s*$/i.test(subject) && /commande a [ée]t[ée] livr[ée]e/i.test(plat);
+      if (annul || livre) {
+        const key = shortHash(subject + plat.slice(0, 400));
+        let notif, famille;
+        if (annul) {
+          const m = plat.match(/(\S+)\s+souhaiterait annuler l['’]achat de l['’]article\s+(.+?)\s+pour la raison suivante\s*:\s*["«“]?\s*([^"»”]{0,140}?)\s*["»”]/i)
+            || plat.match(/(\S+)\s+souhaiterait annuler l['’]achat de l['’]article\s+(.+?)(?:\s+pour la raison|\.|$)/i);
+          const qui = (m && m[1]) || '', article = (m && m[2]) || '', raison = (m && m[3]) || '';
+          famille = "demande d'annulation de l'acheteur";
+          notif = {
+            title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
+            body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${acc.login ? ` sur ${acc.login}` : ''} — accepte ou refuse dans la conversation Vinted.`,
+            tag: `annul-${key}`, url: '/?tab=cat_msg',
+          };
+        } else {
+          const article = subject.replace(/\s*-\s*Confirmation requise\s*$/i, '').trim();
+          const limite = ((plat.match(/Tu as jusqu['’]au\s+(.+?)\s+pour signaler/i) || [])[1] || '').trim();
+          famille = 'achat livré, à vérifier avant la date limite';
+          notif = {
+            title: `📦 Achat livré${article ? ` — ${court(article, 60)}` : ''}`,
+            body: `Vérifie-le${limite ? ` : tu as jusqu'au ${limite} pour signaler un problème` : ' et signale un problème à temps'}${acc.login ? ` (${acc.login})` : ''} — sinon la vente est finalisée.`,
+            tag: `livre-${key}`, url: '/?tab=cat_achats',
+          };
+        }
+        try { await pushOnce(notif, 'action'); } catch (_) {}
+        await garderInconnu(corpsBrut, mail, 'connu, notifié', famille);
+        await logEmail({ type: 'action', subject, from: mail.from, famille, account: acc.login || '' });
+        repondre(res, 200, { ok: true, type: 'action', famille });
+        return;
+      }
     }
 
     // ⚠️ « Ignoré » ne veut pas dire « jeté ». Un email qu'aucune règle ne
