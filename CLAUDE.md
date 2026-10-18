@@ -4419,6 +4419,9 @@ noire en ligne sur eBay sous VRM-82 ; eBay VRM-81 / VRM-48 sont aujourd'hui 80 /
 - **Geste de Julien** : passer la liste carton par carton ; n'imprimer aucun bordereau
   de ces paires avant. Les numéros 25 à 48 de la semaine ne sont plus nulle part en
   base : seul le carton les dit.
+- **Impression gardée (18 oct.)** : tamponner un bordereau dont le N° est encore « à vérifier sur son carton » (`ficheAVerifier`) DEMANDE d'abord — `confirmerNumerosAVerifier`, sur les trois chemins (un bordereau, un lot, bordereau + facture) ; « Annuler » n'imprime rien. `audit-impression-carton.cjs` (rouge sur l'avant).
+- **Mémoire de défilement (18 oct.)** : `MemoireDefilement` observait le premier enfant de la zone (un bandeau de 74 px) et s'arrêtait au premier succès — l'écran qui se raccourcit le temps d'un chargement ramenait la position à 0. Elle se tient 2,5 s, réessayée à chaque image, et cède dès que la personne fait défiler (molette, doigt, clavier, clic). Banc `revendeurs.cjs` (rouge sur l'avant : 250 → 0).
+- La ligne « Ventes Vinted à jour / capture ancienne » sort du résumé Vinted replié sur téléphone (une alerte cachée n'en est pas une).
 
 ### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
