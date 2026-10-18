@@ -31211,6 +31211,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // VRAI. Un total partiel qui se présente comme complet est pire qu'un
     // total absent (§5.27, la même règle que pour l'argent en attente).
     let benefConnu = 0;
+    // BRUT = vente − achat (avant boosts et frais de vente) ; NET = `benefConnu`
+    // (vente − achat − frais). L'écart entre les deux, c'est ce que coûtent les
+    // boosts et les frais de Vinted. Mêmes ventes au coût connu que `benefConnu`.
+    let benefBrut = 0;
     // Finalisées dont l'encaissement n'est pas encore daté : elles sortent du
     // total plutôt que d'être posées au hasard sur la date de vente. On les
     // compte pour le dire — un chiffre incomplet qui se présente comme complet
@@ -31244,9 +31248,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = effEntry(o);
       const fee = chargesVente(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; benefConnu += sell-buy-fee; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; benefBrut += sell-buy; benefConnu += sell-buy-fee; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
+    return { ca, cout, frais, benef:ca-cout-frais, benefBrut, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
 
@@ -34047,14 +34051,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sont plus fiables »). Donc : 0 prix d'achat → on n'affiche pas un
                 faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
+            {/* BRUT (vente − achat) et NET (− boosts & frais), demandés par Julien.
+                Sans aucun prix d'achat : « — » (un faux bénéfice tromperait). Si
+                brut = net (aucun frais capté), une seule carte « Bénéfice » — ne
+                pas écrire deux fois le même nombre (§7). La couverture « sur X/Y »
+                suit le même total partiel que l'ancienne carte (§5). */}
             {totals.nbCout===0
-              ? <StatBox compact label="Bénéfice estimé" value="—" color={C.muted} sub={null}
+              ? <StatBox compact label="Bénéfice" value="—" color={C.muted} sub={null}
                   onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
-              : <StatBox compact label="Bénéfice estimé" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
-                  subColor={totals.nbCout<totals.nb?C.warn:undefined}
-                  sub={totals.nbCout<totals.nb
-                    ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
-                    : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
+              : totals.benefBrut===totals.benefConnu
+                ? <StatBox compact label="Bénéfice" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
+                    subColor={totals.nbCout<totals.nb?C.warn:undefined}
+                    sub={totals.nbCout<totals.nb
+                      ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
+                      : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − achat')}/>
+                : <>
+                    <StatBox compact label="Bénéfice brut" value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
+                      subColor={totals.nbCout<totals.nb?C.warn:undefined}
+                      sub={totals.nbCout<totals.nb
+                        ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — avant frais`
+                        : 'CA − achat (avant frais)'}/>
+                    <StatBox compact label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
+                      sub={totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
+                  </>}
           </div>
         )}
 
