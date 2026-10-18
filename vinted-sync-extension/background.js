@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.188.0';
+const CODE_VERSION = '5.189.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -714,6 +714,14 @@ function familleEcriture(table, rows) {
 function renouvelerUneFois() {
   return refreshSession({ force: true });
 }
+// Code HTTP du DERNIER envoi refusé par la base (401, 403, 400, 5xx…). Posé
+// ici à l'échec, lu par `noterFlux` : le logo DIT alors pourquoi. Un 4xx est un
+// refus DURABLE (accès coupé, session rejetée) — « ça réessaie tout seul »
+// serait une fausse promesse (le défaut le plus coûteux du projet). On ne le
+// remet jamais à `null` sur un succès : `noterFlux` ne le lit que sur un échec,
+// qui vient de le poser — donc toujours frais, même en cas d'écritures en
+// parallèle.
+let _statutDernierRefus = null;
 async function supabaseUpsert(table, rows, onConflict) {
   const list = Array.isArray(rows) ? rows : [rows];
   const envoyer = async () => {
@@ -758,6 +766,7 @@ async function supabaseUpsert(table, rows, onConflict) {
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
   //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
   try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
+  _statutDernierRefus = statut;
   return false;
 }
 
@@ -5283,7 +5292,7 @@ async function noterFlux(plateforme, ok) {
   try {
     const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
     const p = cur[plateforme] || {};
-    if (ok) p.okAt = Date.now(); else p.koAt = Date.now();
+    if (ok) { p.okAt = Date.now(); p.koStatut = null; } else { p.koAt = Date.now(); p.koStatut = _statutDernierRefus; }
     cur[plateforme] = p;
     await chrome.storage.local.set({ vrmFlux: cur });
   } catch (_) {}
