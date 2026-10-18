@@ -9299,6 +9299,18 @@ lui), vert après.
 - **Vente annulée** : `purgeBordereauxAnnules` (à chaque visite, 20 min de recul) — transaction 500-520 dont l'expédition n'a pas bougé ⇒ PDF retiré de `email_bord_{tx}`, `harvest_{uid}_label_{tx}` et `label_latest` qui la porte, sans attendre 7 jours, métadonnée gardée (`annulee: true`), l'app prévenue (`maj · annulee · tx`). Lecture ratée ⇒ rien. Mesuré : 3 ventes 520 ont encore un bordereau. `audit-purge-bordereaux.cjs` §6-7 (2 rouges sur l'avant ; mutation « expédition jamais bougée » ⇒ 2 rouges).
 - Extension **5.185.0**, zip régénéré, `EXT_ATTENDUE` suivie, `EXT_CAPACITES.lbcpack` / `.annulee`.
 
+### Extension 5.186 — booster Leboncoin impossible, publication gratuite jusqu'au bout, compte de session, couleur (17-18 octobre)
+- ⚠️⚠️ **Le boost Leboncoin est IMPOSSIBLE par construction** (sa plainte : un dépôt a coché une option payante). Cause : `cliquerContinuer` cliquait « Continuer » sur l'étape `/deposer-une-annonce/options` alors qu'une option était pré-cochée. Désormais : `cliquerContinuer` refuse sur l'étape de publication et tout bouton portant un prix (`PRIX_ARGENT`) ; `publierSansBooster` choisit d'abord le radio GRATUIT, décoche les six options (`gallery`, `gallery30`, `daily_bump`, `daily_bump30`, `sub_toplist`, `urgent`, `NOM_BOOST`), RELIT deux fois, et ne clique qu'un bouton de publication jamais chiffré, jamais « annuler/retour », jamais dans une carte d'option (`dansCarteOption`). Un doute ⇒ rien n'est cliqué, et le bandeau dit pourquoi. Photos pas envoyées (`photosPretes`, `sessionStorage`) ⇒ pas de publication.
+- **Publication confirmée, pas supposée** : la page `/deposer-une-annonce/confirmation` (`PAGE_CONFIRMATION`, `confirmerDepot`) marque la paire publiée (`markPosted`) ; un dépôt abandonné ne marque RIEN (clic sans confirmation en 30 s ⇒ « pas su », dit).
+- **Le bon compte Leboncoin** : identité lue dans les réponses de SESSION seulement (`LBC_URL_SESSION`, drapeau `courant`, l'objet doit porter un email) — une liste de comptes liés ou une annonce d'autrui ne nomme plus le compte courant ; `vrmLbcCompte` en `v:2` (le badge exige `v===2`).
+- **Couleur** : lue sur l'annonce Vinted (`color1`/`color2`, gardés dans `articleMaigre`), posée sur Leboncoin par OPTION EXACTE seulement (`optionCouleurExacte`, `choisirCouleur`) ; rien d'exact ⇒ laissée vide et dite. **Marque/taille/état** : `brand_title`, `size_title`, `status` gardés dans `articleMaigre` ; l'app lit la marque du dressing d'abord, le coffre en repli.
+- **Retrait d'argent** : la FORME de `POST /api/v2/users/{id}/payouts` est relevée (`WREQ_FORME`, `formeCorps` : clés et types, jamais une valeur) ; VRM ne l'appelle toujours pas.
+- **Relais du téléphone, pont, commandes** : vérifiés avec la 5.186 (bancs `relais-telephone`, `pont`, `publier`, `popup`, `badge` verts).
+- ⚠️⚠️ **« La file Leboncoin a moins de paires qu'eBay » — MESURÉ, et ce n'est pas l'extension** (lecture seule, 18 oct.) : la ligne `main` de Julien dans le NUAGE ne porte que les N° **1 à 24** (dont 15 en ligne) — les N° posés depuis ne vivent que dans ses appareils (écritures de `main` en échec depuis le 11 oct., voir « Une paire, une proposition »). La file Leboncoin (extension ET écran Leboncoin de l'app) lit `main` dans le nuage ; la liste eBay de l'app lit la copie LOCALE (`load('vinted_annonce_numeros')`). Les deux règles sont par ailleurs les mêmes (comptes écartés, vendue prouvée, retirée du stock, déjà publiée) ; seules différences légitimes : Leboncoin coché par défaut, et une paire déjà sur Leboncoin (réf VRM 2, 18, 23 captées ; 3 marquées) sort de sa file au lieu d'être grisée. **Geste : réparer l'écriture de `main`** (hors extension). Le « nXXX » d'un titre Vinted reste une clé de repli (0 titre en ligne n'en porte aujourd'hui) — à retirer des deux côtés ensemble (§11) quand on y touche.
+- Preuves : `audit-extension-5186.cjs` (12 contrôles, 7 rouges sur la 5.185) ; banc `leboncoin.cjs` fixtures `optionsreel` (vraie forme des six cases) et `confirmation` : **11 rouges sur l'ancien `lbc.js`**, dont `__paye=1` (un bouton payant cliqué).
+- ⚠️ **Non mesuré** : la vraie page d'options et de confirmation de leboncoin.fr (403 d'ici ; formes tirées de `lbc_recon.etapes`) ; la forme réelle de la réponse des packs et de la demande de retrait.
+- Extension **5.186.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : des corrections et des mesures.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9869,8 +9881,9 @@ Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonc
   haut se tait : il disait les mêmes montants (§7). Vinted avait déjà les siennes.
 - **Publication eBay pré-remplie depuis la paire** : choisir une paire LANCE
   l'analyse eBay (catégorie + caractéristiques, une lecture) sans second clic.
-  ⚠️ Mesuré : le dressing Vinted ne porte **pas** la marque (0 sur 271 annonces),
-  c'est pour ça qu'elle ne se remplissait pas. Elle vient du **coffre**
+  ⚠️ **Corrigé le 17 oct. (5.186)** : le dressing PORTE la marque (`brand`,
+  372 sur 373 — « 0 sur 271 » lisait le mauvais champ, `brand_title`, que
+  l'allègement jetait). Elle est lue là d'abord ; repli : le **coffre**
   (`coffre_{uid}_{id}.brand`, 401 fiches sur 632), lu en scalaires et paginé.
   L'état Vinted de l'annonce (`status`) donne l'état eBay (`etatEbayDeVinted` :
   neuf avec étiquette → 1000, neuf sans → 1500, occasion → 3000), seulement vers

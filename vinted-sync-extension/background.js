@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.185.0';
+const CODE_VERSION = '5.186.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1797,6 +1797,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 fichiersMultiple: !!msg.fichiersMultiple, categorie: String(msg.categorie || ''),
                 depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
                 ver: String(msg.ver || ''),
+                // 5.186 : les BOUTONS de l'étape (libellé de Leboncoin, borné) et
+                // l'état coché des options payantes — pour voir où le dépôt cale
+                // et vérifier qu'aucun boost n'est actif. Aucun contenu saisi.
+                boutons: (Array.isArray(msg.boutons) ? msg.boutons : []).slice(0, 25).map((b) => ({ t: String((b && b.t) || '').slice(0, 50), prix: !!(b && b.prix), off: !!(b && b.off) })),
+                optionsCochees: Number(msg.optionsCochees) || 0,
                 at: new Date().toISOString() } },
             });
             sendResponse({ ok: true }); return;
@@ -2013,6 +2018,41 @@ async function storeSeenUrls(domain, paths, reponses) {
 //    CHEMIN et leur méthode (diagnostic), jamais leur contenu. Et une requête
 //    vers un autre site (publicité, mesure d'audience) n'est pas rangée du tout.
 const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses/i;
+// (17 oct.) LA FORME D'UNE DEMANDE DE RETRAIT D'ARGENT. Julien veut « un endroit
+// où on peut retirer l'argent du porte-monnaie ». Sa page a déjà appelé
+// `POST /api/v2/users/{id}/payouts`, mais VRM n'en connaît que le chemin : son
+// contenu est retiré (WREQ_SENSIBLE, c'est de l'argent et un compte bancaire).
+// On garde ici la FORME seulement — noms des clés et TYPE de chaque valeur
+// (« amount:number », « bank_account_id:number »), jamais une valeur, jamais une
+// longueur — pour pouvoir un jour proposer le virement sans rien deviner.
+// VRM n'appelle JAMAIS cette adresse : c'est une lecture de ce que la page a fait.
+const WREQ_FORME = /payout/i;
+function formeCorps(body) {
+  const out = [];
+  const t = String(body == null ? '' : body).trim();
+  if (!t) return out;
+  if (/^\[FormData\]/.test(t)) {
+    for (const part of t.replace(/^\[FormData\]\s*/, '').split(' & ')) { const k = part.split('=')[0].trim(); if (k) out.push(k.slice(0, 60) + ':form'); }
+    return out.slice(0, 60);
+  }
+  let j = null;
+  try { j = JSON.parse(t); } catch (_) { j = null; }
+  if (j === null && /^[\w.%\[\]-]+=/.test(t)) {
+    for (const part of t.split('&')) { const k = decodeURIComponent(part.split('=')[0] || '').trim(); if (k) out.push(k.slice(0, 60) + ':form'); }
+    return out.slice(0, 60);
+  }
+  const typ = (v) => v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
+  const walk = (v, pre, prof) => {
+    if (out.length >= 60) return;
+    if (v && typeof v === 'object' && !Array.isArray(v) && prof < 5) {
+      for (const k of Object.keys(v)) walk(v[k], pre ? pre + '.' + k : k, prof + 1);
+    } else if (Array.isArray(v) && v.length && prof < 5) {
+      walk(v[0], pre + '[]', prof + 1);
+    } else out.push(String(pre || '(racine)').slice(0, 80) + ':' + typ(v));
+  };
+  if (j !== null && typeof j === 'object') walk(j, '', 0); else if (j !== null) out.push('(racine):' + typ(j));
+  return out;
+}
 async function storeWriteReq(domain, method, url, body) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
@@ -2021,11 +2061,13 @@ async function storeWriteReq(domain, method, url, body) {
   try { const U = new URL(url, `https://${domain}`); path = U.pathname; hote = U.hostname; } catch (_) {}
   // Une URL relative part forcément vers Vinted ; une absolue, on vérifie l'hôte.
   if (/^https?:/i.test(String(url)) && !/(^|\.)vinted\.[a-z.]+$/i.test(hote)) return;
+  const forme = WREQ_FORME.test(path) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
   const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
+  if (forme) data.forme = forme;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
 }
 
@@ -3158,7 +3200,7 @@ async function vintedGetHtml(acc, endpoint) {
 // l'identité prime, jamais un autre article). Repli : balayage des grandes
 // images vinted.net du HTML.
 function extraireDetailPage(html, id) {
-  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [] };
+  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '' };
   if (!html) return out;
   try {
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -3193,6 +3235,12 @@ function extraireDetailPage(html, id) {
         else if (found.price != null) c.price = String(found.price);
         if (Array.isArray(found.color_ids)) c.color_ids = found.color_ids.filter(x => typeof x === 'number');
         if (Array.isArray(found.item_attributes)) c.item_attributes = found.item_attributes.map(a => a && ({ code: String(a.code || ''), ids: Array.isArray(a.ids) ? a.ids.filter(x => typeof x === 'number') : [] })).filter(a => a && a.code);
+        // (17 oct.) LA COULEUR telle que Vinted l'AFFICHE (« Blanc », « Noir ») —
+        // un libellé texte de l'annonce, jamais déduit d'une photo ni d'un titre.
+        // Leboncoin la demande dans sa liste Couleur ; lbc.js ne la pose que sur
+        // une option EXACTE. Absente ou d'une autre forme ⇒ '' (rien d'inventé).
+        const libCouleur = (v) => typeof v === 'string' ? v.trim() : (v && typeof v === 'object' && typeof v.title === 'string' ? v.title.trim() : '');
+        out.couleur = [libCouleur(found.color1), libCouleur(found.color2)].filter(Boolean).join(' / ').slice(0, 60);
         out.codes = Object.keys(c).length ? c : null;
         out.cles = Object.keys(found).slice(0, 80);
         for (const p of found.photos) if (p && typeof p.id === 'number') out.photoIds.push(p.id);
@@ -3287,7 +3335,8 @@ async function capterPhotosAnnonces(uid) {
       // ou si les photos vivent dans un champ qu'on ne lit pas encore.
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
-        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []) };
+        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
+        couleur: det.couleur || prev.couleur || '' };
       dirty = true;
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
@@ -3317,7 +3366,7 @@ async function completerPhotos(uid, id) {
     if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
     const det = extraireDetailPage(rep.text, id);
     if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
-    await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    await saveItemDetail(id, { description: det.description || '', photos: det.photos, couleur: det.couleur || '' });
     noterDiag('photos_page_ecrit');
     return true;
   } catch (_) { return false; }
@@ -4888,6 +4937,8 @@ async function saveItemDetail(id, detail) {
     description: desc || prev.description || '',
     photos: photos.length ? photos : (prev.photos || []),
     readAt: new Date().toISOString(),
+    // La couleur affichée par Vinted : jamais écrasée par du vide.
+    couleur: String(detail.couleur || '').trim().slice(0, 60) || prev.couleur || '',
   };
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
@@ -5280,7 +5331,10 @@ async function etatSite(url) {
     site = uid ? { id: String(uid), nom: await loginDe(String(uid)) } : { id: null, nom: '' };
   } else if (plateforme === 'leboncoin') {
     const c = local.vrmLbcCompte;
-    site = c && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
+    // 5.186 : seul un compte vu sur l'endpoint de la SESSION (`courant`, v:2)
+    // nomme le compte connecté — une ancienne valeur (le dernier « moi » vu,
+    // parfois un autre compte lié ou un vendeur) n'est plus montrée.
+    site = c && c.v === 2 && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
   }
   const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
   // Vestiaire : rien n'est capté, mais le site est MESURÉ (5.154) — la carte le
@@ -7595,7 +7649,7 @@ function buildLbcAd(raw, det, num, account) {
   const base = String(firstDefined(det.title, raw.title)).trim();
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
   const cond = String(firstDefined(det.status, raw.status)).trim();
-  const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
+  const color = String(firstDefined(det.couleur, [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' / '))).trim();
   // (16 oct., « il a mis un prix au pif, je veux le même que sur Vinted ») :
   // le prix de l'annonce EN LIGNE (le dressing, relu à chaque visite) d'abord ;
   // le détail capté à l'ouverture de la page peut dater d'avant une baisse.
@@ -7614,7 +7668,7 @@ function buildLbcAd(raw, det, num, account) {
   const ref = 'VRM-' + num;
   const description = descriptionLbcDe({ ref, texte: desc0, base, marque: brand, taille: size, etat: cond, couleur: color });
   // marque/taille : le formulaire Leboncoin a des listes déroulantes pour ça.
-  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', couleur: color || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
@@ -8456,13 +8510,13 @@ async function storeLbcAccount(acc) {
       const s = merged[id] && merged[id].source;
       if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
     }
-    merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
+    { const { courant: _c, ...sansCourant } = acc; merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], sansCourant, { seenAt: new Date().toISOString() }); }
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
     try {
-      if (!acc.source || !LBC_URL_AUTRUI.test(String(acc.source))) {
-        await chrome.storage.local.set({ vrmLbcCompte: { id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
+      if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {
+        await chrome.storage.local.set({ vrmLbcCompte: { v: 2, id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
       }
     } catch (_) {}
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
@@ -8978,6 +9032,17 @@ async function publierPrepLbc(enMain) {
 //   côtés (détection ET auto-nettoyage de storeLbcAccount), §11.
 const LBC_URL_MOI = /\/(users?|accounts?)\/me(\b|\/|$)|linked_accounts|\/me(\b|\/|$)|mon-compte|\/user\/settings/i;
 const LBC_URL_AUTRUI = /user-card|\/discovery\/|\/same\/|\/search(\b|\/|\?)|\/dashboard\//i;
+// (17 oct., Julien : « ça met le mauvais compte Leboncoin connecté »). Mesuré :
+// le compte « connecté » de la petite carte était le DERNIER compte vu sur un
+// endpoint « moi » — y compris `users/me/linked_accounts`, qui LISTE tous ses
+// comptes liés : le premier de la liste devenait « le compte connecté », quel
+// que soit celui ouvert dans l'onglet. Et la page (`lbc.js`) remontait n'importe
+// quel objet { user_id, pseudo } — le vendeur de l'annonce affichée.
+// ⇒ Seul l'endpoint qui décrit LA SESSION (`members/me/account`, vu dans son
+//   navigateur ; `users/me` en repli) désigne le compte courant, et seulement
+//   pour un objet hors d'une liste. Les autres « moi » enrichissent la liste de
+//   ses comptes, jamais « celui qui est connecté ».
+const LBC_URL_SESSION = /\/members\/me\/account\/?(\?|$)|\/(?:users?|accounts?)\/me\/?(\?|$)/i;
 function detectLbcAccount(data, url) {
   let best = null;
   const u = String(url || '');
@@ -8986,9 +9051,10 @@ function detectLbcAccount(data, url) {
   if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
     || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
-  const walk = (node, depth, key) => {
+  const session = LBC_URL_SESSION.test(u);
+  const walk = (node, depth, key, dansListe) => {
     if (best || !node || depth > 8 || typeof node !== 'object') return;
-    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1, key); return; }
+    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1, key, true); return; }
     const id = node.user_id || node.userId || node.store_id || node.storeId || node.account_id || node.accountId || node.id;
     const name = node.store_name || node.storeName || node.company_name || node.companyName
       || node.pseudo || node.pseudonym || node.name || node.display_name || node.displayName;
@@ -8996,11 +9062,12 @@ function detectLbcAccount(data, url) {
     if (id && name && (marqueurMoi(node) || (cleMoi && (node.pseudo || node.pseudonym || node.email)))) {
       const pro = !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
       best = { id: String(id), name: String(name), type: pro ? 'pro' : 'particulier', platform: 'leboncoin', source: String(url || '').slice(0, 120) };
+      if (session && !dansListe) best.courant = true;
       return;
     }
-    for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1, k);
+    for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1, k, dansListe);
   };
-  try { walk(data, 0, ''); } catch (_) {}
+  try { walk(data, 0, '', false); } catch (_) {}
   return best;
 }
 
