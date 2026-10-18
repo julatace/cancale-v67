@@ -49,7 +49,10 @@ const affaiblir = (src) => src
   .replace(/const k = cle\(u\);\s*if \(seen\.has\(k\)\) return;\s*seen\.add\(k\);/, 'if (seen.has(u)) return; seen.add(u);')
   .split('\n').filter((l) => !/getAttribute\('(srcset|data-srcset|data-src)'\)/.test(l)).join('\n')
   .replace(/for \(const s of document\.querySelectorAll\('source'\)\) \{\s*\}/, '');
-const VIEUX = (() => { try { return cp.execSync('git show ' + REF_AVANT, { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (_) { return affaiblir(NEUF); } })();
+// ⚠️ (18 octobre) 257d8a7^ porte DÉJÀ le correctif (vérifié : `srcset` y est lu) et
+// l'historique n'a plus aucune version d'avant (fusion groupée 5c9db55). AVANT est
+// donc la version d'aujourd'hui AFFAIBLIE à la main (`affaiblir`), toujours.
+const VIEUX = affaiblir(NEUF);
 const fnNeuf = extrait(NEUF), fnVieux = extrait(VIEUX);
 
 // Le DOM d'une page d'annonce dont le carrousel n'a chargé QUE 5 slides en `src`.
