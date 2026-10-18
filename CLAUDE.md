@@ -10000,6 +10000,26 @@ et 1512, clair · sombre · mode stream). **32 rouges sur a80f584, 0 après.**
   défaut) en mode sombre — c'est un réglage à part (« Ambiance ») ; la fixture
   du 5 octobre n'a pas de pièce (« Ta pièce est vide » au banc).
 
+### Le bouton « retour » revient à l'écran d'avant, et Orion (18 octobre)
+- ⚠️ **Aucun changement d'écran n'entrait dans l'historique** : le geste
+  « retour » d'Android, le balayage de bord sur iPhone ou ← sur ordinateur
+  QUITTAIENT VRM (mesuré : `about:blank`). Chaque écran ET chaque section d'une
+  plateforme devient une entrée (`pushState`, adresse inchangée — `?tab=` reste
+  à `goto`), un retour rejoue écran + section sans nouvelle entrée, l'entrée
+  d'origine vaut Ma journée, un changement d'onglet = UNE entrée (pose différée
+  d'un tour : la section suit l'onglet). `scrollRestoration = 'manual'` : la
+  position reste à `MemoireDefilement`. Les deux `replaceState({})` gardent
+  désormais l'état. Banc `retour-historique.cjs` (aucune fixture, 390/1512) :
+  **10 rouges sur le build d'avant**, 0 après. ⚠️ Non traité : « retour » ne
+  ferme pas une feuille ouverte (il change d'écran sous elle).
+- **Orion (Kagi, Mac et iPhone)** installe les extensions des boutiques Chrome
+  et Firefox — le seul navigateur d'iPhone qui en accepte. Même agent
+  utilisateur que Safari : impossible à reconnaître, donc PROPOSÉ là où l'on
+  dirait « Safari ne peut pas » (Safari Mac, iPhone), seulement avec une fiche
+  publiée (`boutiqueOrion` : Chrome d'abord, Firefox sinon), et « VRM n'y a pas
+  encore été essayé ». Aucun paquet à part. `audit-extension-navigateurs.cjs`
+  +2 contrôles. ⚠️ Non mesuré dans un vrai Orion.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10015,7 +10035,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **86 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**

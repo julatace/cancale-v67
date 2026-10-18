@@ -204,6 +204,19 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     const liens = mod.LIENS_BOUTIQUES || {};
     const bons = { chrome: /^https:\/\/chromewebstore\.google\.com\/detail\//, edge: /^https:\/\/microsoftedge\.microsoft\.com\/addons\/detail\//, opera: /^https:\/\/addons\.opera\.com\//, firefox: /^https:\/\/addons\.mozilla\.org\// };
     const faux = Object.entries(liens).filter(([k, v]) => v && !(bons[k] && bons[k].test(v)));
+    // Orion (Mac, iPhone) : la boutique de Chrome, sinon celle de Firefox — et
+    // RIEN tant qu'aucune n'est publiée (jamais un lien deviné).
+    const sauf = { ...liens };
+    try {
+      for (const k of Object.keys(liens)) liens[k] = '';
+      const vide = mod.boutiqueOrion();
+      liens.firefox = 'https://addons.mozilla.org/firefox/addon/vrm/';
+      const fx = mod.boutiqueOrion();
+      liens.chrome = 'https://chromewebstore.google.com/detail/x';
+      const ch = mod.boutiqueOrion();
+      dit(vide === '' && fx === liens.firefox && ch === liens.chrome, 'app : Orion n\'est proposé qu\'avec une boutique publiée (Chrome d\'abord, Firefox sinon)', JSON.stringify([vide, fx, ch]));
+    } finally { Object.assign(liens, sauf); }
+    dit(/data-premiers-orion="safari"/.test(APP) && /data-premiers-orion="telephone"/.test(APP) && /orion && boutique\.nav === 'safari'/.test(APP), 'app : Orion proposé sur Safari et sur iPhone, seulement avec un lien');
     dit(faux.length === 0, 'app : un lien de boutique est vide (pas encore publié) ou pointe vers la vraie boutique', faux.map((f) => f.join('=')).join(' ; '));
   });
 
