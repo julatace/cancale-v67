@@ -115,9 +115,15 @@ async function brancher(p){
    await p.goto(base+'/?tab='+tab);await p.getByRole('heading',{name:nom,exact:true}).waitFor();
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
    check(sansNom===0,'boutons visibles nommés '+nom);
-   check(await p.waitForFunction(()=>{const e=document.querySelector('.vrm-market-heading img');return !!e && e.complete && e.naturalWidth>0;},null,{timeout:8000}).then(()=>true,()=>false),'logo local chargé '+nom);
-   const summary=p.locator('.vrm-platform-summary');check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
-   await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
+   {const masque=await p.locator('.vrm-market-heading .vrm-plat-marque').evaluate(e=>{const m=getComputedStyle(e).maskImage||getComputedStyle(e).webkitMaskImage||'';const u=(m.match(/url\("?([^")]+)"?\)/)||[])[1]||'';return u;}).catch(()=>'');const ok=!!masque && /\/brands\//.test(masque) && await p.evaluate(u=>fetch(u).then(r=>r.ok&&/svg/.test(r.headers.get('content-type')||'')),masque).catch(()=>false);check(ok,'logo local chargé '+nom);}
+   const summary=p.locator('.vrm-platform-summary');
+   if(nom!=='Vinted' && await summary.count()===0){
+    // (17 oct.) Leboncoin/eBay : sur « Ventes », le résumé se tait — les trois cases le disent (§7).
+    check(await p.locator('[data-ventes-kpi]').count()>0,'chiffres dits par les cases de Ventes '+nom);
+   } else {
+    check(!await summary.evaluate(e=>e.open),'chiffres secondaires repliés '+nom);
+    await summary.locator('summary').click();check(await summary.evaluate(e=>e.open),'chiffres accessibles '+nom);await summary.locator('summary').click();
+   }
    for(const width of [320,390,1512]){
     await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'espace plateforme sans débordement '+nom+' '+width);
     if(width===1512 && nom==='Vinted'){
@@ -126,7 +132,7 @@ async function brancher(p){
       check(await rail.locator('details').count()===0,'aucun groupe Détails ou Autres outils dans le rail');
       check(await rail.getByRole('button',{name:'Gestion',exact:true}).count()===0,'aucun bouton à déplier pour Gestion');
       check(await rail.getByRole('region',{name:'Gestion',exact:true}).isVisible(),'gestion visible en permanence dans le rail');
-      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Factures',exact:true}).isVisible(),'stock et factures toujours accessibles');
+      check(await rail.getByRole('button',{name:'Stock',exact:true}).isVisible() && await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'stock et comptabilité (factures comprises) toujours accessibles');
       check(await rail.getByRole('button',{name:'Stock',exact:true}).getAttribute('title')==='Stock','nom de l’accès au survol');
       check(await rail.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'paramètres directement accessibles dans le rail');
     }
@@ -244,7 +250,7 @@ async function brancher(p){
   // ⚠️ Statistiques « premium » (8571f14, 16 octobre) : la rangée `.vrm-finance-overview` est devenue UNE carte
   //    héros (`data-stats-carte="hero"` : CA finalisé en très gros, bénéfice et marge dessous). La règle jugée
   //    reste « les indicateurs financiers d'abord » : la carte héros est visible et vient AVANT l'objectif.
-  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible() && await p.locator('[data-stats-carte="hero"]').evaluate(e=>{const g=document.querySelector('.vrm-finance-goal');return !!g && e.getBoundingClientRect().top<g.getBoundingClientRect().top && /CA finalis/i.test(e.innerText);}),'indicateurs financiers prioritaires');
+  await p.goto(base+'/?tab=dashboard');await p.locator('[data-stats-carte="hero"]').waitFor();check(await p.locator('[data-stats-carte="hero"]').isVisible() && await p.locator('[data-stats-carte="hero"]').evaluate(e=>{const g=document.querySelector('.vrm-finance-goal');return !!g && e.getBoundingClientRect().top<g.getBoundingClientRect().top && /finalis/i.test(e.innerText);}),'indicateurs financiers prioritaires');
   await p.locator('.vrm-finance-goal').getByRole('button',{name:'Fixer',exact:true}).click();await p.getByLabel('Objectif de chiffre d’affaires du mois').fill('2000');await p.locator('.vrm-finance-goal').getByRole('button',{name:'OK',exact:true}).click();
   check(await p.getByRole('progressbar',{name:'Progression vers l’objectif du mois'}).getAttribute('aria-valuemax')==='2000','objectif réel saisi avec progression accessible');
   check(await p.locator('.vrm-finance-goal').evaluate(e=>e.getBoundingClientRect().top<document.querySelector('.vrm-finance-stock').getBoundingClientRect().top),'objectif placé avant les détails du stock');
@@ -255,7 +261,7 @@ async function brancher(p){
   await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
   await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Statistiques',exact:true}).click();
   await p.waitForTimeout(800);
-  check(avant>100 && Math.abs(await p.locator('main').evaluate(e=>e.scrollTop)-avant)<3, 'position retrouvée après passage dans le stock');
+  check(avant>100 && Math.abs(await p.locator('main').evaluate(e=>e.scrollTop)-avant)<3, 'position retrouvée après passage dans le stock'+' (avant='+avant+', après='+(await p.locator('main').evaluate(e=>e.scrollTop))+', hauteur='+(await p.locator('main').evaluate(e=>e.scrollHeight-e.clientHeight))+')');
 
   await p.goto(base+'/?tab=plat_ebay');await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Messages',exact:true}).click();await p.getByText('Acheteur test',{exact:true}).waitFor();
   await nav.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();

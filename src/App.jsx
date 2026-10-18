@@ -10663,21 +10663,29 @@ function MemoireDefilement({ ecran }) {
     const main=document.querySelector('.vrm-main');
     if(!main) return;
     const cible=positions.current.get(ecran)||0;
-    let position=cible, restauration=true, arrete=false;
-    const restaurer=()=>{ if(!arrete&&restauration){ main.scrollTop=cible; if(Math.abs(main.scrollTop-cible)<2) restauration=false; } };
+    let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
+    // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
+    // d'un chargement (le navigateur ramène alors la position à 0). On tient la
+    // position 2,5 s, sauf si la personne fait défiler elle-même.
+    const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2) main.scrollTop=cible; };
     const lire=()=>{ if(!restauration) position=main.scrollTop; };
     const intervenir=()=>{ restauration=false; position=main.scrollTop; };
     main.addEventListener('scroll',lire,{passive:true});
     main.addEventListener('wheel',intervenir,{passive:true});
     main.addEventListener('touchstart',intervenir,{passive:true});
-    const observer=new ResizeObserver(restaurer);
-    if(main.firstElementChild) observer.observe(main.firstElementChild);
-    restaurer();
-    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;observer.disconnect();},2500);
+    window.addEventListener('keydown',intervenir);
+    main.addEventListener('pointerdown',intervenir,{passive:true});
+    // (18 oct.) On réessaie à chaque image tant que le contenu arrive : la zone
+    // porte plusieurs enfants (un bandeau de 74 px en tête), observer le premier
+    // ne voyait jamais l'écran grandir, et la position retombait à 0.
+    let image=0;
+    const boucle=()=>{ restaurer(); if(!arrete&&restauration) image=requestAnimationFrame(boucle); };
+    boucle();
+    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},2500);
     return ()=>{
-      arrete=true;clearTimeout(delai);observer.disconnect();
+      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);
       positions.current.set(ecran,position);
-      main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);
+      main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };
   },[ecran]);
   return null;
