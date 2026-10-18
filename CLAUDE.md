@@ -4378,6 +4378,21 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
   copies prises), refusé dès qu'un numéro a bougé.
 
+### ⚠️⚠️ La ligne `main` ne s'enregistrait plus depuis la 013 — migration 017 (18 octobre)
+Mesuré (journaux Postgres, lecture seule) : depuis le 11 octobre 14:58, CHAQUE
+écriture de `main` par un navigateur était annulée à 8 s (57014) dans
+`vrm_garde_numeros()` — jointure `jsonb_each … join jsonb_each` où le filtre du
+côté nouveau (`vrm_cle_num`, non inlinable) était rejoué ~450 × 509 fois. Les
+fiches N°25+, prix d'achat et réglages ne vivaient que dans ses navigateurs
+(cause probable du 80/81 et de la file Leboncoin plus courte qu'eBay).
+`017-garde-numeros-rapide.sql` : même règle, mêmes refus, mêmes messages ;
+chaque côté calculé une fois (CTE matérialisées). **Appliquée en production le
+18 octobre** (corps md5 identique au fichier ; celui d'avant était identique à
+la 013). `audit-garde-numeros-rapide.cjs` (Postgres jetable, volume mesuré,
+données inventées) : 8 cas, mêmes verdicts que la 013, 0,2 s au lieu de 6,5 s.
+⚠️ Julien ne doit ni se déconnecter ni vider ses données de navigateur tant que
+chaque appareil n'a pas réécrit `main` (la première ouverture le fait).
+
 ### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
