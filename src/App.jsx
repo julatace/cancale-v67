@@ -9353,7 +9353,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
   const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const mobile = window.matchMedia('(max-width:767px)').matches; const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    const mesure = () => { const mobile = window.matchMedia('(max-width:767px)').matches; const w = el.clientWidth; setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
@@ -9377,6 +9377,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
   const avecRecu = jours.every(j => j.recu);
   const iAuj = jours.findIndex(j => j.auj);
   const bande = Math.min(40, col - 4);
+  const pic=jours.reduce((best,j,i)=>!j.futur&&j.vendu.eur>(jours[best]?.vendu.eur||0)?i:best,0);
   return (
     <div ref={ref} style={{width:'100%'}}>
       <svg data-courbe-semaine="" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
@@ -9398,7 +9399,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
               <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
               {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
               <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.6 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
-              {j.vendu.eur > 0 && <text x={X(i)} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
+              {i===pic && j.vendu.eur > 0 && <text x={Math.max(42,Math.min(W-42,X(i)))} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
             </>}
             <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
             <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? C.text : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
@@ -9484,78 +9485,47 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 // n'écrit que le meilleur mois, le dernier et celui qu'on a touché ; les
 // autres sont dans l'infobulle et au toucher (`onChoisir`).
 function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois' }) {
-  const ref = React.useRef(null);
-  const [W, setW] = React.useState(340);
-  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
-  React.useLayoutEffect(() => {
-    const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const mobile=window.matchMedia('(max-width:767px)').matches; setCompact(mobile); const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
-    mesure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(mesure); ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cm';
-  const n = mois.length;
-  const H = compact ? 124 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 24;
-  const vals = mois.map((m) => Math.max(0, Number(valeur(m)) || 0));
-  const max = Math.max(1, ...vals);
-  const col = (W - gx - gd) / Math.max(1, n - 1);
-  const X = (i) => gx + i * col;
-  const Y = (v) => gy + (1 - v / max) * (H - gy - bas);
-  const base = H - bas;
-  const pts = vals.map((v, i) => [X(i), Y(v)]);
-  const chemin = (p) => p.map((q, k) => `${k ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
-  const iMax = vals.length ? vals.indexOf(Math.max(...vals)) : -1;
-  const dernier = n - 1;
-  const enCours = !!(mois[dernier] && mois[dernier].enCours);
-  const plein = enCours && n > 1 ? pts.slice(0, n - 1) : pts;
-  const toutesValeurs = !compact && col >= 46;
-  const cleDe = (m) => m.cle || m.key;
-  const court = (m) => {
-    const d = new Date(String(cleDe(m)) + '-01T12:00:00');
-    const t = isNaN(d) ? String(m.label || '') : d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
-    return col >= 30 ? t : t.slice(0, 1).toUpperCase();
-  };
-  const iChoisi = choisi == null ? -1 : mois.findIndex((m) => cleDe(m) === choisi);
-  const bande = Math.min(40, Math.max(18, col - 4));
-  if (!n) return null;
-  return (
-    <div ref={ref} style={{ width: '100%' }}>
-      <svg {...{ [attr]: '' }} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={mois.map((m, i) => `${m.long || m.nomComplet || cleDe(m)} ${format(vals[i])}`).join(' · ')}
-        style={{ display: 'block', overflow: 'visible' }}>
-        <defs>
-          <linearGradient id={`cmg${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={C.accent} stopOpacity="0.16" />
-            <stop offset="100%" stopColor={C.accent} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {iChoisi >= 0 && <rect x={X(iChoisi) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg} />}
-        {[0.5, 1].map((f) => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(max * f)} y2={Y(max * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4" />)}
-        <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1" />
-        {!compact && pts.length > 1 && <path d={`${chemin(pts)} L${pts[dernier][0].toFixed(1)},${base} L${pts[0][0].toFixed(1)},${base} Z`} fill={`url(#cmg${uid})`} />}
-        {!compact && plein.length > 1 && <path d={chemin(plein)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />}
-        {!compact && enCours && n > 1 && <path d={chemin(pts.slice(n - 2))} fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" />}
-        {mois.map((m, i) => {
-          const cle = cleDe(m);
-          const actif = i === iChoisi;
-          const ecrit = compact ? (actif || (iChoisi < 0 && i === iMax)) : toutesValeurs || i === iMax || i === dernier || actif;
-          const creux = i === dernier && enCours;
-          const fort = actif || i === iMax;
-          return (
-            <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i] * 100)} onClick={onChoisir ? () => onChoisir(actif ? null : cle) : undefined} style={{ cursor: onChoisir ? 'pointer' : 'default' }}>
-              <title>{`${m.long || m.nomComplet || cle} · ${format(vals[i])}${m.n != null ? ` · ${m.n} vente${m.n > 1 ? 's' : ''}` : ''}${creux ? ' (en cours)' : ''}`}</title>
-              <rect x={X(i) - Math.max(col, 12) / 2} y="0" width={Math.max(col, 12)} height={H} fill="transparent" />
-              {compact ? <rect data-month-bar="" x={X(i)-Math.min(22,col*.55)/2} y={Y(vals[i])} width={Math.min(22,col*.55)} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={C.accent} opacity={fort ? 1 : creux ? .45 : .65}/> : <circle cx={X(i)} cy={Y(vals[i])} r={fort ? 4.6 : 3.4} fill={fort && !creux ? C.accent : C.card} stroke={C.accent} strokeWidth="2" />}
-              {ecrit && vals[i] > 0 && <text x={X(i)} y={Math.max(14, Y(vals[i]) - 10)} textAnchor={i === 0 ? 'start' : i === dernier ? 'end' : 'middle'} fontSize="11" fontWeight="700" fill={C.text} stroke={actif ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{ fontVariantNumeric: 'tabular-nums' }}>{format(vals[i])}</text>}
-              <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={i === dernier || actif ? 700 : 500} fill={i === dernier || actif ? C.text : C.muted}>{court(m)}</text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
+  const ref=React.useRef(null);
+  const [W,setW]=React.useState(340);
+  const [compact,setCompact]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
+  const [lecture,setLecture]=React.useState(null);
+  React.useLayoutEffect(()=>{
+    const el=ref.current;if(!el)return;
+    const mesure=()=>{setCompact(window.matchMedia('(max-width:767px)').matches);if(el.clientWidth>0)setW(el.clientWidth);};
+    mesure();const ro=new ResizeObserver(mesure);ro.observe(el);return()=>ro.disconnect();
+  },[]);
+  const uid=React.useId().replace(/:/g,'');
+  const n=mois.length;
+  if(!n)return null;
+  const H=compact?124:Math.max(hauteur,196), left=18,right=18,top=14,bottom=28;
+  const vals=mois.map(m=>Math.max(0,Number(valeur(m))||0));
+  const max=Math.max(1,...vals),base=H-bottom;
+  const col=(W-left-right)/n;
+  const X=i=>left+(i+.5)*col;
+  const Y=v=>top+(1-v/max)*(base-top);
+  const cleDe=m=>m.cle||m.key;
+  const externe=choisi==null?-1:mois.findIndex(m=>cleDe(m)===choisi);
+  const local=mois.findIndex(m=>cleDe(m)===lecture);
+  const lu=externe>=0?externe:local>=0?local:n-1;
+  const meilleur=vals.indexOf(Math.max(...vals));
+  const pas=col<30?2:1;
+  const court=m=>{const d=new Date(String(cleDe(m))+'-01T12:00:00');return isNaN(d)?String(m.label||''):d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','');};
+  const choisir=(m,i)=>{setLecture(cleDe(m));if(onChoisir)onChoisir(i===externe?null:cleDe(m));};
+  return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
+    <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
+      aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
+      <defs><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
+      {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
+      {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
+        <title>{label}</title>
+        {actif&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
+        <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
+        <rect data-month-bar="" x={X(i)-bar/2} y={Y(vals[i])} width={bar} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={`url(#bars${uid})`} opacity={actif||i===meilleur?1:m.enCours?.45:.65}/>
+        {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
+      </g>;})}
+    </svg>
+    <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>
+  </div>;
 }
 
 function CountUp({ value, format, duration = 950, style }) {
