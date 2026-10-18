@@ -58,7 +58,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.186.0';
+const EXT_ATTENDUE = '5.187.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -647,6 +647,11 @@ const sbAuth = (extra) => {
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
   const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
+  // attendre — la lecture suivante partira avec le jeton frais.
+  if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
+    try { authRefresh({ discret: true }); } catch (_) {}
+  }
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
 };
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
@@ -676,9 +681,9 @@ const authCall = async (path, body) => {
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
-    return { ok: true, json };
-  } catch (e) { return { ok: false, error: 'Pas de connexion internet.' }; }
+    if (!res.ok) return { ok: false, status: res.status, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
+    return { ok: true, status: res.status, json };
+  } catch (e) { return { ok: false, status: 0, error: 'Pas de connexion internet.' }; }
 };
 
 // ── OÙ RAMÈNENT LES LIENS DES EMAILS DE COMPTE (5 octobre) ─────────────────
@@ -699,13 +704,40 @@ const avecRetour = (chemin) => { const r = retourEmail(); return r ? `${chemin}$
 // Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
 // jeton de renouvellement — sinon l'app se déconnecterait toute seule en
 // pleine journée.
-const authRefresh = async () => {
-  const s = AUTH.session;
-  if (!s || !s.refresh_token) return false;
-  const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
-  if (!r.ok) return false;
-  writeSession(sessionFrom(r.json));
-  return true;
+// ⚠️ UN SEUL RENOUVELLEMENT EN VOL (18 octobre). Mesuré dans les journaux de la
+// base le 17 octobre à 21 h 25 : au réveil d'un ordinateur mis en veille, le
+// jeton avait expiré et l'app a fait 104 lectures refusées (401) en cinq
+// minutes, jusqu'au passage suivant de la minuterie de 4 min. Le renouvellement
+// part maintenant au RÉVEIL (retour au premier plan, réseau revenu) et dès
+// qu'une lecture part avec un jeton qui expire (`sbAuth`) ; plusieurs appelants
+// partagent la même demande (deux renouvellements simultanés présenteraient le
+// même jeton de renouvellement).
+let _authRefreshEnVol = null;
+let _authRefreshEchecAt = 0;
+// `{ discret: true }` (une lecture qui part avec un jeton qui expire) : après un
+// échec, pas de nouvel essai avant 15 s — hors ligne, chaque lecture relançait
+// une demande (10 en 5 s au banc `session-reveil.cjs`). Le réveil, la minuterie
+// et l'ouverture, eux, réessaient toujours.
+const authRefresh = (opt) => {
+  if (_authRefreshEnVol) return _authRefreshEnVol;
+  if (opt && opt.discret && Date.now() - _authRefreshEchecAt < 15000) return Promise.resolve(null);
+  _authRefreshEnVol = (async () => {
+    try {
+      const s = AUTH.session;
+      if (!s || !s.refresh_token) return false;
+      const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
+      // Trois états : true (renouvelé) · false (REFUSÉ par le service : jeton
+      // révoqué, compte supprimé) · null (pas su : réseau coupé, service qui ne
+      // répond pas). Seul un refus déconnecte — une coupure, jamais.
+      if (!r.ok) { _authRefreshEchecAt = Date.now(); return (r.status >= 400 && r.status < 500) ? false : null; }
+      // La session a pu changer pendant la demande (déconnexion, autre compte) :
+      // on ne range pas un jeton renouvelé par-dessus.
+      if (!AUTH.session || AUTH.session.refresh_token !== s.refresh_token) return false;
+      writeSession(sessionFrom(r.json));
+      return true;
+    } finally { _authRefreshEnVol = null; }
+  })();
+  return _authRefreshEnVol;
 };
 const sessionFrom = (j) => ({
   access_token: j.access_token,
@@ -1148,7 +1180,10 @@ const authBoot = async () => {
   const s = readSession();
   if (!s) { AUTH = { ...AUTH, ready: true }; prechargerDemarrage(); _emitAuth(); return; }
   AUTH = { ...AUTH, session: s, user: s.user || null };
-  if (!authValid()) { const ok = await authRefresh(); if (!ok) { writeSession(null); return; } }
+  // ⚠️ Une coupure réseau à l'ouverture ne déconnecte plus (18 octobre) : seul
+  // un REFUS du service (false) efface la session. « Pas su » (null) garde la
+  // session ; la minuterie et le réveil réessaient le renouvellement.
+  if (!authValid()) { const ok = await authRefresh(); if (ok === false) { writeSession(null); return; } }
   AUTH = { ...AUTH, ready: true };
   if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
   prechargerDemarrage();
@@ -1217,6 +1252,9 @@ const prendrePrechargeComptes = () => {
 // Renouvellement périodique tant que l'app est ouverte.
 if (MULTI_USER && typeof window !== 'undefined') {
   setInterval(() => { if (AUTH.session && !authValid()) authRefresh(); }, 4 * 60 * 1000);
+  // Au réveil : une minuterie ne tourne pas pendant la veille de l'ordinateur.
+  const auReveil = () => { try { if (AUTH.session && !authValid() && (typeof document === 'undefined' || document.visibilityState !== 'hidden')) authRefresh(); } catch (_) {} };
+  try { document.addEventListener('visibilitychange', auReveil); window.addEventListener('focus', auReveil); window.addEventListener('online', auReveil); } catch (_) {}
 }
 
 // L'EXTENSION A BESOIN DE SAVOIR QUI TU ES.
@@ -6872,7 +6910,7 @@ const verifierVersionNumerotation = () => {
       if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
       else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
     } catch (_) {
-      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu' });
+      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu', essaiAt: Date.now() });
     }
     _verNumEnVol = null;
     return _verNum;
@@ -6886,7 +6924,10 @@ const numerotationPermise = () => {
   if (!isCloudReady()) return false;
   const e = _verNum;
   if (e.etat === 'ok' && Date.now() - e.at < VERSION_FRAICHE_MS) return true;
-  if (e.etat !== 'perime') verifierVersionNumerotation();
+  // ⚠️ Pas plus d'une relecture toutes les 15 s après un échec : sinon chaque
+  // rendu en relançait une (104 lectures refusées en cinq minutes, mesuré le
+  // 17 octobre pendant un jeton expiré).
+  if (e.etat !== 'perime' && !(e.etat === 'passu' && Date.now() - (e.essaiAt || 0) < 15000)) verifierVersionNumerotation();
   return false;
 };
 // Avant d'IMPRIMER (le N° est tamponné sur le bordereau) : on relit si la
@@ -23479,7 +23520,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
         : (
         <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Aucun compte détecté pour l'instant. Installe l'extension « VRM – Vinted Sync »,
+          Aucun compte détecté pour l'instant. Installe l'extension VRM,
           connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
       ))}

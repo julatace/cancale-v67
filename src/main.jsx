@@ -7,6 +7,24 @@ import { ecouterPlantages, noterPlantage } from './plantages.js';
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
 ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
   version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
+// ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
+// N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable
+// to preload CSS for /assets/App-….css »). Les fichiers sont nommés par leur
+// contenu : l'ancienne page vise l'ancien nom, le serveur ne l'a plus, et l'écran
+// tombe. Le seul remède est de relire la page (elle vise alors les bons noms).
+// UNE fois par minute au plus : si le rechargement ne règle rien (vraie panne de
+// réseau), l'erreur repart telle quelle et le dernier filet l'affiche — jamais
+// une boucle de rechargements.
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (ev) => {
+    let dernier = 0;
+    try { dernier = Number(sessionStorage.getItem('vrm_recharge_morceau')) || 0; } catch (_) {}
+    if (Date.now() - dernier < 60000) return;
+    try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) { return; }
+    ev.preventDefault();
+    window.location.reload();
+  });
+}
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 const App = React.lazy(() => import('./App.jsx'));
