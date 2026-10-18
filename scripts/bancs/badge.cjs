@@ -39,6 +39,8 @@ const ETATS = {
   connecte: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - 3 * MIN }, bascule: null },
   expiree: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: false, expiree: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - 90 * MIN }, bascule: null },
   refuse: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 60 * MIN, koAt: Date.now() - 2 * MIN }, bascule: null },
+  refuse403: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.189.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 60 * MIN, koAt: Date.now() - 2 * MIN, koStatut: '403' }, bascule: null },
+  refuse503: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.189.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 60 * MIN, koAt: Date.now() - 2 * MIN, koStatut: '503' }, bascule: null },
   vestiaire: { ok: true, plateforme: 'vestiaire', capte: false, mesure: true, version: '5.154.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: null, flux: { okAt: Date.now() - 120000 }, bascule: null },
   bascule: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'autre@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - MIN }, bascule: { de: 'sophie@exemple.fr', vers: 'autre@exemple.fr', at: Date.now() - 30 * MIN } },
 };
@@ -208,6 +210,29 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     dit(/refusé il y a 2 min/i.test(l.carte), 'la carte dit que le dernier envoi a été refusé, et quand', l.carte.replace(/\n/g, ' · '));
     dit(!/Envoyées à VRM/.test(l.carte), 'et ne dit PAS « envoyées » par-dessus (le refus est plus récent)');
     dit(/Sophie B\./.test(l.carte), 'elle nomme le compte Leboncoin');
+    await ctx.close();
+  });
+
+  // ── 4bis. LE REFUS DIT POURQUOI (5.189) ──────────────────────────────────
+  // Julien, 18 octobre : « Dernier envoi refusé … ça réessaie tout seul » alors
+  // que la base refusait DURABLEMENT (403 de la barrière d'abonnement RLS). Un
+  // 4xx ne repart pas tout seul : la carte doit dire le GESTE, pas une fausse
+  // promesse de nouvel essai (le défaut le plus coûteux du projet).
+  console.log('\n── Le refus DIT pourquoi (code HTTP)');
+  await essaie('refusé 403 — accès coupé', async () => {
+    const { ctx, pg } = await rendre(nav, ETATS.refuse403, { url: 'https://www.leboncoin.fr/mes-annonces' });
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(/abonnement|compte principal/i.test(l.carte), 'un 403 dit le vrai geste (abonnement / compte principal)', l.carte.replace(/\n/g, ' · ').slice(0, 240));
+    dit(!/ça réessaie tout seul/i.test(l.carte), 'et NE promet PLUS « ça réessaie tout seul » (un 403 ne repart pas seul)', l.carte.replace(/\n/g, ' · ').slice(0, 240));
+    await ctx.close();
+  });
+  await essaie('refusé 503 — vrai hoquet', async () => {
+    const { ctx, pg } = await rendre(nav, ETATS.refuse503, { url: 'https://www.leboncoin.fr/mes-annonces' });
+    await survoler(pg);
+    const l = await lire(pg);
+    dit(/ça réessaie tout seul/i.test(l.carte), 'autre sens : un 5xx (la base ne répond pas) garde bien « ça réessaie tout seul »', l.carte.replace(/\n/g, ' · ').slice(0, 240));
+    dit(!/abonnement/i.test(l.carte), 'et ne parle pas d’abonnement sur un simple hoquet');
     await ctx.close();
   });
 

@@ -154,6 +154,23 @@
     return false;
   };
 
+  // POURQUOI un envoi a été refusé, d'après le CODE HTTP que la base a renvoyé
+  // (`f.koStatut`, mesuré au point d'écriture depuis la 5.189). Un 4xx est un
+  // refus DURABLE : recharger ou attendre ne change RIEN, donc on ne promet pas
+  // « ça réessaie tout seul » (le défaut le plus coûteux du projet) — on dit le
+  // geste. Seuls un 5xx / une coupure réseau gardent « ça réessaie ». Une
+  // extension < 5.189 n'a pas `koStatut` : on retombe sur le message d'attente,
+  // comme avant.
+  function raisonRefus(f, v) {
+    if (v && v.connecte === false) return ' — connecte-toi à VRM pour que ça reparte';
+    const st = String((f && f.koStatut) || '');
+    if (st === '403') return ' — ta base VRM refuse ce compte. Vérifie que ton abonnement VRM est actif, et que tu es connecté avec ton compte principal (celui qui ne paie pas). Rien ne partira tant que ce n’est pas réglé.';
+    if (st === '401') return ' — la base a refusé ta session. Reconnecte-toi à VRM (clique le logo). Ça ne repartira pas tout seul.';
+    if (st === '400') return ' — la base n’est pas dans l’état attendu. Rien ne part ; préviens le support VRM.';
+    if (/^4\d\d$/.test(st)) return ` — la base a refusé l’envoi (code ${st}). Reconnecte-toi à VRM ; si ça persiste, préviens le support.`;
+    return ' — la base n’a pas répondu, ça réessaie tout seul';
+  }
+
   function rendre() {
     const e = etat;
     pt.classList.toggle('on', aFaire(e) || perime);
@@ -194,8 +211,7 @@
     if (e.capte) {
       const f = e.flux || {};
       if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
-        const raison = v && v.connecte === false ? ' — connecte-toi à VRM pour que ça reparte' : ' — la base n\'a pas accepté l\'envoi, ça réessaie tout seul';
-        flux = `<div class="val alerte">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raison)}</div>`;
+        flux = `<div class="val alerte">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>`;
       } else if (f.okAt) flux = `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
