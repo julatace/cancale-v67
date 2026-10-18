@@ -4393,6 +4393,33 @@ données inventées) : 8 cas, mêmes verdicts que la 013, 0,2 s au lieu de 6,5 s
 ⚠️ Julien ne doit ni se déconnecter ni vider ses données de navigateur tant que
 chaque appareil n'a pas réécrit `main` (la première ouverture le fait).
 
+### ⚠️⚠️⚠️ La panne de synchro a RENUMÉROTÉ 36 paires — le chargement fusionne désormais (18 octobre)
+Mesuré (lecture seule, `sauvegarde.journal_ecritures`, fiches de `main`) : aucune
+écriture de `main` n'a réussi du 11 oct. 14:58 au 18 oct. 08:26 (017). Pendant ce
+temps, **chaque ouverture de l'app recopiait le nuage par-dessus le navigateur**
+(`SYNC_KEYS.forEach → localStorage.setItem`) : les numéros donnés sur l'appareil
+depuis le 11 disparaissaient, la numérotation automatique en redonnait — y compris
+des numéros déjà écrits sur des cartons (le pool du nuage ne les connaissait pas).
+Le 18 à 08:26:45, le Mac a renuméroté **36 paires (N°49 à 84)** d'un coup. Preuves
+par identité : la Vapor Pro (annonce 10389789504) a reçu le N°82 de l'Air Max 1
+noire en ligne sur eBay sous VRM-82 ; eBay VRM-81 / VRM-48 sont aujourd'hui 80 / 53.
+- **Le chargement FUSIONNE** `vinted_used_numeros` (union, toujours sûre) et
+  `vinted_annonce_numeros` (fiche de l'appareil inconnue du nuage gardée, numéro de
+  l'appareil comblant une fiche du nuage sans numéro ; le nuage gagne si les deux en
+  ont un ; `repriseDe` respecté), seulement à version de numérotation égale
+  (`fusionNumerosAuChargement`), puis repousse.
+- **`prochainLibre` part du plus haut**, jamais d'un trou : un trou peut être un
+  numéro perdu du pool mais écrit sur un carton.
+- **« N numéros à vérifier sur tes cartons »** (Annonces, `data-numeros-a-verifier`) :
+  les fiches auto numérotées pendant la fenêtre `PANNE_NUMEROS`, preuve eBay par
+  identité (brouillon `pairId` → annonce → SKU), « Le carton dit N°X » ou corriger
+  (vers le N° d'une autre paire de la liste : elle prend un numéro neuf et reste à
+  vérifier ; sinon le geste `poserNumero`). `cartonVerifie` sur la fiche.
+- Banc `numeros-panne.cjs` : 6 rouges sur l'avant (« 1002 → 11 »), vert après.
+- **Geste de Julien** : passer la liste carton par carton ; n'imprimer aucun bordereau
+  de ces paires avant. Les numéros 25 à 48 de la semaine ne sont plus nulle part en
+  base : seul le carton les dit.
+
 ### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :

@@ -20,6 +20,14 @@
 //    ne le télécharge jamais.
 import React from 'react';
 import { K } from './accueil-jetons.js';
+
+// La couleur du fond du film, avec une opacité (pour les voiles en dégradé).
+const voileRgba = (a) => {
+  const h = String(K.bg || '').replace('#', '');
+  const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+  return [r, g, b].every(Number.isFinite) ? `rgba(${r},${g},${b},${a})` : `rgba(244,246,250,${a})`;
+};
 import { DEMO, PLATEFORMES, euros } from './accueil-demo.js';
 import { seg, mix, sortie, trajet, clamp01, centreDans } from './accueil-mouvement.js';
 import { CarteJourEcran } from './accueil-carte.jsx';
@@ -353,6 +361,10 @@ function Plateau({ t, W, H, portrait, court }) {
     { q: 'Vendu sur Vinted… encore en ligne sur Leboncoin ?', tq: 16.1, legende: 17.0, efface: 22.0, h: ['8 h 02', '8 h 03', 15.9], tIn: 15.7 },
     { q: 'Combien je déclare à l’URSSAF ?', tq: 22.7, legende: 23.5, efface: 28.0, h: ['8 h 03', '31 octobre', 22.4], tIn: 22.2 },
   ];
+  // ⚠️ (18 octobre) Le voile est fait de la couleur du FOND du film (`K.bg`). Il
+  // était écrit en noir fixe (rgba(7,9,13) — le fond de l'ancienne famille
+  // sombre) : depuis le passage du film au clair, une bande noire dégradée
+  // barrait le haut de l'image derrière chaque question.
   // Un voile en haut de l'image, sous la légende : quand la caméra avance, un
   // écran agrandi passait SOUS la question rétrécie et les deux textes se
   // mêlaient (vu image par image à 15,3 s, aux deux formats). Le voile suit la
@@ -364,7 +376,7 @@ function Plateau({ t, W, H, portrait, court }) {
     if (v > 0) {
       const plein = portrait ? 250 : 140, bas = portrait ? 400 : 230;
       libres.push(<div key="voile" aria-hidden="true" style={{ position: 'absolute', left: 0, top: 0, width: W, height: bas, pointerEvents: 'none', opacity: v,
-        background: `linear-gradient(to bottom, ${K.bg} 0px, rgba(7,9,13,0.96) ${plein}px, rgba(7,9,13,0) ${bas}px)` }} />);
+        background: `linear-gradient(to bottom, ${K.bg} 0px, ${voileRgba(0.96)} ${plein}px, ${voileRgba(0)} ${bas}px)` }} />);
     }
   }
   Q.forEach((x, i) => {
