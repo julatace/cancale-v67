@@ -226,6 +226,11 @@
     }
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
+  // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
+  // les boutiques (Firefox, Edge) relisent sans avertissement.
+  const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes)); };
+
 
   // Un message bref sur la page de dépôt (ce qui vient d'être rempli). Plus de
   // panneau : il vit seul, en bas, et disparaît. VRM Noir (§7).
@@ -1374,7 +1379,7 @@
       el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';
       document.documentElement.appendChild(el);
     }
-    el.innerHTML =
+    poserHtml(el,
       '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + esc(String(pending.numero || '?')) + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
       '<div style="color:#8A93A3">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
       '. Catégorie <b style="color:#E8ECF2">' + esc(pending.category || '—') + '</b>.</div>' +
@@ -1408,7 +1413,7 @@
         : '') +
       '<button id="vrm-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 11px;font-size:11.5px;cursor:pointer">✕</button>' +
       '</div>' +
-      '<div style="color:#6B7485;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>';
+      '<div style="color:#6B7485;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>');
     const refill = el.querySelector('#vrm-refill');
     if (refill) refill.onclick = reprendre;
     // Fermer le bandeau, c'est laisser tomber CE dépôt : l'app doit le savoir

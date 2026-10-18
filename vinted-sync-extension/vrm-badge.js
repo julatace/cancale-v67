@@ -25,6 +25,11 @@
   if (!vivant()) return;
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
+  // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
+  // les boutiques (Firefox, Edge) relisent sans avertissement.
+  const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes)); };
+
   const depuis = (t) => {
     const ms = Date.now() - Number(t || 0);
     if (!t || !isFinite(ms) || ms < 0) return '';
@@ -155,12 +160,18 @@
     // Le code qui tourne n'est pas celui du manifeste : recharger la PAGE ne
     // change rien, c'est l'extension qu'il faut recharger (⟳) — et on le fait
     // nous-mêmes (page de réparation) ; le geste manuel n'est dit qu'en secours.
+    // Firefox (5.188) n'a ni chrome://extensions ni ⟳ : on y désactive puis
+    // réactive l'extension dans about:addons.
+    const FIREFOX = (() => { try { return typeof browser !== 'undefined' && !!browser.runtime; } catch (_) { return false; } })();
+    const SI_MUETTE = FIREFOX
+      ? "L'extension ne répond pas pour l'instant. Si ça dure, ouvre about:addons, désactive puis réactive VRM (dans ce Firefox)."
+      : "L'extension ne répond pas pour l'instant. Si ça dure, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce navigateur).";
     const lignePerime = perime
       ? `<div class="ligne"><div class="lib">Extension</div><div class="val alerte">Elle tourne encore sur son ancienne version${e && e.code ? ' (' + esc(e.code) + ')' : ''} : je la redémarre sur la ${esc(versionManif)}. Si ce message reste, ouvre chrome://extensions et clique ⟳ sur VRM — dans ce Chrome.</div></div>`
       : '';
     if (!e) {
-      carte.innerHTML = `<div class="tete"><b>VRM</b></div>
-        ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? "L'extension ne répond pas pour l'instant. Si ça dure, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce Chrome)." : 'Vérification…'}</div></div>`}`;
+      poserHtml(carte, `<div class="tete"><b>VRM</b></div>
+        ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? SI_MUETTE : 'Vérification…'}</div></div>`}`);
       return;
     }
     const v = e.vrm;
@@ -197,14 +208,14 @@
     }
 
     const pied = v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
-    carte.innerHTML = `<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
+    poserHtml(carte, `<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${bascule}
-      <div class="pied">${pied}</div>`;
+      <div class="pied">${pied}</div>`);
   }
 
   async function rafraichir() {

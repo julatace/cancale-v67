@@ -1,5 +1,9 @@
 # Publier l'extension VRM sur le Chrome Web Store
 
+> Edge, Opera, Brave et Firefox (ordinateur et Android) : voir
+> `docs/boutiques-extension.md` — le même paquet sert Edge et Opera, et les
+> textes ci-dessous servent les quatre boutiques.
+
 Tout ce qu'il faut coller dans le tableau de bord développeur de Google
 (https://chrome.google.com/webstore/devconsole), champ par champ.
 Le paquet à envoyer se fabrique par :

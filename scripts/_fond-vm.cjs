@@ -63,7 +63,7 @@ function filtreOk(row, u) {
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
-  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }] } = {}) {
+  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null } = {}) {
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0 };
@@ -88,7 +88,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: () => 0, clearInterval,
-    URL, TextDecoder, TextEncoder, Buffer,
+    URL, TextDecoder, TextEncoder, Buffer, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
       runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } },
@@ -154,7 +154,27 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  // `firefox` (5.188) : imite Firefox — `browser.*` rend des promesses,
+  // `chrome.*` n'accepte QUE des rappels (sans rappel il ne rend rien : le pire
+  // cas). `firefox.compat` = le source de compat-firefox.js, exécuté AVANT le
+  // fond, comme dans le paquet (`background.scripts`). Sans lui, le fond tourne
+  // sur ce `chrome` à rappels seuls : c'est la preuve que la compat compte.
+  if (firefox) {
+    const promesses = ctx.chrome;
+    const ECOUTE = /^(addListener|removeListener|hasListener)$/;
+    const rappelsSeuls = (o) => new Proxy(o, { get(c, k) {
+      const v = c[k];
+      if (typeof v === 'function') return function (...a) {
+        if (ECOUTE.test(String(k)) || typeof a[a.length - 1] === 'function') return v.apply(c, a);
+        const r = v.apply(c, a); if (r && typeof r.then === 'function') { r.catch(() => {}); return undefined; } return r;
+      };
+      return v && typeof v === 'object' ? rappelsSeuls(v) : v;
+    } });
+    ctx.browser = promesses;
+    ctx.chrome = rappelsSeuls(promesses);
+  }
   vm.createContext(ctx);
+  if (firefox && firefox.compat) vm.runInContext(firefox.compat, ctx, { filename: 'compat-firefox.js' });
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
   ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]);
