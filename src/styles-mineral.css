@@ -1255,3 +1255,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-day-wallet { grid-template-columns:minmax(0,1fr) !important; }
   .vrm-chart-caption { font-size:12px; gap:4px 8px; }
 }
+
+/* Identité VRM fixe : le logo n'est plus un sélecteur d'image. */
+.vrm-app-shell .vrm-header-logo { cursor:default; }
+.vrm-atelier-rail .vrm-sidebar-brand .vrm-logo { object-fit:contain; flex-shrink:0; }
