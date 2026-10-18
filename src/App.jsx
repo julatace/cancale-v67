@@ -7877,8 +7877,29 @@ const ouvrirPdfOnglet = (url) => {
     return !!w;
   } catch (_) { return false; }
 };
+// ⚠️ UN NUMÉRO PAS ENCORE VÉRIFIÉ SUR SON CARTON (18 octobre) : renuméroté
+// pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
+// le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
+// Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le carton (Annonces → « numéros à vérifier sur tes cartons »).";
+const confirmerNumerosAVerifier = async (numeros) => {
+  try {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const cles = new Set((numeros || []).filter(Boolean).map((n) => cleNum(n)));
+    if (!cles.size) return true;
+    const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
+    if (!doute.length) return true;
+    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
+    return await askConfirm({
+      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés sur leur carton` : `Le N°${doute[0].numero} n'est pas encore vérifié sur son carton`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde le carton avant d'imprimer.`,
+      ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
+    });
+  } catch (_) { return true; }
+};
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+  if (numero && !(await confirmerNumerosAVerifier([numero]))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument } = PL;
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
@@ -7903,6 +7924,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, 
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
 const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+  if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
@@ -32522,6 +32544,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
       if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
+      if (numero && !(await confirmerNumerosAVerifier([numero]))) { libererOngletPdf(); toast(NUM_A_VERIFIER_ANNULE); return; }
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
       const inv = invForBord(b);
