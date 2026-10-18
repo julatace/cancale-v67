@@ -10628,7 +10628,7 @@ function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
-  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll">
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>

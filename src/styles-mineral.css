@@ -2,7 +2,7 @@
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
 :root[data-theme="light"] { --vrm-focus:#2458E6; }
-:root[data-theme="light"] body { background:#F6F5F2; }
+:root[data-theme="light"] body { background:#F2F5F5; }
 :root[data-theme="light"] body::before { content:none; }
 :root[data-theme="light"] ::selection { background:rgba(36,88,230,.14); }
 :root[data-theme="light"] :focus-visible { outline:2px solid #2458E6; outline-offset:3px; }
@@ -509,7 +509,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    passent en « sur fond sombre » sans toucher à leur structure. Scopé au
    thème clair ; en sombre, l'app est déjà sombre partout. */
 :root[data-theme="light"] .vrm-sidebar {
-  background:#0E1A2B;
+  background:#21343E;
   --vrm-ink:#EAEFF7; --vrm-muted:#93A1B8;
   --vrm-line:rgba(255,255,255,.10); --vrm-surface:rgba(255,255,255,.08);
 }
