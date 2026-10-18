@@ -8526,9 +8526,9 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
   const tonal = danger ? C.danger : (color || C.accent);
   return (
-    <button className="vrm-button" type="button" onClick={onClick} disabled={!!disabled} style={{
+    <button className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
       background:outline ? 'transparent' : tonal,
-      color:outline ? tonal : (color || danger ? '#fff' : C.onAccent),
+      color:outline ? (danger || color ? tonal : C.text) : (color || danger ? '#fff' : C.onAccent),
       border:`1px solid ${outline ? C.border : tonal}`,
       fontSize:small?12.5:13,
       cursor:disabled?'not-allowed':'pointer',
@@ -8540,8 +8540,8 @@ function Input({label,...p}) {
   return (
     <label style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
-      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:5,
-        color:C.text,padding:'8px 12px',fontSize:13,outline:'none',fontFamily:'inherit',...(p.style||{})}}
+      <input {...p} className={['vrm-input',p.className].filter(Boolean).join(' ')} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
+        color:C.text,padding:'8px 12px',fontSize:13,fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
         onBlur={e=>e.target.style.borderColor=C.border}
       />
@@ -9007,7 +9007,8 @@ function Card({children,style={}}) {
   return <div className="vrm-surface" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
-  return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:8,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
+  const tone = color || C.muted;
+  return <span className="vrm-badge" style={{background:`color-mix(in srgb, ${tone} 10%, ${C.card})`,color:tone}}>{children}</span>;
 }
 // ── « JE VEUX SAISIR MES PRIX D'ACHAT » ────────────────────────────────────
 // Le tableau de bord pose ce drapeau puis navigue vers Annonces ; la modale de

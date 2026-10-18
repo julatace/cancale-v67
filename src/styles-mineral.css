@@ -1092,3 +1092,22 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-feuille-fond { align-items:center !important; padding:24px; }
   .vrm-feuille { border-radius:14px !important; max-height:min(80vh, 760px) !important; box-shadow:0 24px 64px rgba(0,0,0,.28); }
 }
+
+/* Finitions communes : aucune modification des grilles ou des logos. */
+.vrm-button--secondary { box-shadow:none; }
+.vrm-button--small { padding:7px 11px; gap:6px; }
+.vrm-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:22px; max-width:100%; padding:3px 8px; border-radius:6px;
+  font:600 11px/1.35 'Inter',system-ui,sans-serif;
+  vertical-align:middle; overflow-wrap:anywhere;
+}
+.vrm-input { transition:border-color .14s ease,box-shadow .14s ease; }
+.vrm-input:focus-visible { outline:2px solid var(--vrm-focus,#2458E6); outline-offset:2px; }
+@media(hover:hover) and (pointer:fine) {
+  .vrm-button--secondary:hover:not(:disabled) {
+    background:color-mix(in srgb,currentColor 5%,transparent) !important;
+    box-shadow:none;
+  }
+}
+@media(prefers-reduced-motion:reduce) { .vrm-input { transition:none; } }

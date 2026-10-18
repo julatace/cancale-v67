@@ -3,7 +3,7 @@
 // Les statuts métier gardent leurs couleurs.
 export const MINERAL = Object.freeze({
   bg: '#F2F5F5', surface: '#FFFFFF', card: '#FFFFFF', card2: '#EEF2F8',
-  border: '#E3E7EE', text: '#121B2C', muted: '#566077',
+  border: '#E2E8E9', text: '#121B2C', muted: '#566077',
   accent: '#2458E6', accentSoft: '#4C7BFF', onAccent: '#FFFFFF',
   danger: '#C0392B', warn: '#A15C00', gold: '#7A6636',
   blue: '#1D4FD6', purple: '#5B4B9E',
