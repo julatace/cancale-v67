@@ -8526,9 +8526,9 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
   const tonal = danger ? C.danger : (color || C.accent);
   return (
-    <button className="vrm-button" type="button" onClick={onClick} disabled={!!disabled} style={{
+    <button className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
       background:outline ? 'transparent' : tonal,
-      color:outline ? tonal : (color || danger ? '#fff' : C.onAccent),
+      color:outline ? (danger || color ? tonal : C.text) : (color || danger ? '#fff' : C.onAccent),
       border:`1px solid ${outline ? C.border : tonal}`,
       fontSize:small?12.5:13,
       cursor:disabled?'not-allowed':'pointer',
@@ -8540,8 +8540,8 @@ function Input({label,...p}) {
   return (
     <label style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
-      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:5,
-        color:C.text,padding:'8px 12px',fontSize:13,outline:'none',fontFamily:'inherit',...(p.style||{})}}
+      <input {...p} className={['vrm-input',p.className].filter(Boolean).join(' ')} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
+        color:C.text,padding:'8px 12px',fontSize:13,fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
         onBlur={e=>e.target.style.borderColor=C.border}
       />
@@ -9007,7 +9007,8 @@ function Card({children,style={}}) {
   return <div className="vrm-surface" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
-  return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:8,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
+  const tone = color || C.muted;
+  return <span className="vrm-badge" style={{background:`color-mix(in srgb, ${tone} 10%, ${C.card})`,color:tone}}>{children}</span>;
 }
 // ── « JE VEUX SAISIR MES PRIX D'ACHAT » ────────────────────────────────────
 // Le tableau de bord pose ce drapeau puis navigue vers Annonces ; la modale de
@@ -9334,19 +9335,32 @@ function prenomLisible(v) {
 //    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
 //    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
 //    aux repères.
+// Les explications restent visibles sur ordinateur, accessibles au toucher sur mobile.
+function DayWeekNote({children,label='Ventes et versements'}) {
+  const [mobile,setMobile]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
+  React.useEffect(()=>{
+    const mq=window.matchMedia('(max-width:767px)');
+    const maj=()=>setMobile(mq.matches);
+    mq.addEventListener('change',maj);
+    return ()=>mq.removeEventListener('change',maj);
+  },[]);
+  return mobile ? <details className="vrm-day-week-help"><summary className="vrm-day-help-toggle">{label}</summary>{children}</details> : children;
+}
+
 function CourbeSemaine({ jours, hauteur = 176 }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
+  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    const mesure = () => { const mobile = window.matchMedia('(max-width:767px)').matches; const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); setCompact(mobile); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
     return () => ro.disconnect();
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
+  const H = compact ? 120 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
@@ -9472,9 +9486,10 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois' }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
+  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    const mesure = () => { const mobile=window.matchMedia('(max-width:767px)').matches; setCompact(mobile); const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
@@ -9482,7 +9497,7 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cm';
   const n = mois.length;
-  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 24;
+  const H = compact ? 124 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 24;
   const vals = mois.map((m) => Math.max(0, Number(valeur(m)) || 0));
   const max = Math.max(1, ...vals);
   const col = (W - gx - gd) / Math.max(1, n - 1);
@@ -9495,7 +9510,7 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   const dernier = n - 1;
   const enCours = !!(mois[dernier] && mois[dernier].enCours);
   const plein = enCours && n > 1 ? pts.slice(0, n - 1) : pts;
-  const toutesValeurs = col >= 46;
+  const toutesValeurs = !compact && col >= 46;
   const cleDe = (m) => m.cle || m.key;
   const court = (m) => {
     const d = new Date(String(cleDe(m)) + '-01T12:00:00');
@@ -9519,20 +9534,20 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
         {iChoisi >= 0 && <rect x={X(iChoisi) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg} />}
         {[0.5, 1].map((f) => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(max * f)} y2={Y(max * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4" />)}
         <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1" />
-        {pts.length > 1 && <path d={`${chemin(pts)} L${pts[dernier][0].toFixed(1)},${base} L${pts[0][0].toFixed(1)},${base} Z`} fill={`url(#cmg${uid})`} />}
-        {plein.length > 1 && <path d={chemin(plein)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />}
-        {enCours && n > 1 && <path d={chemin(pts.slice(n - 2))} fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" />}
+        {!compact && pts.length > 1 && <path d={`${chemin(pts)} L${pts[dernier][0].toFixed(1)},${base} L${pts[0][0].toFixed(1)},${base} Z`} fill={`url(#cmg${uid})`} />}
+        {!compact && plein.length > 1 && <path d={chemin(plein)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />}
+        {!compact && enCours && n > 1 && <path d={chemin(pts.slice(n - 2))} fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" />}
         {mois.map((m, i) => {
           const cle = cleDe(m);
           const actif = i === iChoisi;
-          const ecrit = toutesValeurs || i === iMax || i === dernier || actif;
+          const ecrit = compact ? (actif || (iChoisi < 0 && i === iMax)) : toutesValeurs || i === iMax || i === dernier || actif;
           const creux = i === dernier && enCours;
           const fort = actif || i === iMax;
           return (
             <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i] * 100)} onClick={onChoisir ? () => onChoisir(actif ? null : cle) : undefined} style={{ cursor: onChoisir ? 'pointer' : 'default' }}>
               <title>{`${m.long || m.nomComplet || cle} · ${format(vals[i])}${m.n != null ? ` · ${m.n} vente${m.n > 1 ? 's' : ''}` : ''}${creux ? ' (en cours)' : ''}`}</title>
               <rect x={X(i) - Math.max(col, 12) / 2} y="0" width={Math.max(col, 12)} height={H} fill="transparent" />
-              <circle cx={X(i)} cy={Y(vals[i])} r={fort ? 4.6 : 3.4} fill={fort && !creux ? C.accent : C.card} stroke={C.accent} strokeWidth="2" />
+              {compact ? <rect data-month-bar="" x={X(i)-Math.min(22,col*.55)/2} y={Y(vals[i])} width={Math.min(22,col*.55)} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={C.accent} opacity={fort ? 1 : creux ? .45 : .65}/> : <circle cx={X(i)} cy={Y(vals[i])} r={fort ? 4.6 : 3.4} fill={fort && !creux ? C.accent : C.card} stroke={C.accent} strokeWidth="2" />}
               {ecrit && vals[i] > 0 && <text x={X(i)} y={Math.max(14, Y(vals[i]) - 10)} textAnchor={i === 0 ? 'start' : i === dernier ? 'end' : 'middle'} fontSize="11" fontWeight="700" fill={C.text} stroke={actif ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{ fontVariantNumeric: 'tabular-nums' }}>{format(vals[i])}</text>}
               <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={i === dernier || actif ? 700 : 500} fill={i === dernier || actif ? C.text : C.muted}>{court(m)}</text>
             </g>
@@ -10628,7 +10643,7 @@ function SideBar({ tab, setTab, entreprise }) {
   const outils = [...NAV_GESTION, ...NAV_OUTILS];
   const actif = BAR_GROUPE[tab] || tab;
   const bouton=t=><button key={t.id} type="button" className="vrm-rail-button" aria-label={t.label} title={t.bientot?`${t.label} — bientôt`:t.label} onClick={()=>setTab(t.id)} aria-current={actif===t.id?'page':undefined}><NavigationIcon item={t} size={25}/></button>;
-  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav className="vrm-sidebar vrm-atelier-rail" aria-label="Navigation principale" style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <div className="vrm-sidebar-brand"><VrmWord height={23} color={C.onChrome} accent={C.onChrome}/><NomEntreprise entreprise={entreprise} className="vrm-sidebar-entreprise"/></div>
     <div className="vrm-rail-scroll">
       <div className="vrm-rail-platforms">{BOTTOM_TABS.map(bouton)}</div>
@@ -10792,12 +10807,12 @@ function BottomBar({tab,setTab}) {
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex'}}>
+    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab;
         const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" className="vrm-tab" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined}>
-          <span aria-hidden="true" className="vrm-tab-ic"><Icon name={t.icon} size={24} style={{strokeWidth:on?2:1.6}}/></span>
+          <span aria-hidden="true" className="vrm-tab-ic"><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/></span>
           <span className="vrm-nav-label">{t.label}</span>
         </button>
       );}); })()}
@@ -19024,7 +19039,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
             <div style={sLib}>Vendu · 12 derniers mois</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
-            <div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div>
+            <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu"/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
@@ -33518,11 +33533,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
                 <CourbeSemaine jours={semaine}/>
-                <div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
+                <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
                   Vendu : au jour de la vente · Reçu : au jour du versement.
                   {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
                   {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
-                </div>
+                </div></DayWeekNote>
               </div>
               );
             })()}

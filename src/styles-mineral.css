@@ -2,7 +2,7 @@
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
 :root[data-theme="light"] { --vrm-focus:#2458E6; }
-:root[data-theme="light"] body { background:#F6F5F2; }
+:root[data-theme="light"] body { background:#F2F5F5; }
 :root[data-theme="light"] body::before { content:none; }
 :root[data-theme="light"] ::selection { background:rgba(36,88,230,.14); }
 :root[data-theme="light"] :focus-visible { outline:2px solid #2458E6; outline-offset:3px; }
@@ -509,7 +509,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    passent en « sur fond sombre » sans toucher à leur structure. Scopé au
    thème clair ; en sombre, l'app est déjà sombre partout. */
 :root[data-theme="light"] .vrm-sidebar {
-  background:#0E1A2B;
+  background:#21343E;
   --vrm-ink:#EAEFF7; --vrm-muted:#93A1B8;
   --vrm-line:rgba(255,255,255,.10); --vrm-surface:rgba(255,255,255,.08);
 }
@@ -1091,4 +1091,153 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 @media(min-width:768px){
   .vrm-feuille-fond { align-items:center !important; padding:24px; }
   .vrm-feuille { border-radius:14px !important; max-height:min(80vh, 760px) !important; box-shadow:0 24px 64px rgba(0,0,0,.28); }
+}
+
+/* Finitions communes : aucune modification des grilles ou des logos. */
+.vrm-button--secondary { box-shadow:none; }
+.vrm-button--small { padding:7px 11px; gap:6px; }
+.vrm-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:22px; max-width:100%; padding:3px 8px; border-radius:6px;
+  font:600 11px/1.35 'Inter',system-ui,sans-serif;
+  vertical-align:middle; overflow-wrap:anywhere;
+}
+.vrm-input { transition:border-color .14s ease,box-shadow .14s ease; }
+.vrm-input:focus-visible { outline:2px solid var(--vrm-focus,#2458E6); outline-offset:2px; }
+@media(hover:hover) and (pointer:fine) {
+  .vrm-button--secondary:hover:not(:disabled) {
+    background:color-mix(in srgb,currentColor 5%,transparent) !important;
+    box-shadow:none;
+  }
+}
+@media(prefers-reduced-motion:reduce) { .vrm-input { transition:none; } }
+
+/* Mobile : contenu à 80 %, navigation indépendante à sa taille native.
+   Le zoom ne touche ni le viewport ni la barre : ses cibles restent à 44 px.
+   Les champs compensent le zoom pour garder 16 px affichés sur iOS. */
+@media(max-width:767px) {
+  .vrm-main { zoom:.8; width:100% !important; max-width:none !important; }
+  .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .vrm-main textarea, .vrm-main select { font-size:20px !important; }
+  .vrm-main button:not([role="switch"]) { min-height:55px !important; }
+  .vrm-main button[aria-label] { min-width:55px; }
+  .vrm-day-top { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  .vrm-day-top > .vrm-day-week { grid-column:2; grid-row:1 / span 2; }
+  .vrm-day-top > .vrm-day-money, .vrm-day-top > .vrm-day-jour { grid-column:1; }
+  .vrm-day-top > .vrm-day-wallet { grid-column:1; }
+  .vrm-day-card { padding:12px; }
+  .vrm-day-head { flex-wrap:wrap; gap:6px; }
+  .vrm-day-hero-n { font-size:34px; }
+  .vrm-day-greeting { margin-bottom:10px; }
+  .vrm-day-bar { margin-bottom:10px; }
+  .vrm-day-recent .vrm-carrousel { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .vrm-day-recent .vrm-carrousel > button { display:grid !important; grid-template-columns:58px minmax(0,1fr); }
+  .vrm-day-recent .vrm-carrousel > button > div:first-child { aspect-ratio:auto !important; min-height:82px; }
+  .vrm-day-recent .vrm-carrousel > button > div + div { padding:8px !important; min-width:0; }
+}
+@media(max-width:1023px) {
+  .vrm-app-shell .vrm-tabbar {
+    background:var(--vrm-nav-bg,#21343E); border-top:1px solid rgba(255,255,255,.12);
+    backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  .vrm-tabbar > .vrm-tab { position:relative; min-height:60px; gap:4px; color:#B8C9CF; }
+  .vrm-tabbar > .vrm-tab[aria-current="page"] { color:#FFFFFF; }
+  .vrm-tabbar > .vrm-tab[aria-current="page"]::before {
+    content:''; position:absolute; top:0; left:calc(50% - 12px);
+    width:24px; height:3px; border-radius:0 0 3px 3px; background:#D8E6E9;
+  }
+  .vrm-tabbar > .vrm-tab:focus-visible { outline:2px solid #FFFFFF; outline-offset:-4px; }
+}
+
+/* Composition mobile : chiffres côte à côte, courbe lisible en pleine largeur. */
+@media(max-width:767px) {
+  .vrm-day-top { grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); align-items:stretch; gap:10px; }
+  .vrm-day-top > .vrm-day-money, .vrm-day-top > .vrm-day-jour { grid-column:1; grid-row:1; }
+  .vrm-day-top > .vrm-day-wallet { grid-column:2; grid-row:1; align-content:center; }
+  .vrm-day-top > .vrm-day-week { grid-column:1 / -1; grid-row:2; }
+  .vrm-day-head { gap:8px; }
+  .vrm-day-money .vrm-day-head .vrm-day-lien { font-size:11px; }
+  .vrm-day-recu { margin-top:10px; padding-top:10px; gap:8px; }
+  .vrm-day-hero-n { margin-top:8px; }
+  .vrm-day-meta { font-size:12px; margin-top:6px; gap:3px 6px; }
+  .vrm-day-week { display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:0 8px; }
+  .vrm-day-week > .vrm-day-head { display:contents; }
+  .vrm-day-week .vrm-day-legende { justify-self:end; font-size:11px; gap:8px; }
+  .vrm-day-week-n { grid-column:1 / -1; font-size:20px; margin:4px 0 0; }
+  .vrm-day-week > div:has(> svg), .vrm-day-week-help { grid-column:1 / -1; }
+  .vrm-day-week-help { color:var(--vrm-muted); font-size:12px; border-top:1px solid var(--vrm-line); margin-top:4px; }
+  .vrm-day-week-help > summary { cursor:pointer; min-height:40px; display:flex; align-items:center; justify-content:space-between; list-style:none; }
+  .vrm-day-week-help > summary::-webkit-details-marker { display:none; }
+  .vrm-day-week-help > summary::after { content:'+'; font-size:18px; }
+  .vrm-day-week-help[open] > summary::after { content:'−'; }
+  .vrm-day-week-help .vrm-day-note { margin:0 0 8px !important; font-size:13px; }
+  .vrm-day-layout .vrm-day-bar > button { flex-direction:row; flex-wrap:wrap; justify-content:center; gap:4px 7px; padding:8px 4px; }
+  .vrm-day-bar-l { flex-basis:100%; text-align:center; }
+  .vrm-ventes-liste .vrm-sale-photo { height:76px !important; }
+  .vrm-ventes-liste .vrm-sale-bas { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 8px; margin:0; }
+  .vrm-ventes-liste .vrm-sale-bas > .vrm-cout-vente { grid-column:1; grid-row:1; }
+  .vrm-ventes-liste .vrm-sale-footer { display:contents; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-invoice { grid-column:1 / -1; grid-row:2; padding:0; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-details { grid-column:2; grid-row:1; margin:0; }
+  .vrm-ventes-liste .vrm-sale-footer > .vrm-sale-details[open] { grid-column:1 / -1; grid-row:3; }
+  .vrm-ventes-liste .vrm-sale-invoice > button { text-align:left; }
+}
+@media(max-width:767px) {
+  .vrm-ventes-liste .vrm-sale-action [data-bouton-bord] { flex-direction:row !important; flex-wrap:wrap; align-items:center !important; gap:4px 12px !important; }
+  .vrm-ventes-liste .vrm-sale-action [data-bouton-bord] > span { flex-basis:100%; }
+}
+@media(min-width:360px) and (max-width:767px) {
+  .vrm-day-layout .vrm-day-lower { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:start; gap:10px; }
+  .vrm-day-layout .vrm-day-recent .vrm-carrousel { grid-auto-flow:row; grid-auto-columns:auto; grid-template-columns:minmax(0,1fr); margin:0; padding:0; overflow:visible; }
+  .vrm-day-layout .vrm-day-stock { min-width:0; padding:12px !important; }
+  .vrm-day-stock-total { flex-wrap:wrap; gap:4px 8px; margin:8px 0; }
+  .vrm-day-stock-total strong { font-size:28px; }
+  .vrm-day-stock-prices { flex-wrap:wrap; gap:4px; }
+  .vrm-day-stock-links { gap:0 8px; margin-top:8px; padding-top:4px; }
+}
+/* Dernières finitions mobile : sections, filtres et lignes de vente. */
+@media(max-width:767px) {
+  .vrm-market-space .vrm-platform-tabs {
+    border:1px solid var(--vrm-line); border-radius:10px;
+    background:var(--vrm-surface); padding:3px; gap:3px;
+  }
+  .vrm-market-space .vrm-platform-tabs > button { border-radius:7px; font-weight:500; }
+  :root[data-theme="light"] .vrm-market-space .vrm-platform-tabs > button[aria-current="page"] {
+    background:var(--vrm-ink); color:var(--vrm-surface); box-shadow:none; font-weight:600;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee,
+  .vrm-main .vrm-shared-workbar > .vrm-sales-filters {
+    flex-wrap:wrap !important; gap:6px !important; overflow:visible; margin-inline:0; padding-inline:0;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee > button,
+  .vrm-main .vrm-shared-workbar > .vrm-sales-filters > button {
+    flex:1 1 auto; min-width:0; min-height:44px !important; padding-inline:9px !important;
+    font-size:12px !important; border-radius:8px !important;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .vrm-ventes-liste .vrm-sale-title,
+  .vrm-shared-sale .vrm-sale-title { font-weight:600 !important; line-height:1.4 !important; overflow-wrap:anywhere; }
+  .vrm-shared-sale .vrm-sale-photo { border-radius:8px !important; overflow:hidden; }
+  .vrm-ventes-liste .vrm-sale-meta,
+  .vrm-shared-sale .vrm-sale-meta { line-height:1.5; }
+  .vrm-sale-price .vrm-display,
+  .vrm-kpi-ventes-val { font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .vrm-day-layout .vrm-day-stock { border-radius:12px; }
+  .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { border-radius:10px !important; }
+}
+
+/* Même identité de plateforme que le rail ordinateur, sur fond ardoise. */
+@media(max-width:1023px) {
+  .vrm-tabbar .vrm-brand-icon { filter:invert(1); opacity:.78; }
+  .vrm-tabbar [aria-current="page"] .vrm-brand-icon { opacity:1; }
+}
+/* Statistiques au même niveau de densité que Ma journée. */
+@media(max-width:767px) {
+  .vrm-finance-page { gap:12px !important; padding:12px !important; }
+  .vrm-finance-page [data-stats-carte] { padding:14px !important; border-radius:12px !important; }
+  .vrm-finance-page .vrm-finance-goal > .vrm-surface { padding:14px !important; }
+  .vrm-finance-page .vrm-stats-volets { padding:0 14px !important; }
+  .vrm-finance-page .vrm-day-week-help { margin-top:6px; }
+  .vrm-finance-page [data-courbe-vendu],
+  .vrm-finance-page [data-courbe-mois] { max-width:100%; }
 }
