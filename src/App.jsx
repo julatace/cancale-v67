@@ -8473,7 +8473,7 @@ function askNotifPermission(){
 function pushNotif(title, body){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
-      new Notification(title, { body, icon:'/vrm-icon-192.png', badge:'/vrm-icon-192.png' });
+      new Notification(title, { body, icon:'/vrm-icon-v2-192.png', badge:'/vrm-icon-v2-192.png' });
       return true;
     }
   }catch(_){/* ignore */}

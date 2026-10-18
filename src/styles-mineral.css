@@ -1259,3 +1259,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* Identité VRM fixe : le logo n'est plus un sélecteur d'image. */
 .vrm-app-shell .vrm-header-logo { cursor:default; }
 .vrm-atelier-rail .vrm-sidebar-brand .vrm-logo { object-fit:contain; flex-shrink:0; }
+
+@media(max-width:1023px) {
+  .vrm-app-shell .vrm-header-logo { width:44px; height:44px; }
+  .vrm-app-shell .vrm-header-logo > img.vrm-logo { width:40px !important; height:40px !important; border-radius:0; object-fit:contain; }
+}
