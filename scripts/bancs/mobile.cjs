@@ -56,7 +56,7 @@ async function brancher(p){
  try{
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
   const base='http://127.0.0.1:'+server.address().port;
-  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM || '/usr/bin/chromium',args:['--no-sandbox']});
+  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox']});
   for(const largeur of [320,360,390,430]){
     const ctx=await b.newContext({viewport:{width:largeur,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();const erreurs=[];p.on('pageerror',e=>erreurs.push(e.message));await brancher(p);
     for(const tab of ['journee','cat_ventes','cat_annonces','plat_vinted','plat_leboncoin','plat_ebay','compta','settings']){

@@ -91,7 +91,7 @@ const STATUT_RELAIS="La livraison n'a pas encore eu lieu - colis déposé en bur
 const LIRE=()=>{
   const txt=document.body.innerText||'';
   const m=/(\d+)\s+colis à retirer/.exec(txt);
-  const actifs=document.querySelectorAll('button[aria-label="Retiré"][title="J\'ai retiré ce colis"]').length;
+  const actifs=document.querySelectorAll('button[title="J\'ai retiré ce colis"]').length;
   const gris=document.querySelectorAll('button[aria-label="Annuler"][title^="Annuler : je ne l\'ai pas encore"]').length;
   return {total:m?+m[1]:null, actifs, gris, garde:/n'a pas pu s'afficher|Cannot access|is not defined/.test(txt)};
 };
@@ -161,7 +161,7 @@ function prepareRelais(purch){
   const CLES=['vinted_pickup_done','vrm_colis_collected'];
   const lireLS=(pg)=>pg.evaluate(k=>{const o={};for(const x of k)o[x]=localStorage.getItem(x);return o;},CLES);
   const avant=await lireLS(p1.pg);
-  const cliqué=await p1.pg.evaluate(()=>{const x=document.querySelector('button[aria-label="Retiré"][title="J\'ai retiré ce colis"]'); if(!x) return false; x.click(); return true;});
+  const cliqué=await p1.pg.evaluate(()=>{const x=document.querySelector('button[title="J\'ai retiré ce colis"]'); if(!x) return false; x.click(); return true;});
   await p1.pg.waitForTimeout(1200);
   const ref=await p1.pg.evaluate(LIRE);
   const apres=await lireLS(p1.pg);

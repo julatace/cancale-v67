@@ -76,11 +76,11 @@ async function prepare(pg){
 // rapport à la zone VISIBLE : la fenêtre ET tout ancêtre dont overflow-x coupe.
 async function ouvreOutils(pg){
   const trouve=await pg.evaluate(()=>{
-    const b=[...document.querySelectorAll('button')].find(x=>/Outils/.test(x.innerText||''));
+    const b=[...document.querySelectorAll('button')].find(x=>/Outils/.test(x.innerText||'')||x.getAttribute('aria-label')==='Outils');
     if(!b) return false; b.click(); return true; });
   await pg.waitForTimeout(500);
   const m=await pg.evaluate(()=>{
-    const b=[...document.querySelectorAll('button')].find(x=>/Outils/.test(x.innerText||''));
+    const b=[...document.querySelectorAll('button')].find(x=>/Outils/.test(x.innerText||'')||x.getAttribute('aria-label')==='Outils');
     if(!b||!b.parentElement) return {outils:[]};
     const outils=[...b.parentElement.querySelectorAll('button')].filter(x=>x!==b);
     return {outils:outils.map(x=>{

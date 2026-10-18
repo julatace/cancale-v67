@@ -25140,7 +25140,7 @@ async function chercherEntreprise(brut) {
     return { etat: 'passu' };
   } catch (_) { return { etat: 'passu' }; }
 }
-const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise — retrouvé avec ton SIRET", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
+const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
 function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
