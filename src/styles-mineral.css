@@ -1225,3 +1225,19 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-day-layout .vrm-day-stock { border-radius:12px; }
   .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { border-radius:10px !important; }
 }
+
+/* Même identité de plateforme que le rail ordinateur, sur fond ardoise. */
+@media(max-width:1023px) {
+  .vrm-tabbar .vrm-brand-icon { filter:invert(1); opacity:.78; }
+  .vrm-tabbar [aria-current="page"] .vrm-brand-icon { opacity:1; }
+}
+/* Statistiques au même niveau de densité que Ma journée. */
+@media(max-width:767px) {
+  .vrm-finance-page { gap:12px !important; padding:12px !important; }
+  .vrm-finance-page [data-stats-carte] { padding:14px !important; border-radius:12px !important; }
+  .vrm-finance-page .vrm-finance-goal > .vrm-surface { padding:14px !important; }
+  .vrm-finance-page .vrm-stats-volets { padding:0 14px !important; }
+  .vrm-finance-page .vrm-day-week-help { margin-top:6px; }
+  .vrm-finance-page [data-courbe-vendu],
+  .vrm-finance-page [data-courbe-mois] { max-width:100%; }
+}

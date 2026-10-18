@@ -9336,7 +9336,7 @@ function prenomLisible(v) {
 //    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
 //    aux repères.
 // Les explications restent visibles sur ordinateur, accessibles au toucher sur mobile.
-function DayWeekNote({children}) {
+function DayWeekNote({children,label='Ventes et versements'}) {
   const [mobile,setMobile]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useEffect(()=>{
     const mq=window.matchMedia('(max-width:767px)');
@@ -9344,7 +9344,7 @@ function DayWeekNote({children}) {
     mq.addEventListener('change',maj);
     return ()=>mq.removeEventListener('change',maj);
   },[]);
-  return mobile ? <details className="vrm-day-week-help"><summary className="vrm-day-help-toggle">Ventes et versements</summary>{children}</details> : children;
+  return mobile ? <details className="vrm-day-week-help"><summary className="vrm-day-help-toggle">{label}</summary>{children}</details> : children;
 }
 
 function CourbeSemaine({ jours, hauteur = 176 }) {
@@ -9486,9 +9486,10 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois' }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
+  const [compact,setCompact] = React.useState(()=>window.matchMedia('(max-width:767px)').matches);
   React.useLayoutEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const mesure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
+    const mesure = () => { const mobile=window.matchMedia('(max-width:767px)').matches; setCompact(mobile); const w = mobile ? el.clientWidth : Math.round(el.getBoundingClientRect().width); if (w > 0) setW((v) => (Math.abs(v - w) > 1 ? w : v)); };
     mesure();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(mesure); ro.observe(el);
@@ -9496,7 +9497,7 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cm';
   const n = mois.length;
-  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 24;
+  const H = compact ? 124 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 24;
   const vals = mois.map((m) => Math.max(0, Number(valeur(m)) || 0));
   const max = Math.max(1, ...vals);
   const col = (W - gx - gd) / Math.max(1, n - 1);
@@ -9509,7 +9510,7 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   const dernier = n - 1;
   const enCours = !!(mois[dernier] && mois[dernier].enCours);
   const plein = enCours && n > 1 ? pts.slice(0, n - 1) : pts;
-  const toutesValeurs = col >= 46;
+  const toutesValeurs = !compact && col >= 46;
   const cleDe = (m) => m.cle || m.key;
   const court = (m) => {
     const d = new Date(String(cleDe(m)) + '-01T12:00:00');
@@ -9533,20 +9534,20 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
         {iChoisi >= 0 && <rect x={X(iChoisi) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg} />}
         {[0.5, 1].map((f) => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(max * f)} y2={Y(max * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4" />)}
         <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1" />
-        {pts.length > 1 && <path d={`${chemin(pts)} L${pts[dernier][0].toFixed(1)},${base} L${pts[0][0].toFixed(1)},${base} Z`} fill={`url(#cmg${uid})`} />}
-        {plein.length > 1 && <path d={chemin(plein)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />}
-        {enCours && n > 1 && <path d={chemin(pts.slice(n - 2))} fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" />}
+        {!compact && pts.length > 1 && <path d={`${chemin(pts)} L${pts[dernier][0].toFixed(1)},${base} L${pts[0][0].toFixed(1)},${base} Z`} fill={`url(#cmg${uid})`} />}
+        {!compact && plein.length > 1 && <path d={chemin(plein)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />}
+        {!compact && enCours && n > 1 && <path d={chemin(pts.slice(n - 2))} fill="none" stroke={C.accent} strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" />}
         {mois.map((m, i) => {
           const cle = cleDe(m);
           const actif = i === iChoisi;
-          const ecrit = toutesValeurs || i === iMax || i === dernier || actif;
+          const ecrit = compact ? (actif || (iChoisi < 0 && i === iMax)) : toutesValeurs || i === iMax || i === dernier || actif;
           const creux = i === dernier && enCours;
           const fort = actif || i === iMax;
           return (
             <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i] * 100)} onClick={onChoisir ? () => onChoisir(actif ? null : cle) : undefined} style={{ cursor: onChoisir ? 'pointer' : 'default' }}>
               <title>{`${m.long || m.nomComplet || cle} · ${format(vals[i])}${m.n != null ? ` · ${m.n} vente${m.n > 1 ? 's' : ''}` : ''}${creux ? ' (en cours)' : ''}`}</title>
               <rect x={X(i) - Math.max(col, 12) / 2} y="0" width={Math.max(col, 12)} height={H} fill="transparent" />
-              <circle cx={X(i)} cy={Y(vals[i])} r={fort ? 4.6 : 3.4} fill={fort && !creux ? C.accent : C.card} stroke={C.accent} strokeWidth="2" />
+              {compact ? <rect data-month-bar="" x={X(i)-Math.min(22,col*.55)/2} y={Y(vals[i])} width={Math.min(22,col*.55)} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={C.accent} opacity={fort ? 1 : creux ? .45 : .65}/> : <circle cx={X(i)} cy={Y(vals[i])} r={fort ? 4.6 : 3.4} fill={fort && !creux ? C.accent : C.card} stroke={C.accent} strokeWidth="2" />}
               {ecrit && vals[i] > 0 && <text x={X(i)} y={Math.max(14, Y(vals[i]) - 10)} textAnchor={i === 0 ? 'start' : i === dernier ? 'end' : 'middle'} fontSize="11" fontWeight="700" fill={C.text} stroke={actif ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{ fontVariantNumeric: 'tabular-nums' }}>{format(vals[i])}</text>}
               <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={i === dernier || actif ? 700 : 500} fill={i === dernier || actif ? C.text : C.muted}>{court(m)}</text>
             </g>
@@ -10811,7 +10812,7 @@ function BottomBar({tab,setTab}) {
         const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" className="vrm-tab" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined}>
-          <span aria-hidden="true" className="vrm-tab-ic"><Icon name={t.icon} size={24} style={{strokeWidth:on?2:1.6}}/></span>
+          <span aria-hidden="true" className="vrm-tab-ic"><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/></span>
           <span className="vrm-nav-label">{t.label}</span>
         </button>
       );}); })()}
@@ -19038,7 +19039,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
             <div style={sLib}>Vendu · 12 derniers mois</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
-            <div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div>
+            <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu"/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
