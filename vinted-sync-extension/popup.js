@@ -21,6 +21,11 @@ if (CARTE) document.body.classList.add('carte');
 
 // Un email est du texte saisi : il n'entre jamais dans du HTML sans être échappé.
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
+// par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
+// les boutiques (Firefox, Edge) relisent sans avertissement.
+const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes)); };
+
 
 // ── LA RÉPARATION D'UN CODE PÉRIMÉ (11 octobre) ───────────────────────────
 // ⚠️⚠️ MESURÉ : après le remplacement du dossier, Chrome garde l'ANCIEN service
@@ -126,10 +131,10 @@ function rendreAuth(e) {
   if (e && e.connecte) {
     // Connecté dans la carte : on NOMME le compte (c'est ce qui permet de voir
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
-    box.innerHTML = `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
+    poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
       <div class="muted" style="margin-top:4px">L'extension capte maintenant pour ce compte VRM. Tout se pilote depuis l'app.</div>
       <button id="vrmBtn">Ouvrir VRM</button>
-      <button class="sec" id="outBtn">Se déconnecter</button>`;
+      <button class="sec" id="outBtn">Se déconnecter</button>`);
     document.getElementById('vrmBtn').addEventListener('click', ouvrirVRM);
     document.getElementById('outBtn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth(true));
@@ -137,7 +142,7 @@ function rendreAuth(e) {
     return;
   }
   const expiree = e && e.expiree;
-  box.innerHTML = `<div class="who"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
+  poserHtml(box, `<div class="who"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
     <div class="muted" style="margin-top:2px">${expiree
       ? 'Reconnecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la reconnecte tout seul.'
       : 'Connecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la connecte tout seul. Rien à taper ici.'}</div>
@@ -151,7 +156,7 @@ function rendreAuth(e) {
       <button class="sec" id="inBtn">Me connecter</button>
       <div class="err" id="authErr" hidden></div>
     </div>
-    <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`;
+    <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`);
   document.getElementById('lierBtn').addEventListener('click', lierAvecVRM);
   document.getElementById('mdpLien').addEventListener('click', (ev) => {
     ev.preventDefault();

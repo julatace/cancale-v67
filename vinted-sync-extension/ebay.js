@@ -58,6 +58,11 @@
   }
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
+  // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
+  // les boutiques (Firefox, Edge) relisent sans avertissement.
+  const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes)); };
+
 
 
 
@@ -284,7 +289,7 @@
     const fini = arrete
       ? `<div style="color:#F5A524;margin-top:6px">Je ne remplis plus tout seul (c'est fini après 1 min 30). La mise en vente se fait en plusieurs étapes : à chaque nouvelle étape, clique <b>Re-remplir</b>.</div>`
       : '';
-    el.innerHTML = (n > 0
+    poserHtml(el, (n > 0
       ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos} Relis tout, choisis la catégorie proposée par eBay, puis publie.`
       : `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Le texte complet est dans ton presse-papier, colle-le.`)
       + fini
@@ -293,7 +298,7 @@
            <button id="vrm-eb-cdesc" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Copier la description</button>
            <button id="vrm-eb-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 9px;font:11.5px system-ui,sans-serif;cursor:pointer">✕</button>
          </div>
-         <div style="color:#8A93A3;font-size:10px;margin-top:7px">VRM ne met jamais en vente à ta place : relis et clique toi-même.</div>`;
+         <div style="color:#8A93A3;font-size:10px;margin-top:7px">VRM ne met jamais en vente à ta place : relis et clique toi-même.</div>`);
     el.querySelector('#vrm-eb-refill').onclick = () => { relancer(ad); };
     el.querySelector('#vrm-eb-cdesc').onclick = () => { copyDire(ad.description || '', 'Description'); };
     el.querySelector('#vrm-eb-close').onclick = () => { clearInterval(minuteur); el.remove(); send({ action: 'setPending', ad: null }); };

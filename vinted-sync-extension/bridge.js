@@ -193,6 +193,19 @@
     //    plus relayé du tout.
     if (d.__vmr === 'session') return;
 
+    // ⚠️ LA LIAISON SANS CANAL ADRESSÉ (5.188 — Firefox ne connaît pas
+    //    `externally_connectable`). L'app nomme l'IDENTIFIANT de l'extension
+    //    qu'elle veut joindre : seul le pont de CETTE extension relaie. Une
+    //    autre extension VRM de la page (copie ancienne, autre identifiant) se
+    //    tait. Le service worker revérifie l'origine et applique les mêmes
+    //    règles que le canal adressé (nonce, compte annoncé, une seule fois).
+    if (d.__vmr === 'adresse' && d.reqId) {
+      if (String(d.ext || '') !== idExt || !d.msg || typeof d.msg !== 'object') return;
+      relayer({ from: 'vmr-bridge', action: 'adresse', msg: d.msg },
+        (resp) => poster({ __vmr: 'adresse:result', reqId: d.reqId, ext: idExt, resp: resp || null }));
+      return;
+    }
+
     // Le PDF d'un bordereau Leboncoin (derrière la session Leboncoin : l'app ne
     // peut pas le lire, l'extension si). Simple relais.
     if (d.__vmr === 'pdfLbc' && d.reqId) {

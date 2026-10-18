@@ -73,14 +73,14 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null, ua = null } = {}) {
   // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
   //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
   //    nohover true en mobile, false/false en bureau).
   const ctx = await nav.newContext(telephone
     ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
-    : { viewport: { width: 1512, height: 950 } });
+    : Object.assign({ viewport: { width: 1512, height: 950 } }, ua ? { userAgent: ua } : {}));
   const pg = await ctx.newPage();
   await pg.addInitScript(([s, pr, sans]) => {
     try {
@@ -398,6 +398,23 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     'sur ordinateur, la marche à suivre est bien là');
   dit(bureau.liens.some((h) => /VRM-extension\.zip/.test(h || '')),
     'et le zip aussi');
+
+  // ── 4 quinquies. FIREFOX ET SAFARI (5.188) : LE ZIP EST UN PAQUET CHROMIUM ─
+  // Firefox ne l'installe pas (il lui faut la fiche signée d'addons.mozilla.org,
+  // pas encore en ligne) ; Safari pas du tout. Leur dérouler « chrome://extensions
+  // + Mode développeur + le zip », c'est du travail impossible.
+  console.log('\n── Firefox et Safari sur ordinateur : pas de marche à suivre Chrome');
+  for (const [nom, ua] of [
+    ['Firefox', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.6; rv:143.0) Gecko/20100101 Firefox/143.0'],
+    ['Safari', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15'],
+  ]) {
+    const r = await rendre(nav, { comptes: [], ua });
+    dit(!/chrome:\/\/extensions/i.test(r.txt) && !r.liens.some((h) => /VRM-extension\.zip/.test(h || '')),
+      `${nom} : ni marche à suivre Chrome, ni zip`, r.txt.replace(/\n/g, ' · ').slice(0, 200));
+    dit(/Chrome, Edge, Brave ou Opera/.test(r.txt), `${nom} : on dit dans quel navigateur l'ouvrir aujourd'hui`);
+  }
+  const edge = await rendre(nav, { comptes: [], ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0' });
+  dit(edge.liens.some((h) => /VRM-extension\.zip/.test(h || '')), 'Edge (Chromium) : le zip reste proposé tant que sa boutique n’est pas en ligne');
 
   // ── 5. LA PORTE D'ENTRÉE N'AFFIRME QUE CE QU'ELLE A MESURÉ ────────────────
   // Elle promettait « l'isolation est appliquée par la base » dès que la

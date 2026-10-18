@@ -102,7 +102,7 @@ const projette = (row, sel) => {
 // dont l'extension a été rechargée) · orphelin+ok (l'orphelin ET un pont
 // vivant) · lent (répond au bout de 4 s) · ok ; `connecte` : uid du cookie
 // Vinted ; `vrm` : ce que l'extension dit de sa session VRM.
-const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = undefined, offresAutoLocal = false, verdict = null, extId, besoin = null, vieux = null }) => {
+const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = undefined, offresAutoLocal = false, verdict = null, extId, besoin = null, vieux = null, firefox = false }) => {
   // `vieux` : une COPIE ANCIENNE à côté (elle répond au ping, rien d'autre).
   if (vieux) window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'ping') window.postMessage({ __vmr: 'ready', version: vieux }, '*'); });
   // `__reparer()` : la page de réparation vient de faire ⟳ — le code est celui
@@ -117,17 +117,25 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
   const auMoins = (v, r) => { const a = vn(v), b = vn(r); for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; };
   const neuf = auMoins(version, '5.171.0');
   // `externally_connectable` : seule une extension ≥ 5.171 l'ouvre à la page.
-  if (neuf) {
+  // Ce que l'extension répond à un message ADRESSÉ (canal de Chrome, ou pont de
+  // la page sous Firefox — 5.188) : les mêmes réponses, le même nonce.
+  const repondreAdresse = (id, msg, par) => {
+    window.__externes.push({ id, par, type: msg && msg.type, nonce: msg && msg.nonce, refresh: msg && msg.session ? msg.session.refresh_token : null, raison: msg && msg.raison, force: !!(msg && msg.force) });
+    try { window.__noterPost && window.__noterPost('adresse:' + (msg && msg.type)); } catch (_) {}
+    let r = { ok: false };
+    if (id !== extId) r = undefined;                  // une autre extension : personne ne répond
+    else if (msg.type === 'liaison') {
+      const b = besoin != null ? besoin : !(vrm && vrm.connecte === true) || msg.raison === 'separer' || msg.force;
+      r = b ? { ok: true, besoin: true, nonce: 'n'.repeat(32), raison: 'test' } : { ok: true, besoin: false };
+    } else if (msg.type === 'session') r = msg.nonce === 'n'.repeat(32) ? { ok: true, email: 'vendeur@exemple.test' } : { ok: false, code: 'nonce' };
+    else if (msg.type === 'deconnexion') r = { ok: true };
+    return r;
+  };
+  // Firefox (5.188) : PAS de `chrome.runtime` dans la page — Firefox ne connaît
+  // pas `externally_connectable`. Le message adressé passe par le pont.
+  if (neuf && !firefox) {
     window.chrome = { runtime: { lastError: null, sendMessage(id, msg, cb) {
-      window.__externes.push({ id, type: msg && msg.type, nonce: msg && msg.nonce, refresh: msg && msg.session ? msg.session.refresh_token : null, raison: msg && msg.raison, force: !!(msg && msg.force) });
-      try { window.__noterPost && window.__noterPost('adresse:' + (msg && msg.type)); } catch (_) {}
-      let r = { ok: false };
-      if (id !== extId) r = undefined;                  // une autre extension : personne ne répond
-      else if (msg.type === 'liaison') {
-        const b = besoin != null ? besoin : !(vrm && vrm.connecte === true) || msg.raison === 'separer' || msg.force;
-        r = b ? { ok: true, besoin: true, nonce: 'n'.repeat(32), raison: 'test' } : { ok: true, besoin: false };
-      } else if (msg.type === 'session') r = msg.nonce === 'n'.repeat(32) ? { ok: true, email: 'vendeur@exemple.test' } : { ok: false, code: 'nonce' };
-      else if (msg.type === 'deconnexion') r = { ok: true };
+      const r = repondreAdresse(id, msg, 'canal');
       setTimeout(() => cb && cb(r), 5);
     } } };
   }
@@ -136,6 +144,11 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: neuf ? extId : undefined });
+    // Le pont Firefox ne relaie que ce qui est adressé à SON identifiant.
+    if (firefox && d.__vmr === 'adresse' && d.reqId && d.ext === extId && mode !== 'muette' && !orphelin) {
+      const r = repondreAdresse(d.ext, d.msg || {}, 'pont');
+      setTimeout(() => post({ __vmr: 'adresse:result', reqId: d.reqId, ext: extId, resp: r || null }), 5);
+    }
     // L'ancien bridge.js (5.159 et avant) quand il est orphelin : `repondre(null)`.
     if (orphelin && (d.__vmr === 'etat' || d.__vmr === 'cmd') && d.reqId) post({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: null });
     // Un pont ≥ 5.171 (lu depuis le disque) devant un service worker qui ne
@@ -216,7 +229,7 @@ const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renou
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes', vrai = null, sessionUneFois = false }) {
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes', vrai = null, sessionUneFois = false, firefox = false, extId = null }) {
   const vp = tel ? { width: largeur || 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -232,7 +245,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   // `vrai` : { src, sw } — le VRAI bridge.js d'une extension ancienne, devant un
   // service worker simulé (voir `swSimule`) ; sinon le pont simulé.
   if (vrai) { await pg.exposeFunction('__swAppel', (m) => vrai.sw.handle(m)); await pg.addInitScript(INJECT_VRAI, { src: vrai.src, version: '5.164.0', id: EXT_ID, vieux }); }
-  else await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente, code, offresAutoLocal, verdict, extId: EXT_ID, besoin, vieux });
+  else await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente, code, offresAutoLocal, verdict, extId: extId || EXT_ID, besoin, vieux, firefox });
   // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
   if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
@@ -608,20 +621,37 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       await r.ctx.close(); }
 
     console.log('── iPHONE ÉTROIT (360 px)');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true, largeur: 360 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true, largeur: 360 }); const v = await r.lire();
       dit(v.sw <= v.cw + 1, 'la pastille ne fait pas déborder l’en-tête à 360 px', `${v.sw} > ${v.cw}`);
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'pont-360.png') });
       await r.ctx.close(); }
 
     console.log('── TÉLÉPHONE, base qui ne rend pas le diagnostic');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true, diagKO: true });
+    { const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true, diagKO: true });
       const p = await r.panneau(); await r.pg.waitForTimeout(600);
       const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), t: x.innerText } : null; });
       dit(p && der && der.e === 'passu' && !/il y a/.test(der.t), '« pas su » quand la base ne répond pas — aucune date inventée', JSON.stringify(der));
       await r.ctx.close(); }
 
+    // ── 5.188 : FIREFOX (ordinateur et Android) — pas de canal adressé ──────
+    console.log('── FIREFOX (5.188) : la session passe par le pont, ADRESSÉE à son identifiant');
+    { const FX = 'vrm@vrm.center';
+      const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.188.0', firefox: true, extId: FX, vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
+      const liaisons = v.externes.filter((x) => x.type === 'liaison'), envois = v.externes.filter((x) => x.type === 'session');
+      dit(liaisons.length >= 1 && liaisons.every((x) => x.id === FX && x.par === 'pont'), 'Firefox : l’app demande la liaison par le pont, à l’identifiant de CETTE extension', JSON.stringify(v.externes));
+      dit(r.fourches.length === 1, 'Firefox : la session de l’extension est fabriquée par le serveur (une famille à elle)', JSON.stringify(r.fourches));
+      dit(envois.length === 1 && envois[0].par === 'pont' && envois[0].id === FX && envois[0].nonce === 'n'.repeat(32) && envois[0].refresh === FOURCHE.refresh_token, 'Firefox : la session part par le pont avec le nonce émis par l’extension', JSON.stringify(envois));
+      dit(v.sessions.length === 0, 'Firefox : rien n’est posté en clair comme l’ancien message « session »', JSON.stringify(v.sessions.length));
+      await r.ctx.close(); }
+    console.log('── FIREFOX POUR ANDROID (5.188) : l’extension est SUR le téléphone');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true, version: '5.188.0', firefox: true, extId: 'vrm@vrm.center' }); const v = await r.lire();
+      dit(v.etat && v.etat.niveau === 'ok' && v.etat.code !== 'telephone', 'Firefox Android : l’en-tête dit « Actions possibles » — l’extension agit d’ici, pas par l’ordinateur', JSON.stringify(v.etat));
+      dit(v.boutons.some((x) => x.etat === 'pret' || x.etat === 'generer') && !v.raisons.some((x) => /^telephone/.test(x)), 'Firefox Android : le bouton de bordereau est actif, sans « depuis ton ordinateur »', JSON.stringify({ b: v.boutons.map((x) => x.etat), r: v.raisons }));
+      dit(v.sw <= v.cw + 1, 'Firefox Android : aucun débordement horizontal', `${v.sw} > ${v.cw}`);
+      await r.ctx.close(); }
+
     console.log('── TÉLÉPHONE');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true }); const v = await r.lire();
       dit(!v.boutons.some((x) => x.etat === 'pret'), 'aucun bouton actif sur un téléphone', JSON.stringify(v.boutons.map((x) => x.etat)));
       dit(v.raisons.length === 1 && /^telephone/.test(v.raisons[0]), 'une raison : « depuis ton ordinateur »', JSON.stringify(v.raisons));
       dit(v.etat && v.etat.niveau === 'lecture' && v.etat.code === 'telephone', 'l’en-tête dit « Lecture » sur le téléphone', JSON.stringify(v.etat));

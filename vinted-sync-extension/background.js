@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.187.0';
+const CODE_VERSION = '5.188.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1630,6 +1630,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     //    venait de mourir faisait oublier à l'extension la sienne, saine. La
     //    session arrive maintenant ADRESSÉE, avec un nonce (`onMessageExternal`,
     //    plus haut). Ce relais-ci est refusé, et le dit.
+    // ══ LA LIAISON PAR LE PONT (5.188 — Firefox, et tout navigateur sans
+    // `externally_connectable`) ══════════════════════════════════════════
+    // Firefox ne connaît pas le canal adressé de Chrome : l'app ne peut pas
+    // appeler `chrome.runtime.sendMessage(<identifiant>, …)`. Elle passe donc
+    // par le pont de SA page, et le message reste ADRESSÉ : bridge.js ne le
+    // relaie que s'il nomme l'identifiant de CETTE extension (une copie
+    // ancienne à côté, qui a un autre identifiant ou ne connaît pas ce message,
+    // n'entend rien). Ici : la même origine exigée, les MÊMES trois fonctions
+    // que le canal adressé (nonce de 2 min, une seule fois, compte annoncé) —
+    // aucune règle de plus, aucune de moins.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'adresse') {
+      const src = (sender && sender.origin) || (sender && sender.url) || '';
+      if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine' }); return true; }
+      const m = msg.msg;
+      if (!m || typeof m !== 'object') { sendResponse({ ok: false, code: 'invalide' }); return true; }
+      (async () => {
+        try {
+          if (m.type === 'liaison') { sendResponse(await demanderLiaison(m)); return; }
+          if (m.type === 'session') { sendResponse(await recevoirSessionAdressee(m)); return; }
+          if (m.type === 'deconnexion') { sendResponse(await deconnexionAdressee(m)); return; }
+          if (m.type === 'code') { let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {} sendResponse({ ok: true, code: CODE_VERSION, ext }); return; }
+          sendResponse({ ok: false, code: 'inconnu' });
+        } catch (e) { sendResponse({ ok: false, code: 'erreur' }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
       sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.171)' });
       return true;
@@ -4523,11 +4549,14 @@ function raisonReinjecte(details) {
   const r = details && details.reason;
   return !r || r === 'install' || r === 'update';
 }
+// Firefox (5.188) : le paquet Firefox pose `compat-firefox.js` devant chaque
+// script — un pont réinjecté en a besoin aussi. Chrome n'a pas ce fichier.
+const FICHIERS_PONT = (() => { try { return (typeof browser !== 'undefined' && browser && browser.runtime) ? ['compat-firefox.js', 'bridge.js'] : ['bridge.js']; } catch (_) { return ['bridge.js']; } })();
 async function reinjecterPont() {
   try {
     const tabs = await chrome.tabs.query({ url: APP_URLS });
     for (const t of tabs || []) {
-      try { await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }); } catch (_) {}
+      try { await chrome.scripting.executeScript({ target: { tabId: t.id }, files: FICHIERS_PONT }); } catch (_) {}
     }
   } catch (_) {}
 }

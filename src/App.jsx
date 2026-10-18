@@ -16,6 +16,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
+import { boutiqueIci, estAndroid, pageExtensionsIci, nomNavigateurIci } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -58,7 +59,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.187.0';
+const EXT_ATTENDUE = '5.188.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2478,7 +2479,8 @@ const texteEnLigne = (liveStats) => {
   return String(liveStats.online);
 };
 function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numeros, activite, attr = 'data-ann-fraicheur', style }) {
-  const sansSouris = useSansSouris();
+  // 5.188 : un téléphone qui a l'extension (Firefox pour Android) fait le geste ICI.
+  const sansSouris = useSansSouris() && !vmrExtPresent();
   const [, majExt] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => onVmrExt(majExt), []);
   const [ouvert, setOuvert] = useState(false);
@@ -5940,7 +5942,20 @@ const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 // (la 5.171 et suivantes). `null` = pas de réponse (absente, trop ancienne,
 // code périmé) — jamais une réponse devinée.
 const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.chrome : null; return (c && c.runtime && typeof c.runtime.sendMessage === 'function') ? c.runtime : null; } catch (_) { return null; } };
+// L'identifiant d'une extension : 32 lettres a-p (Chrome, Edge, Opera, Brave),
+// ou celui que déclare le paquet Firefox (`vrm@vrm.center`, 5.188), ou un
+// identifiant Firefox entre accolades. Rien d'autre n'est accepté.
+const ID_EXT = /^(?:[a-p]{32}|[a-z0-9][a-z0-9._-]{0,63}@[a-z0-9][a-z0-9.-]{0,63}|\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\})$/i;
+// ⚠️ 5.188 — FIREFOX NE CONNAÎT PAS `externally_connectable` : la page n'a pas
+//    de `chrome.runtime`. Le message part alors par le pont de la page
+//    (`adresse`), et il reste ADRESSÉ : seul le pont de l'extension NOMMÉE le
+//    relaie, et le service worker applique les mêmes règles (origine, nonce,
+//    compte annoncé). Chrome garde son canal adressé, inchangé.
 function versExtension(id, msg, timeoutMs = 5000) {
+  const rt0 = canalExt();
+  if ((!rt0 || !/^[a-p]{32}$/.test(String(id || ''))) && ID_EXT.test(String(id || '')) && __vmrExtReady) {
+    return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
+  }
   return new Promise((res) => {
     const rt = canalExt();
     if (!rt || !/^[a-p]{32}$/.test(String(id || ''))) { res(null); return; }
@@ -5967,13 +5982,13 @@ if (typeof window !== 'undefined') {
   try {
     const q = new URLSearchParams(window.location.search || '');
     const id = q.get('lier-extension');
-    if (id && /^[a-p]{32}$/.test(id)) {
+    if (id && ID_EXT.test(id)) {
       __lier = { id, at: Date.now(), etat: 'attente' };
       try { sessionStorage.setItem(LIER_CLE, JSON.stringify({ id, at: Date.now() })); } catch (_) {}
       try { q.delete('lier-extension'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
     } else {
       const g = JSON.parse(sessionStorage.getItem(LIER_CLE) || 'null');
-      if (g && /^[a-p]{32}$/.test(String(g.id || '')) && Date.now() - Number(g.at || 0) < 15 * 60000) __lier = { id: String(g.id), at: Number(g.at), etat: 'attente' };
+      if (g && ID_EXT.test(String(g.id || '')) && Date.now() - Number(g.at || 0) < 15 * 60000) __lier = { id: String(g.id), at: Number(g.at), etat: 'attente' };
     }
   } catch (_) {}
 }
@@ -6477,10 +6492,14 @@ const compteEffectif = (sel, connecte, estChoisissable) => {
 // lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
 // `opt.cap` : la capacité qu'exige le geste (bordereau → `commande`, publier →
 // `publication`) ; `opt.role` : ce que fait l'extension, dit dans la phrase.
+const navigateurIciEstFirefox = () => boutiqueIci().nav === 'firefox';
 function raisonExtGlobale(sansSouris, opt) {
   const cap = (opt && opt.cap) || 'commande';
   const role = (opt && opt.role) || 'génère les bordereaux';
-  if (sansSouris) {
+  // 5.188 : un téléphone peut AVOIR l'extension (Firefox pour Android). Elle
+  // répond alors dans ce navigateur : on la traite comme sur un ordinateur, pas
+  // par le relais de l'ordinateur (le relais lui-même s'éteint dans ce cas).
+  if (sansSouris && !vmrExtPresent()) {
     // 5.183 : le RELAIS — l'extension de l'ordinateur agit pour le téléphone.
     // Trois états, jamais deux : vivant · éteint · pas su.
     const rl = etatRelais();
@@ -6508,7 +6527,9 @@ function raisonExtGlobale(sansSouris, opt) {
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
   // Muette : recharger la page suffit après une mise à jour (l'ancien pont est
   // resté dans la page) ; si non, c'est le service worker — ⟳ dans ce Chrome.
-  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page ; si ça ne suffit pas, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce Chrome)." };
+  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: navigateurIciEstFirefox()
+    ? "L'extension ne répond pas — recharge cette page ; si ça ne suffit pas, ouvre about:addons et désactive puis réactive VRM (dans ce Firefox)."
+    : `L'extension ne répond pas — recharge cette page ; si ça ne suffit pas, ouvre ${pageExtensionsIci()} et clique ⟳ sur VRM (dans ce ${nomNavigateurIci()}).` };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
   // ⚠️ « Pas su » ne vaut pas « oui » (revue du 5 octobre) : sans réponse sur
@@ -12543,6 +12564,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   //    « clique son icône, puis « Se connecter avec VRM » » nommait un bouton que
   //    sa fenêtre n'a pas. Les mêmes voies que l'en-tête (`voieConnexionExt`).
   const voie = voieConnexionExt();
+  const boutique = boutiqueIci();
   const [deconnectee, setDeconnectee] = React.useState(false);
   const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
@@ -12608,6 +12630,16 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     </>
   ) : etape === 'muette' ? (
     <p style={{margin:0}}>Ton extension est bien là, mais elle ne m’a pas répondu quand je lui ai demandé sous quel compte elle écrit. Recharge la page, je lui redemande.</p>
+  ) : (sansSouris && boutique.nav === 'firefox' && estAndroid() && boutique.lien) ? (
+    /* 5.188 : Firefox pour Android ACCEPTE l'extension — mais seulement depuis
+       sa boutique (aucun zip ne s'installe sur un téléphone). Lien PUBLIÉ
+       seulement (`LIENS_BOUTIQUES`) : sinon, la phrase d'avant. */
+    <>
+      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+        <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
+      )}
+      <p style={{margin:0}} data-premiers-boutique="firefox-android">Sur ton téléphone, Firefox accepte l’extension&nbsp;: installe-la depuis la boutique de Firefox (bouton ci-dessous), puis reviens ici — l’écran avance tout seul.</p>
+    </>
   ) : sansSouris ? (
     /* ⚠️ Dérouler la marche à suivre Chrome sur un appareil qui ne peut pas la
        suivre, c'est donner du travail impossible — et proposer d'y télécharger
@@ -12619,6 +12651,28 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       <p style={{margin:0}}>
         Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas.
         Ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul.
+      </p>
+    </>
+  ) : boutique.lien ? (
+    /* 5.188 : la fiche de CE navigateur est publiée — un seul geste, « Ajouter ». */
+    <>
+      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+        <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici. Elle ne touche jamais à ton mot de passe Vinted.</p>
+      )}
+      <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
+    </>
+  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari') ? (
+    /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
+       Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
+       Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
+    <>
+      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+        <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
+      )}
+      <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
+        {boutique.nav === 'firefox'
+          ? <>La version Firefox de l’extension n’est pas encore en ligne dans la boutique de Firefox. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
+          : <>Safari n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
       </p>
     </>
   ) : (
@@ -12646,8 +12700,12 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
   // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
-  const bouton = (!fait.ext && sansSouris)
+  const bouton = (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
+    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
+    : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
+    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari'))
+    ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
     : majLiaison
