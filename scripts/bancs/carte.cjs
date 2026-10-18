@@ -158,7 +158,7 @@ function prepareRelais(purch){
   dit(p1.etat.relais===0, 'la recherche de points relais par ville, retirée (§4.11), ne repart pas', p1.etat.relais+' appel(s) à /api/relais');
   dit(!p1.v.garde && p1.errs.length===0, "l'écran Achats s'affiche (ni garde-fou ni erreur de page)", p1.errs.slice(0,2).join(' | '));
   dit(p1.v.total!=null && p1.v.actifs>=1, 'il y a au moins un colis à retirer à cocher', `total=${p1.v.total} · boutons ✓ Retiré=${p1.v.actifs} · en gris=${p1.v.gris}`);
-  const CLES=['vinted_pickup_done','vrm_colis_collected'];
+  const CLES=['vinted_pickup_done','vinted_pickup_done_at','vrm_colis_collected','vrm_colis_collected_at'];
   const lireLS=(pg)=>pg.evaluate(k=>{const o={};for(const x of k)o[x]=localStorage.getItem(x);return o;},CLES);
   const avant=await lireLS(p1.pg);
   const cliqué=await p1.pg.evaluate(()=>{const x=document.querySelector('button[title="J\'ai retiré ce colis"]'); if(!x) return false; x.click(); return true;});
@@ -167,19 +167,21 @@ function prepareRelais(purch){
   const apres=await lireLS(p1.pg);
   // ce que l'app a ÉCRIT en cochant : la clé qui a changé, et sa valeur entière
   const changees=CLES.filter(k=>apres[k]!==avant[k]);
-  dit(cliqué && changees.length===1, 'cocher « ✓ Retiré » écrit un réglage synchronisé', changees.join(',')||'rien écrit');
+  dit(cliqué && changees.length>=1, 'cocher « ✓ Retiré » écrit un réglage synchronisé', changees.join(',')||'rien écrit');
   dit(p1.v.total!=null && ref.total===p1.v.total-1 && ref.gris===p1.v.gris+1, 'référence : coché ici, le total baisse de un et le colis reste en gris', `total ${p1.v.total}→${ref.total} · gris ${p1.v.gris}→${ref.gris}`);
   await p1.pg.screenshot({path:SC+'/z-carte'+(W<500?'-tel':'')+'.png',fullPage:true});
   await p1.ctx.close();
 
   // ── Passe 2 : appareil NEUF, la même coche n'existe QUE dans le nuage ──────
-  if(changees.length===1){
-    const k=changees[0];
+  if(changees.length>=1){
+    // Tout ce que la coche écrit part au nuage (la coche ET son heure : sans
+    // l'heure, l'app ne sait pas depuis quand il attend la confirmation).
     const main2=JSON.parse(JSON.stringify(main));
-    main2[0].data[k]=JSON.parse(apres[k]);
+    for(const k of changees) main2[0].data[k]=JSON.parse(apres[k]);
     const p2=await rendre(b,{main:main2,purch,delaiMain:1500});
-    const lsK=await p2.pg.evaluate(x=>localStorage.getItem(x),k);
-    dit(lsK===apres[k], 'le nuage a bien livré la coche à cet appareil', lsK===apres[k]?k:'localStorage ≠ nuage');
+    const ls=await p2.pg.evaluate(ks=>ks.map(x=>localStorage.getItem(x)),changees);
+    const okLs=changees.every((k,i)=>ls[i]===apres[k]);
+    dit(okLs, 'le nuage a bien livré la coche à cet appareil', okLs?changees.join(','):'localStorage ≠ nuage');
     dit(p2.v.total===ref.total, 'premier écran ouvert : le colis coché ailleurs ne compte plus dans « à retirer »', `affiché ${p2.v.total} · attendu ${ref.total} (comme après la coche locale)`);
     dit(p2.v.gris===ref.gris && p2.v.actifs===ref.actifs, '… et il reste visible en gris, pas caché', `en gris ${p2.v.gris}/${ref.gris} · à cocher ${p2.v.actifs}/${ref.actifs}`);
     dit(p2.etat.relais===0 && !p2.v.garde && p2.errs.length===0, 'appareil neuf : aucune recherche par ville, aucun écran tombé', `${p2.etat.relais} appel(s) · ${p2.errs.slice(0,2).join(' | ')}`);

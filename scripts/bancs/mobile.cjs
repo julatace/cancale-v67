@@ -76,7 +76,7 @@ async function brancher(p){
       check(geometrie.nav.bottom<=844.5&&geometrie.main.bottom<=geometrie.nav.top+.5,largeur+' '+tab+' navigation hors du contenu');
       if(tab==='cat_ventes'){
         await p.locator('.vrm-sale-row').first().waitFor();
-        check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===64,largeur+' photo de vente compacte');
+        {const lg=(await p.locator('.vrm-sale-photo').first().boundingBox()).width;check(lg>=52&&lg<=64,largeur+' photo de vente compacte ('+lg+' px)');}
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
@@ -94,7 +94,8 @@ async function brancher(p){
     const champs=p.locator('main input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])');
     check((await champs.evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().height>0).every(e=>parseFloat(getComputedStyle(e).fontSize)>=16))),largeur+' champs lisibles sans zoom automatique');
     await p.getByRole('button',{name:'Voir la synchronisation'}).tap();
-    check(await p.getByText('Paramètres',{exact:true}).isVisible(),largeur+' synchronisation accessible au toucher');
+    check(await p.getByText('Paramètres',{exact:true}).first().isVisible(),largeur+' synchronisation accessible au toucher');
+    if(!(await p.getByRole('button',{name:'Grand',exact:true}).count())) await p.getByText("Taille de l'affichage",{exact:true}).first().tap();   // (16 oct.) Réglages en sous-écrans
     await p.getByRole('button',{name:'Grand',exact:true}).tap();
     await p.waitForTimeout(120);
     check(await p.evaluate(()=>document.querySelector('.vrm-mobile-nav').getBoundingClientRect().bottom<=844.5),largeur+' grand affichage: navigation toujours dans l’écran');
@@ -113,13 +114,12 @@ async function brancher(p){
     await ctx.close();
   }
   const ctx=await b.newContext({viewport:{width:1512,height:950}});const p=await ctx.newPage();await brancher(p);await p.addInitScript(()=>localStorage.setItem('vrm_zoom','1'));await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
-  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Ouvrir les paramètres'}).isVisible(),'ordinateur: paramètres dans l’île');check((await p.locator('.vrm-sale-photo').first().boundingBox()).width===72,'ordinateur: disposition conservée');
-  await p.getByText('Autres outils',{exact:true}).click();
-  check(await p.getByRole('button',{name:'Factures',exact:true}).isVisible(),'ordinateur: outils repliés accessibles');
-  await p.getByText('Détails Vinted',{exact:true}).click();
-  check(!(await p.getByRole('button',{name:'Annonces',exact:true}).isVisible()),'ordinateur: détails secondaires repliables');
-  await p.getByText('Détails Vinted',{exact:true}).click();
-  await p.getByRole('button',{name:'Annonces',exact:true}).click();
+  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');{const lg=(await p.locator('.vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine ('+lg+' px)');};
+  // (17 oct.) Le rail n'a plus de groupes repliés : Gestion est toujours visible, Factures vit dans Comptabilité.
+  const rail=p.locator('.vrm-atelier-rail');
+  check(await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
+  await rail.getByRole('button',{name:'Vinted',exact:true}).click();
+  await p.getByRole('button',{name:'Annonces',exact:true}).first().click();
   await p.getByRole('heading',{name:'Annonces en ligne'}).waitFor();
   check(await p.getByRole('heading',{name:'Annonces en ligne'}).isVisible(),'ordinateur: annonces accessibles depuis le rail');
   if(process.env.BANC_CAPTURES){await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'ventes-desktop.png')});}

@@ -39,11 +39,17 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   await pg.goto('http://localhost:4341/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(4000);
-  const n=await pg.evaluate(()=>[...document.querySelectorAll('button')].filter(b=>/Coût d'achat/i.test(b.textContent)).length);
-  dit(n>0, 'la case « Coût d\'achat » est cliquable sur l\'écran Ventes', n+' trouvée(s)');
+  // (30 sept.) Sans aucun prix d'achat, la case « Coût d'achat » se tait et c'est
+  // « Bénéfice estimé — » qui ouvre la saisie : une absence, une case (§7).
+  const PORTE=/Coût d'achat|Bénéfice estimé/i;
+  // Les totaux vivent dans « Analyse de tes ventes » (repliée par défaut).
+  await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Analyse de tes ventes/.test(x.textContent)&&/voir/.test(x.textContent)); if(b) b.click();});
+  await pg.waitForTimeout(600);
+  const n=await pg.evaluate((src)=>{const re=new RegExp(src,'i');return [...document.querySelectorAll('button')].filter(b=>re.test(b.textContent)).length;}, PORTE.source);
+  dit(n>0, 'la case qui ouvre la saisie des prix d\'achat (« Coût d\'achat » ou « Bénéfice estimé ») est cliquable sur l\'écran Ventes', n+' trouvée(s)');
   if(!n){ await pg.screenshot({path:SC+'/s-ventes.png'}); await b.close(); srv.close(); process.exit(1); }
   const t0=Date.now();
-  await pg.evaluate(()=>[...document.querySelectorAll('button')].find(b=>/Coût d'achat/i.test(b.textContent)).click());
+  await pg.evaluate((src)=>{const re=new RegExp(src,'i');[...document.querySelectorAll('button')].find(b=>re.test(b.textContent)).click();}, PORTE.source);
   for(let i=0;i<300;i++){ const ok=await pg.evaluate(()=>/Prix d'achat à compléter|prix d'achat/i.test(document.body.innerText||'')&&document.querySelectorAll('input').length>20); if(ok) break; await pg.waitForTimeout(20); }
   // ⚠️ PLANCHER MESURÉ. Avant `prepAchat`, la modale comparait 288 paires ×
   // 544 achats en ré-épluchant le titre à chaque fois — **3 530 ms** pour
