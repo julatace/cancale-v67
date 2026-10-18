@@ -4378,6 +4378,21 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
   copies prises), refusé dès qu'un numéro a bougé.
 
+### ⚠️⚠️ La ligne `main` ne s'enregistrait plus depuis la 013 — migration 017 (18 octobre)
+Mesuré (journaux Postgres, lecture seule) : depuis le 11 octobre 14:58, CHAQUE
+écriture de `main` par un navigateur était annulée à 8 s (57014) dans
+`vrm_garde_numeros()` — jointure `jsonb_each … join jsonb_each` où le filtre du
+côté nouveau (`vrm_cle_num`, non inlinable) était rejoué ~450 × 509 fois. Les
+fiches N°25+, prix d'achat et réglages ne vivaient que dans ses navigateurs
+(cause probable du 80/81 et de la file Leboncoin plus courte qu'eBay).
+`017-garde-numeros-rapide.sql` : même règle, mêmes refus, mêmes messages ;
+chaque côté calculé une fois (CTE matérialisées). **Appliquée en production le
+18 octobre** (corps md5 identique au fichier ; celui d'avant était identique à
+la 013). `audit-garde-numeros-rapide.cjs` (Postgres jetable, volume mesuré,
+données inventées) : 8 cas, mêmes verdicts que la 013, 0,2 s au lieu de 6,5 s.
+⚠️ Julien ne doit ni se déconnecter ni vider ses données de navigateur tant que
+chaque appareil n'a pas réécrit `main` (la première ouverture le fait).
+
 ### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
@@ -9299,6 +9314,18 @@ lui), vert après.
 - **Vente annulée** : `purgeBordereauxAnnules` (à chaque visite, 20 min de recul) — transaction 500-520 dont l'expédition n'a pas bougé ⇒ PDF retiré de `email_bord_{tx}`, `harvest_{uid}_label_{tx}` et `label_latest` qui la porte, sans attendre 7 jours, métadonnée gardée (`annulee: true`), l'app prévenue (`maj · annulee · tx`). Lecture ratée ⇒ rien. Mesuré : 3 ventes 520 ont encore un bordereau. `audit-purge-bordereaux.cjs` §6-7 (2 rouges sur l'avant ; mutation « expédition jamais bougée » ⇒ 2 rouges).
 - Extension **5.185.0**, zip régénéré, `EXT_ATTENDUE` suivie, `EXT_CAPACITES.lbcpack` / `.annulee`.
 
+### Extension 5.186 — booster Leboncoin impossible, publication gratuite jusqu'au bout, compte de session, couleur (17-18 octobre)
+- ⚠️⚠️ **Le boost Leboncoin est IMPOSSIBLE par construction** (sa plainte : un dépôt a coché une option payante). Cause : `cliquerContinuer` cliquait « Continuer » sur l'étape `/deposer-une-annonce/options` alors qu'une option était pré-cochée. Désormais : `cliquerContinuer` refuse sur l'étape de publication et tout bouton portant un prix (`PRIX_ARGENT`) ; `publierSansBooster` choisit d'abord le radio GRATUIT, décoche les six options (`gallery`, `gallery30`, `daily_bump`, `daily_bump30`, `sub_toplist`, `urgent`, `NOM_BOOST`), RELIT deux fois, et ne clique qu'un bouton de publication jamais chiffré, jamais « annuler/retour », jamais dans une carte d'option (`dansCarteOption`). Un doute ⇒ rien n'est cliqué, et le bandeau dit pourquoi. Photos pas envoyées (`photosPretes`, `sessionStorage`) ⇒ pas de publication.
+- **Publication confirmée, pas supposée** : la page `/deposer-une-annonce/confirmation` (`PAGE_CONFIRMATION`, `confirmerDepot`) marque la paire publiée (`markPosted`) ; un dépôt abandonné ne marque RIEN (clic sans confirmation en 30 s ⇒ « pas su », dit).
+- **Le bon compte Leboncoin** : identité lue dans les réponses de SESSION seulement (`LBC_URL_SESSION`, drapeau `courant`, l'objet doit porter un email) — une liste de comptes liés ou une annonce d'autrui ne nomme plus le compte courant ; `vrmLbcCompte` en `v:2` (le badge exige `v===2`).
+- **Couleur** : lue sur l'annonce Vinted (`color1`/`color2`, gardés dans `articleMaigre`), posée sur Leboncoin par OPTION EXACTE seulement (`optionCouleurExacte`, `choisirCouleur`) ; rien d'exact ⇒ laissée vide et dite. **Marque/taille/état** : `brand_title`, `size_title`, `status` gardés dans `articleMaigre` ; l'app lit la marque du dressing d'abord, le coffre en repli.
+- **Retrait d'argent** : la FORME de `POST /api/v2/users/{id}/payouts` est relevée (`WREQ_FORME`, `formeCorps` : clés et types, jamais une valeur) ; VRM ne l'appelle toujours pas.
+- **Relais du téléphone, pont, commandes** : vérifiés avec la 5.186 (bancs `relais-telephone`, `pont`, `publier`, `popup`, `badge` verts).
+- ⚠️⚠️ **« La file Leboncoin a moins de paires qu'eBay » — MESURÉ, et ce n'est pas l'extension** (lecture seule, 18 oct.) : la ligne `main` de Julien dans le NUAGE ne porte que les N° **1 à 24** (dont 15 en ligne) — les N° posés depuis ne vivent que dans ses appareils (écritures de `main` en échec depuis le 11 oct., voir « Une paire, une proposition »). La file Leboncoin (extension ET écran Leboncoin de l'app) lit `main` dans le nuage ; la liste eBay de l'app lit la copie LOCALE (`load('vinted_annonce_numeros')`). Les deux règles sont par ailleurs les mêmes (comptes écartés, vendue prouvée, retirée du stock, déjà publiée) ; seules différences légitimes : Leboncoin coché par défaut, et une paire déjà sur Leboncoin (réf VRM 2, 18, 23 captées ; 3 marquées) sort de sa file au lieu d'être grisée. **Geste : réparer l'écriture de `main`** (hors extension). Le « nXXX » d'un titre Vinted reste une clé de repli (0 titre en ligne n'en porte aujourd'hui) — à retirer des deux côtés ensemble (§11) quand on y touche.
+- Preuves : `audit-extension-5186.cjs` (12 contrôles, 7 rouges sur la 5.185) ; banc `leboncoin.cjs` fixtures `optionsreel` (vraie forme des six cases) et `confirmation` : **11 rouges sur l'ancien `lbc.js`**, dont `__paye=1` (un bouton payant cliqué).
+- ⚠️ **Non mesuré** : la vraie page d'options et de confirmation de leboncoin.fr (403 d'ici ; formes tirées de `lbc_recon.etapes`) ; la forme réelle de la réponse des packs et de la demande de retrait.
+- Extension **5.186.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : des corrections et des mesures.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -9844,6 +9871,16 @@ couleur les numéros vendus ». Les règles vivent dans **`src/stockRegles.js`**
   de la vue du dessus sur une très grande pièce ; Julien n'a pas encore ouvert sa
   pièce réelle avec ce code (lecture seule de sa base : 2 pièces, 8 meubles).
 
+### Stock, finitions (chantier 11, 17 octobre) — la pile ne « décolle » plus, deux modes, ranger d'un geste
+Julien : « cet onglet doit être revu intégralement » (pile qui décolle, hauteur des étagères, rangement plus simple, refonte).
+- **La pile** : retirer le carton du bas ne fait descendre que SA colonne d'un cran (`retirerDePile`, local à la colonne ; avant, la liste entière se décalait et « tout décollait »), sans rebond ; `ajouterAPile`, `cartonsDePile`, `prochainePlaceMeuble` (la plus BASSE place libre d'abord) dans `src/stockRegles.js`.
+- **Réglages d'un meuble** (mode Aménager) : nombre de niveaux, hauteur d'un niveau (`changerNiveau` : refusé au-delà du plafond, ou si une boîte déjà rangée ne tient plus — dit, un seul toast : un même message ne s'empile plus), largeur, profondeur. Étagère à bacs (1 par case), cintres de face.
+- **Deux modes** (`data-mode-stock`) : **Ranger** (défaut ; aucun réglage à l'écran) et **Aménager** (le dépliant et les réglages). Une pièce VIDE s'ouvre en Aménager (rien à ranger). Barre au-dessus de la 3D : modes + recherche d'un N° qui nomme le meuble et la case. Onglet « Ranger » renommé « Liste des cases ».
+- **Ranger d'un geste** : toucher une place libre range directement (le meuble n'a plus à être choisi d'abord ; toucher une boîte, elle, choisit) ; bande « À ranger » (`data-bande-a-ranger`, seulement quand la liste des paires présentes est LUE) — toucher une paire puis une place, « Ranger ici » (prochaine place libre), ou la glisser (souris ou doigt) dans la pièce (`viseurRef` de `Room3D` : la cible est celle que vise la 3D). Un N° déjà rangé ailleurs n'est pas reposé (`dejaPoseOu`). Aucun numéro ne change.
+- **Sans WebGL** : la forme libre est dessinée (`PlanSecours`) ; étiquettes 3D à taille constante, sans chevauchement ; photo du local retirée.
+- Preuves : `audit-stock-plan.cjs` (`--prouve` 8/8) ; banc `stock-finitions.cjs` (sections I–VIII, 78 contrôles, 390 et 1512 px) — VII et VIII : **9 rouges sur 6c73bfd** (§6.1, banc copié dans l'arbre, build refait là) ; mutation « place libre jamais touchée d'un geste + dépôt ignoré » ⇒ 4 rouges. `stock-piece` (B choisit l'étagère par une boîte), `garage3d`, `rangement`, `premierjour` verts. `compta-stock-ui` : 2 rouges sur le placeholder SIRET de la Compta (#561, hors Stock).
+- **Non mesuré** : un vrai téléphone et un vrai WebGL (banc en rendu logiciel) ; sa pièce réelle porte des étagères métal qui se chevauchent (laissées telles quelles, à lui de les déplacer).
+
 ### Plateformes plus vivantes, ventes même vides, eBay plus complet (17 octobre)
 Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonces).
 - **En-tête des plateformes** : une tuile de marque (la marque dans SA couleur
@@ -9859,8 +9896,9 @@ Demande de Julien du 17 octobre (chantier 6 : eBay, mise en page, ventes, annonc
   haut se tait : il disait les mêmes montants (§7). Vinted avait déjà les siennes.
 - **Publication eBay pré-remplie depuis la paire** : choisir une paire LANCE
   l'analyse eBay (catégorie + caractéristiques, une lecture) sans second clic.
-  ⚠️ Mesuré : le dressing Vinted ne porte **pas** la marque (0 sur 271 annonces),
-  c'est pour ça qu'elle ne se remplissait pas. Elle vient du **coffre**
+  ⚠️ **Corrigé le 17 oct. (5.186)** : le dressing PORTE la marque (`brand`,
+  372 sur 373 — « 0 sur 271 » lisait le mauvais champ, `brand_title`, que
+  l'allègement jetait). Elle est lue là d'abord ; repli : le **coffre**
   (`coffre_{uid}_{id}.brand`, 401 fiches sur 632), lu en scalaires et paginé.
   L'état Vinted de l'annonce (`status`) donne l'état eBay (`etatEbayDeVinted` :
   neuf avec étiquette → 1000, neuf sans → 1500, occasion → 3000), seulement vers
@@ -10285,3 +10323,12 @@ Suite du chantier eBay (« toutes les fonctionnalités d'eBay dans l'app »). Mo
 - Tous les gestes : `confirme` exigé AVANT le jeton, journalisés (`executerAvecJournal`), coupure/5xx ⇒ `incertain` ; droit refusé ⇒ « reconnecte », forme inattendue ⇒ « illisible », jamais une liste vide.
 - Preuves : `scripts/bancs/ebay-apres-vente.mjs` (53 contrôles, faux eBay à la forme documentée ; rouge sur l'avant ; mutations « montant non revérifié » et « commande pas marquée » ⇒ rouges) ; `scripts/bancs/ebay-apres-vente-ecran.cjs` (port `BANC_PORT`, 390/1512 px, 16 contrôles par taille ; 8 rouges sur le build d'avant).
 - ⚠️ **Non mesuré** (rien envoyé à eBay) : chemins, champs (`members`, `cancellations`, `sellerTotalRefund`, `ads`, `responses`), états (`RETURN_REQUESTED`, `CANCEL_REQUESTED`) et l'en-tête IAF viennent de la doc d'eBay ; que le jeton OAuth actuel ouvre la Post-Order API (sinon « reconnecte ») ; le droit `sell.marketing` accordé au keyset de production.
+
+### Une paire, une proposition : jumelles par photo, « Description » retirée, cartes à publier (17 octobre)
+Julien : la N°80 et la N°81 proposées toutes les deux, publiée deux fois sur eBay ; « Description » dans le texte eBay ; visuel des paires à publier.
+- **« Description »** : libellé collé capté de la page Vinted (« Descriptionautry reelwind… »). `descriptionEbayPropre` (sur `lbcDescription`, copie partagée non touchée) le retire aux trois entrées eBay (paires, choix de paire, brouillon) ; une description qui n'est QUE le libellé vaut vide. Jamais une vraie description.
+- **Jumelles par PHOTO EXACTE** (`jumellesParPhoto`, clé `photoKey` du fichier : 0 collision mesurée, jamais le titre, §5) : deux fiches au même fichier de photo sont la même paire. eBay : `dejaSurEbay` porte la jumelle (`via`) ⇒ « Publier », le planificateur et la liste refusent la seconde (« déjà sur eBay sous la N°X, même photo ») ; la liste ne propose qu'une des deux (celle déjà sur eBay, sinon l'annonce la plus récente) et le DIT (`data-jumelles-masquees`). Leboncoin : la file garde les mêmes N° que l'extension (§11), la jumelle est marquée et n'a pas de bouton Publier (`data-apub-jumelle`).
+- **Cartes** (`vrm-apub-carte`, styles-plateformes.css) : photo, N°, prix, titre, pastilles, vignettes, un bouton Publier, liens ; grille 1/2/3 colonnes ; sombre par les variables de la coque.
+- ⚠️ **Mesuré (lecture seule)** : la N°80 et la N°81 n'existent PAS dans `main` — la ligne n'est plus écrite depuis le 11 octobre 14:58 (pool 558 B + 1…24 ; 208 POST `app_data` en 500 en 24 h, timeouts 57014 à 8 s). Les fiches 25 et suivantes, prix d'achat et réglages ne vivent que sur ses appareils : deux appareils peuvent donner deux N° à la même annonce — cause probable du 80/81. **Pas corrigé ici** (production en lecture seule) : à traiter en priorité.
+- Preuves : banc `cross-post.cjs` (port 7210, données inventées, eBay + Leboncoin 1512/390/sombre) **19 rouges sur 9b55e48**, 0 après ; `lbc-preuve`, `ebay-*`, `plateformes-premium`, `lbc-publier-app`, `annonces-carte` et tous les audits verts.
+- ⚠️ Banc en sombre : la bascule « Minéral » (`vrm_bascule_mineral_v1`, un drapeau de `localStorage`) remet `vinted_dark` à faux à l'arrivée du nuage ; un banc sombre doit poser ce drapeau.

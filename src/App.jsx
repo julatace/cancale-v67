@@ -1,5 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, estPoseSur, caler } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -58,7 +58,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.185.0';
+const EXT_ATTENDUE = '5.186.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -152,6 +152,16 @@ const lbcDescription = (brut) => {
   if (!t) return '';
   if (PAS_UNE_DESCRIPTION.test(t)) return '';
   return t.replace(/^\s*Description\s*(?=\S)/, '').trim();
+};
+
+// (17 oct.) La description qui part sur eBay : la règle de Leboncoin (§11 —
+// texte publicitaire de Vinted écarté, libellé « Description » collé retiré),
+// plus les deux restes que le libellé peut laisser : un « : » de tête, ou le
+// mot « Description » tout seul (Julien : « j'ai "description" qui s'affiche
+// dans la description, ça ne sert à rien »). Jamais une vraie description.
+const descriptionEbayPropre = (brut) => {
+  const t = lbcDescription(brut).replace(/^[:\-–]\s*/, '').trim();
+  return /^description$/i.test(t) ? '' : t;
 };
 
 const LBC_TITRE_MAX = 50;
@@ -10267,7 +10277,9 @@ const toast = (msg, type) => {
   const t = type || (/^(⚠|❌|erreur|échec|impossible|invalide)/i.test(text.trim()) ? 'err'
                     : /^(✓|✅)/.test(text.trim()) ? 'ok' : 'info');
   const id = ++_toastId;
-  _toasts = [..._toasts.slice(-3), { id, text, type: t }];
+  // Le même message redit (un réglage cliqué plusieurs fois) remplace le précédent :
+  // quatre bulles identiques empilées ne disent rien de plus qu'une (§7).
+  _toasts = [..._toasts.filter(x => x.text !== text).slice(-3), { id, text, type: t }];
   _emitToasts();
   setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
 };
@@ -13754,7 +13766,7 @@ function itemDeBrouillon(d) {
       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
     }
   }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -14405,7 +14417,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             // Seulement si c'est toujours CETTE paire, et sans écraser des photos retirées à la main.
             if (pairCourante.current !== p.id) return;
             setPhotos((old) => (old.split(/\s+/).filter(Boolean).length <= (p.photos || []).length ? lues.join('\n') : old));
-            if (!String(p.desc || '').trim() && d.description) setDesc((old) => old.trim() ? old : String(d.description));
+            if (!String(p.desc || '').trim() && descriptionEbayPropre(d.description)) setDesc((old) => old.trim() ? old : descriptionEbayPropre(d.description));
             setPhotosEtat('fait');
           } else setPhotosEtat({ raison: "Vinted n'a rendu aucune photo" });
         } catch (_) { setPhotosEtat({ raison: 'la base ne répond pas' }); }
@@ -14578,7 +14590,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       const t = deja.debut && Number.isFinite(Date.parse(deja.debut)) ? ` (${quandParisTexte(Date.parse(deja.debut))})` : '';
       return deja.etat === 'programmee'
         ? { k: 'deja-programmee', t: `La paire N°${n} est déjà programmée sur eBay${t} — une paire, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
-        : { k: 'deja-en-ligne', t: `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
+        : { k: 'deja-en-ligne', t: deja.via ? `Cette paire est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — une paire, une annonce : rien ne sera publié.` : `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
     }
     if (!pairSel) {
       if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `La paire N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-la en ligne sur Vinted, puis reviens.` };
@@ -14643,7 +14655,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
   const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
-  const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
+  // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
+  // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
+  // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.
+  const jumelles = React.useMemo(() => jumellesParPhoto(paires, (k) => !!(dejaSurEbay && typeof dejaSurEbay.has === 'function' && dejaSurEbay.has(k) && !(dejaSurEbay.get(k) || {}).via)), [paires, dejaSurEbay]);
+  const listePaires = paires.filter(p => { const j = jumelles.get(String(p.id)); if (j && j.gardeId !== String(p.id)) return false; const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
+  const nJumellesMasquees = paires.filter(p => { const j = jumelles.get(String(p.id)); return j && j.gardeId !== String(p.id); }).length;
   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
@@ -14719,6 +14736,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
+                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Une paire porte deux N° (même photo sur deux fiches) : elle n\'est proposée qu\'une fois.' : `${nJumellesMasquees} paires portent deux N° (même photo sur deux fiches) : chacune n'est proposée qu'une fois.`}</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -14726,7 +14744,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
-                          return ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}</b> : null; })()}</span>
+                          const jm = jumelles.get(String(p.id));
+                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même paire que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
                   ))}
@@ -14931,13 +14950,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {}, marque = {}, taille = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -14958,10 +14977,45 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       // (17 oct.) L'ÉTAT écrit par Vinted sur l'annonce (« Très bon état ») —
       // un fait capté, il sert à pré-remplir l'état eBay (jamais deviné).
       if (typeof it.status === 'string' && it.status.trim()) etat[id] = it.status.trim();
+      // (17 oct., remesuré) LA MARQUE ET LA TAILLE SONT DANS LE DRESSING : `brand`
+      // (372 annonces sur 373) et `size`, en texte, tels que Vinted les affiche.
+      // La mesure « 0 sur 271 » cherchait `brand_title`, que ce point d'API
+      // n'envoie pas. Le dressing d'abord, le coffre en repli (useEbayPaires).
+      const mq = it.brand_title || it.brand;
+      if (typeof mq === 'string' && mq.trim()) marque[id] = mq.trim();
+      const tl = it.size_title || it.size;
+      if (typeof tl === 'string' && tl.trim()) taille[id] = tl.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat, marque, taille };
 };
+// (17 oct.) UNE PAIRE, UNE PROPOSITION — Julien : « une paire est deux fois
+// proposée, la 80 et la 81 … et ça me propose de la publier sur eBay, je l'ai
+// donc publiée deux fois ». La liste se dédoublonnait par NUMÉRO : deux fiches
+// (deux annonces Vinted : une republication, ou un numéro posé deux fois) se
+// présentaient comme deux paires. L'IDENTITÉ est la PHOTO EXACTE (§5 : même
+// fichier = certain, mesuré 0 collision sur 261 annonces — le dossier seul en
+// donne 17, il ne compte pas ici). Jamais le titre. Rend id → { gardeId,
+// gardeNum, autres:[N°] } pour les paires qui partagent une photo ; la paire
+// retenue est celle déjà sur eBay, sinon l'annonce la plus récente.
+function jumellesParPhoto(paires, estPris) {
+  const liste = Array.isArray(paires) ? paires : [];
+  const cles = (x) => [...new Set([x && x.photoK, x && photoKey(x.cover), x && photoKey(Array.isArray(x.photos) ? x.photos[0] : null)].filter(Boolean))];
+  const parent = liste.map((_, i) => i);
+  const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const vu = new Map();
+  liste.forEach((x, i) => { for (const k of cles(x)) { if (vu.has(k)) parent[racine(i)] = racine(vu.get(k)); else vu.set(k, i); } });
+  const groupes = new Map();
+  liste.forEach((x, i) => { const r = racine(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(x); });
+  const pris = (n) => !!(typeof estPris === 'function' && n && estPris(cleNum(n)));
+  const out = new Map();
+  for (const g of groupes.values()) {
+    if (g.length < 2) continue;
+    const tri = [...g].sort((a, b) => (pris(b.num) ? 1 : 0) - (pris(a.num) ? 1 : 0) || (Number(b.id) || 0) - (Number(a.id) || 0));
+    for (const x of g) out.set(String(x.id), { gardeId: String(tri[0].id), gardeNum: tri[0].num, autres: g.filter((y) => y !== x).map((y) => y.num) });
+  }
+  return out;
+}
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
   const [enLigne, setEnLigne] = React.useState(undefined);
@@ -14983,7 +15037,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -14995,9 +15049,9 @@ function useEbayPaires(comptes) {
       // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
       // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
       // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
-      // description. Le dressing, lui, ne porte pas la marque (mesuré : 0 sur
-      // 271 annonces) — c'est pour ça que « la marque ne s'est pas remplie
-      // toute seule ». Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
+      // description. ⚠️ Remesuré le 17 oct. : le dressing PORTE la marque
+      // (`brand`, 372/373) — elle est lue là d'abord, le coffre n'est qu'un
+      // repli (annonce absente du dressing). Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
       // on fait sans (rien n'est inventé à la place).
       let coffre = {};
       try {
@@ -15017,12 +15071,16 @@ function useEbayPaires(comptes) {
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
         const cf = coffre[String(id)] || {};
         const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
-        const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
+        // (17 oct.) « Description » collé devant le texte (le libellé de la page
+        // Vinted, mesuré : « Descriptionautry reelwind gris… ») partait dans la
+        // description eBay. La même règle que Leboncoin (`lbcDescription`, §11).
+        const dscPropre = descriptionEbayPropre(dsc);
+        const desc = (dscPropre && !PUB.test(dscPropre)) ? dscPropre : '';   // sa vraie description Vinted, jamais le texte pub ni le libellé
         const titreP = String(f.title || titreMap[String(id)] || '').trim();
-        const marque = String(cf.brand || '').trim();
+        const marque = String(marqueMap[String(id)] || cf.brand || '').trim();
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
-        const tailleV = String(cf.size || '').trim();
-        out.push({ id: String(id), num: n, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
+        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
@@ -16112,7 +16170,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
 //    annonce programmée par l'API n'est pas garantie, et une paire vendue
 //    ailleurs avant son heure peut quand même partir. Il le lit et coche
 //    « j'ai compris » avant sa PREMIÈRE programmation — c'est sa décision.
-function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
+function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes, dejaSurEbay = null, onFermer, onBrouillons, onFini, comptesPub = [], compteDefaut = 'principal', onCompte }) {
   const E = EBAY_SKIN;
   // (9 octobre) Le lot part sur UN compte eBay, choisi ici (pré-choisi comme le
   // formulaire) ; la confirmation le NOMME. `annoncesEbay` et `programmees`
@@ -16168,6 +16226,9 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     const sku = d.numero ? skuEbayDe(d.numero) : '';
     if (!sku) return { d, raison: 'pas de N° : sans lui, VRM ne la retrouverait pas si elle se vendait ailleurs avant l\'heure' };
     if (skusEnLigne.has(sku)) return { d, raison: 'déjà en vente sur eBay' };
+    // (17 oct.) La même paire déjà sur eBay sous un AUTRE N° (photo exacte).
+    const jv = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(numDeSkuEbay(sku)) : null;
+    if (jv && jv.via) return { d, raison: `déjà ${jv.etat === 'programmee' ? 'programmée' : 'en vente'} sur eBay sous la N°${jv.via} (même photo)` };
     const p = progParSku.get(sku);
     if (p) return { d, raison: `déjà programmée sur eBay${p.debut && Number.isFinite(Date.parse(p.debut)) ? ` (${quandParisTexte(Date.parse(p.debut))})` : ''}` };
     const ou = vendusPartout && vendusPartout.get(numDeSkuEbay(sku));
@@ -16178,7 +16239,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon de la même paire est déjà dans ce lot' };
     dansLeLot.add(sku);
     return { d, item: b.item, sku };
-  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout]);
+  }); }, [brouillons, skusEnLigne, progParSku, vendusPartout, dejaSurEbay]);
   const ordonnes = React.useMemo(() => {
     const ok = analyse.filter((x) => x.item);
     if (rythme.ordre === 'numero') return [...ok].sort((a, b) => triNum(a.d.numero, b.d.numero));
@@ -17455,8 +17516,21 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
     for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
     for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    // (17 oct.) LA MÊME PAIRE SOUS UN AUTRE N° (photo exacte, `jumellesParPhoto`) :
+    // si l'une est déjà sur eBay, l'autre l'est aussi — « une paire, une
+    // annonce » vaut pour la paire, pas pour le numéro (la 80 publiée, la 81
+    // repartait). Toutes les gardes (Publier, planificateur, sélecteur) lisent
+    // cette carte : une seule règle (§11).
+    const base = new Map(m);
+    const jum = jumellesParPhoto(paires, (k) => base.has(k));
+    for (const x of (Array.isArray(paires) ? paires : [])) {
+      const j = jum.get(String(x.id)); const k = cleNum(x.num);
+      if (!j || !k || m.has(k)) continue;
+      const autre = j.autres.find((n) => base.has(cleNum(n)));
+      if (autre) m.set(k, { ...base.get(cleNum(autre)), via: cleNum(autre) });
+    }
     return m;
-  }, [pris, programmees, listeProgrammees]);
+  }, [pris, programmees, listeProgrammees, paires]);
   const surSku = React.useCallback((itemId, sku) => {
     setItems((l) => Array.isArray(l) ? l.map((a) => String(a.itemId) === String(itemId) ? { ...a, sku } : a) : l);
   }, []);
@@ -17529,7 +17603,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {planif && brouillonsChoisis.length > 0 && (
       <EbayPlanificateur key={planif.join(',')} brouillons={brouillonsChoisis}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub}
-        annoncesEbay={Array.isArray(items) ? items : null}
+        annoncesEbay={Array.isArray(items) ? items : null} dejaSurEbay={dejaSurEbay}
         programmees={programmees && typeof programmees === 'object' ? listeProgrammees : (programmees === 'jamais' ? [] : null)}
         ventes={ventesConnues}
         onFermer={() => setPlanif(null)}
@@ -20395,12 +20469,7 @@ async function generateFacturXPdf(inv, ent){
 }
 
 /* ── Garage ──────────────────────────────────────────── */
-// ── « Mon local en photo » ────────────────────────────────────────────────
-// L'utilisateur photographie son VRAI local (mur d'étagères, commode…), pose des
-// repères numérotés sur l'image, et retrouve une paire d'un coup d'œil : la
-// recherche surligne l'endroit exact sur SA photo. Rangé dans sa propre ligne
-// Supabase (vrm_local) pour ne pas gonfler la synchro principale ; miroir
-// localStorage pour l'affichage instantané. Simple, visuel, sans 3D ni scan.
+// Réduit une photo prise sur l'appareil (JPEG, côté le plus long ≤ maxDim).
 const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resolve) => {
   try {
     const img = new Image();
@@ -20418,155 +20487,10 @@ const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resol
     img.src = url;
   } catch (_) { resolve(null); }
 });
-const loadLocalPlan = async () => {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_local&select=data`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
-};
-const saveLocalPlan = async (data) => {
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify(withOwner({ id: 'vrm_local', data })),
-    });
-  } catch (_) {}
-};
-function LocalPhoto({ locate, onLocateConsumed }) {
-  const [photos, setPhotos] = useState(() => (load('vrm_local_plan', { photos: [] }).photos) || []);
-  const [active, setActive] = useState(0);
-  const [placing, setPlacing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [highlight, setHighlight] = useState(null); // { photoIdx, pinId } | { notFound:true }
-  const [selPin, setSelPin] = useState(null);        // pin sélectionné (pour retirer)
-  const [busy, setBusy] = useState(false);
-  const fileRef = React.useRef(null);
-  const imgWrapRef = React.useRef(null);
+// (17 oct.) « Mon local en photo » (`LocalPhoto`, la ligne `vrm_local`) n'est
+// plus rendu nulle part depuis que le Stock ne garde que la pièce : retiré.
+// La ligne reste en base (rien n'est effacé) ; `compressImage` sert ailleurs.
 
-  useEffect(() => { (async () => {
-    const cloud = await loadLocalPlan();
-    if (cloud && Array.isArray(cloud.photos)) { setPhotos(cloud.photos); save('vrm_local_plan', cloud); }
-  })(); }, []);
-
-  const persist = (next) => { setPhotos(next); const data = { photos: next }; save('vrm_local_plan', data); saveLocalPlan(data); };
-
-  const doSearch = (q) => {
-    const t = String(q).trim().toLowerCase(); setSelPin(null);
-    if (!t) { setHighlight(null); return; }
-    for (let pi = 0; pi < photos.length; pi++) {
-      const hit = (photos[pi].pins || []).find(p => String(p.numero).trim().toLowerCase() === t);
-      if (hit) { setActive(pi); setHighlight({ photoIdx: pi, pinId: hit.id }); return; }
-    }
-    setHighlight({ notFound: true });
-  };
-  useEffect(() => {
-    if (locate != null && String(locate).trim() !== '') { setSearch(String(locate)); doSearch(String(locate)); onLocateConsumed && onLocateConsumed(); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locate, photos.length]);
-  // Défile jusqu'au repère surligné.
-  useEffect(() => { if (highlight && highlight.pinId && imgWrapRef.current) { setTimeout(() => { try { imgWrapRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }, 80); } }, [highlight]);
-
-  const addPhoto = async (file) => {
-    if (!file) return; setBusy(true);
-    const data = await compressImage(file); setBusy(false);
-    if (!data) { toast('Impossible de lire cette image. Réessaie avec une autre photo.'); return; }
-    const p = { id: 'ph' + Date.now(), name: `Zone ${photos.length + 1}`, img: data, pins: [] };
-    const next = [...photos, p]; persist(next); setActive(next.length - 1);
-  };
-  const renamePhoto = async (idx) => { const nom = await askText({ desc: 'Nom de cette zone (ex : Étagère du fond, Commode d\'entrée) :', value: photos[idx].name || '' }); if (nom == null) return; persist(photos.map((p, i) => i === idx ? { ...p, name: nom.trim() || p.name } : p)); };
-  const removePhoto = async (idx)=>{ if (!await askConfirm('Supprimer cette photo et tous ses repères ?')) return; const next = photos.filter((_, i) => i !== idx); persist(next); setActive(a => Math.max(0, Math.min(a, next.length - 1))); setHighlight(null); setSelPin(null); };
-
-  const onImgClick = async (e) => {
-    if (!placing) return;
-    const r = imgWrapRef.current?.getBoundingClientRect(); if (!r) return;
-    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire rangée à cet endroit :', value: '' }) || '').trim();
-    if (!numero) return;
-    const pin = { id: 'pn' + Date.now(), numero, x, y };
-    persist(photos.map((p, i) => i === active ? { ...p, pins: [...(p.pins || []), pin] } : p));
-    setPlacing(false); setHighlight({ photoIdx: active, pinId: pin.id });
-  };
-  const removePin = (pinId) => { persist(photos.map((p, i) => i === active ? { ...p, pins: (p.pins || []).filter(pp => pp.id !== pinId) } : p)); setSelPin(null); setHighlight(null); };
-
-  const cur = photos[active];
-  const pinColor = (isHi) => isHi ? '#e5484d' : (C.accent || '#0aa');
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <style>{`@keyframes vrmpulse{0%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.35);}100%{transform:translate(-50%,-50%) scale(1);}}`}</style>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; addPhoto(f); }} style={{ display: 'none' }} />
-
-      {photos.length === 0 ? (
-        <div style={{ border: `1.5px dashed ${C.accent}66`, background: `${C.accent}08`, borderRadius: 16, padding: '22px 18px', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📸</div>
-          <div style={{ fontSize: 15, fontWeight: 900, color: C.text, marginBottom: 6 }}>Prends ton local en photo</div>
-          <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, maxWidth: 340, margin: '0 auto 14px' }}>
-            1. Photographie ton mur d'étagères, ta commode…<br />
-            2. Pose des <b>numéros</b> aux endroits où sont rangées tes paires.<br />
-            3. Cherche un N° → l'app te montre <b>l'endroit exact sur ta photo</b>.
-          </div>
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 800, padding: '12px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>{busy ? 'Chargement…' : '📷 Ajouter une photo'}</button>
-        </div>
-      ) : (<>
-        {/* Recherche */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → l'app te montre où"
-            inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHighlight(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px', fontFamily: 'inherit' }}><Icon name="close" size={15}/></button>}
-        </div>
-        {highlight && highlight.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucun repère « {search} » sur tes photos. Pose-le avec « 📍 Placer un numéro ».</div>}
-        {highlight && highlight.pinId && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===highlight.pinId); return p ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{p.numero} → <b>{cur.name}</b> (surligné sur la photo)</div> : null; })()}
-
-        {/* Sélecteur de photos (zones) */}
-        {photos.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-            {photos.map((p, i) => (
-              <button type="button" key={p.id} onClick={() => { setActive(i); setHighlight(null); setSelPin(null); }} style={{ flexShrink: 0, border: `1px solid ${i === active ? C.accent : C.border}`, background: i === active ? C.accent : C.card, color: i === active ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{p.name} · {(p.pins || []).length}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Barre d'actions */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" onClick={() => setPlacing(v => !v)} style={{ border: 'none', borderRadius: 10, background: placing ? C.warn : C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>{placing ? '✋ Touche la photo…' : '📍 Placer un numéro'}</button>
-          <button type="button" onClick={() => renamePhoto(active)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>✎ Renommer</button>
-          <button type="button" onClick={() => fileRef.current?.click()} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>➕ Photo</button>
-          <button className="vrm-icon-control" type="button" aria-label="Supprimer cette photo" onClick={() => removePhoto(active)} title="Supprimer cette photo" style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 12.5, fontWeight: 700, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit' }}><Icon name="trash" size={16}/></button>
-        </div>
-        {placing && <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 700 }}>Touche l'endroit de la photo où est rangée la paire, puis tape son N°.</div>}
-
-        {/* La photo + repères */}
-        {cur && (
-          <div ref={imgWrapRef} onClick={onImgClick} style={{ position: 'relative', width: '100%', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: placing ? 'crosshair' : 'default', lineHeight: 0, background: C.surface }}>
-            <img src={cur.img} alt={cur.name} style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
-            {(cur.pins || []).map(p => {
-              const isHi = highlight && highlight.pinId === p.id;
-              const isSel = selPin === p.id;
-              return (
-                <div key={p.id}
-                  onClick={ev => { if (placing) return; ev.stopPropagation(); setSelPin(s => s === p.id ? null : p.id); setHighlight({ photoIdx: active, pinId: p.id }); }}
-                  style={{ position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%,-50%)', minWidth: 26, height: 26, borderRadius: 999, background: pinColor(isHi), color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 7px', border: `2px solid #fff`, boxShadow: '0 1px 6px rgba(0,0,0,0.4)', cursor: placing ? 'crosshair' : 'pointer', zIndex: isHi || isSel ? 5 : 2, animation: isHi ? 'vrmpulse 1s ease-in-out 2' : 'none', pointerEvents: placing ? 'none' : 'auto' }}>
-                  {p.numero}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {/* Pin sélectionné → retirer */}
-        {selPin && cur && (()=>{ const p=(cur.pins||[]).find(x=>x.id===selPin); return p ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 13px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: C.text, flex: 1 }}>📍 Repère N°{p.numero}</span>
-            <button type="button" onClick={() => removePin(p.id)} style={{ border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Retirer</button>
-          </div>
-        ) : null; })()}
-        <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Touche un repère pour le retirer. Ajoute plusieurs photos (une par meuble/mur) via « ➕ Photo ». Tes photos sont sauvegardées et te suivent sur tes appareils.</div>
-      </>)}
-    </div>
-  );
-}
 // ── « Plan du local » : pièce virtuelle vue de dessus ──────────────────────
 // Personnalise ta pièce (murs), pose des meubles (commode, étagère, table,
 // boîtes, penderie), déplace-les, puis ouvre chaque meuble EN VUE DE FACE pour
@@ -20604,6 +20528,7 @@ const saveRoomPlan = async (data) => {
 const FURN_TYPES = {
   metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#9aa3ad', h3d: 1.25, build: 'metal', cases: 'pile' },
   bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
+  bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#9aa3ad', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
   pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
@@ -21089,21 +21014,27 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // un numéro décale toute la suite → les boîtes du dessus DESCENDENT.
   const pileNums = (it) => (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: Math.max(1, it.cols || 1) * Math.max(1, it.rows || 5) }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
   const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = pileNums(it); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; nums.push(t); pileSet(it, nums); };
-  const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (nums.length <= 1) return; nums.pop(); pileSet(it, nums); };
-  const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (pileNums(it)[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
+  // Changer la hauteur RE-EMPILE les colonnes : c'est un rangement voulu, les
+  // places vides ('') disparaissent.
+  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = cartonsDePile(pileNums(it)); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, nums, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
+  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; const n2 = ajouterAPile(nums, t); if (n2) pileSet(it, n2); };
+  const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (cartonsDePile(nums).length <= 1) return; while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); nums.pop(); while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); pileSet(it, nums); };
+  const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (cartonsDePile(pileNums(it))[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; let k = 0; const nums = pileNums(it).map((v) => String(v || '').trim() ? String(st + k++) : ''); updateItem(it.id, { nums, start: st }); };
   // Toucher une boîte de la pile (pile déjà sélectionnée) → changer SON numéro
   // (on peut mettre n'importe quel numéro, pas forcément dans l'ordre), ou la
   // retirer si on laisse vide (les boîtes du dessus descendent).
   const pileTap = async (itemId, idx) => {
+    // Une paire choisie dans « À ranger » se pose sur la pile d'un geste.
+    if (pairePrete) { const it0 = items.find(o => o.id === itemId); if (it0) { setSel(itemId); const n = pairePrete; setPairePrete(null); ajouterDansPile(it0, n); } return; }
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne la pile
     const it = items.find(o => o.id === itemId); if (!it) return;
     const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return;
     const v = await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', value: nums[idx] });
     if (v == null) return;
     const t = String(v).trim();
-    if (!t) { nums.splice(idx, 1); pileSet(it, nums); return; }
+    // ⚠️ (17 oct.) Seuls les cartons du DESSUS, dans la MÊME colonne, descendent
+    //    (`retirerDePile`) — avant, toute la pile se décalait d'un rang.
+    if (!t) { const n2 = retirerDePile(nums, idx, Math.max(1, it.rows || 5)); if (n2) pileSet(it, n2); return; }
     nums[idx] = t; updateItem(itemId, { nums });
   };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
@@ -21170,15 +21101,21 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const out = {};
     for (let c = 0; c < nc; c++) {
       const vals = [];
-      for (let r = 0; r < nr; r++) { const a = slots[r + '_' + c]; if (a && a.length && String(a[0]).trim()) vals.push(String(a[0])); }
+      // ⚠️ TOUS les numéros d'une case (une ancienne case pouvait en porter
+      //    plusieurs) : n'en garder que le premier en PERDAIT.
+      for (let r = 0; r < nr; r++) { (slots[r + '_' + c] || []).forEach(v => { if (String(v).trim()) vals.push(String(v)); }); }
       let r = nr - 1;
       for (let i = vals.length - 1; i >= 0; i--) { out[r + '_' + c] = [vals[i]]; r--; }
     }
     return out;
   };
   const fillCell = async (itemId, cellKey, quoi) => {
-    if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
+    // (17 oct.) Une PLACE LIBRE se touche d'un seul geste (le meuble est choisi
+    // au passage) ; une boîte déjà là demande d'abord de choisir le meuble (on ne
+    // modifie pas un numéro par mégarde).
     const it = items.find(x => x.id === itemId); if (!it) return;
+    const placeVide = quoi ? (quoi.ghost || quoi.num == null) : !numsCase((it.slots || {})[cellKey]).length;
+    if (sel !== itemId) { setSel(itemId); if (!placeVide) return; }
     // (17 oct.) PLATEAU (étagère, table) ou PORTANT : on touche une BOÎTE précise
     // (la modifier, ou la sortir — celles du dessus descendent) ou la place
     // libre au-dessus de la pile (y ranger une paire).
@@ -21199,6 +21136,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         return;
       }
       if (pile.length >= cz.cap) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
+      if (pairePrete) { rangerPaire(pairePrete, itemId, cellKey); return; }
       if (aRanger.length) { setRanger({ itemId, cellKey }); return; }
       poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger ici :', value: '' }));
       return;
@@ -21208,6 +21146,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
     // rangée ailleurs, passait sans un mot. La feuille ne propose que des paires
     // réellement chez lui et pas encore posées.
+    if (!cur && pairePrete) { rangerPaire(pairePrete, itemId, cellKey); return; }
     if (!cur && aRanger.length) { setRanger({ itemId, cellKey }); return; }
     poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
   };
@@ -21594,7 +21533,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const slots = { ...(it.slots || {}) };
       const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
-      updateItem(itemId, { slots: compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) });
+      // Seul un MUR de boîtes (la grille) fait tomber sa colonne. Une ancienne
+      // étagère ou commode a des plateaux / tiroirs : rien ne passe de l'un à
+      // l'autre — seuls ceux du dessus, dans la même case, descendent.
+      const mur = (FURN_TYPES[it.type] || {}).build === 'grille';
+      updateItem(itemId, { slots: mur ? compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) : slots });
       setSortie(null);
       toast(`N°${numero} sorti du stock.`);
     };
@@ -21609,13 +21552,21 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   // Occupation de la pièce : combien de boîtes rangées, combien de places libres,
   // combien de meubles → un vrai tableau de bord de rangement en un coup d'œil.
   const refAmenager = React.useRef(null);   // le dépliant « Aménager la pièce », ouvert par le geste de la pièce vide
+  // (17 oct.) DEUX MODES, séparés : RANGER (le quotidien — poser, retrouver,
+  // sortir des paires ; les meubles sont verrouillés) et AMÉNAGER (dessiner la
+  // pièce, ajouter, régler et déplacer les meubles). Une barre en tête les sépare.
+  const [editionChoisie, setEdition] = useState(false);
+  const edition = editionChoisie || items.length === 0;   // une pièce vide n’a rien à ranger : elle s’ouvre en « Aménager »
+  const [pairePrete, setPairePrete] = useState(null);   // un N° choisi dans « À ranger », en attente d'une place
+  const viseurRef = React.useRef(null);                 // ce qui est sous le doigt dans la 3D (glisser-déposer)
+  const refFantome = React.useRef(null);                // la vignette qui suit le doigt pendant un glisser
   const capacity = useMemo(() => {
     const GRID = ['grille', 'commode', 'etagere', 'casier', 'armoire'];
     let boxes = 0, freeCells = 0, furn = 0;
     items.forEach(it => {
       const ft = FURN_TYPES[it.type] || {};
       if (ft.box) { boxes += 1; return; }                 // boîte à empiler = 1 boîte
-      if (ft.build === 'pile') { boxes += pileNums(it).length; furn += 1; return; }
+      if (ft.build === 'pile') { boxes += cartonsDePile(pileNums(it)).length; furn += 1; return; }
       furn += 1;
       if (GRID.includes(it.type)) {
         const cells = Math.max(1, it.cols || 1) * Math.max(1, it.rows || 1);
@@ -21661,11 +21612,85 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       neuf = {}; for (const k in slots) { const [r, c] = k.split('_').map(Number); const nrr = r + (rows - nr); if (nrr >= 0) neuf[nrr + '_' + c] = slots[k]; }
     }
     const patch = { cols, rows, slots: neuf };
-    if (ft.build === 'metal') patch.h3d = +(rows * 0.375 / 1.5).toFixed(3);          // un plateau = 37,5 cm : la contenance par case ne bouge pas
+    // Un plateau garde SA hauteur (réglée par « Hauteur d'un niveau », 37,5 cm
+    // par défaut) : la contenance par case ne bouge pas.
+    if (ft.build === 'metal') patch.h3d = +(rows * hauteurNiveau(it) / 1.5).toFixed(3);
     if (ft.build === 'portant' || ft.build === 'metal' || ft.build === 'table') { const w = ft.build === 'table' ? Math.max(it.w, +(cols * 0.6).toFixed(2)) : +(cols * (ft.build === 'portant' ? 0.19 : 0.6)).toFixed(2); patch.w = Math.max(0.6, w); }
     changerDimensions(it, patch);
   };
 
+  // (17 oct.) Julien : « pouvoir régler la hauteur des étagères, la largeur, la
+  // profondeur ». Une étagère : hauteur d'UN niveau (tous les plateaux égaux),
+  // le nombre de niveaux à côté. Refusé si une case contient plus de boîtes
+  // que le nouveau niveau n'en tient (elles seraient cachées) — jamais en silence.
+  const hauteurNiveau = (it) => { const nr = Math.max(1, it.rows || 1); return (h3dOf(it) * 1.5) / nr; };
+  const changerNiveau = (it, delta) => {
+    const ft = FURN_TYPES[it.type] || {}; const nr = Math.max(1, it.rows || 1);
+    const niv = Math.max(ft.bacs ? 0.14 : 0.2, Math.min(0.8, +(hauteurNiveau(it) + delta).toFixed(3)));
+    const h3d = +(nr * niv / 1.5).toFixed(3);
+    if (nr * niv > (room.wallH || 3.4) - 0.1) { toast('Plus haut que le plafond de la pièce.'); return; }
+    const cap = capaciteCase(ft, { ...it, h3d }, room.wallH || 3.4);
+    const plein = Object.values(it.slots || {}).some(a => numsCase(a).length > cap);
+    if (plein) { toast(`Un niveau de ${Math.round(niv * 100)} cm ne tient plus toutes les boîtes déjà rangées — sors-en d'abord.`); return; }
+    updateItem(it.id, { h3d });
+  };
+  React.useEffect(() => { const d = refAmenager.current; if (d && d.open !== edition) d.open = edition; setMoveMode(edition); if (edition) setPairePrete(null); }, [edition]);
+  // La prochaine place libre de la pièce : le meuble choisi d'abord, puis les
+  // autres dans l'ordre. Ne décide aucun numéro — seulement OÙ.
+  const prochainePlace = (prefId) => {
+    const ordre = [...items].sort((a, b) => (b.id === prefId ? 1 : 0) - (a.id === prefId ? 1 : 0));
+    for (const it of ordre) {
+      const ft = FURN_TYPES[it.type] || {}; const p = prochainePlaceMeuble(it, ft, room.wallH || 3.4);
+      if (p) return { itemId: it.id, cellKey: p.cell, nom: `${it.name || ft.label} · ${nomCase(Math.max(1, it.rows || 1), p.cell, modeCase(ft), it)}` };
+    }
+    return null;
+  };
+  const ajouterDansPile = (it, numero) => {
+    const v = String(numero || '').trim(); if (!v) return;
+    const ou = dejaPoseOu(v); if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
+    const n2 = ajouterAPile(pileNums(it), v); if (n2) { pileSet(it, n2); toast(`N°${v} posé sur « ${it.name} ».`); }
+  };
+  const rangerPaire = (numero, itemId, cellKey) => {
+    const it = items.find(o => o.id === itemId); if (!it) return;
+    setPairePrete(null); setSel(itemId);
+    if ((FURN_TYPES[it.type] || {}).build === 'pile') { ajouterDansPile(it, numero); return; }
+    poserDansCase(itemId, cellKey, numero);
+  };
+  // Lâcher une paire dans la 3D : sur une place libre → là ; sur un meuble plein
+  // à cet endroit ou sur son cadre → sa prochaine place libre. Jamais un décor.
+  const deposerSur = (numero, x, y) => {
+    const v = viseurRef.current && viseurRef.current(x, y); if (!v || !v.id) return false;
+    const it = items.find(o => o.id === v.id); if (!it) return false; const ft = FURN_TYPES[it.type] || {};
+    if (ft.deco || ft.box) { toast('Ici on ne range rien — dépose-la sur une étagère, une table, un portant ou une pile.'); return true; }
+    if (ft.build === 'pile') { setPairePrete(null); setSel(it.id); ajouterDansPile(it, numero); return true; }
+    const cz = casesDe(it, room.wallH); let cell = v.cell != null ? v.cell : null;
+    if (cell != null && numsCase((it.slots || {})[cell]).length >= (cz.mode === 'colonne' ? 1 : cz.cap)) cell = null;
+    if (cell == null) { const p = prochainePlaceMeuble(it, ft, room.wallH || 3.4); if (!p) { toast(`« ${it.name} » est plein — choisis un autre meuble.`); return true; } cell = p.cell; }
+    rangerPaire(numero, it.id, cell); return true;
+  };
+  // Glisser une vignette « À ranger » (souris ou doigt). Un simple toucher la
+  // CHOISIT (elle attend alors qu'on touche une place) ; un glisser jusque dans
+  // la pièce la RANGE là où on la lâche.
+  const debutGlisser = (e, p) => {
+    if (e.button != null && e.button !== 0) return;
+    const x0 = e.clientX, y0 = e.clientY; let bouge = false;
+    const f = refFantome.current;
+    const suivre = (ev) => {
+      if (!bouge && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { bouge = true; if (f) { f.textContent = `N°${p.numero}`; f.style.display = 'block'; } }
+      if (bouge && f) f.style.transform = `translate(${Math.round(ev.clientX - 28)}px, ${Math.round(ev.clientY - 46)}px)`;
+      if (bouge && ev.cancelable) ev.preventDefault();
+    };
+    const fin = (ev) => {
+      window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule);
+      if (f) f.style.display = 'none';
+      if (!bouge) { setPairePrete(x => x === p.numero ? null : p.numero); return; }
+      const cible = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (cible && cible.closest && cible.closest('[data-stock3d] canvas') ? deposerSur(p.numero, ev.clientX, ev.clientY) : false) return;
+      toast('Lâche la paire sur une étagère, une table, un portant ou une pile dans la pièce.');
+    };
+    const annule = () => { window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule); if (f) f.style.display = 'none'; };
+    window.addEventListener('pointermove', suivre, { passive: false }); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', annule);
+  };
   if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -21674,8 +21699,62 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
           tout l'écran de configuration avant de voir son stock. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
+      {/* (17 oct.) LA BARRE DU STOCK : le mode (ranger / aménager) et la recherche
+          d'un numéro, au même endroit, au-dessus de la pièce. */}
+      <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
+          options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
+        <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
+          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+          {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+        </div>
+      </div>
+      {hi && hi.notFound && <div style={{ fontSize: 12.5, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ». Range-le : choisis-le dans « À ranger » puis touche une place libre.</div>}
+      {hi && hi.itemId && (()=>{
+        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
+        let pos=null;
+        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=nomCase(nr, hi.cell, casesDe(it, room.wallH).mode, it); }
+        return <div data-trouve-num={search} style={{ fontSize: 13, color: C.text, fontWeight: 600, lineHeight:1.4 }}>N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <> · {pos}</> : null}</div>;
+      })()}
+      {/* (17 oct.) « À RANGER » : les paires présentes qui n'ont pas de place.
+          Toucher une vignette la choisit (la prochaine place libre est proposée,
+          ou on touche une place dans la pièce) ; la glisser dans la pièce la
+          range là où on la lâche. Mode Ranger seulement. */}
+      {!edition && aRanger.length > 0 && aRanger[0].sur && (()=>{
+        const pp = pairePrete ? prochainePlace(sel) : null;
+        return (
+          <div data-bande-a-ranger={aRanger.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
+              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} paire{aRanger.length > 1 ? 's' : ''} · touche-en une, ou glisse-la dans la pièce</span>
+            </div>
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {aRanger.slice(0, 60).map(p => {
+                const on = pairePrete === p.numero;
+                return (
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
+                    {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
+                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {pairePrete && (
+              <div data-paire-prete={pairePrete} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: C.text }}>
+                <span style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
+                </span>
+                {pp && <button type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 600, padding: '0 14px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger ici</button>}
+                <button type="button" onClick={() => setPairePrete(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, fontSize: 13, padding: '0 12px', minHeight: 38, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              </div>
+            )}
+            <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
+          </div>
+        );
+      })()}
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
       {chercheLoc && (
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -21704,7 +21783,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
             <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dessine ta pièce vue du dessus, puis ajoute une étagère, une table ou un portant : tu y ranges tes articles, et VRM retrouve chacun par son numéro.</span>
           </span>
-          <button type="button" data-piece-vide-geste="" onClick={() => { const d = refAmenager.current; if (d) { d.open = true; try { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
+          <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
         </div>
       )}
 
@@ -21718,18 +21797,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           onClose={() => setRanger(null)}
         />
       )}
-      {/* Recherche */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
-      </div>
-      {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{
-        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
-        let pos=null;
-        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=`colonne ${c+1} · ${nr-r}ᵉ boîte depuis le bas`; }
-        return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
-      })()}
+
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       {/* (16 oct.) UNE pièce : pas de pastille « Ma pièce » sélectionnée — l'onglet
@@ -21757,15 +21825,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           de construction (meubles, dimensions, murs, déplacement) part donc
           derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
           recherche. */}
-      <details ref={refAmenager} data-amenager="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
+      <details ref={refAmenager} data-amenager="" onToggle={(e) => { const o = e.currentTarget.open; if (o !== edition) setEdition(o); }} style={{ display: edition ? 'block' : 'none', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
         {/* ⚠️ `listStyle:none` retire le triangle du navigateur : sans repère
             ajouté, plus rien ne dit que ça s'ouvre. On pose donc un chevron. */}
-        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }} onClick={(e) => { e.preventDefault(); setEdition(false); }} title="Revenir au rangement">
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
-            <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajouter des meubles, changer les dimensions, déplacer</span>
+            <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajoute un meuble, règle-le, glisse-le à sa place. Les numéros rangés ne bougent pas.</span>
           </span>
-          <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, fontSize: 15, lineHeight: 1 }}>›</span>
+          <span style={{ flexShrink: 0, color: C.accent, fontSize: 13, fontWeight: 600 }}>Terminer</span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 13px 13px' }}>
         {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
@@ -21863,7 +21931,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
+        <div data-meuble-choisi={selItem.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
           <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
           {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
               Le garage savait ranger, pas MONTRER. On voit maintenant chaque
@@ -21905,6 +21973,20 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
+          {!edition && (()=>{
+            const ft = FURN_TYPES[selItem.type] || {};
+            const p = ft.build === 'pile' ? null : prochainePlaceMeuble(selItem, ft, room.wallH || 3.4);
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
+                {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
+                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche un carton pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
+                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
+                <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
+              </div>
+            );
+          })()}
+          {edition && (<>
           {/* Personnalisation : couleur + hauteur */}
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
@@ -21931,10 +22013,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               </span>);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                {ft.build === 'metal' && pas('Plateaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'metal' && pas('Niveaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'metal' && pas('Hauteur d’un niveau', `${Math.round(hauteurNiveau(selItem) * 100)} cm`, () => changerNiveau(selItem, -0.05), () => changerNiveau(selItem, 0.05), 'niveau')}
+                {pas('Largeur', `${Math.round(selItem.w * 100)} cm`, () => changerDimensions(selItem, { w: +Math.max(0.4, selItem.w - 0.1).toFixed(2) }), () => changerDimensions(selItem, { w: +Math.min(room.w, selItem.w + 0.1).toFixed(2) }), 'largeur')}
+                {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
                 <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
-                <span style={{ flex: '1 1 100%', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Touche une place libre (en transparence) pour y ranger un article ; touche une boîte pour changer son numéro ou la sortir — celles du dessus descendent.</span>
               </div>
             );
           })()}
@@ -21958,7 +22042,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
           {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
-            const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
+            const nums = pileNums(selItem), total = cartonsDePile(nums).length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(nums.length / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
@@ -21978,12 +22062,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
             <button className="vrm-icon-control" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
             </>}
-            <button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button className="vrm-icon-control" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button></>}
           </>}
           <button className="vrm-icon-control" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
           <button className="vrm-icon-control" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button className="vrm-icon-control" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
+          </>)}
         </div>
       )}
       {/* ⚠️ MODE D'EMPLOI PERMANENT → DÉPLIANT. Ce paragraphe de cinq lignes
@@ -22468,14 +22553,13 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','box','Ranger']].map(([v,ic,l])=>(
+        {[['plan','home','Ma pièce'],['ranger','grid','Liste des cases']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
         ))}
       </nav>
 
-      {garageView==='photo' && <LocalPhoto locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
 
@@ -39359,6 +39443,14 @@ function LeboncoinScreen() {
     //    ne sait pas DIRE pourquoi elle est vide (voir le bloc « Tout est
     //    publié 🎉 » plus bas — il le disait à quelqu'un qui n'a aucune annonce).
     let nNumerotees = 0;
+    // (17 oct.) La même paire sous deux N° (photo exacte, `jumellesParPhoto`) :
+    // une seule des deux se publie. Notée ici sur toutes les annonces numérotées
+    // (publiées ou non) ; la file reste celle de l'extension (§11), seule la
+    // ligne le DIT et ne propose pas de publier la seconde.
+    const candidatsJ = [];
+    for (const o of online) { const e = numeros[o.id]; const num = e && e.numero; if (num && String(num).trim()) candidatsJ.push({ id: String(o.id), num: String(num), photoK: (e && e.photoK) || null, cover: o.photo || null, posee: posted.has(o.id) || posted.has(String(num)) }); }
+    const jumLbc = jumellesParPhoto(candidatsJ, (k) => candidatsJ.some((c) => c.posee && cleNum(c.num) === k));
+    const twinDe = (id) => { const j = jumLbc.get(String(id)); if (!j) return null; const posee = candidatsJ.find((c) => c.posee && j.autres.some((n) => cleNum(n) === cleNum(c.num))); return posee ? { num: posee.num, posee: true } : (j.gardeId !== String(id) ? { num: j.gardeNum, posee: false } : null); };
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
@@ -39396,6 +39488,7 @@ function LeboncoinScreen() {
         base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
         etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
         compte: nomCompteDe(o.uid),
+        jumelle: twinDe(o.id),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -39750,64 +39843,66 @@ function LeboncoinScreen() {
               // Un seul groupe ⇒ pas de titre de groupe : il répéterait le
               //    compte de l'en-tête (§7, le même nombre deux fois).
               const groupes = [pretes, maigres, nues].filter(g => g.length).length;
+              // (17 oct.) UNE CARTE PAR PAIRE — Julien : « j'aime pas le visuel des
+              // propositions de paires à publier ». La photo en grand, le N° et
+              // le prix d'un coup d'œil, ce qui manque en pastilles (l'ambre
+              // seulement pour ce qui BLOQUE), les gestes en bas. La même paire
+              // sous deux N° (photo exacte) : la seconde ne propose pas de
+              // publier, elle dit laquelle est la bonne.
               const Ligne = (q) => {
                 const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
                 // Combien MANQUENT à la capture (le vrai nombre d'après Vinted).
                 const manque = (q.nReelles != null && q.nReelles > q.photos) ? (q.nReelles - q.photos) : 0;
+                const jm = q.jumelle || null;
+                const vign = toutes.slice(1, 7);
                 return (
-                <div key={q.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
-                      <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}{q.photos > 0 ? '' : ' · 0 photo'}{q.desc ? '' : ' · pas de description'}
-                        {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
-                      </span>
-                    </span>
+                <div key={q.id} className="vrm-apub-carte" data-apub={q.numero} {...(jm ? { 'data-apub-jumelle': cleNum(jm.num) } : {})}>
+                  <div className="vrm-apub-haut">
+                    {toutes[0]
+                      ? <PhotoVinted src={toutes[0]} alt="" loading="lazy" decoding="async" className="vrm-apub-photo" style={{ width: 84, height: 84, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                      : <span className="vrm-apub-photo"><Icon name="image" size={24} style={{ opacity: .5 }} /></span>}
+                    <div className="vrm-apub-corps">
+                      <div className="vrm-apub-ligne1">
+                        <span className="vrm-apub-num">N°{q.numero}</span>
+                        <span className="vrm-apub-prix">{q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+                      </div>
+                      <div className="vrm-apub-titre">{q.title || '—'}</div>
+                      <div className="vrm-apub-pastilles">
+                        <span className="vrm-apub-pastille" data-ton={q.photos === 0 ? 'bloque' : undefined}>{q.photos === 0 ? 'Aucune photo' : `${q.photos}${q.nReelles != null && q.nReelles > q.photos ? `/${q.nReelles}` : ''} photo${q.photos > 1 ? 's' : ''}`}</span>
+                        {!q.desc && <span className="vrm-apub-pastille">Pas de description</span>}
+                        {q.compte ? <span className="vrm-apub-pastille">{q.compte}</span> : null}
+                      </div>
+                    </div>
                   </div>
-
-                  {/* TOUTES les photos captées, en bande qui défile (Julien l'a
-                      demandé). Rien capté ⇒ un cadre neutre, jamais un trou. */}
-                  <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
-                    {toutes.length === 0
-                      ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
-                      : toutes.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
-                    {manque > 0 && (
-                      <span data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`} style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 9, fontWeight: 500 }}>photo{manque > 1 ? 's' : ''}</span><span style={{ fontSize: 9, fontWeight: 500 }}>à récupérer</span></span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
+                  {(vign.length > 0 || manque > 0) && (
+                    <div className="vrm-apub-vignettes">
+                      {vign.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 40, height: 40, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />)}
+                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`}>+{manque}</span>}
+                    </div>
+                  )}
+                  {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
+                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est la même paire, elle ne se publie pas deux fois.</>
+                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute la même paire sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
+                  <div className="vrm-apub-gestes">
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
-                    <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
-                      style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
+                    {!jm && q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles} onFiche={() => setFiche(q)}/>}
+                    <a href={q.url} target="_blank" rel="noreferrer" className="vrm-apub-lien">Annonce Vinted ↗</a>
+                    <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file" className="vrm-apub-lien">Déjà publiée</button>
                   </div>
                 </div>
                 );
               };
+              const Groupe = ({ titre, liste, note, ton }) => (<>
+                {groupes > 1 && <div className="vrm-apub-groupe"><span className="vrm-apub-groupe-titre" style={ton ? { color: C.warn } : undefined}>{titre}</span><span className="vrm-apub-groupe-n">{liste.length}</span></div>}
+                {note ? <div className="vrm-apub-groupe-note">{note}</div> : null}
+                <div className="vrm-apub-grille">{liste.slice(0, 40).map(Ligne)}</div>
+                {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
+              </>);
               return (<>
-                {nues.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.warn, marginTop: 4 }}>Aucune photo — {nues.length}</div>}
-                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.
-                  </div>
-                  {nues.slice(0, 40).map(Ligne)}
-                  {nues.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {nues.length - 40} autres…</div>}
-                </>)}
-                {pretes.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Prêtes — {pretes.length} avec toutes leurs photos</div>}
-                  {pretes.slice(0, 40).map(Ligne)}
-                  {pretes.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {pretes.length - 40} autres…</div>}
-                </>)}
-                {maigres.length > 0 && (<>
-                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Une seule photo — {maigres.length}</div>}
-                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
-                    Une annonce Leboncoin avec une seule photo se vend mal. Les autres existent, mais <b>Vinted ne les donne que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et les autres arrivent ici toutes seules. Mesuré chez toi : les annonces déjà ouvertes ont <b>5 photos</b> en moyenne.
-                  </div>
-                  {maigres.slice(0, 40).map(Ligne)}
-                  {maigres.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {maigres.length - 40} autres…</div>}
-                </>)}
+                {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
+                {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
+                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</>} />}
               </>);
             })()}
           </>)}
