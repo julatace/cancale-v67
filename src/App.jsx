@@ -6390,7 +6390,7 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
   }
   if (mort && repli === null) return null;
   return (
-    <span ref={el} aria-hidden="true" data-photo-vinted={mort ? 'perdue' : 'attente'} style={cadrePhoto(style)}>
+    <span ref={el} aria-hidden="true" data-photo-vinted={mort ? 'perdue' : 'attente'} title={mort?'Photo indisponible':'Chargement de la photo'} style={cadrePhoto(style)}>
       {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
     </span>
   );
@@ -6412,7 +6412,7 @@ function PhotoVenteSources({candidats,onBesoinAlternative,onSourceChargee,style,
  const source=choisirPhotoDisponible(candidats,etat,favori?.key===key?favori.url:null);
  const tousEnEchec=!!source && candidats.every(url=>etat(url)==='ko');
  React.useEffect(()=>{if(tousEnEchec && dejaDemande.current!==key){dejaDemande.current=key;demander.current?.();}},[key,tousEnEchec]);
- if(!source || tousEnEchec && !photosVinted.estPhotoVinted(source))return <span style={cadrePhoto(style)} aria-hidden="true"><Icon name="image" size={taillePicto(style)}/></span>;
+ if(!source || tousEnEchec && !photosVinted.estPhotoVinted(source))return <span style={cadrePhoto(style)} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={taillePicto(style)}/></span>;
  return <PhotoVinted {...props} src={source} style={style} onLoad={()=>{setFavori({key,url:source});onSourceChargee?.(source);}} onError={()=>setEchecs(prev=>{const urls=prev.key===key?prev.urls:[];return urls.includes(source)?prev:{key,urls:[...urls,source]};})}/>;
 }
 // ── QUI DIT DÉJÀ, SUR CET ÉCRAN, CE QUI BLOQUE L'EXTENSION ? (§7) ────────────
@@ -9525,6 +9525,7 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
       </g>;})}
     </svg>
     <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>
+    {lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{format(vals[lu-1])}</strong></div>}
   </div>;
 }
 
@@ -13290,15 +13291,16 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   React.useEffect(() => {setKo(false);setSecours(null);}, [url]);
   React.useEffect(()=>{if(!ko || !url)return;let stop=false;photoViaServeur(url).then(data=>{if(!stop && data)setSecours(data);});return()=>{stop=true;};},[ko,url]);
   const box = { width:size, height:portrait ? Math.round(size*1.3) : size, flexShrink:0, borderRadius:8, overflow:'hidden', background:C.card2 || C.bg, display:'flex', alignItems:'center', justifyContent:'center' };
-  if (secours) return <img src={secours} alt="" style={{...box,objectFit:'cover'}}/>;
+  if (secours) return <img src={secours} alt="" style={{...box,objectFit:'cover'}} onError={()=>setSecours(null)}/>;
   if (url && !ko) return <PhotoVinted src={url} alt="" loading="lazy" decoding="async" onError={()=>setKo(true)} style={{...box,objectFit:'cover'}}/>;
-  return <span style={box} aria-hidden="true"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
+  return <span style={box} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
-function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées' }) {
+function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées', count }) {
   const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
     <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
+    {(search || value!=='all') && <div className="vrm-filter-recap"><span role="status">{count==null?'Filtres actifs':`${count} résultat${count===1?'':'s'}`}</span><button type="button" onClick={()=>{onSearch('');onChange('all');}}>Réinitialiser</button></div>}
   </div>;
 }
 
@@ -13569,14 +13571,14 @@ function PlatResume({ cases, note, dark, baseKO }) {
   );
 }
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = false }) {
-  const [filtre,setFiltre]=React.useState('all');
-  const [recherche,setRecherche]=React.useState('');
+  const [filtre,setFiltre]=useVueSession('leboncoin-ventes-filtre','all');
+  const [recherche,setRecherche]=useVueSession('leboncoin-ventes-recherche','');
   const ventes=lbcVentes.ventes || [];
   const visibles=ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
     && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
   return <div>
     <ScreenHead icon="cash" title="Ventes"/>
-    <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} cancelled/>
+    <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o}/>)}</div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
@@ -15712,8 +15714,8 @@ function EbayActionCompte({vue,comptes,onCompte,children}){
 }
 function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const E = EBAY_SKIN;
-  const [filtre,setFiltre]=React.useState('all');
-  const [recherche,setRecherche]=React.useState('');
+  const [filtre,setFiltre]=useVueSession('ebay-ventes-filtre','all');
+  const [recherche,setRecherche]=useVueSession('ebay-ventes-recherche','');
   const [couts,setCouts]=React.useState(()=>load('vrm_ebay_couts',{}));
   const touched=React.useRef(false);
   React.useEffect(()=>onCloudReady(()=>{if(!touched.current)setCouts(load('vrm_ebay_couts',{}));}),[]);
@@ -15731,7 +15733,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   const wrap = (kids) => <div className="vrm-ebay-sales" style={{ background: E.bg, padding: 16, paddingBottom: 48 }}>{kids}</div>;
   const head = <ScreenHead icon="cash" title="Ventes eBay"/>;
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (orders === undefined) return wrap(<>{head}<Skeleton variant="row" count={3}/></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
   // (17 oct.) Les trois cases, même sans vente (Julien : « ça motive à remplir
   // ces cases »). Lu et vide ⇒ 0 ; un compte illisible ⇒ « — » (pas su).
@@ -15767,7 +15769,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
     {illisibles.length>0 && cible && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
-    {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} doneLabel="Expédiées"/>}
+    {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} doneLabel="Expédiées"/>}
     {!cible && <div className="vrm-ebay-results" role="status">{visibles.length} commande{visibles.length>1?'s':''} affichée{visibles.length>1?'s':''}{(recherche || filtre!=='all') && <button type="button" onClick={()=>{setRecherche('');setFiltre('all');}}>Effacer les filtres</button>}</div>}
     {!cible && !visibles.length && <div className="vrm-ebay-empty"><b>Aucune commande dans cette sélection</b><p>Essaie un titre, un acheteur, une référence ou un numéro de commande.</p></div>}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
@@ -26589,7 +26591,7 @@ function Skeleton({ variant='row', count=6 }) {
   const bg = C.border;
   const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:8 };
   if (variant==='card') {
-    return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
+    return <div className="vrm-skeleton" role="status" aria-label="Chargement des articles" aria-busy="true" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
       {Array.from({length:count}).map((_,i)=>(
         <div key={i} style={{borderRadius:10,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
           <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
@@ -26601,10 +26603,10 @@ function Skeleton({ variant='row', count=6 }) {
       ))}
     </div>;
   }
-  return <div style={{display:'flex',flexDirection:'column',gap:10}}>
+  return <div className="vrm-skeleton" role="status" aria-label="Chargement de la liste" aria-busy="true" style={{display:'flex',flexDirection:'column',gap:10}}>
     {Array.from({length:count}).map((_,i)=>(
       <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:10,background:C.surface,boxShadow:C.shadow||'none'}}>
-        <div style={{...shimmer,width:48,height:48,borderRadius:8,flexShrink:0}}/>
+        <div style={{...shimmer,width:56,height:76,borderRadius:8,flexShrink:0}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
           <div style={{...shimmer,height:13,width:'45%'}}/>
           <div style={{...shimmer,height:11,width:'70%'}}/>
@@ -33023,6 +33025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
+            {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
               {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
@@ -33783,7 +33786,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
-        {sales.loading && <Skeleton variant="row" count={5}/>}
+        {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
@@ -35323,7 +35326,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
-        {buys.loading && <Skeleton variant="row" count={5}/>}
+        {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {buys.items && !buys.error && buysBase.length===0 && (
           <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
@@ -35653,7 +35656,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
           return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} aConfirmer={annAConfirmer} numeros={numeros} activite={liveStats && liveStats.annActivite}/>;
         })()}
-        {listings.loading && <Skeleton variant="card" count={6}/>}
+        {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
@@ -36305,7 +36308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <NoAcc/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
-        {convs.loading && <Skeleton variant="row" count={2}/>}
+        {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
             Julien : « il doit y avoir la messagerie intégrée des derniers
@@ -36467,6 +36470,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
                           <span className="vrm-msg-time" style={{color:c.unread&&!ro?C.accent:C.muted}}>{quand(c.updated_at)}</span>
                         </span>
+                        {(c.item_title||c.item?.title) && <span className="vrm-msg-article">{c.item_title||c.item.title}</span>}
                         <span className="vrm-msg-l2">
                           <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{c.description||''}</span>
                           {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
@@ -36792,7 +36796,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Avant il y avait deux listes — les emails en haut, les vraies ventes
             en bas — et la paire à envoyer se retrouvait sous un bordereau
             fantôme d'un compte supprimé. */}
-        {sales.loading && <Skeleton variant="row" count={4}/>}
+        {sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {!sales.loading && !sales.error && (()=>{
           // ⚠️ 30 septembre (Julien : « les bordereaux doivent s'enlever quand
