@@ -10793,7 +10793,7 @@ function BottomBar({tab,setTab}) {
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex'}}>
+    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab;
         const items=BOTTOM_TABS.filter(t=>t.id!=='plat_vestiaire').map(t=>t.id==='journee'?{...t,label:'Accueil'}:t);
         return items.map(t=>{ const on=actif===t.id; return (

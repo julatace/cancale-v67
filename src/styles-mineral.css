@@ -1111,3 +1111,40 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   }
 }
 @media(prefers-reduced-motion:reduce) { .vrm-input { transition:none; } }
+
+/* Mobile : contenu à 80 %, navigation indépendante à sa taille native.
+   Le zoom ne touche ni le viewport ni la barre : ses cibles restent à 44 px.
+   Les champs compensent le zoom pour garder 16 px affichés sur iOS. */
+@media(max-width:767px) {
+  .vrm-main { zoom:.8; width:100% !important; max-width:none !important; }
+  .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .vrm-main textarea, .vrm-main select { font-size:20px !important; }
+  .vrm-main button:not([role="switch"]) { min-height:55px !important; }
+  .vrm-main button[aria-label] { min-width:55px; }
+  .vrm-day-top { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  .vrm-day-top > .vrm-day-week { grid-column:2; grid-row:1 / span 2; }
+  .vrm-day-top > .vrm-day-money, .vrm-day-top > .vrm-day-jour { grid-column:1; }
+  .vrm-day-top > .vrm-day-wallet { grid-column:1; }
+  .vrm-day-card { padding:12px; }
+  .vrm-day-head { flex-wrap:wrap; gap:6px; }
+  .vrm-day-hero-n { font-size:34px; }
+  .vrm-day-greeting { margin-bottom:10px; }
+  .vrm-day-bar { margin-bottom:10px; }
+  .vrm-day-recent .vrm-carrousel { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .vrm-day-recent .vrm-carrousel > button { display:grid !important; grid-template-columns:58px minmax(0,1fr); }
+  .vrm-day-recent .vrm-carrousel > button > div:first-child { aspect-ratio:auto !important; min-height:82px; }
+  .vrm-day-recent .vrm-carrousel > button > div + div { padding:8px !important; min-width:0; }
+}
+@media(max-width:1023px) {
+  .vrm-app-shell .vrm-tabbar {
+    background:var(--vrm-nav-bg,#21343E); border-top:1px solid rgba(255,255,255,.12);
+    backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  .vrm-tabbar > .vrm-tab { position:relative; min-height:60px; gap:4px; color:#B8C9CF; }
+  .vrm-tabbar > .vrm-tab[aria-current="page"] { color:#FFFFFF; }
+  .vrm-tabbar > .vrm-tab[aria-current="page"]::before {
+    content:''; position:absolute; top:0; left:calc(50% - 12px);
+    width:24px; height:3px; border-radius:0 0 3px 3px; background:#D8E6E9;
+  }
+  .vrm-tabbar > .vrm-tab:focus-visible { outline:2px solid #FFFFFF; outline-offset:-4px; }
+}
