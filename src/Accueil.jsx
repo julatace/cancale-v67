@@ -529,7 +529,7 @@ export default function Accueil({ onEntrer }) {
       <header className={`acc-nav${defile ? ' defile' : ''}`}>
         <div className="acc-in">
           <a className="acc-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
-            <img src="/logo-vrm-96.png" alt="" width="32" height="32" />
+            <img src="/vrm-logo-96.png" alt="" width="32" height="32" />
             <b>VRM</b>
           </a>
           <nav className="acc-ancres" aria-label="Sections">
@@ -727,7 +727,7 @@ export default function Accueil({ onEntrer }) {
       <footer className="acc-pied">
         <div className="acc-in">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo-vrm-96.png" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
+            <img src="/vrm-logo-96.png" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
             <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
           </div>
           <nav aria-label="Informations légales">
