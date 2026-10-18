@@ -215,6 +215,10 @@ async function brancher(p){
   await p.keyboard.press('Escape');
   check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).count()===0, 'Échap ferme la photo');
   check(await photo.evaluate(e=>e===document.activeElement), 'fermeture de photo rend le focus à la miniature');
+  // La photo fermée retire son entrée d'historique (« retour » ferme d'abord la
+  // feuille, 18 oct.) : on laisse ce retour se faire avant de changer d'adresse —
+  // un goto lancé dans la même milliseconde n'est pas un geste humain.
+  await p.waitForTimeout(400);
   rows.push({id:'harvest_111_inbox',data:{capturedAt:maintenant,payload:{conversations:[{id:71,opposite_user:{id:22,login:'Client Vinted'},description:'Paire de test',last_message:'Merci',last_message_at:maintenant}]}}},{id:'harvest_111_conv_71',data:{payload:{conversation:{id:71,opposite_user:{id:22},allow_reply:false,messages:[{entity_type:'message',created_at_ts:1700000000,entity:{user_id:22,body:'Bonjour depuis Vinted'}},{entity_type:'status_message',created_at_ts:1700000001,entity:{title:'Colis disponible',pickup:{pickup_code:456789}}},{entity_type:'message',created_at_ts:1700000002,entity:{user_id:111,body:'Merci pour votre achat'}}]}}}});
   await p.goto(base+'/?tab=plat_vinted');
   const nav=p.getByRole('navigation',{name:'Navigation principale'});

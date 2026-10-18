@@ -10010,8 +10010,19 @@ et 1512, clair · sombre · mode stream). **32 rouges sur a80f584, 0 après.**
   d'un tour : la section suit l'onglet). `scrollRestoration = 'manual'` : la
   position reste à `MemoireDefilement`. Les deux `replaceState({})` gardent
   désormais l'état. Banc `retour-historique.cjs` (aucune fixture, 390/1512) :
-  **10 rouges sur le build d'avant**, 0 après. ⚠️ Non traité : « retour » ne
-  ferme pas une feuille ouverte (il change d'écran sous elle).
+  **10 rouges sur le build d'avant**, 0 après.
+- **« Retour » ferme d'abord la feuille ouverte** (`<FermeAuRetour fermer={…}/>`,
+  posé dans 33 feuilles : voile + panneau, recherche, photo agrandie, fil de
+  conversation, lot de bordereaux…). La feuille ajoute UNE entrée (même écran :
+  la coque n'y voit rien) ; fermée autrement (×, voile, Échap), son entrée part
+  par `history.back()` — ou est REMPLACÉE par le nouvel écran si la fermeture a
+  changé d'écran (sinon le retour défairait la navigation) ; la coque attend ce
+  retour avant d'empiler (`__vrmRetourFeuille`). Une feuille qui refuse de se
+  fermer (envoi en cours) retrouve son entrée. **Toute nouvelle feuille plein
+  écran doit le porter.** Banc `retour-historique.cjs` : 3 rouges sur le build
+  d'avant. ⚠️ Un `goto` lancé dans la même milliseconde qu'une fermeture est
+  défait par ce retour (vu au banc `revendeurs`, qui attend désormais 400 ms) :
+  aucun chemin humain ne le fait.
 - **Orion (Kagi, Mac et iPhone)** installe les extensions des boutiques Chrome
   et Firefox — le seul navigateur d'iPhone qui en accepte. Même agent
   utilisateur que Safari : impossible à reconnaître, donc PROPOSÉ là où l'on

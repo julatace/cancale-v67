@@ -162,10 +162,12 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
       // ⚠️ (16 octobre) L'ordre est : le compte ouvert dans Chrome d'abord (là
       //    où VRM peut répondre — `messages-priorite.cjs`), puis les plus
-      //    récentes. Sur un téléphone (390 px tactile) l'extension n'existe pas :
-      //    aucune priorité, l'ordre des dates seul. (L'ancien contrôle « non
-      //    lues d'abord » était rouge depuis longtemps : l'app trie par date.)
-      const attendu = tel ? ['402', '303', '301'] : ['303', '301', '402'];
+      //    récentes. Ce banc sert un pont qui RÉPOND aussi à 390 px tactile :
+      //    depuis la 5.188 (Firefox pour Android), un téléphone dont l'extension
+      //    répond agit ICI — la même priorité vaut donc aux deux tailles (le
+      //    téléphone SANS extension est jugé par `pont.cjs`). (L'ancien contrôle
+      //    « non lues d'abord » était rouge depuis longtemps : l'app trie par date.)
+      const attendu = ['303', '301', '402'];
       dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)

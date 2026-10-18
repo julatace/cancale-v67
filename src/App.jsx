@@ -1460,10 +1460,66 @@ function sheetTexte(q, defaut) {
   return { titre, corps };
 }
 
+// ── « RETOUR » FERME D'ABORD LA FEUILLE OUVERTE (18 oct.) ──────────────────
+// Le geste retour (Android, balayage iPhone, ← ordinateur) changeait d'écran
+// SOUS une feuille ouverte. Chaque feuille posée par <FermeAuRetour> ajoute une
+// entrée d'historique (même écran, même section : l'écouteur de la coque n'y voit
+// rien à faire) ; « retour » la ferme. Fermée autrement (×, voile, Échap), son
+// entrée est retirée (history.back) — ou remplacée par le nouvel écran si la
+// fermeture a changé d'écran (sinon le retour défairait cette navigation).
+// Une feuille qui refuse de se fermer (envoi en cours) retrouve son entrée.
+const _feuillesOuvertes = [];
+let _idFeuille = 0;
+const _histoOnglet = { tab: null, sub: null };
+function _installerRetourFeuilles() {
+  if (typeof window === 'undefined' || window.__vrmFeuillesPop) return;
+  window.__vrmFeuillesPop = true;
+  window.addEventListener('popstate', (e) => {
+    window.__vrmRetourFeuille = false;
+    const id = e && e.state && e.state.vrmFeuille;
+    const i = id ? _feuillesOuvertes.findIndex(f => f.id === id) : -1;
+    if (id && i < 0) return;   // entrée d'une feuille déjà fermée : rien à fermer
+    for (let k = _feuillesOuvertes.length - 1; k > i; k--) {
+      const f = _feuillesOuvertes[k]; f.consommee = true;
+      try { f.fermer.current && f.fermer.current(); } catch (_) {}
+      setTimeout(() => { if (f.monte && f.consommee) { f.consommee = false; _poserFeuille(f); } }, 0);
+    }
+  });
+}
+function _poserFeuille(f) {
+  try { window.history.pushState({ ...(window.history.state || {}), vrmFeuille: f.id }, ''); } catch (_) {}
+}
+function FermeAuRetour({ fermer }) {
+  const ref = React.useRef(fermer); ref.current = fermer;
+  React.useEffect(() => {
+    _installerRetourFeuilles();
+    const f = { id: 'f' + (++_idFeuille) + '_' + Date.now().toString(36), fermer: ref, monte: true, consommee: false };
+    _feuillesOuvertes.push(f); _poserFeuille(f);
+    return () => {
+      f.monte = false;
+      const j = _feuillesOuvertes.indexOf(f); if (j >= 0) _feuillesOuvertes.splice(j, 1);
+      if (f.consommee) return;
+      setTimeout(() => {
+        try {
+          const st = window.history.state || {};
+          if (st.vrmFeuille !== f.id) return;
+          const h = _histoOnglet;
+          if (h.tab != null && (st.vrmTab !== h.tab || st.vrmSub !== h.sub)) {
+            const { vrmFeuille, ...reste } = st;
+            window.history.replaceState({ ...reste, vrmTab: h.tab, vrmSub: h.sub }, '');
+          } else { window.__vrmRetourFeuille = true; setTimeout(() => { window.__vrmRetourFeuille = false; }, 1200); window.history.back(); }
+        } catch (_) {}
+      }, 0);
+    };
+  }, []);
+  return null;
+}
+
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
 function SheetShell({ onClose, children, maxWidth = 460 }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
         {children}
@@ -9601,6 +9657,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
 
   return createPortal(
     <div data-noswipe onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
           <div style={{flex:1,minWidth:0}}>
@@ -13220,6 +13277,7 @@ function PhotoArticleAgrandissable({src,titre,children}) {
   return <>
     <button ref={bouton} type="button" className="vrm-photo-open" aria-label={`Agrandir la photo de ${titre || 'cet article'}`} onClick={()=>{ const image=bouton.current?.querySelector('img'); setAffichee(image?.complete&&image.naturalWidth>0?image.currentSrc:url);setOuverte(true); }}>{children}<span aria-hidden="true"><Icon name="search" size={12}/></span></button>
     {ouverte && createPortal(<div className="vrm-photo-viewer" onClick={()=>setOuverte(false)} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOuverte(false);}if(e.key==='Tab'){e.preventDefault();fermer.current?.focus();}}}>
+      <FermeAuRetour fermer={()=>setOuverte(false)}/>
       <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" onClick={e=>e.stopPropagation()}>
         <div><span>{titre || 'Photo de l’article'}</span><button className="vrm-icon-control" ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
         <PhotoVinted src={affichee || url} alt={titre || 'Article'} style={{width:'100%',height:'100%',objectFit:'contain',minHeight:0}}/>
@@ -20285,6 +20343,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={onClose}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
@@ -20356,6 +20415,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
   const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
@@ -23047,6 +23107,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
       display:'flex',alignItems:'center',justifyContent:'center',padding:20,
       animation:'fadeIn 0.2s',
     }}>
+      <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{
         background:C.card,border:`1px solid ${C.border}`,borderRadius:8,
         padding:24,maxWidth:480,width:'100%',
@@ -23836,6 +23897,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         const tout = delScopes.annonces && delScopes.ventes && delScopes.achats && delScopes.messages && delScopes.compte;
         return (
         <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
+          <FermeAuRetour fermer={()=>!delBusy&&setDelCible(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
               <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:`${C.danger}14`,color:C.danger,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={17}/></span>
@@ -24882,6 +24944,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {editing && editDraft && (
         <div onClick={()=>{setEditing(null);setEditDraft(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <FermeAuRetour fermer={()=>{setEditing(null);setEditDraft(null);}}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:10,padding:20,width:'100%',maxWidth:420}}>
             <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>Modifier la paire</div>
             <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Numéro</label>
@@ -26604,6 +26667,7 @@ function BordPlacer({ place, onConfirm, onCancel }) {
   const onUp = ()=>{ dragging.current=false; };
   return (
     <div onClick={onCancel} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <FermeAuRetour fermer={onCancel}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:10,maxWidth:420,width:'100%',maxHeight:'92vh',overflow:'auto',padding:16}}>
         <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>📄 Nouveau format de bordereau</div>
         <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginBottom:12}}>
@@ -32956,6 +33020,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+  <FermeAuRetour fermer={()=>setOpenConv(null)}/>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
                 là qu'on le cherche), la personne et la paire, l'actualisation à
@@ -36520,6 +36585,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-noswipe="1" data-lot={L.length} role="dialog" aria-modal="true" aria-label="Bordereaux à imprimer"
                       onClick={e=>{ if(e.target===e.currentTarget) setLot(null); }}
                       style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(10,15,25,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                      <FermeAuRetour fermer={()=>setLot(null)}/>
                       <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
                         <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
                           <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
@@ -37088,6 +37154,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && (
         <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
                 demandait « quel achat correspond à CETTE paire ? » sans jamais
@@ -37176,6 +37243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Recherche d'un point relais par son nom → carte → confirmer */}
       {relayPicker && (
         <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1200,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setRelayPicker(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37230,6 +37298,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <FermeAuRetour fermer={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:10,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
             <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
@@ -37263,6 +37332,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowAnnual(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37403,6 +37473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showLister && (
         <div onClick={()=>setShowLister(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowLister(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37474,6 +37545,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Détail d'un LOT : les paires vendues ensemble, avec leur N° si connu. */}
       {lotView && (
         <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setLotView(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
@@ -37516,6 +37588,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>) : null;
         return (
         <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setReceiptView(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <button className="vrm-icon-control" type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
@@ -37556,6 +37629,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>); })()}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowSourcing(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37639,6 +37713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showTreasury && (
         <div onClick={()=>setShowTreasury(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowTreasury(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37696,6 +37771,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           plus la compta tant que leur coût manque. */}
       {fillBuyOpen && (
         <div className="vrm-feuille-fond" onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1" data-fillbuy-feuille="">
+          <FermeAuRetour fermer={()=>setFillBuyOpen(false)}/>
           {/* (16 oct.) Sur téléphone une feuille du bas ; à partir de 768 px une
               fenêtre CENTRÉE (elle restait collée en bas, étroite, sur ordinateur). */}
           <div className="vrm-feuille" role="dialog" aria-modal="true" aria-label="Prix d'achat à compléter" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -37784,6 +37860,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {iaOpen && (
         <div onClick={()=>setIaOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
+          <FermeAuRetour fermer={()=>setIaOpen(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -37846,6 +37923,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowReport(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
@@ -38125,6 +38203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const already = bordLinks[bordKey(linkPickFor)];
         return (
         <div onClick={()=>setLinkPickFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setLinkPickFor(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'82vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -38169,6 +38248,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return new Date(Y,M-1,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''); };
         return (
         <div onClick={()=>setShowBrandCurves(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowBrandCurves(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>📈 Prix de vente par marque</div><div style={{fontSize:12,color:C.muted}}>Prix de vente moyen mois par mois (12 derniers mois).</div></div>
@@ -38341,6 +38421,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const mapsUrl=(p)=> p.geo&&p.geo.lat ? `https://www.google.com/maps/search/?api=1&query=${p.geo.lat},${p.geo.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.nom+(p.adresse?' '+p.adresse:''))}`;
         return (
         <div onClick={()=>setTourneeOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setTourneeOpen(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:12,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
@@ -38380,6 +38461,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Registre LITIGES & REMBOURSEMENTS ── */}
       {showDisputes && (
         <div onClick={()=>setShowDisputes(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setShowDisputes(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>⚖️ Litiges & remboursements</div><div style={{fontSize:12,color:C.muted}}>L'argent perdu (ventes annulées/remboursées) et récupéré (achats remboursés).</div></div>
@@ -38425,6 +38507,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const { moves, nTotal, nLocked, maxBefore, maxAfter } = renumPlan;
         return (
         <div onClick={()=>setRenumOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setRenumOpen(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'86vh',borderRadius:'20px 20px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'16px 18px 12px',flexShrink:0}}>
               <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
@@ -38590,6 +38673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const nothing = ghosts.length===0 && soldStored.length===0 && notStored.length===0 && unknownAtGarage.length===0;
         return (
         <div onClick={()=>setAuditOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setAuditOpen(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🔎 Audit d'inventaire</div><div style={{fontSize:12,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
@@ -38621,6 +38705,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const nSel = lotSel.size; const total = eur(lotTotal);
         return (
         <div onClick={()=>setLotOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setLotOpen(false)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -38671,6 +38756,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
         <div onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <FermeAuRetour fermer={()=>setNoteEdit(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,width:'100%',maxWidth:420,padding:'18px 18px 16px',boxShadow:C.shadow||'0 12px 40px rgba(0,0,0,.3)'}}>
             <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>Note interne</div>
             <div style={{fontSize:11.5,color:C.muted,marginBottom:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
@@ -38692,6 +38778,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const title = (it && (it.title||it.brand)) || (e && e.title) || 'Paire';
         return (
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setPassportFor(null)}/>
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -38727,6 +38814,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <FermeAuRetour fermer={()=>setQrView(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
             {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
@@ -40559,6 +40647,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     // part dans document.body, au-dessus de tout.
     return createPortal(
       <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:10000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <FermeAuRetour fermer={close}/>
         <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(22px + env(safe-area-inset-bottom))'}}>
           <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
           <div style={{fontSize:17,fontWeight:700,color:M==='out'?C.danger:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
@@ -43709,7 +43798,7 @@ function AppCoeur() {
   // changement d'onglet met aussi à jour la section (effet ci-dessus) — UNE
   // entrée, pas deux.
   const histoRef=React.useRef({ tab, sub:platSub, depuisRetour:false, minuteur:0, init:false });
-  histoRef.current.tab=tab; histoRef.current.sub=platSub;
+  histoRef.current.tab=tab; histoRef.current.sub=platSub; _histoOnglet.tab=tab; _histoOnglet.sub=platSub;
   React.useEffect(()=>{
     const h=histoRef.current;
     if(!h.init){
@@ -43722,13 +43811,17 @@ function AppCoeur() {
     }
     if(h.depuisRetour){ h.depuisRetour=false; return; }
     clearTimeout(h.minuteur);
-    h.minuteur=setTimeout(()=>{
+    const pousser=()=>{
+      // Une feuille vient d'être fermée : son entrée part (history.back, asynchrone).
+      // On attend que ce retour soit fait avant d'empiler l'écran suivant.
+      if(window.__vrmRetourFeuille){ h.minuteur=setTimeout(pousser,30); return; }
       try{
         const st=window.history.state||{};
         if(st.vrmTab===h.tab && st.vrmSub===h.sub) return;
         window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
       }catch(_){}
-    },0);
+    };
+    h.minuteur=setTimeout(pousser,0);
   },[tab,platSub]);
   React.useEffect(()=>{
     const onPop=(e)=>{
@@ -45487,6 +45580,7 @@ function AppCoeur() {
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
+          <FermeAuRetour fermer={()=>setGsOpen(false)}/>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
             <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
             <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
