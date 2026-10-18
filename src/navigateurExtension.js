@@ -40,6 +40,19 @@ export function boutiqueIci(ua) {
   return { nav, lien };
 }
 
+// ORION (Kagi, Mac ET iPhone) installe les extensions de la boutique de Chrome
+// et de celle de Firefox — c'est le seul navigateur d'iPhone qui en accepte.
+// Il se présente exactement comme Safari (même agent utilisateur) : on ne peut
+// pas le reconnaître, donc on le PROPOSE là où l'on dirait « Safari ne peut
+// pas » (Safari sur Mac, iPhone). Le lien est celui d'une fiche PUBLIÉE
+// (Chrome d'abord, Firefox sinon) — vide ⇒ on ne le propose pas. Une fois
+// installée dans Orion, l'extension se mesure comme ailleurs (le pont répond).
+// ⚠️ Non essayé dans Orion : sa prise en charge des API d'extension est
+// partielle, la phrase le dit.
+export function boutiqueOrion() {
+  return LIENS_BOUTIQUES.chrome || LIENS_BOUTIQUES.firefox || '';
+}
+
 // La page des extensions de CE navigateur — celle qu'on nomme dans une consigne.
 export function pageExtensionsIci(ua) {
   const nav = navigateurIci(ua);

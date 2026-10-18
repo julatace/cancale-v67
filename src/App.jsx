@@ -16,7 +16,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
-import { boutiqueIci, estAndroid, pageExtensionsIci, nomNavigateurIci } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -12565,6 +12565,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   //    sa fenêtre n'a pas. Les mêmes voies que l'en-tête (`voieConnexionExt`).
   const voie = voieConnexionExt();
   const boutique = boutiqueIci();
+  const orion = boutiqueOrion();   // Orion (Mac, iPhone) : la boutique de Chrome ou de Firefox, une fois publiée
   const [deconnectee, setDeconnectee] = React.useState(false);
   const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
@@ -12652,6 +12653,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas.
         Ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul.
       </p>
+      {orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
     /* 5.188 : la fiche de CE navigateur est publiée — un seul geste, « Ajouter ». */
@@ -12674,6 +12676,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
           ? <>La version Firefox de l’extension n’est pas encore en ligne dans la boutique de Firefox. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
           : <>Safari n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
       </p>
+      {boutique.nav === 'safari' && orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="safari">Tu préfères un navigateur proche de Safari&nbsp;? <b style={{color:C.text}}>Orion</b> (gratuit) installe l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par Chrome.</p>}
     </>
   ) : (
     <>
@@ -12702,6 +12705,8 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
+    : (!fait.ext && orion && boutique.nav === 'safari' && !(sansSouris && estAndroid()))
+    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
     : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari'))
@@ -15327,7 +15332,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
           : e === 'refus' ? 'Connexion annulée sur eBay — tu peux réessayer.'
           : 'La connexion a échoué' + (r ? ` : ${RAISON_CONNEXION_EBAY[r] || r}` : '') + '.');
         p.delete('ebay'); p.delete('raison'); p.delete('compte'); p.delete('nouveau');
-        window.history.replaceState({}, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
+        window.history.replaceState(window.history.state, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
         if (e === 'connecte') signalerComptesEbay();
       }
     } catch (_) {}
@@ -43692,6 +43697,54 @@ function AppCoeur() {
     }
     subVoulue.current=null;
   },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  // ── LE BOUTON « RETOUR » REVIENT À L'ÉCRAN D'AVANT (18 oct.) ────────────────
+  // Aucun changement d'écran n'entrait dans l'historique du navigateur : le
+  // geste « retour » d'Android, le balayage depuis le bord sur iPhone ou le
+  // bouton ← d'un ordinateur QUITTAIENT VRM au lieu de revenir de Ventes à
+  // Ma journée. Chaque écran (et chaque section d'une plateforme) devient une
+  // entrée d'historique, SANS changer l'adresse (les liens `?tab=` restent
+  // gérés par `goto`). Un retour rejoue l'écran ET sa section, sans en créer
+  // de nouvelle entrée. Une entrée sans écran (la première, avant VRM) vaut
+  // Ma journée, l'écran de départ. Les poses passent par un délai nul : un
+  // changement d'onglet met aussi à jour la section (effet ci-dessus) — UNE
+  // entrée, pas deux.
+  const histoRef=React.useRef({ tab, sub:platSub, depuisRetour:false, minuteur:0, init:false });
+  histoRef.current.tab=tab; histoRef.current.sub=platSub;
+  React.useEffect(()=>{
+    const h=histoRef.current;
+    if(!h.init){
+      h.init=true;
+      // La position de défilement d'un écran est tenue par `MemoireDefilement` :
+      // le navigateur ne doit pas en rejouer une autre au retour.
+      try{ if('scrollRestoration' in window.history) window.history.scrollRestoration='manual'; }catch(_){}
+      try{ window.history.replaceState({ ...(window.history.state||{}), vrmTab:tab, vrmSub:platSub }, ''); }catch(_){}
+      return;
+    }
+    if(h.depuisRetour){ h.depuisRetour=false; return; }
+    clearTimeout(h.minuteur);
+    h.minuteur=setTimeout(()=>{
+      try{
+        const st=window.history.state||{};
+        if(st.vrmTab===h.tab && st.vrmSub===h.sub) return;
+        window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
+      }catch(_){}
+    },0);
+  },[tab,platSub]);
+  React.useEffect(()=>{
+    const onPop=(e)=>{
+      const st=(e && e.state) || {};
+      const t=st.vrmTab || 'journee';
+      const sub=st.vrmSub || 'ventes';
+      const h=histoRef.current;
+      clearTimeout(h.minuteur);
+      if(t===h.tab && sub===h.sub) return;
+      h.depuisRetour=true;
+      if(t!==h.tab){ subVoulue.current=sub; setTabBrut(t); }
+      else setPlatSub(sub);
+    };
+    window.addEventListener('popstate',onPop);
+    return ()=>window.removeEventListener('popstate',onPop);
+  },[]);
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
   // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
   // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
@@ -43770,7 +43823,7 @@ function AppCoeur() {
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
     const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','vinted_annonces'];
-    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);

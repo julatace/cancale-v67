@@ -13,6 +13,7 @@ node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zi
 | **Brave** | ✅ | ❌ | — | il installe depuis le Chrome Web Store |
 | **Opera** | ✅ | ❌ | `VRM-chromium.zip` | Opera Add-ons |
 | **Firefox** | ✅ | ✅ **Android** (Firefox 128 et plus) | `VRM-firefox.zip` | addons.mozilla.org |
+| **Orion** (Kagi, Mac et iPhone) | ⚠️ non essayé | ⚠️ **iPhone**, non essayé | — | il installe depuis le Chrome Web Store ou addons.mozilla.org |
 | **Safari** (Mac, iPhone) | ❌ | ❌ | — | demande une app signée par Apple (voir plus bas) |
 
 Le CODE est le même partout, octet pour octet. Le paquet Firefox ne change que
@@ -91,5 +92,13 @@ pas ») — rien n'est envoyé au mauvais endroit.
   iPhone, **le relais** (5.183) fait le travail : depuis l'iPhone, VRM fait
   agir l'extension de l'ordinateur allumé (bordereaux, réponses, publication
   Leboncoin).
+- **Orion (Kagi)** : le seul navigateur d'iPhone qui accepte des extensions — il
+  installe celles de la boutique de Chrome et de Firefox. Aucun paquet à part.
+  Il se présente exactement comme Safari, donc l'app ne peut pas le
+  reconnaître : sur Safari (Mac) et sur iPhone, l'écran des premiers pas le
+  PROPOSE (« Installer dans Orion »), mais seulement une fois une fiche Chrome
+  ou Firefox publiée (`boutiqueOrion`), et il dit que VRM n'y a pas encore été
+  essayé — sa prise en charge des API d'extension est partielle. Installée,
+  l'extension se mesure comme ailleurs (le pont répond, l'app agit d'ici).
 - Chrome pour Android et Chrome pour iPhone n'acceptent aucune extension. Kiwi
   (Android) a fermé en janvier 2025.
