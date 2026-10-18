@@ -9,8 +9,8 @@
   "background_color": "#07090D",
   "theme_color": "#07090D",
   "icons": [
-    { "src": "/vrm-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/vrm-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/vrm-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/vrm-icon-v2-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/vrm-icon-v2-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/vrm-maskable-v2-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
