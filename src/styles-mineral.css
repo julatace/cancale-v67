@@ -1195,3 +1195,33 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-day-stock-prices { flex-wrap:wrap; gap:4px; }
   .vrm-day-stock-links { gap:0 8px; margin-top:8px; padding-top:4px; }
 }
+/* Dernières finitions mobile : sections, filtres et lignes de vente. */
+@media(max-width:767px) {
+  .vrm-market-space .vrm-platform-tabs {
+    border:1px solid var(--vrm-line); border-radius:10px;
+    background:var(--vrm-surface); padding:3px; gap:3px;
+  }
+  .vrm-market-space .vrm-platform-tabs > button { border-radius:7px; font-weight:500; }
+  :root[data-theme="light"] .vrm-market-space .vrm-platform-tabs > button[aria-current="page"] {
+    background:var(--vrm-ink); color:var(--vrm-surface); box-shadow:none; font-weight:600;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee,
+  .vrm-main .vrm-shared-workbar > .vrm-sales-filters {
+    flex-wrap:wrap !important; gap:6px !important; overflow:visible; margin-inline:0; padding-inline:0;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee > button,
+  .vrm-main .vrm-shared-workbar > .vrm-sales-filters > button {
+    flex:1 1 auto; min-width:0; min-height:44px !important; padding-inline:9px !important;
+    font-size:12px !important; border-radius:8px !important;
+  }
+  .vrm-main .vrm-sales-workbar > .vrm-rangee { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .vrm-ventes-liste .vrm-sale-title,
+  .vrm-shared-sale .vrm-sale-title { font-weight:600 !important; line-height:1.4 !important; overflow-wrap:anywhere; }
+  .vrm-shared-sale .vrm-sale-photo { border-radius:8px !important; overflow:hidden; }
+  .vrm-ventes-liste .vrm-sale-meta,
+  .vrm-shared-sale .vrm-sale-meta { line-height:1.5; }
+  .vrm-sale-price .vrm-display,
+  .vrm-kpi-ventes-val { font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .vrm-day-layout .vrm-day-stock { border-radius:12px; }
+  .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { border-radius:10px !important; }
+}
