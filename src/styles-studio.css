@@ -1,0 +1,48 @@
+/* Studio nuit : finitions du mode sombre, sans modifier le mode clair. */
+:root[data-theme="dark"] { --vrm-focus:#B4D0D7; }
+:root[data-theme="dark"] body { background:#293D47; }
+:root[data-theme="dark"] ::selection { background:#B4D0D7; color:#21343E; }
+:root[data-theme="dark"] :focus-visible { outline:2px solid #B4D0D7; outline-offset:3px; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-app-header { box-shadow:none!important; }
+:root[data-theme="dark"] .vrm-rail-button[aria-current="page"] { background:#ffffff0d; border-color:#ffffff21; }
+:root[data-theme="dark"] .vrm-app-shell :is(.vrm-workbar,.vrm-ann-grid,.vrm-sales-list,.vrm-kpi-ventes-case) { box-shadow:none; }
+:root[data-theme="dark"] .vrm-workbar { background:var(--vrm-surface); border-radius:12px; }
+:root[data-theme="dark"] .vrm-day-bar { border-radius:12px; }
+:root[data-theme="dark"] .vrm-day-recent .vrm-carrousel>button { border-radius:10px!important; box-shadow:none!important; }
+:root[data-theme="dark"] .vrm-sale-title { line-height:1.45!important; }
+:root[data-theme="dark"] .vrm-day-stock-links button { color:var(--vrm-ink); }
+:root[data-theme="dark"] .vrm-day-stock-meter { background:var(--vrm-bg); }
+:root[data-theme="dark"] .vrm-kpi-ventes-val { font-variant-numeric:tabular-nums; }
+:root[data-theme="dark"] :is(.vrm-workbar,.vrm-inbox-column,.vrm-ebay-sales) :is(input,textarea,select):focus-visible { outline:2px solid var(--vrm-accent); outline-offset:2px; }
+@media(min-width:1024px) {
+ :root[data-theme="dark"] .vrm-day-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(280px,1fr); gap:14px; }
+ :root[data-theme="dark"] .vrm-day-layout>* { grid-column:1/-1; }
+ :root[data-theme="dark"] .vrm-day-layout>.vrm-day-top,
+ :root[data-theme="dark"] .vrm-day-layout>.vrm-day-lower { display:contents; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-money,
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-jour { grid-column:1/span 2; grid-row:auto; order:10; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-wallet { grid-column:3; grid-row:auto; order:10; display:grid; align-content:center; }
+ :root[data-theme="dark"] .vrm-day-layout:not(:has(.vrm-day-wallet)) .vrm-day-money { grid-column:1/-1; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-week { grid-column:1/span 2; grid-row:auto; order:20; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-stock { grid-column:3; grid-row:auto; order:20; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-recent { grid-column:1/-1; order:30; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-greeting { grid-template-columns:minmax(0,1fr) auto auto; align-items:center; margin-bottom:0; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-date { grid-column:2; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-todo { grid-column:3; margin:0; font-size:12px; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-bar,
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-task-list { margin-bottom:0; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-card { padding:18px 20px; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-week { align-self:stretch; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-hero-n { font-weight:600; letter-spacing:-.04em; }
+ :root[data-theme="dark"] .vrm-day-recent .vrm-carrousel { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:767px) {
+ :root[data-theme="dark"] .vrm-day-card { border-radius:12px; }
+ :root[data-theme="dark"] .vrm-app-header { background:var(--vrm-bar)!important; }
+ :root[data-theme="dark"] .vrm-mobile-nav { background:var(--vrm-bar)!important; }
+}
+@media(min-width:1024px) {
+ :root[data-theme="dark"] .vrm-day-layout { gap:10px; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-section { margin:0!important; }
+ :root[data-theme="dark"] .vrm-day-layout .vrm-day-card { padding:16px 18px; }
+}

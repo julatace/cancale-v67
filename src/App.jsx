@@ -1,3 +1,4 @@
+import {STUDIO} from './themeStudio.js';
 import {resumerStockJournee} from './stockJournee.js';
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
@@ -500,9 +501,9 @@ const THEMES = {
 // fond clair légèrement crème, encre, un bleu de marque, barre latérale bleu nuit (via le
 // jeton `chrome`). Elle REMPLACE la direction « Minéral » pierre du 13 octobre,
 // que Julien a refusée. Mêmes hex que la page d'accueil (identité commune).
-// Toute clé non couverte garde sa valeur d'avant ; le thème SOMBRE n'est pas
-// touché.
+// Toute clé non couverte garde sa valeur d'avant. Le choix de mode est conservé.
 Object.assign(THEMES.light, MINERAL);
+Object.assign(THEMES.dark, STUDIO);
 let C = THEMES.light;
 
 // Données d'amorçage vidées : chaque utilisateur part d'un catalogue/ventes
@@ -1657,7 +1658,7 @@ function AskTextSheet({ q, close }) {
             {q.cancel || 'Annuler'}
           </button>
           <button type="submit"
-            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{flex:2,border:'none',background:C.accent,color:C.onAccent || '#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             {q.ok || 'Valider'}
           </button>
         </div>
@@ -1767,8 +1768,8 @@ function PanneauSync({ onFermer, onReglages }) {
       {(i.etat === 'error' || i.etat === 'refus') && <div data-sync-raison style={{ marginTop: 6 }}>Pourquoi : {i.raison || 'la base n’a pas répondu'}.</div>}
       {i.etat === 'error' && <div style={{ color: C.muted, marginTop: 6 }}>Rien n’est perdu : tes changements restent sur cet appareil{sec != null ? ` — nouvel essai dans ${sec} s` : ''}.</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
-        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
+        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
+        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
         <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réglages</button>
       </div>
     </div>
@@ -8803,7 +8804,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" data-achat-hors-enregistrer disabled={envoi} onClick={enregistrer}
-              style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
+              style={{ flex: 1, minWidth: 0, height: 48, border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14.5, fontWeight: 600, cursor: envoi ? 'default' : 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.7 : 1 }}>{envoi ? 'Enregistrement…' : (editId ? 'Enregistrer' : "Ajouter l'achat")}</button>
             <button type="button" onClick={fermer} style={{ flexShrink: 0, height: 48, padding: '0 16px', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
           </div>
           {editId && <button type="button" data-achat-hors-supprimer onClick={supprimer} style={{ alignSelf: 'flex-start', height: 44, padding: '0 4px', border: 'none', background: 'transparent', color: C.danger, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="trash" size={15} /> Supprimer cet achat</button>}
@@ -8870,7 +8871,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
             </div>
-            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: '#fff' }}>OK</button>
+            <button type="submit" data-cout-vente-ok style={{ ...bouton, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}>OK</button>
           </form>
         ) : (
           <>
@@ -9334,7 +9335,7 @@ function prenomLisible(v) {
 //    d'axe gradué à gauche (il mangeait la place) : la valeur est écrite sur
 //    chaque point, détourée de la couleur du fond pour ne jamais se mélanger
 //    aux repères.
-function CourbeSemaine({ jours, hauteur = 176 }) {
+function CourbeSemaine({ jours, hauteur = 176, compact = false }) {
   const ref = React.useRef(null);
   const [W, setW] = React.useState(340);
   React.useLayoutEffect(() => {
@@ -9346,7 +9347,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
     return () => ro.disconnect();
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
+  const H = !compact && W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
@@ -9714,7 +9715,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
               <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
             </label>
             <button type="button" onClick={()=>{ setZoom(1); setRot(0); setOff({x:0,y:0}); setBright(1); setContrast(1); }} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.muted,fontSize:12.5,fontWeight:600,padding:'11px 13px',cursor:'pointer',fontFamily:'inherit'}}>Réinit.</button>
-            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
+            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:10,background:C.accent,color:C.onAccent || '#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
           </div>
         )}
       </div>
@@ -11397,7 +11398,7 @@ function BlocNumerosPerimes() {
           Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
         </div>
         <button type="button" onClick={rechargerEnGardantLesSaisies}
-          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
           Recharger
         </button>
       </div>
@@ -12255,7 +12256,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
                 style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
                   border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
                 <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
-                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
+                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color: C.onAccent || '#fff', fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
                 {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
               </button>
             );
@@ -12287,7 +12288,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
           <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
+              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
               <button type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           </div>
@@ -14935,7 +14936,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Icon name="tag" size={17}/> Vendre une paire sur eBay
     </button>
   );
@@ -14963,7 +14964,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
           {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
-          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
+          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
@@ -15171,7 +15172,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 12.5, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
-              <button type="button" data-publier-ebay="1" onClick={publier} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
+              <button type="button" data-publier-ebay="1" onClick={publier} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
           {/* ENREGISTRER EN BROUILLON (5 octobre) : rien ne part chez eBay. Il
@@ -15706,7 +15707,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             Tout est prêt côté clés. Autorise ton compte vendeur sur la page d'eBay — <b>aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
           </div>
           <button type="button" onClick={() => connecter(false)} disabled={busy}
-            style={{ border: 'none', borderRadius: 10, background: C.accent, color: '#fff', padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
+            style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Ouverture d\'eBay…' : 'Connecter mon compte eBay'}
           </button>
           {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>(État du compte non lisible pour l'instant — la base n'a pas répondu.)</div>}
@@ -18939,7 +18940,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {objEdit ? (
           <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
             <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+            <button type="button" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:C.onAccent || '#fff',borderRadius:10,padding:'11px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
           </div>
         ) : objectif>0 && caMoisCourant==null ? (
           <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
@@ -20209,7 +20210,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                         if(!await askConfirm(`Mettre la facture ${inv.number} en file d'envoi à ${inv.buyerEmail} ?`)) return;
                         const ok=await setProInvoiceStatus(inv,'queued');
                         if(ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
-                      }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
+                      }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:C.onAccent || '#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
                     )}
                   </div>
                 </div>
@@ -22241,7 +22242,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
+              <button type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: C.onAccent || '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
               {(selItem.lvl || 0) > 0 && <button type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
               <button type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
@@ -22306,7 +22307,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 10.5, fontWeight: 800, padding: '3px 7px', cursor: 'pointer' }}>⬆️ Plafond</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
+                <button type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: C.onAccent || '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
                 <button type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
                 <button type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
               </div>
@@ -22322,13 +22323,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
+                <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: C.onAccent || '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
                 {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: C.onAccent || '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
           {!(FURN_TYPES[selItem.type] || {}).box && <button type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
             <button className="vrm-icon-control" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
@@ -22376,7 +22377,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                       <div key={c} onClick={() => cellAdd(opened, cell)} style={{ flex: 1, minHeight: 52, borderRadius: 6, border: `1.5px ${cellHi ? 'solid #e5484d' : 'dashed ' + C.border}`, background: cellHi ? '#e5484d18' : C.card, padding: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignContent: 'flex-start', cursor: 'pointer' }}>
                         {arr.length === 0 && <span style={{ margin: 'auto', color: C.muted, fontSize: 16 }}>＋</span>}
                         {arr.map((n, i) => (
-                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color: '#fff', borderRadius: 5, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
+                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color: C.onAccent || '#fff', borderRadius: 5, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
                         ))}
                       </div>
                     );
@@ -26343,7 +26344,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 
   // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
   const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 40 };
-  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, minHeight: 40 };
+  const btnAdd = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, minHeight: 40 };
   const formBox = { padding: '12px 16px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 };
   const lab = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: C.muted, flex: '1 1 140px', minWidth: 0 };
   const pastille = (actif) => ({ border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : 'transparent', color: actif ? C.card : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 36 });
@@ -33513,7 +33514,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
                 <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
-                <CourbeSemaine jours={semaine}/>
+                <CourbeSemaine jours={semaine} hauteur={C === THEMES.dark ? 128 : 176} compact={C === THEMES.dark}/>
                 <div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
                   Vendu : au jour de la vente · Reçu : au jour du versement.
                   {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
@@ -34408,7 +34409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
                     Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
                   </div>
-                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent || '#fff',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                     🎯 Viser {prop} €
                   </button>
                 </div>
@@ -34809,7 +34810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <details className="vrm-pickup-help"><summary>Comment retirer un colis ?</summary><div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
                     {[['1','Va au point relais indiqué'],['2','Donne le code ou montre le QR'],['3','Coche ✓ « récupéré »']].map(([n,txt])=>(
                       <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
-                        <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
+                        <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:C.onAccent || '#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
                         {txt}
                       </span>
                     ))}
@@ -35658,7 +35659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
           <EmptyState icon="🟢" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
+            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:C.onAccent || '#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
@@ -36571,7 +36572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {avecPdf.length>0 && (
                   <button type="button" data-lot-ouvrir="1" onClick={ouvrirLot} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    className="vrm-colis-lot" style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'0 18px',minHeight:44,cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
+                    className="vrm-colis-lot" style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',borderRadius:10,background:C.accent,color:C.onAccent || '#fff',padding:'0 18px',minHeight:44,cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
                     <Icon name="printer" size={16}/>{batchBusy?'Préparation…':avecPdf.length===1?'Imprimer':`Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
@@ -36614,7 +36615,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
                           <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
                           <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
-                            style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
+                            style={{border:'none',background:C.accent,color:C.onAccent || '#fff',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
                             {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
                           </button>
                         </div>
@@ -36999,7 +37000,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>Imprimer{inv?' + facture':''}</button>
+                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent || '#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>Imprimer{inv?' + facture':''}</button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
@@ -37258,7 +37259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
                   placeholder="ex : Super U Cancale, Tabac de la Place Saint-Malo…"
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
+                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent || '#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
               <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
                 <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
@@ -38433,7 +38434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {points.map((p,i)=>(
                 <div key={p.nom} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,overflow:'hidden'}}>
                   <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{width:26,height:26,borderRadius:8,background:C.accent,color:'#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
+                    <div style={{width:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent || '#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.carrier&&<CarrierBadge carrier={p.carrier} size={18}/>}<span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nom}</span></div>
                       {p.adresse && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.adresse}</div>}

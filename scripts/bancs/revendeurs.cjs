@@ -34,8 +34,14 @@ const server = http.createServer((q,r)=>{
 });
 let n=0;
 const check=(v,label)=>{assert.ok(v,label);console.log('OK '+label);n++;};
+async function contrasteDuTexte(locator){return locator.evaluate(e=>{
+ const rgb=c=>c.match(/[\d.]+/g).map(Number);
+ const lum=c=>{const v=rgb(c).slice(0,3).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;});return .2126*v[0]+.7152*v[1]+.0722*v[2];};
+ let parent=e,bg;while(parent){bg=getComputedStyle(parent).backgroundColor;const c=rgb(bg);if(c.length<4 || c[3]>0)break;parent=parent.parentElement;}
+ const a=lum(getComputedStyle(e).color),b=lum(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+});}
 async function brancher(p){
-  await p.addInitScript(()=>{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vrm_zoom','0.65');});
+  await p.addInitScript(theme=>{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vrm_zoom','0.65');if(theme)localStorage.setItem('vinted_dark',JSON.stringify(theme==='dark'));},process.env.BANC_THEME || '');
   await p.route('**/*',async r=>{
     const url = new URL(r.request().url());
     if(url.pathname.includes('/rest/v1/')){
@@ -103,12 +109,14 @@ async function brancher(p){
     await p.waitForTimeout(200);
     const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
     check(bar.y<160,'actions quotidiennes en haut à densité '+zoom);
-    check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
+    if(process.env.BANC_THEME==='dark'){const week=await p.locator('.vrm-day-week').boundingBox();check(stock.x>=week.x+week.width-1 && recent.y>=week.y+week.height-1,'Studio : graphique et stock alignés, ventes dessous '+zoom);}else check(stock.x>=recent.x+recent.width-1,'stock à droite des dernières ventes '+zoom);
     check(stock.y+stock.height<900 && recent.y+recent.height<900,'vue globale visible sans défilement '+zoom);
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'journée sans débordement '+zoom);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'journee-'+zoom+'.png')});}
   }
   check((await p.locator('.vrm-day-stock').innerText()).includes('1 à compléter'),'stock sans prix connu expliqué sans faux montant');
+  if(process.env.BANC_THEME==='dark'){check(await contrasteDuTexte(p.locator('.vrm-day-money .vrm-day-k').first())>=4.5,'Studio : libellés financiers contrastés');check(await contrasteDuTexte(p.locator('.vrm-day-stock-prices > span'))>=4.5,'Studio : coûts du stock lisibles');}
+  if(process.env.BANC_THEME==='dark' && process.env.BANC_CAPTURES){await p.setViewportSize({width:390,height:844});await p.locator('main').evaluate(e=>{e.scrollTop=0;});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'journee-390.png')});await p.setViewportSize({width:1512,height:900});}
   await p.locator('.vrm-day-stock').getByRole('button',{name:'Ouvrir le stock'}).click();await p.getByRole('heading',{name:'Stock',exact:true}).waitFor();
   await p.setViewportSize({width:390,height:844});
   for(const [tab,nom] of [['plat_vinted','Vinted'],['plat_leboncoin','Leboncoin'],['plat_ebay','eBay']]){
@@ -304,6 +312,7 @@ async function brancher(p){
   await p.getByRole('button',{name:'Effacer la recherche',exact:true}).click();check(await p.getByText('Paire de test',{exact:true}).isVisible(),'réinitialiser retrouve les offres');
   for(const width of [320,390,1512]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'offres sans débordement '+width);}await p.setViewportSize({width:390,height:844});
 
+  if(process.env.BANC_THEME==='dark')check(await contrasteDuTexte(p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}))>=4.5,'Studio : action principale contrastée');
   await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
   await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
