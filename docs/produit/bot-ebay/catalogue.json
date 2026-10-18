@@ -1,0 +1,446 @@
+{
+  "date": "2026-10-18",
+  "objet": "Préparation produit, pas un état d’implémentation",
+  "base_inspectee": "0beaaa565bab21553abb6ab2932a8413a72bfd2e",
+  "fonctionnalites": [
+    {
+      "id": "B01",
+      "groupe": "veille-ebay",
+      "fonction": "Recherches guidées et avancées",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "lecture",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B02",
+      "groupe": "veille-ebay",
+      "fonction": "Caractéristiques et états par catégorie/pays",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "lecture",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B03",
+      "groupe": "veille-ebay",
+      "fonction": "Mots inclus/exclus, synonymes et références exactes",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B04",
+      "groupe": "veille-ebay",
+      "fonction": "Prix total et destination, frais inconnus visibles",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "lecture",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B05",
+      "groupe": "veille-ebay",
+      "fonction": "Correspondance oui/non/inconnu et explication",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B06",
+      "groupe": "veille-ebay",
+      "fonction": "Alertes volontaires, pauses et horaires silencieux",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "notifications",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B07",
+      "groupe": "veille-ebay",
+      "fonction": "Déduplication et premier import sans avalanche",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B08",
+      "groupe": "veille-ebay",
+      "fonction": "Baisse de prix et historique observé",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "lecture",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B09",
+      "groupe": "veille-ebay",
+      "fonction": "Disponibilité relue et fraîcheur visible",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "lecture",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B10",
+      "groupe": "veille-ebay",
+      "fonction": "Décisions, refus, notes et comparaisons",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B11",
+      "groupe": "veille-ebay",
+      "fonction": "Offre préparée et question au vendeur",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "offre-a-valider",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B12",
+      "groupe": "veille-ebay",
+      "fonction": "Achat assisté",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "achat-a-valider",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B13",
+      "groupe": "veille-ebay",
+      "fonction": "Mandat éventuel d’achat automatique",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "achat-a-valider",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B14",
+      "groupe": "veille-ebay",
+      "fonction": "Budgets partagés et quantités maximales",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B15",
+      "groupe": "veille-ebay",
+      "fonction": "Enchères et groupes d’achat",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "enchere-a-valider",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B16",
+      "groupe": "veille-ebay",
+      "fonction": "Attribution d’une occasion à un collaborateur",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B17",
+      "groupe": "veille-ebay",
+      "fonction": "Réconciliation des résultats incertains",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "achat-a-valider",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "B18",
+      "groupe": "veille-ebay",
+      "fonction": "Mesures de qualité, quotas et capacité équitable",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "exploitation",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E01",
+      "groupe": "equipe",
+      "fonction": "Missions attribuées, priorités et échéances",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E02",
+      "groupe": "equipe",
+      "fonction": "Checklist par article et preuves privées",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E03",
+      "groupe": "equipe",
+      "fonction": "Blocages, progression et réalisation partielle",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E04",
+      "groupe": "equipe",
+      "fonction": "Validation du responsable et réouverture",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E05",
+      "groupe": "equipe",
+      "fonction": "Récupération de colis par point relais",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E06",
+      "groupe": "equipe",
+      "fonction": "Codes limités aux membres autorisés",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E07",
+      "groupe": "equipe",
+      "fonction": "Transmission entre personnes et missions",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E08",
+      "groupe": "equipe",
+      "fonction": "Missions récurrentes et journal de passation",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E09",
+      "groupe": "equipe",
+      "fonction": "Préparation d’annonce déléguée, publication validée",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "equipe",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "E10",
+      "groupe": "equipe",
+      "fonction": "Budget d’achat et seuil de validation par membre",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O01",
+      "groupe": "stock-et-operations",
+      "fonction": "Réservations avec quantité et expiration",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O02",
+      "groupe": "stock-et-operations",
+      "fonction": "Acomptes enregistrés, solde et annulation",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O03",
+      "groupe": "stock-et-operations",
+      "fonction": "Lots décomposés et coût ventilé au centime",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "comptabilite",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O04",
+      "groupe": "stock-et-operations",
+      "fonction": "Achats de lots partagés et propriété des articles",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "comptabilite",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O05",
+      "groupe": "stock-et-operations",
+      "fonction": "Réceptions partielles et pièces manquantes",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O06",
+      "groupe": "stock-et-operations",
+      "fonction": "Contrôle qualité à réception et avant expédition",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O07",
+      "groupe": "stock-et-operations",
+      "fonction": "Numéros de série et fiches de défauts/accessoires",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O08",
+      "groupe": "stock-et-operations",
+      "fonction": "Consommables, unités et journal de mouvements",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O09",
+      "groupe": "stock-et-operations",
+      "fonction": "Réservation de consommables et modèles d’emballage",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "transactions",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O10",
+      "groupe": "stock-et-operations",
+      "fonction": "Seuils de réapprovisionnement et liste d’achat",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O11",
+      "groupe": "stock-et-operations",
+      "fonction": "Retours, litiges et dossier après-vente",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "mixte",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O12",
+      "groupe": "stock-et-operations",
+      "fonction": "Dossier comptable mensuel et justificatifs",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "comptabilite",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "O13",
+      "groupe": "stock-et-operations",
+      "fonction": "Fiche produit réutilisable et brouillons multi-plateformes",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "mixte",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C01",
+      "groupe": "confort-a-etendre",
+      "fonction": "Recherche globale",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "partiellement-present",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C02",
+      "groupe": "confort-a-etendre",
+      "fonction": "Vue complète d’un article sur liens prouvés",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "partiellement-present",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C03",
+      "groupe": "confort-a-etendre",
+      "fonction": "Bénéfice brut/net expliqué",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "partiellement-present",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C04",
+      "groupe": "confort-a-etendre",
+      "fonction": "Actions groupées avec aperçu et résultats individuels",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "mixte",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C05",
+      "groupe": "confort-a-etendre",
+      "fonction": "État de synchronisation par compte et type de données",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "partiellement-present",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C06",
+      "groupe": "confort-a-etendre",
+      "fonction": "Expéditions regroupées et bordereaux reliés",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "partiellement-present",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    },
+    {
+      "id": "C07",
+      "groupe": "confort-a-etendre",
+      "fonction": "Annulation versionnée des modifications locales",
+      "statut": "retenu-a-realiser-ou-etendre",
+      "dependance": "local",
+      "preuve_livraison": "parcours fonctionnel et tests correspondants du dossier",
+      "automatiquement_active": false
+    }
+  ],
+  "exclus": [
+    "simulateur de bénéfice avant achat",
+    "inventaire au téléphone",
+    "prévision de trésorerie"
+  ],
+  "achats_reels_autorises_par_ce_dossier": false,
+  "sources_concurrentes_actuellement_verifiees": false
+}
