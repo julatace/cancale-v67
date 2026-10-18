@@ -241,9 +241,9 @@ const lire = (pg) => pg.evaluate(() => {
       dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
       dit(lu.recuMois === String(attendu.recuMois + 5500), '« Reçu en {mois} » = argent VERSÉ ce mois, y compris une vente déclarée le mois d’avant (même chiffre que les barres)', `rendu ${lu.recuMois} · attendu ${attendu.recuMois + 5500}`);
       if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'journee-recu-declaree.png') });
-      // La carte URSSAF du tableau de bord lit ce que Ventes vient de publier.
-      await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForFunction(() => document.querySelector('[data-dash-vendu-jour],[data-dash-vendu-pas-su]'), null, { timeout: 15000 }).catch(() => {});
+      // La carte URSSAF (dans Comptabilité depuis le 17 octobre) lit ce que Ventes vient de publier.
+      await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForFunction(() => document.querySelector('[data-urssaf-declare]'), null, { timeout: 15000 }).catch(() => {});
       await pg.waitForTimeout(1200);
       if (process.env.CAPTURES) { await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.screenshot({ path: path.join(process.env.CAPTURES, 'dashboard-urssaf-ailleurs.png') }); }
       const u = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-ailleurs]'); return e ? { cents: e.getAttribute('data-urssaf-ailleurs'), n: e.getAttribute('data-urssaf-ailleurs-n') } : null; });
@@ -254,7 +254,8 @@ const lire = (pg) => pg.evaluate(() => {
       const ym = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`;
       const publie = { mois: [{ ym, n: 1, ca: 50, nMasq: 0, caMasq: 0, par: { Vinted: { n: 1, ca: 50 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, declare: null }],
         aDater: { n: 0, ca: 0, par: {} }, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' }, declare: 'pasSu', at: Date.now() };
-      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { publie });
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'compta', { publie });
+      await pg.waitForFunction(() => document.querySelector('[data-urssaf-declare]'), null, { timeout: 15000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); return e ? e.getAttribute('data-urssaf-declare') : null; });
       dit(v === 'pasSu', 'la carte URSSAF lit « registre pas encore lu » et le dit (le chiffre peut encore compter une vente déclarée ailleurs)', `declare=${v}`);
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));

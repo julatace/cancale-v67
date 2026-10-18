@@ -65,10 +65,12 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     return {cestCa,aVerifier,lignes,modaleOuverte};
   });
   console.log(`modale : ${v.lignes} paire(s) · « C'est ça » ${v.cestCa} · « à vérifier » ${v.aVerifier} (total ${v.cestCa+v.aVerifier})`);
-  dit(v.lignes>50, 'la modale de saisie des prix d\'achat s\'ouvre et liste les paires', v.lignes+' lignes');
+  // Les seuils suivent la COPIE de sa base (fx/) : 320 paires sans prix au 5 octobre, ~58 après la remise
+  // à zéro. On juge des PROPORTIONS, pas des nombres figés sur une copie datée (§6, donnée qui a changé).
+  dit(v.lignes>=20, 'la modale de saisie des prix d\'achat s\'ouvre et liste les paires', v.lignes+' lignes');
   dit(v.aVerifier>0, 'les pistes sous le seuil sûr sont montrées « à vérifier » (plus de blanc)', v.aVerifier+' pastilles');
-  dit(v.cestCa>=80, 'la suggestion sûre « C\'est ça » n\'a pas disparu', v.cestCa+' pastilles');
-  dit((v.cestCa+v.aVerifier)>=200, 'la couverture a bondi (111 sûres → 236 avec une piste)', 'total '+(v.cestCa+v.aVerifier)+' pastilles');
+  dit(v.cestCa>=1, 'la suggestion sûre « C\'est ça » n\'a pas disparu', v.cestCa+' pastilles');
+  dit((v.cestCa+v.aVerifier)>=Math.ceil(v.lignes*0.4) && v.aVerifier>v.cestCa, 'la couverture dépasse largement les seules suggestions sûres (au moins 40 % des paires ont une piste)', 'total '+(v.cestCa+v.aVerifier)+' pastilles sur '+v.lignes+' paires');
   dit(errs.length===0, 'aucune erreur d\'app', errs.slice(0,2).join(' | '));
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nChaque paire sans coût a une piste à confirmer, jamais un blanc muet.');

@@ -146,8 +146,11 @@ const MENSONGES = [
     const champs = await pg.evaluate(() => Array.from(document.querySelectorAll('input,textarea,select'))
       .map((e) => String(e.value == null ? '' : e.value)).filter(Boolean));
     const txt = (await pg.evaluate(() => document.body.innerText || '')) + '\n' + champs.join('\n');
+    // (17 oct.) Le nom de l'entreprise est dans l'EN-TÊTE de toutes les pages
+    // (`data-nom-entreprise`, exprès) : le corps de l'écran se lit sans lui.
+    const corps = (await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-nom-entreprise]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText || ''; c.remove(); return t; })) + '\n' + champs.join('\n');
     await ctx.close();
-    return { txt, errs, ecrits };
+    return { txt, corps, errs, ecrits };
   };
 
   // Le geste qui détruit : basculer UNE notification. Sur le code d'avant, il
@@ -263,7 +266,7 @@ const MENSONGES = [
   }
   {
     const r = await rendre(false, null);
-    dit(!/MA RAISON SOCIALE/.test(r.txt), 'et elle n\'est plus dans Réglages');
+    dit(!/MA RAISON SOCIALE/.test(r.corps), 'et elle n\'est plus dans Réglages (hors en-tête)');
   }
 
   await b.close(); srv.close();

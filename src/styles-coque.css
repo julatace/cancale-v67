@@ -84,7 +84,7 @@
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
 :root[data-theme="dark"] .vrm-seg-btn[aria-current="page"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
 .vrm-seg-point { width: 6px; height: 6px; border-radius: 99px; background: var(--seg-point); flex-shrink: 0; }
-@media (max-width: 767px) { .vrm-seg-btn { padding: 0 10px; } }
+@media (max-width: 767px) { .vrm-seg-btn { padding: 0 10px; min-width: 44px; } }
 @media (min-width: 768px) {
   .vrm-seg { width: fit-content; max-width: 100%; }
   .vrm-seg-btn { flex: 0 0 auto; padding: 0 18px; }

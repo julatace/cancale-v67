@@ -117,6 +117,8 @@ const projette = (row, sel) => {
       const avant = await pg.evaluate(() => localStorage.getItem('vinted_accounts_hidden'));
       let confirmVue = false;
       try {
+        // L'interrupteur vit dans le repli « Gérer ce compte » (revue du 17 octobre) : on l'ouvre d'abord.
+        await pg.evaluate(() => document.querySelectorAll('details[data-gerer-compte]').forEach((d) => { d.open = true; }));
         await pg.locator('button[title*="Clique pour le masquer"]').first().click({ timeout: 4000 });
         await pg.waitForTimeout(600);
         confirmVue = await pg.evaluate(() => /Masquer « /.test(document.body.innerText));

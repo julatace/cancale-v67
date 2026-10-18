@@ -7877,8 +7877,29 @@ const ouvrirPdfOnglet = (url) => {
     return !!w;
   } catch (_) { return false; }
 };
+// ⚠️ UN NUMÉRO PAS ENCORE VÉRIFIÉ SUR SON CARTON (18 octobre) : renuméroté
+// pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
+// le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
+// Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le carton (Annonces → « numéros à vérifier sur tes cartons »).";
+const confirmerNumerosAVerifier = async (numeros) => {
+  try {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const cles = new Set((numeros || []).filter(Boolean).map((n) => cleNum(n)));
+    if (!cles.size) return true;
+    const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
+    if (!doute.length) return true;
+    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
+    return await askConfirm({
+      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés sur leur carton` : `Le N°${doute[0].numero} n'est pas encore vérifié sur son carton`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde le carton avant d'imprimer.`,
+      ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
+    });
+  } catch (_) { return true; }
+};
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+  if (numero && !(await confirmerNumerosAVerifier([numero]))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument } = PL;
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
@@ -7903,6 +7924,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, 
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
 const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
+  if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
@@ -10641,21 +10663,29 @@ function MemoireDefilement({ ecran }) {
     const main=document.querySelector('.vrm-main');
     if(!main) return;
     const cible=positions.current.get(ecran)||0;
-    let position=cible, restauration=true, arrete=false;
-    const restaurer=()=>{ if(!arrete&&restauration){ main.scrollTop=cible; if(Math.abs(main.scrollTop-cible)<2) restauration=false; } };
+    let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
+    // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
+    // d'un chargement (le navigateur ramène alors la position à 0). On tient la
+    // position 2,5 s, sauf si la personne fait défiler elle-même.
+    const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2) main.scrollTop=cible; };
     const lire=()=>{ if(!restauration) position=main.scrollTop; };
     const intervenir=()=>{ restauration=false; position=main.scrollTop; };
     main.addEventListener('scroll',lire,{passive:true});
     main.addEventListener('wheel',intervenir,{passive:true});
     main.addEventListener('touchstart',intervenir,{passive:true});
-    const observer=new ResizeObserver(restaurer);
-    if(main.firstElementChild) observer.observe(main.firstElementChild);
-    restaurer();
-    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;observer.disconnect();},2500);
+    window.addEventListener('keydown',intervenir);
+    main.addEventListener('pointerdown',intervenir,{passive:true});
+    // (18 oct.) On réessaie à chaque image tant que le contenu arrive : la zone
+    // porte plusieurs enfants (un bandeau de 74 px en tête), observer le premier
+    // ne voyait jamais l'écran grandir, et la position retombait à 0.
+    let image=0;
+    const boucle=()=>{ restaurer(); if(!arrete&&restauration) image=requestAnimationFrame(boucle); };
+    boucle();
+    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},2500);
     return ()=>{
-      arrete=true;clearTimeout(delai);observer.disconnect();
+      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);
       positions.current.set(ecran,position);
-      main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);
+      main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };
   },[ecran]);
   return null;
@@ -13061,14 +13091,17 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
   const box = { flex:'1 1 90px', minWidth:0 };
   const eti = { fontSize:10.5, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
   return (
-    <ResumePlateforme><div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
+    <><ResumePlateforme><div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
       <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
-      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/>
     </div></ResumePlateforme>
+    {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
+        ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
+    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/></div>
+    </>
   );
 }
 // Les VENTES Leboncoin (prouvées `isSeller`), avec leur bordereau. Vivent dans
@@ -25140,7 +25173,7 @@ async function chercherEntreprise(brut) {
     return { etat: 'passu' };
   } catch (_) { return { etat: 'passu' }; }
 }
-const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise — retrouvé avec ton SIRET", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
+const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
 function ProfilFiscalCarte({ onNav }) {
   const [cfg, setCfg] = React.useState(undefined);          // undefined = en cours · null = pas su · objet = lu
   const [statut, setStatut] = React.useState('');
@@ -32522,6 +32555,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
       if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
+      if (numero && !(await confirmerNumerosAVerifier([numero]))) { libererOngletPdf(); toast(NUM_A_VERIFIER_ANNULE); return; }
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
       const inv = invForBord(b);

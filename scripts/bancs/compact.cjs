@@ -82,7 +82,8 @@ async function brancher(p){
     //    gardent la ligne partagée : toute la rangée sous 200 px, comme avant.
     const haut=tab==='cat_ventes'?pos.ligne:pos.row;
     if(!(haut<200)){console.log(pos);await p.screenshot({path:'/tmp/compact-height.png'});}check(haut!=null&&haut<200,'ligne compacte '+tab+' ('+Math.round(haut)+' px)');
-    if(tab!=='cat_ventes')check(!(await p.locator('.vrm-platform-summary').evaluate(e=>e.open)),'chiffres repliés sur téléphone '+tab);
+    // Depuis le 17 octobre, Leboncoin/eBay → Ventes ont leurs trois cases (`KpiVentes`) et plus de repli « Chiffres » : on ne juge le repli que là où il existe.
+    if(tab!=='cat_ventes' && await p.locator('.vrm-platform-summary').count())check(!(await p.locator('.vrm-platform-summary').first().evaluate(e=>e.open)),'chiffres repliés sur téléphone '+tab);
     // La vignette est en `loading="lazy"` : on attend qu'elle soit chargée (état observé, borné), jamais un délai fixe.
     if(tab!=='cat_ventes'){await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete&&e.naturalWidth>0?1:new Promise(ok=>{e.addEventListener('load',ok,{once:true});e.addEventListener('error',ok,{once:true});setTimeout(ok,5000);})).catch(()=>{});
     check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo affichée '+tab);}
