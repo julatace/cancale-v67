@@ -20847,7 +20847,7 @@ const FURN_TYPES = {
   bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#9aa3ad', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
-  pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  pile:    { label: 'Boîtes au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
   porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true, structure: true },
   fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
   // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
@@ -21268,7 +21268,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - cell / 2).toFixed(2);
         return [...list, neuf];
       });
-      if (pasDePlace) { toast('Plus de place libre au sol pour ces cartons.'); return; }
+      if (pasDePlace) { toast('Plus de place libre au sol pour ces boîtes.'); return; }
       setSel(id); signalerDisposition(); return;
     }
     // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
@@ -28841,7 +28841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const porteursNum = useMemo(() => {
     const m = {};
-    // Rangé par CLÉ : « b125 » et « B125 » sont le même carton.
+    // Rangé par CLÉ : « b125 » et « B125 » sont le même numéro.
     const add = (num, quoi) => { const n = cleNum(num); if (!n) return; (m[n] = m[n] || []).push(quoi); };
     // ⚠️ TOUS les comptes, même masqués : masquer un compte cache sa COMPTA,
     // ça ne sort pas le carton de l'étagère. (`listings.items` ne contient déjà
@@ -35793,7 +35793,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
             <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'une autre paire. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
@@ -42385,7 +42385,7 @@ function NumerosSetting({ nu = false }) {
         </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même carton.
+        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
     </div>
@@ -45945,7 +45945,7 @@ function AppCoeur() {
               // Les données CAPTÉES (ventes, achats, messages…) ne sont pas réécrites :
               // une copie ancienne écraserait une capture plus fraîche (§4.2), et
               // l'extension les recapte toute seule. On restaure ce que TU as saisi.
-              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule. Les numéros donnés depuis cette sauvegarde restent réservés (un numéro écrit sur un carton ne sert jamais deux fois).\n\n⚠ Tes autres réglages seront REMPLACÉS, puis l'app se rechargera.`)) return;
+              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule. Les numéros donnés depuis cette sauvegarde restent réservés (un numéro écrit sur une étiquette ne sert jamais deux fois).\n\n⚠ Tes autres réglages seront REMPLACÉS, puis l'app se rechargera.`)) return;
               await applyAndReload(entries); return;
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
