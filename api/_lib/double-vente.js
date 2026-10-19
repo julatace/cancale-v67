@@ -51,15 +51,46 @@ export function numerosDeVente(numero) {
 // `idsActifs` : les identifiants de ligne des comptes eBay actifs (registre),
 // `mk` : le marqueur 013 (`null` = aucun ; `undefined` = pas su, refusé par
 // l'appelant). Rend Map N° → [{ itemId, titre }].
-export function annoncesEbayParNumero(lignes, idsActifs, mk) {
+// (19 oct.) LE SKU SEUL NE DÉSIGNE PAS UNE PAIRE — la même règle que l'app
+// (`numEbayLu`, App.jsx). Ses annonces VRM-82, 81, 48 publiées pendant la panne
+// de synchro portaient des numéros redonnés le 18 à d'AUTRES paires : la vente
+// de la Vapor Pro (N°82) aurait sonné « encore en vente sur eBay » sur l'annonce
+// d'une Air Max. Dans l'ordre : le lien par identité (`vrm_ebay_liens`), sinon
+// le SKU seulement s'il est porté par UNE fiche qui l'avait déjà à la
+// publication. `fiches` illisibles ⇒ l'appelant ne lit rien (pas su).
+const PANNE_NUMEROS = { de: '2026-10-11T14:58:00.000Z', a: '2026-10-18T09:30:00.000Z' };
+const ficheAVerifier = (f) => {
+  if (!f || typeof f !== 'object' || !String(f.numero == null ? '' : f.numero).trim() || f.cartonVerifie) return false;
+  if (f.auto === false) return false;
+  const t = String(f.numberedAt || '');
+  if (f.manuelAt && String(f.manuelAt) > PANNE_NUMEROS.a) return false;
+  return t >= PANNE_NUMEROS.de && t <= PANNE_NUMEROS.a;
+};
+export function numeroAnnonceEbay(a, mk, fiches, liensEbay) {
+  const F = fiches && typeof fiches === 'object' ? fiches : {};
+  const lien = liensEbay && typeof liensEbay === 'object' ? liensEbay[String(a.itemId)] : null;
+  if (lien && lien.pairId) { const f = F[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : ''; }
+  const k = numeroExterne(numDeSku(a.sku), a.itemId, 'ebayAnnonces', null, mk);
+  if (!k) return '';
+  const porteurs = Object.values(F).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  const tn = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();   // = normTitle (App.jsx)
+  if (porteurs.length > 2 || (porteurs.length === 2 && (tn(porteurs[0].title) !== tn(porteurs[1].title) || porteurs.some(ficheAVerifier)))) return '';
+  if (porteurs.length === 1) {
+    const f = porteurs[0], pub = Date.parse(a.depuis || ''), quand = Date.parse(f.manuelAt || f.numberedAt || '');
+    if (Number.isFinite(pub) && Number.isFinite(quand) && quand > pub + 60000) return '';
+    if (!Number.isFinite(pub) && ficheAVerifier(f)) return '';
+  }
+  return k;
+}
+export function annoncesEbayParNumero(lignes, idsActifs, mk, fiches, liensEbay) {
   const out = new Map();
   const actifs = new Set(idsActifs || []);
   for (const l of (Array.isArray(lignes) ? lignes : [])) {
     if (!l || !actifs.has(l.id) || !Array.isArray(l.items)) continue;
     for (const a of l.items) {
       if (!a || !a.itemId) continue;
-      const n = numeroExterne(numDeSku(a.sku), a.itemId, 'ebayAnnonces', null, mk);
-      if (!n) continue;                                    // pas de SKU : rien n'est rapproché (§5)
+      const n = numeroAnnonceEbay(a, mk, fiches, liensEbay);
+      if (!n) continue;                                    // pas de SKU, ou un SKU qui ne désigne plus sûrement une paire (§5)
       if (!out.has(n)) out.set(n, []);
       out.get(n).push({ itemId: String(a.itemId), titre: String(a.title || '') });
     }

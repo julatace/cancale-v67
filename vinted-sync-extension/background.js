@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.189.0';
+const CODE_VERSION = '5.190.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9205,6 +9205,17 @@ async function handleLbcRaw(url, body) {
   const found = []; const seen = new Set();
   // Qui suis-je ? (pour ne garder que MES annonces dans le parcours générique)
   const miens = await comptesMiens();
+  // ⚠️⚠️ (19 oct.) « MES ANNONCES » NE DIT PAS À QUI ELLES SONT — ce sont les
+  //    siennes. Mesuré sur sa base : l'extension a VU `api/adfinder/v2/myads`
+  //    (sa page « mes annonces »), mais ses annonces n'y portent pas d'owner ;
+  //    la garde « réf VRM ou owner à moi » les rejetait toutes : AUCUNE de ses
+  //    annonces Leboncoin n'a jamais été rangée (compte et images introuvables
+  //    dans l'app). Sur CET endpoint « moi », une annonce sans owner (ou dont
+  //    l'owner est le compte de la SESSION) est à lui, taguée de ce compte.
+  //    Compte de session inconnu ⇒ on ne tague rien (blanc plutôt que faux, §5).
+  const listeMoi = /\/adfinder\/v\d+\/myads\b/i.test(String(url || ''));
+  let sess = null;
+  if (listeMoi) { try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {} }
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -9287,7 +9298,8 @@ async function handleLbcRaw(url, body) {
         //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
         //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
         const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
-        if (refVRM || (ownerId && miens.has(ownerId))) found.push({
+        const aMoiParSession = !!(listeMoi && sess && (!ownerId || ownerId === String(sess.id)));
+        if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
           ref: refVRM,
@@ -9299,8 +9311,8 @@ async function handleLbcRaw(url, body) {
           //    annonces et le flux « découverte » d'autrui) : on prend l'owner
           //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
           //    ici, ne prouverait pas que le chalet d'à côté est à lui, §5).
-          account: String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '') || null,
-          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || null,
+          account: ownerId || (aMoiParSession ? String(sess.id) : null),
+          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? String(sess.name || '') || null : null),
           platform: 'leboncoin',
         });
       }

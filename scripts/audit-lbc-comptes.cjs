@@ -39,7 +39,7 @@ const essaie = async (nom, fn) => { try { return await fn(); } catch (e) { dit(f
 
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 // `seed` : ce que rend une lecture GET `id=eq.X` (pour préseeder lbc_accounts).
-function faireCtx(SRC, seed) {
+function faireCtx(SRC, seed, local) {
   const ecrits = [];
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
@@ -52,7 +52,7 @@ function faireCtx(SRC, seed) {
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
       tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
-      storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
+      storage: { local: { get: dual(local || {}), set: dual(undefined), remove: dual(undefined) } },
     },
     fetch: async (url, opts = {}) => {
       const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
@@ -151,6 +151,30 @@ const MESSAGES = { conversations: [{ interlocutor: { user_id: 999, pseudo: 'ache
       'seules SES 2 annonces sont rangées (owner à lui + réf VRM)', 'rangées : ' + JSON.stringify(ids));
     dit(!ids.includes('222') && !ids.includes('444'),
       'le chalet et le gîte d’autrui sont IGNORÉS (jamais rangés)');
+  });
+
+  console.log('\n── « MES ANNONCES » (adfinder/v2/myads) : SES annonces, sans owner, sont rangées');
+  // 19 oct. : vu dans son navigateur, jamais rangé (ses annonces n'y portent pas d'owner).
+  await essaie('mes annonces', async () => {
+    const REP = JSON.stringify({ ads: [
+      { list_id: 501, subject: 'Nike Air Max 1 noir', price: [90], images: { urls: ['https://img.leboncoin.fr/a.jpg'] } },
+      { list_id: 502, subject: 'Autry reelwind gris', price: [70] },
+    ] });
+    const sess = { vrmLbcCompte: { v: 2, id: 'faf3', name: 'SHOPCANCALE', type: 'particulier' } };
+    const cc = faireCtx(BG_NEUF, null, sess);
+    await cc.handleLbcRaw('https://api.leboncoin.fr/api/adfinder/v2/myads', REP);
+    const w = cc.__ecrits.filter((r) => r.id === 'lbc_listings').pop();
+    const items = w ? Object.values(w.data.items || {}) : [];
+    dit(items.length === 2 && items.every((it) => it.account === 'faf3'), 'ses 2 annonces sont rangées, taguées de SON compte (celui de la session)', JSON.stringify(items.map((i) => [i.id, i.account])));
+    dit(items.some((it) => Array.isArray(it.images) && it.images.length === 1), '… avec leurs images');
+    // Compte de session inconnu : rien n'est tagué ni rangé (blanc plutôt que faux).
+    const c2 = faireCtx(BG_NEUF, null, {});
+    await c2.handleLbcRaw('https://api.leboncoin.fr/api/adfinder/v2/myads', REP);
+    dit(!c2.__ecrits.some((r) => r.id === 'lbc_listings'), 'compte de session inconnu : rien n’est rangé');
+    // La même forme hors de « mes annonces » (une recherche) : jamais.
+    const c3 = faireCtx(BG_NEUF, null, sess);
+    await c3.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', REP);
+    dit(!c3.__ecrits.some((r) => r.id === 'lbc_listings'), 'la même réponse venue d’une RECHERCHE n’est pas rangée');
   });
 
   console.log(ko === 0 ? '\nChaque compte capté est bien le SIEN — jamais une fiche d’autrui.' : '\n' + ko + ' contrôle(s) au rouge.');

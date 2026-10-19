@@ -416,7 +416,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     const { lire } = chargeApp(e.lignes);
     const p = await lire();
     dit(!!x && !x.vendus.has('9000000700') && !!p && !p.vendus.has('9000000700'), 'vente annulée ensuite ⇒ la paire n\'est plus « vendue », ni pour l\'extension ni pour l\'app', `ext=${JSON.stringify(trie(x && x.vendus))} · app=${JSON.stringify(trie(p && p.vendus))}`);
-    const noms = ['cleNum', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee', 'doublesVenteEbay'];
+    const noms = ['cleNum', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'PANNE_NUMEROS', 'ficheAVerifier', 'normTitle', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee', 'doublesVenteEbay'];
     const ctx = { console }; vm.createContext(ctx);
     vm.runInContext('const load = (k, d) => d;\n' + noms.map((n) => { try { return extraire(APP, n); } catch (_) { return ''; } }).join('\n') + '\n;this.D = doublesVenteEbay;', ctx);
     const d = ctx.D({ annonces: [{ itemId: '128000000040', sku: 'VRM-40', title: 'paire 40' }], commandes: [], numeros: { 9000000700: { numero: '40' } }, enLigne: new Set(['9000000700']), vendusVinted: p ? p.vendus : null, programmees: [] });
@@ -444,7 +444,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
   await essaie('doublesVenteEbay', async () => {
     const { lire } = chargeApp(base());
     const p = await lire({ comptes: [A] });
-    const noms = ['cleNum', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numDeSkuEbay', 'skuEbayDe', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee', 'doublesVenteEbay'];
+    const noms = ['cleNum', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numDeSkuEbay', 'skuEbayDe', 'numeroExterne', 'PANNE_NUMEROS', 'ficheAVerifier', 'normTitle', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee', 'doublesVenteEbay'];
     const ctx = { console }; vm.createContext(ctx);
     vm.runInContext('const load = (k, d) => d;\n' + noms.map((n) => extraire(APP, n)).join('\n') + '\n;this.D = doublesVenteEbay;', ctx);
     const r = ctx.D({ annonces: [{ itemId: '128000000553', sku: 'VRM-553', title: 'Autry reelwind beige 36' }, { itemId: '128000000559', sku: 'VRM-559', title: 'autre paire' }],

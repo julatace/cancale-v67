@@ -49,7 +49,7 @@ function extraire(src, nom, dit) {
 // la remise à zéro (migration 013) : ses lecteurs sont chargés AUSSI (§6.3 — un
 // changement d'API se répercute dans chaque vm), sans marqueur ici (`load` rend
 // le défaut) : la règle jugée est celle d'avant toute coupure.
-const NOMS = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'numDeTitreLbc', 'clesAnnonceLbc', 'numDeSkuEbay', 'skuEbayDe', 'numEbayLu', 'numLigneEbay',
+const NOMS = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'numDeTitreLbc', 'clesAnnonceLbc', 'numDeSkuEbay', 'skuEbayDe', 'PANNE_NUMEROS', 'ficheAVerifier', 'normTitle', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay',
   'commandeEbayEngagee', 'numerosDejaVendus', 'ouVenduesTexte', 'doublesVenteEbay', 'BROUILLON_RELU_MARGE_MS', 'brouillonEncoreAttendu', 'programmeesConnues'];
 
 // ── LES DONNÉES (inventées, la FORME mesurée : §6.3) ─────────────────────────

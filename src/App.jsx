@@ -60,7 +60,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.189.0';
+const EXT_ATTENDUE = '5.190.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1346,6 +1346,8 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
+  'vrm_ebay_liens',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
@@ -13967,7 +13969,10 @@ async function lireBrouillonsEbay() {
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
     const it = rows[0] && rows[0].items;
-    return (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+    const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+    // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
+    try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
+    return out;
   } catch (_) { return null; }
 }
 async function modifierBrouillonsEbay(changer) {
@@ -14898,6 +14903,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
       const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
+      try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}
       setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert }); if (onPublie) onPublie(comptePub);
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
@@ -15857,7 +15863,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sku', itemId: it.itemId, numero: n, ...corpsCompteEbay(it._compte) }) });
       const j = await r.json().catch(() => ({}));
-      if (j && j.ok) { dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
+      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
       else dire((j && j.error) || 'eBay a refusé la référence — rien n\'a changé.');
     } catch (_) { dire('Liaison impossible (réseau) — rien n\'a changé.'); }
     setGeste('');
@@ -16118,7 +16124,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
             {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
-            <span data-relie={numero} style={{ fontWeight: 700, color: numero ? E.text : E.warn }}>{numero ? `N°${numero}` : 'pas reliée'}</span>
+            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement une paire (numéro redonné depuis, ou porté par deux paires) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
             {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
             {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
             {j != null ? ` · en ligne depuis ${j} j` : ''}
@@ -16953,7 +16959,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
             const s = statut(l);
             const t = Date.parse(l.debut || '');
             const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
-            const n = numEbayLu(l.sku, l.itemId);
+            const n = numEbayLu(l.sku, l.itemId, null, l.depuis);
             const info = infos[l.itemId];
             return (
               <div key={(l._compte || '') + l.itemId} data-prog={l.itemId} data-prog-statut={s} data-ebay-compte={l._compte || ''} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
@@ -17667,7 +17673,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const autoIncertains = React.useMemo(() => load('vrm_ebay_auto_incertains', {}) || {}, [retraits, nuage, dv]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
-  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku,a && a.itemId); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
   // (9 octobre) Le prix d'achat de chaque paire, par son N° (une seule fiche ⇒
   // sa valeur ; ambigu ⇒ rien n'est dit). Déclaré APRÈS `fiches` (§4.6).
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [nuage, items]);
@@ -17677,7 +17683,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ou on ne sait pas encore. Elle LIT le verdict de l'écran (§11), elle n'en
   // écrit pas un second. Retirer une règle, elle, reste toujours possible.
   const regleBloquee = (it) => {
-    const n = numEbayLu(it && it.sku,it && it.itemId);
+    const n = numEbayLu(it && it.sku, it && it.itemId, null, it && it.depuis);
     if (!n) return null;            // pas reliée : la preuve de vente ne s'applique pas (le risque est dit à part)
     const id = String(it.itemId);
     if (dv.aRetirerEbay.some((d) => String(d.annonce && d.annonce.itemId) === id)) return { k: 'vendue', t: 'Vendue sur Vinted : retire-la d\'eBay plutôt que d\'y poser une règle d\'offre.' };
@@ -17774,8 +17780,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const dejaSurEbay = React.useMemo(() => {
     const m = new Map();
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
-    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
-    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
+    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId, null, p && p.depuis); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
     // (17 oct.) LA MÊME PAIRE SOUS UN AUTRE N° (photo exacte, `jumellesParPhoto`) :
     // si l'une est déjà sur eBay, l'autre l'est aussi — « une paire, une
     // annonce » vaut pour la paire, pas pour le numéro (la 80 publiée, la 81
@@ -18361,7 +18367,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {itemsVue.map((it, i) => {
-        const n = numEbayLu(it.sku,it.itemId);
+        const n = numEbayLu(it.sku, it.itemId, null, it.depuis);
         const cle = cleAnnonce(it);
         return (
           <div key={(it._compte || '') + (it.itemId || i)} data-ebay-annonce={it.itemId || ''} data-ebay-compte={it._compte || ''}>
@@ -18386,7 +18392,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.</Pourquoi>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite}
@@ -26852,7 +26858,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
       if (!lu || stop) return;
       const set = new Set();
-      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId); if (c) set.add(cleNum(c)); }
+      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); }
       setEbayNums(set);
     } catch (_) {}
   })(); return () => { stop = true; }; }, []);
@@ -30035,7 +30041,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const caps = lu.lignes.filter((x) => x.ligne).map((x) => (Number.isFinite(Number(x.ligne.cap)) ? Number(x.ligne.cap) : Date.parse(x.ligne.cap || '')));
         m.cap = caps.length && caps.every((n) => Number.isFinite(n)) ? Math.min(...caps) : NaN;
         for (const x of lu.items) {
-          const c = numEbayLu(x && x.sku,x && x.itemId); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: 'ebay' }); continue; }
           m.set(c, { itemId: String(x.itemId), prix, titre: String(x.title || ''), url: x.url || `https://www.ebay.fr/itm/${x.itemId}`, compte: x._compte || 'principal' });
@@ -39202,7 +39208,56 @@ const numeroExterne = (k, id, liste, dateMs) => {
   return avant ? cleNum(arch + k) : k;
 };
 // Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
-const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+// ⚠️⚠️ (19 OCTOBRE) LE SKU SEUL NE DÉSIGNE PAS UNE PAIRE. Mesuré chez Julien :
+// ses annonces eBay VRM-82, 81, 48 avaient été publiées du 15 au 17 octobre,
+// pendant la panne de synchro ; la renumérotation du 18 a redonné ces numéros
+// à d'AUTRES paires. VRM-82 (une Air Max 1 noire) désignait la Vapor Pro, dite
+// « en vente sur eBay » à tort, pendant que la vraie paire était « pas en
+// vente » — et le retrait automatique aurait retiré la mauvaise annonce.
+// ⇒ Dans l'ordre : (1) le LIEN par identité (`vrm_ebay_liens`, posé à la
+// publication, au « Relier », repris des brouillons) ; (2) le N° du SKU, mais
+// seulement s'il est porté par UNE seule fiche, et qu'elle l'avait déjà quand
+// l'annonce a été publiée (sinon « pas su » : aucune paire, aucun retrait).
+const LIENS_EBAY = 'vrm_ebay_liens';
+const _depuisEbay = new Map();
+const _fichesEbayMemo = { at: 0, v: {} };
+const fichesPourEbay = () => {
+  const t = Date.now();
+  if (t - _fichesEbayMemo.at > 800) { let v = {}; try { v = load('vinted_annonce_numeros', {}) || {}; } catch (_) {} _fichesEbayMemo.at = t; _fichesEbayMemo.v = v; }
+  return _fichesEbayMemo.v;
+};
+const lienEbay = (itemId) => { let l = {}; try { l = load(LIENS_EBAY, {}) || {}; } catch (_) {} const x = itemId != null ? l[String(itemId)] : null; return x && x.pairId ? x : null; };
+const noterLienEbay = (itemId, pairId, numero, quiPose) => {
+  if (!itemId || !pairId) return;
+  const l = { ...(load(LIENS_EBAY, {}) || {}) };
+  if (quiPose === 'brouillon' && l[String(itemId)]) return;   // un lien posé à la main gagne
+  l[String(itemId)] = { pairId: String(pairId), numero: numero != null ? String(numero) : null, at: Date.now(), par: quiPose || 'vrm' };
+  save(LIENS_EBAY, l); _fichesEbayMemo.at = 0;
+};
+const numEbayLu = (sku, itemId, dateMs, depuis) => {
+  const id = itemId != null ? String(itemId) : '';
+  if (depuis != null && id) { const d = typeof depuis === 'number' ? depuis : Date.parse(depuis); if (isFinite(d)) _depuisEbay.set(id, d); }
+  const fiches = fichesPourEbay();
+  const lien = id ? lienEbay(id) : null;
+  if (lien) { const f = fiches[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : null; }
+  const k = numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+  if (!k) return k;
+  const porteurs = Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  // Deux fiches sous ce N° : une seule paire si elles portent le même titre (vendue
+  // puis revenue — la règle de `conflitsDeNumeros`, §11) ; sinon il ne désigne personne.
+  if (porteurs.length > 2 || (porteurs.length === 2 && normTitle(porteurs[0].title || '') !== normTitle(porteurs[1].title || ''))) return null;
+  if (porteurs.length === 2 && porteurs.some((f) => ficheAVerifier(f))) return null;
+  if (porteurs.length === 1) {
+    const f = porteurs[0], pub = id ? _depuisEbay.get(id) : undefined;
+    const quand = Date.parse(f.manuelAt || f.numberedAt || '');
+    if (pub != null && isFinite(quand) && quand > pub + 60000) return null;   // numéro donné APRÈS la publication
+    if (pub == null && ficheAVerifier(f)) return null;                          // date inconnue + numéro de la panne
+  }
+  return k;
+};
+// Le numéro qu'une annonce eBay PORTE (son SKU) n'est pas fiable pour cette paire :
+// la liste « à relier » le dit, avec le geste.
+const skuEbayDouteux = (a) => !!(a && numDeSkuEbay(a.sku) && !lienEbay(a.itemId) && numEbayLu(a.sku, a.itemId, null, a.depuis) == null);
 const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
@@ -39268,7 +39323,7 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
   for (const d of liste) {
     const a = (d && d.annonce) || {};
     const ecarte = (raison) => ecartes.push({ numero: d && d.numero, itemId: a.itemId, raison });
-    const n = numEbayLu(a.sku,a.itemId);
+    const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
     if (!a.itemId || !n || n !== (d && d.numero)) { ecarte('sku'); continue; }
     const ids = parNum.get(n) || [];
     if (ids.length !== 1) { ecarte('numero-partage'); continue; }
@@ -39481,7 +39536,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   const verdict = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
   if (verdict || vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
     if (!p || !p.itemId) continue;
-    const n = numEbayLu(p.sku, p.itemId);
+    const n = numEbayLu(p.sku, p.itemId, null, p.depuis);
     if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
     const ids = parNum.get(n) || [];
     if (verdict) {
@@ -39496,7 +39551,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
-    const n = numEbayLu(a.sku, a.itemId);
+    const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
     if (!n) { nonReliees.push(a); continue; }
     if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
