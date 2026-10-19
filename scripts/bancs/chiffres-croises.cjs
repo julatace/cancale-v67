@@ -30,6 +30,11 @@
 //      d'achat inventés ; prix manquant ⇒ net « — » et la porte ; tout connu ⇒
 //      net = net des ventes − charges − cotisations. Jugé sur `data-benef-*`
 //      et `data-ventes-benef-*`.
+//      (19 oct., suite) E3-E5 : une vente LEBONCOIN (référence VRM-7 sur son
+//      annonce) et une commande eBay (SKU VRM-12) reliées à leur fiche PAR
+//      IDENTITÉ entrent dans le même bénéfice, Ventes = Comptabilité, et la
+//      couverture se dit par plateforme ; une commande eBay SANS SKU (même titre
+//      qu'une fiche) n'a aucun prix d'achat ; eBay illisible ⇒ rien n'est publié.
 const path=require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -115,6 +120,7 @@ async function page(b, opts={}){
     if(route.request().method()!=='GET') return route.fulfill({status:201,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'[]'});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     if(opts.ebayKO && /ebay_orders/.test(u)) return route.fulfill({status:522,contentType:'text/html',body:'<html>522</html>'});
+    if(opts.lignes){ const eq0=/id=eq\.([^&]*)/.exec(u); if(eq0 && opts.lignes[eq0[1]]) return j([projette({ id:eq0[1], data:opts.lignes[eq0[1]] },(/[?&]select=([^&]*)/.exec(u)||[])[1]||null)]); }
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq&&eq[1]==='main'&&opts.main) return j([projette({id:'main',data:opts.main},S)]);
@@ -254,16 +260,16 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
     console.log('\n── E. Le bénéfice brut et net : Comptabilité = Ventes (19 octobre)');
     // Prix d'achat et frais saisis sur la vente (forme de `vinted_sale_overrides`),
     // inventés. 91004 sans prix d'achat ⇒ couverture partielle, net « — ».
-    const lireVentesBenef=async(pg)=>{
+    const lireVentesBenef=async(pg,attendre=25000)=>{
       await aller(pg,'cat_ventes',null,600);
-      await pg.waitForFunction(()=>{ try{ return !!JSON.parse(localStorage.getItem('vrm_benefice_jours')||'null'); }catch(_){ return false; } },null,{timeout:25000}).catch(()=>{});
+      await pg.waitForFunction(()=>{ try{ return !!JSON.parse(localStorage.getItem('vrm_benefice_jours')||'null'); }catch(_){ return false; } },null,{timeout:attendre}).catch(()=>{});
       const bouton=pg.getByRole('button',{ name:/Analyse de tes ventes/ }).first();
       await bouton.waitFor({timeout:15000}).catch(()=>{});
       if(await bouton.count()) await bouton.click();
       const per=pg.locator('.vrm-period button').first();
       if(await per.count()){ await per.click(); await pg.getByRole('button',{ name:/^Ce mois$/ }).first().click(); }
       await pg.waitForTimeout(700);
-      return pg.evaluate(()=>{ const e=document.querySelector('[data-ventes-benef-n]'); return e?{ n:e.getAttribute('data-ventes-benef-n'), ncout:e.getAttribute('data-ventes-benef-ncout'), brut:e.getAttribute('data-ventes-benef-brut'), net:e.getAttribute('data-ventes-benef-net') }:null; });
+      return pg.evaluate(()=>{ const e=document.querySelector('[data-ventes-benef-n]'); return e?{ n:e.getAttribute('data-ventes-benef-n'), ncout:e.getAttribute('data-ventes-benef-ncout'), brut:e.getAttribute('data-ventes-benef-brut'), net:e.getAttribute('data-ventes-benef-net'), couverture:e.getAttribute('data-ventes-benef-couverture'), autres:e.getAttribute('data-ventes-benef-autres') }:null; });
     };
     const lireComptaBenef=async(pg)=>{
       await aller(pg,'compta','[data-benef-etat]',2500);
@@ -303,6 +309,52 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       if(process.env.BANC_CAPTURE){ for(const w of [1512,390]){ await pg.setViewportSize({width:w,height:950}); await pg.waitForTimeout(300); await pg.locator('[data-benef-etat]').screenshot({path:path.join(process.env.BANC_CAPTURE,`benefice-${w}.png`)}); } }
       const netCalc=Math.round((Number(c['ventes-net'])-Number(c.charges)-Number(c.cotis))*100)/100;
       dit(!!c.net && !!c.cotis && Math.abs(Number(c.net)-netCalc)<0.005,'NET final = net des ventes − charges − cotisations (au centime)',`${c.net} · ${netCalc}`);
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+    // ── E3-E5 : Leboncoin et eBay reliés PAR IDENTITÉ (19 oct., suite) ──
+    const OV3={ ...OV1, '91004':{ buyPrice:'30' } };
+    const FICHES={ ann7:{ numero:'7', buyPrice:'25', title:'Samba inventée' }, ann12:{ numero:'12', buyPrice:'30', title:'Air Max inventée' }, ann9:{ numero:'9', buyPrice:'18', title:'XT-6 inventée' } };
+    const venteLbc={ txId:'L1', itemId:'501', isSeller:true, price:6000, stepStatus:'done', dateVente:iso(ceMois(1,14)), title:'Samba inventée' };
+    const cmdEbay=(orderId,sku,titre,frais)=>({ orderId, orderPaymentStatus:'PAID', creationDate:iso(ceMois(1,15)), pricingSummary:{ total:{ value:'80.00', currency:'EUR' } }, lineItems:[{ sku, legacyItemId:'9'+orderId.replace(/\D/g,''), title:titre }], ...(frais!=null?{ totalMarketplaceFee:{ value:String(frais), currency:'EUR' } }:{}) });
+    const lignesE=(cmds)=>({ lbc_ventes:{ ventes:{ L1:venteLbc } }, lbc_listings:{ items:{ '501':{ id:'501', subject:'Samba inventée', customRef:'VRM-7' } } }, ebay_orders:{ orders:cmds } });
+    const vintedBrut=VENTES.filter(x=>/finalis/i.test(x[3])&&memeMois(x[4])).reduce((t,x)=>t+cents(x[2])-cents(OV3[x[1]].buyPrice),0);
+    const vintedFrais=VENTES.filter(x=>/finalis/i.test(x[3])&&memeMois(x[4])).reduce((t,x)=>t+cents(OV3[x[1]].fees||0),0);
+    await essaie('E3',async()=>{
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_sale_overrides:OV3, vinted_annonce_numeros:FICHES }, lignes:lignesE([cmdEbay('E1','VRM-12','Air Max inventée',9.6)]) });
+      await publier(pg);
+      const v=await lireVentesBenef(pg);
+      const c=await lireComptaBenef(pg);
+      console.log(`   rendu : Ventes ${JSON.stringify(v)} · Compta ${JSON.stringify(c)}`);
+      const brutAtt=(vintedBrut+cents(60)-cents(25)+cents(80)-cents(30))/100;
+      const netAtt=(vintedBrut-vintedFrais+cents(60)-cents(25)+cents(80)-cents(30)-cents(9.6))/100;
+      dit(!!v && Math.abs(Number(v.brut)-brutAtt)<0.005 && Number(v.n)===5 && Number(v.ncout)===5,'Ventes : la vente Leboncoin (réf VRM-7) et la commande eBay (SKU VRM-12) entrent dans le bénéfice, au prix d’achat de LEUR fiche',`${v&&v.brut} (${v&&v.ncout}/${v&&v.n}) · attendu ${brutAtt} (5/5)`);
+      dit(!!v && Math.abs(Number(v.net)-netAtt)<0.005,'Ventes : le net retire les frais eBay de la commande',`${v&&v.net} · attendu ${netAtt}`);
+      dit(!!v && c.brut===v.brut && c['ventes-net']===v.net && c.n===v.n && c.ncout===v.ncout,'Comptabilité = Ventes (brut, net, couverture)',`Compta ${c.brut} / ${c['ventes-net']} (${c.ncout}/${c.n})`);
+      dit(/Leboncoin 1\/1/.test(c.couverture||'') && /eBay 1\/1/.test(c.couverture||'') && c.plateformes==='toutes','la couverture se dit par plateforme dans Comptabilité',`${c.couverture} · ${c.plateformes}`);
+      const txt=await pg.evaluate(()=>{ const e=document.querySelector('[data-benef-etat]'); return e?e.innerText:''; });
+      dit(!/Leboncoin et eBay n.ont pas de prix d.achat reliés/.test(txt),'la phrase « Leboncoin et eBay n’ont pas de prix d’achat reliés » a disparu');
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+    await essaie('E4',async()=>{
+      // Commande eBay SANS SKU, au titre identique à la fiche 9 : aucun prix d'achat.
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_sale_overrides:OV3, vinted_annonce_numeros:FICHES }, lignes:lignesE([cmdEbay('E2','','XT-6 inventée',7)]) });
+      await publier(pg);
+      const v=await lireVentesBenef(pg);
+      const c=await lireComptaBenef(pg);
+      console.log(`   rendu : Ventes ${JSON.stringify(v)} · Compta ${JSON.stringify(c)}`);
+      dit(!!v && Number(v.n)===5 && Number(v.ncout)===4 && /eBay 0\/1/.test(v.couverture||''),'eBay sans SKU : comptée dans la couverture, sans prix d’achat (jamais par le titre)',`${v&&v.ncout}/${v&&v.n} · ${v&&v.couverture}`);
+      dit(c.ncout===v.ncout && c.n===v.n && c.net==='' && c.raison==='achats','Comptabilité : même couverture, net final « — » (raison achats)',`${c.ncout}/${c.n} · ${c.net} · ${c.raison}`);
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+    await essaie('E5',async()=>{
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_sale_overrides:OV3, vinted_annonce_numeros:FICHES }, lignes:lignesE([]), ebayKO:true });
+      const v=await lireVentesBenef(pg,6000);
+      const pub=await pg.evaluate(()=>localStorage.getItem('vrm_benefice_jours'));
+      dit(!!v && v.autres==='passu','eBay illisible : l’écran Ventes le dit (ce bénéfice ne porte que sur Vinted)',JSON.stringify(v));
+      dit(pub==null,'et ne publie AUCUN bénéfice partiel pour Comptabilité',String(pub).slice(0,80));
       dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
       await ctx.close();
     });

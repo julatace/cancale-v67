@@ -4509,14 +4509,29 @@ const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
 // Les deux UNIQUEMENT sur les ventes dont le prix d'achat est connu (§5 : un
 // achat inconnu n'est pas un achat à 0 € — « BÉNÉFICE NET 5 739 € » pour un CA
 // de 5 741 €, le 1er septembre).
-const BENEF_CHAMPS = ['n', 'ca', 'frais', 'nCout', 'cout', 'caCouvert', 'fraisCouverts'];
-const beneficeVide = () => ({ n: 0, ca: 0, frais: 0, nCout: 0, cout: 0, caCouvert: 0, fraisCouverts: 0 });
-const ajouterVenteBenefice = (acc, eur, achat, frais) => {
-  const v = Math.round((Number(eur) || 0) * 100), f = Math.round((Number(frais) || 0) * 100);
+// (19 oct., suite) LEBONCOIN ET eBAY ENTRENT DANS LA MÊME RÈGLE. Une vente y est
+// reliée à SA paire par IDENTITÉ seulement (`ventesAutresBenefice`) ; les
+// champs ajoutés EN FIN de tableau (une publication d'avant en a 7 : ils valent
+// 0) disent la couverture par plateforme et les frais pas sus :
+//   fraisInconnus = ventes au prix d'achat connu dont les frais ne sont PAS sus
+//   (une commande eBay sans `totalMarketplaceFee`) ⇒ le net vaut `null` (« — »),
+//   jamais un net qui compterait ces frais à 0 ;
+//   nL/nCoutL (Leboncoin), nE/nCoutE (eBay) ; Vinted = le reste.
+const BENEF_CHAMPS = ['n', 'ca', 'frais', 'nCout', 'cout', 'caCouvert', 'fraisCouverts', 'fraisInconnus', 'nL', 'nCoutL', 'nE', 'nCoutE'];
+const beneficeVide = () => ({ n: 0, ca: 0, frais: 0, nCout: 0, cout: 0, caCouvert: 0, fraisCouverts: 0, fraisInconnus: 0, nL: 0, nCoutL: 0, nE: 0, nCoutE: 0 });
+// `frais` : un nombre (connu, « 0 » compris) ou `null` = PAS SU (jamais 0).
+// `plateforme` : 'Leboncoin' | 'eBay' | autre (Vinted).
+const ajouterVenteBenefice = (acc, eur, achat, frais, plateforme) => {
+  const fInconnu = frais === null;
+  const v = Math.round((Number(eur) || 0) * 100), f = fInconnu ? 0 : Math.round((Number(frais) || 0) * 100);
   acc.n += 1; acc.ca += v; acc.frais += f;
-  if (achat != null && String(achat).trim() !== '' && isFinite(Number(achat))) {
+  const connu = achat != null && String(achat).trim() !== '' && isFinite(Number(achat));
+  if (connu) {
     acc.nCout += 1; acc.cout += Math.round(Number(achat) * 100); acc.caCouvert += v; acc.fraisCouverts += f;
+    if (fInconnu) acc.fraisInconnus = (acc.fraisInconnus || 0) + 1;
   }
+  if (plateforme === 'Leboncoin') { acc.nL = (acc.nL || 0) + 1; if (connu) acc.nCoutL = (acc.nCoutL || 0) + 1; }
+  else if (plateforme === 'eBay') { acc.nE = (acc.nE || 0) + 1; if (connu) acc.nCoutE = (acc.nCoutE || 0) + 1; }
   return acc;
 };
 // Un jour publié est un tableau (dans l'ordre de BENEF_CHAMPS) : la ligne `main`
@@ -4524,15 +4539,24 @@ const ajouterVenteBenefice = (acc, eur, achat, frais) => {
 const jourBeneficeEnTableau = (b) => BENEF_CHAMPS.map((k) => b[k] || 0);
 const cumulerBenefice = (acc, b) => {
   if (!b) return acc;
-  BENEF_CHAMPS.forEach((k, i) => { acc[k] += Number(Array.isArray(b) ? b[i] : b[k]) || 0; });
+  BENEF_CHAMPS.forEach((k, i) => { acc[k] = (acc[k] || 0) + (Number(Array.isArray(b) ? b[i] : b[k]) || 0); });
   return acc;
 };
 // Le résumé en euros : brut et net en DÉCOULENT (jamais stockés à part).
+// Net `null` quand des frais ne sont pas sus (« pas su » ≠ 0).
 const resumeBenefice = (acc) => {
-  const brut = acc.caCouvert - acc.cout, net = brut - acc.fraisCouverts;
+  const brut = acc.caCouvert - acc.cout, fi = acc.fraisInconnus || 0;
+  const net = fi > 0 ? null : (brut - acc.fraisCouverts) / 100;
+  const nL = acc.nL || 0, nE = acc.nE || 0, nCoutL = acc.nCoutL || 0, nCoutE = acc.nCoutE || 0;
   return { n: acc.n, nCout: acc.nCout, ca: acc.ca / 100, frais: acc.frais / 100, cout: acc.cout / 100,
-    caCouvert: acc.caCouvert / 100, fraisCouverts: acc.fraisCouverts / 100, brut: brut / 100, net: net / 100 };
+    caCouvert: acc.caCouvert / 100, fraisCouverts: acc.fraisCouverts / 100, brut: brut / 100, net, fraisInconnus: fi,
+    par: { Vinted: { n: acc.n - nL - nE, nCout: acc.nCout - nCoutL - nCoutE }, Leboncoin: { n: nL, nCout: nCoutL }, eBay: { n: nE, nCout: nCoutE } } };
 };
+// La couverture par plateforme, dite en une phrase (seulement les plateformes
+// qui ont des ventes sur la période) : « Vinted 3/4 · eBay 1/1 ».
+const couvertureBenefice = (r) => ['Vinted', 'Leboncoin', 'eBay']
+  .filter((p) => r && r.par && r.par[p] && r.par[p].n > 0)
+  .map((p) => `${p} ${r.par[p].nCout}/${r.par[p].n}`).join(' · ');
 // Cumul des jours publiés compris dans [de, a[ (dates locales, AAAA-MM-JJ) :
 // la même borne que `dansPeriode` de l'écran Ventes (jour local entier).
 const beneficeDesJours = (jours, de, a) => {
@@ -4540,6 +4564,56 @@ const beneficeDesJours = (jours, de, a) => {
   const k0 = jourClef(de), k1 = jourClef(a);
   for (const [k, b] of Object.entries(jours || {})) if (k >= k0 && k < k1) cumulerBenefice(acc, b);
   return resumeBenefice(acc);
+};
+// ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE — PAR IDENTITÉ SEULEMENT (19 oct.) ─────
+// Une vente se relie à SA paire par le N° qu'elle porte VRAIMENT :
+//   · eBay : le SKU `VRM-{n°}` de chaque ligne de la commande, lu par
+//     `numLigneEbay` → `numEbayLu` (lien posé par VRM, traduction 013) ;
+//   · Leboncoin : le lien posé à la main, sinon la référence `VRM-{n°}` de
+//     l'annonce (`numeroLbcIdentite`, traduite par `numeroExterne`) — JAMAIS le
+//     « nXXX » d'un titre (§5).
+// Puis le prix d'achat de LA fiche qui porte ce N° — seulement si UNE seule
+// fiche le porte (deux fiches ⇒ rien). Pas d'identité ⇒ pas de prix d'achat
+// (comptée dans la couverture « X sur Y »), jamais deviné.
+// Frais : Leboncoin = 0 (le prix FINAL capté est ce que le vendeur touche) ;
+// eBay = `totalMarketplaceFee` de la commande quand elle le porte (EUR), sinon
+// `null` (pas su). Entrées : `numLbc(v)` → N° ou ''/null ; `numEbayLigne(o, li)`
+// → N° ou ''/null ; `achat(fiche)` → nombre ou null.
+const ficheUniqueDuNumero = (numeros, k) => {
+  if (!k) return null;
+  const fs = Object.values(numeros || {}).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  return fs.length === 1 ? fs[0] : null;
+};
+const fraisEbayCommande = (o) => {
+  const f = o && o.totalMarketplaceFee;
+  if (!f || typeof f !== 'object') return null;
+  if (f.currency && f.currency !== 'EUR') return null;
+  const n = Number(f.value);
+  return f.value != null && String(f.value).trim() !== '' && isFinite(n) ? n : null;
+};
+const ventesAutresBenefice = ({ lbc, ebay, numeros, achat, numLbc, numEbayLigne } = {}) => {
+  const out = [], vus = new Set();
+  const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
+  for (const v of (lbc || [])) {
+    if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    const eur = v.price != null ? Number(v.price) / 100 : NaN;
+    if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
+    vus.add('lbc:' + v.txId);
+    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(numLbc(v)), frais: 0 });
+  }
+  for (const o of (ebay || [])) {
+    if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
+    const tot = (o.pricingSummary && o.pricingSummary.total) || {};
+    if (tot.currency && tot.currency !== 'EUR') continue;
+    const eur = Number(tot.value);
+    if (!isFinite(eur) || vus.has('ebay:' + o.orderId)) continue;
+    vus.add('ebay:' + o.orderId);
+    const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
+    let a = lignes.length ? 0 : null;
+    for (const li of lignes) { const x = achatDuNum(numEbayLigne(o, li)); if (x == null) { a = null; break; } a += x; }
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: fraisEbayCommande(o) });
+  }
+  return out;
 };
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
   const u = aPayerUrssaf(ca, tauxPct); if (u == null) return null;
@@ -26391,7 +26465,8 @@ function ComptaAjout({ ouvert, onClick, libelle, data }) {
 //     cartes « Bénéfice brut / net » sur la même période ;
 //   · CHARGES = `comptaChargesMois` / `comptaChargesAnnee` (celles de cet écran) ;
 //   · COTISATIONS = `aPayerUrssaf` sur la part VINTED du CA déclaré publié
-//     (`vinted_urssaf_mois`) — le bénéfice ne porte que sur les ventes Vinted.
+//     (`vinted_urssaf_mois`) ; depuis la publication `v: 2` (Leboncoin et eBay
+//     reliés par identité), sur le CA déclaré des trois (`caBeneficeDuMois`).
 // Le NET final n'est écrit que si TOUTES les ventes de la période ont leur prix
 // d'achat : sinon un « — », la raison, et la porte (saisie en série). Trois
 // états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
@@ -26417,10 +26492,20 @@ const caVintedDuMois = (m) => {
   if (par && Object.keys(par).length) return par.Vinted ? (Number(par.Vinted.ca) || 0) : 0;
   return Number(m && m.ca) || 0;
 };
+// (19 oct., suite) Depuis que le bénéfice couvre Leboncoin et eBay (publication
+// `v: 2`), les cotisations portent sur le CA déclaré des TROIS plateformes —
+// celles que le bénéfice compte. Une publication d'avant (`v: 1`, Vinted seul)
+// garde la part Vinted : les deux côtés parlent toujours des mêmes ventes.
+const caBeneficeDuMois = (m, toutes) => {
+  if (!toutes) return caVintedDuMois(m);
+  const par = m && m.par && typeof m.par === 'object' ? m.par : null;
+  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
+  return Number(m && m.ca) || 0;
+};
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
 // `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
 // CA déclaré publié (ou null), `taux` = le taux de cotisations.
-const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now() }) => {
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false }) => {
   const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
   const v = beneficeDesJours(jours, de, a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
@@ -26430,13 +26515,13 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
     ? comptaChargesAnnee(compta, de.getFullYear()).total
     : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
-    ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caVintedDuMois(m), 0) * 100) / 100
+    ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caBeneficeDuMois(m, toutes), 0) * 100) / 100
     : null;
   const cotis = caDecl == null ? null : aPayerUrssaf(caDecl, taux);
   const complet = v.nCout === v.n;
-  const netFinal = complet && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
-  const raison = !complet ? 'achats' : cotis == null ? 'cotisations' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison };
+  const netFinal = complet && v.net != null && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
+  const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
+  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes };
 };
 function BeneficeCompta({ compta, onNav }) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -26444,7 +26529,7 @@ function BeneficeCompta({ compta, onNav }) {
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
   const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
-  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode }) : null;
+  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2 }) : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
   const sansAchat = B ? B.n - B.nCout : 0;
@@ -26461,7 +26546,8 @@ function BeneficeCompta({ compta, onNav }) {
       data-benef-n={B ? String(B.n) : ''} data-benef-ncout={B ? String(B.nCout) : ''}
       data-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-benef-ventes-net={B && B.nCout > 0 ? e2(B.net) : ''}
       data-benef-charges={B ? e2(B.charges) : ''} data-benef-cotis={B ? e2(B.cotis) : ''}
-      data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}>
+      data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}
+      data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
@@ -26474,22 +26560,23 @@ function BeneficeCompta({ compta, onNav }) {
           </small></span></div>
         ) : (<>
           <Ligne lib="Bénéfice brut" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
-            sous={B.n === 0 ? 'aucune vente Vinted finalisée sur la période'
+            sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
               : B.nCout === B.n ? `CA − prix d'achat · prix d'achat connus pour les ${B.n} vente${B.n > 1 ? 's' : ''}`
               : <>CA − prix d'achat · prix d'achat connus pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n} — {lienSaisie}</>}
             data={{ 'data-benef-ligne': 'brut' }} />
-          {B.nCout > 0 && B.fraisCouverts > 0 && <Ligne lib="− boosts et frais de vente" val={B.fraisCouverts} sous="des mêmes ventes" data={{ 'data-benef-ligne': 'frais' }} />}
+          {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
           <Ligne lib="− charges" val={B.charges} sous="abonnements, dépenses, packs et coûts fixes de la période" data={{ 'data-benef-ligne': 'charges' }} />
           <Ligne lib="− cotisations URSSAF" val={B.cotis}
-            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA Vinted versé sur la période (${fmt(B.caDecl)})`}
+            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
             data={{ 'data-benef-ligne': 'cotis' }} />
           <Ligne lib="Bénéfice net" fort val={B.netFinal}
             sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas — {lienSaisie}</>
+              : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
               : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
               : 'brut − frais − charges − cotisations'}
             data={{ 'data-benef-ligne': 'net' }} />
           <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
-            Ventes Vinted finalisées, au jour de la vente — la même règle que l'écran Ventes (Leboncoin et eBay n'ont pas de prix d'achat reliés). Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+            {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
           </small></span></div>
         </>)}
       </div>
@@ -31590,6 +31677,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return String(r.der) === String(r.opp) ? 'eux' : 'toi';
   };
 
+  // ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE (19 oct.) — `ventesAutresBenefice`,
+  // par IDENTITÉ seulement (SKU eBay, lien/référence Leboncoin). Les annonces
+  // Leboncoin (226 Ko) ne sont lues que si une vente finalisée n'a pas de lien
+  // posé à la main (sa référence vit sur l'annonce). Trois états : `undefined`
+  // en cours · `null` pas su · objet lu (`{}` quand rien n'est à lire).
+  const [lbcItemsBenef, setLbcItemsBenef] = useState(undefined);
+  useEffect(() => {
+    if (lbcLu === undefined) return;
+    if (lbcLu === null) { setLbcItemsBenef(null); return; }
+    const liens = load('vrm_lbc_liens', {}) || {};
+    const besoin = (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
+    if (!besoin) { setLbcItemsBenef({}); return; }
+    let mort = false;
+    lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsBenef(it == null ? null : it); });
+    return () => { mort = true; };
+  }, [lbcLu, lbcVentes]);
+  // `null` tant qu'une source n'est pas lue (ou a raté) : jamais un bénéfice
+  // partiel présenté comme complet. Une liste sinon.
+  const autresBenefice = useMemo(() => {
+    if (lbcLu !== true || !Array.isArray(ebayCmd) || !lbcItemsBenef) return null;
+    try {
+      const liens = load('vrm_lbc_liens', {}) || {};
+      return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, numeros,
+        achat: (f) => achatDe(withBuyByNum(f)),
+        numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
+        numEbayLigne: (o, li) => numLigneEbay(o, li) });
+    } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum]);
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
@@ -31650,12 +31766,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ajouterVenteBenefice(acc, sell, buy, fee);
       if (buy!=null && sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; }
     }
+    // Le CA finalisé, les boosts et la marge restent ceux de la liste (Vinted) ;
+    // le BÉNÉFICE (brut, net, couverture) ajoute Leboncoin et eBay par la MÊME
+    // règle (`ajouterVenteBenefice`), jamais un second calcul.
+    const RV = resumeBenefice(acc);
+    const autresKO = autresBenefice == null;
+    for (const x of (autresBenefice || [])) if (dansPeriodeDate(x.ts, periode)) ajouterVenteBenefice(acc, x.eur, x.achat, x.frais, x.plateforme);
     const R = resumeBenefice(acc);
-    const ca = R.ca, cout = R.cout, frais = R.frais, nb = R.n, nbCout = R.nCout;
+    const ca = RV.ca, frais = RV.frais, nb = RV.n;
     benefBrut = R.brut; benefConnu = R.net;
-    return { ca, cout, frais, benef:ca-cout-frais, benefBrut, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
+    return { ca, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice]);
 
   // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
   // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
@@ -31666,8 +31788,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (!sales.items) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
+    // Leboncoin ou eBay pas lus (en cours ou raté) ⇒ on ne publie RIEN : la
+    // dernière publication, complète, reste (§5).
+    if (!Array.isArray(autresBenefice)) return;
     try {
-      const an0 = new Date().getFullYear() - 1;           // l'année d'avant suffit (périodes en cours)
+      const an0 = new Date().getFullYear() - 1;          // l'année d'avant suffit (périodes en cours)
       const jours = {};
       for (const o of sales.items) {
         if (isHidden(o)) continue;
@@ -31678,13 +31803,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const e = effEntry(o);
         ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), o.price?.amount, achatDe(e), chargesVente(e));
       }
+      // Leboncoin et eBay, par la même règle (datés au jour de la vente / de la
+      // commande ; sans date : dans aucune période, comme Vinted).
+      for (const x of autresBenefice) {
+        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
+        const k = jourClef(new Date(x.ts));
+        ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), x.eur, x.achat, x.frais, x.plateforme);
+      }
       const charge = {};
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
       const avant = load('vrm_benefice_jours', null);
-      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 1, jours: charge, at: Date.now() });
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay'], jours: charge, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -34480,11 +34612,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {analyseOpen && (<>
-        {(totals.nb>0 || totals.nbAttente>0) && (
+        {(totals.nb>0 || totals.bN>0 || totals.nbAttente>0) && (<>
           /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
              quatre gros blocs empilés prenaient un écran entier sur téléphone. */
-          <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.nb)} data-ventes-benef-ncout={String(totals.nbCout)}
-            data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0?String(Math.round(totals.benefConnu*100)/100):''}
+          <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.bN)} data-ventes-benef-ncout={String(totals.nbCout)}
+            data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
+            data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
             style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
@@ -34505,8 +34638,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 30 sept. — « trop chargé » : sans AUCUN prix d'achat, « Coût
                 d'achat 0 € » et « Bénéfice — » disaient la même absence en deux
                 cases. Il n'en reste qu'une (Bénéfice), qui ouvre la saisie. */}
-            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.nb?' · compléter':''}`}
-              onClick={totals.nbCout<totals.nb ? ()=>setFillBuyOpen(true) : null}
+            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.bN} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.bN?' · compléter':''}`}
+              onClick={totals.nbCout<totals.bN ? ()=>setFillBuyOpen(true) : null}
               title="Compléter les prix d'achat, paire par paire"/>}
             {totals.frais>0 && <StatBox compact label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -34523,23 +34656,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {totals.nbCout===0
               ? <StatBox compact label="Bénéfice" value="—" color={C.muted} sub={null}
                   onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
-              : totals.benefBrut===totals.benefConnu
+              : totals.benefBrut===totals.benefConnu && totals.benefConnu!=null
                 ? <StatBox compact label="Bénéfice" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
-                    subColor={totals.nbCout<totals.nb?C.warn:undefined}
-                    sub={totals.nbCout<totals.nb
-                      ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
+                    subColor={totals.nbCout<totals.bN?C.warn:undefined}
+                    sub={totals.nbCout<totals.bN
+                      ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — les autres n'ont pas de prix d'achat`
                       : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − achat')}/>
                 : <>
                     <StatBox compact label="Bénéfice brut" value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
-                      subColor={totals.nbCout<totals.nb?C.warn:undefined}
-                      sub={totals.nbCout<totals.nb
-                        ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — avant frais`
+                      subColor={totals.nbCout<totals.bN?C.warn:undefined}
+                      sub={totals.nbCout<totals.bN
+                        ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — avant frais`
                         : 'CA − achat (avant frais)'}/>
-                    <StatBox compact label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
-                      sub={totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
+                    <StatBox compact label="Bénéfice net" value={totals.benefConnu==null?'—':fmtE0(totals.benefConnu)} color={totals.benefConnu==null?C.muted:(totals.benefConnu>=0?C.text:C.danger)}
+                      sub={totals.benefConnu==null?`frais eBay pas connus pour ${totals.fraisInconnus} vente${totals.fraisInconnus>1?'s':''}`:totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
                   </>}
           </div>
-        )}
+          {/* (19 oct.) La couverture PAR PLATEFORME, une fois sous les chiffres :
+              une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
+              reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
+          {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:11.5,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
+            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : ce bénéfice ne porte que sur Vinted' : ' · une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre'}.
+          </div>}
+        </>)}
 
         {(totals.nb>0) && (
           <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
@@ -39507,6 +39646,24 @@ function clesAnnonceLbc(ad, liens) {
   const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
   return ks;
 }
+// ── LE N° D'UNE VENTE LEBONCOIN PAR IDENTITÉ SEULEMENT (bénéfice, 19 oct.) ───
+// Plus strict que `clesAnnonceLbc` : le « nXXX » d'un TITRE n'est PAS une
+// identité (§5) — il sert à proposer, jamais à prendre un prix d'achat.
+// Le lien posé à la main gagne (c'est sa correction) ; sinon la référence VRM
+// (CustomRef, réf lue sur l'annonce), traduite par la remise à zéro 013. Deux
+// références qui se contredisent ⇒ personne. `items` absent ⇒ seul le lien.
+const numeroLbcIdentite = (v, items, liens) => {
+  if (!v || v.itemId == null) return '';
+  const iid = String(v.itemId);
+  const lien = liens ? liens[iid] : null;
+  if (lien != null && String(lien).trim()) return cleNum(lien);
+  const ad = items && items[iid];
+  if (!ad) return '';
+  const ks = new Set();
+  for (const r of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '']) { const k = cleNum(r); if (k) ks.add(numeroExterne(k, iid, 'lbcAnnonces')); }
+  ks.delete('');
+  return ks.size === 1 ? [...ks][0] : '';
+};
 
 // ── QUELS COMPTES LEBONCOIN SONT À LUI : CEUX DONT IL A VENDU UNE ANNONCE ────
 // Mesuré le 4 octobre : 58 annonces portent un champ `account`, réparties sur

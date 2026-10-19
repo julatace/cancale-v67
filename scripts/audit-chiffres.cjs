@@ -29,7 +29,8 @@ const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); 
 // cumulé que sous la garde « prix d'achat connu », et `benefConnu` en vient.
 const regleBenef = (() => { const i = app.indexOf('const ajouterVenteBenefice'); return i < 0 ? '' : app.slice(i, app.indexOf('\n};', i)); })();
 (/benefConnu\s*\+=\s*sell-buy-fee/.test(app)
-  || (/if \(achat != null[^{]*\{[^}]*fraisCouverts \+= f/.test(regleBenef) && /benefConnu = R\.net/.test(app) && /net = brut - acc\.fraisCouverts/.test(app)))
+  || ((/if \(achat != null[^{]*\{[^}]*fraisCouverts \+= f/.test(regleBenef) || (/const connu = achat != null && String\(achat\)\.trim\(\) !== '' && isFinite\(Number\(achat\)\)/.test(regleBenef) && /if \(connu\) \{[^}]*fraisCouverts \+= f/.test(regleBenef)))
+      && /benefConnu = R\.net/.test(app) && /net = (?:fi > 0 \? null : \()?brut - acc\.fraisCouverts/.test(app)))
   ? ok('Ventes : le bénéfice ne somme que les ventes au coût connu')
   : nok('Ventes : `benefConnu` sommé sur les ventes au coût connu');
 
@@ -40,7 +41,7 @@ const regleBenef = (() => { const i = app.indexOf('const ajouterVenteBenefice');
   : nok('Ventes : la carte affiche `totals.benefConnu`');
 
 // 3) la couverture est écrite À CÔTÉ du chiffre, et elle se voit (subColor)
-/subColor=\{totals\.nbCout<totals\.nb\?C\.warn/.test(app)
+/subColor=\{totals\.nbCout<totals\.(?:nb|bN)\?C\.warn/.test(app)
   ? ok('Ventes : la couverture est affichée en avertissement, pas en gris')
   : nok('Ventes : `subColor` en warn quand la couverture est partielle');
 
