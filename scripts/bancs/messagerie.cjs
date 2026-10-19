@@ -20,11 +20,18 @@
 //      UNE fois, qui nomme ce compte (et pas `compte_b`, à jour) ; l'autre
 //      sens : boîtes à jour ⇒ aucune ligne. Mesuré sur sa base : deux comptes
 //      figés sur une page ancienne de leur messagerie (27 juillet / 2 octobre).
+//   7. (19 octobre, « messages plus riches ») chaque ligne porte, PAR IDENTITÉ
+//      (transaction de la conversation captée → vente du même n° / annonce du
+//      même item_id → N° de CETTE annonce), le N°, le prix, l'état de la
+//      transaction, qui a écrit en dernier (seulement si le résumé capté porte
+//      bien le DERNIER message) et l'heure ; une conversation sans résumé capté
+//      n'invente rien. Le fil ouvert commence par la carte de la paire et
+//      groupe les messages par jour.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4337;
+const PORT = Number(process.env.BANC_PORT) || 4337;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -33,10 +40,23 @@ const ACCS = [
   { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: iso(0) },
 ];
 const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: iso(h), description: desc, opposite_user: { id: 5000 + id, login } });
-const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, transaction: { id: 9001, item_id: 444 }, description: 'Nike Air Max 1',
+// La forme MESURÉE d'une conversation captée (19 octobre, lecture seule) : la
+// transaction porte item_id, status (1 = simple question), current_user_side,
+// item_title, item_photo ; chaque message porte created_at_ts (ISO), le dernier
+// est le plus récent.
+const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, transaction: { id: 9001, item_id: 444, status: 1, current_user_side: 'seller', item_title: 'Nike Air Max 1 blanc 42', item_photo: { url: 'https://images1.vinted.net/t/444/f800/a.jpeg' } }, description: 'Nike Air Max 1',
   messages: [
-    { entity_type: 'message', entity: { user_id: 5301, body: 'Bonjour, vous feriez 45 € ?' } },
-    { entity_type: 'offer_request_message', entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9001, offer_request_id: 77 } },
+    { id: 1, created_at_ts: iso(54), entity_type: 'message', entity: { id: 1, user_id: 5301, body: 'Bonjour, vous feriez 45 € ?' } },
+    { id: 2, created_at_ts: iso(31), entity_type: 'offer_request_message', entity: { id: 2, user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9001, offer_request_id: 77 } },
+    { id: 3, created_at_ts: iso(30), entity_type: 'message', entity: { id: 3, user_id: 5301, body: 'Je peux payer aujourd’hui' } },
+  ] };
+// La conversation 303 (compte_a) : une VENTE en cours (status 230), tx 8811 — la
+// même que la vente servie plus bas (40 €) ; l'annonce 555 porte le N°12 ; le
+// dernier message est de LUI, au même instant que la boîte (26 h).
+const FIL_VENTE = { id: 303, opposite_user: { id: 5303, login: 'curieux' }, transaction: { id: 8811, item_id: 555, status: 230, current_user_side: 'seller', item_title: 'Adidas Gazelle bleu 40' },
+  messages: [
+    { id: 11, created_at_ts: iso(27), entity_type: 'message', entity: { id: 11, user_id: 5303, body: 'Merci pour l’envoi' } },
+    { id: 12, created_at_ts: iso(26), entity_type: 'message', entity: { id: 12, user_id: 111, body: 'Merci !' } },
   ] };
 const FIL_EXT = { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, transaction: { id: 9002 },
   messages: [{ entity_type: 'message', entity: { user_id: 5402, body: 'Message lu par extension' } }] };
@@ -47,6 +67,14 @@ const rowsDe = ({ venteA = 3 } = {}) => [
   { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26)] } } },
   { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 1)] } } },
   { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: FIL_OFFRE } } },
+  { id: 'harvest_111_conv_303', data: { capturedAt: iso(0), payload: { conversation: FIL_VENTE } } },
+  // 402 : un résumé capté PLUS ANCIEN que la boîte (dernier message capté il y a
+  // 5 h, la boîte dit 1 h) et sans transaction — il ne doit rien faire dire.
+  { id: 'harvest_222_conv_402', data: { capturedAt: iso(5), payload: { conversation: { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, messages: [
+    { id: 21, created_at_ts: iso(5), entity_type: 'message', entity: { id: 21, user_id: 5402, body: 'Ancien message' } } ] } } } },
+  { id: 'harvest_111_listings', data: { uid: '111', type: 'listings', nItems: 1, capturedAt: iso(0), payload: { items: [
+    { id: 444, url: 'https://www.vinted.fr/items/444', title: 'Nike Air Max 1 blanc 42', brand: 'Nike', size: '42', price: { amount: '59.0', currency_code: 'EUR' }, photo: { url: 'https://images1.vinted.net/t/444/f800/a.jpeg' }, is_closed: false, is_draft: false, is_hidden: false },
+  ] } } },
   // Proposition 6 (6 octobre) : les offres reçues PAR EMAIL, en tête de Messages.
   //  · O1 : récente, sur compte_a → à trancher ;
   //  · O2 : vieille de 20 jours → hors sujet ;
@@ -88,14 +116,15 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    // Un index de tableau (`->-1` : le dernier) se lit comme PostgREST le lit.
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : (Array.isArray(v) && /^-?\d+$/.test(seg) ? v[Number(seg) < 0 ? v.length + Number(seg) : Number(seg)] : v[seg]);
     out[alias] = v == null ? null : v;
   }
   return out;
 };
 
 // Le pont simulé : `version` annoncée ; chaque `exec` est noté et répond comme l'extension.
-const PONT = ({ version, filExt }) => {
+const PONT = ({ version, filExt, fils }) => {
   if (!version) return;
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
@@ -104,7 +133,8 @@ const PONT = ({ version, filExt }) => {
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_a' }, cmds: {} } });
     if (d.__vmr === 'exec') {
       window.__exec && window.__exec(JSON.stringify({ uid: d.uid, method: d.method, endpoint: d.endpoint, body: d.body }));
-      const data = d.method === 'GET' ? { conversation: filExt } : {};
+      const idc = (/\/conversations\/(\d+)$/.exec(d.endpoint || '') || [])[1];
+      const data = d.method === 'GET' ? { conversation: (fils && fils[idc]) || filExt } : {};
       setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data }), 50);
     }
   });
@@ -118,8 +148,8 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const execs = [];
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.addInitScript(PONT, { version, filExt: FIL_EXT });
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7' }, '555': { numero: '12' } })); } catch (_) {} });
+  await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -170,6 +200,19 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       const attendu = ['303', '301', '402'];
       dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
+      // 7. (19 oct.) la paire, l'état, le dernier auteur, l'heure — sur chaque ligne.
+      await r.pg.waitForTimeout(900);
+      const rich = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), {
+        num: x.getAttribute('data-conv-num'), prix: x.getAttribute('data-conv-prix'), etat: x.getAttribute('data-conv-etat'), auteur: x.getAttribute('data-conv-auteur'),
+        quand: x.getAttribute('data-conv-quand'), compte: x.getAttribute('data-conv-compte'), txt: x.innerText }])));
+      const r301 = rich['301'] || {}, r303 = rich['303'] || {}, r402 = rich['402'] || {};
+      dit(r301.num === '7' && r301.prix === '59' && r301.etat === 'question', 'une question : le N° et le prix de SON annonce (par item_id), l’état « question »', JSON.stringify(r301));
+      dit(r303.num === '12' && r303.prix === '40' && r303.etat === 'vendue', 'une vente : le prix de LA vente (même n° de transaction), son N°, « vendue · en cours »', JSON.stringify(r303));
+      dit(/N°12/.test(r303.txt || '') && /40/.test(r303.txt || '') && /Vendue/.test(r303.txt || '') && /Gazelle/.test(r303.txt || ''), 'et c’est écrit sur la ligne (N°, titre, prix, état)', (r303.txt || '').replace(/\n/g, ' | '));
+      dit(r303.auteur === 'toi' && /Toi :/.test(r303.txt || '') && r301.auteur === 'eux' && !/Toi :/.test(r301.txt || ''), 'qui a écrit en dernier : « Toi : » sur la sienne, rien sur celle de l’acheteuse', JSON.stringify({ a303: r303.auteur, a301: r301.auteur }));
+      dit(!r402.num && !r402.prix && !r402.etat && !r402.auteur, 'un résumé sans transaction ET plus ancien que la boîte : rien d’inventé (ni N°, ni prix, ni état, ni l’auteur d’un AUTRE message)', JSON.stringify(r402));
+      dit(!!r301.quand && Math.abs(Date.parse(r301.quand) - (auj - 30 * 3600e3)) < 2000 && /\d{1,2}:\d{2}/.test(r301.txt || ''), 'la date ET l’heure du dernier message', JSON.stringify({ q: r301.quand, t: (r301.txt || '').slice(0, 60) }));
+      dit(r301.compte === '111' && r402.compte === '222', 'le compte de chaque conversation est porté par la ligne', JSON.stringify({ c301: r301.compte, c402: r402.compte }));
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
@@ -199,6 +242,12 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       await r.pg.waitForTimeout(1200);
       const off = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre]'); return e ? { etat: e.getAttribute('data-offre'), txt: e.innerText } : null; });
       dit(off && off.etat === 'attente' && /45,00/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
+      // 7 bis. Le fil commence par la carte de la paire, et se groupe par jour.
+      const fil = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); const seps = [...document.querySelectorAll('[data-jour-sep]')].map((x) => x.getAttribute('data-jour-sep'));
+        return { carte: c ? { item: c.getAttribute('data-fil-paire'), num: c.getAttribute('data-fil-num'), prix: c.getAttribute('data-fil-prix'), etat: c.getAttribute('data-fil-etat'), txt: c.innerText } : null, seps }; });
+      dit(fil.carte && fil.carte.item === '444' && fil.carte.num === '7' && fil.carte.prix === '59' && fil.carte.etat === 'question' && /Air Max 1/.test(fil.carte.txt), 'en tête du fil : la carte de la paire (titre, N°7, 59 €, état)', JSON.stringify(fil.carte));
+      dit(fil.seps.length === 2 && new Set(fil.seps).size === 2, 'les messages sont groupés par jour (deux jours, deux séparateurs)', JSON.stringify(fil.seps));
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-fil-' + (tel ? 390 : 1512) + '.png') });
       await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click();
       await r.pg.waitForTimeout(500);
       // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un
