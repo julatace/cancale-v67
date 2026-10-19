@@ -199,8 +199,22 @@ const jugerSegment = async (pg, label, ecran) => {
       const r = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rangee')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => ({
         deborde: e.scrollWidth > e.clientWidth + 2, masque: getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage || 'none',
       })));
-      const debord = r.filter((x) => x.deborde), sage = r.filter((x) => !x.deborde);
-      dit(debord.length > 0 && debord.every((x) => x.masque && x.masque !== 'none'), 'Ventes : une rangée qui déborde porte un fondu sur son bord', JSON.stringify(r));
+      let debord = r.filter((x) => x.deborde);
+      const sage = r.filter((x) => !x.deborde);
+      // (19 oct.) Les filtres de Ventes tiennent maintenant en entier à 390 px :
+      // aucune rangée ne déborde d'elle-même. On en RÉTRÉCIT une pour juger le
+      // mécanisme, sinon le contrôle serait vacant (ou rouge sur un écran juste).
+      if (!debord.length) {
+        debord = await pg.evaluate(async () => {
+          const e = [...document.querySelectorAll('.vrm-rangee')].find((x) => x.getBoundingClientRect().height > 0 && x.children.length > 1);
+          if (!e) return [];
+          e.style.maxWidth = '90px'; e.style.overflowX = 'auto';
+          window.dispatchEvent(new Event('resize'));
+          await new Promise((ok) => setTimeout(ok, 400));
+          return [{ force: true, deborde: e.scrollWidth > e.clientWidth + 2, masque: getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage || 'none' }].filter((x) => x.deborde);
+        });
+      }
+      dit(debord.length > 0 && debord.every((x) => x.masque && x.masque !== 'none'), 'Ventes : une rangée qui déborde porte un fondu sur son bord', JSON.stringify({rangees:r,jugees:debord}));
       dit(sage.every((x) => !x.masque || x.masque === 'none'), 'Ventes : une rangée qui tient en entier n’a aucun fondu', JSON.stringify(sage));
       await ctx.close();
     });
