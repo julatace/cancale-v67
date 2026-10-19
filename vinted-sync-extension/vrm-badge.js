@@ -69,7 +69,7 @@
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
   .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #07090D; display: none; }
   .pt.on { display: block; }
-  .carte, .question { position: absolute; right: 0; bottom: 54px; width: 300px; background: var(--carte); color: var(--texte); border: 1px solid var(--bord);
+  .carte, .question { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto; background: var(--carte); color: var(--texte); border: 1px solid var(--bord);
     border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--ombre); display: none; }
   .carte.on, .question.on { display: block; }
   .tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -90,7 +90,7 @@
   .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
   .q b { font-weight: 700; }
   .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
-  .connexion { position: absolute; right: 0; bottom: 54px; width: 300px; height: 400px; border: 1px solid var(--bord); border-radius: 12px;
+  .connexion { position: absolute; right: 0; bottom: 54px; width: min(300px, calc(100vw - 32px)); height: min(400px, calc(100vh - 90px)); border: 1px solid var(--bord); border-radius: 12px;
     overflow: hidden; background: var(--fond); box-shadow: var(--ombre); display: none; }
   @media (prefers-color-scheme: light) { .connexion { background: #F4F6FA; } }
   .connexion.on { display: block; }
@@ -98,7 +98,11 @@
   .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
     color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
   .fermer:hover { background: var(--survol); color: var(--texte); }
-  .question .fermer { top: 4px; right: 4px; }
+  .question .fermer, .carte .fermer { top: 4px; right: 4px; }
+  .carte.doigt .tete { padding-right: 44px; }
+  /* 19 octobre : au doigt (Firefox pour Android, Orion) — pas de survol, pas
+     de surlignage gris du navigateur, et aucun double-tap qui zoome. */
+  .btn, .b, .fermer { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 </style>
 <div class="carte" part="carte"></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -118,6 +122,17 @@
   img.addEventListener('error', () => { img.remove(); const t = document.createElement('span'); t.className = 'txt'; t.textContent = 'VRM'; btn.appendChild(t); });
   try { img.src = chrome.runtime.getURL('logo-vrm-96.png'); } catch (_) {}
   btn.appendChild(img);
+
+  // ══ AU DOIGT (19 octobre, « l'extension pour iPhone et Samsung ») ═════════
+  // Sur un téléphone il n'y a pas de SURVOL : la carte d'état (et le « Capter
+  // ce compte » qui permet de revenir sur un « Non ») n'était joignable qu'à la
+  // souris. On mesure l'ENTRÉE du geste (`pointerType`), jamais « c'est un
+  // téléphone » : au doigt, toucher le logo OUVRE la carte, qui porte le geste
+  // du logo dans un bouton (« Ouvrir VRM » / « Se connecter avec VRM »).
+  let dernierPointeur = '';
+  let doigt = false;    // la carte est ouverte au doigt : elle porte son bouton et sa croix
+  const sansSurvol = () => { try { return matchMedia('(hover: none)').matches; } catch (_) { return false; } };
+  const auDoigt = () => (dernierPointeur ? dernierPointeur !== 'mouse' : sansSurvol());
 
   let etat = null;      // null = pas encore su
   let pasSu = false;    // le service worker n'a pas répondu
@@ -214,8 +229,11 @@
       ? `<div class="ligne"><div class="lib">Extension</div><div class="val alerte">Elle tourne encore sur son ancienne version${e && e.code ? ' (' + esc(e.code) + ')' : ''} : je la redémarre sur la ${esc(versionManif)}. Si ce message reste, ouvre chrome://extensions et clique ⟳ sur VRM — dans ce Chrome.</div></div>`
       : '';
     if (!e) {
-      poserHtml(carte, `<div class="tete"><b>VRM</b></div>
+      carte.classList.toggle('doigt', doigt);
+      poserHtml(carte, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b></div>
         ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? SI_MUETTE : 'Vérification…'}</div></div>`}`);
+      const fermerV = carte.querySelector('[data-fermer-carte]');
+      if (fermerV) fermerV.addEventListener('click', () => { doigt = false; carte.classList.remove('on'); });
       return;
     }
     const v = e.vrm;
@@ -253,15 +271,26 @@
       bascule = `<div class="ligne"><div class="lib">Attention</div><div class="val alerte">Le ${esc(quand)}, ce Chrome est passé du compte VRM ${esc(b.de || '?')} à ${esc(b.vers || '?')}. Les captures suivent le compte connecté : si ce n'est pas le tien, reconnecte-toi avec le bon.</div></div>`;
     }
 
-    const pied = v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
-    poserHtml(carte, `<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
+    const pied = doigt
+      ? (v && v.connecte ? '' : '<b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.')
+      : v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
+    const gesteDoigt = doigt
+      ? `<button class="b" data-ouvrir-vrm>${v && v.connecte ? 'Ouvrir VRM' : 'Se connecter avec VRM'}</button>`
+      : '';
+    carte.classList.toggle('doigt', doigt);
+    poserHtml(carte, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${bascule}
-      <div class="pied">${pied}</div>`);
+      ${pied ? `<div class="pied">${pied}</div>` : ''}
+      ${gesteDoigt}`);
+    const ouvrir = carte.querySelector('[data-ouvrir-vrm]');
+    if (ouvrir) ouvrir.addEventListener('click', () => { carte.classList.remove('on'); actionLogo(); });
+    const fermerC = carte.querySelector('[data-fermer-carte]');
+    if (fermerC) fermerC.addEventListener('click', () => { doigt = false; carte.classList.remove('on'); });
     const capter = carte.querySelector('[data-capter]');
     if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
   }
@@ -301,7 +330,7 @@
     poserHtml(question, `<button class="fermer" data-plus-tard title="Plus tard" aria-label="Plus tard">×</button>
       <div class="tete"><b>VRM</b></div>
       <div class="q" data-question-login="${esc(nom)}">Tu es connecté sur <b>${esc(nom)}</b> — c'est bien un de tes comptes à capter ?</div>
-      <div class="val gris">Oui : VRM range ses ventes, ses annonces et ses messages. Non : l'extension l'ignore dans ce navigateur (tu pourras revenir dessus en passant la souris sur le logo).</div>
+      <div class="val gris">Oui : VRM range ses ventes, ses annonces et ses messages. Non : l'extension l'ignore dans ce navigateur (tu pourras revenir dessus depuis le logo VRM, en le touchant ou en passant la souris dessus).</div>
       <button class="b" data-choix="oui">Oui, capter ce compte</button>
       <button class="b sec" data-choix="non">Non, ignorer ce compte</button>
       ${questionErreur ? `<div class="err">${esc(questionErreur)}</div>` : ''}`);
@@ -341,6 +370,19 @@
 
   btn.addEventListener('click', async () => {
     if (connexion.classList.contains('on')) { fermerConnexion(); return; }
+    // Au doigt : toucher le logo ouvre (ou referme) la carte — c'est elle qui
+    // porte le geste « Ouvrir VRM », et le moyen de revenir sur un « Non ».
+    if (auDoigt()) {
+      if (carte.classList.contains('on')) { doigt = false; carte.classList.remove('on'); return; }
+      doigt = true;
+      if (question.classList.contains('on')) return;     // la question a déjà ses boutons
+      carte.classList.add('on');
+      await rafraichir();
+      return;
+    }
+    await actionLogo();
+  });
+  async function actionLogo() {
     await rafraichir();
     const v = etat && etat.vrm;
     if (v && v.connecte) {
@@ -363,17 +405,35 @@
         if (err || !r || !r.ok) ouvrirConnexion();
       });
     } catch (_) { repondu = true; clearTimeout(secours); ouvrirConnexion(); }
-  });
+  }
 
-  // La carte d'état au survol ; elle se ferme quand on s'en va.
+  // Le type d'entrée du DERNIER geste (souris, doigt, stylet) : c'est lui qui
+  // décide, pas la taille de l'écran (un portable tactile garde sa souris).
+  hote.addEventListener('pointerdown', (e) => { dernierPointeur = String(e.pointerType || ''); }, true);
+  // La carte d'état au SURVOL — à la souris seulement : au doigt, un toucher
+  // déclenche aussi `pointerenter`, et la carte s'ouvrirait puis se fermerait
+  // au même geste.
   let minuteur = null;
-  hote.addEventListener('mouseenter', () => {
+  hote.addEventListener('pointerenter', (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
     if (connexion.classList.contains('on') || question.classList.contains('on')) return;
     clearTimeout(minuteur);
+    doigt = false;
     rafraichir();
     carte.classList.add('on');
   });
-  hote.addEventListener('mouseleave', () => { clearTimeout(minuteur); minuteur = setTimeout(() => carte.classList.remove('on'), 180); });
+  hote.addEventListener('pointerleave', (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    if (doigt) return;
+    clearTimeout(minuteur); minuteur = setTimeout(() => carte.classList.remove('on'), 180);
+  });
+  // Au doigt, toucher ailleurs dans la page referme la carte (sans rien cliquer
+  // à sa place : on n'empêche pas le geste du site).
+  document.addEventListener('pointerdown', (e) => {
+    if (!carte.classList.contains('on')) return;
+    let dedans = false; try { dedans = e.composedPath().includes(hote); } catch (_) {}
+    if (!dedans) { doigt = false; carte.classList.remove('on'); }
+  }, true);
 
   // Une connexion réussie, un envoi noté, une bascule : la carte suit, sans
   // interroger qui que ce soit en boucle.

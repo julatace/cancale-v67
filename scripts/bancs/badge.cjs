@@ -45,8 +45,12 @@ const ETATS = {
   bascule: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'autre@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - MIN }, bascule: { de: 'sophie@exemple.fr', vers: 'autre@exemple.fr', at: Date.now() - 30 * MIN } },
 };
 
-async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFois = false, dansIframe = false, scheme = 'dark' } = {}) {
-  const ctx = await nav.newContext({ colorScheme: scheme, viewport: { width: 1512, height: 900 } });
+async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFois = false, dansIframe = false, scheme = 'dark', mobile = null } = {}) {
+  // `mobile` (19 oct.) : un téléphone AU DOIGT — `isMobile + hasTouch` fait
+  // déclarer `hover: none` et les touchers arrivent en `pointerType: touch`.
+  const ctx = await nav.newContext(mobile
+    ? Object.assign({ colorScheme: scheme, viewport: { width: mobile.largeur || 390, height: 760 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, mobile.ua ? { userAgent: mobile.ua } : {})
+    : { colorScheme: scheme, viewport: { width: 1512, height: 900 } });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
@@ -54,7 +58,7 @@ async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFo
     const u = metaVersData(r.request().url());
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
     if (/popup\.html/.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body style="background:#07090D;color:#fff">connexion</body>' });
-    return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body style="margin:0;background:#fff;font-family:sans-serif"><h1 style="padding:20px">Une page du site</h1><iframe id="sous" src="/sous" style="width:300px;height:120px"></iframe></body></html>' });
+    return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><h1 style="padding:20px">Une page du site</h1><iframe id="sous" src="/sous" style="width:300px;height:120px"></iframe></body></html>' });
   });
   await pg.goto(url);
   const installe = async (frame) => frame.evaluate(({ e, js }) => {
@@ -366,6 +370,77 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     const l3 = await lire(deco.pg);
     dit(!l3.question, 'pas connecté à VRM : la connexion d’abord, pas la question');
     await deco.ctx.close();
+  });
+
+  // ── 9 bis. AU DOIGT (19 octobre, « l'extension pour iPhone et Samsung ») ─
+  // Sur Firefox pour Android et dans Orion il n'y a PAS de survol : la carte et
+  // le « Capter ce compte » (le retour sur un « Non ») n'étaient joignables qu'à
+  // la souris. Toucher le logo ouvre la carte, qui porte le geste du logo.
+  console.log('\n── Au doigt, sur un téléphone');
+  const UA_FX = 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0';
+  const UA_IP = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+  const rect = (pg, sel) => pg.evaluate((sel) => {
+    const r = document.getElementById('vrm-badge').shadowRoot;
+    const el = sel === '.btn' ? r.querySelector('.btn') : r.querySelector(sel);
+    if (!el || !el.offsetParent && getComputedStyle(el).position !== 'fixed' && el.getClientRects().length === 0) return null;
+    const b = el.getBoundingClientRect();
+    return b.width ? { x: b.left + b.width / 2, y: b.top + b.height / 2, l: b.left, r: b.right, t: b.top, h: b.height, w: b.width } : null;
+  }, sel);
+  const toucher = async (pg, sel) => { const b = await rect(pg, sel); if (!b) return false; await pg.touchscreen.tap(b.x, b.y); await pg.waitForTimeout(250); return true; };
+  for (const [nom, ua, largeur] of [['Firefox Android 360', UA_FX, 360], ['iPhone 412', UA_IP, 412]]) {
+    await essaie(`doigt ${nom}`, async () => {
+      const { ctx, pg, erreurs } = await rendre(nav, AC({ choix: 'oui' }), { mobile: { ua, largeur } });
+      await toucher(pg, '.btn');
+      let l = await lire(pg);
+      dit(!erreurs.length, `${nom} : aucune erreur`, erreurs[0]);
+      dit(l.carteVisible && /angeled92/.test(l.carte), `${nom} : toucher le logo OUVRE la carte d'état (pas de survol au doigt)`, l.carte.replace(/\n/g, ' · ').slice(0, 120));
+      dit(!l.envoyes.includes('ouvrirVRM'), `${nom} : le premier toucher n'ouvre pas VRM à l'aveugle`, JSON.stringify(l.envoyes));
+      const c = await rect(pg, '.carte');
+      dit(c && c.l >= 0 && c.r <= largeur, `${nom} : la carte tient dans l'écran (${c && Math.round(c.l)}–${c && Math.round(c.r)} sur ${largeur})`, JSON.stringify(c));
+      const o = await rect(pg, '[data-ouvrir-vrm]');
+      const f = await rect(pg, '[data-fermer-carte]');
+      dit(o && o.h >= 44 && f && f.h >= 44 && f.w >= 44, `${nom} : « Ouvrir VRM » et la croix ≥ 44 px`, JSON.stringify({ o: o && o.h, f: f && [f.w, f.h] }));
+      await toucher(pg, '[data-ouvrir-vrm]');
+      l = await lire(pg);
+      dit(l.envoyes.includes('ouvrirVRM'), `${nom} : « Ouvrir VRM » fait ce que faisait le logo`, JSON.stringify(l.envoyes));
+      // Toucher ailleurs referme.
+      await toucher(pg, '.btn');
+      l = await lire(pg);
+      dit(l.carteVisible, `${nom} : retoucher le logo rouvre la carte`);
+      await pg.touchscreen.tap(30, 120); await pg.waitForTimeout(200);
+      l = await lire(pg);
+      dit(!l.carteVisible, `${nom} : toucher ailleurs dans la page la referme`);
+      const sw = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      dit(sw <= 1, `${nom} : aucun débordement horizontal`, String(sw));
+      await ctx.close();
+    });
+  }
+  await essaie('doigt question', async () => {
+    const { ctx, pg } = await rendre(nav, AC(), { mobile: { ua: UA_FX, largeur: 360 } });
+    let l = await lire(pg);
+    dit(/angeled92/.test(l.question), 'au doigt : la question apparaît d’elle-même');
+    const q = await rect(pg, '.question');
+    dit(q && q.l >= 0 && q.r <= 360, 'au doigt : la question tient dans 360 px', JSON.stringify(q));
+    await toucher(pg, '[data-choix="non"]');
+    l = await lire(pg);
+    dit(l.choix.join(',') === '111:non' && !l.question, 'toucher « Non » : le choix part, la question se ferme', JSON.stringify(l.choix));
+    await toucher(pg, '.btn');
+    l = await lire(pg);
+    dit(l.carteVisible && /ignoré/i.test(l.carte), 'puis toucher le logo : la carte dit « ignoré (ton choix) » — on peut REVENIR sur le « Non »', l.carte.replace(/\n/g, ' · ').slice(0, 160));
+    const cap = await rect(pg, '[data-capter]');
+    dit(cap && cap.h >= 44, '« Capter ce compte » ≥ 44 px au doigt', JSON.stringify(cap));
+    await toucher(pg, '[data-capter]');
+    l = await lire(pg);
+    dit(l.choix.join(',') === '111:non,111:oui', 'toucher « Capter ce compte » le rallume', JSON.stringify(l.choix));
+    dit(!/passant la souris sur le logo\)/.test(l.question + l.carte), 'plus aucune consigne « passe la souris » seule');
+    await ctx.close();
+  });
+  await essaie('souris inchangée', async () => {
+    const { ctx, pg } = await rendre(nav, AC({ choix: 'oui' }));
+    await cliquer(pg);
+    const l = await lire(pg);
+    dit(l.envoyes.includes('ouvrirVRM'), 'à la souris rien ne change : un clic sur le logo ouvre VRM', JSON.stringify(l.envoyes));
+    await ctx.close();
   });
 
   // ── 10. LE VRAI background.js : « Non » COUPE LA CAPTURE DE CE COMPTE ────
