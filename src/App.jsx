@@ -21242,10 +21242,32 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const e = (await askText({ desc: 'Un emoji pour le représenter (facultatif) :', value: '🪑' }) || '').trim();
       if (e) emoji = e;
     }
+    // (19 oct.) Julien : « choisir le nombre d'étagères, les numéros par ligne ».
+    // Une étagère se dit dès l'ajout : combien de niveaux, combien de cases par
+    // niveau (réglables ensuite dans « Aménager »). Annuler garde le modèle.
+    let nivChoisi = null, casesChoisies = null;
+    if (t.cases && t.build === 'metal') {
+      const nv = await askText({ numeric: true, desc: 'Combien de niveaux (plateaux) sur cette étagère ?', value: String(t.rows) });
+      if (nv == null) return;
+      nivChoisi = Math.max(1, Math.min(10, parseInt(nv, 10) || t.rows));
+      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (paires côte à côte) ?', value: String(t.cols) });
+      if (cs == null) return;
+      casesChoisies = Math.max(1, Math.min(16, parseInt(cs, 10) || t.cols));
+    }
     // Pour une grille, le footprint (w/h) découle de la taille de case × nb de cases,
     // et la HAUTEUR par défaut monte jusqu'au plafond (empilage réaliste).
-    const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
-    const rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    const cell = t.cell;
+    let w = cell ? +(t.cols * cell).toFixed(2) : t.w; const h = cell ? cell : t.h;
+    let rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    let colsN = t.cols, h3dN = t.h3d;
+    if (nivChoisi != null) {
+      // Même règle que « Niveaux » et « Cases par plateau » (changerCases) : un
+      // niveau garde sa hauteur (celle du modèle), 60 cm par case en largeur.
+      const niveau = (t.h3d * 1.5) / Math.max(1, t.rows);
+      rows = nivChoisi; colsN = casesChoisies;
+      h3dN = +(rows * niveau / 1.5).toFixed(3);
+      w = Math.max(0.6, +(colsN * 0.6).toFixed(2));
+    }
     let pasDePlace = false;
     setItems(list => {
       // On répartit chaque nouveau meuble sur une petite grille pour qu'il
@@ -21255,7 +21277,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       // pièce : on cherche la place libre la plus proche (src/stockRegles.js).
       const n = list.length, gx = 0.6 + (n % 4) * 1.5, gy = 0.6 + (Math.floor(n / 4) % 4) * 1.5;
       let x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
-      const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} };
+      const neuf = { id, type, name, emoji, color: t.color, h3d: h3dN, cell, x, y, w, h, rows, cols: colsN, slots: {} };
       if (!t.deco || t.structure) {
         const pl = placeLibre(list, neuf);
         if (!pl) { pasDePlace = true; return list; }
@@ -28303,6 +28325,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (pa !== pb) return pa - pb;                       // les postés tout en bas
       const ia = a.pret ? 0 : 1, ib = b.pret ? 0 : 1;
       if (ia !== ib) return ia - ib;                       // imprimable d'abord
+      // (19 oct.) Julien : « les ventes les plus récentes en haut ». Dans
+      // chaque groupe, la vente la plus récente d'abord ; l'urgence reste écrite
+      // sur chaque ligne et dans l'en-tête. Date illisible ⇒ en bas du groupe.
+      const ta = Date.parse((a.o && a.o.date) || '') || 0, tb = Date.parse((b.o && b.o.date) || '') || 0;
+      if (ta !== tb) return tb - ta;
       return (a.dl == null ? 999 : a.dl) - (b.dl == null ? 999 : b.dl);
     });
     return tout;
@@ -32078,13 +32105,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La phrase du bandeau d'urgence — elle DÉCRIT la liste, elle ne la promet
   // pas. Trois cas, parce qu'il y a trois situations réelles.
   const ouSontLesPresses = (u) => {
-    if (!u.presseAttente) return 'les plus urgents sont en haut de la liste.';
+    // (19 oct.) La liste se trie maintenant par vente la plus récente : la
+    // phrase ne promet plus « en haut », elle dit où le voir (sur sa ligne).
+    if (!u.presseAttente) return 'le délai est écrit sur la ligne de chaque colis.';
     // ⚠️ La phrase est déjà introduite par un tiret (« 1 demain — … ») : une
     //    seconde incise entre tirets la rendait illisible. Une virgule suffit.
     if (!u.pressePret) return u.presseAttente > 1
       ? `ils attendent encore leur bordereau, plus bas dans « En attente de leur bordereau ».`
       : `il attend encore son bordereau, plus bas dans « En attente de leur bordereau ».`;
-    return `${u.pressePret} en haut de la liste, ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
+    return `${u.pressePret} dans « Prêts à imprimer », ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
   };
 
   const setBuyForKey = (key, val) => {
@@ -36940,7 +36969,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
-              <div className="vrm-colis-grille" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:10,alignItems:'start'}}>
+              <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
               {ex.map((e,ix)=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
