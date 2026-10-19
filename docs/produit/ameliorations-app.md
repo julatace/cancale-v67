@@ -112,3 +112,23 @@ Vérification : compilation réussie, 103 contrôles mobiles, 72 contrôles des 
 secondaires (dont contraste et codes longs) et 202 contrôles de navigation/actions
 réussis, en Chromium avec réseau simulé. Captures :
 `/workspace/shared/vrm-compact/`. Proposition encore non publiée.
+
+### Densité des listes, sans retoucher Ma journée
+
+Précision utilisateur : ce sont les onglets de travail, surtout chaque vente,
+qui sont trop grands. Ventes Vinted regroupées en liste à séparateurs : portrait
+48×68, prix à droite, bordereau dans la même zone, puis coût/liaison/facture/détails
+sur une seule rangée. Le bouton visuel « Facture » garde son nom accessible complet
+et le panneau de sélection/confirmation ; ouvert, il prend toute la largeur.
+Les détails restent également dépliables sur toute la largeur.
+
+Lignes Leboncoin/eBay et annonces réduites, marges de colis resserrées. Sur eBay,
+le résumé « Gérer la commande » est compact et le panneau développé garde toute
+la largeur. Aucun changement de calcul, de statut, d’envoi ou de collecte.
+Ma journée n’est pas modifiée dans cette itération. Proposition non publiée.
+
+Vérification : build réussi ; 112 contrôles mobiles, dont vente Vinted <155 px,
+commande eBay avec actions <120 px et boutons de coût côte à côte aux trois
+largeurs ; 89 contrôles d’écrans secondaires, dont panneau facture dépliable,
+aucune sélection automatique et aucune mise en envoi ; 202 contrôles de
+navigation/actions réussis. Captures : `/workspace/shared/vrm-listes-denses/`.

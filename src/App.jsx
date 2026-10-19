@@ -3428,9 +3428,9 @@ function FactureSousVente({ factures, compte }) {
   if(!propres.length)return null;
   const drafts=propres.filter(i=>i.status==='draft' && i.buyerEmail);
   const inv=drafts.find(i=>i._id===choix);
-  return <div className="vrm-sale-invoice">
+  return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
     {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}}>Envoyer une facture à l'acheteur</button>
+      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></button>
       {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
         <label style={{fontSize:11}}>Choisir la facture de cette vente
           <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>

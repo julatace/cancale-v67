@@ -17,11 +17,13 @@ s=s.replace(marker,`
     if(section){const nav=p.locator('.vrm-platform-tabs');check(await nav.getByRole('button',{name:'Ventes',exact:true}).evaluate(e=>{const a=e.getBoundingClientRect(),b=e.parentElement.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;}),'section active visible '+tab+' '+width);
      const input=p.getByRole('searchbox').first();if(await input.count())check(await input.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16),'saisie sans zoom Safari '+tab+' '+width);
     }
+    if(tab==='plat_ebay')check(await p.locator('[data-ebay-vente]').first().evaluate(e=>e.getBoundingClientRect().height<120),'commande eBay et actions compactes '+width);
+    if(tab==='plat_leboncoin'||tab==='plat_ebay')check(await p.locator('.vrm-shared-sale').first().evaluate(e=>e.getBoundingClientRect().height<150),'vente partagée compacte '+tab+' '+width);
     if(tab==='plat_vinted'){
      const prix=p.locator('[data-cout-vente-saisir]').first(),relier=p.locator('[data-cout-vente-relier]').first();
      const a=await prix.boundingBox(),b=await relier.boundingBox();check(Math.abs(a.y-b.y)<2,'actions du coût côte à côte '+width);
-     check(await p.locator('.vrm-sale-row').first().evaluate(e=>e.getBoundingClientRect().height<230),'ligne de vente compacte '+width);
-     check(await p.locator('.vrm-sale-row').first().evaluate(e=>{const titre=e.querySelector('.vrm-sale-title').getBoundingClientRect(),prix=e.querySelector('[data-prix-vente]').getBoundingClientRect();return prix.top>=titre.bottom&&prix.right<=e.getBoundingClientRect().right;}),'titre et montant séparés '+width);
+     check(await p.locator('.vrm-sale-row').first().evaluate(e=>e.getBoundingClientRect().height<155),'ligne de vente compacte '+width);
+     check(await p.locator('.vrm-sale-row').first().evaluate(e=>{const titre=e.querySelector('.vrm-sale-title').getBoundingClientRect(),prix=e.querySelector('[data-prix-vente]').getBoundingClientRect();return (prix.left>=titre.right-1||prix.top>=titre.bottom-1)&&prix.right<=e.getBoundingClientRect().right;}),'titre et montant sans chevauchement '+width);
     }
     if(tab==='journee')check(await p.locator('.vrm-day-bar').evaluate(e=>(()=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e).backgroundColor),b=lum(getComputedStyle(e.querySelector('.vrm-day-bar-n')).color);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;})()),'bandeau des tâches contrasté '+width);
     if(tab==='journee')check(await p.locator('.vrm-app-header button[aria-label="Tous les écrans"]').isHidden(),'menu Gestion sans doublon en haut '+width);

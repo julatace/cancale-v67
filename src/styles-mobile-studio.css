@@ -257,3 +257,50 @@
  .vrm-app-shell .vrm-tabbar{padding:4px 6px max(4px,env(safe-area-inset-bottom));}
  .vrm-app-shell .vrm-tabbar>.vrm-tab{min-height:44px;padding-block:4px;}
 }
+
+/* Les listes de travail sont des lignes, pas des cartes de tableau de bord. */
+.vrm-invoice-short{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ventes-liste{background:var(--studio-card)!important;border:1px solid var(--studio-line)!important;border-radius:12px!important;overflow:hidden!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:9px 9px 3px!important;margin:0;border:0!important;border-bottom:1px solid var(--studio-line)!important;border-radius:0!important;box-shadow:none;background:transparent!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row:last-child{border-bottom:0!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:48px minmax(0,1fr) auto!important;gap:2px 8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:48px!important;height:68px!important;grid-column:1;grid-row:1 / span 2;border-radius:6px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-info{grid-column:2;grid-row:1!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{grid-column:3;grid-row:1;font-size:16px!important;max-width:78px;text-align:right;justify-self:end;letter-spacing:-.4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>[data-benef-vente]{grid-column:3;grid-row:2;text-align:right;justify-self:end;max-width:78px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-overview .vrm-sale-action{grid-column:2 / -1!important;grid-row:2!important;margin:0!important;align-self:end;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview:has([data-benef-vente]) .vrm-sale-action{padding-right:65px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{min-height:28px!important;padding-inline:6px!important;font-size:10px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{grid-template-columns:minmax(0,1fr) auto auto;padding-top:0;margin-top:4px;border-top:0;gap:0 5px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{grid-column:2;grid-row:1;background:transparent!important;border:0!important;border-radius:0;margin:0;padding:0!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-details{grid-column:3;grid-row:1;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice[data-ouvert=true]{grid-column:1 / -1;grid-row:2;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-details[open]{grid-column:1 / -1;grid-row:3;}
+ .vrm-main .vrm-ventes-liste .vrm-invoice-full{display:none;}
+ .vrm-main .vrm-ventes-liste .vrm-invoice-short{display:inline;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice>button{min-height:30px!important;padding:0 4px!important;width:auto;white-space:nowrap;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{padding-inline:3px!important;font-size:10px!important;min-height:30px!important;height:30px!important;}
+ .vrm-main .vrm-shared-sale{padding:9px!important;margin-bottom:0;border:0!important;border-bottom:1px solid var(--studio-line)!important;border-radius:0;box-shadow:none;background:var(--studio-card);}
+ .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:42px minmax(0,1fr) auto!important;gap:6px 9px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{width:42px!important;height:58px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-title{font-size:12px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-meta{font-size:10px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price>.vrm-display{font-size:15px!important;}
+ .vrm-main .vrm-ann-card{margin:0;border-radius:0!important;border:0!important;border-bottom:1px solid var(--studio-line)!important;box-shadow:none!important;}
+ .vrm-main .vrm-ann-grid{gap:0!important;border-radius:12px;overflow:hidden;border:1px solid var(--studio-line);}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:9px!important;gap:9px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:44px!important;height:60px!important;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:16px!important;}
+ .vrm-main .vrm-lbc-package{padding:9px!important;border-radius:10px!important;box-shadow:none;}
+ .vrm-main .vrm-lbc-package [data-imprime-lbc]{min-height:34px!important;font-size:11px!important;padding:7px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card{padding:9px!important;gap:7px!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-market-space .vrm-shared-sale{padding:8px!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order{border-bottom:1px solid var(--studio-line);}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order .vrm-shared-sale{border-bottom:0!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions{margin:0 9px 3px 59px!important;padding:0!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions>summary{min-height:28px!important;padding:0!important;font-size:10px;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions[open]{margin:0 9px 8px!important;}
+}
