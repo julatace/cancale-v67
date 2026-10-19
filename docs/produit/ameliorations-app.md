@@ -76,3 +76,17 @@ sept chiffres ; 202 contrôles de navigation et d’actions revendeurs réussis.
 Le résumé déplié a sa propre rangée et ne recouvre plus la fraîcheur des données.
 Sur ordinateur, marges du stock compactées pour conserver ses liens dans la
 fenêtre de 900 px à densité réelle. Aucun appareil iPhone physique testé.
+
+### Finition Studio
+
+Bloc d’attente compact avec montant aligné à droite et détail à gauche ; la
+variante à deux soldes conserve deux colonnes et ses informations distinctes.
+Tâches avec repère discret et cible « Voir » séparée. Titre de ventes simplifié,
+nombre de résultats sans badge supplémentaire. Sans bénéfice affiché, le
+bordereau reste dans la colonne d’information à côté de la photo. Avec bénéfice,
+il conserve une rangée dédiée. Boutons indisponibles différenciés via l’état
+natif ou `aria-disabled`, sans changer leur comportement explicatif. Pas publié.
+
+Finition vérifiée : compilation réussie et 100 contrôles mobiles Chromium à
+320/390/430 px, sans débordement ni chevauchement des titres et montants.
+Captures : `/workspace/shared/vrm-mobile-finition/` (données d’exemple).
