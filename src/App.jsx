@@ -13565,7 +13565,7 @@ function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuve
     <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
       <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
-      <span className="vrm-ledger-sale-state">{etat}</span>
+      <span className="vrm-ledger-sale-state" title={etat}>{etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>

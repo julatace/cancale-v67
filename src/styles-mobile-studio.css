@@ -2,7 +2,7 @@
    conservent leur source ; seules les surfaces et la hiérarchie changent. */
 .vrm-mobile-sales-intro{display:none;}
 @media(max-width:767px){
- .vrm-app-shell{--studio-paper:#eff1ed;--studio-ink:#243d43;--studio-muted:#657774;--studio-sage:#dce9df;--studio-line:#e6ebe5;--studio-card:#fffefa;}
+ .vrm-app-shell{--studio-paper:#eff1ed;--studio-ink:#243d43;--studio-muted:#657774;--studio-sage:#dce9df;--studio-line:#e6ebe5;--studio-card:#fffefa;--studio-soft:#edf2ef;--studio-ledger-label:#52636b;}
  .vrm-app-shell .vrm-main{background-color:var(--studio-paper);background-image:url('/textures/vrm-grain.svg'),radial-gradient(ellipse at 0 0,#dce9df90,transparent 70%);}
  .vrm-app-shell .vrm-app-header{min-height:54px;background-image:url('/textures/vrm-grain.svg'),linear-gradient(120deg,#21343e,#34544f);}
  .vrm-main .vrm-market-space{background:transparent;}
@@ -71,7 +71,7 @@
  .vrm-day-layout .vrm-day-bar-l{color:var(--studio-muted)!important;font-size:9px;}
  .vrm-day-layout .vrm-day-bar-ic{color:#56766a!important;}
  .vrm-day-layout .vrm-day-bar>button{border-color:var(--studio-line)!important;min-height:61px!important;}
- :root[data-theme=dark] .vrm-app-shell{--studio-paper:#17262d;--studio-ink:#edf5f0;--studio-muted:#b0c5bc;--studio-line:#ffffff14;--studio-card:#243c40;}
+ :root[data-theme=dark] .vrm-app-shell{--studio-paper:#17262d;--studio-ink:#edf5f0;--studio-muted:#b0c5bc;--studio-line:#ffffff14;--studio-card:#243c40;--studio-soft:#2c4548;--studio-ledger-label:#b0c5bc;}
  :root[data-theme=dark] .vrm-mobile-resultats,:root[data-theme=dark] .vrm-main [data-raison-bord]{background:#34443b!important;color:#e2e8d7;}
  :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-row,:root[data-theme=dark] .vrm-main .vrm-sales-workbar .vrm-list-search,:root[data-theme=dark] .vrm-day-layout :is(.vrm-day-bar,.vrm-day-task,.vrm-day-week){background:#243c40!important;}
  :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-invoice,:root[data-theme=dark] .vrm-day-layout .vrm-day-wallet{background:#2d443a!important;}
@@ -382,7 +382,7 @@
    Montant désigne le prix de vente, sans le présenter comme un revenu net. */
 .vrm-ledger-heading{display:none;}
 @media(max-width:767px){
- .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 54px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-muted,#52636b);}
+ .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 54px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-ledger-label,#52636b);}
  .vrm-main .vrm-ventes-liste{border-radius:8px!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:8px 9px 2px!important;gap:4px!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:2px 8px!important;}
@@ -453,4 +453,8 @@
  .vrm-main .vrm-shared-sale .vrm-ledger-sale-toggle{grid-template-columns:28px minmax(0,1fr) auto auto 24px;}
  .vrm-main .vrm-ledger-sale-state:empty{display:block;}
  .vrm-main .vrm-ventes-liste>.vrm-ledger-heading{padding-left:53px;padding-right:39px;}
+}
+
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main :is(input,textarea)::placeholder{color:var(--studio-muted);opacity:1;}
 }
