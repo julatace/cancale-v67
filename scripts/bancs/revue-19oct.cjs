@@ -16,7 +16,8 @@
 //   E. Compta — la prochaine échéance se dit « au moins » quand la ligne
 //      publiée porte des ventes finalisées sans date de versement.
 //   F. Colis en lignes (1512) — « Colis fait » à la même place sur chaque ligne.
-// Rouge sur le build de 47e9249 (12 défauts), vert après.
+//   G. Annonces (390) — une valeur éditable en place (« achat — ») fait 44 px de large.
+// Rouge sur le build de 47e9249 (13 défauts), vert après.
 // `EXPLORE=dossier` : captures hautes de chaque écran (pour REGARDER, §6.2) et
 // la liste des cibles tactiles < 44 px affichés à 390 px.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -170,6 +171,10 @@ async function contexte(b, W, H, tactile, sombre) {
       dit(r.saut > 0 && r.saut <= r.lh * 1.8, 'Annonces : le bouton « à confirmer » ne fait pas de trou dans le paragraphe', `écart entre deux lignes ${Math.round(r.saut)} px (ligne ${Math.round(r.lh)} px)`);
       dit(r.btnH >= 43.5, 'Annonces : la cible du bouton « à confirmer » garde 44 px affichés', `${Math.round(r.btnH)} px`);
     }
+    // G. Les champs édités en place (« achat — », « N°2 ») : 44 px de large au doigt.
+    const larg = await pg.evaluate(() => [...document.querySelectorAll('[data-edition]')].map(x => x.getBoundingClientRect()).filter(rc => rc.width > 0).map(rc => Math.round(rc.width)));
+    const etroits = larg.filter(w => w < 43.5);
+    dit(larg.length > 0 && etroits.length === 0, `Annonces (390) : les ${larg.length} valeurs éditables en place font 44 px de large au doigt`, etroits.length ? `${etroits.length} plus étroites (${[...new Set(etroits)].slice(0, 4).join(', ')} px)` : '');
     if (pg.__errs.length) dit(false, 'erreurs d’app', pg.__errs.join(' | '));
     await ctx.close();
   }

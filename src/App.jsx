@@ -8623,8 +8623,11 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
     </span>
   );
   return (
+    // (revue du 19 oct.) La zone au doigt fait 44 px de LARGE aussi : sur
+    // « achat — » elle faisait 10 px (le tiret), 25 px sur « N°2 ». Le
+    // pointillé reste sous le texte seul (le span), pas sous la zone.
     <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || 'Cliquer pour modifier'}
-      style={{border:'none',borderBottom:`1px dashed ${C.border}`,background:'transparent',padding:0,minHeight:0,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit'}}>{rendu}</button>
+      style={{border:'none',background:'transparent',padding:0,minHeight:0,minWidth:44,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit',textAlign:'inherit'}}><span style={{borderBottom:`1px dashed ${C.border}`}}>{rendu}</span></button>
   );
 }
 
