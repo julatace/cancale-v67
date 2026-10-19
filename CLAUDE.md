@@ -10048,6 +10048,74 @@ hauteur en `vh`/px dans `.vrm-main` se pense ×1,25 sur téléphone.**
   `verif_visuel`/`verif_dark` ; une réponse non JSON (panne) est dite en
   français, et la lecture ratée UNE fois.
 
+### Messages plus riches : la paire, l'état, qui a écrit, l'heure (19 octobre)
+Julien : « les messages plus riches, plus d'informations ». **Mesuré d'abord**
+(lecture seule) : la boîte `harvest_{uid}_inbox` ne porte que id · aperçu ·
+non lu · date · interlocuteur · 1ʳᵉ photo — aucun identifiant d'annonce. La
+conversation captée `harvest_{uid}_conv_{id}` (1 408 lignes) porte la
+transaction : `item_id` (924), `status` (926 ; 1 = simple question, 230 payée,
+450 finalisée, 5xx annulée…), `current_user_side`, `item_title`,
+`item_photo.url` ; ses messages sont chronologiques (le dernier est le plus
+récent, 934/934), `entity.user_id` dit qui a écrit (absent sur un message de
+Vinted). `offer_price` n'est PAS le prix de la paire (valeurs à 1,70 €) : pas lu.
+- **Liste** (`data-messagerie`) : chaque ligne porte, par IDENTITÉ (§5),
+  `N° · prix · titre` puis l'état en pastille neutre (« Question », « Vendue ·
+  en cours », « Ton achat », « Vente annulée »…). Transaction → vente du même
+  n° (son prix) ou annonce captée du même `item_id` (son prix) → N° de CETTE
+  annonce (`numeros[item_id]`). Jamais le titre. L'état de `TXN_ETATS` (meta des
+  transactions) prime quand il est connu. « Toi : » devant l'aperçu si le
+  dernier message est de lui — **seulement** si le résumé capté porte bien le
+  dernier message de la boîte (même instant à 2 min près) : sinon rien. Heure
+  absolue (« 14:32 », « hier 14:32 », « 12 oct. 14:32 »), date complète en
+  infobulle. Attributs : `data-conv-num|prix|etat|auteur|quand|compte`.
+- **Fil** : en tête, la carte de la paire (`data-fil-paire|num|prix|etat`,
+  photo, titre, lien vers l'annonce) ; messages groupés par jour
+  (`data-jour-sep`, « Aujourd'hui », « Hier », « samedi 17 octobre ») ; la bulle
+  ne garde que l'heure ; un évènement non affiché n'ouvre pas de jour.
+- **Lecture** : `fetchResumesConversations` — scalaires seulement (jamais
+  `select=data`), paginée, strict (une page ratée = « pas su » ⇒ rien n'est
+  ajouté), au plus une fois par minute, sur Messages seulement. Les annonces sont
+  désormais lues aussi sur Messages (cache partagé avec les autres écrans).
+- **Leboncoin → Messages** : inchangé — seuls des COMPTEURS de non-lus sont
+  captés (aucune conversation), rien de plus à montrer sans deviner.
+- Preuves : banc `messagerie.cjs` (+9 contrôles par taille, 390 tactile et
+  1512) **16 rouges sur le build d'avant** (1023dd4), 0 après ; mutations
+  « garde des 2 min retirée » ⇒ 2 rouges (l'auteur d'un AUTRE message affiché),
+  « prix de la vente ignoré » ⇒ 2 rouges. Le banc applique `->-1` comme PostgREST.
+- ⚠️ **Non mesuré** : `messages->-1` (dernier élément) dans la projection
+  PostgREST de SA base — grammaire attendue, jamais envoyée d'ici ; refusée, la
+  lecture repart SANS l'auteur (`_resumeConvSansAuteur`) : pas de « Toi : »,
+  le reste s'affiche. Le coût serveur de la lecture (~1 400 lignes décompressées
+  pour quelques scalaires) n'est pas mesuré.
+
+### Les offres en attente sur la LISTE des conversations (19 octobre)
+Une offre en attente n'apparaissait que dans le fil ouvert. **Mesuré (lecture
+seule)** : 1 371 conversations captées, 807 portent au moins une offre, **3**
+une offre au statut 10 (en attente) — et l'une d'elles est le 3ᵉ message sur 5 :
+`messages->-1` ne la voit pas. La transaction ne la porte pas (`offer_price` =
+le prix de l'ANNONCE : 99 € pour une offre à 60 €). Tous les messages pèsent
+1,45 Mo. ⇒ `fetchOffresConversations` demande à la base les SEULES
+conversations dont un message est une offre au statut 10
+(`data->payload->conversation->messages=cs.[{"entity_type":"offer_request_message","entity":{"status":10}}]`,
+jsonb @>, condition nécessaire de la règle) : 3 lignes, ~4 Ko, 25 ms en base
+(`explain analyze`). Puis **`offreEnAttenteDe`, LA règle du fil (§11)**, sur
+leurs messages entiers ; le fil ouvert et chargé prime (plus frais). Lu avec les
+résumés (une fois par minute, Messages seulement). Échec ⇒ `null` ⇒ aucune
+pastille (on ne garde pas l'ancienne Map : une offre tranchée depuis resterait).
+- Ligne : pastille « Offre 45 € en attente » (montant de l'OFFRE) sur la ligne du
+  message (sur celle de la paire elle tronquait N° et prix — vu au rendu),
+  `data-conv-offre`, `data-offre-liste`. Filtre « Offres N » (`data-filtre-offres`),
+  affiché seulement s'il y en a. Aucun geste automatique (§3).
+- Preuves : banc `messagerie.cjs` (offre en attente qui n'est pas le dernier
+  message ; acceptée 30, refusée 40, « Expirée » au statut 10 ; lecture des
+  offres en 500 ; le banc applique `cs.` comme jsonb @>, types compris) —
+  **6 rouges sur dd03ffd**, 0 après ; mutation « seconde règle : tout statut 10 »
+  ⇒ 6 rouges (l'offre expirée affichée).
+- ⚠️ **Non mesuré** : le filtre `cs.` sur un chemin JSON contre SA PostgREST
+  (grammaire documentée, jamais envoyée d'ici) ; refusé, la lecture vaut « pas
+  su » et rien ne s'affiche. Une capture ancienne garde une offre « en attente »
+  que Vinted a peut-être expirée depuis — le fil dit la même chose (même règle).
+
 ### Le bénéfice brut et net dans Comptabilité (19 octobre)
 Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
 encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**
@@ -10112,6 +10180,34 @@ captures et liste les cibles < 44 px) :
   date de versement » est dit trois fois sur Compta (trois cartes, trois
   chiffres) ; eBay « Réponse eBay incomplète » ×4 sur À traiter vient du banc
   (il sert `{pret:true}` à toute route `/api`, une forme que la route ne rend pas).
+
+### Leboncoin et eBay dans le bénéfice, par identité seulement (19 octobre)
+- `ventesAutresBenefice` (module) relie une vente à SA paire : eBay = SKU de
+  chaque ligne par `numLigneEbay` → `numEbayLu` (lien VRM, carte 013 par
+  annonce) ; Leboncoin = `numeroLbcIdentite` (lien posé à la main, sinon
+  référence VRM de l'annonce traduite par `numeroExterne` — JAMAIS le « nXXX »
+  d'un titre, contrairement à `clesAnnonceLbc` qui sert aux propositions). Prix
+  d'achat = `achatDe(withBuyByNum(fiche))` seulement si UNE fiche porte le N°
+  (`ficheUniqueDuNumero`). Sans identité : comptée, sans prix d'achat.
+- Même règle (`ajouterVenteBenefice(…, plateforme)`) dans `totals` (Ventes) et
+  la publication `vrm_benefice_jours` (`v: 2`, 12 nombres par jour : +
+  `fraisInconnus, nL, nCoutL, nE, nCoutE` ; une publication `v: 1` se relit).
+  Frais : Leboncoin 0 (prix final capté), eBay `totalMarketplaceFee` (EUR) sinon
+  `null` = pas su ⇒ net « — » (`raison: 'frais'`), jamais 0. Leboncoin, eBay ou
+  les annonces Leboncoin (lues seulement si une vente n'a pas de lien) pas lus ⇒
+  aucune publication ; Ventes le dit (`data-ventes-benef-autres="passu"`).
+- Le CA finalisé, les boosts et la marge de Ventes restent ceux de la liste
+  Vinted. Comptabilité dit la couverture par plateforme (`couvertureBenefice`,
+  `data-benef-couverture`) ; en `v: 2` les cotisations portent sur le CA déclaré
+  des trois plateformes (`caBeneficeDuMois`), en `v: 1` sur Vinted seul.
+- Mesuré (lecture seule) : 0 commande eBay, 3 ventes Leboncoin non finalisées et
+  sans date — rien ne change aujourd'hui chez lui.
+- Preuves : `audit-benefice.cjs` 40 contrôles ; `--mutation=titre|ambigu|
+  fraiszero` ⇒ 4 · 4 · 2 rouges. Banc `chiffres-croises.cjs` E3-E5 : 8 rouges sur
+  le build d'avant, 2 sous la mutation « eBay sans SKU relié par le titre ».
+- Non mesuré : la vraie forme de `totalMarketplaceFee` dans ses commandes (aucune
+  commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
+  que si toutes ses lignes sont reliées.
 
 ---
 

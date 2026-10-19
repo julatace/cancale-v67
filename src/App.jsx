@@ -4246,6 +4246,108 @@ const fetchHarvestConversation = async (uid, convId) => {
   } catch (_) { return null; }
 };
 
+// ── LE RÉSUMÉ DE CHAQUE CONVERSATION CAPTÉE (19 octobre, « messages plus riches ») ──
+// Mesuré (lecture seule, 19 oct.) : la boîte (`harvest_{uid}_inbox`) ne porte que
+// id · aperçu · non lu · date · interlocuteur · 1ʳᵉ photo — AUCUN identifiant
+// d'annonce. La conversation captée (`harvest_{uid}_conv_{id}`, 1 408 lignes)
+// porte la transaction : `item_id` (924), `status` (926 : 1 = simple question ·
+// 230 payée · 450 finalisée · 5xx annulée…), `current_user_side` (seller/buyer),
+// `item_title`, `item_photo.url`, et les messages — le DERNIER est le plus récent
+// (934 sur 934), son `entity.user_id` dit qui l'a écrit (absent sur un message
+// de Vinted). On ne lit que ces scalaires, jamais `select=data` (§4.4), paginé
+// (§4.5). L'identité est la conversation elle-même (compte + n°), jamais un titre.
+// ⚠️ `->-1` (dernier élément) : grammaire PostgREST, non essayée sur SA base —
+// si elle est refusée, on relit SANS l'auteur (rien n'est deviné : pas d'auteur).
+// Rend une Map `${uid}_${conv}` → résumé, ou `null` (pas su).
+let _resumeConvSansAuteur = false;
+const RESUME_CONV_BASE = 'id=like.harvest_%25_conv_%25&select=id,tx:data->payload->conversation->transaction->>id,item:data->payload->conversation->transaction->>item_id,st:data->payload->conversation->transaction->>status,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,ph:data->payload->conversation->transaction->item_photo->>url,opp:data->payload->conversation->opposite_user->>id';
+const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts';
+const fetchResumesConversations = async () => {
+  try {
+    let rows = null;
+    if (!_resumeConvSansAuteur) {
+      rows = await lireTout(RESUME_CONV_BASE + RESUME_CONV_AUTEUR, { strict: true });
+      if (rows === null) _resumeConvSansAuteur = true;
+    }
+    if (rows === null) rows = await lireTout(RESUME_CONV_BASE, { strict: true });
+    if (rows === null) return null;
+    const out = new Map();
+    for (const r of rows) {
+      const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
+      if (!m) continue;
+      out.set(`${m[1]}_${m[2]}`, r);
+    }
+    return out;
+  } catch (_) { return null; }
+};
+// ── LES OFFRES EN ATTENTE, SUR LA LISTE (19 octobre) ────────────────────────
+// Mesuré (lecture seule, 1 371 conversations captées) : l'offre vit dans les
+// MESSAGES (`entity_type: offer_request_message`, `entity.status` 10 = en
+// attente, `price.amount`, `user_id`, `transaction_id`, `offer_request_id`) —
+// et pas forcément au dernier : une offre en attente sur trois était le 3ᵉ
+// message sur 5, donc `messages->-1` ne la voit pas. La transaction ne la porte
+// pas (`offer_price` est le prix de l'ANNONCE : 99 € pour une offre à 60 €).
+// Rapatrier tous les messages : 1,45 Mo. On demande donc à la base de ne rendre
+// QUE les conversations dont un message est une offre au statut 10 (`cs.`,
+// jsonb @>) — condition NÉCESSAIRE de la règle du fil : 3 conversations, ~4 Ko,
+// 25 ms côté base — puis on leur applique `offreEnAttenteDe`, LA règle du fil
+// (§11), sur leurs messages entiers. Map `${uid}_${conv}` → offre ; absente =
+// aucune ; `null` = pas su (lecture refusée ou ratée) ⇒ aucune pastille.
+const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,msgs:data->payload->conversation->messages';
+const fetchOffresConversations = async () => {
+  try {
+    const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
+    if (rows === null) return null;
+    const out = new Map();
+    for (const r of rows) {
+      const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
+      if (!m) continue;
+      const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
+      if (off) out.set(`${m[1]}_${m[2]}`, off);
+    }
+    return out;
+  } catch (_) { return null; }
+};
+// L'état de la transaction d'une conversation, en mots — codes mesurés (voir
+// TXN_ETATS). Inconnu ⇒ `null` (rien n'est écrit, jamais un faux).
+const etatConversation = (st, side) => {
+  if (side === 'buyer') return { k: 'achat', t: 'Ton achat' };
+  const s = Number(st);
+  if (st == null || st === '' || !isFinite(s)) return null;
+  if (s === 1) return { k: 'question', t: 'Question' };
+  if (s === 230) return { k: 'vendue', t: 'Vendue · en cours' };
+  if (s === 450) return { k: 'finalisee', t: 'Vendue · finalisée' };
+  if (s === 220) return { k: 'paiement-echoue', t: 'Paiement échoué' };
+  if (s === 430) return { k: 'suspendue', t: 'Vente suspendue' };
+  if (s === 440) return { k: 'retour', t: 'Retour en cours' };
+  if (s >= 500 && s < 600) return { k: 'annulee', t: 'Vente annulée' };
+  return null;
+};
+// L'heure d'un message : aujourd'hui « 14:32 », hier « hier 14:32 », sinon
+// « 12 oct. 14:32 » (l'année si ce n'est pas celle-ci).
+const heureMessage = (t) => {
+  if (!t || !isFinite(t)) return '';
+  const d = new Date(t), auj = new Date();
+  const hh = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const jour = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (jour(d) === jour(auj)) return hh;
+  const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
+  if (jour(d) === jour(hier)) return `hier ${hh}`;
+  const opts = { day: 'numeric', month: 'short' }; if (d.getFullYear() !== auj.getFullYear()) opts.year = 'numeric';
+  return `${d.toLocaleDateString('fr-FR', opts)} ${hh}`;
+};
+const libelleJour = (t) => {
+  const d = new Date(t), auj = new Date();
+  const jour = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (jour(d) === jour(auj)) return "Aujourd'hui";
+  const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
+  if (jour(d) === jour(hier)) return 'Hier';
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' }; if (d.getFullYear() !== auj.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('fr-FR', opts);
+};
+const cleJour = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 // Vinted utilise DEUX hosts differents selon l'endpoint (constate via
 // plusieurs vraies requetes "Copy as fetch") :
 // - www.vinted.fr/api/v2/...      -> commandes, ventes, achats
@@ -4436,14 +4538,29 @@ const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
 // Les deux UNIQUEMENT sur les ventes dont le prix d'achat est connu (§5 : un
 // achat inconnu n'est pas un achat à 0 € — « BÉNÉFICE NET 5 739 € » pour un CA
 // de 5 741 €, le 1er septembre).
-const BENEF_CHAMPS = ['n', 'ca', 'frais', 'nCout', 'cout', 'caCouvert', 'fraisCouverts'];
-const beneficeVide = () => ({ n: 0, ca: 0, frais: 0, nCout: 0, cout: 0, caCouvert: 0, fraisCouverts: 0 });
-const ajouterVenteBenefice = (acc, eur, achat, frais) => {
-  const v = Math.round((Number(eur) || 0) * 100), f = Math.round((Number(frais) || 0) * 100);
+// (19 oct., suite) LEBONCOIN ET eBAY ENTRENT DANS LA MÊME RÈGLE. Une vente y est
+// reliée à SA paire par IDENTITÉ seulement (`ventesAutresBenefice`) ; les
+// champs ajoutés EN FIN de tableau (une publication d'avant en a 7 : ils valent
+// 0) disent la couverture par plateforme et les frais pas sus :
+//   fraisInconnus = ventes au prix d'achat connu dont les frais ne sont PAS sus
+//   (une commande eBay sans `totalMarketplaceFee`) ⇒ le net vaut `null` (« — »),
+//   jamais un net qui compterait ces frais à 0 ;
+//   nL/nCoutL (Leboncoin), nE/nCoutE (eBay) ; Vinted = le reste.
+const BENEF_CHAMPS = ['n', 'ca', 'frais', 'nCout', 'cout', 'caCouvert', 'fraisCouverts', 'fraisInconnus', 'nL', 'nCoutL', 'nE', 'nCoutE'];
+const beneficeVide = () => ({ n: 0, ca: 0, frais: 0, nCout: 0, cout: 0, caCouvert: 0, fraisCouverts: 0, fraisInconnus: 0, nL: 0, nCoutL: 0, nE: 0, nCoutE: 0 });
+// `frais` : un nombre (connu, « 0 » compris) ou `null` = PAS SU (jamais 0).
+// `plateforme` : 'Leboncoin' | 'eBay' | autre (Vinted).
+const ajouterVenteBenefice = (acc, eur, achat, frais, plateforme) => {
+  const fInconnu = frais === null;
+  const v = Math.round((Number(eur) || 0) * 100), f = fInconnu ? 0 : Math.round((Number(frais) || 0) * 100);
   acc.n += 1; acc.ca += v; acc.frais += f;
-  if (achat != null && String(achat).trim() !== '' && isFinite(Number(achat))) {
+  const connu = achat != null && String(achat).trim() !== '' && isFinite(Number(achat));
+  if (connu) {
     acc.nCout += 1; acc.cout += Math.round(Number(achat) * 100); acc.caCouvert += v; acc.fraisCouverts += f;
+    if (fInconnu) acc.fraisInconnus = (acc.fraisInconnus || 0) + 1;
   }
+  if (plateforme === 'Leboncoin') { acc.nL = (acc.nL || 0) + 1; if (connu) acc.nCoutL = (acc.nCoutL || 0) + 1; }
+  else if (plateforme === 'eBay') { acc.nE = (acc.nE || 0) + 1; if (connu) acc.nCoutE = (acc.nCoutE || 0) + 1; }
   return acc;
 };
 // Un jour publié est un tableau (dans l'ordre de BENEF_CHAMPS) : la ligne `main`
@@ -4451,15 +4568,24 @@ const ajouterVenteBenefice = (acc, eur, achat, frais) => {
 const jourBeneficeEnTableau = (b) => BENEF_CHAMPS.map((k) => b[k] || 0);
 const cumulerBenefice = (acc, b) => {
   if (!b) return acc;
-  BENEF_CHAMPS.forEach((k, i) => { acc[k] += Number(Array.isArray(b) ? b[i] : b[k]) || 0; });
+  BENEF_CHAMPS.forEach((k, i) => { acc[k] = (acc[k] || 0) + (Number(Array.isArray(b) ? b[i] : b[k]) || 0); });
   return acc;
 };
 // Le résumé en euros : brut et net en DÉCOULENT (jamais stockés à part).
+// Net `null` quand des frais ne sont pas sus (« pas su » ≠ 0).
 const resumeBenefice = (acc) => {
-  const brut = acc.caCouvert - acc.cout, net = brut - acc.fraisCouverts;
+  const brut = acc.caCouvert - acc.cout, fi = acc.fraisInconnus || 0;
+  const net = fi > 0 ? null : (brut - acc.fraisCouverts) / 100;
+  const nL = acc.nL || 0, nE = acc.nE || 0, nCoutL = acc.nCoutL || 0, nCoutE = acc.nCoutE || 0;
   return { n: acc.n, nCout: acc.nCout, ca: acc.ca / 100, frais: acc.frais / 100, cout: acc.cout / 100,
-    caCouvert: acc.caCouvert / 100, fraisCouverts: acc.fraisCouverts / 100, brut: brut / 100, net: net / 100 };
+    caCouvert: acc.caCouvert / 100, fraisCouverts: acc.fraisCouverts / 100, brut: brut / 100, net, fraisInconnus: fi,
+    par: { Vinted: { n: acc.n - nL - nE, nCout: acc.nCout - nCoutL - nCoutE }, Leboncoin: { n: nL, nCout: nCoutL }, eBay: { n: nE, nCout: nCoutE } } };
 };
+// La couverture par plateforme, dite en une phrase (seulement les plateformes
+// qui ont des ventes sur la période) : « Vinted 3/4 · eBay 1/1 ».
+const couvertureBenefice = (r) => ['Vinted', 'Leboncoin', 'eBay']
+  .filter((p) => r && r.par && r.par[p] && r.par[p].n > 0)
+  .map((p) => `${p} ${r.par[p].nCout}/${r.par[p].n}`).join(' · ');
 // Cumul des jours publiés compris dans [de, a[ (dates locales, AAAA-MM-JJ) :
 // la même borne que `dansPeriode` de l'écran Ventes (jour local entier).
 const beneficeDesJours = (jours, de, a) => {
@@ -4467,6 +4593,56 @@ const beneficeDesJours = (jours, de, a) => {
   const k0 = jourClef(de), k1 = jourClef(a);
   for (const [k, b] of Object.entries(jours || {})) if (k >= k0 && k < k1) cumulerBenefice(acc, b);
   return resumeBenefice(acc);
+};
+// ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE — PAR IDENTITÉ SEULEMENT (19 oct.) ─────
+// Une vente se relie à SA paire par le N° qu'elle porte VRAIMENT :
+//   · eBay : le SKU `VRM-{n°}` de chaque ligne de la commande, lu par
+//     `numLigneEbay` → `numEbayLu` (lien posé par VRM, traduction 013) ;
+//   · Leboncoin : le lien posé à la main, sinon la référence `VRM-{n°}` de
+//     l'annonce (`numeroLbcIdentite`, traduite par `numeroExterne`) — JAMAIS le
+//     « nXXX » d'un titre (§5).
+// Puis le prix d'achat de LA fiche qui porte ce N° — seulement si UNE seule
+// fiche le porte (deux fiches ⇒ rien). Pas d'identité ⇒ pas de prix d'achat
+// (comptée dans la couverture « X sur Y »), jamais deviné.
+// Frais : Leboncoin = 0 (le prix FINAL capté est ce que le vendeur touche) ;
+// eBay = `totalMarketplaceFee` de la commande quand elle le porte (EUR), sinon
+// `null` (pas su). Entrées : `numLbc(v)` → N° ou ''/null ; `numEbayLigne(o, li)`
+// → N° ou ''/null ; `achat(fiche)` → nombre ou null.
+const ficheUniqueDuNumero = (numeros, k) => {
+  if (!k) return null;
+  const fs = Object.values(numeros || {}).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  return fs.length === 1 ? fs[0] : null;
+};
+const fraisEbayCommande = (o) => {
+  const f = o && o.totalMarketplaceFee;
+  if (!f || typeof f !== 'object') return null;
+  if (f.currency && f.currency !== 'EUR') return null;
+  const n = Number(f.value);
+  return f.value != null && String(f.value).trim() !== '' && isFinite(n) ? n : null;
+};
+const ventesAutresBenefice = ({ lbc, ebay, numeros, achat, numLbc, numEbayLigne } = {}) => {
+  const out = [], vus = new Set();
+  const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
+  for (const v of (lbc || [])) {
+    if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    const eur = v.price != null ? Number(v.price) / 100 : NaN;
+    if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
+    vus.add('lbc:' + v.txId);
+    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(numLbc(v)), frais: 0 });
+  }
+  for (const o of (ebay || [])) {
+    if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
+    const tot = (o.pricingSummary && o.pricingSummary.total) || {};
+    if (tot.currency && tot.currency !== 'EUR') continue;
+    const eur = Number(tot.value);
+    if (!isFinite(eur) || vus.has('ebay:' + o.orderId)) continue;
+    vus.add('ebay:' + o.orderId);
+    const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
+    let a = lignes.length ? 0 : null;
+    for (const li of lignes) { const x = achatDuNum(numEbayLigne(o, li)); if (x == null) { a = null; break; } a += x; }
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: fraisEbayCommande(o) });
+  }
+  return out;
 };
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
   const u = aPayerUrssaf(ca, tauxPct); if (u == null) return null;
@@ -26328,7 +26504,8 @@ function ComptaAjout({ ouvert, onClick, libelle, data }) {
 //     cartes « Bénéfice brut / net » sur la même période ;
 //   · CHARGES = `comptaChargesMois` / `comptaChargesAnnee` (celles de cet écran) ;
 //   · COTISATIONS = `aPayerUrssaf` sur la part VINTED du CA déclaré publié
-//     (`vinted_urssaf_mois`) — le bénéfice ne porte que sur les ventes Vinted.
+//     (`vinted_urssaf_mois`) ; depuis la publication `v: 2` (Leboncoin et eBay
+//     reliés par identité), sur le CA déclaré des trois (`caBeneficeDuMois`).
 // Le NET final n'est écrit que si TOUTES les ventes de la période ont leur prix
 // d'achat : sinon un « — », la raison, et la porte (saisie en série). Trois
 // états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
@@ -26354,10 +26531,20 @@ const caVintedDuMois = (m) => {
   if (par && Object.keys(par).length) return par.Vinted ? (Number(par.Vinted.ca) || 0) : 0;
   return Number(m && m.ca) || 0;
 };
+// (19 oct., suite) Depuis que le bénéfice couvre Leboncoin et eBay (publication
+// `v: 2`), les cotisations portent sur le CA déclaré des TROIS plateformes —
+// celles que le bénéfice compte. Une publication d'avant (`v: 1`, Vinted seul)
+// garde la part Vinted : les deux côtés parlent toujours des mêmes ventes.
+const caBeneficeDuMois = (m, toutes) => {
+  if (!toutes) return caVintedDuMois(m);
+  const par = m && m.par && typeof m.par === 'object' ? m.par : null;
+  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
+  return Number(m && m.ca) || 0;
+};
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
 // `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
 // CA déclaré publié (ou null), `taux` = le taux de cotisations.
-const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now() }) => {
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false }) => {
   const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
   const v = beneficeDesJours(jours, de, a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
@@ -26367,13 +26554,13 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
     ? comptaChargesAnnee(compta, de.getFullYear()).total
     : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
-    ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caVintedDuMois(m), 0) * 100) / 100
+    ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caBeneficeDuMois(m, toutes), 0) * 100) / 100
     : null;
   const cotis = caDecl == null ? null : aPayerUrssaf(caDecl, taux);
   const complet = v.nCout === v.n;
-  const netFinal = complet && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
-  const raison = !complet ? 'achats' : cotis == null ? 'cotisations' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison };
+  const netFinal = complet && v.net != null && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
+  const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
+  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes };
 };
 function BeneficeCompta({ compta, onNav }) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -26381,7 +26568,7 @@ function BeneficeCompta({ compta, onNav }) {
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
   const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
-  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode }) : null;
+  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2 }) : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
   const sansAchat = B ? B.n - B.nCout : 0;
@@ -26398,7 +26585,8 @@ function BeneficeCompta({ compta, onNav }) {
       data-benef-n={B ? String(B.n) : ''} data-benef-ncout={B ? String(B.nCout) : ''}
       data-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-benef-ventes-net={B && B.nCout > 0 ? e2(B.net) : ''}
       data-benef-charges={B ? e2(B.charges) : ''} data-benef-cotis={B ? e2(B.cotis) : ''}
-      data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}>
+      data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}
+      data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
@@ -26411,22 +26599,23 @@ function BeneficeCompta({ compta, onNav }) {
           </small></span></div>
         ) : (<>
           <Ligne lib="Bénéfice brut" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
-            sous={B.n === 0 ? 'aucune vente Vinted finalisée sur la période'
+            sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
               : B.nCout === B.n ? `CA − prix d'achat · prix d'achat connus pour les ${B.n} vente${B.n > 1 ? 's' : ''}`
               : <>CA − prix d'achat · prix d'achat connus pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n} — {lienSaisie}</>}
             data={{ 'data-benef-ligne': 'brut' }} />
-          {B.nCout > 0 && B.fraisCouverts > 0 && <Ligne lib="− boosts et frais de vente" val={B.fraisCouverts} sous="des mêmes ventes" data={{ 'data-benef-ligne': 'frais' }} />}
+          {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
           <Ligne lib="− charges" val={B.charges} sous="abonnements, dépenses, packs et coûts fixes de la période" data={{ 'data-benef-ligne': 'charges' }} />
           <Ligne lib="− cotisations URSSAF" val={B.cotis}
-            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA Vinted versé sur la période (${fmt(B.caDecl)})`}
+            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
             data={{ 'data-benef-ligne': 'cotis' }} />
           <Ligne lib="Bénéfice net" fort val={B.netFinal}
             sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas — {lienSaisie}</>
+              : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
               : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
               : 'brut − frais − charges − cotisations'}
             data={{ 'data-benef-ligne': 'net' }} />
           <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
-            Ventes Vinted finalisées, au jour de la vente — la même règle que l'écran Ventes (Leboncoin et eBay n'ont pas de prix d'achat reliés). Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+            {B.toutes ? <>Ventes finalisées Vinted, Leboncoin et eBay, au jour de la vente — la même règle que l'écran Ventes.{couvertureBenefice(B) ? ` Prix d'achat connus : ${couvertureBenefice(B)}.` : ''} Une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre.</> : <>Ventes Vinted finalisées, au jour de la vente — publiées par une version d'avant de l'écran Ventes : ouvre-le une fois pour y ajouter Leboncoin et eBay.</>} Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
           </small></span></div>
         </>)}
       </div>
@@ -28565,6 +28754,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const listingsRef = useRef(listings); listingsRef.current = listings;
   const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
+  // Le résumé de chaque conversation captée (paire, état, dernier auteur) — trois
+  // états : `undefined` en cours · `null` pas su · Map (19 octobre).
+  const [resumesConv, setResumesConv] = useState(undefined);
+  const resumesConvAt = useRef(0);
+  // Les offres en attente des conversations captées (`fetchOffresConversations`) :
+  // `undefined` en cours · `null` pas su · Map lue.
+  const [offresConv, setOffresConv] = useState(undefined);
   const [openConv,setOpenConv]=useState(null);
   const conversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
@@ -30796,9 +30992,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
+  // fois par minute (une lecture de ~1 400 lignes, en scalaires).
+  useEffect(() => {
+    if (curSub!=='messages' || !accounts.length || !convs.items) return;
+    if (resumesConv && Date.now()-resumesConvAt.current < 60000) return;
+    let fini = false;
+    resumesConvAt.current = Date.now();
+    fetchResumesConversations().then(m => { if (!fini) setResumesConv(prev => m || (prev instanceof Map ? prev : null)); });
+    fetchOffresConversations().then(m => { if (!fini) setOffresConv(m); });
+    return () => { fini = true; };
+    /* eslint-disable-next-line */
+  }, [sub, convs.items, cleComptes]);
   // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
   // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
   // et seulement 3 conversations captées portent une offre en attente — vieilles.
@@ -31476,7 +31684,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
+  // ── LA PAIRE D'UNE CONVERSATION (19 octobre, « messages plus riches ») ──────
+  // Par IDENTITÉ seulement (§5) : la transaction de la conversation (Vinted la
+  // rattache lui-même) → la vente du même n° de transaction (son prix) ou
+  // l'annonce captée du même `item_id` (son prix, sa photo) → le N° posé sur
+  // CETTE annonce. Jamais le titre. Ce qu'on ne sait pas reste vide.
+  const venteParTx = useMemo(() => { const m = new Map(); for (const o of (sales.items || [])) if (o && o.transaction_id != null) m.set(String(o.transaction_id), o); return m; }, [sales.items]);
+  const annonceParId = useMemo(() => { const m = new Map(); for (const it of [...(listings.items || []), ...(listings.aConfirmer || [])]) if (it && it.id != null) m.set(String(it.id), it); return m; }, [listings.items, listings.aConfirmer]);
+  const paireDeConv = (uid, convId, conversation) => {
+    const r = resumesConv instanceof Map ? resumesConv.get(`${uid}_${convId}`) : null;
+    const t = conversation && conversation.transaction && typeof conversation.transaction === 'object' ? conversation.transaction : null;
+    if (!r && !t) return null;
+    const pick = (a, b) => (a != null && a !== '' ? a : (b != null && b !== '' ? b : null));
+    const tx = pick(t && t.id, r && r.tx), item = pick(t && t.item_id, r && r.item);
+    const side = pick(t && t.current_user_side, r && r.side);
+    const e2 = etatTxn(tx);
+    const etat = etatConversation(e2 ? e2.s : pick(t && t.status, r && r.st), side);
+    const vente = tx != null && side !== 'buyer' ? venteParTx.get(String(tx)) : null;
+    const ann = item != null ? annonceParId.get(String(item)) : null;
+    let prixV = null, devise = 'EUR';
+    if (vente) { const v = Number(String(vente.price && vente.price.amount != null ? vente.price.amount : vente.price).replace(',', '.')); if (isFinite(v) && v > 0) { prixV = v; devise = (vente.price && vente.price.currency_code) || 'EUR'; } }
+    if (prixV == null && ann && ann.price != null && ann.price !== '') { const v = Number(ann.price); if (isFinite(v) && v > 0) { prixV = v; devise = ann.currency || 'EUR'; } }
+    const num = item != null && side !== 'buyer' ? String((numeros[String(item)] || {}).numero || '') : '';
+    const photo = pick(t && t.item_photo && t.item_photo.url, r && r.ph) || (ann && ann.photo) || (vente && vente.photo) || null;
+    const titre = pick(t && t.item_title, r && r.titre) || (ann && ann.title) || '';
+    return { tx, item, etat, prix: prixV, devise, prixDe: vente && prixV != null ? 'vente' : prixV != null ? 'annonce' : null, num, photo, titre, url: (t && t.item_url) || (ann && ann.url) || null, r };
+  };
+  // Qui a écrit le dernier message — seulement si le résumé capté porte BIEN le
+  // dernier message de la boîte (même instant, à 2 min près) : un résumé plus
+  // ancien dirait l'auteur d'un AUTRE message. Sinon `null` (rien n'est écrit).
+  const auteurDernier = (c, p) => {
+    const r = p && p.r; if (!r || r.der == null || r.der === '' || r.opp == null) return null;
+    const a = Date.parse(r.derTs || ''), b = Date.parse(c.updated_at || '');
+    if (!a || !b || Math.abs(a - b) > 120000) return null;
+    return String(r.der) === String(r.opp) ? 'eux' : 'toi';
+  };
 
+  // ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE (19 oct.) — `ventesAutresBenefice`,
+  // par IDENTITÉ seulement (SKU eBay, lien/référence Leboncoin). Les annonces
+  // Leboncoin (226 Ko) ne sont lues que si une vente finalisée n'a pas de lien
+  // posé à la main (sa référence vit sur l'annonce). Trois états : `undefined`
+  // en cours · `null` pas su · objet lu (`{}` quand rien n'est à lire).
+  const [lbcItemsBenef, setLbcItemsBenef] = useState(undefined);
+  useEffect(() => {
+    if (lbcLu === undefined) return;
+    if (lbcLu === null) { setLbcItemsBenef(null); return; }
+    const liens = load('vrm_lbc_liens', {}) || {};
+    const besoin = (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
+    if (!besoin) { setLbcItemsBenef({}); return; }
+    let mort = false;
+    lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsBenef(it == null ? null : it); });
+    return () => { mort = true; };
+  }, [lbcLu, lbcVentes]);
+  // `null` tant qu'une source n'est pas lue (ou a raté) : jamais un bénéfice
+  // partiel présenté comme complet. Une liste sinon.
+  const autresBenefice = useMemo(() => {
+    if (lbcLu !== true || !Array.isArray(ebayCmd) || !lbcItemsBenef) return null;
+    try {
+      const liens = load('vrm_lbc_liens', {}) || {};
+      return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, numeros,
+        achat: (f) => achatDe(withBuyByNum(f)),
+        numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
+        numEbayLigne: (o, li) => numLigneEbay(o, li) });
+    } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum]);
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
@@ -31537,12 +31809,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ajouterVenteBenefice(acc, sell, buy, fee);
       if (buy!=null && sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; }
     }
+    // Le CA finalisé, les boosts et la marge restent ceux de la liste (Vinted) ;
+    // le BÉNÉFICE (brut, net, couverture) ajoute Leboncoin et eBay par la MÊME
+    // règle (`ajouterVenteBenefice`), jamais un second calcul.
+    const RV = resumeBenefice(acc);
+    const autresKO = autresBenefice == null;
+    for (const x of (autresBenefice || [])) if (dansPeriodeDate(x.ts, periode)) ajouterVenteBenefice(acc, x.eur, x.achat, x.frais, x.plateforme);
     const R = resumeBenefice(acc);
-    const ca = R.ca, cout = R.cout, frais = R.frais, nb = R.n, nbCout = R.nCout;
+    const ca = RV.ca, frais = RV.frais, nb = RV.n;
     benefBrut = R.brut; benefConnu = R.net;
-    return { ca, cout, frais, benef:ca-cout-frais, benefBrut, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
+    return { ca, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice]);
 
   // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
   // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
@@ -31553,8 +31831,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (!sales.items) return;
     if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
+    // Leboncoin ou eBay pas lus (en cours ou raté) ⇒ on ne publie RIEN : la
+    // dernière publication, complète, reste (§5).
+    if (!Array.isArray(autresBenefice)) return;
     try {
-      const an0 = new Date().getFullYear() - 1;           // l'année d'avant suffit (périodes en cours)
+      const an0 = new Date().getFullYear() - 1;          // l'année d'avant suffit (périodes en cours)
       const jours = {};
       for (const o of sales.items) {
         if (isHidden(o)) continue;
@@ -31565,13 +31846,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const e = effEntry(o);
         ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), o.price?.amount, achatDe(e), chargesVente(e));
       }
+      // Leboncoin et eBay, par la même règle (datés au jour de la vente / de la
+      // commande ; sans date : dans aucune période, comme Vinted).
+      for (const x of autresBenefice) {
+        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
+        const k = jourClef(new Date(x.ts));
+        ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), x.eur, x.achat, x.frais, x.plateforme);
+      }
       const charge = {};
       for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
       const avant = load('vrm_benefice_jours', null);
-      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 1, jours: charge, at: Date.now() });
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay'], jours: charge, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -33385,7 +33673,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ))}
                 </div>
               ) : null; })()}
-              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
+              {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
+                  conversation (identité, §5), jamais par le titre. Ce qu'on ne
+                  sait pas n'est pas écrit. */}
+              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; return (
+                <div className="vrm-chat-paire" data-fil-paire={pc.item!=null?String(pc.item):''} data-fil-num={pc.num||undefined} data-fil-prix={pc.prix!=null?String(pc.prix):undefined} data-fil-etat={pc.etat?pc.etat.k:undefined} style={{background:C.card,border:`1px solid ${C.border}`}}>
+                  <span className="vrm-chat-paire-ph" style={{background:C.bg,border:`1px solid ${C.border}`}}>{pc.photo?<PhotoVinted src={pc.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>
+                  <div className="vrm-chat-paire-t">
+                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}</div>}
+                    <div className="vrm-chat-paire-l" style={{color:C.muted}}>
+                      {pc.num && <b style={{color:C.text}}>N°{pc.num}</b>}
+                      {pc.prix!=null && <span title={pc.prixDe==='vente'?'Prix de la vente':"Prix de l'annonce"} style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{prix(pc.prix,pc.devise)}</span>}
+                      {pc.etat && <span className="vrm-msg-etat" data-etat={pc.etat.k} style={{borderColor:C.border}}>{pc.etat.t}</span>}
+                      {pc.url && <a href={pc.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>Annonce ↗</a>}
+                    </div>
+                  </div>
+                </div>
+              ); })()}
+              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>{
+                // (19 oct.) Les messages groupés par JOUR : un séparateur quand
+                // le jour change ; la bulle ne garde que l'heure.
+                // Un évènement sans texte lisible n'est pas affiché : il n'ouvre
+                // pas de jour (sinon « Hier » au-dessus de rien).
+                const visible = (x) => !(x.kind==='event' && /^[a-z]+(_[a-z]+)+$/.test(String(x.body||'').trim()) && !(x.links||[]).length);
+                if (!visible(m)) return null;
+                const j = m.ts ? cleJour(m.ts) : null;
+                const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
+                const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
+                return <React.Fragment key={i}>{sep}{(
                 m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
@@ -33403,11 +33718,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       {(m.ts || (!m.mine && m.body)) && <div className="vrm-bulle-pied">
-                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}
                         {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
                       </div>}
                     </div>
-              ))}
+              )}</React.Fragment>; })}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
@@ -34351,11 +34666,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {analyseOpen && (<>
-        {(totals.nb>0 || totals.nbAttente>0) && (
+        {(totals.nb>0 || totals.bN>0 || totals.nbAttente>0) && (<>
           /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
              quatre gros blocs empilés prenaient un écran entier sur téléphone. */
-          <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.nb)} data-ventes-benef-ncout={String(totals.nbCout)}
-            data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0?String(Math.round(totals.benefConnu*100)/100):''}
+          <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.bN)} data-ventes-benef-ncout={String(totals.nbCout)}
+            data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0&&totals.benefConnu!=null?String(Math.round(totals.benefConnu*100)/100):''}
+            data-ventes-benef-couverture={totals.couverture} data-ventes-benef-autres={totals.autresKO?'passu':'lu'}
             style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
@@ -34376,8 +34692,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 30 sept. — « trop chargé » : sans AUCUN prix d'achat, « Coût
                 d'achat 0 € » et « Bénéfice — » disaient la même absence en deux
                 cases. Il n'en reste qu'une (Bénéfice), qui ouvre la saisie. */}
-            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.nb?' · compléter':''}`}
-              onClick={totals.nbCout<totals.nb ? ()=>setFillBuyOpen(true) : null}
+            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.bN} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.bN?' · compléter':''}`}
+              onClick={totals.nbCout<totals.bN ? ()=>setFillBuyOpen(true) : null}
               title="Compléter les prix d'achat, paire par paire"/>}
             {totals.frais>0 && <StatBox compact label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -34394,23 +34710,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {totals.nbCout===0
               ? <StatBox compact label="Bénéfice" value="—" color={C.muted} sub={null}
                   onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
-              : totals.benefBrut===totals.benefConnu
+              : totals.benefBrut===totals.benefConnu && totals.benefConnu!=null
                 ? <StatBox compact label="Bénéfice" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
-                    subColor={totals.nbCout<totals.nb?C.warn:undefined}
-                    sub={totals.nbCout<totals.nb
-                      ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
+                    subColor={totals.nbCout<totals.bN?C.warn:undefined}
+                    sub={totals.nbCout<totals.bN
+                      ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — les autres n'ont pas de prix d'achat`
                       : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − achat')}/>
                 : <>
                     <StatBox compact label="Bénéfice brut" value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
-                      subColor={totals.nbCout<totals.nb?C.warn:undefined}
-                      sub={totals.nbCout<totals.nb
-                        ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — avant frais`
+                      subColor={totals.nbCout<totals.bN?C.warn:undefined}
+                      sub={totals.nbCout<totals.bN
+                        ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — avant frais`
                         : 'CA − achat (avant frais)'}/>
-                    <StatBox compact label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
-                      sub={totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
+                    <StatBox compact label="Bénéfice net" value={totals.benefConnu==null?'—':fmtE0(totals.benefConnu)} color={totals.benefConnu==null?C.muted:(totals.benefConnu>=0?C.text:C.danger)}
+                      sub={totals.benefConnu==null?`frais eBay pas connus pour ${totals.fraisInconnus} vente${totals.fraisInconnus>1?'s':''}`:totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
                   </>}
           </div>
-        )}
+          {/* (19 oct.) La couverture PAR PLATEFORME, une fois sous les chiffres :
+              une vente Leboncoin ou eBay n'a un prix d'achat que si elle est
+              reliée à sa paire par IDENTITÉ (SKU, référence, lien posé). */}
+          {totals.bN>0 && <div data-ventes-benef-note="" style={{fontSize:11.5,color:C.muted,margin:'-6px 2px 12px',lineHeight:1.45}}>
+            Prix d'achat connus : {totals.couverture || '—'}{totals.autresKO ? ' · Leboncoin et eBay pas encore lus : ce bénéfice ne porte que sur Vinted' : ' · une vente Leboncoin ou eBay se relie à sa paire par son SKU VRM, sa référence ou un lien posé, jamais par son titre'}.
+          </div>}
+        </>)}
 
         {(totals.nb>0) && (
           <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
@@ -36699,6 +37021,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
+          // (19 oct.) L'offre en attente d'une conversation : LA règle du fil
+          // (`offreEnAttenteDe`, §11), sur le fil ouvert s'il est chargé (plus
+          // frais), sinon sur la lecture ciblée des conversations captées. Pas su
+          // ⇒ `null` : aucune pastille.
+          const offreDeConv = (c) => {
+            if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) return offreEnAttenteDe(openConv.conversation);
+            return offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
+          };
+          const nOffres = liste.filter(c=>offreDeConv(c)).length;
           // ⚠️ (16 octobre) Depuis qu'un choix EXPLICITE filtre la liste
           //    (13 octobre), `liste` ne porte plus les autres comptes : compté
           //    dessus, ce nombre valait toujours 0, et l'en-tête passait à « tout
@@ -36713,12 +37044,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
-          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
           // ⚠️ UNE BOÎTE FIGÉE SE DIT (6 octobre). Mesuré : deux comptes avaient
           // leur boîte bloquée sur une page ANCIENNE (dernière conversation captée
@@ -36754,6 +37084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
                   <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                  {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres <span>{nOffres}</span></button>}
                 </div>
                 <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
@@ -36761,6 +37092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
+              {messageFilter==='offres' && tri.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
                   <b>{nonLusAilleurs}</b> non lu{nonLusAilleurs>1?'s':''} sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'}, pas affiché{nonLusAilleurs>1?'s':''} ici — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'les':'le'} voir.
@@ -36790,7 +37122,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
-                  const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                  const paire = paireDeConv(uidC(c), c.id, null);
+                  const auteur = auteurDernier(c, paire);
+                  const offre = offreDeConv(c);
+                  const tsConv = Date.parse(c.updated_at||'') || null;
+                  const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   const ro = !!prioMsg && uidC(c)!==prioMsg;
                   // Les deux groupes se nomment UNE fois, en tête de chacun : la
                   // raison de la lecture seule vit dans l'en-tête de son groupe,
@@ -36816,7 +37152,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                     {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined} onClick={()=>openConversation(c)}
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined}
+                      data-conv-num={paire&&paire.num?paire.num:undefined} data-conv-prix={paire&&paire.prix!=null?String(paire.prix):undefined} data-conv-etat={paire&&paire.etat?paire.etat.k:undefined} data-conv-auteur={auteur||undefined} data-conv-quand={tsConv?new Date(tsConv).toISOString():undefined} data-conv-compte={c._acc?String(c._acc.vinted_user_id):undefined} data-conv-offre={offre?String(offre.prix):undefined}
+                      onClick={()=>openConversation(c)}
                       style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
                       <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
                         {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className="vrm-msg-ini vrm-sensible" style={{color:C.muted}}>{String(nom).trim().charAt(0).toUpperCase()||'·'}</span>}
@@ -36825,11 +37163,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span className="vrm-msg-l1">
                           <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
                           {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
-                          <span className="vrm-msg-time" style={{color:c.unread&&!ro?C.accent:C.muted}}>{quand(c.updated_at)}</span>
+                          <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
                         </span>
-                        {(c.item_title||c.item?.title) && <span className="vrm-msg-article">{c.item_title||c.item.title}</span>}
+                        {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[paire&&paire.num?`N°${paire.num}`:null, paire&&paire.prix!=null?prix(paire.prix,paire.devise):null, titre||null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
+                          <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
+                            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{j===0&&paire&&paire.num?<b style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
+                            {paire&&paire.etat && <span className="vrm-msg-etat" data-etat={paire.etat.k} style={{color:C.muted,borderColor:C.border}}>{paire.etat.t}</span>}
+                          </span>); })()}
                         <span className="vrm-msg-l2">
-                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{c.description||''}</span>
+                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{auteur==='toi'?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{c.description||''}</span>
+                          {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
+                              elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
+                          {offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
                           {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
                         </span>
                       </span>
@@ -39382,6 +39727,24 @@ function clesAnnonceLbc(ad, liens) {
   const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
   return ks;
 }
+// ── LE N° D'UNE VENTE LEBONCOIN PAR IDENTITÉ SEULEMENT (bénéfice, 19 oct.) ───
+// Plus strict que `clesAnnonceLbc` : le « nXXX » d'un TITRE n'est PAS une
+// identité (§5) — il sert à proposer, jamais à prendre un prix d'achat.
+// Le lien posé à la main gagne (c'est sa correction) ; sinon la référence VRM
+// (CustomRef, réf lue sur l'annonce), traduite par la remise à zéro 013. Deux
+// références qui se contredisent ⇒ personne. `items` absent ⇒ seul le lien.
+const numeroLbcIdentite = (v, items, liens) => {
+  if (!v || v.itemId == null) return '';
+  const iid = String(v.itemId);
+  const lien = liens ? liens[iid] : null;
+  if (lien != null && String(lien).trim()) return cleNum(lien);
+  const ad = items && items[iid];
+  if (!ad) return '';
+  const ks = new Set();
+  for (const r of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '']) { const k = cleNum(r); if (k) ks.add(numeroExterne(k, iid, 'lbcAnnonces')); }
+  ks.delete('');
+  return ks.size === 1 ? [...ks][0] : '';
+};
 
 // ── QUELS COMPTES LEBONCOIN SONT À LUI : CEUX DONT IL A VENDU UNE ANNONCE ────
 // Mesuré le 4 octobre : 58 annonces portent un champ `account`, réparties sur

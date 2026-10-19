@@ -35,10 +35,19 @@ if (MUT === 'duplique') {
     'const v = (() => { const x = beneficeDesJours(jours, de, a); return { ...x, brut: x.ca - x.cout, net: x.ca - x.cout - x.frais }; })();');
 } else if (MUT === 'zero') {
   // La règle elle-même : un achat inconnu compté à 0 €.
-  muter("if (achat != null && String(achat).trim() !== '' && isFinite(Number(achat))) {", 'if (true) { achat = Number(achat) || 0;');
+  muter("const connu = achat != null && String(achat).trim() !== '' && isFinite(Number(achat));", 'achat = Number(achat) || 0; const connu = true;');
 } else if (MUT === 'cotis') {
   // Le net écrit même quand un prix d'achat manque.
   muter('const complet = v.nCout === v.n;', 'const complet = true;');
+} else if (MUT === 'titre') {
+  // Un rapprochement par TITRE ajouté : le « nXXX » du titre Leboncoin pris pour une identité.
+  muter("  if (!ad) return '';\n  const ks = new Set();", "  if (!ad) return '';\n  const ks = new Set(); { const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) return cleNum(mt); }");
+} else if (MUT === 'ambigu') {
+  // Un N° porté par DEUX fiches accepté : la première prise.
+  muter('return fs.length === 1 ? fs[0] : null;', 'return fs.length >= 1 ? fs[0] : null;');
+} else if (MUT === 'fraiszero') {
+  // Des frais eBay inconnus comptés à 0.
+  muter('const fInconnu = frais === null;', 'const fInconnu = false;');
 } else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0, ok = 0;
@@ -56,11 +65,55 @@ for (const n of ast.program.body) {
   if (d.type === 'FunctionDeclaration' && d.id) decl.set(d.id.name, src.slice(d.start, d.end));
   if (d.type === 'VariableDeclaration') for (const v of d.declarations) if (v.id && v.id.name) decl.set(v.id.name, `${d.kind} ${src.slice(v.start, v.end)};`);
 }
-const VOULUS = ['BENEF_CHAMPS', 'beneficeVide', 'ajouterVenteBenefice', 'jourBeneficeEnTableau', 'cumulerBenefice', 'resumeBenefice', 'beneficeDesJours', 'caVintedDuMois', 'beneficePeriode'];
+const VOULUS = ['BENEF_CHAMPS', 'beneficeVide', 'ajouterVenteBenefice', 'jourBeneficeEnTableau', 'cumulerBenefice', 'resumeBenefice', 'beneficeDesJours', 'caVintedDuMois', 'beneficePeriode',
+  'ventesAutresBenefice', 'numeroLbcIdentite', 'numLigneEbay', 'couvertureBenefice', 'caBeneficeDuMois'];
 const manquants = VOULUS.filter((k) => !decl.has(k));
 dit(!manquants.length, 'les fonctions du bénéfice existent dans App.jsx', manquants.join(', '));
 if (manquants.length) { console.log(`\n❌ audit-benefice : ${ko} rouge(s)`); process.exit(1); }
 
+// ── (19 oct., suite) Leboncoin et eBay : données INVENTÉES ───────────────────
+// Les fiches (`vinted_annonce_numeros`), le marqueur de la remise à zéro 013 et
+// les liens eBay vivent dans un faux localStorage : `numEbayLu` (la vraie
+// règle) les lit là, comme dans l'app.
+const NOW_ISO = new Date().toISOString();
+const COUPURE = new Date(Date.now() - 30 * 86400000).toISOString();
+const FICHES = {
+  a12: { numero: '12', buyPrice: '30', title: 'Nike Air Max inventée' },
+  a7: { numero: '7', buyPrice: '25', title: 'Adidas Samba inventée' },
+  t9: { numero: '9', buyPrice: '18', title: 'Salomon XT-6 inventée' },
+  d1: { numero: '40', buyPrice: '10', title: 'Paire A inventée' },
+  d2: { numero: '40', buyPrice: '12', title: 'Paire B inventée' },
+  m1: { numero: '41', buyPrice: '11', title: 'Même titre inventé' },
+  m2: { numero: '41', buyPrice: '13', title: 'Même titre inventé' },
+};
+const MAGASIN = {
+  vinted_annonce_numeros: JSON.stringify(FICHES),
+  vrm_numerotation: JSON.stringify({ version: 2, archive: 'B', coupure: COUPURE, ebayAnnonces: { '222': { '553': '12' } }, lbcAnnonces: {} }),
+};
+const FAUX_LS = { getItem: (k) => (Object.prototype.hasOwnProperty.call(MAGASIN, k) ? MAGASIN[k] : null), setItem: (k, v) => { MAGASIN[k] = String(v); }, removeItem: (k) => { delete MAGASIN[k]; } };
+const ebayCmd = (orderId, total, lignes, extra = {}) => ({ orderId, orderPaymentStatus: 'PAID', creationDate: NOW_ISO, pricingSummary: { total: { value: String(total), currency: 'EUR' } }, lineItems: lignes, ...extra });
+const EBAY_TEST = [
+  ebayCmd('E1', 80, [{ sku: 'VRM-12', legacyItemId: '111', title: 'Nike Air Max inventée' }], { totalMarketplaceFee: { value: '9.60', currency: 'EUR' } }),
+  ebayCmd('E2', 60, [{ sku: '', legacyItemId: '112', title: 'Salomon XT-6 inventée' }], { totalMarketplaceFee: { value: '7', currency: 'EUR' } }),
+  ebayCmd('E3', 45, [{ sku: 'VRM-41', legacyItemId: '113', title: 'Même titre inventé' }], { totalMarketplaceFee: { value: '5', currency: 'EUR' } }),
+  ebayCmd('E4', 70, [{ sku: 'VRM-553', legacyItemId: '222', title: 'Nike Air Max inventée' }], { totalMarketplaceFee: { value: '8', currency: 'EUR' } }),
+  ebayCmd('E5', 50, [{ sku: 'VRM-7', legacyItemId: '114', title: 'Adidas Samba inventée' }]),            // frais inconnus
+  ebayCmd('E6', 90, [{ sku: 'VRM-12', legacyItemId: '115' }], { orderPaymentStatus: 'FULLY_REFUNDED' }), // pas une vente
+];
+const lbcVente = (txId, itemId, prix, titre) => ({ txId, itemId, isSeller: true, price: prix * 100, stepStatus: 'done', dateVente: NOW_ISO, title: titre });
+const LBC_TEST = [
+  lbcVente('L1', '501', 50, 'Adidas Samba inventée'),          // référence VRM-7 sur l'annonce
+  lbcVente('L2', '502', 40, 'Salomon n°9 inventée'),           // « n°9 » dans le titre : PAS une identité
+  lbcVente('L3', '503', 35, 'Paire A inventée'),               // lien posé à la main vers 40 : deux fiches
+  lbcVente('L4', '504', 30, 'Nike Air Max inventée'),          // lien posé à la main vers 12
+];
+const LBC_ITEMS = {
+  '501': { id: '501', subject: 'Adidas Samba inventée', customRef: 'VRM-7' },
+  '502': { id: '502', subject: 'Salomon n°9 inventée' },
+  '503': { id: '503', subject: 'Paire A inventée' },
+  '504': { id: '504', subject: 'Nike Air Max inventée' },
+};
+const LBC_LIENS = { '503': '40', '504': '12' };
 // Charge les fonctions voulues ; une ReferenceError ajoute la déclaration qui
 // manque (si elle existe au premier niveau) — jamais une copie à la main.
 const charger = () => {
@@ -68,11 +121,12 @@ const charger = () => {
   for (let essai = 0; essai < 60; essai++) {
     const ordre = [...decl.keys()].filter((k) => noms.has(k));
     const code = ordre.map((k) => decl.get(k)).join('\n') + `\n;({ ${VOULUS.join(', ')} })`;
-    const ctx = vm.createContext({ console, Date, Math, Number, String, Object, Array, JSON, isFinite, isNaN, parseFloat, Set, Map });
+    const ctx = vm.createContext({ console, Date, Math, Number, String, Object, Array, JSON, isFinite, isNaN, parseFloat, parseInt, RegExp, Set, Map, localStorage: FAUX_LS });
     try {
       const out = vm.runInContext(code, ctx);
       // Un appel « à blanc » pour faire lever ce qui manque à l'exécution.
       out.beneficePeriode({ jours: { '2026-01-02': [1, 100, 0, 1, 50, 100, 0] }, compta: {}, ligneUrssaf: { mois: [] }, taux: 13.5, periode: 'mois' });
+      out.ventesAutresBenefice({ lbc: LBC_TEST, ebay: EBAY_TEST, numeros: FICHES, achat: (f) => Number(f.buyPrice), numLbc: (v) => out.numeroLbcIdentite(v, LBC_ITEMS, LBC_LIENS), numEbayLigne: (o, li) => out.numLigneEbay(o, li) });
       return out;
     } catch (e) {
       const m = /([A-Za-z_$][\w$]*) is not defined/.exec(String(e && e.message));
@@ -150,6 +204,44 @@ essaie('net final complet', () => {
   dit(V.n === 0 && V.brut === 0 && V.netFinal != null, 'aucune vente sur la période : brut 0 (lu, vide), le net reste calculable', `${V.brut} · ${V.netFinal}`);
 });
 
+essaie('Leboncoin et eBay par identité', () => {
+  const L = F.ventesAutresBenefice({ lbc: LBC_TEST, ebay: EBAY_TEST, numeros: FICHES,
+    achat: (f) => (f && f.buyPrice != null && String(f.buyPrice).trim() !== '' ? Number(f.buyPrice) : null),
+    numLbc: (v) => F.numeroLbcIdentite(v, LBC_ITEMS, LBC_LIENS),
+    numEbayLigne: (o, li) => F.numLigneEbay(o, li) });
+  const par = Object.fromEntries(L.map((x) => [x.id, x]));
+  dit(par['ebay:E1'] && par['ebay:E1'].achat === 30 && par['ebay:E1'].frais === 9.6, 'eBay : SKU VRM-12 → la fiche 12 → prix d’achat 30 €, frais eBay de la commande', JSON.stringify(par['ebay:E1']));
+  dit(par['ebay:E2'] && par['ebay:E2'].achat === null, 'eBay sans SKU, au titre identique à une fiche : AUCUN prix d’achat (jamais par le titre)', JSON.stringify(par['ebay:E2']));
+  dit(par['ebay:E3'] && par['ebay:E3'].achat === null, 'eBay : un N° porté par DEUX fiches ⇒ aucun prix d’achat', JSON.stringify(par['ebay:E3']));
+  dit(par['ebay:E4'] && par['ebay:E4'].achat === 30, 'eBay : VRM-553 traduit par la carte 013 de SON annonce → la fiche 12', JSON.stringify(par['ebay:E4']));
+  dit(par['ebay:E5'] && par['ebay:E5'].achat === 25 && par['ebay:E5'].frais === null, 'eBay : frais absents de la commande ⇒ « pas su » (null), jamais 0', JSON.stringify(par['ebay:E5']));
+  dit(!par['ebay:E6'], 'une commande remboursée n’entre pas', JSON.stringify(par['ebay:E6'] || null));
+  dit(par['lbc:L1'] && par['lbc:L1'].achat === 25 && par['lbc:L1'].frais === 0, 'Leboncoin : référence VRM-7 de l’annonce → la fiche 7 (prix final, frais 0)', JSON.stringify(par['lbc:L1']));
+  dit(par['lbc:L2'] && par['lbc:L2'].achat === null, 'Leboncoin : le « n°9 » d’un TITRE n’est pas une identité ⇒ aucun prix d’achat', JSON.stringify(par['lbc:L2']));
+  dit(par['lbc:L3'] && par['lbc:L3'].achat === null, 'Leboncoin : lien vers un N° porté par deux fiches ⇒ aucun prix d’achat', JSON.stringify(par['lbc:L3']));
+  dit(par['lbc:L4'] && par['lbc:L4'].achat === 30, 'Leboncoin : le lien posé à la main → la fiche 12', JSON.stringify(par['lbc:L4']));
+  // La MÊME règle : cumul, couverture par plateforme, net « pas su » si des frais manquent.
+  const acc = F.beneficeVide();
+  F.ajouterVenteBenefice(acc, 61, 20, 2.5);                                   // une vente Vinted
+  for (const x of L) F.ajouterVenteBenefice(acc, x.eur, x.achat, x.frais, x.plateforme);
+  const R = F.resumeBenefice(acc);
+  dit(R.par.eBay.n === 5 && R.par.eBay.nCout === 3 && R.par.Leboncoin.n === 4 && R.par.Leboncoin.nCout === 2 && R.par.Vinted.n === 1 && R.par.Vinted.nCout === 1,
+    'la couverture par plateforme : eBay 3/5 · Leboncoin 2/4 · Vinted 1/1', F.couvertureBenefice(R));
+  const brutAtt = (cents(61) - cents(20) + cents(80) - cents(30) + cents(70) - cents(30) + cents(50) - cents(25) + cents(50) - cents(25) + cents(30) - cents(30)) / 100;
+  dit(Math.abs(R.brut - brutAtt) < 0.005, 'BRUT = Σ (vente − achat) des seules ventes reliées', `${R.brut} · attendu ${brutAtt}`);
+  dit(R.net === null && R.fraisInconnus === 1, 'des frais eBay pas sus ⇒ net « — » (null), jamais compté à 0', `${R.net} · ${R.fraisInconnus}`);
+  // Publiée par jour (tableau) puis relue par Comptabilité : mêmes nombres.
+  const k = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const P = F.beneficePeriode({ jours: { [k]: F.jourBeneficeEnTableau(acc) }, compta: {}, ligneUrssaf: { mois: [] }, taux: 13.5, periode: 'mois', toutes: true });
+  dit(P.brut === R.brut && P.nCout === R.nCout && P.n === R.n && P.net === null && F.couvertureBenefice(P) === F.couvertureBenefice(R), 'Comptabilité relit la même couverture et le même brut que Ventes', `${P.brut} ${F.couvertureBenefice(P)}`);
+  const ancien = F.beneficeDesJours({ [k]: [1, 6100, 250, 1, 2000, 6100, 250] }, new Date(Date.now() - 86400000 * 40), new Date(Date.now() + 86400000));
+  dit(ancien.n === 1 && ancien.net === 38.5 && ancien.par.Vinted.n === 1, 'une publication d’avant (7 nombres) se relit telle quelle', JSON.stringify(ancien.par));
+  const ym = k.slice(0, 7);
+  const ligne = { mois: [{ ym, ca: 300, par: { Vinted: { n: 2, ca: 200 }, Leboncoin: { n: 1, ca: 60 }, eBay: { n: 1, ca: 40 } } }] };
+  const T = F.beneficePeriode({ jours: {}, compta: {}, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', toutes: true });
+  dit(T.caDecl === 300, 'publication à trois plateformes : les cotisations portent sur le CA déclaré des trois', `${T.caDecl}`);
+});
+
 essaie('le code', () => {
   const corps = (nom) => decl.get(nom) || '';
   const pc = corps('beneficePeriode') + corps('BeneficeCompta');
@@ -163,6 +255,14 @@ essaie('le code', () => {
   dit(/ajouterVenteBenefice\(/.test(pub) && /achatDe\(e\)/.test(pub), 'la publication par jour utilise la même règle et la même lecture du prix d’achat');
   dit(/'vrm_benefice_jours'/.test(src.slice(src.indexOf('const SYNC_KEYS'), src.indexOf('const SYNC_KEYS') + 20000)), 'la publication est synchronisée (elle arrive sur un autre appareil)');
   dit(!/pas encore ton bénéfice net/.test(src), 'la phrase « ce n’est donc pas encore ton bénéfice net » a disparu');
+  // (19 oct., suite) Leboncoin et eBay : la même règle, et aucune ressemblance.
+  dit(/for \(const x of \(autresBenefice \|\| \[\]\)\)[^\n]*ajouterVenteBenefice\(acc, x\.eur, x\.achat, x\.frais, x\.plateforme\)/.test(t), 'l’écran Ventes ajoute Leboncoin et eBay par la même règle');
+  const pubJ = pubI >= 0 ? src.slice(Math.max(0, pubI - 2500), pubI) : '';
+  dit(/for \(const x of autresBenefice\)/.test(pubJ) && /ajouterVenteBenefice\(jours\[k\][^\n]*x\.plateforme\)/.test(pubJ), 'la publication par jour aussi');
+  dit(/if \(!Array\.isArray\(autresBenefice\)\) return;/.test(pubJ), 'Leboncoin ou eBay pas lus ⇒ rien n’est publié (aucune publication partielle)');
+  const va = corps('ventesAutresBenefice') + corps('numeroLbcIdentite') + corps('ficheUniqueDuNumero');
+  dit(!/normTitle|motsDeTitre|numDeTitreLbc|\.title\b|\.subject\b|suggestionsPaires/.test(va), 'le rapprochement Leboncoin/eBay ne lit aucun titre', (va.match(/normTitle|motsDeTitre|numDeTitreLbc|\.title\b|\.subject\b|suggestionsPaires/) || [''])[0]);
+  dit(!/ne couvre que Vinted|Leboncoin et eBay n'ont pas de prix d'achat reliés/.test(corps('BeneficeCompta')), 'la phrase « Leboncoin et eBay n’ont pas de prix d’achat reliés » a disparu de Comptabilité');
 });
 
 console.log(ko ? `\n❌ audit-benefice${MUT ? ' (mutation ' + MUT + ')' : ''} : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-benefice : ${ok} verts, 0 rouge`);

@@ -103,7 +103,7 @@ const PONT = ({ chrome, fils }) => {
 // `etroit` : une fenêtre Chrome de 390 px (souris, extension présente) ;
 // `tel` : un vrai téléphone (tactile, aucune souris) — l'extension n'y existe
 // pas, rien ne doit y être déclaré actionnable.
-async function rendre(b, { chrome = '111', etroit = false, tel = false } = {}) {
+async function rendre(b, { chrome = '111', etroit = false, tel = false, extTel = false } = {}) {
   const vp = (etroit || tel) ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -111,7 +111,9 @@ async function rendre(b, { chrome = '111', etroit = false, tel = false } = {}) {
   const execs = [];
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.addInitScript(PONT, { chrome, fils: { 301: FIL_A, 402: FIL_B } });
+  // Un iPhone n'a pas d'extension (aucun pont) ; un téléphone Firefox Android
+  // en a une depuis la 5.188 (`extTel`) : il agit alors ICI, comme un ordinateur.
+  if (!tel || extTel) await pg.addInitScript(PONT, { chrome, fils: { 301: FIL_A, 402: FIL_B } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -231,6 +233,13 @@ const fermerFil = async (pg) => { await pg.evaluate(() => { const b = document.q
       await r.pg.waitForTimeout(1500);
       const fb = await lireFil(r.pg);
       dit(fb.lectureSeule === 0, 'le fil n’affirme pas « lecture seule » sur un état inconnu', JSON.stringify(fb));
+      await r.ctx.close();
+    });
+    console.log('── 4b. téléphone AVEC extension (Firefox Android, 5.188) : il agit ici');
+    await essaie('4b', async () => {
+      const r = await rendre(b, { chrome: '111', tel: true, extTel: true });
+      const l = await lireListe(r.pg);
+      dit(l.convs.some((c) => c.acces === 'action') && l.convs.some((c) => c.acces === 'lecture'), 'téléphone dont l’extension répond : le compte de Chrome est actionnable, les autres en lecture', JSON.stringify(l));
       await r.ctx.close();
     });
     console.log('── 4. iPhone (tactile, sans souris) : l’extension n’y vit pas, rien n’est promis');
