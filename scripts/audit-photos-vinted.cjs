@@ -142,6 +142,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'TeteEquipe :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
       'VrmLogo :: "/vrm-logo-192.png"': 'logo de l’app (fichier du site, logo officiel)',
       'VrmLogo :: "/logo-vrm-192.png"': 'logo de l’app (fichier du site)',
+      'EbayAchats :: a.photo': 'photo de l’annonce eBay achetée : https://i.ebayimg.com seulement (filtrée par le serveur, photoAchat)',
       'QrColis :: url': 'QR de retrait (adresse du transporteur, extraite de l’email)',
       'LocalPhoto :: cur.img': 'photo de SA pièce, prise sur l’appareil (data:)',
       'AchatsHorsPlateforme :: photoForm': 'photo d’un achat hors plateforme, prise sur l’appareil (data:image, filtrée à la lecture)',
