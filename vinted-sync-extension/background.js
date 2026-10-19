@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.190.0';
+const CODE_VERSION = '5.191.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -815,6 +815,71 @@ async function compteSupprime(uid) {
   const r = await unblockedAccounts();
   return !!(r && !r.has(String(uid)));
 }
+// ── CONFIRMER LE BON COMPTE VINTED (5.191, 19 octobre) ───────────────────────
+// Julien : « à l'installation de l'extension, confirmer le bon compte Vinted ».
+// La petite carte (vrm-badge.js) demande UNE fois, pour chaque compte Vinted vu
+// dans le cookie : « c'est bien un de tes comptes à capter ? ». Le choix vit
+// dans `chrome.storage.local` (ce Chrome ; §4.9 : jamais une variable de module).
+// · « non » ⇒ ce compte n'est plus capté du tout (comme un compte supprimé :
+//   ni dressing, ni ventes, ni messages, ni jetons), jusqu'à ce qu'il change
+//   d'avis depuis la carte ;
+// · pas encore répondu, ou stockage illisible ⇒ « pas su » ⇒ on capte COMME
+//   AVANT (une nouveauté n'éteint pas ce qui marchait) ;
+// · la carte ne demande que si elle sait NOMMER le compte (login lu dans la
+//   base ou dans la réponse `users/current` déjà reçue) — jamais deviné.
+const CHOIX_COMPTES = 'vrmChoixComptes';
+const LOGINS_VUS = 'vrmLoginsVus';
+async function lireChoixComptes() {
+  try { const s = await chrome.storage.local.get(CHOIX_COMPTES); const m = s && s[CHOIX_COMPTES]; return m && typeof m === 'object' ? m : {}; }
+  catch (_) { return null; }
+}
+async function choixCompte(uid) {
+  if (uid == null) return null;
+  const m = await lireChoixComptes();
+  const c = m && m[String(uid)];
+  return c && (c.choix === 'oui' || c.choix === 'non') ? c.choix : null;
+}
+async function compteRefuse(uid) { return (await choixCompte(uid)) === 'non'; }
+async function comptesRefuses() {
+  const m = await lireChoixComptes();
+  return new Set(Object.keys(m || {}).filter((k) => m[k] && m[k].choix === 'non'));
+}
+// La porte de toute capture : refusé dans ce Chrome, OU supprimé définitivement.
+async function compteNonCapte(uid) {
+  if (uid == null) return false;
+  if (await compteRefuse(uid)) { noterDiag('ignore_compte_refuse'); return true; }
+  return compteSupprime(uid);
+}
+let _choixChaine = Promise.resolve();
+function noterChoixCompte(uid, choix, login) {
+  const p = _choixChaine.then(async () => {
+    const m = await lireChoixComptes();
+    if (m === null) return false;                       // pas su : on n'écrase rien
+    m[String(uid)] = { choix, login: String(login || ''), at: Date.now() };
+    try { await chrome.storage.local.set({ [CHOIX_COMPTES]: m }); return true; } catch (_) { return false; }
+  }).catch(() => false);
+  _choixChaine = p.then(() => {}, () => {});
+  return p;
+}
+// Le login lu dans `users/current` (la réponse que la page a déjà reçue) : sert
+// à NOMMER le compte dans la question, avant même qu'il soit dans la base.
+async function noterLoginVu(uid, json) {
+  try {
+    const u = json && (json.user || json);
+    const login = u && typeof u.login === 'string' ? u.login.trim() : '';
+    if (!uid || !login) return;
+    const s = await chrome.storage.local.get(LOGINS_VUS);
+    const m = (s && s[LOGINS_VUS]) || {};
+    if (m[String(uid)] && m[String(uid)].login === login) return;
+    m[String(uid)] = { login, at: Date.now() };
+    await chrome.storage.local.set({ [LOGINS_VUS]: m });
+  } catch (_) {}
+}
+async function loginVu(uid) {
+  try { const s = await chrome.storage.local.get(LOGINS_VUS); const e = s && s[LOGINS_VUS] && s[LOGINS_VUS][String(uid)]; return (e && e.login) || ''; }
+  catch (_) { return ''; }
+}
+
 async function blockedAccounts() {
   if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
   try {
@@ -900,6 +965,9 @@ async function captureDomain(domain) {
     logActivity(`⛔ Compte ${uid} ignoré (supprimé définitivement) — réautorise-le dans « Mes comptes »`);
     return null;
   }
+  // 5.191 : « Non, ignorer ce compte » dans la carte — ses jetons ne partent
+  // pas (on n'efface rien : c'est un choix de CE Chrome, réversible d'un clic).
+  if (await compteRefuse(uid)) { await noterRefus(uid, domain, 'refuse'); return null; }
   await oublierRefus(uid);
   const row = {
     vinted_user_id: uid,
@@ -1370,7 +1438,7 @@ async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
-  if (await compteSupprime(uid)) { noterDiag('ignore_compte_supprime'); return; }
+  if (await compteNonCapte(uid)) { noterDiag('ignore_compte_supprime'); return; }
   let parsed = null;
   try { parsed = JSON.parse(body); } catch (_) {
     noterDiag(`abandon_json_${type || 'inconnu'}`);
@@ -1387,7 +1455,7 @@ async function storeHarvest(domain, type, id, body) {
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
   verifFormeListe(type, parsed, id);
   verifFormeObjet(type, parsed, id);   // transaction/conversation : un champ lu renommé
-  if (type === 'profile') { try { await noterEtatCompte(uid, parsed); } catch (_) {} }   // 5.181 : actif / banni, lu dans la réponse déjà reçue
+  if (type === 'profile') { try { await noterEtatCompte(uid, parsed); } catch (_) {} noterLoginVu(uid, parsed); }   // 5.181 : actif / banni ; 5.191 : le login, pour nommer le compte
 
   // ⚠️⚠️ 5.165 — LE DRESSING D'UN AUTRE MEMBRE N'EST JAMAIS LE SIEN (§5).
   //    `/wardrobe/{id}/items` passe par ici quel que soit `{id}` : ouvrir le
@@ -1606,6 +1674,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // celui de l'ONGLET qui demande (sender.tab), jamais ce que dit le message.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'etat') {
       etatSite(sender && sender.tab && sender.tab.url).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.191 : « Oui, capter ce compte » / « Non, ignorer ce compte ». Seulement
+    // pour le compte du COOKIE de l'onglet qui demande (jamais un autre compte
+    // nommé par le message) — c'est la règle « garde » de l'extension.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'choixCompte') {
+      (async () => {
+        const choix = msg.choix === 'oui' ? 'oui' : msg.choix === 'non' ? 'non' : null;
+        if (!choix) return { ok: false, raison: 'invalide' };
+        let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+        if (!/(^|\.)vinted\.[a-z.]+$/.test(dom)) return { ok: false, raison: 'site' };
+        const uid = await compteConnecte(dom);
+        if (!uid || String(uid) !== String(msg.uid || '')) return { ok: false, raison: 'compte' };
+        const login = (await loginDe(String(uid), { attendreMs: 0 })) || (await loginVu(String(uid)));
+        const ok = await noterChoixCompte(String(uid), choix, login);
+        if (!ok) return { ok: false, raison: 'stockage' };
+        if (choix === 'oui') { await oublierRefus(uid); captureDomain(dom).catch(() => {}); }
+        logActivity(choix === 'oui' ? `✅ Compte ${login || uid} confirmé : il est capté` : `🚫 Compte ${login || uid} ignoré : plus rien n'est capté pour lui dans ce Chrome`);
+        notifierApp({ type: 'maj', quoi: 'comptes' });
+        return { ok: true, choix };
+      })().then(sendResponse, () => sendResponse({ ok: false, raison: 'erreur' }));
       return true;
     }
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
@@ -2015,7 +2104,7 @@ async function noterStatutsOffres(parsed) {
 async function storeSeenUrls(domain, paths, reponses) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
-  if (await compteSupprime(uid)) return;
+  if (await compteNonCapte(uid)) return;
   // ⚠️⚠️ ÇA ÉCRASAIT LA LISTE À CHAQUE VISITE. Une page ne fait qu'une poignée
   //    d'appels : la visite suivante remplaçait donc tout ce qu'on avait appris
   //    ailleurs. Mesuré le 19 septembre — 41 chemins distincts en tout sur
@@ -3663,11 +3752,12 @@ async function relireAnnoncesAutresComptes(uidConnecte) {
     const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
     const lus = await lecturesParCompte();
     if (lus === null) { noterDiag('enligne_dates_pas_lues'); return 0; }
+    const refuses = await comptesRefuses();   // 5.191 : « Non, ignorer ce compte » dans ce Chrome
     const essais = st0[ENLIGNE_ESSAIS] || {};
     const t = Date.now();
     const recent = (u) => (t - Number(echecs[u] || 0) < ENLIGNE_ECHEC_RECENT_MS) || (t - Number(freins[u] || 0) < ENLIGNE_ECHEC_RECENT_MS);
     const candidats = [...new Set(accts.map((a) => String((a && a.vinted_user_id) || '')))]
-      .filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u))
+      .filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u) && !refuses.has(u))
       .filter((u) => !(t - Number(freins[u] || 0) < ENLIGNE_FREIN_MS))             // freiné : pas avant demain
       .filter((u) => !(t - Number(essais[u] || 0) < ENLIGNE_DELAI_MS))
       .filter((u) => !(t - Number(lus.get(u) || 0) < ENLIGNE_DELAI_MS))
@@ -4003,7 +4093,7 @@ function resumeCommandes(type, payload) {
 //    page vide). Elle le SAIT ; une page captée en passant, jamais.
 //    Voir `dressingCompletFaitFoi`.
 async function storeHarvestRow(uid, type, payload, domain, opts) {
-  if (await compteSupprime(uid)) { noterDiag('ignore_compte_supprime'); return 'ignore'; }
+  if (await compteNonCapte(uid)) { noterDiag('ignore_compte_supprime'); return 'ignore'; }
   // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
   // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
   // près : seule la voie passive archivait. C'est pour ça que le coffre plafonne
@@ -4014,7 +4104,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
-  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} }   // 5.181 : actif / banni
+  if (type === 'profile') { try { await noterEtatCompte(uid, brut); } catch (_) {} noterLoginVu(uid, brut); }   // 5.181 : actif / banni ; 5.191 : login
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
@@ -4454,7 +4544,7 @@ async function runActive() {
   //    propriétaire ne passe pas RLS). Vingt requêtes Vinted pour rien (§3 :
   //    aucune requête sans raison), et une garde de 5 min consommée.
   if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }
-  try { if (await compteSupprime(await activeUidForDomain('www.vinted.fr'))) { noterDiag('moisson_compte_supprime'); return false; } } catch (_) {}
+  try { if (await compteNonCapte(await activeUidForDomain('www.vinted.fr'))) { noterDiag('moisson_compte_supprime'); return false; } } catch (_) {}
   // Revue 5.165 : NOTRE base refuse tout depuis peu (panne, RLS) — rien ne part
   // chez Vinted pour une lecture qu'on ne pourrait pas ranger. Ici, et pas
   // seulement dans la visite : l'alarme des 20 min et le changement de cookie
@@ -4784,7 +4874,7 @@ async function visiteVinted() {
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
     relaisTick('visite').catch(() => {});
-    if (await compteSupprime(uid)) { noterDiag('visite_compte_supprime'); return; }
+    if (await compteNonCapte(uid)) { noterDiag('visite_compte_supprime'); return; }
     // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
     // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
     // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
@@ -5366,7 +5456,9 @@ async function etatSite(url) {
   if (plateforme === 'vinted') {
     let dom = 'www.vinted.fr'; try { dom = new URL(url).hostname || dom; } catch (_) {}
     const uid = await compteConnecte(dom);
-    site = uid ? { id: String(uid), nom: await loginDe(String(uid)) } : { id: null, nom: '' };
+    // 5.191 : le login de la base, sinon celui lu dans `users/current` ; et le
+    // choix fait dans CE Chrome (`oui` · `non` · `null` = jamais répondu).
+    site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
   } else if (plateforme === 'leboncoin') {
     const c = local.vrmLbcCompte;
     // 5.186 : seul un compte vu sur l'endpoint de la SESSION (`courant`, v:2)

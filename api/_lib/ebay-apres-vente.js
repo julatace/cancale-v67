@@ -69,6 +69,19 @@ export function annoncesPromues(data){
 // Le taux : de 2 à 100 %, une décimale (doc eBay « bidPercentage »).
 export const tauxValide=v=>{const s=String(v ?? '').trim().replace(',','.');if(!/^\d{1,3}(?:\.\d)?$/.test(s))return null;const n=Number(s);return n>=2 && n<=100?n.toFixed(1):null;};
 // ── Achats (Trading GetMyeBayBuying → WonList) ─────────────────────────────────
+// La photo d'une annonce achetée : seulement une adresse https d'eBay
+// (i.ebayimg.com), sinon rien.
+function photoAchat(it){
+  const pd=it?.PictureDetails || {};
+  for(const v of [pd.GalleryURL,...liste(pd.PictureURL)]){const u=texte(v).trim();if(/^https:\/\/i\.ebayimg\.com\//.test(u))return u;}
+  return null;
+}
+// Le suivi déclaré par le vendeur : un numéro et un transporteur, sinon null.
+function suiviAchat(t){
+  const d=liste(t.ShippingDetails?.ShipmentTrackingDetails)[0] || {};
+  const n=texte(d.ShipmentTrackingNumber).trim(),c=texte(d.ShippingCarrierUsed).trim();
+  return /^[A-Za-z0-9-]{4,40}$/.test(n)?{numero:n,transporteur:c.slice(0,40)}:null;
+}
 export function achatsEbay(root){
   if(!root)return null;
   const ot=liste(root.WonList?.OrderTransactionArray?.OrderTransaction);
@@ -78,6 +91,11 @@ export function achatsEbay(root){
       itemId:texte(t.Item?.ItemID),titre:texte(t.Item?.Title),vendeur:texte(t.Item?.Seller?.UserID),
       prix:texte(t.TransactionPrice),devise:t.TransactionPrice?.['@_currencyID'] || null,date:texte(t.CreatedDate) || null,
       statut:texte(t.Status?.CompleteStatus || ''),
+      // (19 oct.) Ce qu'il faut pour la même ligne que les achats Vinted.
+      // Tout est FACULTATIF : absent ⇒ rien n'est affiché, jamais deviné.
+      photo:photoAchat(t.Item),
+      payeLe:texte(t.PaidTime) || null,expedieLe:texte(t.ShippedTime) || null,
+      suivi:suiviAchat(t),
     }));
   }).filter(a=>idNum(a.itemId));
 }
