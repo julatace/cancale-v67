@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {etatCommandeEbay} from './ebay-etat-commande.js';
+import {limiteEnvoiEbay} from './ebay-a-expedier.js';
 // Préparation uniquement : une tâche ouvre l'écran d'action et ses confirmations.
 export function preparerAgentEbay({orders,messages,offres,journal},now=Date.now()) {
  const tasks=[],sources=[];
@@ -9,7 +10,7 @@ export function preparerAgentEbay({orders,messages,offres,journal},now=Date.now(
  const add=(section,items,make)=>{for(const x of items){const t=make(x);if(t)tasks.push({section,...t});}};
  const known=Array.isArray(orders?.orders);
  sources.push({nom:'Commandes',ok:known,at:orders?.capturedAt || null,partiel:true,ancien:known && (!Number.isFinite(Number(orders?.capturedAt)) || Number(orders.capturedAt)<=0 || now-Number(orders.capturedAt)>86400000)});
- if(known)add('ventes',orders.orders,o=>o.orderId && etatCommandeEbay(o).peutExpedier?{id:'order:'+o.orderId,label:'Préparer l’expédition',ref:o.orderId,title:titre(o.lineItems?.[0]?.title),...deadline(o.lineItems?.map(l=>date(l.fulfillmentInstructions?.shipByDate)).filter(t=>t!=null).sort((a,b)=>a-b)[0] ?? null)}:null);
+ if(known)add('ventes',orders.orders,o=>o.orderId && etatCommandeEbay(o).peutExpedier?{id:'order:'+o.orderId,label:'Préparer l’expédition',ref:o.orderId,title:titre(o.lineItems?.[0]?.title),...deadline(limiteEnvoiEbay(o))}:null);
  for(const [nom,section,r,key,make] of [
   ['Messages','messages',messages,'messages',m=>['Unanswered','Pending'].includes(m.status)?{id:'message:'+m.id,label:'Répondre au message',ref:m.itemId,title:titre(m.titre || m.subject)}:null],
   ['Offres','offres',offres,'offres',o=>['Pending','Active'].includes(o.status) && (!o.expiresAt || (date(o.expiresAt)!=null && date(o.expiresAt)>now))?{id:'offer:'+o.id,label:'Étudier l’offre',ref:o.itemId,title:titre(o.titre),price:o.price,currency:o.currency,...deadline(date(o.expiresAt))}:null],
