@@ -1320,3 +1320,19 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
     margin-block:-16px;
   }
 }
+
+/* (19 oct.) Colis : une LIGNE fine par colis, pleine largeur (Julien : « des
+   barres larges et fines au lieu de trois par ligne »). Ordinateur seulement ;
+   le téléphone garde sa liste groupée. Les styles en ligne gagnent sur une
+   classe : d'où les !important. */
+@media(min-width:768px) {
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte { display:flex !important; align-items:center !important; gap:14px !important; padding:8px 12px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte > :first-child { flex:1 1 auto !important; min-width:0 !important; align-items:center !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-photo { width:44px !important; height:52px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-titre { -webkit-line-clamp:1 !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { margin-top:0 !important; flex:0 0 470px !important; flex-wrap:wrap !important; justify-content:flex-end; row-gap:2px !important; }
+  /* Les lignes s'alignent : même largeur de gestes pour tous, la source du PDF en petit dessous. */
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { flex:1 1 100% !important; text-align:right !important; font-size:11px !important; max-width:none !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-primaire { flex:0 0 auto !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-masquer { align-self:center !important; margin:0 !important; order:9; }
+}

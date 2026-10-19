@@ -28303,6 +28303,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (pa !== pb) return pa - pb;                       // les postés tout en bas
       const ia = a.pret ? 0 : 1, ib = b.pret ? 0 : 1;
       if (ia !== ib) return ia - ib;                       // imprimable d'abord
+      // (19 oct.) Julien : « les ventes les plus récentes en haut ». Dans
+      // chaque groupe, la vente la plus récente d'abord ; l'urgence reste écrite
+      // sur chaque ligne et dans l'en-tête. Date illisible ⇒ en bas du groupe.
+      const ta = Date.parse((a.o && a.o.date) || '') || 0, tb = Date.parse((b.o && b.o.date) || '') || 0;
+      if (ta !== tb) return tb - ta;
       return (a.dl == null ? 999 : a.dl) - (b.dl == null ? 999 : b.dl);
     });
     return tout;
@@ -32078,13 +32083,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La phrase du bandeau d'urgence — elle DÉCRIT la liste, elle ne la promet
   // pas. Trois cas, parce qu'il y a trois situations réelles.
   const ouSontLesPresses = (u) => {
-    if (!u.presseAttente) return 'les plus urgents sont en haut de la liste.';
+    // (19 oct.) La liste se trie maintenant par vente la plus récente : la
+    // phrase ne promet plus « en haut », elle dit où le voir (sur sa ligne).
+    if (!u.presseAttente) return 'le délai est écrit sur la ligne de chaque colis.';
     // ⚠️ La phrase est déjà introduite par un tiret (« 1 demain — … ») : une
     //    seconde incise entre tirets la rendait illisible. Une virgule suffit.
     if (!u.pressePret) return u.presseAttente > 1
       ? `ils attendent encore leur bordereau, plus bas dans « En attente de leur bordereau ».`
       : `il attend encore son bordereau, plus bas dans « En attente de leur bordereau ».`;
-    return `${u.pressePret} en haut de la liste, ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
+    return `${u.pressePret} dans « Prêts à imprimer », ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
   };
 
   const setBuyForKey = (key, val) => {
@@ -36940,7 +36947,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
-              <div className="vrm-colis-grille" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:10,alignItems:'start'}}>
+              <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
               {ex.map((e,ix)=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
