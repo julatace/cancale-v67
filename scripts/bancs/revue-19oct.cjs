@@ -17,7 +17,8 @@
 //      publiée porte des ventes finalisées sans date de versement.
 //   F. Colis en lignes (1512) — « Colis fait » à la même place sur chaque ligne.
 //   G. Annonces (390) — une valeur éditable en place (« achat — ») fait 44 px de large.
-// Rouge sur le build de 47e9249 (13 défauts), vert après.
+//   H. Compta (390) « Déclarer sur l’URSSAF » et Colis (390) « voir » : 44 px au doigt.
+// Rouge sur le build de 47e9249 (15 défauts), vert après.
 // `EXPLORE=dossier` : captures hautes de chaque écran (pour REGARDER, §6.2) et
 // la liste des cibles tactiles < 44 px affichés à 390 px.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -251,6 +252,22 @@ async function contexte(b, W, H, tactile, sombre) {
     if (!nAD) dit(true, 'Compta : aucune vente sans date de versement — rien à dire sur l’échéance');
     else if (!e || e.ca === '') dit(true, 'Compta : l’échéance n’a pas de montant (« — »)');
     else dit(/au moins/.test(e.txt), `Compta : l'échéance (${e.ca} €) se dit « au moins » — ${nAD} ventes finalisées sans date de versement`, e.txt.replace(/\n/g, ' | ').slice(0, 120));
+    await ctx.close();
+  }
+
+  // H. Deux cibles au doigt trop petites (390) : « Déclarer sur l'URSSAF »
+  // (Compta) et le « voir » des bordereaux déjà traités (Colis).
+  {
+    const { ctx, pg } = await contexte(b, 390, 844, true, false);
+    await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('a[href*="autoentrepreneur.urssaf.fr"]', { timeout: 15000 }).catch(() => {});
+    await pg.waitForTimeout(800);
+    const h = await pg.$$eval('a[href*="autoentrepreneur.urssaf.fr"]', as => as.map(a => a.getBoundingClientRect()).filter(r => r.width > 0 && r.width > 80).map(r => Math.round(r.height))).catch(() => []);
+    dit(h.length > 0 && h.every(x => x >= 43.5), 'Compta (390) : « Déclarer sur l’URSSAF » fait 44 px affichés', h.join(', ') + ' px');
+    await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForTimeout(4500);
+    const w = await pg.$$eval('.vrm-main button', bs => bs.filter(x => /^(voir|masquer)$/.test((x.innerText || '').trim())).map(x => Math.round(x.getBoundingClientRect().width))).catch(() => []);
+    dit(w.length > 0 && w.every(x => x >= 43.5), 'Colis (390) : le « voir » des bordereaux déjà traités fait 44 px de large', w.join(', ') + ' px');
     await ctx.close();
   }
 
