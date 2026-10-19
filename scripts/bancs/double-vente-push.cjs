@@ -267,6 +267,24 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(dv().length === 0, 'ventes Leboncoin illisibles : aucune notification', `${dv().length}`);
   });
 
+  // ══ 5 bis. Le SKU d'une annonce publiée AVANT que la paire ne reçoive ce N° ══
+  //    (19 oct., chez Julien : VRM-82 publiée le 15, N°82 redonné le 18 à la
+  //    Vapor Pro). La vente de la Vapor ne doit PAS sonner « encore sur eBay ».
+  console.log('\n── 5 bis. Un N° redonné APRÈS la publication de l’annonce eBay');
+  await essaie('sku-redonne', async () => {
+    reset();
+    pose(A, 'main', { vinted_annonce_numeros: { vapor: { numero: '82', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'Nike Vapor Pro n82' } } });
+    pose(A, 'ebay_listings', { items: [{ itemId: '8282', sku: 'VRM-82', title: 'Nike Air Max 1 noir', depuis: '2026-10-15T21:37:54.000Z' }] });
+    await recoit(bordereau('a@vrm.test', 'Nike Vapor Pro n82'));
+    dit(dv().length === 0, 'la Vapor (N°82 donné le 18) vendue : l’annonce VRM-82 du 15 n’est pas la sienne — aucune notification', `${dv().length}`);
+    // Reliée à la main (identité) : là, oui.
+    reset();
+    pose(A, 'main', { vinted_annonce_numeros: { vapor: { numero: '82', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'Nike Vapor Pro n82' } }, vrm_ebay_liens: { 8282: { pairId: 'vapor', numero: '82' } } });
+    pose(A, 'ebay_listings', { items: [{ itemId: '8282', sku: 'VRM-82', title: 'Nike Vapor Pro', depuis: '2026-10-15T21:37:54.000Z' }] });
+    await recoit(bordereau('a@vrm.test', 'Nike Vapor Pro n82'));
+    dit(dv('A').length === 1, 'reliée par identité à la Vapor : la notification part', `${dv('A').length}`);
+  });
+
   // ══ 6. Une seule fois ═══════════════════════════════════════════════════════
   console.log('\n── 6. Le même email rejoué, puis le bordereau de la même vente');
   await essaie('dedup', async () => {

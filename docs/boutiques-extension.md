@@ -13,6 +13,7 @@ node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zi
 | **Brave** | ✅ | ❌ | — | il installe depuis le Chrome Web Store |
 | **Opera** | ✅ | ❌ | `VRM-chromium.zip` | Opera Add-ons |
 | **Firefox** | ✅ | ✅ **Android** (Firefox 128 et plus) | `VRM-firefox.zip` | addons.mozilla.org |
+| **Samsung Internet** | — | ❌ programme d'extensions fermé (Galaxy Store, développeurs choisis par Samsung) | — | — |
 | **Orion** (Kagi, Mac et iPhone) | ⚠️ non essayé | ⚠️ **iPhone**, non essayé | — | il installe depuis le Chrome Web Store ou addons.mozilla.org |
 | **Safari** (Mac, iPhone) | ❌ | ❌ | — | demande une app signée par Apple (voir plus bas) |
 
@@ -80,25 +81,52 @@ pas ») — rien n'est envoyé au mauvais endroit.
 - **Firefox : pas de ⟳** dans `about:addons` ; si l'extension ne répond plus,
   l'app dit de la désactiver puis la réactiver.
 
-## Le téléphone
+## Le téléphone — mesuré le 19 octobre 2026 (« l'extension pour iPhone et Samsung »)
 
-- **Android** : Firefox pour Android + l'extension depuis addons.mozilla.org.
-  L'extension tourne alors SUR le téléphone : l'app le voit (le pont répond) et
-  agit d'ici, sans passer par l'ordinateur (`raisonExtGlobale`, prouvé au banc
-  `pont.cjs`, « Firefox pour Android »).
-- **iPhone** : aucun navigateur iPhone n'accepte cette extension aujourd'hui
-  (Safari exige une app emballée et signée par Apple — compte développeur à
-  99 $/an, revue de l'App Store, et des API que Safari n'a pas toutes). Sur
-  iPhone, **le relais** (5.183) fait le travail : depuis l'iPhone, VRM fait
-  agir l'extension de l'ordinateur allumé (bordereaux, réponses, publication
-  Leboncoin).
-- **Orion (Kagi)** : le seul navigateur d'iPhone qui accepte des extensions — il
-  installe celles de la boutique de Chrome et de Firefox. Aucun paquet à part.
-  Il se présente exactement comme Safari, donc l'app ne peut pas le
-  reconnaître : sur Safari (Mac) et sur iPhone, l'écran des premiers pas le
-  PROPOSE (« Installer dans Orion »), mais seulement une fois une fiche Chrome
-  ou Firefox publiée (`boutiqueOrion`), et il dit que VRM n'y a pas encore été
-  essayé — sa prise en charge des API d'extension est partielle. Installée,
-  l'extension se mesure comme ailleurs (le pont répond, l'app agit d'ici).
-- Chrome pour Android et Chrome pour iPhone n'acceptent aucune extension. Kiwi
-  (Android) a fermé en janvier 2025.
+⚠️ **Comment c'est mesuré** : recherches web le 19 octobre. Deux sources
+primaires étaient **bloquées depuis ce conteneur** (DNS) :
+`developer.samsung.com` (guide des extensions Samsung Internet) et
+`help.kagi.com` (aide d'Orion). Ce qui en est dit ci-dessous vient des extraits
+indexés de ces pages et de la presse spécialisée — pas d'une lecture directe.
+Aucun navigateur mobile n'a été essayé avec VRM : rien n'est promis tant que
+Julien ne l'a pas vu marcher sur son téléphone.
+
+| téléphone · navigateur | extension VRM ? | ce qu'il faut | source |
+|---|---|---|---|
+| **Samsung · Firefox pour Android** | ✅ **oui** (paquet Firefox, 5.188) | publier `VRM-firefox.zip` sur addons.mozilla.org en cochant « Firefox pour Android » (étape 4 ci-dessus) | manifeste `gecko_android`, `web-ext lint` 0 erreur |
+| **Samsung · Samsung Internet** | ❌ **impossible pour VRM** | ses modules passent par le Galaxy Store, dans un programme **fermé** (« closed beta » : seuls les développeurs que Samsung autorise) ; aucune installation d'une extension non publiée | guide Samsung (extrait indexé), forum développeurs Samsung — des développeurs y réclament encore l'ouverture de l'API |
+| **Samsung · Chrome pour Android** | ❌ | Chrome mobile n'accepte aucune extension | — |
+| **Samsung · Edge pour Android** | ❌ aujourd'hui | Edge stable n'ouvre qu'un **catalogue choisi par Microsoft** (22 extensions au lancement, mars 2025) ; Edge Canary installe une extension par identifiant derrière une option développeur — pas un geste à demander | presse (Windows Latest, Android Authority, mars 2025) ; rien de plus récent trouvé |
+| **Kiwi** (Android) | ❌ | **abandonné** en janvier 2025 (dépôt archivé, retiré du Play Store) | annonce du développeur, presse |
+| **Lemur, Quetta, Yandex** (Android, Chromium) | ⚠️ peut-être | ils installent depuis le Chrome Web Store — donc seulement une fois la fiche Chrome publiée ; VRM utilise un service worker MV3, des menus de page et le monde « MAIN » : rien ne dit qu'ils les exécutent. **Non essayé — ne pas le proposer dans l'app.** | presse secondaire seulement |
+| **iPhone · Safari** | ❌ sans Apple | une « Safari Web Extension » doit être **emballée dans une app iOS** : un Mac avec Xcode, `xcrun safari-web-extension-converter`, le **programme développeur Apple (99 $/an)**, puis la revue de l'App Store. Et des API que VRM utilise ne sont pas toutes dans Safari (à mesurer). Gros chantier, pas un réglage. | documentation Apple (« Packaging a web extension for Safari ») |
+| **iPhone · Chrome, Firefox, Edge** | ❌ | sur iPhone tous utilisent le moteur de Safari, sans extensions | — |
+| **iPhone · Orion (Kagi)** | ⚠️ **expérimental** | il installe en un toucher depuis le Chrome Web Store ou addons.mozilla.org (donc seulement une fois une fiche publiée) ; Kagi dit lui-même que « seul un petit nombre d'extensions marche complètement » sur iOS (API limitées par Apple). Il se présente comme Safari : l'app ne peut pas le reconnaître. | page Orion de Kagi, aide Orion (extrait indexé), forum Orion |
+
+**Ce que fait l'app selon le téléphone** (`mobileIci`, `src/navigateurExtension.js`) :
+- **Samsung Internet** (reconnu par « SamsungBrowser » dans l'agent utilisateur)
+  et **Chrome Android** : la carte des premiers pas dit qu'il n'accepte pas
+  l'extension ; dès que la fiche Firefox est publiée (`LIENS_BOUTIQUES.firefox`),
+  elle propose **« Installer Firefox pour Android »** (fiche Google Play de
+  Mozilla) ; d'ici là, l'étape se fait sur l'ordinateur.
+- **Firefox pour Android** : fiche publiée ⇒ « Installer depuis la boutique » ;
+  sinon « pas encore en ligne », et l'ordinateur.
+- **iPhone** : l'ordinateur d'abord, puis **le relais** (5.183 — depuis l'iPhone,
+  VRM fait agir l'extension de l'ordinateur allumé) ; Orion seulement avec une
+  fiche publiée, et en disant qu'il n'a pas été essayé.
+- **Au doigt** (Firefox pour Android, Orion), la carte du logo s'ouvre au
+  toucher (il n'y a pas de survol), porte « Ouvrir VRM », et le retour sur un
+  « Non » (« Capter ce compte ») se fait au toucher (banc `badge.cjs`).
+
+**Les gestes de Julien pour le téléphone** :
+1. **Samsung** : publier la version Firefox (étape 4 : compte gratuit AMO,
+   `VRM-firefox.zip`, cocher **Firefox pour Android**), puis recopier l'adresse
+   de la fiche dans `LIENS_BOUTIQUES.firefox`. Sur son Samsung : installer
+   Firefox depuis le Play Store, ouvrir vrm.center dedans, installer l'extension.
+2. **iPhone, sans rien publier** : rien à faire — le relais marche déjà depuis
+   l'iPhone tant que l'ordinateur est allumé avec l'extension.
+3. **iPhone, Orion** : après la publication Chrome OU Firefox — installer Orion,
+   ouvrir la fiche dans Orion, « Ajouter ». À essayer avant de compter dessus.
+4. **iPhone, Safari** : seulement s'il décide d'y consacrer un chantier — compte
+   développeur Apple (99 $/an), un Mac avec Xcode, et une revue de l'App Store.
+   Rien n'est commencé, rien n'est promis.

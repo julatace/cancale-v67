@@ -79,7 +79,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
   //    nohover true en mobile, false/false en bureau).
   const ctx = await nav.newContext(telephone
-    ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+    ? Object.assign({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua ? { userAgent: ua } : {})
     : Object.assign({ viewport: { width: 1512, height: 950 } }, ua ? { userAgent: ua } : {}));
   const pg = await ctx.newPage();
   await pg.addInitScript(([s, pr, sans]) => {
@@ -164,6 +164,11 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   const carte = await pg.evaluate(() => { const el = document.querySelector('[data-etape]'); return el ? el.innerText : ''; });
 
   const txt = await pg.evaluate(() => document.body.innerText);
+  const mobile = await pg.evaluate(() => ({
+    m: Array.from(document.querySelectorAll('[data-premiers-mobile]')).map((x) => x.getAttribute('data-premiers-mobile')),
+    relais: !!document.querySelector('[data-premiers-relais]'),
+    debord: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  }));
   // ⚠️ On lit aussi les href : un geste qui se CLIQUE ne se voit pas dans
   //    innerText (récidive corrigée sur `panne.cjs`).
   const liens = await pg.evaluate(() => Array.from(document.querySelectorAll('a[href]')).map((a) => a.getAttribute('href')));
@@ -178,7 +183,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // sur toute la page attraperait n'importe quel prénom écrit ailleurs.
   const bonjour = (/^(?:Bonjour|Bon après-midi|Bonsoir).*$/m.exec(txt) || [''])[0].trim();
   await ctx.close();
-  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique };
+  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique, mobile };
 }
 
 (async () => {
@@ -415,6 +420,29 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   }
   const edge = await rendre(nav, { comptes: [], ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0' });
   dit(edge.liens.some((h) => /VRM-extension\.zip/.test(h || '')), 'Edge (Chromium) : le zip reste proposé tant que sa boutique n’est pas en ligne');
+
+  // ── 4 bis. LE TÉLÉPHONE, SELON SON NAVIGATEUR (19 octobre) ──────────────
+  // Julien : « l'extension pour iPhone et Samsung ». Mesuré
+  // (docs/boutiques-extension.md) : Samsung Internet ne l'accepte pas (programme
+  // fermé), Chrome Android non plus, Firefox Android oui (fiche pas encore
+  // publiée), iPhone ⇒ le relais de l'ordinateur. On juge les ATTRIBUTS.
+  console.log('\n── Le téléphone : le bon geste selon le navigateur');
+  const UA = {
+    samsung: 'Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36',
+    chromeAndroid: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+    firefoxAndroid: 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0',
+    iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  };
+  for (const [nom, attendu] of [['samsung', 'samsung'], ['chromeAndroid', 'android'], ['firefoxAndroid', 'firefox-android-pas-encore']]) {
+    const r = await rendre(nav, { comptes: [], telephone: true, ua: UA[nom] });
+    dit(r.mobile.m.includes(attendu), `${nom} : la carte dit ce que CE navigateur accepte (data-premiers-mobile=${attendu})`, JSON.stringify(r.mobile.m));
+    dit(!r.liens.some((h) => /VRM-extension\.zip/.test(h || '')) && !/chrome:\/\/extensions/.test(r.carte), `${nom} : ni zip ni marche à suivre Chrome sur un téléphone`);
+    dit(!r.gestes.includes('firefox-android'), `${nom} : aucun « Installer Firefox » tant que la fiche Firefox n'est pas publiée (aucune boutique devinée)`, JSON.stringify(r.gestes));
+    dit(r.mobile.debord <= 1, `${nom} : aucun débordement horizontal à 390 px`, String(r.mobile.debord));
+  }
+  { const r = await rendre(nav, { comptes: [], telephone: true, ua: UA.iphone });
+    dit(r.mobile.relais && !r.mobile.m.length, 'iPhone : la carte dit que l’iPhone agira par l’ordinateur allumé (le relais), rien sur Android', JSON.stringify(r.mobile));
+    dit(!r.gestes.includes('orion'), 'iPhone : aucun « Installer dans Orion » sans fiche publiée', JSON.stringify(r.gestes)); }
 
   // ── 5. LA PORTE D'ENTRÉE N'AFFIRME QUE CE QU'ELLE A MESURÉ ────────────────
   // Elle promettait « l'isolation est appliquée par la base » dès que la

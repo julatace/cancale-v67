@@ -33,10 +33,14 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
 // Rend la vraie popup dans une page, avec un faux `chrome` qui répond ce qu'on
 // lui dit. `etat` est ce que `authEtat` renvoie côté service worker.
 // `geste(pg)` : ce qu'on fait dans la fenêtre avant de relever.
-async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux = {} } = {}) {
+async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux = {}, scheme = 'dark', mobile = null } = {}) {
   // La carte (2 octobre) : la même page, dans un iframe de 300 × 380 posé par
   // vrm-badge.js sur le site — `?mode=carte`.
-  const ctx = await nav.newContext({ viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
+  // `mobile` (19 oct.) : un VRAI téléphone au doigt — Firefox pour Android
+  // ouvre cette fenêtre dans un onglet entier ; Orion, dans une feuille.
+  const ctx = await nav.newContext(mobile
+    ? Object.assign({ colorScheme: scheme, viewport: { width: mobile.largeur || 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, mobile.ua ? { userAgent: mobile.ua } : {})
+    : { colorScheme: scheme, viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
   const pg = await ctx.newPage();
   const html = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8')
     .replace('<script src="popup.js"></script>', '');
@@ -113,9 +117,25 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight + 1);
   // Rien de l'ancienne palette (or, menthe) : la famille « VRM Noir » (§7).
   const anciens = await pg.evaluate(() => /#4aa87d|#E0B972|#F7E3B6/i.test(document.documentElement.outerHTML));
+  // 5.191 — le graphisme (§7) : fond, accent, et la taille des cibles au doigt.
+  const look = await pg.evaluate(() => {
+    const vis = (el) => !!(el && el.offsetParent);
+    const h = (el) => Math.round(el.getBoundingClientRect().height);
+    const b = document.getElementById('lierBtn') || document.getElementById('vrmBtn');
+    return {
+      fond: getComputedStyle(document.body).backgroundColor,
+      accent: b ? getComputedStyle(b).backgroundColor : '',
+      rayon: b ? getComputedStyle(b).borderTopLeftRadius : '',
+      cibles: Array.from(document.querySelectorAll('button, input, #mdpLien')).filter(vis).map((el) => ({ id: el.id || el.tagName, h: h(el) })),
+      largeurCorps: Math.round(document.body.getBoundingClientRect().width),
+      policeChamps: Array.from(document.querySelectorAll('input')).filter(vis).map((i) => parseFloat(getComputedStyle(i).fontSize)),
+      debordeX: document.documentElement.scrollWidth - window.innerWidth,
+      viewport: !!document.querySelector('meta[name="viewport"]'),
+    };
+  });
   if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
   await ctx.close();
-  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours, look };
 }
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
@@ -233,6 +253,47 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.171.0', code: '5.129.0', stockKO: true } });
     dit(d.recharges === 0, 'stockage illisible : PAS de ⟳ (sans garde, une boucle de rechargements est possible)', `${d.recharges} · ${d.reparation}`);
     dit(!a.champs.some((x) => x.visible) && !a.envoyes.includes('authEtat'), 'la page de réparation ne montre rien et ne demande rien d’autre', JSON.stringify(a.envoyes));
+  });
+
+  // ── 6. LE GRAPHISME (5.191, 19 octobre) ──────────────────────────────────
+  // « VRM Noir » (§7) : sombre #07090D / accent #3D7BFF ; clair #F4F6FA /
+  // accent #2458E6 — suivant le système (prefers-color-scheme). Une seule forme
+  // de bouton, et toute cible au doigt ≥ 44 px (boutons, champs, le lien du
+  // mot de passe).
+  console.log('\n── Le graphisme : VRM Noir, clair et sombre, cibles ≥ 44 px');
+  await essaie('graphisme', async () => {
+    for (const [scheme, fond, accent] of [['dark', 'rgb(7, 9, 13)', 'rgb(61, 123, 255)'], ['light', 'rgb(244, 246, 250)', 'rgb(36, 88, 230)']]) {
+      for (const carte of [false, true]) {
+        const r = await rendre(nav, { ok: true, connecte: false }, { carte, scheme, geste: ouvrirMdp });
+        const ou = `${scheme}${carte ? ' · carte' : ''}`;
+        dit(r.look.fond === fond, `${ou} : le fond suit le système (${fond})`, r.look.fond);
+        dit(r.look.accent === accent, `${ou} : le bouton principal porte LE bleu de la marque (${accent})`, r.look.accent);
+        dit(r.look.rayon === '8px', `${ou} : bouton au rayon 8 (5 / 8 / 10 / 12)`, r.look.rayon);
+        const petits = r.look.cibles.filter((c) => c.h < 44);
+        dit(r.look.cibles.length >= 4 && !petits.length, `${ou} : chaque cible (boutons, champs, lien) fait au moins 44 px`, JSON.stringify(petits.length ? petits : r.look.cibles));
+      }
+    }
+    const co = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr' }, { carte: true, scheme: 'light' });
+    const petits = co.look.cibles.filter((c) => c.h < 44);
+    dit(!petits.length && co.look.cibles.length >= 2, 'connectée (carte, clair) : « Ouvrir VRM » et « Se déconnecter » ≥ 44 px', JSON.stringify(co.look.cibles));
+  });
+
+  // ── 19 octobre : AU DOIGT, SUR UN TÉLÉPHONE (Firefox Android, iPhone) ──
+  // La fenêtre est lue sur un écran de 360 à 412 px : elle suit sa largeur,
+  // aucun défilement de côté, et ses champs à 16 px (en dessous, iOS zoome).
+  console.log('\n── Au doigt, sur un téléphone');
+  await essaie('mobile', async () => {
+    const UA_FX = 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0';
+    const UA_IP = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+    for (const [nom, ua, largeur] of [['Firefox Android 360', UA_FX, 360], ['Firefox Android 412', UA_FX, 412], ['iPhone 390', UA_IP, 390]]) {
+      const r = await rendre(nav, { ok: true, connecte: false }, { mobile: { ua, largeur }, geste: ouvrirMdp });
+      dit(r.look.viewport, `${nom} : la page déclare sa largeur d'écran (meta viewport)`);
+      dit(r.look.largeurCorps >= largeur - 2, `${nom} : la fenêtre suit l'écran (${r.look.largeurCorps} px sur ${largeur})`, String(r.look.largeurCorps));
+      dit(r.look.debordeX <= 0, `${nom} : aucun défilement de côté`, String(r.look.debordeX));
+      dit(r.look.policeChamps.length >= 1 && r.look.policeChamps.every((f) => f >= 16), `${nom} : champs à 16 px au moins (iOS ne zoome pas au toucher)`, JSON.stringify(r.look.policeChamps));
+      const petits = r.look.cibles.filter((c) => c.h < 44);
+      dit(!petits.length, `${nom} : chaque cible au doigt ≥ 44 px`, JSON.stringify(petits));
+    }
   });
 
   await nav.close();

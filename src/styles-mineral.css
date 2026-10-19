@@ -1279,3 +1279,92 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-chat-shortcuts button { min-height:44px; }
   .vrm-msg-article { font-size:12px; }
 }
+
+/* (19 oct.) LA COMPENSATION DU ZOOM, PARTOUT. Le contenu est à 80 % sur
+   téléphone (`.vrm-main { zoom:.8 }` ci-dessus) : une cible de 44 px CSS s'y
+   affiche à 35 px. La compensation (55 px) ne visait que la règle générale des
+   boutons — toutes les règles plus précises qui disent « 44 px » (sous-onglets
+   des plateformes, filtres, segments, replis, interrupteurs, champs, liens)
+   l'emportaient et retombaient à 35 px affichés, sous le doigt. Mesuré par les
+   bancs `coque-mobile`, `plateformes-premium`, `reglages-premium`,
+   `ventes-colis-premium`. Ici on ne change PAS la densité voulue : on garde
+   seulement 44 px AFFICHÉS (55 × 0,8) à tout ce qui se touche. */
+@media(max-width:767px) {
+  :root body .vrm-main :is(button, summary, select, [role="tab"]):not([role="switch"]),
+  :root body .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) {
+    min-height:55px !important;
+  }
+  :root body .vrm-main :is(button, [role="tab"])[aria-label]:not([role="switch"]) { min-width:55px !important; }
+  /* Les cibles posées à 44 px EN LIGNE (style={{minHeight:44}}) et les liens
+     qui ont une règle « 44 px » : même compensation. */
+  :root body .vrm-main [style*="min-height: 44px"],
+  :root body .vrm-main .vrm-market-space[aria-label="eBay"] a[href][style*="border"],
+  :root body .vrm-main [data-messages-lbc] a[data-ouvrir-messages-lbc],
+  :root body .vrm-main .vrm-ann-actions a[href],
+  :root body .vrm-main :is(.vrm-achats a[data-retour-tx], .vrm-buy-retour > a, .vrm-pickup-cta, .vrm-pickup-lien) { min-height:55px !important; }
+  :root body .vrm-main [style*="min-width: 44px"] { min-width:55px !important; }
+  /* Un lien-texte posé dans une ligne (« voir », « Annonce Vinted ↗ ») : sa
+     zone au doigt fait 44 px affichés, rendue à la ligne par une marge négative. */
+  :root body .vrm-main :is(a.vrm-lien-touche, .vrm-apub-gestes > a.vrm-apub-lien) {
+    display:inline-flex; align-items:center; justify-content:center; min-height:55px; min-width:55px; margin-block:-16px; box-sizing:border-box;
+  }
+  :root body .vrm-main .vrm-market-space .vrm-platform-tabs > button { min-width:55px !important; }
+  /* La vue 3D du stock garde sa taille AFFICHÉE d'avant le zoom (52vh, 460 px
+     au plus) : réduite à 80 %, ses commandes (◀ + − ▶) recouvraient le bas de
+     l'étagère, et toucher une boîte du bas touchait un bouton (banc
+     `stock-finitions`, rouge depuis le zoom). */
+  :root body .vrm-main [data-stock3d] { height:min(65vh, 575px) !important; min-height:400px !important; }
+  :root body .vrm-main [role="switch"] { min-height:55px !important; height:55px !important; min-width:57px !important; }
+  :root body .vrm-main button.vrm-lien-action,
+  :root body .vrm-main button:is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
+    margin-block:-16px;
+  }
+}
+
+/* (19 oct.) Colis : une LIGNE fine par colis, pleine largeur (Julien : « des
+   barres larges et fines au lieu de trois par ligne »). Ordinateur seulement ;
+   le téléphone garde sa liste groupée. Les styles en ligne gagnent sur une
+   classe : d'où les !important. */
+@media(min-width:768px) {
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte { display:flex !important; align-items:center !important; gap:14px !important; padding:8px 12px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte > :first-child { flex:1 1 auto !important; min-width:0 !important; align-items:center !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-photo { width:44px !important; height:52px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-titre { -webkit-line-clamp:1 !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { margin-top:0 !important; flex:0 0 470px !important; flex-wrap:wrap !important; justify-content:flex-start !important; row-gap:2px !important; }
+  /* Chaque geste a SA place : même largeur sur toutes les lignes, donc « Imprimer » est au même endroit partout. */
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > :is(button, [data-bouton-bord], a) { flex:0 0 108px !important; width:108px !important; max-width:108px !important; min-width:0 !important; justify-content:center !important; padding-left:6px !important; padding-right:6px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-bouton-bord] > button { width:100% !important; }
+  /* Les lignes s'alignent : même largeur de gestes pour tous, la source du PDF en petit dessous. */
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { flex:1 1 100% !important; text-align:left !important; font-size:11px !important; max-width:none !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-primaire { flex:0 0 auto !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-masquer { align-self:center !important; margin:0 !important; order:9; }
+}
+
+/* (19 oct.) Colis jamais retirés : les gestes (code, QR, Vérifier, « Je l'ai eu »)
+   forment un groupe poussé à droite — « Je l'ai eu » au même endroit sur chaque
+   ligne. Sur téléphone le groupe prend sa propre ligne, toujours. */
+.vrm-oublie-gestes { display:flex; align-items:center; gap:8px; margin-left:auto; flex-wrap:nowrap; }
+@media(max-width:767px) { .vrm-oublie-gestes { flex-basis:100%; justify-content:flex-end; } }
+/* (19 oct.) Colis en lignes : chaque geste a SA colonne (Imprimer · Imprimé ? ·
+   Colis fait · Suivre). En flex, un geste absent faisait glisser les suivants :
+   « Colis fait » passait de la 3e à la 2e place d'une ligne à l'autre. */
+@media(min-width:768px) {
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { display:grid !important; grid-template-columns:repeat(4, 108px); column-gap:8px; row-gap:2px; align-items:center; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="imprime"] { grid-column:2; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="fait"] { grid-column:3; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="suivre"] { grid-column:4; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { grid-column:1 / -1; }
+}
+
+/* Messages plus riches (19 oct.) : la paire de la conversation (N°, titre, prix)
+   puis son état en pastille neutre — jamais coupée par le titre. */
+.vrm-msg-paire { display:flex !important; align-items:center; gap:6px; min-width:0; }
+.vrm-msg-paire-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vrm-msg-etat { flex-shrink:0; font-size:11px; font-weight:600; line-height:1.3; padding:1px 7px; border:1px solid; border-radius:999px; white-space:nowrap; }
+.vrm-chat-paire { display:flex; gap:12px; align-items:center; border-radius:12px; padding:10px 12px; margin-bottom:6px; }
+.vrm-chat-paire-ph { width:56px; height:56px; border-radius:10px; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.vrm-chat-paire-t { flex:1; min-width:0; }
+.vrm-chat-paire-n { font-size:14px; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.vrm-chat-paire-l { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; font-size:12.5px; margin-top:3px; }
+.vrm-chat-paire a { display:inline-flex; align-items:center; min-height:44px; margin:-12px 0; font-weight:600; text-decoration:none; }
+.vrm-chat-jour { align-self:center; font-size:11.5px; font-weight:600; letter-spacing:.01em; padding:3px 10px; border-radius:999px; margin:12px 0 2px; }

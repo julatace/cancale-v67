@@ -1,6 +1,8 @@
 import { sbCle } from './_lib/cle.js';
 import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -133,6 +135,25 @@ async function rows(like) {
 // reportée ici). On ne projette que les 4 champs scalaires réellement lus plus
 // bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
 const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
+// Une ligne projetée (§4.4) : objet · null (absente) · undefined (pas su).
+async function ligneProjetee(id, cles) {
+  try {
+    const sel = cles.map((k) => `${k}:data->${k}`).join(',');
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? (j[0] || null) : undefined;
+  } catch (_) { return undefined; }
+}
+// (19 octobre) Les ventes eBay à poster — la MÊME règle que l'app (`colisEbay`,
+// §11). `null` = pas su (un compte illisible) : le widget dit « au moins ».
+async function colisEbayDuVendeur() {
+  try {
+    return resumeColisEbay(colisEbay(await lireCommandesEbayServeur({
+      lireLigne: ligneProjetee, lireToutes: (p) => fetchPaginated(scoped(p)), comptesActifs, normaliserRegistre,
+    })));
+  } catch (_) { return null; }
+}
 async function bordRows() {
   return await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`));
 }
@@ -353,9 +374,9 @@ export default async function handler(req, res) {
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
     const vivants = await comptesVivants();
-    const [bords, txSold, txBuy, sales, m, snap] = await Promise.all([
+    const [bords, txSold, txBuy, sales, m, snap, eb] = await Promise.all([
       bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
-      rows('email_sale_*'), main(), snapshot(),
+      rows('email_sale_*'), main(), snapshot(), colisEbayDuVendeur(),
     ]);
     const sold = txSold ? [] : await harvestOrders('sold', vivants);
     const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
@@ -440,7 +461,14 @@ export default async function handler(req, res) {
     const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);
 
     res.status(200).json({
-      ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
+      // (19 oct.) Ventes eBay comprises — le même nombre que Colis et Ma journée
+      // (§11). eBay illisible ⇒ `ebay: null`, `auMoins: true` : le total Vinted
+      // seul, dit « au moins » (jamais un total partiel présenté complet).
+      ship: {
+        total: shipTotal + (eb ? eb.total : 0), overdue: shipOverdue + (eb ? eb.overdue : 0),
+        today: shipToday + (eb ? eb.today : 0), tomorrow: shipTomorrow + (eb ? eb.tomorrow : 0),
+        vinted: shipTotal, ebay: eb, auMoins: !eb, manque: eb ? [] : ['eBay'],
+      },
       pickup,
       moneyMonth: Math.round(moneyMonth),
       salesMonth,

@@ -63,6 +63,7 @@ const LBC_VENTES = { ventes: {
   l2: lbc('l2', 'Adidas Gazelle bleu taille 40', 7200, { stepLabel: 'Colis à envoyer', deliveryLabel: 'Colissimo' }),
   l3: lbc('l3', 'Salomon Speedcross 5 noir taille 44', 11000, { stepLabel: 'En cours de livraison', deliveryLabel: 'Shop2Shop' }),
   a1: lbc('a1', 'Lot New Balance 990v5 gris taille 43', 8500, { isSeller: false, stepStatus: 'done', stepLabel: 'Terminé' }),
+  a2: lbc('a2', 'Asics Gel-Kayano 14 argent taille 42', 6000, { isSeller: false, stepLabel: 'En cours de livraison', deliveryLabel: 'Mondial Relay', label: { qrUrl: 'https://img.test/qr-a2.png', trackingUrl: 'https://suivi.test/a2' } }),
 } };
 const LBC_LISTINGS = { items: [
   { id: 'lb1', ref: 'VRM-41', subject: 'Nike Air Max 1 obsidian lilac T42', price: 119, status: 'active', url: 'https://www.leboncoin.fr/ad/1' },
@@ -226,6 +227,7 @@ const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
   { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]'] },
   { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]'] },
+  { nom: 'leboncoin-achats', tab: 'plat_leboncoin', section: 'achats', attend: '[data-lbc-achat]', attrs: ['.vrm-buy-row[data-lbc-achat="a1"]', '.vrm-buy-row[data-lbc-achat="a2"]', '[data-lbc-achat="a2"] a[href="https://suivi.test/a2"]', '[data-lbc-achat="a2"] [data-lbc-achat-qr]'] },
   { nom: 'leboncoin-messages', tab: 'plat_leboncoin', section: 'messages', attend: '[data-messages-lbc]', attrs: ['[data-messages-lbc]', '[data-compte-lbc="u1"]'] },
   { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"]'] },
   { nom: 'ebay-annonces', tab: 'plat_ebay', section: 'annonces', attend: '[data-ebay-annonce]', attrs: ['[data-ebay-annonce="110000000041"]', '[data-ebay-annonce="110000000099"]'] },

@@ -10031,6 +10031,191 @@ et 1512, clair · sombre · mode stream). **32 rouges sur a80f584, 0 après.**
   encore été essayé ». Aucun paquet à part. `audit-extension-navigateurs.cjs`
   +2 contrôles. ⚠️ Non mesuré dans un vrai Orion.
 
+### Le zoom mobile à 80 % : la compensation complétée (19 octobre)
+Le 18 (« densifier le mobile »), `.vrm-main { zoom:.8 }` sur téléphone, avec une
+compensation (55 px) posée seulement sur la règle générale des boutons. Mesuré
+par les bancs le 19 : toute règle plus précise « 44 px » l'emportait et
+retombait à **35 px affichés** (sous-onglets des plateformes, filtres, segments,
+interrupteurs, champs, liens, `style={{minHeight:44}}` en ligne) — `coque-mobile`,
+`plateformes-premium`, `reglages-premium`, `ventes-colis-premium` rouges. Et la
+vue 3D du stock, réduite à 80 %, avait ses commandes (◀ + − ▶) PAR-DESSUS le bas
+de l'étagère : toucher une boîte du bas touchait un bouton (`stock-finitions`,
+bissecté jusqu'à a808208). ⇒ Bloc de fin de `styles-mineral.css` : 55 px (44
+affichés) à tout ce qui se touche dans `.vrm-main`, la 3D à sa taille affichée
+d'avant. La densité voulue ne change pas. ⚠️ **Toute nouvelle cible tactile ou
+hauteur en `vh`/px dans `.vrm-main` se pense ×1,25 sur téléphone.**
+- Écran **Organisation** (nouveau) : accepté par `?tab=`, rendu par
+  `verif_visuel`/`verif_dark` ; une réponse non JSON (panne) est dite en
+  français, et la lecture ratée UNE fois.
+
+### Messages plus riches : la paire, l'état, qui a écrit, l'heure (19 octobre)
+Julien : « les messages plus riches, plus d'informations ». **Mesuré d'abord**
+(lecture seule) : la boîte `harvest_{uid}_inbox` ne porte que id · aperçu ·
+non lu · date · interlocuteur · 1ʳᵉ photo — aucun identifiant d'annonce. La
+conversation captée `harvest_{uid}_conv_{id}` (1 408 lignes) porte la
+transaction : `item_id` (924), `status` (926 ; 1 = simple question, 230 payée,
+450 finalisée, 5xx annulée…), `current_user_side`, `item_title`,
+`item_photo.url` ; ses messages sont chronologiques (le dernier est le plus
+récent, 934/934), `entity.user_id` dit qui a écrit (absent sur un message de
+Vinted). `offer_price` n'est PAS le prix de la paire (valeurs à 1,70 €) : pas lu.
+- **Liste** (`data-messagerie`) : chaque ligne porte, par IDENTITÉ (§5),
+  `N° · prix · titre` puis l'état en pastille neutre (« Question », « Vendue ·
+  en cours », « Ton achat », « Vente annulée »…). Transaction → vente du même
+  n° (son prix) ou annonce captée du même `item_id` (son prix) → N° de CETTE
+  annonce (`numeros[item_id]`). Jamais le titre. L'état de `TXN_ETATS` (meta des
+  transactions) prime quand il est connu. « Toi : » devant l'aperçu si le
+  dernier message est de lui — **seulement** si le résumé capté porte bien le
+  dernier message de la boîte (même instant à 2 min près) : sinon rien. Heure
+  absolue (« 14:32 », « hier 14:32 », « 12 oct. 14:32 »), date complète en
+  infobulle. Attributs : `data-conv-num|prix|etat|auteur|quand|compte`.
+- **Fil** : en tête, la carte de la paire (`data-fil-paire|num|prix|etat`,
+  photo, titre, lien vers l'annonce) ; messages groupés par jour
+  (`data-jour-sep`, « Aujourd'hui », « Hier », « samedi 17 octobre ») ; la bulle
+  ne garde que l'heure ; un évènement non affiché n'ouvre pas de jour.
+- **Lecture** : `fetchResumesConversations` — scalaires seulement (jamais
+  `select=data`), paginée, strict (une page ratée = « pas su » ⇒ rien n'est
+  ajouté), au plus une fois par minute, sur Messages seulement. Les annonces sont
+  désormais lues aussi sur Messages (cache partagé avec les autres écrans).
+- **Leboncoin → Messages** : inchangé — seuls des COMPTEURS de non-lus sont
+  captés (aucune conversation), rien de plus à montrer sans deviner.
+- Preuves : banc `messagerie.cjs` (+9 contrôles par taille, 390 tactile et
+  1512) **16 rouges sur le build d'avant** (1023dd4), 0 après ; mutations
+  « garde des 2 min retirée » ⇒ 2 rouges (l'auteur d'un AUTRE message affiché),
+  « prix de la vente ignoré » ⇒ 2 rouges. Le banc applique `->-1` comme PostgREST.
+- ⚠️ **Non mesuré** : `messages->-1` (dernier élément) dans la projection
+  PostgREST de SA base — grammaire attendue, jamais envoyée d'ici ; refusée, la
+  lecture repart SANS l'auteur (`_resumeConvSansAuteur`) : pas de « Toi : »,
+  le reste s'affiche. Le coût serveur de la lecture (~1 400 lignes décompressées
+  pour quelques scalaires) n'est pas mesuré.
+
+### Les offres en attente sur la LISTE des conversations (19 octobre)
+Une offre en attente n'apparaissait que dans le fil ouvert. **Mesuré (lecture
+seule)** : 1 371 conversations captées, 807 portent au moins une offre, **3**
+une offre au statut 10 (en attente) — et l'une d'elles est le 3ᵉ message sur 5 :
+`messages->-1` ne la voit pas. La transaction ne la porte pas (`offer_price` =
+le prix de l'ANNONCE : 99 € pour une offre à 60 €). Tous les messages pèsent
+1,45 Mo. ⇒ `fetchOffresConversations` demande à la base les SEULES
+conversations dont un message est une offre au statut 10
+(`data->payload->conversation->messages=cs.[{"entity_type":"offer_request_message","entity":{"status":10}}]`,
+jsonb @>, condition nécessaire de la règle) : 3 lignes, ~4 Ko, 25 ms en base
+(`explain analyze`). Puis **`offreEnAttenteDe`, LA règle du fil (§11)**, sur
+leurs messages entiers ; le fil ouvert et chargé prime (plus frais). Lu avec les
+résumés (une fois par minute, Messages seulement). Échec ⇒ `null` ⇒ aucune
+pastille (on ne garde pas l'ancienne Map : une offre tranchée depuis resterait).
+- Ligne : pastille « Offre 45 € en attente » (montant de l'OFFRE) sur la ligne du
+  message (sur celle de la paire elle tronquait N° et prix — vu au rendu),
+  `data-conv-offre`, `data-offre-liste`. Filtre « Offres N » (`data-filtre-offres`),
+  affiché seulement s'il y en a. Aucun geste automatique (§3).
+- Preuves : banc `messagerie.cjs` (offre en attente qui n'est pas le dernier
+  message ; acceptée 30, refusée 40, « Expirée » au statut 10 ; lecture des
+  offres en 500 ; le banc applique `cs.` comme jsonb @>, types compris) —
+  **6 rouges sur dd03ffd**, 0 après ; mutation « seconde règle : tout statut 10 »
+  ⇒ 6 rouges (l'offre expirée affichée).
+- ⚠️ **Non mesuré** : le filtre `cs.` sur un chemin JSON contre SA PostgREST
+  (grammaire documentée, jamais envoyée d'ici) ; refusé, la lecture vaut « pas
+  su » et rien ne s'affiche. Une capture ancienne garde une offre « en attente »
+  que Vinted a peut-être expirée depuis — le fil dit la même chose (même règle).
+
+### Le bénéfice brut et net dans Comptabilité (19 octobre)
+Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
+encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**
+(Mois · Trimestre · Année, `BeneficeCompta`) : brut, − frais de vente, −
+charges, − cotisations URSSAF, net.
+- **Une règle, un propriétaire (§11)** : `ajouterVenteBenefice` /
+  `resumeBenefice` (centimes entiers, module) servent `totals` de l'écran Ventes
+  ET la publication `vrm_benefice_jours` (SYNC_KEYS : cumuls PAR JOUR de vente,
+  tableaux de 7 nombres, deux années au plus), que Comptabilité somme
+  (`beneficeDesJours`, `beneficePeriode`). Comptabilité ne relit aucun prix
+  d'achat. Le prix d'achat d'une fiche : `achatDe(e)` (aussi `buyOf`).
+- **Brut et net des ventes** : seulement les ventes au prix d'achat connu
+  (« 0 » saisi est connu), couverture écrite (« X ventes sur Y ») avec la porte
+  (saisie en série). **Net final** (net des ventes − charges de la période −
+  cotisations sur la part VINTED du CA déclaré publié) : « — » si un prix d'achat
+  manque (`raison: achats`) ou si le CA déclaré n'est pas publié (`cotisations`).
+  Jamais publié ⇒ « se calcule dans Ventes ». Un compte non lu ⇒ Ventes ne
+  publie pas (la dernière, complète, reste). Aucune couleur sur un bénéfice.
+- Limites dites à l'écran : ventes Vinted seulement (Leboncoin/eBay n'ont pas de
+  prix d'achat reliés) ; brut au jour de la VENTE, cotisations au CA VERSÉ.
+- Preuves : `audit-benefice.cjs` (vraies fonctions dans un vm, 19 contrôles ;
+  `--mutation=duplique|zero|cotis` ⇒ 3 · 4 · 1 rouges) ; banc
+  `chiffres-croises.cjs` section E (Compta = Ventes « Ce mois », `data-benef-*`
+  / `data-ventes-benef-*`) : **10 rouges sur le build d'avant**, rouge sous la
+  mutation « second calcul divergent ».
+
+### Revue de tous les écrans après les fusions du 19 octobre
+Rendu de chaque écran et section (390 tactile, 1512, clair, sombre), captures
+hautes regardées. Corrigé, chacun prouvé par `scripts/bancs/revue-19oct.cjs`
+(**15 rouges sur le build de 47e9249**, 0 après ; `EXPLORE=dossier` fait les
+captures et liste les cibles < 44 px) :
+- ⚠️ **Ma journée « En attente » comptait l'argent des comptes SUPPRIMÉS** (2 240 €,
+  « 9 porte-monnaie », « lu il y a 69 j » ; le résumé Vinted disait 1 995,80 €) :
+  la lecture partait au montage, avant les comptes (liste vide = aucun filtre),
+  et n'était jamais refaite. Elle attend les comptes et suit leur liste (`_cle`).
+- Annonces : « elle ne est pas comptée » ; et le bouton « N annonces à
+  confirmer » trouait le paragraphe (`margin:0` en ligne battait la marge
+  négative de compensation : il porte `vrm-lien-action`).
+- Achats, colis jamais retirés : « Je l'ai eu » changeait de place d'une ligne à
+  l'autre (groupe de gestes `vrm-oublie-gestes`, poussé à droite, sa ligne sur
+  téléphone), l'âge était coupé (« il y a… »), « Vérifier » faisait 21 px, et le
+  bloc était ROUGE (§7 : rouge = deux paires sous un N°) ⇒ ambre.
+- Colis : « ✅ 15 colis partis » en vert menthe `#0F8A6A`, juste sous « Partis —
+  Vinted suit le colis · 26 » (une autre notion) ⇒ « 15 bordereaux déjà
+  traités », neutre. En lignes (1512), « Colis fait » glissait de la 3ᵉ à la 2ᵉ
+  place quand « Imprimé ? » manquait ⇒ une colonne par geste (`data-geste`).
+- Compta, prochaine échéance : « CA finalisé 0,00 € » sous un tableau qui dit
+  « Finalisé 4 224,77 € » pour le même mois — le montant est le **reçu (versé)** ;
+  libellé corrigé, et « au moins » quand la ligne publiée porte des ventes sans
+  date de versement (`data-echeance-partiel`).
+- Cibles au doigt : les valeurs éditables en place (« achat — » 10 px de large,
+  « N°2 » 25 px), « Déclarer sur l'URSSAF » (26 px), le « voir » de Colis, le
+  lien « Ouvrir la conversation ↗ » d'Achats (`.vrm-pickup-lien`, banc
+  `achats-messages-premium`, rouge avant).
+- **Laissés, avec la raison** : `stats-premium` rouge (3) depuis 866a90d (commit de
+  Julien du 18 oct. : la courbe « Vendu » replie son explication sur téléphone,
+  tailles 12/14 px) — son choix de design ; sur téléphone, les gestes secondaires
+  d'un colis se partagent la ligne (décision du 16 oct.), donc « Colis fait » n'y
+  a pas de place fixe ; `INV_STATUS.online.color` (le vert menthe) reste dans 60
+  endroits (pastilles « Reçu », boutons à texte blanc : un neutre y rendrait du
+  blanc sur blanc en sombre — à reprendre site par site) ; « 162 ventes sans
+  date de versement » est dit trois fois sur Compta (trois cartes, trois
+  chiffres) ; eBay « Réponse eBay incomplète » ×4 sur À traiter vient du banc
+  (il sert `{pret:true}` à toute route `/api`, une forme que la route ne rend pas).
+
+### Leboncoin et eBay dans le bénéfice, par identité seulement (19 octobre)
+- `ventesAutresBenefice` (module) relie une vente à SA paire : eBay = SKU de
+  chaque ligne par `numLigneEbay` → `numEbayLu` (lien VRM, carte 013 par
+  annonce) ; Leboncoin = `numeroLbcIdentite` (lien posé à la main, sinon
+  référence VRM de l'annonce traduite par `numeroExterne` — JAMAIS le « nXXX »
+  d'un titre, contrairement à `clesAnnonceLbc` qui sert aux propositions). Prix
+  d'achat = `achatDe(withBuyByNum(fiche))` seulement si UNE fiche porte le N°
+  (`ficheUniqueDuNumero`). Sans identité : comptée, sans prix d'achat.
+- Même règle (`ajouterVenteBenefice(…, plateforme)`) dans `totals` (Ventes) et
+  la publication `vrm_benefice_jours` (`v: 2`, 12 nombres par jour : +
+  `fraisInconnus, nL, nCoutL, nE, nCoutE` ; une publication `v: 1` se relit).
+  Frais : Leboncoin 0 (prix final capté), eBay `totalMarketplaceFee` (EUR) sinon
+  `null` = pas su ⇒ net « — » (`raison: 'frais'`), jamais 0. Leboncoin, eBay ou
+  les annonces Leboncoin (lues seulement si une vente n'a pas de lien) pas lus ⇒
+  aucune publication ; Ventes le dit (`data-ventes-benef-autres="passu"`).
+- Le CA finalisé, les boosts et la marge de Ventes restent ceux de la liste
+  Vinted. Comptabilité dit la couverture par plateforme (`couvertureBenefice`,
+  `data-benef-couverture`) ; en `v: 2` les cotisations portent sur le CA déclaré
+  des trois plateformes (`caBeneficeDuMois`), en `v: 1` sur Vinted seul.
+- Mesuré (lecture seule) : 0 commande eBay, 3 ventes Leboncoin non finalisées et
+  sans date — rien ne change aujourd'hui chez lui.
+- Preuves : `audit-benefice.cjs` 40 contrôles ; `--mutation=titre|ambigu|
+  fraiszero` ⇒ 4 · 4 · 2 rouges. Banc `chiffres-croises.cjs` E3-E5 : 8 rouges sur
+  le build d'avant, 2 sous la mutation « eBay sans SKU relié par le titre ».
+- Non mesuré : la vraie forme de `totalMarketplaceFee` dans ses commandes (aucune
+  commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
+  que si toutes ses lignes sont reliées.
+
+### La vente eBay arrive dans Colis, Ma journée, la cloche, le widget et le rappel du matin (19 octobre, agent eBay K7 en partie)
+« Rien ne se passe après une vente eBay » (etat.md) : une commande eBay payée n'était visible que dans eBay → Ventes. État K par K, lu dans le code : `docs/passation/notes/agent-ebay/etat.md` (en tête).
+- **Une règle** `colisEbay` (`api/_lib/ebay-a-expedier.js`, importée par l'app ET le serveur, §11) : à poster = `etatCommandeEbay(o).peutExpedier`, pas d'annulation demandée, un envoi (`fulfillmentInstructionsType` SHIP_TO ou absent — jamais un colis caché) ; « Ne poste pas » = annulation demandée (inconnue ⇒ demandée) ; date limite `lineItemFulfillmentInstructions.shipByDate` (ancien nom lu en repli — `ebay-agent.js` ne lisait que lui) ; authentification d'eBay signalée. `null` = pas su, jamais `[]`.
+- **Lecteurs** : Colis (bloc « Ventes eBay à poster » : N° par le SKU via `numLigneEbay`, jours, emplacement, « Étiquette sur eBay ↗ » vers `ebay.fr/sh/ord/details?orderid=` — adresse NON mesurée —, « Suivi et message à l'acheteur » → `?tab=ebay_ventes` + `DEMANDE_EBAY_CIBLE` ; « Ne poste pas » en tête, → `?tab=ebay_agent` ; total du haut Vinted + eBay ; âge des commandes au-delà de 6 h), Ma journée (« À envoyer » au même nombre, `data-ebay`), `vrm_colis_aposter` (+ `ebay`, `nePasPoster`), `api/widget.js` (`ship.total` comprend eBay, `ship.ebay`, `ship.auMoins`), `api/ship-reminders.js` (rappel aussi pour un vendeur eBay seul, sans mémo quand rien n'est lisible ni à dire), bilan du lundi (« au moins » si eBay illisible). L'étiquette se prend DANS eBay (§2.8) : VRM n'achète rien.
+- ⚠️ **Les commandes eBay ne se relisent que sur synchro** (Compte eBay → Rafraîchir, ou la relecture des 6 h quand une règle d'offre est posée) tant que K5 (VRM fermé, migrations 014 + 015) n'existe pas : Colis dit leur âge.
+- Preuves : `audit-ebay-colis.cjs` (règle + vraies routes widget et rappel, 9 rouges sur 65eec06, 3 mutations rouges) ; banc `ebay-colis.cjs` (`BANC_PORT`, 390/1512, 28 rouges sur le build de 65eec06, mutation « Ma journée sans eBay » rouge). Aucun appel réel à eBay ; formes de l'API Fulfillment tirées de la doc.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10402,3 +10587,61 @@ Julien : « si on doit la publier elle doit marcher sur tous les moteurs de rech
 - **Premiers pas selon le navigateur** (`src/navigateurExtension.js`) : `LIENS_BOUTIQUES` (vides tant que les fiches ne sont pas validées — jamais un lien deviné) ; lien rempli ⇒ « Installer depuis la boutique » ; Firefox sans lien ⇒ « pas encore en ligne, ouvre vrm.center dans Chrome/Edge/Brave/Opera » (le zip est un paquet Chromium, Firefox ne l'installe pas) ; Safari ⇒ pas accepté. Texte « l'extension ne répond pas » : `about:addons` sous Firefox, `edge://extensions` sous Edge.
 - Preuves : `audit-extension-navigateurs.cjs` (43 contrôles ; **16 rouges sur 526a6c1** ; mutations « pont qui relaie sans regarder l'identifiant » et « compat absente des scripts de contenu » ⇒ rouges ; le fond SANS la compat dans un Firefox imité ne lit plus son stockage) ; `_fond-vm.cjs` option `firefox` (chrome à rappels seuls + browser à promesses) ; banc `pont.cjs` « FIREFOX » + « FIREFOX POUR ANDROID » : **5 rouges sur le build de 526a6c1**, vert après.
 - ⚠️ **Non mesuré** : un vrai Firefox (bloqué d'ici) — le premier essai sera chez Julien ; Edge pour Android (extensions pas ouvertes à tous). Gestes de Julien : `docs/boutiques-extension.md` (comptes Edge/Opera/AMO gratuits, adresse de contact, puis remplir `LIENS_BOUTIQUES`).
+
+### Confirmer le bon compte Vinted, et le graphisme de l'extension (19 octobre, 5.191)
+Julien : « à l'installation de l'extension, confirmer le bon compte Vinted » et « le graphisme de l'extension ».
+- **La question** (`vrm-badge.js`, panneau `.question`) : sur Vinted, VRM connecté, quand le compte du COOKIE n'a jamais été confirmé dans ce Chrome ET qu'on sait le nommer (login de la base `loginDe`, sinon celui lu dans la réponse `users/current` déjà reçue, rangé dans `chrome.storage.local.vrmLoginsVus` — jamais deviné, jamais « compte n° … ») : « Tu es connecté sur {login} — c'est bien un de tes comptes à capter ? [Oui, capter ce compte] [Non, ignorer ce compte] » (× = plus tard, pour cette page). Pas de pastille ambre : une question n'est pas une panne.
+- **Le choix** : `chrome.storage.local.vrmChoixComptes[uid] = {choix, login, at}` (ce Chrome seulement ; pas de ligne `app_data`). Écrit par le service worker (`choixCompte`) **seulement pour le compte du cookie de l'onglet qui demande** — un autre uid est refusé. « Non » ⇒ `compteNonCapte` (refusé OU supprimé définitivement) ferme les cinq portes de capture (passive, active, moisson, visite, chemins vus), ses jetons ne partent pas (`captureDomain`, rien d'effacé), et la relecture publique des autres comptes le saute. Pas répondu ou stockage illisible ⇒ on capte COMME AVANT. Revenir : au survol du logo, « ignoré dans ce navigateur (ton choix) » + **« Capter ce compte »**.
+- **Graphisme** : `popup.html` (fenêtre de l'icône et `?mode=carte`) et la carte du badge en VRM Noir par variables, clair/sombre selon `prefers-color-scheme` (sombre #07090D / #10141B / #3D7BFF ; clair #F4F6FA / blanc / #2458E6), boutons d'une seule forme (rayon 8, 44 px), champs et lien « avec mon mot de passe VRM » à 44 px. CSS seulement côté popup.
+- Preuves (§6.1, bancs copiés dans l'arbre de HEAD) : `badge.cjs` 67 contrôles dont la section 10 sur le VRAI `background.js` (`_fond-vm`) — « Non » ⇒ zéro écriture `harvest_111_*`, « Oui » et « pas répondu » ⇒ la capture part, autre uid refusé — **12 rouges sur l'avant** ; `popup.cjs` 57 contrôles, **9 rouges sur l'avant** (fond clair, accent clair, cibles < 44 px).
+- Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien de neuf). Extension **5.191.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ Non mesuré : le vrai Vinted (le login arrive avec la première réponse `users/current` : la question peut apparaître quelques secondes après l'ouverture) ; sur Firefox Android, pas de survol — le retour sur un « Non » passe par la carte au toucher.
+
+### Achats Leboncoin et eBay sur la forme des achats Vinted (19 octobre)
+Julien : « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ». Une ligne d'achat (`LigneAchat`, classes `vrm-buy-row`) : photo · titre · statut à pastille (mêmes mots et couleurs qu'`etapeAchat`) · date · prix · gestes.
+- **Leboncoin** (`etapeAchatLbc`, `LigneAchatLbc`) : Annulé · Reçu · En transit · étape capturée, lue sur ce que capte l'extension (`lbcAnnulee`, `lbcFinalisee`, `lbcExpediee`). En route : « Suivre » (`label.trackingUrl`) et le QR du colis (`label.qrUrl`, `QrColis`) dépliable — seulement si capturés.
+- **eBay** (`EbayAchats`) : même ligne ; `achatsEbay` lit en plus la photo (`i.ebayimg.com` seulement), `PaidTime`, `ShippedTime` et le suivi déclaré par le vendeur (numéro + transporteur). Étape : Expédié · Payé · À payer — jamais « Reçu » (eBay ne le dit pas ici). Lien « ↗ » vers l'annonce.
+- Preuves : `plateformes-premium.cjs` (écran Leboncoin → Achats, 2 tailles) 8 rouges sur 1023dd4 ; `ebay-apres-vente-ecran.cjs` 7 rouges sur 1023dd4 ; `ebay-apres-vente.mjs` vert.
+- ⚠️ Non mesuré : que `GetMyeBayBuying` rende `PictureDetails`, `ShippedTime` et `ShipmentTrackingDetails` dans la WonList (doc d'eBay) — absents ⇒ rien n'est affiché.
+
+### Toucher une case à cocher sur téléphone ne la cochait pas (19 octobre)
+`BottomBar` cachait la barre du bas dès qu'un `<input>` prenait le focus — y compris une case à cocher ou un bouton radio, qui n'ouvrent aucun clavier. Au toucher, la barre disparaissait, l'écran sautait de 22 px entre l'appui et le relâchement, et le geste retombait à côté : la case « J'ai compris » du planificateur eBay ne se cochait pas (banc `ebay-programmer`, 6 rouges hérités, à 390 px seulement). Seuls les champs à clavier cachent la barre maintenant (`SANS_CLAVIER`). `ebay-programmer` et `coque-mobile` verts.
+
+### L'extension au doigt, et le bon geste selon le téléphone (19 octobre, 5.192)
+Julien : « l'extension pour iPhone et Samsung ». **Mesuré** (détail et sources :
+`docs/boutiques-extension.md`, section Téléphone ; `developer.samsung.com` et
+`help.kagi.com` bloqués d'ici, lus par extraits indexés) : Samsung → **Firefox
+pour Android** seulement (paquet 5.188, fiche AMO à publier) ; **Samsung
+Internet impossible** (programme d'extensions fermé, Galaxy Store) ; Chrome
+Android ❌ ; Edge Android : catalogue choisi par Microsoft ❌ ; Kiwi abandonné ;
+Lemur/Quetta/Yandex non essayés (jamais proposés) ; iPhone : Safari exige une app
+iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expérimental
+(fiche publiée exigée) ; sinon **le relais** de l'ordinateur.
+- **Badge au doigt** (`vrm-badge.js`) : `pointerType` du dernier geste (repli
+  `hover: none`) — au doigt, toucher le logo OUVRE la carte (plus d'ouverture de
+  VRM à l'aveugle), qui porte « Ouvrir VRM » / « Se connecter avec VRM » et une
+  croix (≥ 44 px) ; toucher ailleurs la referme ; le survol reste à la souris
+  (`pointerenter` filtré). Le retour sur un « Non » (« Capter ce compte ») se fait
+  au toucher. Cartes `min(300px, 100vw − 32px)`, hauteur bornée à l'écran. À la
+  souris, rien ne change.
+- **Popup** : meta viewport, au doigt la largeur suit l'écran et les champs
+  passent à 16 px (iOS ne zoome pas).
+- **App** : `mobileIci()` (`ios · firefox-android · samsung · android · autre`,
+  Samsung lu par « SamsungBrowser » AVANT Chrome) ; les premiers pas disent ce que
+  CE navigateur accepte (`data-premiers-mobile`), « Installer Firefox pour
+  Android » seulement quand `LIENS_BOUTIQUES.firefox` est rempli (aucun lien
+  deviné), l'iPhone apprend le relais (`data-premiers-relais`) ; Orion seulement
+  sur iPhone. Le panneau d'état (`raisonExtGlobale`, repli téléphone) ne propose
+  la boutique Firefox que publiée.
+- Preuves (§6.1, bancs copiés dans l'arbre de 65eec06, build refait là) :
+  `badge.cjs` **4 rouges** avant (le premier toucher ouvrait VRM, aucun bouton
+  dans la carte), `popup.cjs` **9 rouges** (300 px figés, champs 14 px, pas de
+  viewport), `premierjour.cjs` rouges sur les attributs Samsung/Android/iPhone ;
+  `pont.cjs` + Samsung Internet / Firefox Android / iPhone sans extension (aucune
+  boutique promise). `web-ext lint` du paquet Firefox : 0 / 0 / 0.
+- ⚠️ **Non mesuré** : un vrai Firefox Android, un vrai Orion, un vrai Samsung.
+- **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
+  Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).
+
+### Messages : une offre en attente passe devant (19 octobre)
+Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.

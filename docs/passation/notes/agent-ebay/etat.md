@@ -1,3 +1,75 @@
+# État réel de l'agent eBay au 19 octobre — lu dans le code d'`origin/main`
+
+**Rédigé le 19 octobre 2026.** Source : le code de `origin/main` au commit
+`65eec06` (PR #592), lu ici — pas les notes, qui peuvent être en retard. Les
+`fichier:ligne` renvoient à ce commit, sauf « (cette PR) ». Aucun appel à eBay,
+aucune écriture en base. La section du 11 octobre (plus bas) reste comme
+historique ; **ce tableau la remplace pour l'état**.
+
+Légende : **FAIT** · **PARTIEL** · **RIEN** (pas commencé) · **GELÉ**.
+
+| K | chantier | état | où (65eec06) |
+|---|---|---|---|
+| K0 | plusieurs comptes eBay + règle d'offre dans `main` | **FAIT** | registre `ebay_comptes` `api/_lib/ebay.js:191` (`normaliserRegistre`), `:227` (`comptesActifs`) ; règle d'offre `api/ebay.js:423` (`handleRegleOffre`), `:540` ; écran `src/App.jsx:17323` (`EbayReglesToutes`) |
+| K1 | la paire vendue ailleurs ne reste pas sur eBay sans un mot | **FAIT (app ouverte)** | preuve par bordereau `src/App.jsx:24543` (`lireVentesVintedProuvees`) ; `doublesVenteEbay` `:40205` ; retrait auto `:39995` ; extension `capterPreuvesVente` `vinted-sync-extension/background.js:4949` ; double vente app fermée par email `api/email-inbound.js:730` |
+| K2 | socle (status, suppression de compte, signatures d'évènements) | **PARTIEL** | suppression eBay = mode de `api/ebay.js:1542` (`handleDeletion`, `vercel.json:22`) ; `agent-evenements.js` (signatures, cache de clés publiques) **absent** |
+| K3 | mémoire de l'agent (migration 014) | **ÉCRITE, PAS APPLIQUÉE** | `supabase/migrations/014-agent.sql` ; audit `scripts/audit-agent-sql.cjs` |
+| K4 | coffre, jetons gardés, garde-quota | **RIEN** | aucun `api/_lib/coffre.js` ; jetons toujours dans `app_data` (`ebay_tokens*`) |
+| K5 | moteur VRM fermé (battement, veille, « vendu sur eBay ») | **RIEN** | aucun `agent-ebay.js`, aucune migration 015, aucun mode `battement` ; `ebay_orders` ne se relit que sur synchro (`src/App.jsx:15782`, `:17848`) |
+| K6 | écran « Agent » | **PARTIEL** | `EbayAgent` `src/ebayGestion.jsx:171` sur `preparerAgentEbay` `api/_lib/ebay-agent.js:4` : une liste de tâches à faire (préparation seulement), journal des actions (`executerAvecJournal`) — ni pouls, ni interrupteurs, ni familles |
+| K7 | expédier sans argent (Colis, Ma journée, voie eBay) | **PARTIEL → avancé par cette PR** | avant : eBay → Ventes seulement (`EbayCommande` `src/ebayGestion.jsx:31` : adresse, suivi tapé `expedier` `api/_lib/ebay-gestion.js:84`, message) ; **cette PR** : la vente eBay dans Colis, Ma journée, la cloche, le widget, le rappel du matin, le bilan (voir plus bas). Reste : « Imprimer la journée », étiquette glissée et tamponnée, rappels J-1/J |
+| K8 | doubles et retrait d'eBay VRM fermé | **RIEN** (dépend de K5) | le retrait auto existe **app ouverte** seulement |
+| K9 | argent juste (Finances, signature UE) | **PARTIEL** | solde `api/ebay.js:1370` (`seller_funds_summary`) ; CA « l'argent reçu » dans `ventesDeclarables` ; pas de `ebay-signature.js` (transactions/payouts signés) |
+| K10 | notifications d'eBay (l'oreille) | **RIEN** | aucun mode `ebay-notif` |
+| K11 | suivi jusqu'au client | **RIEN** | le suivi n'est que listé dans `EbayCommande` ; pas d'étapes, pas de La Poste |
+| K12 | photos chez eBay (Media API) | **RIEN** | `PictureURL` = liens Vinted (`api/ebay.js:246`) |
+| K13 | messages au client et évaluation | **PARTIEL (sur son clic)** | message à l'acheteur `api/_lib/ebay-gestion.js:103`, réponses `:134`, évaluations positives `:202` ; aucun message automatique |
+| K14 | bordereaux achetés par VRM | **GELÉ** (§2.8 : l'acheteur paie) | — |
+| K15 | boîte, après-vente, niveau vendeur | **PARTIEL (sur son clic)** | retours, annulations, offres reçues, achats `api/_lib/ebay-apres-vente.js`, `src/ebayGestion.jsx:237` ; pas de niveau vendeur |
+| K16 | annonces vivantes et prix | **PARTIEL** | baisse des paires qui dorment (clic), promotion `src/ebayGestion.jsx:284` ; rien d'automatique |
+| K17 | « brancher ton agent », bilan de la semaine | **PARTIEL** | le bilan du lundi compte eBay dans vendu/reçu (`api/_lib/bilan-semaine.js`) et, **avec cette PR**, dans les colis ; pas de parcours « brancher » |
+
+**Ce qui bloque le reste :** K5, K8, K10 et tout « VRM fermé » attendent la
+**migration 014 appliquée** et l'**horloge (015, `pg_cron`/`pg_net`)**, sur un oui de
+Julien ; K4 attend `VRM_COFFRE_CLE`. Rien de cela ne se fait sans lui.
+
+## Ce que cette PR construit (19 octobre) — « rien ne se passe après une vente eBay »
+
+Mesuré d'abord dans le code : une commande eBay payée n'était visible que dans
+eBay → Ventes. `toShip` (Colis, Ma journée), `vrm_colis_aposter` (la cloche),
+`api/widget.js` et `api/ship-reminders.js` ne comptaient que Vinted.
+
+- **Une règle** (`api/_lib/ebay-a-expedier.js`, cette PR) : `colisEbay(orders)` →
+  `null` (pas su) ou `{ aPoster, nePasPoster, horsEnvoi }`. À poster = payée
+  (`etatCommandeEbay(o).peutExpedier`), pas expédiée, pas d'annulation demandée,
+  un envoi (`fulfillmentInstructionsType` SHIP_TO, ou type absent — jamais un colis
+  caché). « Ne poste pas » = annulation demandée (inconnue ⇒ demandée). Date
+  limite = `lineItems[].lineItemFulfillmentInstructions.shipByDate` (l'ancien nom
+  `fulfillmentInstructions` reste lu ; `ebay-agent.js` lisait SEULEMENT l'ancien,
+  donc l'urgence de l'écran Agent ne s'allumait jamais si eBay suit sa doc —
+  corrigé). Authentification d'eBay signalée (`program.authenticityVerification`).
+- **Lue par** Colis (bloc « Ventes eBay à poster » : N° par le SKU `VRM-{n°}` via
+  `numLigneEbay`, jours, emplacement au stock, « Étiquette sur eBay ↗ », « Suivi et
+  message à l'acheteur » qui ouvre eBay → Ventes sur CETTE commande ; « Ne poste
+  pas » en tête ; total du haut Vinted + eBay ; âge de la lecture des commandes
+  au-delà de 6 h), Ma journée (« À envoyer » au même nombre, action « Ne poste
+  pas »), `vrm_colis_aposter` (la cloche : `ebay`, `nePasPoster`), le widget
+  (`ship.total` comprend eBay, `ship.ebay`, `ship.auMoins`), le rappel du matin
+  (part aussi pour un vendeur eBay seul ; « colis eBay », « ne poste pas ») et le
+  bilan du lundi (« au moins » si eBay illisible). Trois états partout.
+- **Non mesuré** (aucune vente eBay chez lui) : les noms de champs de l'API
+  Fulfillment (doc d'eBay) ; l'adresse `ebay.fr/sh/ord/details?orderid=` du Seller
+  Hub (un lien, pas une promesse) ; la fraîcheur des commandes dépend de la synchro
+  (manuelle, ou la relecture quand une règle d'offre est posée) tant que K5 n'existe
+  pas — d'où l'âge affiché.
+- **Preuves** : `scripts/audit-ebay-colis.cjs` (la règle + les VRAIES routes widget
+  et rappel) — 9 rouges sur 65eec06, 3 mutations rouges (annulation comptée 7 ·
+  widget sans eBay 1 · eBay illisible lu 0 1) ; banc `scripts/bancs/ebay-colis.cjs`
+  (390 tactile + 1512, données inventées) — 28 rouges sur le build de 65eec06,
+  mutation « Ma journée sans eBay » 2 rouges.
+
+---
+
 # État réel de l'agent eBay — ce qui est construit, ce que Julien a testé (11 octobre)
 
 **Pour :** Julien, et les sessions qui construiront l'« agent eBay 100 % autonome ».

@@ -2,34 +2,58 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* « VRM Noir » — la famille de l'app (§7) : sombre, UN seul accent bleu.
-       L'ancien logo doré et la menthe sont partis (2 octobre). */
-    :root { color-scheme: dark; }
+    /* « VRM Noir » — la famille de l'app (§7) : UN seul accent bleu, rare ; le
+       clair et le sombre suivent le système ; rayons 5 / 8 / 10 / 12 ; une
+       seule forme de bouton (44 px). 5.191 : CSS seulement, aucune logique. */
+    :root { color-scheme: dark light;
+      --fond: #07090D; --carte: #10141B; --bord: #1E2530; --texte: #E8ECF2; --doux: #8A93A3;
+      --accent: #3D7BFF; --ambre: #F5A524; --survol: #1A202A; }
+    @media (prefers-color-scheme: light) {
+      :root { --fond: #F4F6FA; --carte: #FFFFFF; --bord: #DCE1EA; --texte: #10151B; --doux: #5B6577;
+        --accent: #2458E6; --ambre: #A15C00; --survol: #EEF1F6; }
+    }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; width: 300px; margin: 0; padding: 16px;
-      background: #07090D; color: #E8ECF2; font-size: 12.5px; }
+      background: var(--fond); color: var(--texte); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
     body.carte { width: auto; min-height: 100vh; padding: 16px 16px 14px; }
-    .head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .logo { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; display: block; }
-    h1 { font-size: 14px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-    .dot { width: 7px; height: 7px; border-radius: 999px; background: #8A93A3; flex-shrink: 0; }
-    .dot.warn { background: #F5A524; }
+    .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    body.carte .head { padding-right: 44px; }
+    .logo { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: block; box-shadow: 0 0 0 1px rgba(61,123,255,.38); }
+    h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--doux); flex-shrink: 0; }
+    .dot.warn { background: var(--ambre); }
     .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-    button { width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 8px; background: #3D7BFF; color: #fff;
-      font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; min-height: 38px; }
+    button { display: block; width: 100%; margin-top: 12px; padding: 0 14px; min-height: 44px; border: 1px solid transparent; border-radius: 8px;
+      background: var(--accent); color: #fff; font-weight: 600; font-size: 13px; line-height: 1.2; cursor: pointer; font-family: inherit;
+      transition: filter .12s ease, background .12s ease; }
+    button:hover { filter: brightness(1.06); }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     button:disabled { opacity: .6; cursor: default; }
-    .muted { font-size: 11px; color: #8A93A3; margin-top: 10px; line-height: 1.5; }
-    .muted a { color: #3D7BFF; }
-    input { width: 100%; margin-top: 8px; padding: 9px 10px; border-radius: 8px;
-      border: 1px solid #1E2530; background: #10141B; color: #E8ECF2; font: inherit; font-size: 12.5px; outline: none; }
-    input:focus { border-color: #3D7BFF; }
-    button.sec { background: transparent; color: #8A93A3; border: 1px solid #1E2530; font-weight: 600; margin-top: 8px; }
-    .err { font-size: 11.5px; color: #F5A524; margin-top: 8px; line-height: 1.45; }
-    .who { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+    button.sec { background: transparent; color: var(--texte); border-color: var(--bord); margin-top: 8px; }
+    button.sec:hover { background: var(--survol); filter: none; }
+    .muted { font-size: 12px; color: var(--doux); margin-top: 10px; line-height: 1.5; }
+    .muted a { color: var(--accent); }
+    #mdpLien { display: inline-flex; align-items: center; min-height: 44px; }
+    .muted b { color: var(--texte); }
+    input { width: 100%; margin-top: 8px; padding: 0 12px; min-height: 44px; border-radius: 8px;
+      border: 1px solid var(--bord); background: var(--carte); color: var(--texte); font: inherit; font-size: 14px; outline: none; }
+    input::placeholder { color: var(--doux); }
+    input:focus { border-color: var(--accent); }
+    .err { font-size: 12px; color: var(--ambre); margin-top: 8px; line-height: 1.45; }
+    .who { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 10px; background: var(--carte); }
     /* L'icône OUVRE VRM (30 sept.). La fenêtre ne sert qu'à se connecter : tant
        qu'on ne sait pas, on ne montre que le logo. */
     body.decide #auth { display: none; }
+    /* 19 octobre — au doigt (Firefox pour Android ouvre la fenêtre dans un
+       onglet entier ; Orion, dans une feuille) : la largeur suit l'écran, et
+       les champs passent à 16 px (en dessous, iOS zoome la page au toucher). */
+    @media (hover: none) and (pointer: coarse) {
+      body { width: auto; max-width: 480px; margin: 0 auto; }
+      input { font-size: 16px; }
+      button, input, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    }
   </style>
 </head>
 <body class="decide">

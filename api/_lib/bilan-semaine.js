@@ -85,7 +85,7 @@ const dansSemaine = (ts, debut, fin) => ts >= debut && ts < fin;
 //   commandes { uid: { orders, cap } }        — `harvest_{uid}_orders_sold`
 //   masquesTx, masquesComptes (Set), panneau  — ce que l'app écarte (son choix)
 //   lbc [], ebay [], versements {}            — comme l'écran Ventes
-//   colis (nombre), dorment ({ n, total, datesKnown, at })
+//   colis (nombre, ventes eBay comprises), colisAuMoins (eBay illisible), dorment ({ n, total, datesKnown, at })
 export function calculerBilan(e) {
   const { debut, fin, maintenant = Date.now() } = e;
   const out = { vendu: { etat: 'pas-su', n: 0, eur: 0, manque: [] }, recu: { etat: 'pas-su', eur: 0, manque: [] }, colis: { etat: 'pas-su', n: null }, dorment: { etat: 'pas-su', n: null, auMoins: false } };
@@ -144,7 +144,8 @@ export function calculerBilan(e) {
   }
 
   // ── COLIS : le nombre que l'app et le widget appellent « à expédier » ──
-  if (Number.isFinite(e.colis)) out.colis = { etat: 'su', n: e.colis };
+  // (19 oct.) Ventes eBay comprises ; eBay illisible ⇒ « au moins » (partiel).
+  if (Number.isFinite(e.colis)) out.colis = { etat: e.colisAuMoins ? 'partiel' : 'su', n: e.colis };
 
   // ── QUI DORMENT : publié par l'écran Annonces (`vrm_paires_dorment`) ──
   // On ne le recalcule pas (§11). Plus de 8 jours, ce n'est plus une mesure.
@@ -179,6 +180,7 @@ export function texteBilan(b, sem) {
   if (r.etat === 'pas-su') l.push("Reçu : à voir dans l'app.");
   else l.push(r.etat === 'partiel' ? `Reçu : au moins ${euros(r.eur)} (le détail dans l'app).` : `Reçu : ${euros(r.eur)}.`);
   if (b.colis.etat === 'su') l.push(b.colis.n ? `À expédier maintenant : ${b.colis.n} colis.` : 'Rien à expédier.');
+  else if (b.colis.etat === 'partiel') l.push(`À expédier maintenant : au moins ${b.colis.n} colis (ventes eBay pas lues).`);
   else l.push("À expédier : à voir dans l'app.");
   if (b.dorment.etat === 'su' && (b.dorment.n > 0 || !b.dorment.auMoins)) {
     l.push(b.dorment.n
