@@ -1279,3 +1279,44 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-chat-shortcuts button { min-height:44px; }
   .vrm-msg-article { font-size:12px; }
 }
+
+/* (19 oct.) LA COMPENSATION DU ZOOM, PARTOUT. Le contenu est à 80 % sur
+   téléphone (`.vrm-main { zoom:.8 }` ci-dessus) : une cible de 44 px CSS s'y
+   affiche à 35 px. La compensation (55 px) ne visait que la règle générale des
+   boutons — toutes les règles plus précises qui disent « 44 px » (sous-onglets
+   des plateformes, filtres, segments, replis, interrupteurs, champs, liens)
+   l'emportaient et retombaient à 35 px affichés, sous le doigt. Mesuré par les
+   bancs `coque-mobile`, `plateformes-premium`, `reglages-premium`,
+   `ventes-colis-premium`. Ici on ne change PAS la densité voulue : on garde
+   seulement 44 px AFFICHÉS (55 × 0,8) à tout ce qui se touche. */
+@media(max-width:767px) {
+  :root body .vrm-main :is(button, summary, select, [role="tab"]):not([role="switch"]),
+  :root body .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) {
+    min-height:55px !important;
+  }
+  :root body .vrm-main :is(button, [role="tab"])[aria-label]:not([role="switch"]) { min-width:55px !important; }
+  /* Les cibles posées à 44 px EN LIGNE (style={{minHeight:44}}) et les liens
+     qui ont une règle « 44 px » : même compensation. */
+  :root body .vrm-main [style*="min-height: 44px"],
+  :root body .vrm-main .vrm-market-space[aria-label="eBay"] a[href][style*="border"],
+  :root body .vrm-main [data-messages-lbc] a[data-ouvrir-messages-lbc],
+  :root body .vrm-main .vrm-ann-actions a[href],
+  :root body .vrm-main :is(.vrm-achats a[data-retour-tx], .vrm-buy-retour > a, .vrm-pickup-cta) { min-height:55px !important; }
+  :root body .vrm-main [style*="min-width: 44px"] { min-width:55px !important; }
+  /* Un lien-texte posé dans une ligne (« voir », « Annonce Vinted ↗ ») : sa
+     zone au doigt fait 44 px affichés, rendue à la ligne par une marge négative. */
+  :root body .vrm-main :is(a.vrm-lien-touche, .vrm-apub-gestes > a.vrm-apub-lien) {
+    display:inline-flex; align-items:center; justify-content:center; min-height:55px; min-width:55px; margin-block:-16px; box-sizing:border-box;
+  }
+  :root body .vrm-main .vrm-market-space .vrm-platform-tabs > button { min-width:55px !important; }
+  /* La vue 3D du stock garde sa taille AFFICHÉE d'avant le zoom (52vh, 460 px
+     au plus) : réduite à 80 %, ses commandes (◀ + − ▶) recouvraient le bas de
+     l'étagère, et toucher une boîte du bas touchait un bouton (banc
+     `stock-finitions`, rouge depuis le zoom). */
+  :root body .vrm-main [data-stock3d] { height:min(65vh, 575px) !important; min-height:400px !important; }
+  :root body .vrm-main [role="switch"] { min-height:55px !important; height:55px !important; min-width:57px !important; }
+  :root body .vrm-main button.vrm-lien-action,
+  :root body .vrm-main button:is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
+    margin-block:-16px;
+  }
+}
