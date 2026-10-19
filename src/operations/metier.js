@@ -15,6 +15,24 @@ export function repartir(total,poids){
  let reste=total-parts.reduce((s,p)=>s+p.n,0);[...parts].sort((a,b)=>b.r-a.r||a.i-b.i).forEach(p=>{if(reste>0){p.n++;reste--;}});return parts.map(p=>p.n);
 }
 export const etatReservation=(r,now)=>r.etat==='active'&&Date.parse(r.expire)<=Date.parse(now)?'expiree':r.etat;
+// La même validation sert à la création et à la modification d’une recherche.
+export function criteresVeille(p){
+ const minimum=p.minimum===null?null:entier(p.minimum),maximum=entier(p.maximum,1);
+ exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
+ return {titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous'])};
+}
+export function echeanceActive(section,x,maintenant){
+ const active=section==='missions'?['attribuee','en_cours','bloquee'].includes(x.etat):section==='reservations'?etatReservation(x,maintenant)==='active':section==='dossiers'?x.etat!=='clos':false;
+ const at=active?Date.parse(section==='reservations'?x.expire:x.echeance):NaN,now=Date.parse(maintenant);
+ if(!Number.isFinite(at)||!Number.isFinite(now))return null;
+ return {at,etat:at<=now?'retard':at-now<=86400000?'proche':'ulterieure'};
+}
+export function trierOperations(items,section,maintenant,tri='recent'){
+ return items.map((x,i)=>({x,i,e:echeanceActive(section,x,maintenant)})).sort((a,b)=>{
+  if(tri==='echeance'){const r=(a.e?.at??Infinity)-(b.e?.at??Infinity);if(r&&!Number.isNaN(r))return r;}
+  return b.i-a.i;
+ }).map(v=>v.x);
+}
 export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=null,empreinte=''}){
  exige(source?.version===1&&Number.isSafeInteger(source.revision),'Format de données non reconnu.');
  const deja=source.commandes.find(c=>c.id===commande.id);
@@ -50,6 +68,11 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   exige(occupe+quantite<=stock,'Quantité insuffisante : vérifie les réservations ou ventes déjà enregistrées.');
   ajoute(d.reservations,{...commun,reference,quantite,stock,acheteur:texte(p.acheteur),expire,prix,acompte,rembourse:0,etat:'active'});break;
  }
+ case 'reservation.prolonger':{
+  const x=trouve(d.reservations,p.cible);exige(etatReservation(x,maintenant)==='active','Seule une réservation encore active peut être prolongée.');
+  const expire=date(p.expire);exige(Date.parse(expire)>Date.parse(x.expire),'Choisis une échéance après celle déjà convenue.');
+  const note=texte(p.note,250);(x.evenements??=[]).push({...commun,nature:'prolongation',avant:x.expire,apres:expire,note});x.expire=expire;break;
+ }
  case 'reservation.etat':{
   const x=trouve(d.reservations,p.cible);exige(etatReservation(x,maintenant)==='active','Cette réservation n’est plus active.');x.etat=choix(p.etat,['annulee','convertie']);(x.evenements??=[]).push({...commun,nature:x.etat,note:texte(p.note||'',250,true)});break;
  }
@@ -71,10 +94,23 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   x.mouvements.push({...commun,nature,quantite:n,motif,avant:x.stock,apres:suivant});x.stock=suivant;break;
  }
  case 'veille.creer':{
-  const minimum=p.minimum===null?null:entier(p.minimum),maximum=entier(p.maximum,1);exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
-  ajoute(d.veilles,{...commun,titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),etat:'preparee'});break;
+  ajoute(d.veilles,{...commun,...criteresVeille(p),version:1,etat:'preparee',evenements:[]});break;
  }
- case 'veille.archiver':{trouve(d.veilles,p.cible).etat='archivee';break;}
+ case 'veille.modifier':{
+  const x=trouve(d.veilles,p.cible);exige(x.etat==='preparee','Restaure cette recherche avant de la modifier.');
+  exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
+  exige(p.versionAttendue===(x.version||1),'Cette recherche a changé. Ferme le formulaire et rouvre-la avant de sauvegarder.');
+  const avant=criteresVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
+ }
+ case 'veille.dupliquer':{
+  const x=trouve(d.veilles,p.cible);ajoute(d.veilles,{...commun,...criteresVeille(x),titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
+ }
+ case 'veille.archiver':
+ case 'veille.restaurer':{
+  const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');
+  exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
+  (x.evenements??=[]).push({...commun,nature:archiver?'archivage':'restauration'});x.etat=archiver?'archivee':'preparee';break;
+ }
  case 'dossier.creer':{
   d.dossiers??=[];ajoute(d.dossiers,{...commun,reference:texte(p.reference),titre:texte(p.titre),nature:choix(p.nature,['retour','litige','manquant','autre']),echeance:p.echeance?date(p.echeance):null,note:texte(p.note||'',1500,true),etat:'ouvert',evenements:[]});break;
  }
