@@ -55,3 +55,24 @@ Les variantes sombres utilisent des surfaces adaptées. Proposition non publiée
 
 Vérification de cette proposition : compilation réussie et 94 contrôles Chromium
 sur trois largeurs de téléphone, dont présence du bandeau contrasté des tâches.
+
+### Proposition Studio — composition, au-delà des matières
+
+Feuille mobile dédiée `styles-mobile-studio.css` : le titre de plateforme ne se
+répète plus visuellement sous l’en-tête, les onglets ferment le bandeau ardoise,
+et le contenu Vinted commence par un titre et le nombre réel de résultats (jamais
+un faux zéro pendant le chargement). Recherche et période intégrées à une même
+rangée, filtres sur la suivante. Portraits plus présents et prix sous le titre
+pour ne plus comprimer les noms longs. Coût, modification et facture conservent
+leurs accès. Les raisons des actions indisponibles restent visibles.
+
+À l’accueil, bilan mensuel horizontal distinguant vendu et reçu, puis argent en
+attente et graphique sur toute la largeur. Les calculs et le dessin des courbes
+restent inchangés. Piste encore non publiée, captures avec données synthétiques.
+
+Vérification Studio : compilation réussie ; 100 contrôles mobiles Chromium à
+320/390/430 px, dont contraste des compteurs, titre séparé du prix et bilan à
+sept chiffres ; 202 contrôles de navigation et d’actions revendeurs réussis.
+Le résumé déplié a sa propre rangée et ne recouvre plus la fraîcheur des données.
+Sur ordinateur, marges du stock compactées pour conserver ses liens dans la
+fenêtre de 900 px à densité réelle. Aucun appareil iPhone physique testé.
