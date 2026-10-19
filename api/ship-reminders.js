@@ -25,6 +25,7 @@ import { aExpedier } from './widget.js';
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -154,21 +155,9 @@ async function getRowProjete(id, cles) {
 // la route (`comptesActifs`, §11) : un compte déconnecté n'y entre plus.
 // `null` = pas su (registre ou commandes illisibles) — jamais `[]` à sa place.
 async function lireCommandesEbay() {
-  const [reg, rows] = await Promise.all([
-    getRowProjete('ebay_comptes', ['comptes']),
-    fetchPaginated(scoped('app_data?id=like.ebay_orders%25&select=id,orders:data->orders')),
-  ]);
-  if (reg === undefined || !Array.isArray(rows)) return null;
-  const ids = new Set(comptesActifs(normaliserRegistre(reg)).map((c) => 'ebay_orders' + c.suffixe));
-  const out = [], vus = new Set(), lus=new Set();
-  for (const r of rows) {
-    if(!r || !ids.has(r.id))continue;
-    if(!Array.isArray(r.orders))return null;
-    lus.add(r.id);
-    for (const o of r.orders) { const k = o && o.orderId; if (k && vus.has(k)) continue; if (k) vus.add(k); out.push(o); }
-  }
-  if([...ids].some(id=>!lus.has(id) && (id!=='ebay_orders' || Array.isArray(reg?.comptes) && reg.comptes.some(c=>c.principal && !c.deconnecteLe))))return null;
-  return out;
+  return lireCommandesEbayServeur({
+    lireLigne: getRowProjete, lireToutes: (p) => fetchPaginated(scoped(p)), comptesActifs, normaliserRegistre,
+  });
 }
 const MAIN_BILAN = ['vinted_sales_hidden', 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
@@ -231,7 +220,11 @@ function colisAExpedier(d) {
     for (const o of l.orders) if (o && o.transaction_id != null) parTx[o.transaction_id] = o;
   }
   const txs = resumeTrouve ? [...resume] : Object.values(parTx).filter((o) => aExpedier(o)).map((o) => String(o.transaction_id));
-  return new Set(txs.map(String).filter(pasPartie)).size;
+  // (19 octobre) Les ventes eBay à poster comptent aussi — la MÊME règle que le
+  // widget et l'app (`colisEbay`, §11). eBay illisible ⇒ le nombre Vinted seul,
+  // dit « au moins » par l'appelant (jamais un total partiel présenté complet).
+  const eb = resumeColisEbay(colisEbay(d.ebay));
+  return new Set(txs.map(String).filter(pasPartie)).size + (eb ? eb.total : 0);
 }
 
 async function bilanDeLaSemaine(maintenant = Date.now()) {
@@ -244,7 +237,7 @@ async function bilanDeLaSemaine(maintenant = Date.now()) {
   const d = await lireDonneesBilan();
   if (Array.isArray(d.comptes) && !d.comptes.length) return 'aucun compte Vinted lié';
   const b = calculerBilan({
-    ...d, colis: colisAExpedier(d),
+    ...d, colis: colisAExpedier(d), colisAuMoins: !Array.isArray(d.ebay),
     dorment: d.main ? d.main.vrm_paires_dorment : null,
     debut: sem.debut, fin: sem.fin, maintenant,
   });
@@ -341,18 +334,28 @@ async function traiterVendeur() {
         }
       }
     } catch (_) { attente = null; }
+    // (19 octobre) Les ventes eBay à poster : la MÊME règle que l'app et le
+    // widget (`colisEbay`, §11), lue indépendamment de Vinted — un vendeur qui
+    // ne vend que sur eBay a aussi son rappel. Illisible ⇒ `null`, on n'invente
+    // rien pour eBay (ni « 0 », ni un rappel).
+    let eb = null;
+    try { eb = resumeColisEbay(colisEbay(await lireCommandesEbay())); } catch (_) { eb = null; }
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
-    // se TAIT. Une notification fausse est pire que pas de notification — c'est
-    // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) return { urssaf, bilan, skipped: 'resume absent — aucune notification envoyee' };
+    // se TAIT pour Vinted. Une notification fausse est pire que pas de
+    // notification — c'est très exactement le « 51 bordereaux » qu'on corrige ici.
     // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
     //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
-    //    et la notification annoncerait des colis déjà partis. On se tait.
-    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, skipped: 'réglages illisibles — aucune notification envoyée' };
+    //    et la notification annoncerait des colis déjà partis. On se tait (Vinted).
+    let vintedSkip = null;
+    if (!attente) vintedSkip = 'resume absent';
+    else if (mLu === undefined || panelLu === undefined) vintedSkip = 'réglages illisibles';
+    // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
+    // passage suivant, réglages lus, ne doit pas se croire « déjà notifié »).
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip === 'resume absent' ? 'resume absent — aucune notification envoyee' : 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
-    for (const b of rows) {
+    if (!vintedSkip) for (const b of rows) {
       if (!b) continue;
       const k = key(b);
       if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
@@ -363,26 +366,36 @@ async function traiterVendeur() {
       else if (iso === today) dueToday += 1;
       else if (iso === tomorrow) dueTomorrow += 1;
     }
+    const ebayDus = eb ? eb.overdue + eb.today + eb.tomorrow : 0;
+    if (eb) { overdue += eb.overdue; dueToday += eb.today; dueTomorrow += eb.tomorrow; }
     const total = overdue + dueToday + dueTomorrow;
+    const nePasPoster = eb ? eb.nePasPoster : 0;
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, skipped: 'déjà notifié', total };
 
-    if (total > 0 && await pushCategorieActive('expedier')) {
+    if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const parts = [];
       if (overdue) parts.push(`${overdue} en retard`);
       if (dueToday) parts.push(`${dueToday} aujourd'hui`);
       if (dueTomorrow) parts.push(`${dueTomorrow} demain`);
+      // Le mot suit la donnée : un bordereau Vinted s'imprime depuis VRM, une
+      // étiquette eBay se prend DANS eBay (l'acheteur l'a payée, §2.8).
+      const quoi = !ebayDus ? `${total} bordereau${total > 1 ? 'x' : ''} à envoyer`
+        : ebayDus === total ? `${total} colis eBay à envoyer`
+        : `${total} colis à envoyer, dont ${ebayDus} eBay`;
+      const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
+      const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
       await sendPushToAll({
-        title: overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
-        body: `${total} bordereau${total > 1 ? 'x' : ''} à envoyer (${parts.join(' · ')}). Ouvre l'app pour les imprimer.`,
+        title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
+        body: (corps + stop).trim() + (ebayDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les imprimer."),
         tag: 'ship-reminder',
         url: '/?tab=cat_bord',
       });
     }
-    await ecrireDedup('ship_reminder_dedup', { date: today, total });
-    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total };
+    await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
+    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total, ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
 
 export default async function handler(req, res) {

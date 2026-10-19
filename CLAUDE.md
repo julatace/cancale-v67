@@ -10209,6 +10209,13 @@ captures et liste les cibles < 44 px) :
   commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
   que si toutes ses lignes sont reliées.
 
+### La vente eBay arrive dans Colis, Ma journée, la cloche, le widget et le rappel du matin (19 octobre, agent eBay K7 en partie)
+« Rien ne se passe après une vente eBay » (etat.md) : une commande eBay payée n'était visible que dans eBay → Ventes. État K par K, lu dans le code : `docs/passation/notes/agent-ebay/etat.md` (en tête).
+- **Une règle** `colisEbay` (`api/_lib/ebay-a-expedier.js`, importée par l'app ET le serveur, §11) : à poster = `etatCommandeEbay(o).peutExpedier`, pas d'annulation demandée, un envoi (`fulfillmentInstructionsType` SHIP_TO ou absent — jamais un colis caché) ; « Ne poste pas » = annulation demandée (inconnue ⇒ demandée) ; date limite `lineItemFulfillmentInstructions.shipByDate` (ancien nom lu en repli — `ebay-agent.js` ne lisait que lui) ; authentification d'eBay signalée. `null` = pas su, jamais `[]`.
+- **Lecteurs** : Colis (bloc « Ventes eBay à poster » : N° par le SKU via `numLigneEbay`, jours, emplacement, « Étiquette sur eBay ↗ » vers `ebay.fr/sh/ord/details?orderid=` — adresse NON mesurée —, « Suivi et message à l'acheteur » → `?tab=ebay_ventes` + `DEMANDE_EBAY_CIBLE` ; « Ne poste pas » en tête, → `?tab=ebay_agent` ; total du haut Vinted + eBay ; âge des commandes au-delà de 6 h), Ma journée (« À envoyer » au même nombre, `data-ebay`), `vrm_colis_aposter` (+ `ebay`, `nePasPoster`), `api/widget.js` (`ship.total` comprend eBay, `ship.ebay`, `ship.auMoins`), `api/ship-reminders.js` (rappel aussi pour un vendeur eBay seul, sans mémo quand rien n'est lisible ni à dire), bilan du lundi (« au moins » si eBay illisible). L'étiquette se prend DANS eBay (§2.8) : VRM n'achète rien.
+- ⚠️ **Les commandes eBay ne se relisent que sur synchro** (Compte eBay → Rafraîchir, ou la relecture des 6 h quand une règle d'offre est posée) tant que K5 (VRM fermé, migrations 014 + 015) n'existe pas : Colis dit leur âge.
+- Preuves : `audit-ebay-colis.cjs` (règle + vraies routes widget et rappel, 9 rouges sur 65eec06, 3 mutations rouges) ; banc `ebay-colis.cjs` (`BANC_PORT`, 390/1512, 28 rouges sur le build de 65eec06, mutation « Ma journée sans eBay » rouge). Aucun appel réel à eBay ; formes de l'API Fulfillment tirées de la doc.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
