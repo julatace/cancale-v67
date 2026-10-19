@@ -24,7 +24,12 @@ const ok  = m => console.log('✅ ' + m);
 const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); };
 
 // 1) l'écran Ventes calcule le bénéfice sur le SOUS-ENSEMBLE CONNU
-/benefConnu\s*\+=\s*sell-buy-fee/.test(app)
+// (19 oct.) La règle vit dans `ajouterVenteBenefice` (partagée avec
+// Comptabilité, §11) : on suit la RÈGLE, pas son orthographe — le net n'est
+// cumulé que sous la garde « prix d'achat connu », et `benefConnu` en vient.
+const regleBenef = (() => { const i = app.indexOf('const ajouterVenteBenefice'); return i < 0 ? '' : app.slice(i, app.indexOf('\n};', i)); })();
+(/benefConnu\s*\+=\s*sell-buy-fee/.test(app)
+  || (/if \(achat != null[^{]*\{[^}]*fraisCouverts \+= f/.test(regleBenef) && /benefConnu = R\.net/.test(app) && /net = brut - acc\.fraisCouverts/.test(app)))
   ? ok('Ventes : le bénéfice ne somme que les ventes au coût connu')
   : nok('Ventes : `benefConnu` sommé sur les ventes au coût connu');
 

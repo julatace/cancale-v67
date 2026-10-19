@@ -10088,6 +10088,32 @@ Vinted). `offer_price` n'est PAS le prix de la paire (valeurs à 1,70 €) : pas
   le reste s'affiche. Le coût serveur de la lecture (~1 400 lignes décompressées
   pour quelques scalaires) n'est pas mesuré.
 
+### Le bénéfice brut et net dans Comptabilité (19 octobre)
+Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
+encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**
+(Mois · Trimestre · Année, `BeneficeCompta`) : brut, − frais de vente, −
+charges, − cotisations URSSAF, net.
+- **Une règle, un propriétaire (§11)** : `ajouterVenteBenefice` /
+  `resumeBenefice` (centimes entiers, module) servent `totals` de l'écran Ventes
+  ET la publication `vrm_benefice_jours` (SYNC_KEYS : cumuls PAR JOUR de vente,
+  tableaux de 7 nombres, deux années au plus), que Comptabilité somme
+  (`beneficeDesJours`, `beneficePeriode`). Comptabilité ne relit aucun prix
+  d'achat. Le prix d'achat d'une fiche : `achatDe(e)` (aussi `buyOf`).
+- **Brut et net des ventes** : seulement les ventes au prix d'achat connu
+  (« 0 » saisi est connu), couverture écrite (« X ventes sur Y ») avec la porte
+  (saisie en série). **Net final** (net des ventes − charges de la période −
+  cotisations sur la part VINTED du CA déclaré publié) : « — » si un prix d'achat
+  manque (`raison: achats`) ou si le CA déclaré n'est pas publié (`cotisations`).
+  Jamais publié ⇒ « se calcule dans Ventes ». Un compte non lu ⇒ Ventes ne
+  publie pas (la dernière, complète, reste). Aucune couleur sur un bénéfice.
+- Limites dites à l'écran : ventes Vinted seulement (Leboncoin/eBay n'ont pas de
+  prix d'achat reliés) ; brut au jour de la VENTE, cotisations au CA VERSÉ.
+- Preuves : `audit-benefice.cjs` (vraies fonctions dans un vm, 19 contrôles ;
+  `--mutation=duplique|zero|cotis` ⇒ 3 · 4 · 1 rouges) ; banc
+  `chiffres-croises.cjs` section E (Compta = Ventes « Ce mois », `data-benef-*`
+  / `data-ventes-benef-*`) : **10 rouges sur le build d'avant**, rouge sous la
+  mutation « second calcul divergent ».
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10459,3 +10485,22 @@ Julien : « si on doit la publier elle doit marcher sur tous les moteurs de rech
 - **Premiers pas selon le navigateur** (`src/navigateurExtension.js`) : `LIENS_BOUTIQUES` (vides tant que les fiches ne sont pas validées — jamais un lien deviné) ; lien rempli ⇒ « Installer depuis la boutique » ; Firefox sans lien ⇒ « pas encore en ligne, ouvre vrm.center dans Chrome/Edge/Brave/Opera » (le zip est un paquet Chromium, Firefox ne l'installe pas) ; Safari ⇒ pas accepté. Texte « l'extension ne répond pas » : `about:addons` sous Firefox, `edge://extensions` sous Edge.
 - Preuves : `audit-extension-navigateurs.cjs` (43 contrôles ; **16 rouges sur 526a6c1** ; mutations « pont qui relaie sans regarder l'identifiant » et « compat absente des scripts de contenu » ⇒ rouges ; le fond SANS la compat dans un Firefox imité ne lit plus son stockage) ; `_fond-vm.cjs` option `firefox` (chrome à rappels seuls + browser à promesses) ; banc `pont.cjs` « FIREFOX » + « FIREFOX POUR ANDROID » : **5 rouges sur le build de 526a6c1**, vert après.
 - ⚠️ **Non mesuré** : un vrai Firefox (bloqué d'ici) — le premier essai sera chez Julien ; Edge pour Android (extensions pas ouvertes à tous). Gestes de Julien : `docs/boutiques-extension.md` (comptes Edge/Opera/AMO gratuits, adresse de contact, puis remplir `LIENS_BOUTIQUES`).
+
+### Confirmer le bon compte Vinted, et le graphisme de l'extension (19 octobre, 5.191)
+Julien : « à l'installation de l'extension, confirmer le bon compte Vinted » et « le graphisme de l'extension ».
+- **La question** (`vrm-badge.js`, panneau `.question`) : sur Vinted, VRM connecté, quand le compte du COOKIE n'a jamais été confirmé dans ce Chrome ET qu'on sait le nommer (login de la base `loginDe`, sinon celui lu dans la réponse `users/current` déjà reçue, rangé dans `chrome.storage.local.vrmLoginsVus` — jamais deviné, jamais « compte n° … ») : « Tu es connecté sur {login} — c'est bien un de tes comptes à capter ? [Oui, capter ce compte] [Non, ignorer ce compte] » (× = plus tard, pour cette page). Pas de pastille ambre : une question n'est pas une panne.
+- **Le choix** : `chrome.storage.local.vrmChoixComptes[uid] = {choix, login, at}` (ce Chrome seulement ; pas de ligne `app_data`). Écrit par le service worker (`choixCompte`) **seulement pour le compte du cookie de l'onglet qui demande** — un autre uid est refusé. « Non » ⇒ `compteNonCapte` (refusé OU supprimé définitivement) ferme les cinq portes de capture (passive, active, moisson, visite, chemins vus), ses jetons ne partent pas (`captureDomain`, rien d'effacé), et la relecture publique des autres comptes le saute. Pas répondu ou stockage illisible ⇒ on capte COMME AVANT. Revenir : au survol du logo, « ignoré dans ce navigateur (ton choix) » + **« Capter ce compte »**.
+- **Graphisme** : `popup.html` (fenêtre de l'icône et `?mode=carte`) et la carte du badge en VRM Noir par variables, clair/sombre selon `prefers-color-scheme` (sombre #07090D / #10141B / #3D7BFF ; clair #F4F6FA / blanc / #2458E6), boutons d'une seule forme (rayon 8, 44 px), champs et lien « avec mon mot de passe VRM » à 44 px. CSS seulement côté popup.
+- Preuves (§6.1, bancs copiés dans l'arbre de HEAD) : `badge.cjs` 67 contrôles dont la section 10 sur le VRAI `background.js` (`_fond-vm`) — « Non » ⇒ zéro écriture `harvest_111_*`, « Oui » et « pas répondu » ⇒ la capture part, autre uid refusé — **12 rouges sur l'avant** ; `popup.cjs` 57 contrôles, **9 rouges sur l'avant** (fond clair, accent clair, cibles < 44 px).
+- Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien de neuf). Extension **5.191.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ Non mesuré : le vrai Vinted (le login arrive avec la première réponse `users/current` : la question peut apparaître quelques secondes après l'ouverture) ; sur Firefox Android, pas de survol — le retour sur un « Non » passe par la carte au toucher.
+
+### Achats Leboncoin et eBay sur la forme des achats Vinted (19 octobre)
+Julien : « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ». Une ligne d'achat (`LigneAchat`, classes `vrm-buy-row`) : photo · titre · statut à pastille (mêmes mots et couleurs qu'`etapeAchat`) · date · prix · gestes.
+- **Leboncoin** (`etapeAchatLbc`, `LigneAchatLbc`) : Annulé · Reçu · En transit · étape capturée, lue sur ce que capte l'extension (`lbcAnnulee`, `lbcFinalisee`, `lbcExpediee`). En route : « Suivre » (`label.trackingUrl`) et le QR du colis (`label.qrUrl`, `QrColis`) dépliable — seulement si capturés.
+- **eBay** (`EbayAchats`) : même ligne ; `achatsEbay` lit en plus la photo (`i.ebayimg.com` seulement), `PaidTime`, `ShippedTime` et le suivi déclaré par le vendeur (numéro + transporteur). Étape : Expédié · Payé · À payer — jamais « Reçu » (eBay ne le dit pas ici). Lien « ↗ » vers l'annonce.
+- Preuves : `plateformes-premium.cjs` (écran Leboncoin → Achats, 2 tailles) 8 rouges sur 1023dd4 ; `ebay-apres-vente-ecran.cjs` 7 rouges sur 1023dd4 ; `ebay-apres-vente.mjs` vert.
+- ⚠️ Non mesuré : que `GetMyeBayBuying` rende `PictureDetails`, `ShippedTime` et `ShipmentTrackingDetails` dans la WonList (doc d'eBay) — absents ⇒ rien n'est affiché.
+
+### Toucher une case à cocher sur téléphone ne la cochait pas (19 octobre)
+`BottomBar` cachait la barre du bas dès qu'un `<input>` prenait le focus — y compris une case à cocher ou un bouton radio, qui n'ouvrent aucun clavier. Au toucher, la barre disparaissait, l'écran sautait de 22 px entre l'appui et le relâchement, et le geste retombait à côté : la case « J'ai compris » du planificateur eBay ne se cochait pas (banc `ebay-programmer`, 6 rouges hérités, à 390 px seulement). Seuls les champs à clavier cachent la barre maintenant (`SANS_CLAVIER`). `ebay-programmer` et `coque-mobile` verts.

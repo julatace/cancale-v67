@@ -25,6 +25,11 @@
 //      jamais publiée ⇒ « pas su » (aucun montant), puis elle se relit dès
 //      qu'une publication arrive. Jugé sur `data-compta-ca-etat` /
 //      `data-compta-ca`, jamais sur la phrase.
+//   E. (19 octobre) le bénéfice BRUT et NET de Comptabilité (« Ton bénéfice »,
+//      mois) = celui de l'écran Ventes (« Ce mois »), sur les mêmes prix
+//      d'achat inventés ; prix manquant ⇒ net « — » et la porte ; tout connu ⇒
+//      net = net des ventes − charges − cotisations. Jugé sur `data-benef-*`
+//      et `data-ventes-benef-*`.
 const path=require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -242,6 +247,62 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       await pg.waitForTimeout(600);
       const r2=await lireRes(pg);
       dit(!!r2 && r2.etat==='lu' && Number(r2.ca)===100,'dès qu’une publication arrive, la carte la lit sans changer d’écran',JSON.stringify(r2));
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+
+    console.log('\n── E. Le bénéfice brut et net : Comptabilité = Ventes (19 octobre)');
+    // Prix d'achat et frais saisis sur la vente (forme de `vinted_sale_overrides`),
+    // inventés. 91004 sans prix d'achat ⇒ couverture partielle, net « — ».
+    const lireVentesBenef=async(pg)=>{
+      await aller(pg,'cat_ventes',null,600);
+      await pg.waitForFunction(()=>{ try{ return !!JSON.parse(localStorage.getItem('vrm_benefice_jours')||'null'); }catch(_){ return false; } },null,{timeout:25000}).catch(()=>{});
+      const bouton=pg.getByRole('button',{ name:/Analyse de tes ventes/ }).first();
+      await bouton.waitFor({timeout:15000}).catch(()=>{});
+      if(await bouton.count()) await bouton.click();
+      const per=pg.locator('.vrm-period button').first();
+      if(await per.count()){ await per.click(); await pg.getByRole('button',{ name:/^Ce mois$/ }).first().click(); }
+      await pg.waitForTimeout(700);
+      return pg.evaluate(()=>{ const e=document.querySelector('[data-ventes-benef-n]'); return e?{ n:e.getAttribute('data-ventes-benef-n'), ncout:e.getAttribute('data-ventes-benef-ncout'), brut:e.getAttribute('data-ventes-benef-brut'), net:e.getAttribute('data-ventes-benef-net') }:null; });
+    };
+    const lireComptaBenef=async(pg)=>{
+      await aller(pg,'compta','[data-benef-etat]',2500);
+      await pg.evaluate(()=>{ const b=document.querySelector('[data-benef-choix="mois"]'); if(b) b.click(); });
+      await pg.waitForTimeout(400);
+      return pg.evaluate(()=>{ const e=document.querySelector('[data-benef-etat]'); const o={ phrase:/pas encore ton bénéfice net/.test(document.body.innerText||'') }; if(!e) return o; for(const a of e.getAttributeNames()) if(a.startsWith('data-benef-')) o[a.slice(11)]=e.getAttribute(a); return o; });
+    };
+    const OV1={ '91002':{ buyPrice:'20', fees:'2' }, '91003':{ buyPrice:'15' } };
+    await essaie('E1',async()=>{
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_sale_overrides:OV1 } });
+      const v=await lireVentesBenef(pg);
+      const c=await lireComptaBenef(pg);
+      console.log(`   rendu : Ventes ${JSON.stringify(v)} · Compta ${JSON.stringify(c)}`);
+      const fin=VENTES.filter(x=>/finalis/i.test(x[3])&&memeMois(x[4]));
+      const conn=fin.filter(x=>OV1[x[1]]);
+      const brutAtt=conn.reduce((s,x)=>s+cents(x[2])-cents(OV1[x[1]].buyPrice),0)/100;
+      const netAtt=conn.reduce((s,x)=>s+cents(x[2])-cents(OV1[x[1]].buyPrice)-cents(OV1[x[1]].fees||0),0)/100;
+      dit(!!v && Number(v.ncout)===conn.length && Number(v.n)===fin.length && Math.abs(Number(v.brut)-brutAtt)<0.005,'Ventes (ce mois) : brut sur les ventes au prix connu = attendu',`${v&&v.brut} (${v&&v.ncout}/${v&&v.n}) · attendu ${brutAtt} (${conn.length}/${fin.length})`);
+      dit(c.etat==='lu' && c.periode==='mois','Comptabilité lit le bénéfice publié par Ventes (mois)',JSON.stringify({etat:c.etat,periode:c.periode}));
+      dit(!!v && c.brut!=null && c.brut===v.brut && c['ventes-net']===v.net,'le BRUT et le NET des ventes de Comptabilité = ceux de Ventes',`Compta ${c.brut} / ${c['ventes-net']} · Ventes ${v&&v.brut} / ${v&&v.net}`);
+      dit(!!v && c.n===v.n && c.ncout===v.ncout,'et la même couverture (prix d’achat connus pour X ventes sur Y)',`${c.ncout}/${c.n}`);
+      dit(c['ventes-net']!=null && Math.abs(Number(c['ventes-net'])-netAtt)<0.005,'NET des ventes = attendu (brut − frais des mêmes ventes)',`${c['ventes-net']} · attendu ${netAtt}`);
+      dit(c.net==='' && c.raison==='achats','un prix d’achat manque ⇒ net final « — », raison « achats »',`${c.net} · ${c.raison}`);
+      dit(await pg.locator('[data-benef-porte]').count()>0,'et la porte « Compléter les prix d’achat » est là');
+      dit(!c.phrase,'la phrase « pas encore ton bénéfice net » a disparu');
+      dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
+      await ctx.close();
+    });
+    await essaie('E2',async()=>{
+      const OV2={ ...OV1, '91004':{ buyPrice:'30' } };
+      const { ctx, pg, errs }=await page(b,{ main:{ vinted_sale_overrides:OV2 } });
+      await publier(pg);
+      const v=await lireVentesBenef(pg);
+      const c=await lireComptaBenef(pg);
+      console.log(`   rendu : Ventes ${JSON.stringify(v)} · Compta ${JSON.stringify(c)}`);
+      dit(!!v && c.brut!=null && c.brut===v.brut && c['ventes-net']===v.net && c.n===v.n && c.ncout===c.n,'tout est connu : Comptabilité = Ventes, couverture complète',`Compta ${c.brut} / ${c['ventes-net']} · Ventes ${v&&v.brut} / ${v&&v.net}`);
+      if(process.env.BANC_CAPTURE){ for(const w of [1512,390]){ await pg.setViewportSize({width:w,height:950}); await pg.waitForTimeout(300); await pg.locator('[data-benef-etat]').screenshot({path:path.join(process.env.BANC_CAPTURE,`benefice-${w}.png`)}); } }
+      const netCalc=Math.round((Number(c['ventes-net'])-Number(c.charges)-Number(c.cotis))*100)/100;
+      dit(!!c.net && !!c.cotis && Math.abs(Number(c.net)-netCalc)<0.005,'NET final = net des ventes − charges − cotisations (au centime)',`${c.net} · ${netCalc}`);
       dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
       await ctx.close();
     });
