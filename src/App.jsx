@@ -13544,6 +13544,56 @@ function CarteLbc({ o }) {
   return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
+// L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
+// celle d'un achat Vinted (`etapeAchat`) : Annulé · Reçu · En transit · Payé.
+// Elle lit ce que l'extension capte (colis, liste v3), jamais un mot deviné.
+function etapeAchatLbc(o) {
+  if (lbcAnnulee(o)) return { label: 'Annulé', step: 0, color: C.danger };
+  if (lbcFinalisee(o)) return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  if (lbcExpediee(o)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+  const s = String(o.stepLabel || '').trim();
+  return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'Payé', step: 1, color: C.muted };
+}
+// UNE LIGNE D'ACHAT, la forme de l'écran Achats Vinted (`vrm-buy-row` : photo ·
+// titre + statut à pastille · prix · gestes). Partagée par les achats
+// Leboncoin (et la même structure est rendue par les achats eBay) — Julien :
+// « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ».
+function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenue, data }) {
+  return (
+    <div className="vrm-buy-row" {...(data || {})} style={{ opacity: attenue ? 0.55 : 1 }}>
+      <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }} />}
+      </div>
+      <div className="vrm-buy-main">
+        <div className="vrm-buy-title" style={{ color: C.text }} title={titre || ''}>{titre || '(sans titre)'}</div>
+        <div className="vrm-buy-meta" style={{ color: C.muted }}>
+          {statut && <span className="vrm-buy-statut" style={{ color: C.text }}><i style={{ background: statut.color }} />{statut.label}</span>}
+          {meta}
+        </div>
+        {sous}
+      </div>
+      <div className="vrm-buy-price" style={{ color: C.text }}>{montant}</div>
+      <div className="vrm-buy-act">{actions}</div>
+    </div>
+  );
+}
+function LigneAchatLbc({ o }) {
+  const [qr, setQr] = React.useState(false);
+  const st = etapeAchatLbc(o);
+  const lbl = o.label || {};
+  const enCours = st.step >= 1 && st.step < 4;
+  const qrUrl = enCours && /^https?:\/\//.test(String(lbl.qrUrl || '')) ? lbl.qrUrl : '';
+  const suivi = enCours && /^https?:\/\//.test(String(lbl.trackingUrl || '')) ? lbl.trackingUrl : '';
+  const date = o.dateVente ? new Date(o.dateVente) : null;
+  return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || '') }} attenue={st.step === 0}
+    photo={photoArticle(o)} titre={o.title} statut={st} montant={lbcEuro(o.price)}
+    meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
+    sous={qr && qrUrl ? <div style={{ marginTop: 8 }}><QrColis url={qrUrl} size={120} /></div> : null}
+    actions={<>
+      {suivi && <a className="vrm-buy-quick" href={suivi} target="_blank" rel="noreferrer" title="Suivre le colis" aria-label="Suivre le colis" style={{ color: C.muted }}><Icon name="truck" size={16} /></a>}
+      {qrUrl && <button className="vrm-icon-control vrm-buy-quick" type="button" data-lbc-achat-qr="" onClick={() => setQr(v => !v)} title="QR du colis" aria-label="QR du colis" aria-expanded={qr} style={{ color: C.warn }}><Icon name="key" size={16} /></button>}
+    </>} />;
+}
 function lbcArgent(lbcVentes) {
   const ventes = (lbcVentes && lbcVentes.ventes) || [];
   const actives = ventes.filter(o => !lbcAnnulee(o));
@@ -13616,7 +13666,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const annules = achats.filter(lbcAnnulee);
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
-  const Carte = (o) => <CarteLbc key={o.txId} o={o} />;
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{arr.map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -13639,7 +13689,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       )}
       {enRoute.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
-        {enRoute.map(Carte)}
+        <Liste arr={enRoute}/>
         {/* (17 oct.) OÙ ARRIVE LE CODE D'UN COLIS LEBONCOIN. Mesuré sur sa base :
             une transaction Leboncoin ne porte NI point de retrait NI code (champs
             captés : statut, transporteur, prix). Le code vient de l'e-mail du
@@ -13650,11 +13700,11 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       </>)}
       {recus.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
-        {recus.map(Carte)}
+        <Liste arr={recus}/>
       </>)}
       {annules.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulés / remboursés ({annules.length})</div>
-        {annules.map(Carte)}
+        <Liste arr={annules}/>
       </>)}
     </div>
   );
