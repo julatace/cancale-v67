@@ -1405,6 +1405,10 @@ const SYNC_KEYS = [
   // Il porte aussi l'argent REÇU par mois (`recu`), CONSOMMÉ par le widget de
   // l'iPhone (api/widget.js) — qui ne le recalcule plus sur les emails.
   'vinted_urssaf_mois',
+  // Le bénéfice des ventes Vinted, cumulé JOUR PAR JOUR (19 octobre) : PUBLIÉ
+  // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
+  // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
+  'vrm_benefice_jours',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -4421,6 +4425,48 @@ const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
   if (ca == null || !isFinite(Number(ca))) return null;
   const centimes = Math.round(Number(ca) * 100);
   return Math.round(Number((centimes * Number(tauxPct) / 100).toFixed(6))) / 100;
+};
+// ── BÉNÉFICE BRUT ET NET (19 octobre) — UNE règle, deux écrans (§11) ────────
+// L'écran Ventes (`totals`) et Comptabilité (« Ton bénéfice ») passent par ici :
+// Ventes cumule ses ventes, et PUBLIE ses cumuls par jour (`vrm_benefice_jours`)
+// que Comptabilité CONSOMME — elle ne relit aucun prix d'achat elle-même.
+// Tout en CENTIMES entiers : la somme des jours publiés et celle de l'écran
+// Ventes ne peuvent pas différer d'un centime d'arrondi.
+//   BRUT = vente − prix d'achat ; NET des ventes = brut − boosts et frais de vente.
+// Les deux UNIQUEMENT sur les ventes dont le prix d'achat est connu (§5 : un
+// achat inconnu n'est pas un achat à 0 € — « BÉNÉFICE NET 5 739 € » pour un CA
+// de 5 741 €, le 1er septembre).
+const BENEF_CHAMPS = ['n', 'ca', 'frais', 'nCout', 'cout', 'caCouvert', 'fraisCouverts'];
+const beneficeVide = () => ({ n: 0, ca: 0, frais: 0, nCout: 0, cout: 0, caCouvert: 0, fraisCouverts: 0 });
+const ajouterVenteBenefice = (acc, eur, achat, frais) => {
+  const v = Math.round((Number(eur) || 0) * 100), f = Math.round((Number(frais) || 0) * 100);
+  acc.n += 1; acc.ca += v; acc.frais += f;
+  if (achat != null && String(achat).trim() !== '' && isFinite(Number(achat))) {
+    acc.nCout += 1; acc.cout += Math.round(Number(achat) * 100); acc.caCouvert += v; acc.fraisCouverts += f;
+  }
+  return acc;
+};
+// Un jour publié est un tableau (dans l'ordre de BENEF_CHAMPS) : la ligne `main`
+// est lue partout, on ne l'alourdit pas de noms de clés répétés.
+const jourBeneficeEnTableau = (b) => BENEF_CHAMPS.map((k) => b[k] || 0);
+const cumulerBenefice = (acc, b) => {
+  if (!b) return acc;
+  BENEF_CHAMPS.forEach((k, i) => { acc[k] += Number(Array.isArray(b) ? b[i] : b[k]) || 0; });
+  return acc;
+};
+// Le résumé en euros : brut et net en DÉCOULENT (jamais stockés à part).
+const resumeBenefice = (acc) => {
+  const brut = acc.caCouvert - acc.cout, net = brut - acc.fraisCouverts;
+  return { n: acc.n, nCout: acc.nCout, ca: acc.ca / 100, frais: acc.frais / 100, cout: acc.cout / 100,
+    caCouvert: acc.caCouvert / 100, fraisCouverts: acc.fraisCouverts / 100, brut: brut / 100, net: net / 100 };
+};
+// Cumul des jours publiés compris dans [de, a[ (dates locales, AAAA-MM-JJ) :
+// la même borne que `dansPeriode` de l'écran Ventes (jour local entier).
+const beneficeDesJours = (jours, de, a) => {
+  const acc = beneficeVide();
+  const k0 = jourClef(de), k1 = jourClef(a);
+  for (const [k, b] of Object.entries(jours || {})) if (k >= k0 && k < k1) cumulerBenefice(acc, b);
+  return resumeBenefice(acc);
 };
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
   const u = aPayerUrssaf(ca, tauxPct); if (u == null) return null;
@@ -26210,6 +26256,118 @@ function ComptaAjout({ ouvert, onClick, libelle, data }) {
     </button>
   );
 }
+// ── TON BÉNÉFICE, BRUT ET NET (19 octobre, Julien : « le bénéfice brut et net ») ─
+// AUCUNE règle de vente ni aucun prix d'achat n'est relu ici (§11) :
+//   · BRUT et NET DES VENTES = la somme des jours publiés par l'écran Ventes
+//     (`vrm_benefice_jours`, `ajouterVenteBenefice`) — le même nombre que ses
+//     cartes « Bénéfice brut / net » sur la même période ;
+//   · CHARGES = `comptaChargesMois` / `comptaChargesAnnee` (celles de cet écran) ;
+//   · COTISATIONS = `aPayerUrssaf` sur la part VINTED du CA déclaré publié
+//     (`vinted_urssaf_mois`) — le bénéfice ne porte que sur les ventes Vinted.
+// Le NET final n'est écrit que si TOUTES les ventes de la période ont leur prix
+// d'achat : sinon un « — », la raison, et la porte (saisie en série). Trois
+// états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
+const PERIODES_BENEF = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
+const lireBeneficeJours = () => { try { const v = load('vrm_benefice_jours', null); return v && v.jours && typeof v.jours === 'object' ? v : null; } catch (_) { return null; } };
+function useLigneSynchro(cle, lire) {
+  const [v, setV] = React.useState(lire);
+  const [pret, setPret] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => { setPret(true); setV(lire()); }), []);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === cle) setV(lire()); };
+    const g = (e) => { if (e && e.key === cle) setV(lire()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return [v, pret];
+}
+// La part Vinted d'un mois publié : `par.Vinted` quand la ligne détaille ses
+// plateformes, le total quand elle n'en détaille aucune (ligne d'avant).
+const caVintedDuMois = (m) => {
+  const par = m && m.par && typeof m.par === 'object' ? m.par : null;
+  if (par && Object.keys(par).length) return par.Vinted ? (Number(par.Vinted.ca) || 0) : 0;
+  return Number(m && m.ca) || 0;
+};
+// Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
+// `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
+// CA déclaré publié (ou null), `taux` = le taux de cotisations.
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now() }) => {
+  const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
+  const v = beneficeDesJours(jours, de, a);
+  // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
+  const yms = [];
+  for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
+  const charges = periode === 'annee'
+    ? comptaChargesAnnee(compta, de.getFullYear()).total
+    : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
+  const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
+    ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caVintedDuMois(m), 0) * 100) / 100
+    : null;
+  const cotis = caDecl == null ? null : aPayerUrssaf(caDecl, taux);
+  const complet = v.nCout === v.n;
+  const netFinal = complet && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
+  const raison = !complet ? 'achats' : cotis == null ? 'cotisations' : '';
+  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison };
+};
+function BeneficeCompta({ compta, onNav }) {
+  const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const ligneUrssaf = useLigneUrssaf();
+  const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
+  const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
+  const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
+  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode }) : null;
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
+  const sansAchat = B ? B.n - B.nCout : 0;
+  const Ligne = ({ lib, val, sous, fort, data }) => (
+    <div className="vrm-set-ligne" {...(data || {})}>
+      <span className="vrm-set-lib"><b style={{ color: C.text }}>{lib}</b>{sous ? <small style={{ color: C.muted }}>{sous}</small> : null}</span>
+      <span className="vrm-display" style={{ fontSize: fort ? 20 : 15, fontWeight: fort ? 700 : 600, color: val == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{val == null ? '—' : fmt(val)}</span>
+    </div>
+  );
+  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
+  return (
+    <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}
+      data-benef-etat={etat} data-benef-periode={periode}
+      data-benef-n={B ? String(B.n) : ''} data-benef-ncout={B ? String(B.nCout) : ''}
+      data-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-benef-ventes-net={B && B.nCout > 0 ? e2(B.net) : ''}
+      data-benef-charges={B ? e2(B.charges) : ''} data-benef-cotis={B ? e2(B.cotis) : ''}
+      data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
+        <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
+        <Segmente label="Période du bénéfice" value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
+          options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
+      </div>
+      <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
+        {!B ? (
+          <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
+            {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
+          </small></span></div>
+        ) : (<>
+          <Ligne lib="Bénéfice brut" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
+            sous={B.n === 0 ? 'aucune vente Vinted finalisée sur la période'
+              : B.nCout === B.n ? `CA − prix d'achat · prix d'achat connus pour les ${B.n} vente${B.n > 1 ? 's' : ''}`
+              : <>CA − prix d'achat · prix d'achat connus pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n} — {lienSaisie}</>}
+            data={{ 'data-benef-ligne': 'brut' }} />
+          {B.nCout > 0 && B.fraisCouverts > 0 && <Ligne lib="− boosts et frais de vente" val={B.fraisCouverts} sous="des mêmes ventes" data={{ 'data-benef-ligne': 'frais' }} />}
+          <Ligne lib="− charges" val={B.charges} sous="abonnements, dépenses, packs et coûts fixes de la période" data={{ 'data-benef-ligne': 'charges' }} />
+          <Ligne lib="− cotisations URSSAF" val={B.cotis}
+            sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA Vinted versé sur la période (${fmt(B.caDecl)})`}
+            data={{ 'data-benef-ligne': 'cotis' }} />
+          <Ligne lib="Bénéfice net" fort val={B.netFinal}
+            sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas — {lienSaisie}</>
+              : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
+              : 'brut − frais − charges − cotisations'}
+            data={{ 'data-benef-ligne': 'net' }} />
+          <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
+            Ventes Vinted finalisées, au jour de la vente — la même règle que l'écran Ventes (Leboncoin et eBay n'ont pas de prix d'achat reliés). Les cotisations sont celles du CA versé sur la période.{pub.at ? ` Calculé avec tes ventes lues le ${new Date(pub.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}.` : ''}
+          </small></span></div>
+        </>)}
+      </div>
+    </section>
+  );
+}
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -26239,8 +26397,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // On CONSOMME la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`, le CA
   // déclaré, toutes plateformes, §11) — on ne recalcule aucun CA. Ligne
   // absente/pas encore publiée ⇒ `null` (on n'invente pas de recettes).
-  // ⚠️ Ce n'est PAS le bénéfice : le coût d'achat des paires n'est pas déduit
-  // ici (il n'est pas saisi, §2.5, et il vit dans Statistiques).
+  // ⚠️ Ce n'est PAS le bénéfice : le prix d'achat des paires n'est pas déduit
+  // ici — le bénéfice brut et net vit dans `BeneficeCompta`, juste en dessous.
   // ⚠️ (17 octobre) TROIS ÉTATS, ET LA LIGNE SE RELIT QUAND ELLE CHANGE. Elle
   // était lue une fois au rendu : sur un appareil qui n'avait jamais ouvert
   // Ventes, la carte disait « ton CA déclaré arrive sur cet appareil » — rien ne
@@ -26416,12 +26574,14 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 </div>
               )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans {lienBtn('Statistiques', 'dashboard', 13)}) — ce n'est donc pas encore ton bénéfice net.
+                Ce résultat ne déduit pas le prix d'achat de tes paires : ton bénéfice brut et net, qui le déduit, est juste en dessous.
               </div>
             </div>
           )}
         </div>
       </Card>
+
+      <BeneficeCompta compta={data} onNav={onNav} />
 
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
@@ -28966,7 +29126,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
-  const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? b : null; };
+  // Le prix d'achat d'une fiche (`null` = inconnu) — une seule lecture pour
+  // `buyOf`, les totaux de l'écran et la publication du bénéfice (§11).
+  const achatDe = (e) => { const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? b : null; };
+  const buyOf = (o) => achatDe(effEntry(o));
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
   // comme 100 % de marge tant que le coût n'est pas saisi).
   const isSaleNoBuy = (o) => classifyOrderStatus(o.status)==='completed' && buyOf(o)==null;
@@ -31255,7 +31418,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // quelques lignes : deux chiffres pour la même chose sur le même écran
     // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
     const items = (sales.items || []).filter(o => dansPeriode(o, periode));
-    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
+    let margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
+    // (19 oct.) Les montants du bénéfice passent par `ajouterVenteBenefice` — la
+    // règle que Comptabilité consomme (§11) : jamais un second calcul.
+    const acc = beneficeVide();
     // ⚠️ LE BÉNÉFICE NE SE CALCULE QUE SUR CE QU'ON CONNAÎT.
     // `benef = ca - cout` suppose que les ventes SANS prix d'achat ont coûté
     // ZÉRO. Mesuré le 1er septembre : 1 prix d'achat sur 175 → l'écran
@@ -31299,15 +31465,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // validé / bordereau) → argent qui arrive dans le porte-monnaie.
       if (stt === 'pending') { enAttente += sellAmt; nbAttente += 1; }
       if (stt !== 'completed') continue;
-      const sell = sellAmt; ca+=sell; nb+=1;
+      const sell = sellAmt;
       const e = effEntry(o);
-      const fee = chargesVente(e); frais += fee;
-      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; benefBrut += sell-buy; benefConnu += sell-buy-fee; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
+      const fee = chargesVente(e);
+      const buy = achatDe(e);
+      ajouterVenteBenefice(acc, sell, buy, fee);
+      if (buy!=null && sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; }
     }
+    const R = resumeBenefice(acc);
+    const ca = R.ca, cout = R.cout, frais = R.frais, nb = R.n, nbCout = R.nCout;
+    benefBrut = R.brut; benefConnu = R.net;
     return { ca, cout, frais, benef:ca-cout-frais, benefBrut, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
+
+  // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
+  // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
+  // d'achat. Les mêmes ventes que `totals` (finalisées, hors masquées), datées au
+  // jour de la VENTE (heure de l'appareil, la borne de `dansPeriode`). Un compte
+  // non lu (hors comptes exclus) ⇒ on ne publie RIEN : la dernière publication,
+  // complète, reste (un total partiel présenté comme complet est pire, §5).
+  useEffect(() => {
+    if (!sales.items) return;
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
+    try {
+      const an0 = new Date().getFullYear() - 1;           // l'année d'avant suffit (périodes en cours)
+      const jours = {};
+      for (const o of sales.items) {
+        if (isHidden(o)) continue;
+        if (classifyOrderStatus(o.status) !== 'completed') continue;
+        const t = o.date ? Date.parse(o.date) : NaN;
+        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;   // sans date : dans aucune période
+        const k = jourClef(new Date(t));
+        const e = effEntry(o);
+        ajouterVenteBenefice(jours[k] || (jours[k] = beneficeVide()), o.price?.amount, achatDe(e), chargesVente(e));
+      }
+      const charge = {};
+      for (const k of Object.keys(jours).sort()) charge[k] = jourBeneficeEnTableau(jours[k]);
+      const avant = load('vrm_benefice_jours', null);
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_benefice_jours', { v: 1, jours: charge, at: Date.now() });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -34079,7 +34278,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
              quatre gros blocs empilés prenaient un écran entier sur téléphone. */
-          <div className="vrm-summary-strip" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div className="vrm-summary-strip" data-ventes-benef-n={String(totals.nb)} data-ventes-benef-ncout={String(totals.nbCout)}
+            data-ventes-benef-brut={totals.nbCout>0?String(Math.round(totals.benefBrut*100)/100):''} data-ventes-benef-net={totals.nbCout>0?String(Math.round(totals.benefConnu*100)/100):''}
+            style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est

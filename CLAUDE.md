@@ -10048,6 +10048,32 @@ hauteur en `vh`/px dans `.vrm-main` se pense ×1,25 sur téléphone.**
   `verif_visuel`/`verif_dark` ; une réponse non JSON (panne) est dite en
   français, et la lecture ratée UNE fois.
 
+### Le bénéfice brut et net dans Comptabilité (19 octobre)
+Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
+encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**
+(Mois · Trimestre · Année, `BeneficeCompta`) : brut, − frais de vente, −
+charges, − cotisations URSSAF, net.
+- **Une règle, un propriétaire (§11)** : `ajouterVenteBenefice` /
+  `resumeBenefice` (centimes entiers, module) servent `totals` de l'écran Ventes
+  ET la publication `vrm_benefice_jours` (SYNC_KEYS : cumuls PAR JOUR de vente,
+  tableaux de 7 nombres, deux années au plus), que Comptabilité somme
+  (`beneficeDesJours`, `beneficePeriode`). Comptabilité ne relit aucun prix
+  d'achat. Le prix d'achat d'une fiche : `achatDe(e)` (aussi `buyOf`).
+- **Brut et net des ventes** : seulement les ventes au prix d'achat connu
+  (« 0 » saisi est connu), couverture écrite (« X ventes sur Y ») avec la porte
+  (saisie en série). **Net final** (net des ventes − charges de la période −
+  cotisations sur la part VINTED du CA déclaré publié) : « — » si un prix d'achat
+  manque (`raison: achats`) ou si le CA déclaré n'est pas publié (`cotisations`).
+  Jamais publié ⇒ « se calcule dans Ventes ». Un compte non lu ⇒ Ventes ne
+  publie pas (la dernière, complète, reste). Aucune couleur sur un bénéfice.
+- Limites dites à l'écran : ventes Vinted seulement (Leboncoin/eBay n'ont pas de
+  prix d'achat reliés) ; brut au jour de la VENTE, cotisations au CA VERSÉ.
+- Preuves : `audit-benefice.cjs` (vraies fonctions dans un vm, 19 contrôles ;
+  `--mutation=duplique|zero|cotis` ⇒ 3 · 4 · 1 rouges) ; banc
+  `chiffres-croises.cjs` section E (Compta = Ventes « Ce mois », `data-benef-*`
+  / `data-ventes-benef-*`) : **10 rouges sur le build d'avant**, rouge sous la
+  mutation « second calcul divergent ».
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
