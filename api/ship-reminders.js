@@ -349,7 +349,9 @@ async function traiterVendeur() {
     let vintedSkip = null;
     if (!attente) vintedSkip = 'resume absent';
     else if (mLu === undefined || panelLu === undefined) vintedSkip = 'réglages illisibles';
-    if (vintedSkip && !eb) return { urssaf, bilan, skipped: vintedSkip === 'resume absent' ? 'resume absent — aucune notification envoyee' : 'réglages illisibles — aucune notification envoyée' };
+    // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
+    // passage suivant, réglages lus, ne doit pas se croire « déjà notifié »).
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip === 'resume absent' ? 'resume absent — aucune notification envoyee' : 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
