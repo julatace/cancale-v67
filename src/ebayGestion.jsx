@@ -322,9 +322,24 @@ export function EbayAchats({compte='principal',headers,theme:C}){
   {rows===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture de tes achats…</p>}
   {rows===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="achats">{raison || 'Je n’ai pas pu lire tes achats eBay.'}</p>}
   {Array.isArray(rows) && !rows.length && <p style={{fontSize:12,color:C.muted}}>Aucun achat eBay sur les 60 derniers jours.</p>}
-  <div style={{display:'grid',gap:8}}>{(rows||[]).map((a,i)=><article key={a.itemId+':'+i} data-ebay-achat={a.itemId} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:12,background:C.card}}>
-   <b style={{fontSize:13,display:'block',overflowWrap:'anywhere'}}>{a.titre || 'Annonce '+a.itemId}</b>
-   <div style={{fontSize:11.5,color:C.muted,marginTop:3}}>{a.prix && Number.isFinite(Number(a.prix))?euros({value:Number(a.prix).toFixed(2),currency:a.devise || 'EUR'}):''}{a.vendeur?` · vendeur ${a.vendeur}`:''}{a.date?` · ${heureCourte(a.date)}`:''}</div>
-  </article>)}</div>
+  {Array.isArray(rows) && rows.length>0 && <div className="vrm-buy-list" style={{background:C.card,border:`1px solid ${C.border}`}}>{rows.map((a,i)=>{
+   // La même ligne que les achats Vinted (`vrm-buy-row`). L'étape ne dit que
+   // ce qu'eBay rend : expédié (ShippedTime), payé, ou à payer. « Reçu » n'est
+   // jamais affiché : eBay ne le dit pas à l'acheteur dans cette réponse.
+   const st=a.expedieLe?{label:'Expédié',color:C.blue || C.accent}:(a.payeLe || /^complete$/i.test(a.statut || ''))?{label:'Payé',color:C.muted}:/incomplete|pending/i.test(a.statut || '')?{label:'À payer',color:C.warn}:null;
+   return <div key={a.itemId+':'+i} className="vrm-buy-row" data-ebay-achat={a.itemId}>
+    <div className="vrm-buy-ph" style={{background:C.card2 || C.bg}}>{a.photo?<img src={a.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:null}</div>
+    <div className="vrm-buy-main">
+     <div className="vrm-buy-title" style={{color:C.text}} title={a.titre || ''}>{a.titre || 'Annonce '+a.itemId}</div>
+     <div className="vrm-buy-meta" style={{color:C.muted}}>
+      {st && <span className="vrm-buy-statut" style={{color:C.text}} data-ebay-achat-etape={st.label}><i style={{background:st.color}}/>{st.label}</span>}
+      {a.date && <span style={{whiteSpace:'nowrap'}}>{new Date(a.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</span>}
+      {a.vendeur && <span>· {a.vendeur}</span>}
+      {a.suivi && <span data-ebay-achat-suivi="">· {a.suivi.transporteur?a.suivi.transporteur+' ':''}n°{a.suivi.numero}</span>}
+     </div>
+    </div>
+    <div className="vrm-buy-price" style={{color:C.text}}>{a.prix && Number.isFinite(Number(a.prix))?euros({value:Number(a.prix).toFixed(2),currency:a.devise || 'EUR'}):''}</div>
+    <div className="vrm-buy-act"><a className="vrm-buy-quick" href={`https://www.ebay.fr/itm/${encodeURIComponent(a.itemId)}`} target="_blank" rel="noreferrer" title="Voir l’annonce sur eBay" aria-label="Voir l’annonce sur eBay" style={{color:C.muted,fontSize:13,fontWeight:600,textDecoration:'none'}}>↗</a></div>
+   </div>;})}</div>}
  </section>;
 }

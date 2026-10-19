@@ -13544,6 +13544,56 @@ function CarteLbc({ o }) {
   return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
+// L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
+// celle d'un achat Vinted (`etapeAchat`) : Annulé · Reçu · En transit · Payé.
+// Elle lit ce que l'extension capte (colis, liste v3), jamais un mot deviné.
+function etapeAchatLbc(o) {
+  if (lbcAnnulee(o)) return { label: 'Annulé', step: 0, color: C.danger };
+  if (lbcFinalisee(o)) return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  if (lbcExpediee(o)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+  const s = String(o.stepLabel || '').trim();
+  return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'Payé', step: 1, color: C.muted };
+}
+// UNE LIGNE D'ACHAT, la forme de l'écran Achats Vinted (`vrm-buy-row` : photo ·
+// titre + statut à pastille · prix · gestes). Partagée par les achats
+// Leboncoin (et la même structure est rendue par les achats eBay) — Julien :
+// « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ».
+function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenue, data }) {
+  return (
+    <div className="vrm-buy-row" {...(data || {})} style={{ opacity: attenue ? 0.55 : 1 }}>
+      <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }} />}
+      </div>
+      <div className="vrm-buy-main">
+        <div className="vrm-buy-title" style={{ color: C.text }} title={titre || ''}>{titre || '(sans titre)'}</div>
+        <div className="vrm-buy-meta" style={{ color: C.muted }}>
+          {statut && <span className="vrm-buy-statut" style={{ color: C.text }}><i style={{ background: statut.color }} />{statut.label}</span>}
+          {meta}
+        </div>
+        {sous}
+      </div>
+      <div className="vrm-buy-price" style={{ color: C.text }}>{montant}</div>
+      <div className="vrm-buy-act">{actions}</div>
+    </div>
+  );
+}
+function LigneAchatLbc({ o }) {
+  const [qr, setQr] = React.useState(false);
+  const st = etapeAchatLbc(o);
+  const lbl = o.label || {};
+  const enCours = st.step >= 1 && st.step < 4;
+  const qrUrl = enCours && /^https?:\/\//.test(String(lbl.qrUrl || '')) ? lbl.qrUrl : '';
+  const suivi = enCours && /^https?:\/\//.test(String(lbl.trackingUrl || '')) ? lbl.trackingUrl : '';
+  const date = o.dateVente ? new Date(o.dateVente) : null;
+  return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || '') }} attenue={st.step === 0}
+    photo={photoArticle(o)} titre={o.title} statut={st} montant={lbcEuro(o.price)}
+    meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
+    sous={qr && qrUrl ? <div style={{ marginTop: 8 }}><QrColis url={qrUrl} size={120} /></div> : null}
+    actions={<>
+      {suivi && <a className="vrm-buy-quick" href={suivi} target="_blank" rel="noreferrer" title="Suivre le colis" aria-label="Suivre le colis" style={{ color: C.muted }}><Icon name="truck" size={16} /></a>}
+      {qrUrl && <button className="vrm-icon-control vrm-buy-quick" type="button" data-lbc-achat-qr="" onClick={() => setQr(v => !v)} title="QR du colis" aria-label="QR du colis" aria-expanded={qr} style={{ color: C.warn }}><Icon name="key" size={16} /></button>}
+    </>} />;
+}
 function lbcArgent(lbcVentes) {
   const ventes = (lbcVentes && lbcVentes.ventes) || [];
   const actives = ventes.filter(o => !lbcAnnulee(o));
@@ -13616,7 +13666,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const annules = achats.filter(lbcAnnulee);
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
-  const Carte = (o) => <CarteLbc key={o.txId} o={o} />;
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{arr.map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -13639,7 +13689,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       )}
       {enRoute.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
-        {enRoute.map(Carte)}
+        <Liste arr={enRoute}/>
         {/* (17 oct.) OÙ ARRIVE LE CODE D'UN COLIS LEBONCOIN. Mesuré sur sa base :
             une transaction Leboncoin ne porte NI point de retrait NI code (champs
             captés : statut, transporteur, prix). Le code vient de l'e-mail du
@@ -13650,11 +13700,11 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
       </>)}
       {recus.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
-        {recus.map(Carte)}
+        <Liste arr={recus}/>
       </>)}
       {annules.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulés / remboursés ({annules.length})</div>
-        {annules.map(Carte)}
+        <Liste arr={annules}/>
       </>)}
     </div>
   );
@@ -20797,7 +20847,7 @@ const FURN_TYPES = {
   bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#9aa3ad', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8a8f98', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#b0916f', h3d: 0.5, build: 'table', cases: 'pile' },
-  pile:    { label: 'Cartons au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  pile:    { label: 'Boîtes au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
   porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true, structure: true },
   fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
   // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
@@ -21218,7 +21268,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         neuf.x = +(pl.cx - w / 2).toFixed(2); neuf.y = +(pl.cy - cell / 2).toFixed(2);
         return [...list, neuf];
       });
-      if (pasDePlace) { toast('Plus de place libre au sol pour ces cartons.'); return; }
+      if (pasDePlace) { toast('Plus de place libre au sol pour ces boîtes.'); return; }
       setSel(id); signalerDisposition(); return;
     }
     // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
@@ -28791,7 +28841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const porteursNum = useMemo(() => {
     const m = {};
-    // Rangé par CLÉ : « b125 » et « B125 » sont le même carton.
+    // Rangé par CLÉ : « b125 » et « B125 » sont le même numéro.
     const add = (num, quoi) => { const n = cleNum(num); if (!n) return; (m[n] = m[n] || []).push(quoi); };
     // ⚠️ TOUS les comptes, même masqués : masquer un compte cache sa COMPTA,
     // ça ne sort pas le carton de l'étagère. (`listings.items` ne contient déjà
@@ -35743,7 +35793,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
             <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'une autre paire. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
@@ -42335,7 +42385,7 @@ function NumerosSetting({ nu = false }) {
         </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même carton.
+        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
     </div>
@@ -45895,7 +45945,7 @@ function AppCoeur() {
               // Les données CAPTÉES (ventes, achats, messages…) ne sont pas réécrites :
               // une copie ancienne écraserait une capture plus fraîche (§4.2), et
               // l'extension les recapte toute seule. On restaure ce que TU as saisi.
-              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule. Les numéros donnés depuis cette sauvegarde restent réservés (un numéro écrit sur un carton ne sert jamais deux fois).\n\n⚠ Tes autres réglages seront REMPLACÉS, puis l'app se rechargera.`)) return;
+              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule. Les numéros donnés depuis cette sauvegarde restent réservés (un numéro écrit sur une étiquette ne sert jamais deux fois).\n\n⚠ Tes autres réglages seront REMPLACÉS, puis l'app se rechargera.`)) return;
               await applyAndReload(entries); return;
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }

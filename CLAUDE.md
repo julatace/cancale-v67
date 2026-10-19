@@ -10428,3 +10428,10 @@ Julien : « à l'installation de l'extension, confirmer le bon compte Vinted » 
 - Preuves (§6.1, bancs copiés dans l'arbre de HEAD) : `badge.cjs` 67 contrôles dont la section 10 sur le VRAI `background.js` (`_fond-vm`) — « Non » ⇒ zéro écriture `harvest_111_*`, « Oui » et « pas répondu » ⇒ la capture part, autre uid refusé — **12 rouges sur l'avant** ; `popup.cjs` 57 contrôles, **9 rouges sur l'avant** (fond clair, accent clair, cibles < 44 px).
 - Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien de neuf). Extension **5.191.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 - ⚠️ Non mesuré : le vrai Vinted (le login arrive avec la première réponse `users/current` : la question peut apparaître quelques secondes après l'ouverture) ; sur Firefox Android, pas de survol — le retour sur un « Non » passe par la carte au toucher.
+
+### Achats Leboncoin et eBay sur la forme des achats Vinted (19 octobre)
+Julien : « les achats Leboncoin et eBay doivent fonctionner exactement comme Vinted ». Une ligne d'achat (`LigneAchat`, classes `vrm-buy-row`) : photo · titre · statut à pastille (mêmes mots et couleurs qu'`etapeAchat`) · date · prix · gestes.
+- **Leboncoin** (`etapeAchatLbc`, `LigneAchatLbc`) : Annulé · Reçu · En transit · étape capturée, lue sur ce que capte l'extension (`lbcAnnulee`, `lbcFinalisee`, `lbcExpediee`). En route : « Suivre » (`label.trackingUrl`) et le QR du colis (`label.qrUrl`, `QrColis`) dépliable — seulement si capturés.
+- **eBay** (`EbayAchats`) : même ligne ; `achatsEbay` lit en plus la photo (`i.ebayimg.com` seulement), `PaidTime`, `ShippedTime` et le suivi déclaré par le vendeur (numéro + transporteur). Étape : Expédié · Payé · À payer — jamais « Reçu » (eBay ne le dit pas ici). Lien « ↗ » vers l'annonce.
+- Preuves : `plateformes-premium.cjs` (écran Leboncoin → Achats, 2 tailles) 8 rouges sur 1023dd4 ; `ebay-apres-vente-ecran.cjs` 7 rouges sur 1023dd4 ; `ebay-apres-vente.mjs` vert.
+- ⚠️ Non mesuré : que `GetMyeBayBuying` rende `PictureDetails`, `ShippedTime` et `ShipmentTrackingDetails` dans la WonList (doc d'eBay) — absents ⇒ rien n'est affiché.

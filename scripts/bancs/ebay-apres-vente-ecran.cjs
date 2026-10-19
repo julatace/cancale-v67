@@ -83,7 +83,7 @@ async function ouvrir(b, vp) {
     if (a === 'retours') return mode === 'scope' ? j({ ok: false, reason: 'scope', error: 'eBay n’a pas autorisé VRM à lire tes demandes de retour. Reconnecte ton compte eBay (Compte → Connecter) pour donner ce droit.' }) : j({ ok: true, retours: [RETOUR, RETOUR_RECU] });
     if (a === 'annulations') return mode === 'scope' ? j({ ok: false, reason: 'pas-su', error: 'eBay n’a pas rendu tes demandes d’annulation.' }, 502) : j({ ok: true, annulations: [ANNUL] });
     if (a === 'promotion') return j({ ok: true, campagnes: [{ id: 'C1', nom: 'VRM', taux: 5 }], promues: [{ listingId: '3001', taux: 5, campagne: 'C1' }], annonces: [{ itemId: '3001', titre: 'Salomon XT-6 noir taille 43' }, { itemId: '3002', titre: 'Nike Dunk Low panda taille 42' }] });
-    if (a === 'achats') return j({ ok: true, achats: [{ itemId: '4001', titre: 'Achat test Converse', vendeur: 'vendeur_x', prix: '42.00', devise: 'EUR', date: '2026-10-01T10:00:00.000Z' }] });
+    if (a === 'achats') return j({ ok: true, achats: [{ itemId: '4001', titre: 'Achat test Converse', vendeur: 'vendeur_x', prix: '42.00', devise: 'EUR', date: '2026-10-01T10:00:00.000Z', expedieLe: '2026-10-02T10:00:00.000Z', suivi: { numero: 'LA123456789FR', transporteur: 'Colissimo' } }, { itemId: '4002', titre: 'Achat pas payé', vendeur: 'vendeur_y', prix: '10.00', devise: 'EUR', statut: 'Incomplete' }] });
     if (a === 'agent') return j({ ok: true, tasks: [], sources: [], journal: [], journalLisible: true });
     if (a === 'evaluations') return j({ ok: true, evaluations: [] });
     if (a === 'offreinfo') return j({ ok: true, eligibles: [], complet: true });
@@ -151,6 +151,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await sousOnglet(pg, 'Achats');
         await pg.waitForSelector('[data-ebay-achat="4001"]', { timeout: 10000 });
         dit(/42,00\s*€/.test(await pg.$eval('[data-ebay-achat="4001"]', (e) => e.innerText)), 'achats eBay listés, avec leur prix');
+        dit(await pg.$eval('[data-ebay-achat="4001"]', (e) => e.classList.contains('vrm-buy-row')), 'un achat eBay a la même ligne qu’un achat Vinted (vrm-buy-row)');
+        dit(await pg.$eval('[data-ebay-achat="4001"]', (e) => (e.querySelector('[data-ebay-achat-etape]')||{}).dataset?.ebayAchatEtape === 'Expédié' && /LA123456789FR/.test(e.innerText)), 'achat expédié : l’étape et le suivi sont dits');
+        dit(await pg.$eval('[data-ebay-achat="4002"]', (e) => (e.querySelector('[data-ebay-achat-etape]')||{}).dataset?.ebayAchatEtape === 'À payer' && !/Reçu/.test(e.innerText)), 'achat pas payé : « À payer », jamais « Reçu »');
       });
       dit((await deborde(pg)) <= 1, 'aucun débordement horizontal');
       // Droit refusé : la raison est dite, jamais « aucune demande ».
