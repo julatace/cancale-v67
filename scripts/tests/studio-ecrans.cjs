@@ -9,6 +9,7 @@ const finRetraits=s.indexOf("  await p.goto",debutRetraits);
 if(!s.includes(marker)||debutMessages<0||debutRetraits<0)throw Error('Fixtures de revue introuvables');
 const fixtures=s.slice(debutMessages,finMessages)+s.slice(debutRetraits,finRetraits);
 s=s.replace(marker,fixtures+`
+  if(process.env.STUDIO_DARK)await p.addInitScript(()=>localStorage.setItem('vinted_dark','true'));
   for(const width of (process.env.STUDIO_WIDTHS||'320,390,1512').split(',').map(Number)){
    await p.setViewportSize({width,height:900});
    for(const [nom,tab,section] of [['ventes','plat_vinted','Ventes'],['annonces','plat_vinted','Annonces'],['achats','plat_vinted','Achats'],['messages','plat_vinted','Messages'],['annonces-ebay','plat_ebay','Annonces'],['messages-ebay','plat_ebay','Messages'],['colis','plat_leboncoin','Colis'],['retraits','cat_achats',null],['parametres','settings',null]]){
@@ -17,10 +18,14 @@ s=s.replace(marker,fixtures+`
     if(nom==='retraits')await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
     if(nom==='messages')await p.locator('[data-conv="71"]').waitFor();
     await p.waitForTimeout(400);await p.locator('main').evaluate(e=>e.scrollTop=0);
+    if(process.env.STUDIO_DARK)check(await p.locator('html').getAttribute('data-theme')==='dark','thème sombre actif '+nom+' '+width);
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement '+nom+' '+width);
     check(await p.locator('main button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height;}).every(e=>e.textContent.trim()||e.getAttribute('aria-label')||e.getAttribute('title')||e.querySelector('img[alt]'))),'boutons nommés '+nom+' '+width);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,nom+'-'+width+'.png')});}
     if(section && width<768)check(await p.locator('.vrm-platform-tabs').evaluate(e=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e.closest('.vrm-seg-cadre')).backgroundColor);return [...e.querySelectorAll('button')].every(b=>{const v=lum(getComputedStyle(b).color);return (Math.max(a,v)+.05)/(Math.min(a,v)+.05)>=4.5;});}),'onglets contrastés '+nom+' '+width);
+    if((nom==='ventes'||nom==='annonces') && width<768){
+     check(await p.locator('.vrm-ledger-heading').evaluate(e=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const st=getComputedStyle(e),a=lum(st.color),b=lum(st.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;}),'en-tête du tableau lisible '+nom+' '+width);
+    }
     if(nom==='annonces' && width<768){
      const search=await p.locator('.vrm-ann-search').boundingBox(),tri=await p.locator('.vrm-ann-tri').boundingBox();
      check(tri.x-search.x-search.width>=0&&tri.x-search.x-search.width<9,'recherche et tri sans colonne vide '+width);
@@ -54,7 +59,8 @@ s=s.replace(marker,fixtures+`
     }
     if(nom==='messages'){
      await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
-     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'conversation sans débordement '+width);
+     if(process.env.STUDIO_DARK)check(await p.locator('html').getAttribute('data-theme')==='dark','thème sombre actif '+nom+' '+width);
+    check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'conversation sans débordement '+width);
      if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'conversation-'+width+'.png')});
     }
    }
