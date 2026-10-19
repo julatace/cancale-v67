@@ -4,7 +4,8 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
+const Operations = lazy(() => import("./operations/Operations.jsx"));
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
@@ -10001,6 +10002,7 @@ function titreEcran(tab) {
 }
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
+  {id:'organisation', icon:'check', emoji:'📋', label:'Organisation', desc:'Missions, réservations, lots et consommables'},
   /* ⚠️ Colis descend ici (barre du bas = les plateformes, demande du 27 sept.).
      Il reste en tête du menu — c'est le geste quotidien le plus fréquent après
      l'accueil — et à un tap depuis la carte « Expédier N colis » de Ma journée. */
@@ -10022,7 +10024,7 @@ const PLUS_TABS=[
      paramètres, ça prend de la place pour rien »). L'écran reste monté et
      joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
 ];
-const NAV_GESTION = ['cat_bord', 'garage', 'dashboard', 'compta'].map(id => PLUS_TABS.find(t => t.id===id));
+const NAV_GESTION = ['cat_bord', 'garage', 'organisation', 'dashboard', 'compta'].map(id => PLUS_TABS.find(t => t.id===id));
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique].
 const ONGLETS_DEPLACES = { prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null] };
 const NAV_OUTILS = PLUS_TABS.filter(t => !NAV_GESTION.includes(t));
@@ -41867,7 +41869,7 @@ function InvitationsEquipe({ invitations, uid, onPropre, onFait }) {
 }
 // Ce qu'un membre voit et ne voit pas — UNE phrase, pour l'invitation et pour
 // le panneau du vendeur (§11). Elle dit la règle de la base (016), rien de plus.
-const CE_QUE_VOIT_UN_MEMBRE = "Un membre voit les colis à expédier et peut imprimer leurs bordereaux, et il voit les codes de retrait des achats. Il ne voit aucun montant (ni prix, ni ventes, ni argent), ni les réglages, ni les comptes Vinted, ni les messages des acheteurs — et il ne peut rien modifier.";
+const CE_QUE_VOIT_UN_MEMBRE = "Un membre voit les colis à expédier et peut imprimer leurs bordereaux, et il voit les codes de retrait des achats. Il ne voit aucun montant (ni prix, ni ventes, ni argent), ni les réglages, ni les comptes Vinted, ni les messages des acheteurs. Il peut réaliser les missions qui lui sont attribuées, cocher leurs étapes et signaler un blocage. Le responsable conserve la validation finale ; une mission terminée ne modifie pas les ventes ou le stock.";
 
 // ── L'ÉCRAN DU MEMBRE : les colis du vendeur, et rien d'autre ─────────────
 // Chaque lecture porte l'en-tête `x-vrm-equipe` (la base ne montre les lignes
@@ -42028,6 +42030,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
       <div style={boiteEquipe()}>
         <TeteEquipe titre={titreEcran} sous={sous} onPropre={onPropre}/>
         {corps}
+        <Suspense fallback={<p>Lecture des missions…</p>}><Operations sombre={C===THEMES.dark} key={vendeur} headers={enTeteSession} vendeur={vendeur}/></Suspense>
       </div>
     </div>
   );
@@ -45881,7 +45884,7 @@ function AppCoeur() {
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {platSub==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));setPlatSub(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {platSub==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {platSub==='achats'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref}/>}</EbayActionCompte></div>}
+          {platSub==='achats'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref}/><Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} initialSection="veilles" contexteEbay/></Suspense></>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
@@ -45899,6 +45902,7 @@ function AppCoeur() {
         {tab==='masques' &&<EcranMasques comptes={vintedAccounts} ordi={ordi}/>}
         {tab==='compta'&&platSub==='factures'&&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
+        {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={[['compta','Comptabilité'],['factures','Factures']]}/></div>}

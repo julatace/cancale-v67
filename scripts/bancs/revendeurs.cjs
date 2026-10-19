@@ -98,6 +98,7 @@ async function brancher(p){
   await p.goto(base+'/?tab=journee');await p.locator('[data-barre-jour]').waitFor();
   await p.getByRole('region',{name:'Aperçu du stock Vinted'}).waitFor();
   await p.waitForFunction(()=>document.querySelector('[data-stock-en-ligne]')?.dataset.stockEnLigne==='1');
+  await p.evaluate(()=>document.fonts.ready);
   for(const zoom of [.65,1]){
     await p.evaluate(z=>{document.documentElement.style.zoom=String(z);document.documentElement.style.minWidth='';document.documentElement.style.setProperty('--vrm-zoom',String(z));document.querySelector('main').scrollTop=0;},zoom);
     await p.waitForTimeout(200);

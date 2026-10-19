@@ -391,7 +391,7 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         const etat = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-reglage]'); return x ? x.getAttribute('data-equipe-reglage') : null; });
         dit(etat === 'lu', 'Réglages → Mon compte → Équipe est lu', etat);
         const tt = await pg.evaluate(() => { const x = document.querySelector('[data-equipe-reglage]'); return x ? x.innerText : ''; });
-        dit(/aide@exemple\.test/.test(tt) && /aucun montant/i.test(tt) && /ne peut rien modifier/i.test(tt), 'il voit son équipe et ce qu’un membre voit / ne voit pas', tt.replace(/\n/g, ' ').slice(0, 160));
+        dit(/aide@exemple\.test/.test(tt) && /aucun montant/i.test(tt) && /missions qui lui sont attribuées/i.test(tt) && /validation finale/i.test(tt), 'il voit son équipe et ce qu’un membre voit / ne voit pas', tt.replace(/\n/g, ' ').slice(0, 160));
         await pg.fill('[data-equipe-email]', 'nouvelle@exemple.test');
         await pg.click('[data-equipe-inviter]'); await pg.waitForTimeout(1500);
         const inv = B.equipe.find((x) => x.email === 'nouvelle@exemple.test');
