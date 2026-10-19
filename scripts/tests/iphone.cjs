@@ -20,11 +20,12 @@ s=s.replace(marker,`
     if(tab==='plat_vinted'){
      const prix=p.locator('[data-cout-vente-saisir]').first(),relier=p.locator('[data-cout-vente-relier]').first();
      const a=await prix.boundingBox(),b=await relier.boundingBox();check(Math.abs(a.y-b.y)<2,'actions du coût côte à côte '+width);
-     check(await p.locator('.vrm-sale-row').first().evaluate(e=>e.getBoundingClientRect().height<270),'ligne de vente compacte '+width);
+     check(await p.locator('.vrm-sale-row').first().evaluate(e=>e.getBoundingClientRect().height<230),'ligne de vente compacte '+width);
      check(await p.locator('.vrm-sale-row').first().evaluate(e=>{const titre=e.querySelector('.vrm-sale-title').getBoundingClientRect(),prix=e.querySelector('[data-prix-vente]').getBoundingClientRect();return prix.top>=titre.bottom&&prix.right<=e.getBoundingClientRect().right;}),'titre et montant séparés '+width);
     }
     if(tab==='journee')check(await p.locator('.vrm-day-bar').evaluate(e=>(()=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e).backgroundColor),b=lum(getComputedStyle(e.querySelector('.vrm-day-bar-n')).color);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;})()),'bandeau des tâches contrasté '+width);
     if(tab==='journee')check(await p.locator('.vrm-app-header button[aria-label="Tous les écrans"]').isHidden(),'menu Gestion sans doublon en haut '+width);
+    if(tab==='journee')check(await p.locator('.vrm-day-greeting').isHidden(),'bonjour retiré pour remonter les actions '+width);
     if(tab==='journee')check(await p.locator('.vrm-day-money').evaluate(e=>{const clone=e.cloneNode(true);Object.assign(clone.style,{position:'fixed',left:'-10000px',width:e.getBoundingClientRect().width+'px',boxSizing:'border-box'});e.parentElement.appendChild(clone);const n=clone.querySelector('.vrm-day-hero-n');n.textContent='1 234 567 €';const a=n.getBoundingClientRect(),b=clone.querySelector('.vrm-day-recu').getBoundingClientRect(),ok=n.scrollWidth<=n.clientWidth+1&&a.right<=b.left;clone.remove();return ok;}),'grand montant sans chevauchement '+width);
     if(process.env.BANC_CAPTURES){await p.waitForTimeout(1300);fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-'+width+'.png')});}
    }

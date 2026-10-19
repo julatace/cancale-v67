@@ -90,3 +90,25 @@ natif ou `aria-disabled`, sans changer leur comportement explicatif. Pas publié
 Finition vérifiée : compilation réussie et 100 contrôles mobiles Chromium à
 320/390/430 px, sans débordement ni chevauchement des titres et montants.
 Captures : `/workspace/shared/vrm-mobile-finition/` (données d’exemple).
+
+### Revue étendue et densité réduite
+
+Revue réelle avec fixtures sur Annonces/Achats/Messages Vinted, conversation
+complète, annonces/messages eBay, colis Leboncoin, retraits et paramètres.
+Correction d’une bande vide dans l’en-tête sans fraîcheur, et du contraste des
+onglets eBay imbriqués. Conversations ardoise/sauge, surfaces des annonces,
+colis et réglages harmonisées. Les codes longs ne sont plus tronqués : libellé,
+valeur intégrale et état de copie restent séparés, zéros initiaux conservés.
+Les courts restent sur une ligne au petit format.
+
+À la demande « c’est encore trop gros », densité réduite sur téléphone : retrait
+du bonjour redondant, barre d’action et navigation plus courtes, portraits de
+vente 60×84, titres 12 px et prix 19 px, actions et pieds plus compacts. Les
+champs conservent 16 px et les cinq accès du bas au moins 44 px de hauteur.
+Sur la capture 390×844, les deux ventes de l’exemple tiennent entièrement et
+l’accueil montre le graphique et les deux dernières ventes sans défilement.
+
+Vérification : compilation réussie, 103 contrôles mobiles, 72 contrôles des écrans
+secondaires (dont contraste et codes longs) et 202 contrôles de navigation/actions
+réussis, en Chromium avec réseau simulé. Captures :
+`/workspace/shared/vrm-compact/`. Proposition encore non publiée.

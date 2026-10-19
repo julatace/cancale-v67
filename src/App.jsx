@@ -13276,7 +13276,7 @@ function PhotoArticleAgrandissable({src,titre,children}) {
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
-  return <button type="button" className="vrm-pickup-code" aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
+  return <button type="button" className="vrm-pickup-code" data-code-long={String(code).length > 8 ? "true" : undefined} aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
@@ -40972,7 +40972,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
       </div>
       <button type="button"
-        onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+        className="vrm-set-connect" onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
         style={{...bouton(true),marginTop:12}}>
         Aller à l'écran de connexion
       </button>
