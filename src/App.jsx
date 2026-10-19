@@ -35468,10 +35468,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
-            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
+            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
-            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
+            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
+            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
@@ -35686,7 +35686,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </details>
         )}
-        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary>Stock et ajustements</summary>
+        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
               affichait un instantané périmé en le faisant passer pour du direct
@@ -36101,9 +36101,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sans ouvrir. `data-places` reste sur le contenu : le banc le
                 trouve par cet attribut (invariant : aucune case eBay). */}
             <details data-places-wrap style={{marginBottom:12}}>
-              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+              <summary aria-label="Publier aussi ailleurs" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
-                <span style={{fontSize:13,fontWeight:600,color:C.text}}>Publier aussi ailleurs</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">Publier aussi ailleurs</span><span className="vrm-label-short" aria-hidden="true">Publier</span></span>
                 <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
                 <span className="vrm-chevron" style={{fontSize:14,color:C.muted}}>›</span>
               </summary>

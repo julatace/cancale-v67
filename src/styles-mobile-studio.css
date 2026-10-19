@@ -339,3 +339,41 @@
  .vrm-main .vrm-pickup-point>div:first-child{padding-top:7px!important;padding-bottom:7px!important;}
  .vrm-main .vrm-achats .vrm-pickup-card{padding-block:8px!important;}
 }
+
+/* Les commandes occasionnelles forment une seule barre ; leurs panneaux
+   s’ouvrent dans le flux et ne recouvrent jamais les articles ni les alertes. */
+.vrm-label-short{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar{align-items:stretch;gap:5px!important;}
+ .vrm-main .vrm-ann-search{flex:1 1 0!important;min-width:0;border:1px solid var(--studio-line);border-radius:10px;background:var(--studio-card);padding-left:10px;gap:6px;}
+ .vrm-main .vrm-ann-search input{border:0!important;background:transparent!important;padding-left:0!important;box-shadow:none;min-width:0;}
+ .vrm-main .vrm-ann-search>button{flex:0 0 36px;width:36px;min-width:36px;min-height:38px!important;padding:0!important;border:0!important;background:transparent!important;border-radius:0;}
+ .vrm-main .vrm-ann-outils>button{background:var(--studio-card)!important;border-color:var(--studio-line)!important;border-radius:10px!important;}
+ .vrm-main .vrm-ann-stock-tools,.vrm-main [data-places-wrap]{display:inline-block;width:calc(50% - 6px);vertical-align:top;margin-bottom:9px!important;}
+ .vrm-main .vrm-ann-stock-tools{margin-right:8px;}
+ .vrm-main .vrm-ann-stock-tools>summary,.vrm-main [data-places-wrap]>summary{display:flex;align-items:center;min-height:34px!important;box-sizing:border-box;padding:6px 9px!important;border:1px solid var(--studio-line);border-radius:8px;background:var(--studio-card);box-shadow:none!important;font-size:11px;}
+ .vrm-main .vrm-ann-stock-tools>summary::after{margin-left:auto;}
+ .vrm-main .vrm-ann-stock-tools[open],.vrm-main [data-places-wrap][open]{display:block;width:100%;margin-right:0;}
+ .vrm-main .vrm-ann-stock-tools .vrm-label-full,.vrm-main [data-places-wrap] .vrm-label-full{display:none;}
+ .vrm-main .vrm-ann-stock-tools .vrm-label-short,.vrm-main [data-places-wrap] .vrm-label-short{display:inline;}
+ .vrm-main [data-places-wrap]>summary>span:nth-child(3){font-size:9px!important;}
+ .vrm-main .vrm-ann-stock-tools[open]>summary,.vrm-main [data-places-wrap][open]>summary{background:#e4ecdf;}
+ :root[data-theme=dark] .vrm-main .vrm-ann-stock-tools[open]>summary,:root[data-theme=dark] .vrm-main [data-places-wrap][open]>summary{background:#344b40;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-kpi-ventes-grille{gap:0;border:1px solid var(--studio-line);border-radius:10px;background:var(--studio-card);overflow:hidden;}
+ .vrm-main .vrm-kpi-ventes-case{background:transparent!important;border:0!important;border-radius:0;box-shadow:none;padding:8px 10px;min-width:0;}
+ .vrm-main .vrm-kpi-ventes-case+.vrm-kpi-ventes-case{border-left:1px solid var(--studio-line)!important;}
+ .vrm-app-shell .vrm-main .vrm-shared-workbar{border:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;margin-bottom:8px!important;}
+ .vrm-main .vrm-shared-workbar>.vrm-sales-filters{margin-bottom:0!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 40px 40px!important;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-search{grid-column:1!important;grid-row:1!important;width:100%;max-width:none!important;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-tri{grid-column:2!important;grid-row:1!important;width:40px!important;max-width:40px!important;min-width:0;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-outils{grid-column:3!important;grid-row:1!important;}
+}
+
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar .vrm-ann-outils>button{width:40px!important;min-width:40px!important;max-width:40px;box-sizing:border-box;}
+}

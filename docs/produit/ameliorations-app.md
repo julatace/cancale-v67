@@ -148,3 +148,20 @@ contrôles de navigation/actions réussis. Le banc de densité bureau synchronis
 sa préférence de zoom et attend la largeur mesurée du graphique avant de tester
 la visibilité du stock ; ses exigences de visibilité restent inchangées.
 Captures : `/workspace/shared/vrm-outils-compacts/`. Toujours non publié.
+
+### Barre de travail regroupée
+
+Annonces : dictée intégrée au champ de recherche, tri et outils sur deux petites
+colonnes fixes ; aucune colonne vide laissée par l’ancien bouton de dictée.
+Stock et publication occupent une seule rangée sur téléphone. Les libellés
+accessibles complets sont conservés ; chaque panneau ouvert prend toute la
+largeur dans le flux et les alertes conservent leur position. Les informations
+de publication restent consultables dans le panneau, sans modifier la sélection.
+Ventes Leboncoin/eBay : les trois compteurs partagent un bandeau fin, recherche
+et filtres sans double cadre. Ma journée inchangée.
+
+Compilation réussie ; 101 contrôles des écrans secondaires, dont alignement des
+commandes et dépliage, 112 contrôles mobiles et 202 contrôles de navigation/actions
+réussis. La correction finale de grille des annonces a été revérifiée avec le
+banc des écrans secondaires. Captures : `/workspace/shared/vrm-listes-barre/`.
+Proposition non publiée.

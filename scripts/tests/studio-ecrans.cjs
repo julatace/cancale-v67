@@ -21,6 +21,13 @@ s=s.replace(marker,fixtures+`
     check(await p.locator('main button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height;}).every(e=>e.textContent.trim()||e.getAttribute('aria-label')||e.getAttribute('title')||e.querySelector('img[alt]'))),'boutons nommés '+nom+' '+width);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,nom+'-'+width+'.png')});}
     if(section && width<768)check(await p.locator('.vrm-platform-tabs').evaluate(e=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e.closest('.vrm-seg-cadre')).backgroundColor);return [...e.querySelectorAll('button')].every(b=>{const v=lum(getComputedStyle(b).color);return (Math.max(a,v)+.05)/(Math.min(a,v)+.05)>=4.5;});}),'onglets contrastés '+nom+' '+width);
+    if(nom==='annonces' && width<768){
+     const search=await p.locator('.vrm-ann-search').boundingBox(),tri=await p.locator('.vrm-ann-tri').boundingBox();
+     check(tri.x-search.x-search.width>=0&&tri.x-search.x-search.width<9,'recherche et tri sans colonne vide '+width);
+     const stock=p.locator('.vrm-ann-stock-tools'),pub=p.locator('[data-places-wrap]');const a=await stock.boundingBox(),b=await pub.boundingBox();
+     check(Math.abs(a.y-b.y)<2,'stock et publication sur une rangée '+width);
+     for(const panneau of [stock,pub]){await panneau.locator(':scope > summary').click();check(await panneau.evaluate(e=>e.open&&e.getBoundingClientRect().width>innerWidth*.75),'panneau gestion déplié pleine largeur '+width);await panneau.locator(':scope > summary').click();}
+    }
     if(nom==='colis' && width<768){
      check(await p.locator('.vrm-lbc-package').first().evaluate(e=>e.getBoundingClientRect().height<115),'colis à préparer compact '+width);
      check(await p.locator('.vrm-lbc-package-primary').first().getAttribute('href')==='https://example.test/label.pdf','lien du bordereau conservé '+width);
