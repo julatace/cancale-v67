@@ -4,6 +4,8 @@ Préparation produit et technique du 18 octobre 2026. **Ce dossier n'active aucu
 
 **Mise à jour du 19 octobre :** les premiers parcours sont développés. Voir [l’état exact de la livraison et ce qui reste à faire](08-livraison-organisation.md). Les chapitres de conception ci-dessous conservent le périmètre cible.
 
+Suite publiée : [modification des recherches et suivi des échéances](09-suivi-et-recherches.md).
+
 ## La direction
 
 Un assistant d'approvisionnement pour des revendeurs de toutes catégories : trouver les annonces pertinentes, expliquer ce qui est connu, décider en équipe, puis suivre la réception. L'objectif est la qualité des occasions reçues et la fiabilité des décisions, pas un compteur de notifications ni une promesse d'être systématiquement le plus rapide.
