@@ -10765,7 +10765,12 @@ function BottomBar({tab,setTab}) {
   const [kbOpen,setKbOpen]=React.useState(false);
   // Les accès quotidiens restent fixes ; Plus ouvre les plateformes et les outils.
   React.useEffect(()=>{
-    const isField=el=>el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT');
+    // (19 oct.) Seul un champ qui OUVRE UN CLAVIER cache la barre. Une case à
+    // cocher, un bouton radio ou un curseur prennent aussi le focus au toucher :
+    // la barre disparaissait, l'écran sautait de 22 px pendant le geste, et le
+    // toucher retombait à côté (la case ne se cochait pas — banc ebay-programmer).
+    const SANS_CLAVIER=/^(checkbox|radio|range|file|button|submit|reset|color|image)$/i;
+    const isField=el=>el&&(el.tagName==='TEXTAREA'||el.tagName==='SELECT'||(el.tagName==='INPUT'&&!SANS_CLAVIER.test(el.type||'')));
     const onIn=e=>{ if(isField(e.target)) setKbOpen(true); };
     const onOut=()=>setTimeout(()=>{ if(!isField(document.activeElement)) setKbOpen(false); },80);
     window.addEventListener('focusin',onIn);

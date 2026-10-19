@@ -10426,3 +10426,6 @@ Julien : « les achats Leboncoin et eBay doivent fonctionner exactement comme Vi
 - **eBay** (`EbayAchats`) : même ligne ; `achatsEbay` lit en plus la photo (`i.ebayimg.com` seulement), `PaidTime`, `ShippedTime` et le suivi déclaré par le vendeur (numéro + transporteur). Étape : Expédié · Payé · À payer — jamais « Reçu » (eBay ne le dit pas ici). Lien « ↗ » vers l'annonce.
 - Preuves : `plateformes-premium.cjs` (écran Leboncoin → Achats, 2 tailles) 8 rouges sur 1023dd4 ; `ebay-apres-vente-ecran.cjs` 7 rouges sur 1023dd4 ; `ebay-apres-vente.mjs` vert.
 - ⚠️ Non mesuré : que `GetMyeBayBuying` rende `PictureDetails`, `ShippedTime` et `ShipmentTrackingDetails` dans la WonList (doc d'eBay) — absents ⇒ rien n'est affiché.
+
+### Toucher une case à cocher sur téléphone ne la cochait pas (19 octobre)
+`BottomBar` cachait la barre du bas dès qu'un `<input>` prenait le focus — y compris une case à cocher ou un bouton radio, qui n'ouvrent aucun clavier. Au toucher, la barre disparaissait, l'écran sautait de 22 px entre l'appui et le relâchement, et le geste retombait à côté : la case « J'ai compris » du planificateur eBay ne se cochait pas (banc `ebay-programmer`, 6 rouges hérités, à 390 px seulement). Seuls les champs à clavier cachent la barre maintenant (`SANS_CLAVIER`). `ebay-programmer` et `coque-mobile` verts.
