@@ -27,6 +27,12 @@
 //      bien le DERNIER message) et l'heure ; une conversation sans résumé capté
 //      n'invente rien. Le fil ouvert commence par la carte de la paire et
 //      groupe les messages par jour.
+//   8. (19 octobre, « offres sur la liste ») une offre EN ATTENTE se voit sur
+//      la LIGNE (« Offre 45 € en attente », le montant de l'OFFRE, jamais le
+//      prix de l'annonce), jugée par LA règle du fil (`offreEnAttenteDe`) —
+//      même quand l'offre n'est pas le dernier message ; pas de pastille pour
+//      une offre acceptée, refusée ou expirée (statut 10 mais « Expirée »), ni
+//      quand la lecture des offres échoue (pas su) ; le filtre « Offres ».
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -96,6 +102,30 @@ const rowsDe = ({ venteA = 3 } = {}) => [
   ] } } },
 ];
 const rows = rowsDe();
+// 8. Trois conversations dont l'offre n'est PLUS en attente (compte_b) :
+//    acceptée (statut 30), refusée (40), et « Expirée » au statut 10 — la base
+//    la rend au filtre `cs` (statut 10), c'est la RÈGLE du fil qui l'écarte.
+const filOffre = (id, st, titre, px) => ({ id, opposite_user: { id: 5000 + id, login: 'ach_' + id }, transaction: { id: 9100 + id, item_id: 700 + id, status: 1, current_user_side: 'seller', item_title: 'Paire ' + id },
+  messages: [
+    { id: id * 10 + 1, created_at_ts: iso(10), entity_type: 'offer_request_message', entity: { id: id * 10 + 1, user_id: 5000 + id, current: true, status: st, status_title: titre, price: { amount: px }, transaction_id: 9100 + id, offer_request_id: 800 + id } },
+    { id: id * 10 + 2, created_at_ts: iso(9), entity_type: 'message', entity: { id: id * 10 + 2, user_id: 5000 + id, body: 'ok' } },
+  ] });
+const rowsOffres = () => {
+  const r = rowsDe();
+  const inbox = r.find((x) => x.id === 'harvest_222_inbox');
+  inbox.data.payload.conversations.push(conv(405, 'ach_405', 'Offre acceptée', false, 9), conv(406, 'ach_406', 'Offre refusée', false, 9), conv(407, 'ach_407', 'Offre expirée', false, 9));
+  r.push({ id: 'harvest_222_conv_405', data: { capturedAt: iso(0), payload: { conversation: filOffre(405, 30, 'Acceptée', '30.0') } } });
+  r.push({ id: 'harvest_222_conv_406', data: { capturedAt: iso(0), payload: { conversation: filOffre(406, 40, 'Refusée', '31.0') } } });
+  r.push({ id: 'harvest_222_conv_407', data: { capturedAt: iso(0), payload: { conversation: filOffre(407, 10, 'Expirée', '32.0') } } });
+  return r;
+};
+// jsonb @> : un tableau contient chaque élément de l'autre ; un objet, chaque clé ;
+// un scalaire, la même valeur DU MÊME TYPE (10 ≠ "10").
+const contient = (a, b) => {
+  if (Array.isArray(b)) return Array.isArray(a) && b.every((x) => a.some((y) => contient(y, x)));
+  if (b && typeof b === 'object') return !!a && typeof a === 'object' && !Array.isArray(a) && Object.keys(b).every((k) => contient(a[k], b[k]));
+  return a === b;
+};
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -141,7 +171,7 @@ const PONT = ({ version, filExt, fils }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { version, tel = false, lignes = rows }) {
+async function rendre(b, { version, tel = false, lignes = rows, offresKO = false }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -158,10 +188,14 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
+    // Un filtre `chemin=cs.{json}` sur `data` (jsonb @>), comme PostgREST.
+    const cs = /[?&](data(?:->[^=&]+)+)=cs\.([^&]*)/.exec(u);
+    if (cs && offresKO) return route.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"panne"}' });
+    const garde = cs ? (r) => { let v = r.data; for (const seg of cs[1].replace(/^data->/, '').split('->')) v = v == null ? null : v[seg]; try { return contient(v, JSON.parse(cs[2])); } catch (_) { return false; } } : () => true;
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(lignes.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(lignes.filter((r) => r.id === eq[1] && garde(r)).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(lignes.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(lignes.filter((r) => re.test(r.id) && garde(r)).map(forme)); }
     return j([]);
   });
   const proxy = [];
@@ -213,6 +247,10 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(!r402.num && !r402.prix && !r402.etat && !r402.auteur, 'un résumé sans transaction ET plus ancien que la boîte : rien d’inventé (ni N°, ni prix, ni état, ni l’auteur d’un AUTRE message)', JSON.stringify(r402));
       dit(!!r301.quand && Math.abs(Date.parse(r301.quand) - (auj - 30 * 3600e3)) < 2000 && /\d{1,2}:\d{2}/.test(r301.txt || ''), 'la date ET l’heure du dernier message', JSON.stringify({ q: r301.quand, t: (r301.txt || '').slice(0, 60) }));
       dit(r301.compte === '111' && r402.compte === '222', 'le compte de chaque conversation est porté par la ligne', JSON.stringify({ c301: r301.compte, c402: r402.compte }));
+      // 8. l'offre en attente, sur la LIGNE (elle n'est pas le dernier message du fil)
+      const offL = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), { o: x.getAttribute('data-conv-offre'), p: (x.querySelector('[data-offre-liste]') || {}).innerText || null }])));
+      dit(offL['301'] && offL['301'].o === '45' && /Offre 45\s?€ en attente/.test(offL['301'].p || ''), 'la ligne dit « Offre 45 € en attente » — le montant de l’OFFRE (l’annonce est à 59 €)', JSON.stringify(offL['301']));
+      dit(offL['303'] && !offL['303'].o && !offL['303'].p && offL['402'] && !offL['402'].o, 'aucune pastille sur une conversation sans offre en attente', JSON.stringify({ a: offL['303'], b: offL['402'] }));
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
@@ -280,6 +318,35 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-' + (tel ? 390 : 1512) + '.png') });
+      await r.ctx.close();
+    }
+    for (const tel of [false, true]) {
+      console.log(`── offres sur la liste : acceptée, refusée, expirée · ${tel ? '390 px' : '1512 px'}`);
+      const r = await rendre(b, { version: '5.135.0', tel, lignes: rowsOffres() });
+      await r.pg.waitForTimeout(900);
+      const o = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), x.getAttribute('data-conv-offre')])));
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-liste-offres-' + (tel ? 390 : 1512) + '.png') });
+      dit(Object.keys(o).length === 6, 'les six conversations sont listées', JSON.stringify(Object.keys(o)));
+      dit(o['301'] === '45', 'l’offre en attente garde sa pastille', JSON.stringify(o));
+      dit(!o['405'] && !o['406'] && !o['407'], 'aucune pastille pour une offre acceptée, refusée ou EXPIRÉE (même au statut 10)', JSON.stringify({ 405: o['405'], 406: o['406'], 407: o['407'] }));
+      const f = await r.pg.evaluate(() => { const bt = document.querySelector('[data-filtre-offres]'); return bt ? bt.getAttribute('data-filtre-offres') : null; });
+      dit(f === '1', 'le filtre « Offres » compte UNE offre en attente', String(f));
+      if (f) {
+        await r.pg.click('[data-filtre-offres]');
+        await r.pg.waitForTimeout(400);
+        const ids = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => x.getAttribute('data-conv')));
+        dit(JSON.stringify(ids) === '["301"]', 'et ne montre qu’elle', JSON.stringify(ids));
+      }
+      dit(r.execs.filter((x) => x.method !== 'GET').length === 0, 'aucun geste n’est parti tout seul', JSON.stringify(r.execs));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    for (const tel of [false, true]) {
+      console.log(`── lecture des offres EN ÉCHEC (pas su) · ${tel ? '390 px' : '1512 px'}`);
+      const r = await rendre(b, { version: '5.135.0', tel, offresKO: true });
+      await r.pg.waitForTimeout(900);
+      const o = await r.pg.evaluate(() => ({ n: document.querySelectorAll('[data-messagerie] [data-conv]').length, off: [...document.querySelectorAll('[data-conv-offre],[data-offre-liste],[data-filtre-offres]')].length }));
+      dit(o.n === 3 && o.off === 0, 'la liste reste, et aucune pastille ni filtre « Offres » sur une lecture ratée', JSON.stringify(o));
       await r.ctx.close();
     }
     console.log('── boîtes à jour (l’autre sens)');

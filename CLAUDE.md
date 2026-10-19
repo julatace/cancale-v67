@@ -10088,6 +10088,34 @@ Vinted). `offer_price` n'est PAS le prix de la paire (valeurs à 1,70 €) : pas
   le reste s'affiche. Le coût serveur de la lecture (~1 400 lignes décompressées
   pour quelques scalaires) n'est pas mesuré.
 
+### Les offres en attente sur la LISTE des conversations (19 octobre)
+Une offre en attente n'apparaissait que dans le fil ouvert. **Mesuré (lecture
+seule)** : 1 371 conversations captées, 807 portent au moins une offre, **3**
+une offre au statut 10 (en attente) — et l'une d'elles est le 3ᵉ message sur 5 :
+`messages->-1` ne la voit pas. La transaction ne la porte pas (`offer_price` =
+le prix de l'ANNONCE : 99 € pour une offre à 60 €). Tous les messages pèsent
+1,45 Mo. ⇒ `fetchOffresConversations` demande à la base les SEULES
+conversations dont un message est une offre au statut 10
+(`data->payload->conversation->messages=cs.[{"entity_type":"offer_request_message","entity":{"status":10}}]`,
+jsonb @>, condition nécessaire de la règle) : 3 lignes, ~4 Ko, 25 ms en base
+(`explain analyze`). Puis **`offreEnAttenteDe`, LA règle du fil (§11)**, sur
+leurs messages entiers ; le fil ouvert et chargé prime (plus frais). Lu avec les
+résumés (une fois par minute, Messages seulement). Échec ⇒ `null` ⇒ aucune
+pastille (on ne garde pas l'ancienne Map : une offre tranchée depuis resterait).
+- Ligne : pastille « Offre 45 € en attente » (montant de l'OFFRE) sur la ligne du
+  message (sur celle de la paire elle tronquait N° et prix — vu au rendu),
+  `data-conv-offre`, `data-offre-liste`. Filtre « Offres N » (`data-filtre-offres`),
+  affiché seulement s'il y en a. Aucun geste automatique (§3).
+- Preuves : banc `messagerie.cjs` (offre en attente qui n'est pas le dernier
+  message ; acceptée 30, refusée 40, « Expirée » au statut 10 ; lecture des
+  offres en 500 ; le banc applique `cs.` comme jsonb @>, types compris) —
+  **6 rouges sur dd03ffd**, 0 après ; mutation « seconde règle : tout statut 10 »
+  ⇒ 6 rouges (l'offre expirée affichée).
+- ⚠️ **Non mesuré** : le filtre `cs.` sur un chemin JSON contre SA PostgREST
+  (grammaire documentée, jamais envoyée d'ici) ; refusé, la lecture vaut « pas
+  su » et rien ne s'affiche. Une capture ancienne garde une offre « en attente »
+  que Vinted a peut-être expirée depuis — le fil dit la même chose (même règle).
+
 ### Le bénéfice brut et net dans Comptabilité (19 octobre)
 Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
 encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**

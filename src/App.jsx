@@ -4280,6 +4280,35 @@ const fetchResumesConversations = async () => {
     return out;
   } catch (_) { return null; }
 };
+// ── LES OFFRES EN ATTENTE, SUR LA LISTE (19 octobre) ────────────────────────
+// Mesuré (lecture seule, 1 371 conversations captées) : l'offre vit dans les
+// MESSAGES (`entity_type: offer_request_message`, `entity.status` 10 = en
+// attente, `price.amount`, `user_id`, `transaction_id`, `offer_request_id`) —
+// et pas forcément au dernier : une offre en attente sur trois était le 3ᵉ
+// message sur 5, donc `messages->-1` ne la voit pas. La transaction ne la porte
+// pas (`offer_price` est le prix de l'ANNONCE : 99 € pour une offre à 60 €).
+// Rapatrier tous les messages : 1,45 Mo. On demande donc à la base de ne rendre
+// QUE les conversations dont un message est une offre au statut 10 (`cs.`,
+// jsonb @>) — condition NÉCESSAIRE de la règle du fil : 3 conversations, ~4 Ko,
+// 25 ms côté base — puis on leur applique `offreEnAttenteDe`, LA règle du fil
+// (§11), sur leurs messages entiers. Map `${uid}_${conv}` → offre ; absente =
+// aucune ; `null` = pas su (lecture refusée ou ratée) ⇒ aucune pastille.
+const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,msgs:data->payload->conversation->messages';
+const fetchOffresConversations = async () => {
+  try {
+    const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
+    if (rows === null) return null;
+    const out = new Map();
+    for (const r of rows) {
+      const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
+      if (!m) continue;
+      const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
+      if (off) out.set(`${m[1]}_${m[2]}`, off);
+    }
+    return out;
+  } catch (_) { return null; }
+};
 // L'état de la transaction d'une conversation, en mots — codes mesurés (voir
 // TXN_ETATS). Inconnu ⇒ `null` (rien n'est écrit, jamais un faux).
 const etatConversation = (st, side) => {
@@ -28632,6 +28661,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // états : `undefined` en cours · `null` pas su · Map (19 octobre).
   const [resumesConv, setResumesConv] = useState(undefined);
   const resumesConvAt = useRef(0);
+  // Les offres en attente des conversations captées (`fetchOffresConversations`) :
+  // `undefined` en cours · `null` pas su · Map lue.
+  const [offresConv, setOffresConv] = useState(undefined);
   const [openConv,setOpenConv]=useState(null);
   const conversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
@@ -30874,6 +30906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let fini = false;
     resumesConvAt.current = Date.now();
     fetchResumesConversations().then(m => { if (!fini) setResumesConv(prev => m || (prev instanceof Map ? prev : null)); });
+    fetchOffresConversations().then(m => { if (!fini) setOffresConv(m); });
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
@@ -36820,6 +36853,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
           //    côté, avec le geste, jamais à la place.
           const nonLus = liste.filter(c=>c.unread).length;
+          // (19 oct.) L'offre en attente d'une conversation : LA règle du fil
+          // (`offreEnAttenteDe`, §11), sur le fil ouvert s'il est chargé (plus
+          // frais), sinon sur la lecture ciblée des conversations captées. Pas su
+          // ⇒ `null` : aucune pastille.
+          const offreDeConv = (c) => {
+            if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) return offreEnAttenteDe(openConv.conversation);
+            return offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
+          };
+          const nOffres = liste.filter(c=>offreDeConv(c)).length;
           // ⚠️ (16 octobre) Depuis qu'un choix EXPLICITE filtre la liste
           //    (13 octobre), `liste` ne porte plus les autres comptes : compté
           //    dessus, ce nombre valait toujours 0, et l'en-tête passait à « tout
@@ -36834,7 +36876,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
-          const tri=liste.filter(c=>messageFilter==='all'||c.unread).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
@@ -36874,6 +36916,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
                   <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                  {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres <span>{nOffres}</span></button>}
                 </div>
                 <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
@@ -36881,6 +36924,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
               </div>
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
+              {messageFilter==='offres' && tri.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
                 <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
                   <b>{nonLusAilleurs}</b> non lu{nonLusAilleurs>1?'s':''} sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'}, pas affiché{nonLusAilleurs>1?'s':''} ici — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'les':'le'} voir.
@@ -36912,6 +36956,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
                   const auteur = auteurDernier(c, paire);
+                  const offre = offreDeConv(c);
                   const tsConv = Date.parse(c.updated_at||'') || null;
                   const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   const ro = !!prioMsg && uidC(c)!==prioMsg;
@@ -36940,7 +36985,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     )}
                     {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
                     <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined}
-                      data-conv-num={paire&&paire.num?paire.num:undefined} data-conv-prix={paire&&paire.prix!=null?String(paire.prix):undefined} data-conv-etat={paire&&paire.etat?paire.etat.k:undefined} data-conv-auteur={auteur||undefined} data-conv-quand={tsConv?new Date(tsConv).toISOString():undefined} data-conv-compte={c._acc?String(c._acc.vinted_user_id):undefined}
+                      data-conv-num={paire&&paire.num?paire.num:undefined} data-conv-prix={paire&&paire.prix!=null?String(paire.prix):undefined} data-conv-etat={paire&&paire.etat?paire.etat.k:undefined} data-conv-auteur={auteur||undefined} data-conv-quand={tsConv?new Date(tsConv).toISOString():undefined} data-conv-compte={c._acc?String(c._acc.vinted_user_id):undefined} data-conv-offre={offre?String(offre.prix):undefined}
                       onClick={()=>openConversation(c)}
                       style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
                       <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
@@ -36959,6 +37004,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </span>); })()}
                         <span className="vrm-msg-l2">
                           <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{auteur==='toi'?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{c.description||''}</span>
+                          {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
+                              elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
+                          {offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
                           {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
                         </span>
                       </span>
