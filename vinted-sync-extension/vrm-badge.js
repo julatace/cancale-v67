@@ -48,39 +48,60 @@
   const ombre = hote.attachShadow({ mode: 'closed' });
   ombre.innerHTML = `
 <style>
-  :host { all: initial; }
+  /* « VRM Noir » (§7) : UN seul accent bleu, rare ; le clair et le sombre
+     suivent le système ; rayons 5 / 8 / 10 / 12 ; une seule forme de bouton. */
+  :host { all: initial;
+    --fond: #07090D; --carte: #10141B; --bord: #1E2530; --filet: #1A202A; --texte: #E8ECF2; --doux: #8A93A3; --pale: #6B7485;
+    --accent: #3D7BFF; --ambre: #F5A524; --survol: #1A202A;
+    --ombre: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.36); }
+  @media (prefers-color-scheme: light) {
+    :host { --carte: #FFFFFF; --bord: #DCE1EA; --filet: #E8ECF2; --texte: #10151B; --doux: #5B6577; --pale: #7A8494;
+      --accent: #2458E6; --ambre: #A15C00; --survol: #EEF1F6;
+      --ombre: 0 1px 2px rgba(16,21,27,.08), 0 16px 40px rgba(16,21,27,.14); }
+  }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; }
   .btn { position: relative; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(61,123,255,.38); border-radius: 12px;
     background: #07090D; cursor: pointer; display: block;
     box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.28); transition: transform .12s ease, box-shadow .12s ease; }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.34); }
-  .btn img { width: 100%; height: 100%; border-radius: 11px; display: block; }
+  .btn:focus-visible, .b:focus-visible, .fermer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn img { width: 100%; height: 100%; border-radius: 10px; display: block; }
   .btn .txt { color: #E8ECF2; font-weight: 800; font-size: 12px; letter-spacing: .04em; line-height: 42px; text-align: center; display: block; }
-  .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: #F5A524; border: 2px solid #07090D; display: none; }
+  .pt { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 999px; background: var(--ambre); border: 2px solid #07090D; display: none; }
   .pt.on { display: block; }
-  .carte { position: absolute; right: 0; bottom: 54px; width: 280px; background: #10141B; color: #E8ECF2; border: 1px solid #1E2530;
-    border-radius: 12px; padding: 12px 14px; font-size: 12.5px; line-height: 1.45;
-    box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.36); display: none; }
-  .carte.on { display: block; }
-  .tete { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
-  .tete b { font-size: 13px; letter-spacing: .02em; }
-  .ver { font-size: 10.5px; color: #6B7485; }
-  .ligne { padding: 6px 0; border-top: 1px solid #1A202A; }
-  .lib { font-size: 10.5px; color: #8A93A3; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
-  .val { margin-top: 1px; word-break: break-word; }
-  .val.alerte { color: #F5A524; }
-  .val.gris { color: #8A93A3; }
-  .pied { margin-top: 8px; font-size: 11px; color: #8A93A3; }
-  .pied b { color: #3D7BFF; font-weight: 600; }
-  .connexion { position: absolute; right: 0; bottom: 54px; width: 300px; height: 380px; border: 1px solid #1E2530; border-radius: 12px;
-    overflow: hidden; background: #07090D; box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.36); display: none; }
+  .carte, .question { position: absolute; right: 0; bottom: 54px; width: 300px; background: var(--carte); color: var(--texte); border: 1px solid var(--bord);
+    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: var(--ombre); display: none; }
+  .carte.on, .question.on { display: block; }
+  .tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .tete b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+  .ver { font-size: 11px; color: var(--pale); }
+  .ligne { padding: 8px 0; border-top: 1px solid var(--filet); }
+  .lib { font-size: 11px; color: var(--doux); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .val { margin-top: 2px; word-break: break-word; }
+  .val.alerte { color: var(--ambre); }
+  .val.gris { color: var(--doux); }
+  .pied { margin-top: 8px; font-size: 12px; color: var(--doux); }
+  .pied b { color: var(--texte); font-weight: 600; }
+  .b { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px;
+    background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-align: center; }
+  .b.sec { background: transparent; color: var(--texte); border-color: var(--bord); }
+  .b.sec:hover { background: var(--survol); }
+  .b:disabled { opacity: .6; cursor: default; }
+  .q { font-size: 14px; font-weight: 600; margin: 2px 0 4px; }
+  .q b { font-weight: 700; }
+  .err { margin-top: 8px; font-size: 12px; color: var(--ambre); }
+  .connexion { position: absolute; right: 0; bottom: 54px; width: 300px; height: 400px; border: 1px solid var(--bord); border-radius: 12px;
+    overflow: hidden; background: var(--fond); box-shadow: var(--ombre); display: none; }
+  @media (prefers-color-scheme: light) { .connexion { background: #F4F6FA; } }
   .connexion.on { display: block; }
-  .connexion iframe { width: 100%; height: 100%; border: 0; display: block; background: #07090D; }
-  .fermer { position: absolute; top: 6px; right: 8px; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent;
-    color: #8A93A3; font-size: 16px; cursor: pointer; line-height: 24px; padding: 0; }
-  .fermer:hover { background: #1A202A; color: #E8ECF2; }
+  .connexion iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+  .fermer { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--doux); font-size: 18px; cursor: pointer; line-height: 44px; padding: 0; }
+  .fermer:hover { background: var(--survol); color: var(--texte); }
+  .question .fermer { top: 4px; right: 4px; }
 </style>
 <div class="carte" part="carte"></div>
+<div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
 <div class="connexion"><button class="fermer" title="Fermer" aria-label="Fermer">×</button></div>
 <button class="btn" title="VRM" aria-label="VRM"><span class="pt"></span></button>`;
 
@@ -88,6 +109,7 @@
   const pt = ombre.querySelector('.pt');
   const carte = ombre.querySelector('.carte');
   const connexion = ombre.querySelector('.connexion');
+  const question = ombre.querySelector('.question');
 
   // Le logo de l'app (le même qu'en haut de chaque écran de VRM). S'il ne
   // charge pas : « VRM » en texte, jamais une image cassée.
@@ -149,6 +171,7 @@
     const v = e.vrm;
     if (v && v.connecte === false) return true;                               // pas connecté, ou session expirée
     if (e.bascule) return true;                                               // une autre session VRM a été adoptée
+    if (e.site && e.site.choix === 'non' && e.plateforme === 'vinted') return false;   // un CHOIX n'est pas une panne
     const f = e.flux;
     if (f && f.koAt && (!f.okAt || f.koAt > f.okAt)) return true;            // dernier envoi refusé
     return false;
@@ -172,6 +195,10 @@
   }
 
   function rendre() {
+    rendreCarte();
+    rendreQuestion();
+  }
+  function rendreCarte() {
     const e = etat;
     pt.classList.toggle('on', aFaire(e) || perime);
     // Le code qui tourne n'est pas celui du manifeste : recharger la PAGE ne
@@ -202,13 +229,16 @@
     let compteSite;
     if (!e.capte && !e.mesure) compteSite = `<div class="val gris">VRM ne capte pas encore ${esc(nomSite)}.</div>`;
     else if (!e.capte) compteSite = '<div class="val gris">pas encore reconnu</div>';
+    else if (e.site && e.site.nom && e.site.choix === 'non') compteSite = `<div class="val gris" data-compte-ignore>${esc(e.site.nom)} — ignoré dans ce navigateur (ton choix) : rien n'est capté pour lui.</div><button class="b sec" data-capter>Capter ce compte</button>`;
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
     else if (e.site && e.site.id) compteSite = `<div class="val">compte n° ${esc(e.site.id)}</div>`;
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
     let flux = '';
-    if (e.capte) {
+    const ignore = !!(e.site && e.site.choix === 'non' && e.plateforme === 'vinted');
+    if (e.capte && ignore) flux = '<div class="val gris">Rien n’est capté pour ce compte — ton choix.</div>';
+    else if (e.capte) {
       const f = e.flux || {};
       if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
         flux = `<div class="val alerte">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>`;
@@ -232,6 +262,53 @@
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${bascule}
       <div class="pied">${pied}</div>`);
+    const capter = carte.querySelector('[data-capter]');
+    if (capter) capter.addEventListener('click', () => { capter.disabled = true; envoyerChoix('oui'); });
+  }
+
+  // ══ CONFIRMER LE BON COMPTE VINTED (5.191, 19 octobre) ═══════════════════
+  // Julien : « à l'installation de l'extension, confirmer le bon compte
+  // Vinted ». Une fois par compte : seulement sur Vinted, seulement si on sait
+  // NOMMER le compte (jamais « compte n° … » ni un login deviné), et seulement
+  // tant qu'il n'a pas répondu dans ce Chrome. Pas répondu ⇒ la capture
+  // continue comme avant : la question ne coupe rien.
+  let questionFermee = '';   // « Plus tard » : plus de question sur cette page pour ce compte
+  let questionErreur = '';
+  const aDemander = (e) => !!(e && e.plateforme === 'vinted' && e.capte && e.site && e.site.id && e.site.nom
+    && !e.site.choix && questionFermee !== String(e.site.id) && !(e.vrm && e.vrm.connecte === false));
+  function envoyerChoix(choix) {
+    const s = etat && etat.site;
+    if (!s || !s.id) return;
+    questionErreur = '';
+    ombre.querySelectorAll('[data-choix]').forEach((b) => { b.disabled = true; });
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'choixCompte', uid: String(s.id), choix }, (r) => {
+        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+        if (!err && r && r.ok) { s.choix = choix; questionErreur = ''; }
+        else questionErreur = r && r.raison === 'compte'
+          ? "Le compte Vinted ouvert a changé entre-temps — rien n'est noté. Recharge la page."
+          : "Je n'ai pas pu le noter — rien n'a changé. Réessaie dans un moment.";
+        rendre();
+      });
+    } catch (_) { questionErreur = "Je n'ai pas pu le noter — rien n'a changé."; rendre(); }
+  }
+  function rendreQuestion() {
+    const e = etat;
+    const montrer = aDemander(e);
+    question.classList.toggle('on', montrer);
+    if (!montrer) { if (question.childNodes.length) question.replaceChildren(); return; }
+    const nom = e.site.nom;
+    poserHtml(question, `<button class="fermer" data-plus-tard title="Plus tard" aria-label="Plus tard">×</button>
+      <div class="tete"><b>VRM</b></div>
+      <div class="q" data-question-login="${esc(nom)}">Tu es connecté sur <b>${esc(nom)}</b> — c'est bien un de tes comptes à capter ?</div>
+      <div class="val gris">Oui : VRM range ses ventes, ses annonces et ses messages. Non : l'extension l'ignore dans ce navigateur (tu pourras revenir dessus en passant la souris sur le logo).</div>
+      <button class="b" data-choix="oui">Oui, capter ce compte</button>
+      <button class="b sec" data-choix="non">Non, ignorer ce compte</button>
+      ${questionErreur ? `<div class="err">${esc(questionErreur)}</div>` : ''}`);
+    question.querySelector('[data-choix="oui"]').addEventListener('click', () => envoyerChoix('oui'));
+    question.querySelector('[data-choix="non"]').addEventListener('click', () => envoyerChoix('non'));
+    question.querySelector('[data-plus-tard]').addEventListener('click', () => { questionFermee = String(e.site.id); rendre(); });
+    carte.classList.remove('on');
   }
 
   async function rafraichir() {
@@ -291,7 +368,7 @@
   // La carte d'état au survol ; elle se ferme quand on s'en va.
   let minuteur = null;
   hote.addEventListener('mouseenter', () => {
-    if (connexion.classList.contains('on')) return;
+    if (connexion.classList.contains('on') || question.classList.contains('on')) return;
     clearTimeout(minuteur);
     rafraichir();
     carte.classList.add('on');
@@ -303,7 +380,7 @@
   try {
     chrome.storage.onChanged.addListener((ch, zone) => {
       if (zone !== 'local') return;
-      if (ch.vrmSession || ch.vrmFlux || ch.vrmBascule || ch.vrmLbcCompte) rafraichir();
+      if (ch.vrmSession || ch.vrmFlux || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rafraichir(); });
