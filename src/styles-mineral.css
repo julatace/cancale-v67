@@ -1340,6 +1340,22 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-masquer { align-self:center !important; margin:0 !important; order:9; }
 }
 
+/* (19 oct.) Colis jamais retirés : les gestes (code, QR, Vérifier, « Je l'ai eu »)
+   forment un groupe poussé à droite — « Je l'ai eu » au même endroit sur chaque
+   ligne. Sur téléphone le groupe prend sa propre ligne, toujours. */
+.vrm-oublie-gestes { display:flex; align-items:center; gap:8px; margin-left:auto; flex-wrap:nowrap; }
+@media(max-width:767px) { .vrm-oublie-gestes { flex-basis:100%; justify-content:flex-end; } }
+/* (19 oct.) Colis en lignes : chaque geste a SA colonne (Imprimer · Imprimé ? ·
+   Colis fait · Suivre). En flex, un geste absent faisait glisser les suivants :
+   « Colis fait » passait de la 3e à la 2e place d'une ligne à l'autre. */
+@media(min-width:768px) {
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { display:grid !important; grid-template-columns:repeat(4, 108px); column-gap:8px; row-gap:2px; align-items:center; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="imprime"] { grid-column:2; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="fait"] { grid-column:3; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="suivre"] { grid-column:4; grid-row:1; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { grid-column:1 / -1; }
+}
+
 /* Messages plus riches (19 oct.) : la paire de la conversation (N°, titre, prix)
    puis son état en pastille neutre — jamais coupée par le titre. */
 .vrm-msg-paire { display:flex !important; align-items:center; gap:6px; min-width:0; }

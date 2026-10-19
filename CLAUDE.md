@@ -10142,6 +10142,45 @@ charges, − cotisations URSSAF, net.
   / `data-ventes-benef-*`) : **10 rouges sur le build d'avant**, rouge sous la
   mutation « second calcul divergent ».
 
+### Revue de tous les écrans après les fusions du 19 octobre
+Rendu de chaque écran et section (390 tactile, 1512, clair, sombre), captures
+hautes regardées. Corrigé, chacun prouvé par `scripts/bancs/revue-19oct.cjs`
+(**15 rouges sur le build de 47e9249**, 0 après ; `EXPLORE=dossier` fait les
+captures et liste les cibles < 44 px) :
+- ⚠️ **Ma journée « En attente » comptait l'argent des comptes SUPPRIMÉS** (2 240 €,
+  « 9 porte-monnaie », « lu il y a 69 j » ; le résumé Vinted disait 1 995,80 €) :
+  la lecture partait au montage, avant les comptes (liste vide = aucun filtre),
+  et n'était jamais refaite. Elle attend les comptes et suit leur liste (`_cle`).
+- Annonces : « elle ne est pas comptée » ; et le bouton « N annonces à
+  confirmer » trouait le paragraphe (`margin:0` en ligne battait la marge
+  négative de compensation : il porte `vrm-lien-action`).
+- Achats, colis jamais retirés : « Je l'ai eu » changeait de place d'une ligne à
+  l'autre (groupe de gestes `vrm-oublie-gestes`, poussé à droite, sa ligne sur
+  téléphone), l'âge était coupé (« il y a… »), « Vérifier » faisait 21 px, et le
+  bloc était ROUGE (§7 : rouge = deux paires sous un N°) ⇒ ambre.
+- Colis : « ✅ 15 colis partis » en vert menthe `#0F8A6A`, juste sous « Partis —
+  Vinted suit le colis · 26 » (une autre notion) ⇒ « 15 bordereaux déjà
+  traités », neutre. En lignes (1512), « Colis fait » glissait de la 3ᵉ à la 2ᵉ
+  place quand « Imprimé ? » manquait ⇒ une colonne par geste (`data-geste`).
+- Compta, prochaine échéance : « CA finalisé 0,00 € » sous un tableau qui dit
+  « Finalisé 4 224,77 € » pour le même mois — le montant est le **reçu (versé)** ;
+  libellé corrigé, et « au moins » quand la ligne publiée porte des ventes sans
+  date de versement (`data-echeance-partiel`).
+- Cibles au doigt : les valeurs éditables en place (« achat — » 10 px de large,
+  « N°2 » 25 px), « Déclarer sur l'URSSAF » (26 px), le « voir » de Colis, le
+  lien « Ouvrir la conversation ↗ » d'Achats (`.vrm-pickup-lien`, banc
+  `achats-messages-premium`, rouge avant).
+- **Laissés, avec la raison** : `stats-premium` rouge (3) depuis 866a90d (commit de
+  Julien du 18 oct. : la courbe « Vendu » replie son explication sur téléphone,
+  tailles 12/14 px) — son choix de design ; sur téléphone, les gestes secondaires
+  d'un colis se partagent la ligne (décision du 16 oct.), donc « Colis fait » n'y
+  a pas de place fixe ; `INV_STATUS.online.color` (le vert menthe) reste dans 60
+  endroits (pastilles « Reçu », boutons à texte blanc : un neutre y rendrait du
+  blanc sur blanc en sombre — à reprendre site par site) ; « 162 ventes sans
+  date de versement » est dit trois fois sur Compta (trois cartes, trois
+  chiffres) ; eBay « Réponse eBay incomplète » ×4 sur À traiter vient du banc
+  (il sert `{pret:true}` à toute route `/api`, une forme que la route ne rend pas).
+
 ### Leboncoin et eBay dans le bénéfice, par identité seulement (19 octobre)
 - `ventesAutresBenefice` (module) relie une vente à SA paire : eBay = SKU de
   chaque ligne par `numLigneEbay` → `numEbayLu` (lien VRM, carte 013 par
