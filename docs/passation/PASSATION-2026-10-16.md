@@ -1,5 +1,18 @@
 # PASSATION COMPLÈTE — 16 octobre 2026
 
+> ## ⚠️ MISE À JOUR DU 19 OCTOBRE — lire `LIS-MOI-D-ABORD-2026-10-16.md` §1 et §2 d'abord
+> Ce fichier décrit l'état au **16 octobre**. Depuis, deux autres agents ont poussé
+> **74 commits sur `main`** (extension **5.190**) et ont réimplémenté de leur côté
+> presque tout ce que ce fichier marque ⬜ / 🟨 / 🟧 : publication Leboncoin et eBay
+> en un clic, Tout imprimer, tampons par type, litiges hors des colis à faire,
+> numérotation réparée (migration 017), nuage, comptes bannis, mode stream, 2FA,
+> mode équipe (migration 016 non appliquée), studio photo, double vente app fermée,
+> design de la maquette… **Ne fusionne pas cette branche, n'applique pas les
+> patchs : ils sont plus vieux que la production.** Ce qui reste vraiment (vérifié
+> contre `main` le 19 oct.) est listé au §2 de `LIS-MOI-D-ABORD-2026-10-16.md` ;
+> ce fichier-ci reste utile pour le texte de chaque demande, les décisions de
+> Julien (§8) et les pièges (§9).
+
 **À lire après `docs/passation/LIS-MOI-D-ABORD-2026-10-16.md`** (l'ordre de travail,
 les 7 patchs, la mise en ligne). Ici : **tout le reste**, en détail — chacune des
 demandes de Julien du 2 au 16 octobre avec son état, ce qui reste de la grande
