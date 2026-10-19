@@ -192,3 +192,23 @@
  .vrm-main .vrm-shared-sale .vrm-sale-photo{background-image:url('/textures/vrm-grain.svg'),linear-gradient(145deg,#e6ece8,#f3f5f0);border-radius:9px;overflow:hidden;}
  :root[data-theme=dark] .vrm-main .vrm-shared-sale{background:linear-gradient(130deg,#253b45,#21343e);border-color:#ffffff12!important;}
 }
+
+/* Le zoom est désormais 1 : les compensations de l'ancien zoom .8 ne
+   doivent plus agrandir les cibles à 55 px ni déborder des outils compacts. */
+@media(max-width:767px){
+ :root body .vrm-main :is(button,summary,select,[role="tab"]):not([role="switch"]),
+ :root body .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]){min-height:44px!important;}
+ :root body .vrm-main :is(button,[role="tab"])[aria-label]:not([role="switch"]),
+ :root body .vrm-main [style*="min-width: 44px"],
+ :root body .vrm-main .vrm-market-space .vrm-platform-tabs>button{min-width:44px!important;}
+ :root body .vrm-main [style*="min-height: 44px"],
+ :root body .vrm-main .vrm-market-space[aria-label="eBay"] a[href][style*="border"],
+ :root body .vrm-main [data-messages-lbc] a[data-ouvrir-messages-lbc],
+ :root body .vrm-main .vrm-ann-actions a[href],
+ :root body .vrm-main :is(.vrm-achats a[data-retour-tx],.vrm-buy-retour>a,.vrm-pickup-cta,.vrm-pickup-lien){min-height:44px!important;}
+ :root body .vrm-main :is(a.vrm-lien-touche,.vrm-apub-gestes>a.vrm-apub-lien){min-height:44px;min-width:44px;margin-block:-10px;}
+ :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
+ :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
+ :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
+ :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:40px!important;}
+}
