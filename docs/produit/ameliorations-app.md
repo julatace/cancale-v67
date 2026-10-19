@@ -132,3 +132,19 @@ commande eBay avec actions <120 px et boutons de coût côte à côte aux trois
 largeurs ; 89 contrôles d’écrans secondaires, dont panneau facture dépliable,
 aucune sélection automatique et aucune mise en envoi ; 202 contrôles de
 navigation/actions réussis. Captures : `/workspace/shared/vrm-listes-denses/`.
+
+### Outils de liste et préparation des colis
+
+Compteurs des ventes, filtres, vues rapides et réglages de publication plus
+compacts sur téléphone. Recherche Vinted sans bordure doublée. Les premières
+annonces remontent dans l’écran, sans retirer les outils de stock/publication.
+Colis Leboncoin : vignette, titre et actions Imprimer/Générer + Colis fait dans
+une petite grille ; lien de secours et commande d’impression conservent leur
+comportement distinct. Détails des retraits moins hauts, codes inchangés.
+
+Vérification : compilation réussie, 93 contrôles des écrans secondaires (colis
+à préparer <115 px et href du bordereau intact), 112 contrôles mobiles et 202
+contrôles de navigation/actions réussis. Le banc de densité bureau synchronise
+sa préférence de zoom et attend la largeur mesurée du graphique avant de tester
+la visibilité du stock ; ses exigences de visibilité restent inchangées.
+Captures : `/workspace/shared/vrm-outils-compacts/`. Toujours non publié.
