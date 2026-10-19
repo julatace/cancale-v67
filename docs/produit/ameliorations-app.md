@@ -33,3 +33,13 @@ Ces travaux prolongent les fonctions existantes. L’accord ne vaut ni envoi aut
 - Logo officiel, couleurs des plateformes et règles de calcul conservés.
 
 Vérification : 91 contrôles iPhone sur les écrans Accueil, ventes Vinted/Leboncoin/eBay et Statistiques à 320/390/430 px ; 202 contrôles revendeurs/navigation sur téléphone et ordinateur réussis ; compilation de production réussie. Navigation, absence de débordement, champs de saisie, recherche, boutons côte à côte et hauteur des lignes vérifiés. Les données sont synthétiques. Rendu testé dans Chromium avec émulation mobile ; aucun appareil iPhone physique ni moteur Safari n’a été utilisé.
+
+### Seconde proposition mobile, avant publication
+
+Navigation de plateforme soulignée, fiches de vente individuelles avec portrait
+62 × 82 px, statut discret et prix distinct, actions secondaires séparées par un
+filet. Les explications de bordereau restent lisibles sans grand encadré. Le
+porte-monnaie sans solde disponible ne réserve plus une rangée sur téléphone ;
+les chiffres financiers restent accessibles dans le résumé. Le mode sombre
+utilise les variables de surface et de texte de l’app. Captures synthétiques
+prises après la fin des animations de montant, sans modifier les photos réelles.

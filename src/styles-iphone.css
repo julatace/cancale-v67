@@ -92,3 +92,51 @@
  .vrm-global-search .vrm-global-search-head{padding-top:max(12px,env(safe-area-inset-top))!important;}
  .vrm-global-search input{font-size:16px!important;min-width:0;}
 }
+
+/* Téléphone : une surface de travail, une navigation et des fiches lisibles. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{background:var(--vrm-bg,#f2f5f5);border-bottom:0;}
+ .vrm-main .vrm-market-space{background:var(--vrm-bg,#f2f5f5);}
+ .vrm-main .vrm-market-heading{padding:4px 16px 6px;gap:8px;}
+ .vrm-main .vrm-market-heading h1{font-size:22px;letter-spacing:-.6px;}
+ .vrm-main .vrm-plat-tuile{width:30px;height:30px;border-radius:9px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{gap:18px;padding:0 16px;border-bottom:1px solid var(--vrm-line);}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{background:transparent!important;border:0!important;border-radius:0!important;padding:10px 0!important;min-height:42px!important;font-size:13px!important;box-shadow:none!important;position:relative;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]{color:var(--vrm-ink,#21343e)!important;font-weight:750!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--vrm-ink,#21343e);border-radius:3px 3px 0 0;}
+ .vrm-main [data-retirer-argent]{padding:5px 10px!important;border-radius:10px!important;}
+ .vrm-main [data-retirer-argent]>button>span:first-child>span{font-size:11px!important;line-height:1.4;}
+ .vrm-main [data-retirer-argent]>button>span:first-child>span:first-child{font-size:12px!important;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar{padding:8px 12px!important;}
+ .vrm-main [data-raison-bord]{border:0!important;border-left:2px solid #b98a38!important;background:transparent!important;border-radius:0!important;padding:4px 9px!important;font-size:10px!important;}
+ .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:28px;padding:5px 0;font-size:10px!important;}
+ .vrm-main .vrm-ventes-liste{background:transparent!important;border:0!important;border-radius:0!important;overflow:visible!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background:var(--vrm-surface,#fff);border:1px solid var(--vrm-line,#dfe7e9)!important;border-radius:14px!important;padding:12px!important;margin-bottom:9px;box-shadow:0 2px 5px #21343e04;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:62px minmax(0,1fr) auto!important;gap:3px 10px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:62px!important;height:82px!important;border-radius:9px!important;grid-row:1 / span 3;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:13px!important;line-height:1.4!important;font-weight:650!important;letter-spacing:-.15px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:10px!important;gap:5px 8px!important;margin-top:6px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{font-size:10px;padding:3px 6px;background:var(--vrm-bg,#f2f5f5);border-radius:5px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:18px!important;letter-spacing:-.6px;line-height:1.4;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:8px;padding-top:5px;border-top:1px solid var(--vrm-line,#e7edef);gap:0 4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{border-top:1px solid var(--vrm-line,#e7edef);}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:var(--vrm-ink,#21343e)!important;font-weight:550!important;font-size:11px!important;}
+ .vrm-app-shell .vrm-tabbar{border-radius:16px 16px 0 0;box-shadow:0 -4px 18px #21343e12;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab{position:relative;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]::before{content:'';position:absolute;top:4px;width:18px;height:2px;border-radius:3px;background:currentColor;}
+}
+
+@media(max-width:767px){
+ .vrm-main .vrm-plat-tuile-mot{width:auto;height:30px;padding-inline:9px;}
+ .vrm-main [data-retirer-argent]{height:auto!important;min-height:0!important;}
+ .vrm-app-shell .vrm-main [data-retirer-argent]>button{height:auto!important;min-height:36px!important;}
+}
+
+@media(max-width:767px){
+ /* Sans solde disponible, le porte-monnaie reste dans Chiffres : la liste
+    des ventes ne réserve pas une rangée entière à une action sans objet. */
+ .vrm-market-space>div:has(>[data-portefeuille-vide=true]){display:none;}
+ .vrm-main .vrm-market-heading{padding-block:2px;}
+ .vrm-main .vrm-market-space>[data-fraicheur-ventes]{font-size:10px!important;padding-block:2px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{display:flex;align-items:center;gap:6px;}
+}

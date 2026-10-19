@@ -13160,7 +13160,7 @@ function RetirerArgent({ liveStats }) {
   if (!liste) return null;
   const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
   return (
-    <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
+    <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
             ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
