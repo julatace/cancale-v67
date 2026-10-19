@@ -377,3 +377,80 @@
 @media(max-width:767px){
  .vrm-main .vrm-ann-toolbar .vrm-ann-outils>button{width:40px!important;min-width:40px!important;max-width:40px;box-sizing:border-box;}
 }
+
+/* Direction Gestion : repères de colonnes et lignes compactes sur téléphone.
+   Montant désigne le prix de vente, sans le présenter comme un revenu net. */
+.vrm-ledger-heading{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 54px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-muted,#52636b);}
+ .vrm-main .vrm-ventes-liste{border-radius:8px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:8px 9px 2px!important;gap:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:2px 8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:12px!important;font-weight:600!important;line-height:1.35!important;letter-spacing:-.1px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:10px!important;gap:4px 7px!important;margin-top:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:15px!important;font-variant-numeric:tabular-nums;letter-spacing:-.2px!important;}
+ .vrm-main .vrm-ventes-liste [data-benef-vente]{font-variant-numeric:tabular-nums;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:2px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:5px 8px!important;}
+ .vrm-main .vrm-shared-sale .vrm-display{font-variant-numeric:tabular-nums;}
+}
+
+/* Même grille de lecture pour l'inventaire publié : photo, article, prix. */
+@media(max-width:767px){
+ .vrm-main .vrm-ann-ledger-heading{border:1px solid var(--studio-line);border-radius:8px 8px 0 0;padding-left:54px;}
+ .vrm-main .vrm-ann-ledger-heading+.vrm-ann-grid{border-top:0;border-radius:0 0 8px 8px;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:8px 9px!important;gap:8px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-ledger-info{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px!important;align-content:start;}
+ .vrm-main .vrm-ann-ledger-info>div{grid-column:1 / -1;min-width:0;}
+ .vrm-main .vrm-ann-ledger-info>[data-titre]{grid-column:1;grid-row:1;font-size:12px!important;font-weight:600!important;line-height:1.35!important;}
+ .vrm-main .vrm-ann-ledger-info>.vrm-ann-price-line{grid-column:2;grid-row:1 / span 2;display:flex!important;flex-direction:column;align-items:flex-end!important;gap:4px!important;max-width:100px;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:15px!important;font-variant-numeric:tabular-nums;line-height:1.35;}
+ .vrm-main .vrm-ann-ledger-info>div:nth-child(3){grid-column:1;grid-row:2;font-size:10px!important;}
+ .vrm-main .vrm-ann-card [data-chiffres]{font-variant-numeric:tabular-nums;padding-top:3px;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions{padding:0 9px 3px 53px!important;border-top:0!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions>summary{min-height:32px;display:flex;align-items:center;gap:5px;font-size:10px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-title{line-height:1.35!important;overflow-wrap:anywhere;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price{min-width:0;max-width:120px;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price>.vrm-display{white-space:nowrap;}
+}
+.vrm-sale-row:focus-within,.vrm-ann-card:focus-within{outline:2px solid #809b91;outline-offset:-2px;}
+
+@media(max-width:767px){
+ .vrm-main .vrm-ann-grid .vrm-ann-card{display:flex!important;flex-direction:column!important;border-radius:0!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions{position:static;display:block!important;align-self:stretch;padding:0 9px 3px 53px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions>summary{position:static;width:auto;height:auto;min-height:32px!important;justify-content:flex-start;white-space:nowrap;padding:0!important;font-size:10px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions>summary::before{content:none;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions>summary>*{display:inline-flex!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions[open]>div{padding:0 0 8px!important;}
+}
+
+/* Une vente = une seule ligne ; le bouton ouvre les actions existantes. */
+.vrm-ledger-sale-toggle{display:none;}
+.vrm-ledger-sale-content{display:contents;}
+@media(max-width:767px){
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto 24px;align-items:center;gap:6px;width:100%;min-height:48px;padding:4px 0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer;}
+ .vrm-main .vrm-ledger-sale-toggle>img,.vrm-main .vrm-ledger-photo-empty{width:28px;height:36px;object-fit:cover;border-radius:3px;background:var(--studio-paper);display:flex;align-items:center;justify-content:center;}
+ .vrm-main .vrm-ledger-sale-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:600;}
+ .vrm-main .vrm-ledger-sale-state{font-size:9px;white-space:nowrap;color:var(--studio-muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;}
+ .vrm-main .vrm-ledger-sale-state:empty{display:none;}
+ .vrm-main .vrm-ledger-sale-amount{font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+ .vrm-app-shell .vrm-main .vrm-sale-row{padding:0 9px!important;gap:0!important;}
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-content{display:none;}
+ .vrm-main .vrm-sale-row[data-ligne-ouverte=true]>.vrm-ledger-sale-content{display:flex;flex-direction:column;gap:8px;padding:8px 0 10px;border-top:1px solid var(--studio-line);}
+ .vrm-main .vrm-shared-sale .vrm-ledger-sale-toggle{grid-template-columns:28px minmax(0,1fr) auto 24px;}
+ .vrm-main .vrm-ledger-sale-toggle:focus-visible{outline:2px solid #617d73;outline-offset:-2px;border-radius:4px;}
+}
+
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:0 9px!important;gap:0!important;}
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{box-sizing:border-box;}
+ .vrm-main .vrm-ledger-photo-empty>*{max-width:28px!important;max-height:36px!important;}
+ .vrm-main .vrm-shared-sale .vrm-ledger-sale-toggle{grid-template-columns:28px minmax(0,1fr) auto auto 24px;}
+ .vrm-main .vrm-ledger-sale-state:empty{display:block;}
+ .vrm-main .vrm-ventes-liste>.vrm-ledger-heading{padding-left:53px;padding-right:39px;}
+}

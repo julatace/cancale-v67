@@ -37,11 +37,20 @@ s=s.replace(marker,fixtures+`
      check(await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).count()===1,'zéros initiaux conservés '+width);
      if(width<768)check(await p.locator('.vrm-pickup-code:not([data-code-long]) strong').evaluateAll(es=>es.every(e=>e.getBoundingClientRect().height<30)),'code court sur une ligne '+width);
     }
+    if(nom==='ventes' && width<768){
+     const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();
+     check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=52),'vente sur une seule ligne '+width);
+     const ouvrir=ligne.locator('.vrm-ledger-sale-toggle');
+     check(await ouvrir.getAttribute('aria-expanded')==='false','actions repliées au départ '+width);
+     await ouvrir.click();
+     check(await ouvrir.getAttribute('aria-expanded')==='true','actions ouvrables au clic '+width);
+    }
     if(nom==='ventes'){
      const bouton=p.getByRole('button',{name:"Envoyer une facture à l'acheteur",exact:true}).first();await bouton.click();const choix=p.getByRole('combobox',{name:'Facture de cette vente',exact:true});await choix.waitFor();
      check(await choix.evaluate(e=>{const a=e.getBoundingClientRect(),m=document.querySelector('main').getBoundingClientRect();return a.left>=m.left&&a.right<=m.right;}),'panneau facture dans la largeur '+width);
      check(await choix.inputValue()==='','aucune facture sélectionnée automatiquement '+width);
      await bouton.click();check(await choix.count()===0,'facture repliable sans envoi '+width);
+     if(width<768){const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await ligne.locator('.vrm-ledger-sale-toggle').click();check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=52),'retour à une seule ligne '+width);}
     }
     if(nom==='messages'){
      await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
