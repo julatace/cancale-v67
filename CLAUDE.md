@@ -10048,6 +10048,46 @@ hauteur en `vh`/px dans `.vrm-main` se pense ×1,25 sur téléphone.**
   `verif_visuel`/`verif_dark` ; une réponse non JSON (panne) est dite en
   français, et la lecture ratée UNE fois.
 
+### Messages plus riches : la paire, l'état, qui a écrit, l'heure (19 octobre)
+Julien : « les messages plus riches, plus d'informations ». **Mesuré d'abord**
+(lecture seule) : la boîte `harvest_{uid}_inbox` ne porte que id · aperçu ·
+non lu · date · interlocuteur · 1ʳᵉ photo — aucun identifiant d'annonce. La
+conversation captée `harvest_{uid}_conv_{id}` (1 408 lignes) porte la
+transaction : `item_id` (924), `status` (926 ; 1 = simple question, 230 payée,
+450 finalisée, 5xx annulée…), `current_user_side`, `item_title`,
+`item_photo.url` ; ses messages sont chronologiques (le dernier est le plus
+récent, 934/934), `entity.user_id` dit qui a écrit (absent sur un message de
+Vinted). `offer_price` n'est PAS le prix de la paire (valeurs à 1,70 €) : pas lu.
+- **Liste** (`data-messagerie`) : chaque ligne porte, par IDENTITÉ (§5),
+  `N° · prix · titre` puis l'état en pastille neutre (« Question », « Vendue ·
+  en cours », « Ton achat », « Vente annulée »…). Transaction → vente du même
+  n° (son prix) ou annonce captée du même `item_id` (son prix) → N° de CETTE
+  annonce (`numeros[item_id]`). Jamais le titre. L'état de `TXN_ETATS` (meta des
+  transactions) prime quand il est connu. « Toi : » devant l'aperçu si le
+  dernier message est de lui — **seulement** si le résumé capté porte bien le
+  dernier message de la boîte (même instant à 2 min près) : sinon rien. Heure
+  absolue (« 14:32 », « hier 14:32 », « 12 oct. 14:32 »), date complète en
+  infobulle. Attributs : `data-conv-num|prix|etat|auteur|quand|compte`.
+- **Fil** : en tête, la carte de la paire (`data-fil-paire|num|prix|etat`,
+  photo, titre, lien vers l'annonce) ; messages groupés par jour
+  (`data-jour-sep`, « Aujourd'hui », « Hier », « samedi 17 octobre ») ; la bulle
+  ne garde que l'heure ; un évènement non affiché n'ouvre pas de jour.
+- **Lecture** : `fetchResumesConversations` — scalaires seulement (jamais
+  `select=data`), paginée, strict (une page ratée = « pas su » ⇒ rien n'est
+  ajouté), au plus une fois par minute, sur Messages seulement. Les annonces sont
+  désormais lues aussi sur Messages (cache partagé avec les autres écrans).
+- **Leboncoin → Messages** : inchangé — seuls des COMPTEURS de non-lus sont
+  captés (aucune conversation), rien de plus à montrer sans deviner.
+- Preuves : banc `messagerie.cjs` (+9 contrôles par taille, 390 tactile et
+  1512) **16 rouges sur le build d'avant** (1023dd4), 0 après ; mutations
+  « garde des 2 min retirée » ⇒ 2 rouges (l'auteur d'un AUTRE message affiché),
+  « prix de la vente ignoré » ⇒ 2 rouges. Le banc applique `->-1` comme PostgREST.
+- ⚠️ **Non mesuré** : `messages->-1` (dernier élément) dans la projection
+  PostgREST de SA base — grammaire attendue, jamais envoyée d'ici ; refusée, la
+  lecture repart SANS l'auteur (`_resumeConvSansAuteur`) : pas de « Toi : »,
+  le reste s'affiche. Le coût serveur de la lecture (~1 400 lignes décompressées
+  pour quelques scalaires) n'est pas mesuré.
+
 ### Le bénéfice brut et net dans Comptabilité (19 octobre)
 Julien : « le bénéfice brut et net ». Comptabilité disait « ce n'est donc pas
 encore ton bénéfice net ». Elle affiche maintenant **« Ton bénéfice »**

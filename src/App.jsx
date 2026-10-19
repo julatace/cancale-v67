@@ -4246,6 +4246,79 @@ const fetchHarvestConversation = async (uid, convId) => {
   } catch (_) { return null; }
 };
 
+// ── LE RÉSUMÉ DE CHAQUE CONVERSATION CAPTÉE (19 octobre, « messages plus riches ») ──
+// Mesuré (lecture seule, 19 oct.) : la boîte (`harvest_{uid}_inbox`) ne porte que
+// id · aperçu · non lu · date · interlocuteur · 1ʳᵉ photo — AUCUN identifiant
+// d'annonce. La conversation captée (`harvest_{uid}_conv_{id}`, 1 408 lignes)
+// porte la transaction : `item_id` (924), `status` (926 : 1 = simple question ·
+// 230 payée · 450 finalisée · 5xx annulée…), `current_user_side` (seller/buyer),
+// `item_title`, `item_photo.url`, et les messages — le DERNIER est le plus récent
+// (934 sur 934), son `entity.user_id` dit qui l'a écrit (absent sur un message
+// de Vinted). On ne lit que ces scalaires, jamais `select=data` (§4.4), paginé
+// (§4.5). L'identité est la conversation elle-même (compte + n°), jamais un titre.
+// ⚠️ `->-1` (dernier élément) : grammaire PostgREST, non essayée sur SA base —
+// si elle est refusée, on relit SANS l'auteur (rien n'est deviné : pas d'auteur).
+// Rend une Map `${uid}_${conv}` → résumé, ou `null` (pas su).
+let _resumeConvSansAuteur = false;
+const RESUME_CONV_BASE = 'id=like.harvest_%25_conv_%25&select=id,tx:data->payload->conversation->transaction->>id,item:data->payload->conversation->transaction->>item_id,st:data->payload->conversation->transaction->>status,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,ph:data->payload->conversation->transaction->item_photo->>url,opp:data->payload->conversation->opposite_user->>id';
+const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts';
+const fetchResumesConversations = async () => {
+  try {
+    let rows = null;
+    if (!_resumeConvSansAuteur) {
+      rows = await lireTout(RESUME_CONV_BASE + RESUME_CONV_AUTEUR, { strict: true });
+      if (rows === null) _resumeConvSansAuteur = true;
+    }
+    if (rows === null) rows = await lireTout(RESUME_CONV_BASE, { strict: true });
+    if (rows === null) return null;
+    const out = new Map();
+    for (const r of rows) {
+      const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
+      if (!m) continue;
+      out.set(`${m[1]}_${m[2]}`, r);
+    }
+    return out;
+  } catch (_) { return null; }
+};
+// L'état de la transaction d'une conversation, en mots — codes mesurés (voir
+// TXN_ETATS). Inconnu ⇒ `null` (rien n'est écrit, jamais un faux).
+const etatConversation = (st, side) => {
+  if (side === 'buyer') return { k: 'achat', t: 'Ton achat' };
+  const s = Number(st);
+  if (st == null || st === '' || !isFinite(s)) return null;
+  if (s === 1) return { k: 'question', t: 'Question' };
+  if (s === 230) return { k: 'vendue', t: 'Vendue · en cours' };
+  if (s === 450) return { k: 'finalisee', t: 'Vendue · finalisée' };
+  if (s === 220) return { k: 'paiement-echoue', t: 'Paiement échoué' };
+  if (s === 430) return { k: 'suspendue', t: 'Vente suspendue' };
+  if (s === 440) return { k: 'retour', t: 'Retour en cours' };
+  if (s >= 500 && s < 600) return { k: 'annulee', t: 'Vente annulée' };
+  return null;
+};
+// L'heure d'un message : aujourd'hui « 14:32 », hier « hier 14:32 », sinon
+// « 12 oct. 14:32 » (l'année si ce n'est pas celle-ci).
+const heureMessage = (t) => {
+  if (!t || !isFinite(t)) return '';
+  const d = new Date(t), auj = new Date();
+  const hh = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const jour = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (jour(d) === jour(auj)) return hh;
+  const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
+  if (jour(d) === jour(hier)) return `hier ${hh}`;
+  const opts = { day: 'numeric', month: 'short' }; if (d.getFullYear() !== auj.getFullYear()) opts.year = 'numeric';
+  return `${d.toLocaleDateString('fr-FR', opts)} ${hh}`;
+};
+const libelleJour = (t) => {
+  const d = new Date(t), auj = new Date();
+  const jour = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (jour(d) === jour(auj)) return "Aujourd'hui";
+  const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
+  if (jour(d) === jour(hier)) return 'Hier';
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' }; if (d.getFullYear() !== auj.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('fr-FR', opts);
+};
+const cleJour = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 // Vinted utilise DEUX hosts differents selon l'endpoint (constate via
 // plusieurs vraies requetes "Copy as fetch") :
 // - www.vinted.fr/api/v2/...      -> commandes, ventes, achats
@@ -28555,6 +28628,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const listingsRef = useRef(listings); listingsRef.current = listings;
   const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
+  // Le résumé de chaque conversation captée (paire, état, dernier auteur) — trois
+  // états : `undefined` en cours · `null` pas su · Map (19 octobre).
+  const [resumesConv, setResumesConv] = useState(undefined);
+  const resumesConvAt = useRef(0);
   const [openConv,setOpenConv]=useState(null);
   const conversationRequest=React.useRef(0);
   const conversationOrigin=React.useRef(null);
@@ -30786,9 +30863,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
+  // fois par minute (une lecture de ~1 400 lignes, en scalaires).
+  useEffect(() => {
+    if (curSub!=='messages' || !accounts.length || !convs.items) return;
+    if (resumesConv && Date.now()-resumesConvAt.current < 60000) return;
+    let fini = false;
+    resumesConvAt.current = Date.now();
+    fetchResumesConversations().then(m => { if (!fini) setResumesConv(prev => m || (prev instanceof Map ? prev : null)); });
+    return () => { fini = true; };
+    /* eslint-disable-next-line */
+  }, [sub, convs.items, cleComptes]);
   // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
   // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
   // et seulement 3 conversations captées portent une offre en attente — vieilles.
@@ -31466,6 +31554,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
+  // ── LA PAIRE D'UNE CONVERSATION (19 octobre, « messages plus riches ») ──────
+  // Par IDENTITÉ seulement (§5) : la transaction de la conversation (Vinted la
+  // rattache lui-même) → la vente du même n° de transaction (son prix) ou
+  // l'annonce captée du même `item_id` (son prix, sa photo) → le N° posé sur
+  // CETTE annonce. Jamais le titre. Ce qu'on ne sait pas reste vide.
+  const venteParTx = useMemo(() => { const m = new Map(); for (const o of (sales.items || [])) if (o && o.transaction_id != null) m.set(String(o.transaction_id), o); return m; }, [sales.items]);
+  const annonceParId = useMemo(() => { const m = new Map(); for (const it of [...(listings.items || []), ...(listings.aConfirmer || [])]) if (it && it.id != null) m.set(String(it.id), it); return m; }, [listings.items, listings.aConfirmer]);
+  const paireDeConv = (uid, convId, conversation) => {
+    const r = resumesConv instanceof Map ? resumesConv.get(`${uid}_${convId}`) : null;
+    const t = conversation && conversation.transaction && typeof conversation.transaction === 'object' ? conversation.transaction : null;
+    if (!r && !t) return null;
+    const pick = (a, b) => (a != null && a !== '' ? a : (b != null && b !== '' ? b : null));
+    const tx = pick(t && t.id, r && r.tx), item = pick(t && t.item_id, r && r.item);
+    const side = pick(t && t.current_user_side, r && r.side);
+    const e2 = etatTxn(tx);
+    const etat = etatConversation(e2 ? e2.s : pick(t && t.status, r && r.st), side);
+    const vente = tx != null && side !== 'buyer' ? venteParTx.get(String(tx)) : null;
+    const ann = item != null ? annonceParId.get(String(item)) : null;
+    let prixV = null, devise = 'EUR';
+    if (vente) { const v = Number(String(vente.price && vente.price.amount != null ? vente.price.amount : vente.price).replace(',', '.')); if (isFinite(v) && v > 0) { prixV = v; devise = (vente.price && vente.price.currency_code) || 'EUR'; } }
+    if (prixV == null && ann && ann.price != null && ann.price !== '') { const v = Number(ann.price); if (isFinite(v) && v > 0) { prixV = v; devise = ann.currency || 'EUR'; } }
+    const num = item != null && side !== 'buyer' ? String((numeros[String(item)] || {}).numero || '') : '';
+    const photo = pick(t && t.item_photo && t.item_photo.url, r && r.ph) || (ann && ann.photo) || (vente && vente.photo) || null;
+    const titre = pick(t && t.item_title, r && r.titre) || (ann && ann.title) || '';
+    return { tx, item, etat, prix: prixV, devise, prixDe: vente && prixV != null ? 'vente' : prixV != null ? 'annonce' : null, num, photo, titre, url: (t && t.item_url) || (ann && ann.url) || null, r };
+  };
+  // Qui a écrit le dernier message — seulement si le résumé capté porte BIEN le
+  // dernier message de la boîte (même instant, à 2 min près) : un résumé plus
+  // ancien dirait l'auteur d'un AUTRE message. Sinon `null` (rien n'est écrit).
+  const auteurDernier = (c, p) => {
+    const r = p && p.r; if (!r || r.der == null || r.der === '' || r.opp == null) return null;
+    const a = Date.parse(r.derTs || ''), b = Date.parse(c.updated_at || '');
+    if (!a || !b || Math.abs(a - b) > 120000) return null;
+    return String(r.der) === String(r.opp) ? 'eux' : 'toi';
+  };
 
   const totals = useMemo(() => {
     // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
@@ -33364,7 +33487,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ))}
                 </div>
               ) : null; })()}
-              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
+              {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
+                  conversation (identité, §5), jamais par le titre. Ce qu'on ne
+                  sait pas n'est pas écrit. */}
+              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; return (
+                <div className="vrm-chat-paire" data-fil-paire={pc.item!=null?String(pc.item):''} data-fil-num={pc.num||undefined} data-fil-prix={pc.prix!=null?String(pc.prix):undefined} data-fil-etat={pc.etat?pc.etat.k:undefined} style={{background:C.card,border:`1px solid ${C.border}`}}>
+                  <span className="vrm-chat-paire-ph" style={{background:C.bg,border:`1px solid ${C.border}`}}>{pc.photo?<PhotoVinted src={pc.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>
+                  <div className="vrm-chat-paire-t">
+                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}</div>}
+                    <div className="vrm-chat-paire-l" style={{color:C.muted}}>
+                      {pc.num && <b style={{color:C.text}}>N°{pc.num}</b>}
+                      {pc.prix!=null && <span title={pc.prixDe==='vente'?'Prix de la vente':"Prix de l'annonce"} style={{color:C.text,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{prix(pc.prix,pc.devise)}</span>}
+                      {pc.etat && <span className="vrm-msg-etat" data-etat={pc.etat.k} style={{borderColor:C.border}}>{pc.etat.t}</span>}
+                      {pc.url && <a href={pc.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>Annonce ↗</a>}
+                    </div>
+                  </div>
+                </div>
+              ); })()}
+              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>{
+                // (19 oct.) Les messages groupés par JOUR : un séparateur quand
+                // le jour change ; la bulle ne garde que l'heure.
+                // Un évènement sans texte lisible n'est pas affiché : il n'ouvre
+                // pas de jour (sinon « Hier » au-dessus de rien).
+                const visible = (x) => !(x.kind==='event' && /^[a-z]+(_[a-z]+)+$/.test(String(x.body||'').trim()) && !(x.links||[]).length);
+                if (!visible(m)) return null;
+                const j = m.ts ? cleJour(m.ts) : null;
+                const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
+                const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
+                return <React.Fragment key={i}>{sep}{(
                 m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
@@ -33382,11 +33532,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       {(m.ts || (!m.mine && m.body)) && <div className="vrm-bulle-pied">
-                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</time>}
+                        {m.ts && <time dateTime={new Date(m.ts).toISOString()} style={{color:C.muted}}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}
                         {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
                       </div>}
                     </div>
-              ))}
+              )}</React.Fragment>; })}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
@@ -36689,7 +36839,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
           const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
-          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
           // ⚠️ UNE BOÎTE FIGÉE SE DIT (6 octobre). Mesuré : deux comptes avaient
           // leur boîte bloquée sur une page ANCIENNE (dernière conversation captée
@@ -36761,7 +36910,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {liste.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
-                  const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                  const paire = paireDeConv(uidC(c), c.id, null);
+                  const auteur = auteurDernier(c, paire);
+                  const tsConv = Date.parse(c.updated_at||'') || null;
+                  const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
                   const ro = !!prioMsg && uidC(c)!==prioMsg;
                   // Les deux groupes se nomment UNE fois, en tête de chacun : la
                   // raison de la lecture seule vit dans l'en-tête de son groupe,
@@ -36787,7 +36939,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     )}
                     {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
-                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined} onClick={()=>openConversation(c)}
+                    <button className={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)?'vrm-inbox-row is-current':'vrm-inbox-row'} type="button" data-conv={c.id} data-conv-acces={prioMsg?(ro?'lecture':'action'):undefined} data-nonlu={c.unread?'1':undefined}
+                      data-conv-num={paire&&paire.num?paire.num:undefined} data-conv-prix={paire&&paire.prix!=null?String(paire.prix):undefined} data-conv-etat={paire&&paire.etat?paire.etat.k:undefined} data-conv-auteur={auteur||undefined} data-conv-quand={tsConv?new Date(tsConv).toISOString():undefined} data-conv-compte={c._acc?String(c._acc.vinted_user_id):undefined}
+                      onClick={()=>openConversation(c)}
                       style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}>
                       <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
                         {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className="vrm-msg-ini vrm-sensible" style={{color:C.muted}}>{String(nom).trim().charAt(0).toUpperCase()||'·'}</span>}
@@ -36796,11 +36950,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span className="vrm-msg-l1">
                           <span className="vrm-msg-name"><span className="vrm-sensible">{nom}</span></span>
                           {plusieurs && c._acc && <span className="vrm-msg-acc" style={{color:C.muted}}>· {accName(c._acc)}</span>}
-                          <span className="vrm-msg-time" style={{color:c.unread&&!ro?C.accent:C.muted}}>{quand(c.updated_at)}</span>
+                          <time className="vrm-msg-time" dateTime={tsConv?new Date(tsConv).toISOString():undefined} title={tsConv?new Date(tsConv).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):undefined} style={{color:c.unread&&!ro?C.accent:C.muted}}>{tsConv?heureMessage(tsConv):''}</time>
                         </span>
-                        {(c.item_title||c.item?.title) && <span className="vrm-msg-article">{c.item_title||c.item.title}</span>}
+                        {(()=>{ const titre=(paire&&paire.titre)||c.item_title||c.item?.title||''; const morceaux=[paire&&paire.num?`N°${paire.num}`:null, paire&&paire.prix!=null?prix(paire.prix,paire.devise):null, titre||null].filter(Boolean); if(!morceaux.length && !(paire&&paire.etat)) return null; return (
+                          <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
+                            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{j===0&&paire&&paire.num?<b style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
+                            {paire&&paire.etat && <span className="vrm-msg-etat" data-etat={paire.etat.k} style={{color:C.muted,borderColor:C.border}}>{paire.etat.t}</span>}
+                          </span>); })()}
                         <span className="vrm-msg-l2">
-                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{c.description||''}</span>
+                          <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{auteur==='toi'?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{c.description||''}</span>
                           {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
                         </span>
                       </span>
