@@ -170,7 +170,7 @@ function extraire(src, nom) {
 }
 const NOMS = ['cleNum', 'NUM_OK', 'normTitle', 'refVRMDe', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'versionNumerotation',
   'estArchive', 'venteApresCoupure', 'dateMiseEnLigneMs', 'annonceNumerotable', 'numeroReprenable', 'numeroEmailAdmis',
-  'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay'];
+  'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'PANNE_NUMEROS', 'ficheAVerifier', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay'];
 let MARQUEUR = null;
 const charge = () => {
   const ctx = { console };

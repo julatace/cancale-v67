@@ -60,7 +60,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.189.0';
+const EXT_ATTENDUE = '5.190.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1346,6 +1346,8 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
+  'vrm_ebay_liens',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
@@ -7959,7 +7961,7 @@ const ouvrirPdfOnglet = (url) => {
 // pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
 // Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
-const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le carton (Annonces → « numéros à vérifier sur tes cartons »).";
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de la paire (Annonces → « numéros à vérifier »).";
 const confirmerNumerosAVerifier = async (numeros) => {
   try {
     const fiches = load('vinted_annonce_numeros', {}) || {};
@@ -7969,8 +7971,8 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (!doute.length) return true;
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
     return await askConfirm({
-      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés sur leur carton` : `Le N°${doute[0].numero} n'est pas encore vérifié sur son carton`,
-      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde le carton avant d'imprimer.`,
+      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de la paire avant d'imprimer.`,
       ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
     });
   } catch (_) { return true; }
@@ -11380,7 +11382,7 @@ function BlocNumerosPerimes() {
           {!relue ? 'Cet écran n\'est plus à jour' : remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
         </div>
         <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
-          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
+          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur une étiquette et n'imprime rien depuis cet écran.
           <br/><br/>
           Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
         </div>
@@ -13967,7 +13969,10 @@ async function lireBrouillonsEbay() {
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
     const it = rows[0] && rows[0].items;
-    return (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+    const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+    // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
+    try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
+    return out;
   } catch (_) { return null; }
 }
 async function modifierBrouillonsEbay(changer) {
@@ -14898,6 +14903,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
       const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
+      try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}
       setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg: mo ? mo.msg : '', offreOk: !!(mo && mo.ok), offreIssue: mo ? mo.issue : '', avertissements: avert }); if (onPublie) onPublie(comptePub);
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
@@ -15857,7 +15863,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sku', itemId: it.itemId, numero: n, ...corpsCompteEbay(it._compte) }) });
       const j = await r.json().catch(() => ({}));
-      if (j && j.ok) { dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
+      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
       else dire((j && j.error) || 'eBay a refusé la référence — rien n\'a changé.');
     } catch (_) { dire('Liaison impossible (réseau) — rien n\'a changé.'); }
     setGeste('');
@@ -16118,7 +16124,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
             {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
-            <span data-relie={numero} style={{ fontWeight: 700, color: numero ? E.text : E.warn }}>{numero ? `N°${numero}` : 'pas reliée'}</span>
+            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement une paire (numéro redonné depuis, ou porté par deux paires) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
             {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
             {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
             {j != null ? ` · en ligne depuis ${j} j` : ''}
@@ -16953,7 +16959,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
             const s = statut(l);
             const t = Date.parse(l.debut || '');
             const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
-            const n = numEbayLu(l.sku, l.itemId);
+            const n = numEbayLu(l.sku, l.itemId, null, l.depuis);
             const info = infos[l.itemId];
             return (
               <div key={(l._compte || '') + l.itemId} data-prog={l.itemId} data-prog-statut={s} data-ebay-compte={l._compte || ''} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
@@ -17667,7 +17673,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const autoIncertains = React.useMemo(() => load('vrm_ebay_auto_incertains', {}) || {}, [retraits, nuage, dv]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
-  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku,a && a.itemId); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
   // (9 octobre) Le prix d'achat de chaque paire, par son N° (une seule fiche ⇒
   // sa valeur ; ambigu ⇒ rien n'est dit). Déclaré APRÈS `fiches` (§4.6).
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [nuage, items]);
@@ -17677,7 +17683,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ou on ne sait pas encore. Elle LIT le verdict de l'écran (§11), elle n'en
   // écrit pas un second. Retirer une règle, elle, reste toujours possible.
   const regleBloquee = (it) => {
-    const n = numEbayLu(it && it.sku,it && it.itemId);
+    const n = numEbayLu(it && it.sku, it && it.itemId, null, it && it.depuis);
     if (!n) return null;            // pas reliée : la preuve de vente ne s'applique pas (le risque est dit à part)
     const id = String(it.itemId);
     if (dv.aRetirerEbay.some((d) => String(d.annonce && d.annonce.itemId) === id)) return { k: 'vendue', t: 'Vendue sur Vinted : retire-la d\'eBay plutôt que d\'y poser une règle d\'offre.' };
@@ -17774,8 +17780,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const dejaSurEbay = React.useMemo(() => {
     const m = new Map();
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
-    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
-    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
+    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId, null, p && p.depuis); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
     // (17 oct.) LA MÊME PAIRE SOUS UN AUTRE N° (photo exacte, `jumellesParPhoto`) :
     // si l'une est déjà sur eBay, l'autre l'est aussi — « une paire, une
     // annonce » vaut pour la paire, pas pour le numéro (la 80 publiée, la 81
@@ -18361,7 +18367,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {itemsVue.map((it, i) => {
-        const n = numEbayLu(it.sku,it.itemId);
+        const n = numEbayLu(it.sku, it.itemId, null, it.depuis);
         const cle = cleAnnonce(it);
         return (
           <div key={(it._compte || '') + (it.itemId || i)} data-ebay-annonce={it.itemId || ''} data-ebay-compte={it._compte || ''}>
@@ -18386,7 +18392,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.</Pourquoi>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite}
@@ -22240,7 +22246,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
                 {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
-                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche un carton pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
+                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
                 {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
                 <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
               </div>
@@ -22517,7 +22523,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand le carton est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand la place est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
@@ -26852,7 +26858,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
       if (!lu || stop) return;
       const set = new Set();
-      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId); if (c) set.add(cleNum(c)); }
+      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); }
       setEbayNums(set);
     } catch (_) {}
   })(); return () => { stop = true; }; }, []);
@@ -28866,7 +28872,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // republiée a un numéro neuf (Julien, 10 octobre).
     if (!numeroReprenable(cle)) {
       updatePair(item, { numero: avant });
-      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur le carton.`);
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur son étiquette.`);
       return;
     }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
@@ -29337,7 +29343,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
   };
-  const confirmerCarton = async (it) => { marquerCartonVerifie(String(it.id), cleNum((numeros[it.id] || {}).numero)); toast(`N°${(numeros[it.id] || {}).numero} confirmé pour « ${it.title} »`); };
+  // (19 oct.) LE NUMÉRO D'UNE AUTRE PAIRE PRÉSENTE. Mesuré chez Julien : les
+  // N°50, 58 et 60 portés à la fois par une paire numérotée le 14 octobre
+  // (vendue : à expédier, ou encore rangée au garage) et par une paire
+  // renumérotée par la panne du 18 (en ligne). « Le carton dit N°58 » sur la
+  // seconde CONFIRMAIT un numéro que porte déjà un autre carton présent.
+  const autresPorteurs = (it) => {
+    const moi = String(it.id), cle = cleNum((numeros[moi] || {}).numero);
+    return cle ? (porteursNum[cle] || []).filter((p) => !(p.type === 'annonce' && String(p.id) === moi)) : [];
+  };
+  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à expédier' : p.type === 'annulee' ? 'vente annulée, encore là' : 'en ligne'})`;
+  // Donner un numéro NEUF à une paire (jamais un numéro déjà servi) — sur SON clic.
+  const donnerNumeroNeuf = async (it, pourquoi) => {
+    const f = numeros[String(it.id)] || {};
+    const prov = String(nextNumero);
+    const ok = await askConfirm({
+      title: `Nouveau numéro pour « ${it.title} »`,
+      desc: `${pourquoi}\n\nElle prend le N°${prov} (jamais servi). Écris N°${prov} sur SON étiquette, à la place du N°${f.numero}.`,
+      ok: `Oui, N°${prov}`, cancel: 'Annuler',
+    });
+    if (!ok) return false;
+    const now = new Date().toISOString();
+    updatePair(it, { numero: prov, auto: false, manuelAt: now, cartonVerifie: now });
+    recordUsed(prov);
+    toast(`« ${it.title} » → N°${prov} · écris-le sur son étiquette`);
+    return true;
+  };
+  const confirmerCarton = async (it) => {
+    const f = numeros[it.id] || {};
+    const autres = autresPorteurs(it);
+    if (autres.length) {
+      // On ne confirme pas un numéro qu'un autre carton présent porte déjà.
+      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux paires au même numéro, c'est la mauvaise qui part.`);
+      return;
+    }
+    marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
+  };
   const corrigerCarton = async (it, valeur) => {
     const brut = String(valeur || '').trim();
     const cle = cleNum(brut);
@@ -29354,7 +29395,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const prov = String(nextNumero);
       const ok = await askConfirm({
         title: `Le N°${n} est sur « ${autre.title} »`,
-        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON carton (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
+        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON étiquette (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
         ok: `Oui, le N°${n} est à « ${it.title} »`, cancel: 'Annuler',
       });
       if (!ok) return;
@@ -30000,7 +30041,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const caps = lu.lignes.filter((x) => x.ligne).map((x) => (Number.isFinite(Number(x.ligne.cap)) ? Number(x.ligne.cap) : Date.parse(x.ligne.cap || '')));
         m.cap = caps.length && caps.every((n) => Number.isFinite(n)) ? Math.min(...caps) : NaN;
         for (const x of lu.items) {
-          const c = numEbayLu(x && x.sku,x && x.itemId); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: 'ebay' }); continue; }
           m.set(c, { itemId: String(x.itemId), prix, titre: String(x.title || ''), url: x.url || `https://www.ebay.fr/itm/${x.itemId}`, compte: x._compte || 'principal' });
@@ -33863,11 +33904,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
                       const arch = !numeroReprenable(num);
                       if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
+                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>↩️ revient → numéro neuf</span>
                         : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
                       if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
                       return arch
-                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
+                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>🔁 renvoi → numéro neuf</span>
                         : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
@@ -35670,10 +35711,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier sur tes cartons
+              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
             <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seul le carton dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui écrit sur le carton. N'imprime pas leur bordereau avant (le N° y est tamponné).
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
@@ -35788,7 +35829,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
                     suit le numéro, une phrase par cas présent (§7). */}
                 {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
-                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur le carton. Elle sortira de cette liste toute seule.</span>}
+                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur son étiquette. Elle sortira de cette liste toute seule.</span>}
               </div>)}
               {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
@@ -36776,14 +36817,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux paires
             </div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
-            {conflitsNum.slice(0,6).map(c=>(
-              <div key={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux paires portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            {conflitsNum.slice(0,6).map(c=>{
+              // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
+              // automatiquement pendant la panne (`ficheAVerifier`), face à un
+              // autre porteur qui l'avait avant. Une seule : on la nomme et on
+              // propose son numéro neuf. Sinon on ne devine pas (§5).
+              const fautives=c.porteurs.filter(p=>p.type==='annonce'&&ficheAVerifier(numeros[p.id]));
+              const fautive=fautives.length===1&&c.porteurs.length>1?fautives[0]:null;
+              const item=fautive?(listings.items||[]).concat(listings.aConfirmer||[]).find(x=>String(x.id)===String(fautive.id)):null;
+              const autres=fautive?c.porteurs.filter(p=>p!==fautive):[];
+              return (
+              <div key={c.numero} data-conflit-num={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
                 ))}
+                {item && <div data-conflit-fautive={String(item.id)} style={{marginTop:4,lineHeight:1.45}}>
+                  La panne du 18 octobre a redonné ce numéro à « {String(item.title||'').slice(0,40)} », alors qu'il était déjà sur {autres.map(nomPorteur).join(' et ')}.{' '}
+                  <button type="button" onClick={()=>donnerNumeroNeuf(item,`La panne du 18 octobre lui a donné le N°${c.numero}, déjà sur ${autres.map(nomPorteur).join(' et ')}.`)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',marginTop:4}}>Lui donner un nouveau numéro</button>
+                </div>}
               </div>
-            ))}
+            );})}
           </div>
         )}
         {/* « N bordereaux sans vente correspondante » RETIRÉ le 30 septembre
@@ -36971,7 +37025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
-                                {' '}— vérifie la photo ci-contre avant de fermer le carton, et corrige le numéro de l'autre paire dans Annonces.
+                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre paire dans Annonces.
                               </span>
                             </div>
                           );
@@ -38620,7 +38674,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux paires</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux paires portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,overflow:'hidden'}}>
@@ -39154,7 +39208,56 @@ const numeroExterne = (k, id, liste, dateMs) => {
   return avant ? cleNum(arch + k) : k;
 };
 // Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
-const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+// ⚠️⚠️ (19 OCTOBRE) LE SKU SEUL NE DÉSIGNE PAS UNE PAIRE. Mesuré chez Julien :
+// ses annonces eBay VRM-82, 81, 48 avaient été publiées du 15 au 17 octobre,
+// pendant la panne de synchro ; la renumérotation du 18 a redonné ces numéros
+// à d'AUTRES paires. VRM-82 (une Air Max 1 noire) désignait la Vapor Pro, dite
+// « en vente sur eBay » à tort, pendant que la vraie paire était « pas en
+// vente » — et le retrait automatique aurait retiré la mauvaise annonce.
+// ⇒ Dans l'ordre : (1) le LIEN par identité (`vrm_ebay_liens`, posé à la
+// publication, au « Relier », repris des brouillons) ; (2) le N° du SKU, mais
+// seulement s'il est porté par UNE seule fiche, et qu'elle l'avait déjà quand
+// l'annonce a été publiée (sinon « pas su » : aucune paire, aucun retrait).
+const LIENS_EBAY = 'vrm_ebay_liens';
+const _depuisEbay = new Map();
+const _fichesEbayMemo = { at: 0, v: {} };
+const fichesPourEbay = () => {
+  const t = Date.now();
+  if (t - _fichesEbayMemo.at > 800) { let v = {}; try { v = load('vinted_annonce_numeros', {}) || {}; } catch (_) {} _fichesEbayMemo.at = t; _fichesEbayMemo.v = v; }
+  return _fichesEbayMemo.v;
+};
+const lienEbay = (itemId) => { let l = {}; try { l = load(LIENS_EBAY, {}) || {}; } catch (_) {} const x = itemId != null ? l[String(itemId)] : null; return x && x.pairId ? x : null; };
+const noterLienEbay = (itemId, pairId, numero, quiPose) => {
+  if (!itemId || !pairId) return;
+  const l = { ...(load(LIENS_EBAY, {}) || {}) };
+  if (quiPose === 'brouillon' && l[String(itemId)]) return;   // un lien posé à la main gagne
+  l[String(itemId)] = { pairId: String(pairId), numero: numero != null ? String(numero) : null, at: Date.now(), par: quiPose || 'vrm' };
+  save(LIENS_EBAY, l); _fichesEbayMemo.at = 0;
+};
+const numEbayLu = (sku, itemId, dateMs, depuis) => {
+  const id = itemId != null ? String(itemId) : '';
+  if (depuis != null && id) { const d = typeof depuis === 'number' ? depuis : Date.parse(depuis); if (isFinite(d)) _depuisEbay.set(id, d); }
+  const fiches = fichesPourEbay();
+  const lien = id ? lienEbay(id) : null;
+  if (lien) { const f = fiches[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : null; }
+  const k = numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+  if (!k) return k;
+  const porteurs = Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+  // Deux fiches sous ce N° : une seule paire si elles portent le même titre (vendue
+  // puis revenue — la règle de `conflitsDeNumeros`, §11) ; sinon il ne désigne personne.
+  if (porteurs.length > 2 || (porteurs.length === 2 && normTitle(porteurs[0].title || '') !== normTitle(porteurs[1].title || ''))) return null;
+  if (porteurs.length === 2 && porteurs.some((f) => ficheAVerifier(f))) return null;
+  if (porteurs.length === 1) {
+    const f = porteurs[0], pub = id ? _depuisEbay.get(id) : undefined;
+    const quand = Date.parse(f.manuelAt || f.numberedAt || '');
+    if (pub != null && isFinite(quand) && quand > pub + 60000) return null;   // numéro donné APRÈS la publication
+    if (pub == null && ficheAVerifier(f)) return null;                          // date inconnue + numéro de la panne
+  }
+  return k;
+};
+// Le numéro qu'une annonce eBay PORTE (son SKU) n'est pas fiable pour cette paire :
+// la liste « à relier » le dit, avec le geste.
+const skuEbayDouteux = (a) => !!(a && numDeSkuEbay(a.sku) && !lienEbay(a.itemId) && numEbayLu(a.sku, a.itemId, null, a.depuis) == null);
 const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
@@ -39220,7 +39323,7 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
   for (const d of liste) {
     const a = (d && d.annonce) || {};
     const ecarte = (raison) => ecartes.push({ numero: d && d.numero, itemId: a.itemId, raison });
-    const n = numEbayLu(a.sku,a.itemId);
+    const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
     if (!a.itemId || !n || n !== (d && d.numero)) { ecarte('sku'); continue; }
     const ids = parNum.get(n) || [];
     if (ids.length !== 1) { ecarte('numero-partage'); continue; }
@@ -39433,7 +39536,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   const verdict = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
   if (verdict || vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
     if (!p || !p.itemId) continue;
-    const n = numEbayLu(p.sku, p.itemId);
+    const n = numEbayLu(p.sku, p.itemId, null, p.depuis);
     if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
     const ids = parNum.get(n) || [];
     if (verdict) {
@@ -39448,7 +39551,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
-    const n = numEbayLu(a.sku, a.itemId);
+    const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
     if (!n) { nonReliees.push(a); continue; }
     if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
@@ -40511,8 +40614,8 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Le carton dit N°{fiche.numero}</button>
-        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou N° du carton" aria-label={`Numéro écrit sur le carton de ${it.title}`}
+        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>C'est bien le N°{fiche.numero}</button>
+        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou le vrai N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
         <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none', background: C.text, color: C.card, fontSize: 12.5, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
@@ -42179,7 +42282,7 @@ function NumerosSetting({ nu = false }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Comment tu écris le numéro sur tes cartons. Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
+        Comment tu écris le numéro de tes paires (étiquette, boîte, sachet…). Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
         <button type="button" onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>

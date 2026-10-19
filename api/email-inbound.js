@@ -693,7 +693,7 @@ export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
   if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
   const [mainL, reg, ebayL, lbcL, ventesL] = await Promise.all([
-    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens'),
+    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
@@ -707,7 +707,10 @@ export async function lireAnnoncesAilleurs() {
   let ebay = null;
   if (reg && ebayL) {
     const ids = comptesActifs(normaliserRegistre(reg[0] || null)).map((c) => 'ebay_listings' + c.suffixe);
-    ebay = annoncesEbayParNumero(ebayL, ids, mk);
+    const fiches = mainL[0] ? objetJson(mainL[0].fiches) : null;
+    const liensEbay = mainL[0] ? objetJson(mainL[0].liensEbay) : null;
+    // Fiches illisibles : on ne sait pas si un SKU désigne encore sa paire ⇒ rien.
+    if (fiches !== undefined && liensEbay !== undefined) ebay = annoncesEbayParNumero(ebayL, ids, mk, fiches || {}, liensEbay || {});
   }
   let lbc = null;
   if (lbcL && ventesL && liens !== undefined) {
