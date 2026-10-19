@@ -21242,10 +21242,32 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const e = (await askText({ desc: 'Un emoji pour le représenter (facultatif) :', value: '🪑' }) || '').trim();
       if (e) emoji = e;
     }
+    // (19 oct.) Julien : « choisir le nombre d'étagères, les numéros par ligne ».
+    // Une étagère se dit dès l'ajout : combien de niveaux, combien de cases par
+    // niveau (réglables ensuite dans « Aménager »). Annuler garde le modèle.
+    let nivChoisi = null, casesChoisies = null;
+    if (t.cases && t.build === 'metal') {
+      const nv = await askText({ numeric: true, desc: 'Combien de niveaux (plateaux) sur cette étagère ?', value: String(t.rows) });
+      if (nv == null) return;
+      nivChoisi = Math.max(1, Math.min(10, parseInt(nv, 10) || t.rows));
+      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (paires côte à côte) ?', value: String(t.cols) });
+      if (cs == null) return;
+      casesChoisies = Math.max(1, Math.min(16, parseInt(cs, 10) || t.cols));
+    }
     // Pour une grille, le footprint (w/h) découle de la taille de case × nb de cases,
     // et la HAUTEUR par défaut monte jusqu'au plafond (empilage réaliste).
-    const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
-    const rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    const cell = t.cell;
+    let w = cell ? +(t.cols * cell).toFixed(2) : t.w; const h = cell ? cell : t.h;
+    let rows = cell ? Math.max(3, Math.floor((room.wallH || 3.4) / cell)) : t.rows;
+    let colsN = t.cols, h3dN = t.h3d;
+    if (nivChoisi != null) {
+      // Même règle que « Niveaux » et « Cases par plateau » (changerCases) : un
+      // niveau garde sa hauteur (celle du modèle), 60 cm par case en largeur.
+      const niveau = (t.h3d * 1.5) / Math.max(1, t.rows);
+      rows = nivChoisi; colsN = casesChoisies;
+      h3dN = +(rows * niveau / 1.5).toFixed(3);
+      w = Math.max(0.6, +(colsN * 0.6).toFixed(2));
+    }
     let pasDePlace = false;
     setItems(list => {
       // On répartit chaque nouveau meuble sur une petite grille pour qu'il
@@ -21255,7 +21277,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       // pièce : on cherche la place libre la plus proche (src/stockRegles.js).
       const n = list.length, gx = 0.6 + (n % 4) * 1.5, gy = 0.6 + (Math.floor(n / 4) % 4) * 1.5;
       let x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
-      const neuf = { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows, cols: t.cols, slots: {} };
+      const neuf = { id, type, name, emoji, color: t.color, h3d: h3dN, cell, x, y, w, h, rows, cols: colsN, slots: {} };
       if (!t.deco || t.structure) {
         const pl = placeLibre(list, neuf);
         if (!pl) { pasDePlace = true; return list; }

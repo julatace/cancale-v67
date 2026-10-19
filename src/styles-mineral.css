@@ -1330,9 +1330,12 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte > :first-child { flex:1 1 auto !important; min-width:0 !important; align-items:center !important; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-photo { width:44px !important; height:52px !important; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-titre { -webkit-line-clamp:1 !important; }
-  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { margin-top:0 !important; flex:0 0 470px !important; flex-wrap:wrap !important; justify-content:flex-end; row-gap:2px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions { margin-top:0 !important; flex:0 0 470px !important; flex-wrap:wrap !important; justify-content:flex-start !important; row-gap:2px !important; }
+  /* Chaque geste a SA place : même largeur sur toutes les lignes, donc « Imprimer » est au même endroit partout. */
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > :is(button, [data-bouton-bord], a) { flex:0 0 108px !important; width:108px !important; max-width:108px !important; min-width:0 !important; justify-content:center !important; padding-left:6px !important; padding-right:6px !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-bouton-bord] > button { width:100% !important; }
   /* Les lignes s'alignent : même largeur de gestes pour tous, la source du PDF en petit dessous. */
-  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { flex:1 1 100% !important; text-align:right !important; font-size:11px !important; max-width:none !important; }
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { flex:1 1 100% !important; text-align:left !important; font-size:11px !important; max-width:none !important; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-primaire { flex:0 0 auto !important; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-masquer { align-self:center !important; margin:0 !important; order:9; }
 }
