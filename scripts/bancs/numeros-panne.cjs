@@ -148,10 +148,47 @@ const poolLocal = (pg) => pg.evaluate(() => { try { return JSON.parse(localStora
       const n1 = await pg.evaluate(() => { const e = document.querySelector('[data-numeros-a-verifier]'); return e ? Number(e.getAttribute('data-numeros-a-verifier')) : 0; });
       dit(n1 === 1, '2001 reste dans la liste, à vérifier', `${n1}`);
       // Confirmer 2001.
-      await pg.locator('[data-verif-carton="2001"] button', { hasText: 'Le carton dit' }).click();
+      await pg.locator('[data-verif-carton="2001"] button').first().click({ timeout: 8000 }).catch(() => {});
       await pg.waitForTimeout(1200);
       const reste = await pg.evaluate(() => !!document.querySelector('[data-numeros-a-verifier]'));
       dit(!reste, 'une fois tout vérifié, la liste disparaît', `${reste}`);
+      dit(erreurs.length === 0, 'aucune erreur d\'app', erreurs.join(' | '));
+      await ctx.close();
+    }
+    // ── C. Deux paires, un numéro : celle que la panne a renumérotée est NOMMÉE
+    //     (19 oct., chez Julien : N°50, 58, 60). « C'est bien le N°58 » sur elle
+    //     ne confirme PAS un numéro qu'une autre paire présente porte déjà.
+    for (const taille of [1512, 390]) {
+      console.log(`\n── C. Deux paires sous le même numéro (${taille} px)`);
+      const etat = {
+        main: { vinted_annonce_numeros: {
+          '3001': { numero: '58', auto: true, numberedAt: '2026-10-09T15:47:09.775Z', title: 'Spezial de banc' },
+          '3002': { numero: '58', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'Olive de banc' },
+        }, vinted_used_numeros: [1, 2, 3, 58], vinted_accounts_hidden: [] },
+        listings: LISTINGS([{ id: 3001, t: 'Spezial de banc' }, { id: 3002, t: 'Olive de banc' }]),
+        ecrits: [], panneEcriture: false, ebay: null,
+      };
+      const ctx = await nav.newContext(taille === 390 ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1512, height: 950 } });
+      await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
+      const pg = await ctx.newPage(); await brancher(pg, etat);
+      const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('[data-conflit-num="58"]', { timeout: 15000 }).catch(() => {});
+      const fautive = await pg.evaluate(() => { const e = document.querySelector('[data-conflit-num="58"] [data-conflit-fautive]'); return e ? e.getAttribute('data-conflit-fautive') : ''; });
+      dit(fautive === '3002', 'Colis : la paire renumérotée par la panne est nommée (pas l\'autre)', fautive || 'aucune');
+      // Sur Annonces : « C'est bien le N°58 » sur 3002 doit proposer un numéro NEUF.
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('[data-verif-carton="3002"]', { timeout: 15000 }).catch(() => {});
+      await pg.locator('[data-verif-carton="3002"] button').first().click({ timeout: 8000 }).catch(() => {});
+      const oui = pg.locator('button', { hasText: /^Oui, N°/ });
+      const propose = await oui.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+      dit(propose, '« C\'est bien le N°58 » ne confirme pas : un numéro neuf est proposé', `${propose}`);
+      if (propose) await oui.click();
+      await pg.waitForTimeout(1200);
+      const loc = await fichesLocales(pg) || {};
+      const n = String((loc['3002'] || {}).numero || '');
+      dit(n && !['1', '2', '3', '58'].includes(n), '3002 prend un numéro jamais servi ; 3001 garde le N°58', `3002:N°${n} 3001:N°${(loc['3001'] || {}).numero}`);
+      dit(String((loc['3001'] || {}).numero) === '58', '… et la paire qui l\'avait d\'abord n\'a pas bougé', String((loc['3001'] || {}).numero));
       dit(erreurs.length === 0, 'aucune erreur d\'app', erreurs.join(' | '));
       await ctx.close();
     }

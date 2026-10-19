@@ -7959,7 +7959,7 @@ const ouvrirPdfOnglet = (url) => {
 // pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
 // Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
-const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le carton (Annonces → « numéros à vérifier sur tes cartons »).";
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de la paire (Annonces → « numéros à vérifier »).";
 const confirmerNumerosAVerifier = async (numeros) => {
   try {
     const fiches = load('vinted_annonce_numeros', {}) || {};
@@ -7969,8 +7969,8 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (!doute.length) return true;
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
     return await askConfirm({
-      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés sur leur carton` : `Le N°${doute[0].numero} n'est pas encore vérifié sur son carton`,
-      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde le carton avant d'imprimer.`,
+      title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de la paire avant d'imprimer.`,
       ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
     });
   } catch (_) { return true; }
@@ -11380,7 +11380,7 @@ function BlocNumerosPerimes() {
           {!relue ? 'Cet écran n\'est plus à jour' : remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
         </div>
         <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
-          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
+          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur une étiquette et n'imprime rien depuis cet écran.
           <br/><br/>
           Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
         </div>
@@ -22240,7 +22240,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre (en transparence) pour y ranger ; une boîte pour la changer ou la sortir.</span>}
                 {ft.cases && p && <button type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger une paire ici'}</button>}
-                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche un carton pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
+                {ft.build === 'pile' && <span style={{ fontSize: 12.5, color: C.muted }}>Touche une boîte pour changer son numéro ou le retirer — ceux du dessus descendent d'un cran.</span>}
                 {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button type="button" onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13, fontWeight: 600, padding: '0 14px', minHeight: 36, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger dedans ({storedCount(selItem)})</button>}
                 <button type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 12px', minHeight: 34, cursor: 'pointer', fontFamily: 'inherit' }}>Régler ce meuble</button>
               </div>
@@ -22517,7 +22517,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand le carton est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand la place est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
@@ -28866,7 +28866,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // republiée a un numéro neuf (Julien, 10 octobre).
     if (!numeroReprenable(cle)) {
       updatePair(item, { numero: avant });
-      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur le carton.`);
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur son étiquette.`);
       return;
     }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
@@ -29337,7 +29337,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
   };
-  const confirmerCarton = async (it) => { marquerCartonVerifie(String(it.id), cleNum((numeros[it.id] || {}).numero)); toast(`N°${(numeros[it.id] || {}).numero} confirmé pour « ${it.title} »`); };
+  // (19 oct.) LE NUMÉRO D'UNE AUTRE PAIRE PRÉSENTE. Mesuré chez Julien : les
+  // N°50, 58 et 60 portés à la fois par une paire numérotée le 14 octobre
+  // (vendue : à expédier, ou encore rangée au garage) et par une paire
+  // renumérotée par la panne du 18 (en ligne). « Le carton dit N°58 » sur la
+  // seconde CONFIRMAIT un numéro que porte déjà un autre carton présent.
+  const autresPorteurs = (it) => {
+    const moi = String(it.id), cle = cleNum((numeros[moi] || {}).numero);
+    return cle ? (porteursNum[cle] || []).filter((p) => !(p.type === 'annonce' && String(p.id) === moi)) : [];
+  };
+  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à expédier' : p.type === 'annulee' ? 'vente annulée, encore là' : 'en ligne'})`;
+  // Donner un numéro NEUF à une paire (jamais un numéro déjà servi) — sur SON clic.
+  const donnerNumeroNeuf = async (it, pourquoi) => {
+    const f = numeros[String(it.id)] || {};
+    const prov = String(nextNumero);
+    const ok = await askConfirm({
+      title: `Nouveau numéro pour « ${it.title} »`,
+      desc: `${pourquoi}\n\nElle prend le N°${prov} (jamais servi). Écris N°${prov} sur SON étiquette, à la place du N°${f.numero}.`,
+      ok: `Oui, N°${prov}`, cancel: 'Annuler',
+    });
+    if (!ok) return false;
+    const now = new Date().toISOString();
+    updatePair(it, { numero: prov, auto: false, manuelAt: now, cartonVerifie: now });
+    recordUsed(prov);
+    toast(`« ${it.title} » → N°${prov} · écris-le sur son étiquette`);
+    return true;
+  };
+  const confirmerCarton = async (it) => {
+    const f = numeros[it.id] || {};
+    const autres = autresPorteurs(it);
+    if (autres.length) {
+      // On ne confirme pas un numéro qu'un autre carton présent porte déjà.
+      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux paires au même numéro, c'est la mauvaise qui part.`);
+      return;
+    }
+    marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
+  };
   const corrigerCarton = async (it, valeur) => {
     const brut = String(valeur || '').trim();
     const cle = cleNum(brut);
@@ -29354,7 +29389,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const prov = String(nextNumero);
       const ok = await askConfirm({
         title: `Le N°${n} est sur « ${autre.title} »`,
-        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON carton (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
+        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON étiquette (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
         ok: `Oui, le N°${n} est à « ${it.title} »`, cancel: 'Annuler',
       });
       if (!ok) return;
@@ -33863,11 +33898,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
                       const arch = !numeroReprenable(num);
                       if (out === 'retour') return arch
-                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
+                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur son étiquette.`}>↩️ revient → numéro neuf</span>
                         : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
                       if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
                       return arch
-                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
+                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur son étiquette.`}>🔁 renvoi → numéro neuf</span>
                         : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
@@ -35670,10 +35705,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier sur tes cartons
+              {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
             <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seul le carton dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui écrit sur le carton. N'imprime pas leur bordereau avant (le N° y est tamponné).
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'un autre carton. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
@@ -35788,7 +35823,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
                     suit le numéro, une phrase par cas présent (§7). */}
                 {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
-                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur le carton. Elle sortira de cette liste toute seule.</span>}
+                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur son étiquette. Elle sortira de cette liste toute seule.</span>}
               </div>)}
               {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
@@ -36776,14 +36811,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux paires
             </div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
-            {conflitsNum.slice(0,6).map(c=>(
-              <div key={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux paires portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            {conflitsNum.slice(0,6).map(c=>{
+              // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
+              // automatiquement pendant la panne (`ficheAVerifier`), face à un
+              // autre porteur qui l'avait avant. Une seule : on la nomme et on
+              // propose son numéro neuf. Sinon on ne devine pas (§5).
+              const fautives=c.porteurs.filter(p=>p.type==='annonce'&&ficheAVerifier(numeros[p.id]));
+              const fautive=fautives.length===1&&c.porteurs.length>1?fautives[0]:null;
+              const item=fautive?(listings.items||[]).concat(listings.aConfirmer||[]).find(x=>String(x.id)===String(fautive.id)):null;
+              const autres=fautive?c.porteurs.filter(p=>p!==fautive):[];
+              return (
+              <div key={c.numero} data-conflit-num={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
                 ))}
+                {item && <div data-conflit-fautive={String(item.id)} style={{marginTop:4,lineHeight:1.45}}>
+                  La panne du 18 octobre a redonné ce numéro à « {String(item.title||'').slice(0,40)} », alors qu'il était déjà sur {autres.map(nomPorteur).join(' et ')}.{' '}
+                  <button type="button" onClick={()=>donnerNumeroNeuf(item,`La panne du 18 octobre lui a donné le N°${c.numero}, déjà sur ${autres.map(nomPorteur).join(' et ')}.`)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',marginTop:4}}>Lui donner un nouveau numéro</button>
+                </div>}
               </div>
-            ))}
+            );})}
           </div>
         )}
         {/* « N bordereaux sans vente correspondante » RETIRÉ le 30 septembre
@@ -36971,7 +37019,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
-                                {' '}— vérifie la photo ci-contre avant de fermer le carton, et corrige le numéro de l'autre paire dans Annonces.
+                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre paire dans Annonces.
                               </span>
                             </div>
                           );
@@ -38620,7 +38668,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux paires</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux paires portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,overflow:'hidden'}}>
@@ -40511,8 +40559,8 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Le carton dit N°{fiche.numero}</button>
-        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou N° du carton" aria-label={`Numéro écrit sur le carton de ${it.title}`}
+        <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>C'est bien le N°{fiche.numero}</button>
+        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou le vrai N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
         <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none', background: C.text, color: C.card, fontSize: 12.5, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
@@ -42179,7 +42227,7 @@ function NumerosSetting({ nu = false }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Comment tu écris le numéro sur tes cartons. Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
+        Comment tu écris le numéro de tes paires (étiquette, boîte, sachet…). Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
         <button type="button" onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
