@@ -17,7 +17,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -60,7 +60,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.191.0';
+const EXT_ATTENDUE = '5.192.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6793,7 +6793,10 @@ function raisonExtGlobale(sansSouris, opt) {
     if (rl.niveau === 'perime') return { code: 'telephone', relais: 'perime', texte: `Ton ordinateur n'a pas donné signe de vie depuis ${dureeRelais(rl.age)} — ouvre Chrome sur l'ordinateur où l'extension VRM est installée : c'est elle qui ${role}, et tu pourras le faire d'ici.` };
     if (rl.niveau === 'retard') return { code: 'telephone', relais: 'retard', texte: `L'extension de ton ordinateur (${rl.ver || 'version ?'}) ne sait pas encore agir pour ton téléphone : mets-la à jour (${EXT_ATTENDUE}) sur l'ordinateur.` };
     if (rl.niveau === 'passu') return { code: 'telephone', relais: 'passu', texte: `Je n'ai pas pu savoir si ton ordinateur est allumé (la base n'a pas répondu) — c'est l'extension de ton ordinateur qui ${role}.` };
-    return { code: 'telephone', relais: rl.niveau, texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+    // 19 oct. : Firefox pour Android accepte l'extension — dit seulement si sa
+    // fiche est PUBLIÉE (`LIENS_BOUTIQUES`), jamais une boutique devinée.
+    const ffAndroid = mobileIci() === 'firefox-android' && LIENS_BOUTIQUES.firefox;
+    return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.${ffAndroid ? ' Ou installe-la dans ce Firefox, depuis sa boutique : elle agira alors d’ici.' : ''}` };
   }
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
@@ -12843,6 +12846,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const voie = voieConnexionExt();
   const boutique = boutiqueIci();
   const orion = boutiqueOrion();   // Orion (Mac, iPhone) : la boutique de Chrome ou de Firefox, une fois publiée
+  const mobile = mobileIci();      // 19 oct. : ios · firefox-android · samsung · android · autre
   const [deconnectee, setDeconnectee] = React.useState(false);
   const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
@@ -12926,11 +12930,24 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
+      {/* 19 octobre : le BON geste selon le navigateur du téléphone (mesuré,
+          docs/boutiques-extension.md) — jamais une boutique qui n'existe pas. */}
+      {(mobile === 'samsung' || mobile === 'android') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
+        {mobile === 'samsung'
+          ? <><b style={{color:C.text}}>Samsung Internet</b> n’accepte pas cette extension&nbsp;: ses modules sont réservés aux développeurs que Samsung choisit.</>
+          : <>{nomNavigateurIci()} sur Android n’accepte aucune extension.</>}{' '}
+        {LIENS_BOUTIQUES.firefox
+          ? <>Sur ce téléphone, <b style={{color:C.text}}>Firefox pour Android</b> (gratuit) l’accepte&nbsp;: installe Firefox (bouton ci-dessous), ouvre <b style={{color:C.text}}>vrm.center</b> dedans, et l’écran te guidera.</>
+          : <>Sur Android, seul <b style={{color:C.text}}>Firefox</b> l’accepte, et la version Firefox de l’extension n’est pas encore en ligne.</>}
+      </p>}
+      {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">Firefox pour Android accepte l’extension, mais sa version Firefox n’est pas encore en ligne dans la boutique de Firefox.</p>}
       <p style={{margin:0}}>
-        Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas.
-        Ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul.
+        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android'
+          ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: </>
+          : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. </>}
+        ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>
-      {orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
+      {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
     /* 5.188 : la fiche de CE navigateur est publiée — un seul geste, « Ajouter ». */
@@ -12940,7 +12957,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
     </>
-  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari') ? (
+  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung') ? (
     /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
        Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
        Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
@@ -12951,7 +12968,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
         {boutique.nav === 'firefox'
           ? <>La version Firefox de l’extension n’est pas encore en ligne dans la boutique de Firefox. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
-          : <>Safari n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
+          : <>{nomNavigateurIci()} n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
       </p>
       {boutique.nav === 'safari' && orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="safari">Tu préfères un navigateur proche de Safari&nbsp;? <b style={{color:C.text}}>Orion</b> (gratuit) installe l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par Chrome.</p>}
     </>
@@ -12984,9 +13001,11 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
     : (!fait.ext && orion && boutique.nav === 'safari' && !(sansSouris && estAndroid()))
     ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
+    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android'))
+    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer Firefox pour Android</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
-    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari'))
+    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung'))
     ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
