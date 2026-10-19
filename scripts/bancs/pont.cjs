@@ -229,9 +229,9 @@ const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renou
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes', vrai = null, sessionUneFois = false, firefox = false, extId = null }) {
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null, vieux = null, url = '/?tab=cat_ventes', vrai = null, sessionUneFois = false, firefox = false, extId = null, ua = null }) {
   const vp = tel ? { width: largeur || 390, height: 844 } : { width: 1512, height: 950 };
-  const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}), ...(ua ? { userAgent: ua } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   let labelPret = false; const cmds = [];
@@ -649,6 +649,23 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(v.boutons.some((x) => x.etat === 'pret' || x.etat === 'generer') && !v.raisons.some((x) => /^telephone/.test(x)), 'Firefox Android : le bouton de bordereau est actif, sans « depuis ton ordinateur »', JSON.stringify({ b: v.boutons.map((x) => x.etat), r: v.raisons }));
       dit(v.sw <= v.cw + 1, 'Firefox Android : aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       await r.ctx.close(); }
+
+    // ── 19 octobre : le téléphone SANS extension, selon son navigateur ─────
+    // Samsung Internet (programme d'extensions fermé) et Firefox Android dont la
+    // fiche n'est pas publiée : le téléphone agit par l'ordinateur (le relais),
+    // et AUCUNE boutique n'est promise tant que `LIENS_BOUTIQUES` est vide.
+    for (const [nom, ua] of [
+      ['Samsung Internet', 'Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'],
+      ['Firefox Android sans extension', 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'],
+      ['iPhone Safari', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'],
+    ]) {
+      console.log(`── TÉLÉPHONE ${nom}`);
+      const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true, ua, largeur: 360 }); const v = await r.lire();
+      dit(v.etat && v.etat.code === 'telephone' && !v.boutons.some((x) => x.etat === 'pret'), `${nom} : « Lecture », par l'ordinateur — aucun bouton actif`, JSON.stringify(v.etat));
+      dit(!v.raisons.some((x) => /boutique/.test(x)), `${nom} : aucune boutique promise (aucune fiche publiée)`, JSON.stringify(v.raisons));
+      dit(v.sw <= v.cw + 1, `${nom} : aucun débordement à 360 px`, `${v.sw} > ${v.cw}`);
+      await r.ctx.close();
+    }
 
     console.log('── TÉLÉPHONE');
     { const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true }); const v = await r.lire();

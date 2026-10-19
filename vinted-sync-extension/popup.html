@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     /* « VRM Noir » — la famille de l'app (§7) : UN seul accent bleu, rare ; le
        clair et le sombre suivent le système ; rayons 5 / 8 / 10 / 12 ; une
@@ -45,6 +46,14 @@
     /* L'icône OUVRE VRM (30 sept.). La fenêtre ne sert qu'à se connecter : tant
        qu'on ne sait pas, on ne montre que le logo. */
     body.decide #auth { display: none; }
+    /* 19 octobre — au doigt (Firefox pour Android ouvre la fenêtre dans un
+       onglet entier ; Orion, dans une feuille) : la largeur suit l'écran, et
+       les champs passent à 16 px (en dessous, iOS zoome la page au toucher). */
+    @media (hover: none) and (pointer: coarse) {
+      body { width: auto; max-width: 480px; margin: 0 auto; }
+      input { font-size: 16px; }
+      button, input, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    }
   </style>
 </head>
 <body class="decide">

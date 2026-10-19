@@ -10606,3 +10606,39 @@ Julien : « les achats Leboncoin et eBay doivent fonctionner exactement comme Vi
 
 ### Toucher une case à cocher sur téléphone ne la cochait pas (19 octobre)
 `BottomBar` cachait la barre du bas dès qu'un `<input>` prenait le focus — y compris une case à cocher ou un bouton radio, qui n'ouvrent aucun clavier. Au toucher, la barre disparaissait, l'écran sautait de 22 px entre l'appui et le relâchement, et le geste retombait à côté : la case « J'ai compris » du planificateur eBay ne se cochait pas (banc `ebay-programmer`, 6 rouges hérités, à 390 px seulement). Seuls les champs à clavier cachent la barre maintenant (`SANS_CLAVIER`). `ebay-programmer` et `coque-mobile` verts.
+
+### L'extension au doigt, et le bon geste selon le téléphone (19 octobre, 5.192)
+Julien : « l'extension pour iPhone et Samsung ». **Mesuré** (détail et sources :
+`docs/boutiques-extension.md`, section Téléphone ; `developer.samsung.com` et
+`help.kagi.com` bloqués d'ici, lus par extraits indexés) : Samsung → **Firefox
+pour Android** seulement (paquet 5.188, fiche AMO à publier) ; **Samsung
+Internet impossible** (programme d'extensions fermé, Galaxy Store) ; Chrome
+Android ❌ ; Edge Android : catalogue choisi par Microsoft ❌ ; Kiwi abandonné ;
+Lemur/Quetta/Yandex non essayés (jamais proposés) ; iPhone : Safari exige une app
+iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expérimental
+(fiche publiée exigée) ; sinon **le relais** de l'ordinateur.
+- **Badge au doigt** (`vrm-badge.js`) : `pointerType` du dernier geste (repli
+  `hover: none`) — au doigt, toucher le logo OUVRE la carte (plus d'ouverture de
+  VRM à l'aveugle), qui porte « Ouvrir VRM » / « Se connecter avec VRM » et une
+  croix (≥ 44 px) ; toucher ailleurs la referme ; le survol reste à la souris
+  (`pointerenter` filtré). Le retour sur un « Non » (« Capter ce compte ») se fait
+  au toucher. Cartes `min(300px, 100vw − 32px)`, hauteur bornée à l'écran. À la
+  souris, rien ne change.
+- **Popup** : meta viewport, au doigt la largeur suit l'écran et les champs
+  passent à 16 px (iOS ne zoome pas).
+- **App** : `mobileIci()` (`ios · firefox-android · samsung · android · autre`,
+  Samsung lu par « SamsungBrowser » AVANT Chrome) ; les premiers pas disent ce que
+  CE navigateur accepte (`data-premiers-mobile`), « Installer Firefox pour
+  Android » seulement quand `LIENS_BOUTIQUES.firefox` est rempli (aucun lien
+  deviné), l'iPhone apprend le relais (`data-premiers-relais`) ; Orion seulement
+  sur iPhone. Le panneau d'état (`raisonExtGlobale`, repli téléphone) ne propose
+  la boutique Firefox que publiée.
+- Preuves (§6.1, bancs copiés dans l'arbre de 65eec06, build refait là) :
+  `badge.cjs` **4 rouges** avant (le premier toucher ouvrait VRM, aucun bouton
+  dans la carte), `popup.cjs` **9 rouges** (300 px figés, champs 14 px, pas de
+  viewport), `premierjour.cjs` rouges sur les attributs Samsung/Android/iPhone ;
+  `pont.cjs` + Samsung Internet / Firefox Android / iPhone sans extension (aucune
+  boutique promise). `web-ext lint` du paquet Firefox : 0 / 0 / 0.
+- ⚠️ **Non mesuré** : un vrai Firefox Android, un vrai Orion, un vrai Samsung.
+- **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
+  Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).

@@ -24,12 +24,15 @@ export const LIENS_BOUTIQUES = {
 export function navigateurIci(ua) {
   const u = String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '');
   if (/Firefox\/|FxiOS\//.test(u)) return 'firefox';
+  // Samsung Internet se présente AUSSI comme Chrome : on le lit avant (19 oct.).
+  if (/SamsungBrowser\//.test(u)) return 'samsung';
   if (/\bEdg(?:e|A|iOS)?\//.test(u)) return 'edge';
   if (/\bOPR\/|\bOpera\b/.test(u)) return 'opera';
   if (/Chrome\/|CriOS\//.test(u)) return 'chrome';
   if (/Safari\//.test(u)) return 'safari';
   return 'autre';
 }
+export const estIOS = (ua) => /iPhone|iPad|iPod/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
 export const estAndroid = (ua) => /Android/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
 
 // La boutique du navigateur d'ici : `{ nav, lien }` (lien vide si pas publiée).
@@ -64,5 +67,30 @@ export function pageExtensionsIci(ua) {
 
 // Le nom du navigateur, pour une phrase (« dans ce Firefox »).
 export function nomNavigateurIci(ua) {
-  return { firefox: 'Firefox', edge: 'Edge', opera: 'Opera', chrome: 'Chrome', safari: 'Safari' }[navigateurIci(ua)] || 'ce navigateur';
+  return { firefox: 'Firefox', samsung: 'Samsung Internet', edge: 'Edge', opera: 'Opera', chrome: 'Chrome', safari: 'Safari' }[navigateurIci(ua)] || 'ce navigateur';
 }
+
+// ══ LE TÉLÉPHONE (19 octobre, « l'extension pour iPhone et Samsung ») ═══════
+// Mesuré (docs/boutiques-extension.md, section « Téléphone ») :
+// - Firefox pour Android ACCEPTE l'extension (paquet Firefox, 5.188) — depuis
+//   addons.mozilla.org seulement ;
+// - Samsung Internet : ses modules passent par le Galaxy Store, programme
+//   FERMÉ (seuls des développeurs choisis par Samsung) ⇒ impossible pour VRM ;
+// - Chrome pour Android, Chrome et Safari sur iPhone : aucune extension ;
+// - Edge pour Android : catalogue choisi par Microsoft, pas ouvert ;
+// - iPhone : Orion (même agent que Safari, indétectable) — proposé seulement
+//   avec une fiche publiée (`boutiqueOrion`) ; sinon le RELAIS de l'ordinateur.
+// Rend UN code, et l'écran choisit sa phrase ; jamais une capacité (la présence
+// de l'extension se mesure par le pont).
+export function mobileIci(ua) {
+  const nav = navigateurIci(ua);
+  if (estIOS(ua)) return 'ios';
+  if (!estAndroid(ua)) return 'autre';
+  if (nav === 'firefox') return 'firefox-android';
+  if (nav === 'samsung') return 'samsung';
+  return 'android';
+}
+// La fiche Google Play de Firefox pour Android (adresse stable de Mozilla) :
+// proposée seulement quand l'extension Firefox est PUBLIÉE — sinon installer
+// Firefox ne servirait à rien.
+export const LIEN_FIREFOX_ANDROID = 'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
