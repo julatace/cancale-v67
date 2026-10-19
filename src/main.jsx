@@ -48,6 +48,7 @@ import './styles-reglages.css';
 import './styles-coque.css';
 import './styles-atelier.css';
 import './styles-plateformes.css';
+import './styles-iphone.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

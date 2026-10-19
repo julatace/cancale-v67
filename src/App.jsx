@@ -13108,7 +13108,6 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
   // en reste. Mesuré sur la piste (rien n'est supposé), eBay seulement.
   const [bords, setBords] = React.useState({ g: false, d: false });
   React.useEffect(() => {
-    if (!dark) return undefined;
     const el = refPiste.current; if (!el) return undefined;
     const mesure = () => { const g = el.scrollLeft > 2, d = el.scrollLeft + el.clientWidth < el.scrollWidth - 2; setBords((b) => (b.g === g && b.d === d) ? b : { g, d }); };
     mesure();
@@ -13116,11 +13115,11 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     window.addEventListener('resize', mesure);
     return () => { el.removeEventListener('scroll', mesure); window.removeEventListener('resize', mesure); };
   }, [dark, sections.length]);
-  const masque = dark && (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
+  const masque = (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
   return (
     <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
       <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
-        data-seg-deborde={dark ? ((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined : undefined}
+        data-seg-deborde={((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined}
         style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent, ...(masque ? { WebkitMaskImage: masque, maskImage: masque } : null) }}>
         {sections.map(([id,label,point])=>{ const on = sub===id; return (
           <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
@@ -45494,11 +45493,11 @@ function AppCoeur() {
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
-        <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
+        <div className="vrm-global-search" style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+          <div className="vrm-global-search-head" style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
             <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
-            <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
+            <input aria-label="Rechercher un article dans VRM" type="search" autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
               style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
