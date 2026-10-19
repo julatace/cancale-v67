@@ -43,6 +43,7 @@ import { routeSuperPdp } from './_lib/superpdp.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
+import { routeOperations } from './_lib/operations.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -915,6 +916,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if (mode === 'operations') return routeOperations(req, res);
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
