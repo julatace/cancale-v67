@@ -43,3 +43,15 @@ porte-monnaie sans solde disponible ne réserve plus une rangée sur téléphone
 les chiffres financiers restent accessibles dans le résumé. Le mode sombre
 utilise les variables de surface et de texte de l’app. Captures synthétiques
 prises après la fin des animations de montant, sans modifier les photos réelles.
+
+### Matières et contraste mobile
+
+Fond minéral avec grain SVG local (331 octets), bandeau et navigation ardoise
+satinée, surfaces claires avec relief discret, portraits sur fond minéral et
+statuts sauge. Même traitement des fiches Vinted, Leboncoin et eBay. La texture
+est purement décorative, sans calque sur les boutons et sans dépendance externe.
+Les variantes sombres utilisent des surfaces adaptées. Proposition non publiée,
+à examiner sur les captures de l’app avec données synthétiques.
+
+Vérification de cette proposition : compilation réussie et 94 contrôles Chromium
+sur trois largeurs de téléphone, dont présence du bandeau contrasté des tâches.

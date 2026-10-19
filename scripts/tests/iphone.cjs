@@ -22,8 +22,9 @@ s=s.replace(marker,`
      const a=await prix.boundingBox(),b=await relier.boundingBox();check(Math.abs(a.y-b.y)<2,'actions du coût côte à côte '+width);
      check(await p.locator('.vrm-sale-row').first().evaluate(e=>e.getBoundingClientRect().height<270),'ligne de vente compacte '+width);
     }
+    if(tab==='journee')check(await p.locator('.vrm-day-bar').evaluate(e=>getComputedStyle(e).backgroundImage.includes('linear-gradient')),'bandeau des tâches contrasté '+width);
     if(tab==='journee')check(await p.locator('.vrm-app-header button[aria-label="Tous les écrans"]').isHidden(),'menu Gestion sans doublon en haut '+width);
-    if(process.env.BANC_CAPTURES){await p.waitForTimeout(800);fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-'+width+'.png')});}
+    if(process.env.BANC_CAPTURES){await p.waitForTimeout(1300);fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-'+width+'.png')});}
    }
   }
   await p.setViewportSize({width:390,height:844});await p.getByRole('button',{name:'Rechercher une paire',exact:true}).click();const recherche=p.getByRole('searchbox',{name:'Rechercher un article dans VRM',exact:true});await recherche.waitFor();check(await recherche.evaluate(e=>getComputedStyle(e).fontSize==='16px'),'recherche globale à 16 px sur iPhone');await recherche.fill('New Balance');await p.locator('.vrm-global-search button').filter({hasText:'New Balance'}).first().waitFor();check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'recherche globale sans débordement');await p.getByRole('button',{name:'Fermer la recherche',exact:true}).click();check(await p.locator('.vrm-global-search').count()===0,'retour à la liste depuis la recherche');

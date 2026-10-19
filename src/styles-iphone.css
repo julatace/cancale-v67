@@ -137,6 +137,58 @@
     des ventes ne réserve pas une rangée entière à une action sans objet. */
  .vrm-market-space>div:has(>[data-portefeuille-vide=true]){display:none;}
  .vrm-main .vrm-market-heading{padding-block:2px;}
- .vrm-main .vrm-market-space>[data-fraicheur-ventes]{font-size:10px!important;padding-block:2px!important;}
+ .vrm-main .vrm-market-space [data-fraicheur-ventes]{font-size:10px!important;padding-block:2px!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{display:flex;align-items:center;gap:6px;}
+}
+
+/* Matières mobiles : ardoise satinée et grain minéral très fin.
+   Texture locale décorative ; aucune couche ne recouvre les interactions. */
+@media(max-width:767px){
+ .vrm-app-shell{--vrm-mobile-paper:#edf0ed;--vrm-mobile-slate:#21343e;}
+ .vrm-app-shell .vrm-main{background-image:url('/textures/vrm-grain.svg'),radial-gradient(ellipse at 100% 20%,#dce8e480,transparent 65%);background-color:var(--vrm-mobile-paper);}
+ .vrm-app-shell .vrm-app-header{background-image:url('/textures/vrm-grain.svg'),linear-gradient(115deg,#21343e,#304b56);color:#f3f7f5;border-bottom:1px solid #ffffff12;}
+ .vrm-app-shell .vrm-app-header :is(button,.vrm-hdr-titre){color:#f3f7f5!important;}
+ .vrm-main .vrm-market-space{background-color:transparent;background-image:url('/textures/vrm-grain.svg'),linear-gradient(#293f49 0 110px,transparent 110px);}
+ .vrm-main .vrm-market-heading{padding-top:9px;padding-bottom:5px;}
+ .vrm-main .vrm-market-heading h1{color:#f5f8f6;}
+ .vrm-main .vrm-market-heading .vrm-plat-tuile{background:#ffffffed;box-shadow:0 1px 0 #ffffff45,inset 0 0 0 1px #ffffff80;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary>summary{color:#e0ebe8!important;}
+ .vrm-main .vrm-market-space [data-fraicheur-ventes]{color:#c4d4d4!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{border-bottom:0;gap:19px;padding-bottom:5px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{color:#c4d2d5!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]{color:#fff!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]::after{background:#a6cebf;height:3px;bottom:3px;}
+ .vrm-main .vrm-market-space .vrm-seg-cadre{background:transparent!important;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar{background:transparent!important;}
+ .vrm-main .vrm-sales-workbar input{background:#ffffffd9!important;border-color:#d5dedb!important;box-shadow:inset 0 1px 3px #21343e06;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button{box-shadow:0 1px 2px #21343e06;border-radius:9px!important;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:#29434d!important;color:white!important;border-color:#29434d!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background-image:linear-gradient(130deg,#ffffff,#fcfdfb);border:1px solid #ffffff!important;box-shadow:0 5px 16px #21343e08,0 1px 2px #21343e0a;border-radius:16px!important;margin-bottom:12px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{background-image:url('/textures/vrm-grain.svg'),linear-gradient(145deg,#e6ece8,#f3f5f0)!important;box-shadow:inset 0 0 0 1px #21343e0a;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-variant-numeric:tabular-nums;letter-spacing:-.8px;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{background:#eaf0ec;color:#29423c!important;}
+ .vrm-app-shell .vrm-tabbar{background-image:url('/textures/vrm-grain.svg'),linear-gradient(110deg,#21343e,#304b56)!important;border-top:1px solid #ffffff30;box-shadow:0 -5px 22px #21343e20;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]{background:linear-gradient(#ffffff12,#ffffff03);border-radius:12px;}
+ .vrm-day-layout .vrm-day-card{background-image:linear-gradient(140deg,#ffffff,#fafcf9);border-color:#ffffff!important;box-shadow:0 4px 16px #21343e08;}
+ .vrm-day-layout .vrm-day-bar{background:url('/textures/vrm-grain.svg'),linear-gradient(115deg,#21343e,#304b56)!important;box-shadow:0 5px 15px #21343e16;border:1px solid #ffffff30!important;}
+ .vrm-day-layout .vrm-day-bar>button,.vrm-day-bar .vrm-day-bar-l{color:#f1f6f3!important;}
+ :root[data-theme=dark] .vrm-app-shell{--vrm-mobile-paper:#17262d;}
+ :root[data-theme=dark] .vrm-app-shell .vrm-main{background-image:url('/textures/vrm-grain.svg');}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-row,
+ :root[data-theme=dark] .vrm-day-layout .vrm-day-card{background-image:linear-gradient(130deg,#253b45,#21343e);border-color:#ffffff12!important;}
+ :root[data-theme=dark] .vrm-main .vrm-sales-workbar input{background:#21343e!important;border-color:#ffffff20!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-photo{background-image:url('/textures/vrm-grain.svg'),linear-gradient(145deg,#304b56,#21343e)!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-statut{background:#344d48;color:#d8eee4!important;}
+}
+
+@media(max-width:767px){
+ .vrm-day-layout .vrm-day-bar>button{background:transparent!important;border-color:#ffffff20!important;}
+ .vrm-day-bar .vrm-day-bar-n{color:#f4f8f6!important;}
+ .vrm-day-bar .vrm-day-bar-l{color:#cfdfdc!important;}
+ .vrm-app-shell .vrm-app-header .vrm-hdr-titre{font-size:13px;max-width:28vw;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-shared-sale{margin:0 0 10px;border:1px solid #fff!important;border-radius:14px;background:linear-gradient(130deg,#fff,#fcfdfb);box-shadow:0 4px 14px #21343e08;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{background-image:url('/textures/vrm-grain.svg'),linear-gradient(145deg,#e6ece8,#f3f5f0);border-radius:9px;overflow:hidden;}
+ :root[data-theme=dark] .vrm-main .vrm-shared-sale{background:linear-gradient(130deg,#253b45,#21343e);border-color:#ffffff12!important;}
 }
