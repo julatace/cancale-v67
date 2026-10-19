@@ -10142,6 +10142,34 @@ charges, − cotisations URSSAF, net.
   / `data-ventes-benef-*`) : **10 rouges sur le build d'avant**, rouge sous la
   mutation « second calcul divergent ».
 
+### Leboncoin et eBay dans le bénéfice, par identité seulement (19 octobre)
+- `ventesAutresBenefice` (module) relie une vente à SA paire : eBay = SKU de
+  chaque ligne par `numLigneEbay` → `numEbayLu` (lien VRM, carte 013 par
+  annonce) ; Leboncoin = `numeroLbcIdentite` (lien posé à la main, sinon
+  référence VRM de l'annonce traduite par `numeroExterne` — JAMAIS le « nXXX »
+  d'un titre, contrairement à `clesAnnonceLbc` qui sert aux propositions). Prix
+  d'achat = `achatDe(withBuyByNum(fiche))` seulement si UNE fiche porte le N°
+  (`ficheUniqueDuNumero`). Sans identité : comptée, sans prix d'achat.
+- Même règle (`ajouterVenteBenefice(…, plateforme)`) dans `totals` (Ventes) et
+  la publication `vrm_benefice_jours` (`v: 2`, 12 nombres par jour : +
+  `fraisInconnus, nL, nCoutL, nE, nCoutE` ; une publication `v: 1` se relit).
+  Frais : Leboncoin 0 (prix final capté), eBay `totalMarketplaceFee` (EUR) sinon
+  `null` = pas su ⇒ net « — » (`raison: 'frais'`), jamais 0. Leboncoin, eBay ou
+  les annonces Leboncoin (lues seulement si une vente n'a pas de lien) pas lus ⇒
+  aucune publication ; Ventes le dit (`data-ventes-benef-autres="passu"`).
+- Le CA finalisé, les boosts et la marge de Ventes restent ceux de la liste
+  Vinted. Comptabilité dit la couverture par plateforme (`couvertureBenefice`,
+  `data-benef-couverture`) ; en `v: 2` les cotisations portent sur le CA déclaré
+  des trois plateformes (`caBeneficeDuMois`), en `v: 1` sur Vinted seul.
+- Mesuré (lecture seule) : 0 commande eBay, 3 ventes Leboncoin non finalisées et
+  sans date — rien ne change aujourd'hui chez lui.
+- Preuves : `audit-benefice.cjs` 40 contrôles ; `--mutation=titre|ambigu|
+  fraiszero` ⇒ 4 · 4 · 2 rouges. Banc `chiffres-croises.cjs` E3-E5 : 8 rouges sur
+  le build d'avant, 2 sous la mutation « eBay sans SKU relié par le titre ».
+- Non mesuré : la vraie forme de `totalMarketplaceFee` dans ses commandes (aucune
+  commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
+  que si toutes ses lignes sont reliées.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
