@@ -1309,6 +1309,11 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
     display:inline-flex; align-items:center; justify-content:center; min-height:55px; min-width:55px; margin-block:-16px; box-sizing:border-box;
   }
   :root body .vrm-main .vrm-market-space .vrm-platform-tabs > button { min-width:55px !important; }
+  /* La vue 3D du stock garde sa taille AFFICHÉE d'avant le zoom (52vh, 460 px
+     au plus) : réduite à 80 %, ses commandes (◀ + − ▶) recouvraient le bas de
+     l'étagère, et toucher une boîte du bas touchait un bouton (banc
+     `stock-finitions`, rouge depuis le zoom). */
+  :root body .vrm-main [data-stock3d] { height:min(65vh, 575px) !important; min-height:400px !important; }
   :root body .vrm-main [role="switch"] { min-height:55px !important; height:55px !important; min-width:57px !important; }
   :root body .vrm-main button.vrm-lien-action,
   :root body .vrm-main button:is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {

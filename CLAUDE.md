@@ -10031,6 +10031,23 @@ et 1512, clair · sombre · mode stream). **32 rouges sur a80f584, 0 après.**
   encore été essayé ». Aucun paquet à part. `audit-extension-navigateurs.cjs`
   +2 contrôles. ⚠️ Non mesuré dans un vrai Orion.
 
+### Le zoom mobile à 80 % : la compensation complétée (19 octobre)
+Le 18 (« densifier le mobile »), `.vrm-main { zoom:.8 }` sur téléphone, avec une
+compensation (55 px) posée seulement sur la règle générale des boutons. Mesuré
+par les bancs le 19 : toute règle plus précise « 44 px » l'emportait et
+retombait à **35 px affichés** (sous-onglets des plateformes, filtres, segments,
+interrupteurs, champs, liens, `style={{minHeight:44}}` en ligne) — `coque-mobile`,
+`plateformes-premium`, `reglages-premium`, `ventes-colis-premium` rouges. Et la
+vue 3D du stock, réduite à 80 %, avait ses commandes (◀ + − ▶) PAR-DESSUS le bas
+de l'étagère : toucher une boîte du bas touchait un bouton (`stock-finitions`,
+bissecté jusqu'à a808208). ⇒ Bloc de fin de `styles-mineral.css` : 55 px (44
+affichés) à tout ce qui se touche dans `.vrm-main`, la 3D à sa taille affichée
+d'avant. La densité voulue ne change pas. ⚠️ **Toute nouvelle cible tactile ou
+hauteur en `vh`/px dans `.vrm-main` se pense ×1,25 sur téléphone.**
+- Écran **Organisation** (nouveau) : accepté par `?tab=`, rendu par
+  `verif_visuel`/`verif_dark` ; une réponse non JSON (panne) est dite en
+  français, et la lecture ratée UNE fois.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
