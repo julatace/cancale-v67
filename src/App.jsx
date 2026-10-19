@@ -2598,13 +2598,13 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
       {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} plus en ligne sur Vinted (supprimée{s} ou retirée{s}) : enlevée{s} d'ici automatiquement. </span>}
       {nAC > 0 && <span data-a-confirmer-dit>
         <button type="button" data-a-confirmer-ouvrir aria-expanded={ouvert} onClick={() => setOuvert((o) => !o)}
-          style={{ border: 'none', background: 'transparent', padding: 0, margin: 0, font: 'inherit', color: C.text, fontWeight: 600, cursor: 'pointer', textAlign: 'left', minHeight: 0 }}>
+          className="vrm-lien-action" style={{ border: 'none', background: 'transparent', padding: 0, font: 'inherit', color: C.text, fontWeight: 600, cursor: 'pointer', textAlign: 'left', minHeight: 0 }}>
           {ouvert ? '▾' : '▸'} {nAC} annonce{sAC}{uidsAC.length === 1 ? ` de ${nom(uidsAC[0])}` : ''} à confirmer
         </button>
         {' '}— {uidsAC.length === 1
           ? ageAC(uidsAC[0])
           : uidsAC.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> ({parC[u].length}, {ageAC(u)})</React.Fragment>)}
-        {' '}: elle{sAC} ne {nAC > 1 ? 'sont' : 'est'} pas comptée{sAC} en ligne, et rien n'est supprimé.{' '}
+        {' '}: {nAC > 1 ? 'elles ne sont' : "elle n'est"} pas comptée{sAC} en ligne, et rien n'est supprimé.{' '}
       </span>}
       {vieux.length > 0 && <span data-vieux-dit>
         {vieux.length === 1
@@ -25872,6 +25872,9 @@ function CarteUrssafMois({ liveStats, onNav }) {
     const [y, mo] = m.ym.split('-'); const d = new Date(Number(y), Number(mo) - 1, 1);
     return (d >= urssafDue.periodStart && d <= urssafDue.periodEnd) ? s + (Number(m.ca) || 0) : s;
   }, 0) * 100) / 100;
+  // Des ventes finalisées sans date de versement peuvent tomber dans cette
+  // période : le montant de l'échéance est alors un MINIMUM, et il le dit (§5).
+  const echeancePartiel = (urssafInfo && urssafInfo.aDater && Number(urssafInfo.aDater.n)) || 0;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
@@ -26010,8 +26013,12 @@ function CarteUrssafMois({ liveStats, onNav }) {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 12px',marginTop:10,fontSize:13,color:C.muted}}>
                   <span>Période</span><span style={{color:C.text,fontWeight:500,textAlign:'right'}}>{urssafDue.label}</span>
-                  <span>CA finalisé</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={urssafPeriodCA}/>}</span>
-                  <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/>}</span>
+                  {/* (revue du 19 oct.) Ce montant vient de la ligne publiée, datée au
+                      VERSEMENT : c'est le « Reçu (versé) » du tableau juste au-dessus,
+                      pas son « Finalisé ». Le libellé « CA finalisé » le contredisait
+                      sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
+                  <span>Reçu (versé)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
+                  <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
@@ -31616,14 +31623,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // de l'écran Ventes, pas seulement à la modale Trésorerie : sans ça la carte
   // retombait sur une estimation très éloignée du vrai montant bloqué.
   // Lecture Supabase légère, une seule fois.
+  // ⚠️ (revue du 19 oct.) LA LISTE DES COMPTES D'ABORD. Ce passage partait au
+  // montage, AVANT l'arrivée des comptes : la liste vide voulait dire « ne rien
+  // filtrer », et l'argent des comptes SUPPRIMÉS entrait dans « En attente »
+  // (mesuré : 9 porte-monnaie et 2 240 € au lieu de 6 et 1 995,80 € — le
+  // résumé Vinted, lui, disait juste). Il n'était jamais refait. On attend
+  // donc les comptes, et on relit quand la liste change (§11 : la même somme
+  // que la coque, `liveStats.walletAttente`).
+  const cleUidsWallet = [...accountUids].sort().join(',');
   useEffect(() => {
-    if (walletEscrow !== null) return;
-    if (curSub !== 'ventes' && curSub !== 'journee') return;
-    fetchWalletEscrow(accountUids).then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
+    if (curSub !== 'ventes' && curSub !== 'journee') return undefined;
+    if (!accountUids.size) return undefined;
+    if (walletEscrow && walletEscrow._cle === cleUidsWallet) return undefined;
+    let vivant = true;
+    fetchWalletEscrow(accountUids).then(w => { if (w && vivant) setWalletEscrow({ ...w, _cle: cleUidsWallet }); }).catch(() => {});
+    return () => { vivant = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curSub]);
+  }, [curSub, cleUidsWallet]);
 
-  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow(accountUids).then(setWalletEscrow); };
+  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); if (accountUids.size) fetchWalletEscrow(accountUids).then(w => setWalletEscrow({ ...w, _cle: cleUidsWallet })); };
 
   // Points de DÉPÔT des colis (§5.26). Chargés seulement sur l'écran Bordereaux
   // et une seule fois : les lignes pèsent ~30 Ko, on ne les relit pas à chaque
@@ -35530,9 +35548,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             aucun total : l'action n'est pas « aller au comptoir », c'est
             « réclamer » ou « je l'avais eu ». */}
         {aFilter==='attente' && (pickupUnion.oublies||[]).length>0 && (
-          <div style={{border:`1px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
+          <div data-oublies={pickupUnion.oublies.length} style={{border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:7}}>
-              <Icon name="alert" size={16} color={C.danger}/>{pickupUnion.oublies.length} colis jamais retirés
+              <Icon name="alert" size={16} color={C.warn}/>{pickupUnion.oublies.length} colis jamais retirés
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
               Arrivés il y a plus de {PICKUP_MAX_DAYS} jours et jamais cochés. Un point relais rend le colis
@@ -35549,16 +35567,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
                 const j=Math.floor((Date.now()-new Date(t.receivedAt||0).getTime())/86400000);
                 return (
-                  <div key={colisKey(t)||i} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
+                  <div key={colisKey(t)||i} data-oublie="" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
                     <CarrierBadge carrier={t.carrier} size={20}/>
                     <div style={{flex:'1 1 150px',minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {cl.nom || carrierName(t.carrier)}
                       </div>
-                      <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.danger}}>il y a {isFinite(j)?j:'?'} j</b>
+                      {/* (revue du 19 oct.) L'âge est ce qui compte ici : la ligne
+                          passe à la ligne au lieu d'être coupée (« il y a… » à 390 px). */}
+                      <div data-oublie-info="" style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
+                        n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.warn,whiteSpace:'nowrap'}}>il y a {isFinite(j)?j:'?'} j</b>
                       </div>
                     </div>
+                    {/* Les gestes forment UN groupe, poussé à droite : « Je l'ai eu »
+                        est au même endroit sur chaque ligne, qu'il y ait un code,
+                        un QR ou rien (avant, il passait seul à la ligne, à gauche,
+                        dès qu'un code prenait de la place). */}
+                    <div className="vrm-oublie-gestes">
                     {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
                     {/* ⚠️ CE BLOC CACHAIT DES QR QU'IL POSSÈDE. Mesuré sur la
                         vraie base : sur les 6 colis rangés ici, **3 portent un
@@ -35573,8 +35598,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <img src={qi} alt="QR de retrait" onError={()=>noterImgMorte(qi)} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                       </button>
                     ) : null; })()}
-                    {t.suivi && <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600}}>Vérifier</a>}
-                    <button type="button" title="Je l'avais récupéré" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
+                    {t.suivi && <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" data-oublie-verifier="" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Vérifier</a>}
+                    <button type="button" title="Je l'avais récupéré" data-oublie-eu="" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
+                    </div>
                   </div>
                 );
               })}
@@ -37385,7 +37411,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           la carte occupait deux étages pour trois mots. Le retour
                           à la ligne (`flexWrap`) fait le travail sur téléphone. */}
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
-                        title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
+                        title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'} data-geste="imprime"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:isBordPrinted(b)?C.bg:'transparent',color:isBordPrinted(b)?C.text:C.muted}}>
                         {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
                       </button>}
@@ -37395,11 +37421,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <button type="button" onClick={()=>{
                         if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
                         else { if(o && !isShipDone(o)) toggleShipDone(o); if(b) markBordShipped(b); }
-                      }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'}
+                      }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'} data-geste="fait"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
+                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
                       {capte && <span className="vrm-colis-source" style={{fontSize:11.5,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
@@ -37470,8 +37496,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
           if (!faits.length) return null;
           return (
-            <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:8,padding:'9px 12px'}}>
-              <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {faits.length} colis parti{faits.length>1?'s':''}</span>
+            /* (revue du 19 oct.) Neutre : plus le vert de l'ancienne palette
+               menthe (§7, rien à rattraper ici), et un autre mot que le groupe
+               « Partis — Vinted suit le colis » juste au-dessus, qui compte
+               autre chose (les VENTES suivies, pas les bordereaux faits). */
+            <div data-bords-faits={faits.length} style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px'}}>
+              <span style={{color:C.text,fontWeight:600}}>{faits.length} bordereau{faits.length>1?'x':''} déjà traité{faits.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
               <button type="button" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
             </div>
