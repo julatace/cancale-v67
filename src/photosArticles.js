@@ -66,11 +66,15 @@ export function photosTransactionsLues(rows,demandes){
  return out;
 }
 
-export function photosVenteVintedCandidates(commande,annonces=[],itemId=null,archives={},transactions={}){
+// `fiche` : la fiche N° de CETTE annonce (clé = l'identifiant que Vinted donne
+// à la transaction), dernier recours — jamais une fiche trouvée par titre ni
+// par un ancien verrou : mieux vaut aucune photo qu'une fausse (§5).
+export function photosVenteVintedCandidates(commande,annonces=[],itemId=null,archives={},transactions={},fiche=null){
  const uid=commande?._acc?.vinted_user_id,tid=commande?.transaction_id,id=itemId ?? commande?.item_id ?? commande?.item?.id;
  const sources=[photoArticle(commande),id!=null?photoCommande({item_id:id,_acc:commande?._acc},annonces):null,
   uid!=null && tid!=null?photoArticle(transactions[JSON.stringify([String(uid),String(tid)])]):null,
-  uid!=null && id!=null?photoArticle(archives[JSON.stringify([String(uid),String(id)])]):null];
+  uid!=null && id!=null?photoArticle(archives[JSON.stringify([String(uid),String(id)])]):null,
+  id!=null?photoArticle(fiche):null];
  return [...new Set(sources.filter(Boolean))];
 }
 export function choisirPhotoDisponible(candidates,etat,favorite=null){

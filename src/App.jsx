@@ -16,7 +16,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
-import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
@@ -6690,9 +6690,34 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
   );
 }
 // Plusieurs sources certaines d’une vente : ne pas laisser un lien mort masquer son archive.
-function PhotoVenteSources({candidats,onBesoinAlternative,onSourceChargee,style,...props}){
- const key=JSON.stringify(candidats),[favori,setFavori]=useState(null),[echecs,setEchecs]=useState({key,urls:[]});
+// ── UNE VENTE, UNE PHOTO (20 octobre) ────────────────────────────────────────
+// Julien : « quand je clique sur la vente d'une paire, il y a une AUTRE photo
+// qui apparaît ». La ligne repliée montrait la PREMIÈRE source (`PhotoVente`),
+// le détail déplié choisissait la sienne (`PhotoVenteSources`, la première qui
+// charge) : dès que la vignette de la commande ne chargeait pas, les deux ne
+// montraient plus la même image. Le choix vit maintenant ICI, par vente
+// (`cle` = [compte, transaction]) : la ligne et le détail lisent la même
+// source et les mêmes échecs — ce que l'un affiche, l'autre l'affiche.
+const __choixPhotoVente = new Map();
+const __choixPhotoVenteSubs = new Set();
+const choixPhotoVente = (cle, key) => { const c = cle != null ? __choixPhotoVente.get(cle) : null; return c && c.key === key ? c : { key, favori: null, echecs: [] }; };
+const poserChoixPhotoVente = (cle, key, patch) => {
+  if (cle == null) return;
+  const cur = choixPhotoVente(cle, key), next = { ...cur, ...patch(cur), key };
+  if (next.favori === cur.favori && next.echecs.length === cur.echecs.length) return;
+  __choixPhotoVente.set(cle, next);
+  if (__choixPhotoVente.size > 600) __choixPhotoVente.delete(__choixPhotoVente.keys().next().value);
+  __choixPhotoVenteSubs.forEach(fn => { try { fn(cle); } catch (_) {} });
+};
+function PhotoVenteSources({candidats,cle,onBesoinAlternative,onSourceChargee,style,...props}){
+ const key=JSON.stringify(candidats),[favoriLocal,setFavoriLocal]=useState(null),[echecsLocal,setEchecsLocal]=useState({key,urls:[]});
  const [,maj]=React.useReducer(n=>n+1,0);
+ React.useEffect(()=>{ if(cle==null)return undefined; const fn=c=>{ if(c===cle)maj(); }; __choixPhotoVenteSubs.add(fn); return ()=>{ __choixPhotoVenteSubs.delete(fn); }; },[cle]);
+ const partage=cle!=null?choixPhotoVente(cle,key):null;
+ const favori=partage?(partage.favori?{key,url:partage.favori}:null):favoriLocal;
+ const echecs=partage?{key,urls:partage.echecs}:echecsLocal;
+ const setFavori=v=>{ if(partage)poserChoixPhotoVente(cle,key,()=>({favori:v.url})); else setFavoriLocal(v); };
+ const setEchecs=f=>{ if(partage)poserChoixPhotoVente(cle,key,cur=>({echecs:f({key,urls:cur.echecs}).urls})); else setEchecsLocal(f); };
  const echecNatif=key===echecs.key?echecs.urls:[];
  const echecsActuels=React.useRef(echecNatif);echecsActuels.current=echecNatif;
  const etat=url=>echecNatif.includes(url)?'ko':photosVinted.estPhotoVinted(url)?(photosVinted.estMorte(url)?'ko':photosVinted.etatRendu(url)):'natif';
@@ -13684,13 +13709,13 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVenteCompacte({ photo, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
   const panneau = React.useId();
   return <div {...props} data-ligne-ouverte={ouvert}>
     <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
-      <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
+      <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={28} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
       <span className="vrm-ledger-sale-state" title={etat}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
@@ -28672,11 +28697,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ph = orderPhoto(a);
     return (
       <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:8,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
-        <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+        {/* La photo de l'ACHAT (celle du vendeur à qui tu l'as achetée), pas
+            celle de la paire vendue : elle est dite comme telle (20 oct.). */}
+        <div title="Photo de l'achat (prise par le vendeur)" style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          {ph ? <PhotoVinted src={ph} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
-          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
+          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}><span style={{color:C.muted,fontWeight:500}}>Achat relié · </span>{a.title||'sans titre'}</div>
           <div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
             Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')} ${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
           </div>
@@ -33747,8 +33774,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const e = effEntry(o); const num = e?.numero;
     const baseE = resolvedEntry(o);
     const lst = listings.items || _acctCache.listings?.items || [];
-    const photo = photoVenteVinted(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions) || photoArticle(baseE);
-    const sourcesPhoto = photosVenteVintedCandidates(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions);
+    // UNE liste de sources, la même pour la ligne repliée et le détail : la
+    // photo de la commande, puis l'annonce, la transaction, le coffre, et la
+    // fiche N° de CETTE annonce (par identité `txnItem`). Plus de repli sur
+    // `resolvedEntry` : il peut venir d'un ancien verrou posé par titre.
+    const ficheIdentite = txnItem[tx] != null ? numeros[String(txnItem[tx])] || null : null;
+    const sourcesPhoto = photosVenteVintedCandidates(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions, ficheIdentite);
+    const photo = sourcesPhoto[0] || null;
     const ov = saleOv[tx] || {};
     const hidden = isHidden(o);
     const cell = num ? garageCellOf(garageGrid, num) : null;
@@ -34999,6 +35031,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const photo = pre.photo;
             const sourcesPhoto = pre.sourcesPhoto;
             const clePhoto=JSON.stringify([String(o._acc?.vinted_user_id),String(o.transaction_id)]);
+            // La ligne repliée et le détail déplié montrent LA MÊME photo : mêmes
+            // sources, même choix partagé (`cle`), voir `PhotoVenteSources`.
+            const photoSourcesProps={candidats:sourcesPhoto,cle:clePhoto,alt:'',loading:'lazy',decoding:'async',onSourceChargee:url=>photosVentesValides.current.set(clePhoto,url),onBesoinAlternative:()=>{photosVentesValides.current.delete(clePhoto);setPhotosVentesForcees(prev=>{const next=new Set(prev);next.add(clePhoto);return next;});}};
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             // Les gestes passent par `actionsVentes` : une ligne gardée telle
@@ -35007,11 +35042,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte photo={photo} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources candidats={sourcesPhoto.length?sourcesPhoto:[photo]} alt="" loading="lazy" decoding="async" onSourceChargee={url=>photosVentesValides.current.set(clePhoto,url)} onBesoinAlternative={()=>{photosVentesValides.current.delete(clePhoto);setPhotosVentesForcees(prev=>{const next=new Set(prev);next.add(clePhoto);return next;});}} style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
