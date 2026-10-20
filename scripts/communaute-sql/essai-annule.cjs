@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-//  LES MIGRATIONS 018 + 019 (carte de la communauté, Discord, classement) :
+//  LES MIGRATIONS 018 + 019 + 020 (carte de la communauté, Discord, classement,
+//  groupes à code) :
 //  L'ESSAI ANNULÉ, PUIS LA VÉRIFICATION
 //
-//  node scripts/communaute-sql/essai-annule.cjs            > essai.sql     (l'essai de la 019)
+//  node scripts/communaute-sql/essai-annule.cjs            > essai.sql     (l'essai du DERNIER fichier : la 020)
 //  node scripts/communaute-sql/essai-annule.cjs --verifier > verifier.sql  (après application)
 //  --migration=fichier (répétable) : l'essai porte sur le DERNIER fichier, la
 //  vérification sur leur union (une fonction redéfinie plus loin l'emporte).
-//  Par défaut : 018 puis 019 (la 018 est appliquée en production, l'essai joue la 019).
+//  Par défaut : 018, 019 puis 020 (la 018 est appliquée en production). Pour
+//  l'essai de la 019 seule : --migration=…018… --migration=…019…
 //
 //  1. L'ESSAI, fabriqué à partir du fichier TEL QU'IL EST : une transaction, la
 //     migration SANS son propre BEGIN/COMMIT, un rapport d'UNE ligne (`essai`,
@@ -24,13 +26,15 @@
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const MIGS_ARG = process.argv.filter((x) => x.startsWith('--migration=')).map((x) => x.slice('--migration='.length));
-const MIGS = MIGS_ARG.length ? MIGS_ARG : ['018-communaute.sql', '019-communaute-discord-classement.sql'].map((f) => path.join(__dirname, '..', '..', 'supabase/migrations', f));
+const MIGS = MIGS_ARG.length ? MIGS_ARG : ['018-communaute.sql', '019-communaute-discord-classement.sql', '020-communaute-groupes.sql'].map((f) => path.join(__dirname, '..', '..', 'supabase/migrations', f));
 const SQLS = MIGS.map((f) => fs.readFileSync(f, 'utf8'));
 const sql = SQLS[SQLS.length - 1];      // l'essai porte sur le dernier fichier
 const tout = SQLS.join('\n');
 const lit = (x) => "'" + String(x).replace(/'/g, "''") + "'";
 const md5 = (x) => crypto.createHash('md5').update(x).digest('hex');
-const TABLES = ['vrm_communaute_blocages', 'vrm_communaute_conversations', 'vrm_communaute_messages', 'vrm_communaute_profils', 'vrm_communaute_signalements'];
+const AVEC_GROUPES = /create table if not exists public\.vrm_communaute_groupes/.test(tout);
+const TABLES = ['vrm_communaute_blocages', 'vrm_communaute_conversations', ...(AVEC_GROUPES ? ['vrm_communaute_groupes', 'vrm_communaute_membres'] : []),
+  'vrm_communaute_messages', 'vrm_communaute_profils', 'vrm_communaute_signalements'];
 const SEQUENCES = ['vrm_communaute_messages_id_seq', 'vrm_communaute_signalements_id_seq'];
 
 function sansCommentaires(s) {
@@ -62,9 +66,11 @@ const FONCTIONS_ATTENDUES = Object.fromEntries(Object.entries(FONCTIONS).map(([k
   { n: 1, def: f.def, cfg: f.sp ? ['search_path=""'] : null, vol: f.vol, md5: f.md5,
     auth: (GRANTS[k] || []).includes('authenticated'), sr: (GRANTS[k] || []).includes('service_role'), anon: false }]));
 const derniere = (re) => { for (let i = SQLS.length - 1; i >= 0; i--) { const m = re.exec(SQLS[i]); if (m) return m[1]; } return null; };
-const FORME = derniere(/select (pg_catalog\.md5\(pg_catalog\.string_agg\([\s\S]*?\) t\(n\))\n {4}into v;/);
+// (sans traverser un autre « into » : la 020 contrôle aussi la forme d'AVANT, `into avant`)
+const FORME = derniere(/select (pg_catalog\.md5\(pg_catalog\.string_agg\((?:(?!\binto\b)[\s\S])*?\) t\(n\))\n {4}into v;/);
 const EMPREINTE = derniere(/if v is distinct from '([0-9a-f]{32}|__EMPREINTE__)' then/);
-const FONCTIONS_COMPTE = /019/.test(MIGS.map((f) => path.basename(f)).join(' ')) ? 14 : 10;
+const NOMS_FICHIERS = MIGS.map((f) => path.basename(f)).join(' ');
+const FONCTIONS_COMPTE = /020/.test(NOMS_FICHIERS) ? 22 : /019/.test(NOMS_FICHIERS) ? 14 : 10;
 const arr = (l) => 'array[' + l.map(lit).join(',') + ']';
 const PRIVS = `case when current_setting('server_version_num')::int >= 170000
      then array['SELECT','INSERT','UPDATE','DEL' || 'ETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']

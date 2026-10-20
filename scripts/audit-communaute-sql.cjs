@@ -32,6 +32,7 @@ const { spawnSync, execFileSync } = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const MIG = path.join(RACINE, 'supabase/migrations/018-communaute.sql');
 const MIG19 = path.join(RACINE, 'supabase/migrations/019-communaute-discord-classement.sql');
+const MIG20 = path.join(RACINE, 'supabase/migrations/020-communaute-groupes.sql');
 const MIN = path.join(__dirname, 'agent-sql/supabase-min.sql');
 const OUTIL_SRC = path.join(__dirname, 'communaute-sql/essai-annule.cjs');
 const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql']
@@ -107,6 +108,14 @@ const MUTATIONS = {
     "  elsif d !~ '^[a-z0-9._]{2,32}$' or pg_catalog.strpos(d, '..') > 0 then", "  elsif false then", 'dl1'),
     "      check (discord is null or (discord ~ '^[a-z0-9._]{2,32}$' and position('..' in discord) = 0));", '      check (true);', 'dl2') },
   'discord-sans-carte': { sql19: (s) => remplace(s, "  if not exists (select 1 from public.vrm_communaute_profils p where p.owner = moi) then\n    return jsonb_build_object('ok', false, 'raison', 'invisible');\n  end if;\n  if d = '' then", "  if d = '' then", 'dsc') },
+  // ── 020 : les groupes à code ──
+  'groupe-non-membre': { sql20: (s) => remplace(s, "  if not exists (select 1 from public.vrm_communaute_membres m join public.vrm_communaute_profils p on p.pid = m.pid\n                  where m.groupe = p_groupe and p.owner = auth.uid() and m.quitte_le is null) then", '  if false then', 'gnm') },
+  'code-autrui': { sql20: (s) => remplace(s, "  if not exists (select 1 from public.vrm_communaute_groupes g join public.vrm_communaute_profils p on p.pid = g.cree_par\n                  where g.id = p_groupe and p.owner = moi) then", '  if false then', 'ca') },
+  'groupe-tous': { sql20: (s) => remplace(s, "where g.groupe = p_groupe and g.pid = p.pid and g.quitte_le is null) end", "where g.groupe = p_groupe and g.quitte_le is null) end", 'gt') },
+  'groupe-quitte-compte': { sql20: (s) => remplace(s, "where g.groupe = p_groupe and g.pid = p.pid and g.quitte_le is null) end", "where g.groupe = p_groupe and g.pid = p.pid) end", 'gqc') },
+  'groupe-bloque-visible': { sql20: (s) => remplace(s, "                                             and (p.owner = auth.uid() or public.vrm_acces_pour(p.owner))\n                                             and not exists (select 1 from public.vrm_communaute_blocages b where b.qui = auth.uid() and b.bloque = p.owner)), '[]'::jsonb))",
+    "                                             and (p.owner = auth.uid() or public.vrm_acces_pour(p.owner))), '[]'::jsonb))", 'gbv') },
+  'groupes-autrui': { sql20: (s) => remplace(s, "                  where m.pid = (select q.pid from public.vrm_communaute_profils q where q.owner = auth.uid()) and m.quitte_le is null), '[]'::jsonb))", "                  where m.quitte_le is null), '[]'::jsonb))", 'ga') },
   'effacer-019': { apres19: "create or replace function public.vrm_communaute_effacer(p_owner uuid) returns integer language plpgsql volatile security definer set search_path = '' as $$ begin return 0; end $$;" },
 };
 
@@ -411,6 +420,7 @@ const convs = (u) => J(u, 'select public.vrm_communaute_conversations();');
   });
 
   await partie019(mut);
+  await partie020(mut);
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
   process.exit(ko === 0 ? 0 : 1);
 })();
@@ -587,6 +597,204 @@ async function partie019(mut) {
     touche('classement-anon', 'grant execute on function public.vrm_communaute_classement(text) to anon;', 'fonctions');
     touche('aide-ouverte', 'grant execute on function public.vrm_communaute_ts(text) to authenticated;', 'fonctions');
     touche('carte-018', fs.readFileSync(MIG, 'utf8').split('-- ── 2. LA CARTE')[1].split('-- ── 3.')[0].replace(/^[^\n]*\n[^\n]*\n/, ''), 'fonctions');
+    DB = 'base';
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  020 — LES GROUPES À CODE (accompagnement)
+//  Sur une base neuve : le socle, la 018 et la 019 TELLES QU'ELLES SONT, puis la
+//  020 (éventuellement mutée).
+// ════════════════════════════════════════════════════════════════════════════
+async function partie020(mut) {
+  console.log('\n── 020 : les groupes à code ──');
+  if (!fs.existsSync(MIG20)) { dit(false, 'la migration 020 existe (supabase/migrations/020-communaute-groupes.sql)', 'absente'); return; }
+  let S20 = fs.readFileSync(MIG20, 'utf8');
+  try { if (mut && mut.sql20) S20 = mut.sql20(S20); } catch (e) { dit(false, e.message); return; }
+  const F18 = path.join(DIR, '018-vrai.sql'); fs.writeFileSync(F18, fs.readFileSync(MIG, 'utf8'));
+  const F19 = path.join(DIR, '019-vrai.sql'); fs.writeFileSync(F19, fs.readFileSync(MIG19, 'utf8'));
+  const F20 = path.join(DIR, '020.sql'); fs.writeFileSync(F20, S20);
+  const outil20 = (extra) => spawnSync(process.execPath, [OUTIL, '--migration=' + F18, '--migration=' + F19, '--migration=' + F20, ...extra], { encoding: 'utf8' });
+  const verifier20 = (db) => {
+    const v = outil20(['--verifier']);
+    if (v.status !== 0) throw new Error('verifier : ' + v.stderr.slice(0, 200));
+    const r = run(v.stdout, { db });
+    if (!r.ok) throw new Error('verifier (SQL) : ' + r.err.slice(0, 300));
+    return JSON.parse(lignes(r.out).pop());
+  };
+  dit(!/\bdelete\b/i.test(fs.readFileSync(MIG20, 'utf8')), 'la 020 ne contient AUCUNE suppression (elle se colle d\'un bloc dans l\'outil SQL)');
+
+  const pret = await essaie('020 : socle + 018 + 019', () => {
+    fraiche('c20b', 'socle'); Q(fs.readFileSync(MIG, 'utf8')); Q(fs.readFileSync(MIG19, 'utf8')); return true;
+  });
+  if (!pret) return;
+
+  await essaie('020 : refusée sans la 019', () => {
+    fraiche('c20sans', 'socle'); Q(fs.readFileSync(MIG, 'utf8'));
+    const r = run(S20);
+    dit(!r.ok && /vrm_communaute_forme/.test(r.err), 'la 020 sur une base sans la 019 est REFUSÉE (rien n\'est installé)', r.ok ? 'installée' : r.err.slice(0, 160));
+    dit(Q("select count(*) from pg_class where relname = 'vrm_communaute_groupes'") === '0', 'et la table des groupes n\'existe pas');
+  });
+
+  await essaie('020 : essai annulé', () => {
+    fraiche('c20essai', 'c20b');
+    const e = outil20([]);
+    if (e.status !== 0) throw new Error(e.stderr.slice(0, 200));
+    dit(!/\bdelete\b/i.test(e.stdout), "l'essai de la 020 ne contient aucune suppression");
+    const r = run(e.stdout);
+    dit(r.ok, "l'essai annulé de la 020 passe d'un bloc sur une base où la 018 et la 019 sont installées", r.err);
+    if (r.ok) { const j = JSON.parse(lignes(r.out).pop()); dit(j.tables === 7 && j.rls === true, "l'essai voit les sept tables (RLS forcé) avant d'annuler", JSON.stringify(j).slice(0, 120)); }
+    dit(Q("select count(*) from pg_class where relname in ('vrm_communaute_groupes','vrm_communaute_membres')") === '0', "après l'essai : aucune table des groupes");
+    dit(Q("select count(*) from pg_proc where proname like 'vrm\\_communaute\\_%'") === '14', "après l'essai : les quatorze fonctions de la 018 + 019, rien de plus");
+  });
+
+  fraiche('c20', 'c20b');
+  const installe = await essaie('020 : installation', () => {
+    const r = run(S20); if (!r.ok) throw new Error(r.err);
+    const r2 = run(S20); dit(r2.ok, 'la 020 se rejoue sans erreur (idempotente)', r2.err);
+    return true;
+  });
+  if (!installe) return;
+  await essaie('020 : vérification', () => {
+    const v = verifier20('c20');
+    dit(v.ok === true, '`--verifier` (018 + 019 + 020) rend ok sur une installation neuve', JSON.stringify(v.ecarts) + ' ' + JSON.stringify(v.fonctions_differentes || ''));
+  });
+
+  const U = { A: '71111111-1111-4111-8111-111111111111', B: '72222222-2222-4222-8222-222222222222', C: '73333333-3333-4333-8333-333333333333',
+    D: '74444444-4444-4444-8444-444444444444', E: '75555555-5555-4555-8555-555555555555' };
+  const iso = (heure) => `to_char(((date_trunc('day', now() at time zone 'Europe/Paris') + interval '${heure}') at time zone 'Europe/Paris') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+  const vente = (tx, heure, statut = "Commande finalisée - l'acheteur a validé la commande") =>
+    `jsonb_build_object('transaction_id', ${tx}, 'date', ${iso(heure)}, 'status', ${lit(statut)})`;
+  const ligne = (owner, uid, ventes) => `insert into public.app_data (owner, id, data) values ('${owner}', 'harvest_${uid}_orders_sold', jsonb_build_object('payload', jsonb_build_object('my_orders', jsonb_build_array(${ventes.join(',')}))));`;
+  const pidDe = {};
+  const ok20 = await essaie('020 : données inventées', () => {
+    fraiche('c20d', 'c20');
+    ADM(`insert into auth.users (id, email) values ${Object.values(U).map((u, i) => `('${u}', 'g${i}@exemple.fr')`).join(',')};`);
+    ADM(`insert into public.vinted_accounts (vinted_user_id, login, owner) values ('710', 'ga', '${U.A}'), ('720', 'gb', '${U.B}'), ('730', 'gc', '${U.C}'), ('750', 'ge', '${U.E}');`);
+    ADM([
+      ligne(U.A, '710', [vente(7101, '00:30'), vente(7102, '10:00'), vente(7103, '11:00'), vente(7103, '11:00'), vente(7104, '12:00', 'Remboursement effectué')]),
+      ligne(U.B, '720', [7201, 7202, 7203, 7204, 7205].map((t) => vente(t, '08:00'))),
+      ligne(U.C, '730', [7301, 7302].map((t) => vente(t, '07:00'))),
+      ligne(U.E, '750', [7501, 7502, 7503, 7504, 7505, 7506, 7507, 7508].map((t) => vente(t, '07:00'))),
+    ].join('\n'));
+    DB = 'c20d';
+    for (const k of ['A', 'B', 'C', 'E']) pidDe[k] = J(U[k], `select public.vrm_communaute_rejoindre('Membre${k}', 'Cancale', 'FR', 48.68, -1.85);`).pid;
+    return true;
+  });
+  if (!ok20) return;
+  const creer = (u, nom) => J(u, `select public.vrm_communaute_groupe_creer(${lit(nom)});`);
+  const entrer = (u, code) => J(u, `select public.vrm_communaute_groupe_rejoindre(${lit(code)});`);
+  const sortir = (u, g) => J(u, `select public.vrm_communaute_groupe_quitter(${lit(g)});`);
+  const nouveauCode = (u, g) => J(u, `select public.vrm_communaute_groupe_code(${lit(g)});`);
+  const clg = (u, g, per = 'jour') => J(u, `select public.vrm_communaute_classement_groupe(${lit(per)}, ${lit(g)});`);
+  const cl = (u, per = 'jour') => J(u, `select public.vrm_communaute_classement(${lit(per)});`);
+  const carteDe = (u) => J(u, 'select public.vrm_communaute_carte();');
+  const ventesDe = (c, k) => { const l = c && Array.isArray(c.lignes) && c.lignes.find((x) => x.pid === pidDe[k]); return l ? l.ventes : undefined; };
+  let G = null;
+
+  await essaie('020 : créer un groupe', () => {
+    dit(creer(U.D, 'Accompagnement').raison === 'invisible', 'hors de la carte, on ne crée pas de groupe');
+    for (const m of ['a', '<b>', 'x'.repeat(41), 'nom@mail']) dit(creer(U.A, m).raison === 'nom-groupe', `nom de groupe refusé : « ${m.slice(0, 10)} »`);
+    G = creer(U.A, '  Accompagnement Julien ');
+    dit(G && G.ok === true && /^[A-HJ-NP-Z2-9]{8}$/.test(G.code) && G.nom === 'Accompagnement Julien', 'A crée un groupe : un code de 8 caractères sans I, O, 0, 1', JSON.stringify(G));
+    const g = carteDe(U.A).groupes;
+    dit(Array.isArray(g) && g.length === 1 && g[0].code === G.code && g[0].createur === true && g[0].membres.length === 1 && g[0].membres[0] === pidDe.A, 'le créateur est membre et voit son code sur la carte', JSON.stringify(g));
+    dit(Array.isArray(carteDe(U.B).groupes) && carteDe(U.B).groupes.length === 0, 'un non-membre ne voit pas le groupe (ni son code)');
+    for (let i = 2; i <= 5; i++) creer(U.A, 'Groupe ' + i);
+    dit(creer(U.A, 'Groupe 6').raison === 'trop-crees', '5 groupes créés au plus');
+  });
+  if (!G || !G.code) return;
+
+  await essaie('020 : entrer avec le code', () => {
+    dit(entrer(U.B, 'ZZZZZZZZ').raison === 'code', 'un code inconnu est refusé');
+    dit(entrer(U.B, '<script>').raison === 'code', 'un code mal formé est refusé');
+    dit(entrer(U.D, G.code).raison === 'invisible', 'hors de la carte, on n\'entre pas dans un groupe');
+    const avec = G.code.slice(0, 4).toLowerCase() + '-' + G.code.slice(4).toLowerCase();
+    const r = entrer(U.B, ' ' + avec + ' ');
+    dit(r && r.ok === true && r.id === G.id && r.nom === 'Accompagnement Julien', 'B entre avec le code tapé en minuscules, avec un tiret et des espaces', JSON.stringify(r));
+    dit(entrer(U.B, G.code).deja === true, 'rentrer une seconde fois ne double pas l\'adhésion');
+    dit(entrer(U.C, G.code).ok === true, 'C entre aussi');
+    const g = carteDe(U.B).groupes.find((x) => x.id === G.id);
+    dit(g && g.createur === false && g.membres.length === 3 && g.membres.includes(pidDe.A) && !g.membres.includes(pidDe.E), 'B voit les membres du groupe (par leur pid), pas E qui n\'y est pas', JSON.stringify(g));
+    const txt = JSON.stringify(carteDe(U.B).groupes);
+    for (const f of [U.A, U.C, 'g0@exemple.fr', 'owner']) dit(!txt.includes(f), `les groupes de la carte ne portent PAS « ${f.length > 20 ? f.slice(0, 8) + '…' : f} »`);
+  });
+
+  await essaie('020 : le classement du groupe', () => {
+    const c = clg(U.B, G.id);
+    dit(c && c.acces === true && c.groupe === G.id && c.n === 3, 'le classement du groupe compte ses trois membres', JSON.stringify(c).slice(0, 200));
+    dit(ventesDe(c, 'B') === 5 && ventesDe(c, 'A') === 3 && ventesDe(c, 'C') === 2, 'même comptage que le classement public (A : 3 — doublon et remboursée écartés ; B : 5 ; C : 2)', JSON.stringify(c && c.lignes));
+    dit(ventesDe(c, 'E') === undefined, 'E (8 ventes) n\'est pas dans le groupe : il n\'y apparaît pas');
+    dit(c && c.moi && c.moi.rang === 1 && c.moi.ventes === 5, 'ma ligne : B est 1er du groupe');
+    dit(cl(U.B).n === 0, 'entrer dans un groupe n\'inscrit PAS au classement public (opt-in à part)');
+    const e = clg(U.E, G.id);
+    dit(e && e.erreur === 'groupe' && !Array.isArray(e.lignes), 'un non-membre ne lit pas le classement du groupe', JSON.stringify(e));
+    const n = run(ANON + `select public.vrm_communaute_classement_groupe('jour', '${G.id}');`);
+    dit(!n.ok && /permission denied/.test(n.err), 'sans compte (anon) : refusé');
+    dit(JSON.stringify(c).indexOf(U.A) < 0 && JSON.stringify(c).indexOf('owner') < 0, 'le classement du groupe ne porte ni identifiant de compte ni « owner »');
+    const direct = enRun(U.E, `insert into public.vrm_communaute_membres (groupe, pid) values ('${G.id}', '${pidDe.E}');`);
+    dit(!direct.ok && /permission denied/.test(direct.err), 'personne n\'écrit les tables des groupes en direct (ni s\'ajouter sans le code)');
+    const lire = enRun(U.E, 'select code from public.vrm_communaute_groupes;');
+    dit(!lire.ok && /permission denied/.test(lire.err), 'personne ne lit les codes en direct');
+    J(U.A, "select public.vrm_communaute_classement_inscrire(true);");
+    dit(cl(U.B).n === 1 && ventesDe(cl(U.B), 'A') === 3, 'le classement public, lui, ne compte que les inscrits (A : 3, comme dans le groupe)');
+  });
+
+  await essaie('020 : blocage, abonnement, quitter', () => {
+    J(U.B, `select public.vrm_communaute_ecrire('${pidDe.C}', 'bonjour');`);
+    const conv = J(U.B, 'select public.vrm_communaute_conversations();')[0].conv;
+    en(U.B, `select public.vrm_communaute_bloquer('${conv}', true);`);
+    const g = carteDe(U.B).groupes.find((x) => x.id === G.id);
+    dit(g && !g.membres.includes(pidDe.C) && ventesDe(clg(U.B, G.id), 'C') === undefined, 'un membre bloqué disparaît du groupe de celui qui bloque (carte et classement)');
+    en(U.B, `select public.vrm_communaute_bloquer('${conv}', false);`);
+    ADM("update public.vrm_reglages set valeur = '1' where cle = 'abonnement_obligatoire';");
+    ADM(`insert into public.abonnements (owner, statut) values ('${U.A}', 'active'), ('${U.B}', 'active');`);
+    dit(ventesDe(clg(U.B, G.id), 'C') === undefined && !carteDe(U.B).groupes.find((x) => x.id === G.id).membres.includes(pidDe.C), 'qui ne paie plus n\'est plus montré dans le groupe');
+    dit((clg(U.C, G.id) || {}).acces === false, 'et ne voit plus le classement du groupe');
+    dit(creer(U.C, 'Autre').raison === 'abonnement' && entrer(U.E, G.code).raison === 'abonnement', 'ni ne crée ni n\'entre dans un groupe');
+    ADM("update public.vrm_reglages set valeur = '0' where cle = 'abonnement_obligatoire'; truncate public.abonnements;");
+    dit(sortir(U.C, G.id).quitte === true && clg(U.C, G.id).erreur === 'groupe' && ventesDe(clg(U.B, G.id), 'C') === undefined, 'C quitte le groupe : il n\'y est plus, et ne le lit plus');
+    dit(entrer(U.C, G.code).ok === true && ventesDe(clg(U.B, G.id), 'C') === 2, 'il peut y revenir avec le code');
+  });
+
+  await essaie('020 : changer le code', () => {
+    dit(nouveauCode(U.B, G.id).raison === 'pas-createur', 'un membre qui n\'a pas créé le groupe ne change pas le code');
+    const r = nouveauCode(U.A, G.id);
+    dit(r && r.ok === true && /^[A-HJ-NP-Z2-9]{8}$/.test(r.code) && r.code !== G.code, 'le créateur change le code', JSON.stringify(r));
+    dit(entrer(U.E, G.code).raison === 'code', 'l\'ancien code ne marche plus');
+    dit(ventesDe(clg(U.B, G.id), 'B') === 5, 'les membres déjà dedans y restent');
+    G.code = r.code;
+  });
+
+  await essaie('020 : quitter la carte, revenir, « Fermer mon compte »', () => {
+    dit(en(U.C, 'select public.vrm_communaute_quitter();') === 't', 'C quitte la carte');
+    dit(clg(U.B, G.id).n === 2 && !carteDe(U.B).groupes.find((x) => x.id === G.id).membres.includes(pidDe.C), 'quitter la carte fait quitter le groupe (plus montré, plus compté)');
+    const neuf = J(U.C, "select public.vrm_communaute_rejoindre('MembreC', 'Cancale', 'FR', 48.68, -1.85);").pid;
+    dit(neuf !== pidDe.C && carteDe(U.C).groupes.length === 0, 'revenir sur la carte ne fait rentrer dans AUCUN groupe');
+    const n = Number(Q(SERVEUR + `select public.vrm_communaute_effacer('${U.A}');`));
+    dit(n > 0, 'la clé de service efface A (le créateur)', String(n));
+    const g = carteDe(U.B).groupes.find((x) => x.id === G.id);
+    dit(g && !g.membres.includes(pidDe.A) && clg(U.B, G.id).n === 1, 'A n\'apparaît plus dans le groupe');
+    dit(ADM(`select count(*) from public.vrm_communaute_membres m join public.vrm_communaute_profils p on p.pid = m.pid where p.owner = '${U.A}'`) === '0'
+      && ADM(`select count(*) from public.vrm_communaute_membres where pid = '${pidDe.A}' and (select count(*) from public.vrm_communaute_profils where pid = '${pidDe.A}') > 0`) === '0',
+      'aucune adhésion ne se relie plus à son compte');
+    dit(entrer(U.E, G.code).ok === true, 'le groupe continue de marcher pour les autres (le code reste valable)');
+  });
+
+  await essaie('020 : la vérification voit une garde touchée', () => {
+    const touche = (nom, sql, partie) => {
+      const db = 't20_' + nom.replace(/-/g, '_');
+      fraiche(db, 'c20');
+      ADM(sql);
+      const v = verifier20(db);
+      dit(v.ok === false && v.ecarts.includes(partie), `--verifier (020) voit « ${nom} » (${partie})`, JSON.stringify(v.ecarts));
+    };
+    touche('groupes-lisibles', 'grant select on public.vrm_communaute_groupes to authenticated;', 'droits');
+    touche('membres-rls', 'alter table public.vrm_communaute_membres no force row level security;', 'rls');
+    touche('creer-anon', 'grant execute on function public.vrm_communaute_groupe_creer(text) to anon;', 'fonctions');
+    touche('calc-ouvert', 'grant execute on function public.vrm_communaute_classement_calc(text, uuid) to authenticated;', 'fonctions');
+    touche('groupe-forme', 'alter table public.vrm_communaute_groupes add column createur_email text;', 'forme');
+    touche('classement-019', fs.readFileSync(MIG19, 'utf8').split('-- ── 8. LE CLASSEMENT')[1].split('-- ── 9.')[0].replace(/^[^\n]*\n[^\n]*\n[^\n]*\n/, ''), 'fonctions');
     DB = 'base';
   });
 }
