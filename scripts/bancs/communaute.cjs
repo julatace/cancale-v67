@@ -483,6 +483,11 @@ async function partie019(nav) {
       const largeur = await pg.evaluate(() => document.documentElement.scrollWidth);
       dit(largeur <= 390, 'aucun débordement horizontal à 390 px', String(largeur));
       await pg.waitForSelector('[data-cm-pin]', { timeout: 15000 });
+      const geo = await pg.evaluate(() => { const c = document.querySelector('[data-cm-carte]'); const r = c.getBoundingClientRect(); const t = document.querySelector('.leaflet-tile');
+        return { zoom: getComputedStyle(c).zoom, haut: Math.round(r.top), vh: innerHeight, tuile: t ? Math.round(t.getBoundingClientRect().width) : null }; });
+      dit(geo.zoom === '1' || geo.zoom === 'normal', 'téléphone : aucun zoom CSS posé sur le conteneur de Leaflet (il ne sait pas le compter, Safari surtout)', JSON.stringify(geo));
+      dit(geo.haut < geo.vh * 0.6, 'téléphone : la carte est dans le premier écran, pas sous la barre du bas', JSON.stringify(geo));
+      dit(geo.tuile == null || geo.tuile === 256, 'téléphone : une tuile fait 256 px affichés (carte pas grossie)', JSON.stringify(geo));
       if (process.env.BANC_DEBUG) { console.log(await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin]').getBoundingClientRect(); const e = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return JSON.stringify(b) + ' ' + (e && e.outerHTML.slice(0, 200)); })); await pg.screenshot({ path: process.env.BANC_DEBUG + '/b390.png', fullPage: true }); }
       await pg.click('[data-cm-pin]');
       await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
