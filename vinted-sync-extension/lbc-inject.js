@@ -5,6 +5,23 @@
 // background. Un mouchard note aussi les chemins d'API vus (pour brancher juste).
 (function () {
   'use strict';
+  // 20 octobre (Orion iPhone, tout navigateur qui ignorerait `world: "MAIN"`
+  // dans le manifeste) : ce fichier tournerait alors dans le monde ISOLÉ — où
+  // envelopper fetch/XHR ne voit RIEN de la page, en silence. Le signe est
+  // sûr : seul un script de contenu isolé voit `chrome.runtime.id`, et il n'a
+  // pas de `document.currentScript`. Dans ce cas on se pose dans la page par
+  // une balise <script> (ressource web-accessible), comme inject.js sur Vinted.
+  // Sur Chrome et Firefox (monde MAIN honoré) rien ne change.
+  try {
+    const rt = (typeof chrome !== 'undefined' && chrome && chrome.runtime) || null;
+    if (!document.currentScript && rt && rt.id && typeof rt.getURL === 'function') {
+      const s = document.createElement('script');
+      s.src = rt.getURL('lbc-inject.js');
+      s.onload = function () { this.remove(); };
+      (document.head || document.documentElement).appendChild(s);
+      return;
+    }
+  } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
   const post = (payload) => { try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {} };

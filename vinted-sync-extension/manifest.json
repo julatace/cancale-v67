@@ -159,6 +159,14 @@
     },
     {
       "resources": [
+        "vc-inject.js"
+      ],
+      "matches": [
+        "https://*.vestiairecollective.com/*"
+      ]
+    },
+    {
+      "resources": [
         "logo-vrm-96.png",
         "popup.html"
       ],

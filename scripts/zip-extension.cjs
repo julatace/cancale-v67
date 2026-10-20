@@ -24,6 +24,8 @@ const iStore = args.indexOf('--store');
 const store = iStore >= 0 ? path.resolve(args[iStore + 1] || '') : '';
 const iFx = args.indexOf('--firefox');
 const firefox = iFx >= 0 ? path.resolve(args[iFx + 1] || '') : '';
+const iSa = args.indexOf('--safari');
+const safari = iSa >= 0 ? path.resolve(args[iSa + 1] || '') : '';
 const COMPAT = 'compat-firefox.js';
 
 // ── LE MANIFESTE FIREFOX (Firefox 128+, ordinateur et Android) ─────────────
@@ -62,6 +64,43 @@ function manifesteFirefox(m) {
   return f;
 }
 
+// ── LE MANIFESTE SAFARI (Mac et iPhone, 20 octobre) ─────────────────────────
+// Safari n'installe pas un zip : il faut une app conteneur, faite sur un Mac
+// avec Xcode (`xcrun safari-web-extension-converter VRM-safari/`), signée par
+// un compte développeur Apple (docs/boutiques-extension.md). Ce paquet est le
+// DOSSIER prêt à passer au convertisseur. Ce qui change (source : données de
+// compatibilité de MDN, browser-compat-data) :
+//  · `background.scripts` + `persistent: false` : Safari iOS n'accepte qu'un
+//    fond NON persistant (service worker, ou page non persistante) ; la page
+//    permet de poser `compat-firefox.js` devant, comme Firefox ;
+//  · `downloads` retiré des permissions : Safari ne l'a pas (le bordereau a
+//    deux autres portes : l'API Vinted et inject.js) ;
+//  · `strict_min_version` 16.4 : le premier Safari où le fond déclare son type ;
+//    le monde MAIN des scripts de contenu n'arrive qu'en Safari 18 — avant,
+//    lbc-inject.js et vc-inject.js se posent eux-mêmes dans la page ;
+//  · `externally_connectable` GARDÉ : Safari le prend en charge (matches seuls).
+function manifesteSafari(m) {
+  const f = JSON.parse(JSON.stringify(m));
+  const fond = f.background && f.background.service_worker;
+  f.background = { scripts: [COMPAT, fond || 'background.js'], persistent: false };
+  f.permissions = (f.permissions || []).filter((p) => p !== 'downloads');
+  f.browser_specific_settings = { safari: { strict_min_version: '16.4' } };
+  for (const cs of f.content_scripts || []) {
+    if (cs.world === 'MAIN') continue;
+    if (Array.isArray(cs.js) && cs.js[0] !== COMPAT) cs.js = [COMPAT, ...cs.js];
+  }
+  return f;
+}
+// La fenêtre de l'icône charge ses scripts elle-même : la compatibilité d'abord.
+function compatDansPopup(dossier) {
+  const ph = path.join(dossier, 'popup.html');
+  const html = fs.readFileSync(ph, 'utf8');
+  if (html.includes(COMPAT)) return;
+  const n = html.replace(/<script\b/i, `<script src="${COMPAT}"></script>\n<script`);
+  if (n === html) throw new Error('popup.html : aucune balise <script> où poser la compatibilité');
+  fs.writeFileSync(ph, n);
+}
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-zip-'));
 try {
   const dossier = path.join(tmp, 'VRM-extension');
@@ -84,16 +123,23 @@ try {
     fs.copyFileSync(path.join(__dirname, 'extension-firefox', COMPAT), path.join(fx, COMPAT));
     const m = JSON.parse(fs.readFileSync(path.join(fx, 'manifest.json'), 'utf8'));
     fs.writeFileSync(path.join(fx, 'manifest.json'), JSON.stringify(manifesteFirefox(m), null, 2) + '\n');
-    // La fenêtre de l'icône charge ses scripts elle-même : la compatibilité d'abord.
-    const ph = path.join(fx, 'popup.html');
-    const html = fs.readFileSync(ph, 'utf8');
-    if (!html.includes(COMPAT)) {
-      const n = html.replace(/<script\b/i, `<script src="${COMPAT}"></script>\n<script`);
-      if (n === html) throw new Error('popup.html : aucune balise <script> où poser la compatibilité Firefox');
-      fs.writeFileSync(ph, n);
-    }
+    compatDansPopup(fx);
     fs.rmSync(firefox, { force: true });
     execFileSync('zip', ['-qrX', firefox, ...fs.readdirSync(fx)], { cwd: fx });
     console.log('✓', firefox, '(Firefox ordinateur et Android : addons.mozilla.org)');
+  }
+  if (safari) {
+    const sa = path.join(tmp, 'VRM-safari');
+    fs.cpSync(dossier, sa, { recursive: true });
+    fs.rmSync(path.join(sa, 'README.md'), { force: true });
+    fs.copyFileSync(path.join(__dirname, 'extension-firefox', COMPAT), path.join(sa, COMPAT));
+    const m = JSON.parse(fs.readFileSync(path.join(sa, 'manifest.json'), 'utf8'));
+    fs.writeFileSync(path.join(sa, 'manifest.json'), JSON.stringify(manifesteSafari(m), null, 2) + '\n');
+    compatDansPopup(sa);
+    fs.rmSync(safari, { force: true });
+    // Un zip qui se dézippe en UN dossier (`VRM-safari/`) : c'est ce dossier
+    // qu'on donne au convertisseur d'Apple.
+    execFileSync('zip', ['-qrX', safari, 'VRM-safari'], { cwd: tmp });
+    console.log('✓', safari, '(Safari Mac et iPhone : dossier à convertir avec Xcode)');
   }
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

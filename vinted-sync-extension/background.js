@@ -57,6 +57,44 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const VINTED_DOMAINS = ['www.vinted.fr', 'www.vinted.com', 'www.vinted.it', 'www.vinted.de'];
 
+// ══════════════════════════════════════════════════════════════════════════
+// CE QUE CE NAVIGATEUR SAIT FAIRE — MESURÉ, JAMAIS DEVINÉ (20 octobre, Orion)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome ».
+// Orion (Kagi) a SA propre implémentation des API d'extension, et sur iOS
+// Apple en limite la portée : sa liste officielle n'est pas joignable d'ici,
+// et rien ne dit que `cookies`, `alarms`, `scripting` (monde MAIN),
+// `downloads` ou `externally_connectable` y marchent. On ne lit donc PAS
+// l'agent utilisateur : on regarde, une fois, ce qui EXISTE ici. Une API
+// présente garde le chemin de Chrome à l'identique ; une API absente prend un
+// chemin de remplacement qui garde la FONCTION :
+//   · cookies   → la page Vinted les donne au script de contenu (`vrm-cookies`) ;
+//   · alarms    → minuteries + rattrapage daté dans `chrome.storage.local`
+//                 (iOS suspend le fond : rien ne se perd, tout repart au réveil) ;
+//   · scripting (monde MAIN) → le relais de la page (content.js ↔ inject.js) ;
+//   · downloads → les deux autres portes du bordereau (API Vinted, inject.js) ;
+//   · externally_connectable → le pont de la page (comme Firefox).
+// Ce qui ne se remplace pas est DIT à l'app (`nav` dans l'état du pont).
+function mesurerCapacites() {
+  const fn = (o, k) => { try { return !!(o && typeof o[k] === 'function'); } catch (_) { return false; } };
+  const ev = (o) => { try { return !!(o && typeof o.addListener === 'function'); } catch (_) { return false; } };
+  let c = null; try { c = (typeof chrome !== 'undefined' && chrome) || null; } catch (_) { c = null; }
+  c = c || {};
+  return {
+    cookies: fn(c.cookies, 'get'),
+    cookiesEvt: ev(c.cookies && c.cookies.onChanged),
+    alarms: fn(c.alarms, 'create') && ev(c.alarms && c.alarms.onAlarm),
+    scripting: fn(c.scripting, 'executeScript'),
+    downloads: ev(c.downloads && c.downloads.onCreated),
+    tabsMsg: fn(c.tabs, 'sendMessage'),
+    externe: ev(c.runtime && c.runtime.onMessageExternal),
+    popup: fn(c.action, 'setPopup'),
+  };
+}
+const CAP = mesurerCapacites();
+// `executeScript` existe mais refuse le monde MAIN (constaté au premier essai).
+let CAP_MAIN_REFUSE = false;
+
 // ── COMPTE VENDEUR (multi-vendeurs) ────────────────────────────────────────
 // Une fois la base passee en multi-vendeurs, la cle publique « anon » n'a plus
 // le droit d'ecrire : chaque ligne doit porter le compte de son proprietaire.
@@ -683,10 +721,54 @@ function jwtPayload(token) {
   try { const p = token.split('.')[1]; const j = b64urlDecode(p); return j ? JSON.parse(j) : null; } catch (_) { return null; }
 }
 function getCookie(domain, name) {
+  // Orion iPhone : sans API `cookies`, la page Vinted les donne (voir `vrm-cookies`).
+  if (!CAP.cookies) return cookieDeLaPage(domain, name);
   return new Promise((resolve) => {
     try { chrome.cookies.get({ url: `https://${domain}`, name }, (c) => resolve(c ? c.value : null)); }
     catch (_) { resolve(null); }
   });
+}
+// ── LES COOKIES DE SESSION, LUS PAR LA PAGE (navigateur sans API `cookies`) ──
+// Le script de contenu de vinted.fr lit `document.cookie` (ce que la page voit
+// elle-même) et l'envoie ici ; on le range dans `chrome.storage.local` (§4.9 :
+// iOS suspend le fond, une variable de module ne survivrait pas). Seuls les
+// trois noms utiles sont acceptés, seulement depuis un onglet Vinted, et pour
+// SON domaine. ⚠️ Si Vinted pose ces cookies en HttpOnly, la page ne les voit
+// pas : la session reste « pas vue », et c'est DIT à l'app (`nav`), jamais
+// remplacé par une identité devinée.
+const COOKIES_PAGE_STORE = 'vrmCookiesPage';
+const COOKIES_UTILES = ['access_token_web', 'refresh_token_web', 'anon_id'];
+async function cookieDeLaPage(domain, name) {
+  try {
+    const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {};
+    const d = o[String(domain || '')];
+    const v = d && d.c && d.c[name];
+    return typeof v === 'string' && v ? v : null;
+  } catch (_) { return null; }
+}
+let cookiesPageTimer = null;
+async function recevoirCookiesPage(msg, sender) {
+  if (CAP.cookies) return { ok: true, ignore: true };
+  let hote = ''; try { hote = new URL(String((sender && sender.tab && sender.tab.url) || (sender && sender.url) || '')).hostname; } catch (_) {}
+  if (!VINTED_DOMAINS.includes(hote) || String(msg.domain || '') !== hote) return { ok: false, raison: 'site' };
+  const c = {};
+  const src = msg.c && typeof msg.c === 'object' ? msg.c : {};
+  for (const k of COOKIES_UTILES) if (typeof src[k] === 'string' && src[k].length > 0 && src[k].length <= 8192) c[k] = src[k];
+  let avant = null;
+  try {
+    const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {};
+    avant = o[hote] || null;
+    o[hote] = { c, vu: !!c.access_token_web, at: Date.now() };
+    await chrome.storage.local.set({ [COOKIES_PAGE_STORE]: o });
+  } catch (_) { return { ok: false, raison: 'stockage' }; }
+  // L'équivalent de `cookies.onChanged` : une session qui change (connexion,
+  // bascule de compte, renouvellement) relance la capture, comme sur Chrome.
+  const change = !avant || (avant.c || {}).access_token_web !== c.access_token_web || (avant.c || {}).refresh_token_web !== c.refresh_token_web;
+  if (change && c.access_token_web) {
+    clearTimeout(cookiesPageTimer);
+    cookiesPageTimer = setTimeout(() => { captureDomain(hote).then(() => runActive()).catch(() => {}); }, 2000);
+  }
+  return { ok: true, vu: !!c.access_token_web };
 }
 
 // ⚠️ UNE ÉCRITURE RATÉE SE DIT AVEC SON CODE (4 octobre, 5.155). `supabaseUpsert`
@@ -1638,6 +1720,16 @@ async function storeHarvest(domain, type, id, body) {
 // --- Messages venant de content.js ----------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Navigateur sans `alarms` (Orion iPhone) : chaque réveil rattrape les
+  // tâches périodiques en retard (iOS a pu suspendre le fond entre-temps).
+  if (!CAP.alarms) rattraperMinuteries();
+  // Navigateur sans API `cookies` : la page Vinted donne les siens (voir
+  // `recevoirCookiesPage`). Sur Chrome, `veux` répond non et rien d'autre ne part.
+  if (msg && msg.from === 'vrm-cookies') {
+    if (msg.action === 'veux') { sendResponse({ ok: true, veux: !CAP.cookies }); return true; }
+    recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   if (!msg || msg.from !== 'cancale-content') {
     // FRAÎCHEUR : pour chaque compte, quand ses annonces ont-elles été captées
     // pour la dernière fois ? C'est LA question qui compte — un compte capté
@@ -3657,6 +3749,77 @@ async function ongletVinted(prefere) {
     return (tabs || []).find((t) => ongletEstVinted(t) && t.status === 'complete') || null;
   } catch (_) { return null; }
 }
+// ── LE RELAIS DE LA PAGE : « exécuter dans le monde MAIN » SANS `scripting` ──
+// (Orion iPhone, 20 octobre.) Chrome injecte la fonction dans la page
+// (`executeScript`, world MAIN) : la requête part DE LA PAGE, avec ses cookies.
+// Un navigateur qui n'a pas `scripting`, ou qui refuse le monde MAIN, garde la
+// même fonction — exécutée ici — mais chacune de ses requêtes part de la page
+// par le relais : fond → content.js (`chrome.tabs.sendMessage`, sinon une
+// boîte aux lettres dans `chrome.storage.local`) → inject.js (monde MAIN, déjà
+// posé par une balise `<script>`) → `fetch` de la page. Mêmes requêtes, même
+// origine, même file Vinted (`requeteVinted`), mêmes garde-fous (§3).
+// Sur Chrome, `executerMain` fait exactement l'appel d'avant : rien ne change.
+const PAGE_REQ_STORE = 'vrmPageReq', PAGE_REP_STORE = 'vrmPageRep';
+const reponsePage = (o) => (o && typeof o === 'object')
+  ? { status: Number(o.status) || 0, ok: !!o.ok, origine: String(o.origine || ''),
+      json: async () => { if (o.json === undefined || o.json === null) throw new Error('vide'); return o.json; } }
+  : { status: 0, ok: false, origine: '', json: async () => { throw new Error('rien'); } };
+function demandeParStockage(req, fin) {
+  let ecoute = null;
+  try {
+    ecoute = (ch, zone) => {
+      try {
+        if (zone !== 'local' || !ch || !ch[PAGE_REP_STORE]) return;
+        const v = ch[PAGE_REP_STORE].newValue;
+        if (!v || v.id !== req.id) return;
+        try { chrome.storage.onChanged.removeListener(ecoute); } catch (_) {}
+        try { chrome.storage.local.remove(PAGE_REP_STORE); } catch (_) {}
+        fin(v);
+      } catch (_) {}
+    };
+    chrome.storage.onChanged.addListener(ecoute);
+    chrome.storage.local.set({ [PAGE_REQ_STORE]: Object.assign({}, req, { at: Date.now() }) });
+  } catch (_) { try { if (ecoute) chrome.storage.onChanged.removeListener(ecoute); } catch (_) {} fin(null); }
+}
+function fetchParLaPage(tabId, p, headers) {
+  const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const req = { vrm: 'fetchPage', id, p: String(p || ''), h: (headers && typeof headers === 'object') ? headers : {} };
+  return new Promise((res) => {
+    let fini = false, t = null;
+    const fin = (o) => { if (fini) return; fini = true; clearTimeout(t); res(reponsePage(o)); };
+    t = setTimeout(() => fin(null), 25000);
+    if (CAP.tabsMsg && tabId != null) {
+      try {
+        chrome.tabs.sendMessage(tabId, req, (o) => {
+          void (chrome.runtime && chrome.runtime.lastError);
+          if (o && typeof o === 'object' && o.id === id) fin(o); else demandeParStockage(req, fin);
+        });
+        return;
+      } catch (_) {}
+    }
+    demandeParStockage(req, fin);
+  });
+}
+async function executerMain(tabId, func, args) {
+  if (CAP.scripting && !CAP_MAIN_REFUSE) {
+    try { return await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args, func }); }
+    catch (e) {
+      const m = String((e && e.message) || e || '');
+      // Un refus ORDINAIRE (onglet fermé, page qui navigue) reste un refus, comme avant.
+      if (!/world|MAIN|unsupported|not supported|not implemented|is not a function|Unexpected property/i.test(m)) throw e;
+      CAP_MAIN_REFUSE = true;
+      try { noterDiag('nav_main_refuse'); } catch (_) {}
+    }
+  }
+  let loc = null;
+  try { const t = await chrome.tabs.get(tabId); loc = new URL(String((t && t.url) || '')); } catch (_) { loc = null; }
+  const relais = {
+    fetch: (p, init) => fetchParLaPage(tabId, p, init && init.headers),
+    location: loc ? { hostname: loc.hostname, origin: loc.origin } : { hostname: '', origin: '' },
+  };
+  try { noterDiag('nav_relais_page'); } catch (_) {}
+  return [{ result: await func(...(args || []), relais) }];
+}
 async function lecteurPublic(domain) {
   let tabId = ((await ongletVinted(null)) || {}).id;
   const csrf = lastCsrfByDomain[domain] || '';
@@ -3668,12 +3831,14 @@ async function lecteurPublic(domain) {
     tabId = tab.id;
     return requeteVinted('public', async () => {
       try {
-        const res = await chrome.scripting.executeScript({
-          target: { tabId }, world: 'MAIN', args: [chemin, csrf],
-          func: async (p, csrfTok) => {
+        const res = await executerMain(tabId, async (p, csrfTok, __relais) => {
+            // `__relais` n'existe que hors de Chrome (navigateur sans monde MAIN) :
+            // la même fonction, ses requêtes passent par la page (`executerMain`).
+            const L = __relais ? __relais.location : (typeof location !== 'undefined' ? location : null);
+            const fetch = __relais ? __relais.fetch : globalThis.fetch;
             // Hors de Vinted, AUCUNE requête : un fetch relatif partirait chez l'autre site.
-            const hote = String((typeof location !== 'undefined' && location.hostname) || '');
-            const origine = String((typeof location !== 'undefined' && location.origin) || '');
+            const hote = String((L && L.hostname) || '');
+            const origine = String((L && L.origin) || '');
             if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };
             try {
               const h = { accept: 'application/json' };
@@ -3682,8 +3847,7 @@ async function lecteurPublic(domain) {
               let json = null; try { json = await r.json(); } catch (_) {}
               return { status: r.status, ok: r.ok, json, origine };
             } catch (_) { return { status: 0, ok: false, json: null, origine }; }
-          },
-        });
+          }, [chemin, csrf]);
         const o = res && res[0] && res[0].result;
         if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null };
         // La réponse ne vient pas de Vinted : « rien lu » — jamais une pause Vinted.
@@ -4370,11 +4534,9 @@ async function pageActiveFetch() {
   // boîte, porte-monnaie, une trentaine de requêtes après le refus.
   const rep = await requeteVinted('page', async () => {
    try {
-    const res = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world: 'MAIN',
-      args: [csrf, knownPid],
-      func: async (csrfTok, knownPidArg) => {
+    const res = await executerMain(tab.id, async (csrfTok, knownPidArg, __relais) => {
+        // Hors de Chrome (sans monde MAIN), ses requêtes partent par la page.
+        const fetch = __relais ? __relais.fetch : globalThis.fetch;
         let frein = 0;                        // Vinted a dit « ralentis » : plus rien ne part
         const get = async (p) => {
           if (frein) return null;
@@ -4441,8 +4603,7 @@ async function pageActiveFetch() {
         // est deja connecte — c'est le meme profil de trafic qu'une visite.
         const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
         return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
-      },
-    });
+      }, [csrf, knownPid]);
     const o = res && res[0] && res[0].result;
     // Le statut que la file regarde : le frein reçu dans la page, sinon « lu ».
     return { status: (o && o.frein) || (o ? 200 : 0), ok: !!o, out: o || null };
@@ -4721,42 +4882,73 @@ function alarmeSiAbsente(nom, opts) {
     chrome.alarms.get(nom, (a) => { void (chrome.runtime && chrome.runtime.lastError); if (!a) { try { chrome.alarms.create(nom, opts); } catch (_) {} } });
   } catch (_) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
 }
-try {
-  // Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
-  // (assez pour etre a jour, assez espace pour rester discret).
-  alarmeSiAbsente('cancale-sync', { periodInMinutes: 10 });
-  alarmeSiAbsente('cancale-active', { periodInMinutes: 20 });
-  // ⚠️ ENTRETIEN DE LA SESSION VENDEUR. Le jeton d'accès dure ~1 h ; il n'était
-  // renouvelé qu'au moment d'écrire, et SEULEMENT si la base est cloisonnée.
-  // Une fois la migration passée, une extension restée ouverte sans écrire
-  // aurait laissé mourir son jeton, puis serait retombée sur la clé publique —
-  // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
-  // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
-  alarmeSiAbsente('vrm-session', { periodInMinutes: 40 });
-  // Photos des annonces : tant qu'un onglet Vinted est ouvert, on complète tout
-  // seul, sans attendre une navigation (Julien, 29 sept.). Voir `tickPhotos`.
-  alarmeSiAbsente('vrm-photos', { periodInMinutes: 1 });
-  // 5.183 : le relais du téléphone — 30 s, le minimum de Chrome. Rien ne part
-  // sans session VRM (voir `relaisTick`).
-  alarmeSiAbsente('vrm-relais', { periodInMinutes: 0.5 });
-  chrome.alarms.onAlarm.addListener((a) => {
-    if (a.name === 'cancale-sync') captureAllAccounts();
-    else if (a.name === 'cancale-active') runActive();
-    else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
-    else if (a.name === 'vrm-photos') tickPhotos();
-    else if (a.name === 'vrm-relais') relaisTick('alarme');
-    // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
-    // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
-    // une longue période calme attendrait la prochaine capture pour être écrit.
-    majTampon(() => {});
-    // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
-    // session) repart ici — la file vit dans `chrome.storage.local`.
-    viderSuppressions();
-    // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
-    // 30 s) partent ici si le service worker s'est endormi entre-temps.
-    try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
-  });
-} catch (_) {}
+// Les tâches périodiques : nom → minutes. UNE liste pour les deux chemins.
+// Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
+// (assez pour etre a jour, assez espace pour rester discret).
+// ⚠️ ENTRETIEN DE LA SESSION VENDEUR (`vrm-session`, 40 min). Le jeton d'accès
+// dure ~1 h ; il n'était renouvelé qu'au moment d'écrire, et SEULEMENT si la
+// base est cloisonnée. Une fois la migration passée, une extension restée
+// ouverte sans écrire aurait laissé mourir son jeton, puis serait retombée sur
+// la clé publique — c'est-à-dire, sous RLS, plus aucune capture enregistrée,
+// en silence. 40 min : bien avant l'heure, et rien ne part sans session.
+// Photos des annonces (`vrm-photos`, 1 min) : tant qu'un onglet Vinted est
+// ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
+// 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
+// Rien ne part sans session VRM (voir `relaisTick`).
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5 };
+function surAlarme(a) {
+  if (a.name === 'cancale-sync') captureAllAccounts();
+  else if (a.name === 'cancale-active') runActive();
+  else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+  else if (a.name === 'vrm-photos') tickPhotos();
+  else if (a.name === 'vrm-relais') relaisTick('alarme');
+  // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
+  // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
+  // une longue période calme attendrait la prochaine capture pour être écrit.
+  majTampon(() => {});
+  // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
+  // session) repart ici — la file vit dans `chrome.storage.local`.
+  viderSuppressions();
+  // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
+  // 30 s) partent ici si le service worker s'est endormi entre-temps.
+  try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
+}
+// ── SANS `chrome.alarms` (Orion iPhone, 20 octobre) ─────────────────────────
+// Des minuteries tant que le fond est éveillé, ET la date du dernier passage de
+// chaque tâche dans `chrome.storage.local` : iOS suspend le fond dès que
+// l'écran se verrouille ou que l'onglet passe derrière ; au réveil (n'importe
+// quel message, un onglet qui charge), ce qui est en retard repart UNE fois —
+// jamais une rafale de rattrapage (une tâche en retard de 3 h tourne une fois).
+// Les garde-fous de chaque tâche (garde, plafonds, file Vinted, pause) sont
+// ceux de Chrome : seule l'horloge change.
+const MINUTERIES_STORE = 'vrmMinuteries';
+let _rattrapageA = 0, _rattrapageEnCours = false;
+async function rattraperMinuteries(force) {
+  if (CAP.alarms || _rattrapageEnCours) return;
+  if (!force && Date.now() - _rattrapageA < 15000) return;
+  _rattrapageEnCours = true; _rattrapageA = Date.now();
+  try {
+    let vus = {};
+    try { vus = (await chrome.storage.local.get(MINUTERIES_STORE))[MINUTERIES_STORE] || {}; } catch (_) { return; }   // stockage illisible : on ne rejoue rien
+    const maintenant = Date.now(), dus = [];
+    for (const nom of Object.keys(PERIODES)) {
+      const der = Number(vus[nom]) || 0;
+      if (maintenant - der >= PERIODES[nom] * 60000 - 1000) { dus.push(nom); vus[nom] = maintenant; }
+    }
+    if (!dus.length) return;
+    try { await chrome.storage.local.set({ [MINUTERIES_STORE]: vus }); } catch (_) { return; }   // noté AVANT d'agir : pas de double tour
+    for (const nom of dus) { try { surAlarme({ name: nom }); } catch (_) {} }
+  } finally { _rattrapageEnCours = false; }
+}
+if (CAP.alarms) {
+  try {
+    for (const nom of Object.keys(PERIODES)) alarmeSiAbsente(nom, { periodInMinutes: PERIODES[nom] });
+    chrome.alarms.onAlarm.addListener(surAlarme);
+  } catch (_) {}
+} else {
+  try { setInterval(() => { rattraperMinuteries(true); }, 30000); } catch (_) {}
+  rattraperMinuteries(true);
+}
 
 // ── CAPTURE À CHAQUE VISITE SUR VINTED ──────────────────────────────────────
 // Demande de Julien : « à chaque fois que je vais sur Vinted, l'extension capte
@@ -5593,9 +5785,31 @@ async function etatPourApp() {
   //    récent que lui, voir `rechargerSiCodePerime`) ; `ext` = l'identifiant de
   //    CETTE extension, à qui l'app adresse sa session (jamais à toutes).
   let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {}
+  // 20 octobre : ce que CE navigateur n'a pas (Orion iPhone…), mesuré par
+  // l'extension elle-même. Absent sur Chrome (tout est là) : l'état est inchangé.
+  const nav = await avecDelai(etatNavigateur(), 300, null).catch(() => null);
   return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
     vintedPasSu ? { vintedPasSu: true } : {},
-    pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {});
+    pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
+    nav ? { nav } : {});
+}
+// `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
+// `indispo` : rien ne la remplace ICI, aujourd'hui — l'app le dit, une fois.
+//   · `cookies` : la page Vinted n'a montré aucune session (déconnecté, ou
+//     cookies invisibles aux scripts) — sans elle, rien ne se capte.
+//   · `cookies-passu` : le stockage n'a pas répondu (« pas su », pas « non »).
+async function etatNavigateur() {
+  const remplace = [], indispo = [];
+  if (!CAP.cookies) {
+    let vu = null;
+    try { const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {}; vu = Object.keys(o).some((k) => o[k] && o[k].vu); } catch (_) { vu = null; }
+    if (vu === true) remplace.push('cookies'); else indispo.push(vu === null ? 'cookies-passu' : 'cookies');
+  }
+  if (!CAP.alarms) remplace.push('alarms');
+  if (!CAP.scripting || CAP_MAIN_REFUSE) remplace.push('scripting');
+  if (!CAP.downloads) remplace.push('downloads');
+  if (!CAP.externe) remplace.push('externe');
+  return (remplace.length || indispo.length) ? { remplace, indispo } : null;
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
