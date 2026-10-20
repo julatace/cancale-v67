@@ -10261,7 +10261,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **95 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -10674,6 +10674,40 @@ iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expér
 - **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
   Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).
 
+### Fiabilité de l'extension, mesurée chez lui (19 octobre, 5.193)
+**Mesuré** (lecture seule, `panel_diag_capture`, extension installée **5.188**,
+captures du 17-18 oct. sur 7 comptes) : `ecriture_ratee_vinted_accounts_400` ×82,
+`ecriture_ratee_harvest_{txn,conv,inbox,seen_urls,profile}_400` (~40),
+`forme_inconnue_champ_conversation` ×246 avec `cles=[code,message,message_code]`,
+`conversation_lecture_ou_forme_ratee` ×206, `photos_page_refuse_429` ×15,
+`label_ko_statuts_200_200_200` ×32 (Vinted répond sans URL : pas un défaut de code).
+Quatre défauts, reproduits sur le vrai `background.js` (`audit-fiabilite-fond.cjs`,
+22 contrôles, **14 rouges sur la 5.192**, `--prouve` : 5/5 mutations rouges) :
+- ⚠️⚠️ **Base cloisonnée, session VRM morte ou en pause ⇒ écriture vouée au 400.**
+  `withOwner` sans `owner`, clé publique, cible `id`/`vinted_user_id` (aucun index
+  unique) : la capture perdue, une requête pour rien. Et la session était relue
+  par ligne puis pour l'en-tête (un renouvellement en route mélangeait `owner` et
+  clé publique). `supabaseUpsert` lit la session UNE fois ; cloisonnée sans
+  session ⇒ rien ne part, diagnostic `ecriture_ratee_<famille>_sans_session`, et
+  le logo dit « ta session VRM n'a pas pu être renouvelée » (plus « ça réessaie
+  tout seul »). `null` (pas su) garde le comportement d'avant.
+- **Un refus de Vinted (`code ≠ 0` + `message_code`) n'est plus une capture**
+  (`estErreurVinted`) : ni fausse alerte « Format d'un site », ni ligne rangée, ni
+  recul de la base dans la moisson ; compté `ignore_erreur_vinted_<type>`.
+- **`vinted_item_details` : une écriture à la fois** (`unItemDetailsALaFois`) —
+  la capture photo réécrivait la ligne depuis sa copie du début de boucle et
+  EFFAÇAIT une fiche rangée entre-temps (page ouverte, clic « Publier ») ; deux
+  `saveItemDetail` simultanés aussi. Elle relit au moment d'écrire et ne pose que
+  ses fiches ; relecture ratée ⇒ rien écrit, les annonces seront relues.
+- **Capture photo : un 429/403/401/coupure ne pose plus le mémo de 6 h**
+  (`memoApresEchec`, la règle des codes de retrait) et arrête la boucle.
+- ⚠️ Onze audits servaient une base « cloisonnée » (sonde de schéma à 200) **sans
+  session** — une forme où la production répond 400 (§6.3) : ils fournissent
+  maintenant une session (`ctx.authToken`).
+- **Geste de Julien** : installer la 5.193 (remplacer le dossier, puis ⟳ dans
+  chaque Chrome) ; s'il voit « session VRM n'a pas pu être renouvelée » sur le
+  logo, cliquer le logo pour se reconnecter.
+
 ### Messages : une offre en attente passe devant (19 octobre)
 Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.
 
@@ -10685,3 +10719,9 @@ Relecture adverse des chemins qui coûtent de l'argent (N° tamponné, double ve
 - `audit-urssaf.cjs` et `audit-ebay-route.cjs` chargent `commandeEbayEngagee` (§6.3).
 - **Rejetés après vérification** : `label_latest` sans transaction (la transaction est exigée), ordre de `numForBord`, lot d'impression (gardé par la version de numérotation et les N° à vérifier), URSSAF (arrondi une fois), bénéfice Leboncoin/eBay (passait déjà par l'engagement).
 - ⚠️ **Noté, pas corrigé (session eBay)** : le CA et le bénéfice eBay lisent `pricingSummary.total`, port compris — contraire à §2.8 et à la décision « l'argent que tu reçois » (dû au vendeur − frais). Non mesuré : 0 commande eBay en base, aucune facture manuelle, forme réelle de `cancelState` non vue.
+
+### Rappel URSSAF à l'échéance (fonction retenue le 11 octobre, 20 octobre)
+Le rappel du 30 septembre partait le 1er de chaque mois, sans date ni montant, quel que soit le rythme (trimestriel : deux rappels sur trois pour rien), même pour une période déjà notée « déclaré ». Une règle, `rappelUrssaf` (module, à côté d'`aPayerUrssaf`) : la période de la prochaine échéance (`nextUrssafDeadline`, rythme `vinted_urssaf_freq`) doit être FINIE ; tous ses mois notés dans `vrm_urssaf_declare` ⇒ rien ; rappel les 3 premiers jours du mois ET les 7 derniers jours avant l'échéance (ambre). Montant : la ligne publiée `vinted_urssaf_mois` (mois de la période seulement, `aPayerUrssaf`) ; absente ⇒ aucun montant (« se calcule dans Ventes ») ; ventes sans date de versement ⇒ « au moins ». Ma journée : action `data-job="urssaf"`, `data-urssaf-echeance` (AAAA-MM-JJ local), `data-urssaf-apayer`. Aucun cron, aucune notification serveur (le « rappel la veille au soir » reste à trancher par Julien). Preuves : `audit-rappel-urssaf.cjs` (14 contrôles, `--mutation=rythme|declare|zero|fenetre` 2 · 2 · 2 · 3 rouges) ; banc `rappel-urssaf.cjs` 8 rouges sur le build d'avant, 2 sous la mutation « registre ignoré ».
+- **Mesuré, pas construit — « achats à vérifier avant la date limite »** (lecture seule, 20 oct.) : la date limite existe, mais UNIQUEMENT dans le message d'action « Confirmation nécessaire » d'une conversation captée (`entity.subtitle` « d'ici le 21 sept. 15:59 », `interpolation_values.subtitle.return_shipment_date`, sans année ; « tu disposeras de 2 jours »). Vu dans **2 conversations sur ~1 400**, toutes deux anciennes ; les commandes et les transactions n'ont aucun champ de date limite ; **14 achats sur 581** ont leur conversation captée ; aucun achat n'est aujourd'hui dans l'état « livré, à confirmer ». ⚠️ `transaction.current_user_side` vaut « seller » sur ces deux achats où il est l'acheteur : ne pas s'y fier. Pour le construire, l'extension doit lire la conversation des achats livrés (comme `capterRetraits` le fait pour les colis au relais) — chantier extension.
+- **Pas construit — « fiche prête à l'arrivée d'un achat »** : rien ne relie un achat à une paire par identité (§5 « prix d'achat : aucun pont automatique » — il rephotographie ses paires) ; une fiche pré-remplie depuis l'achat serait un rapprochement deviné. À définir avec lui.
+

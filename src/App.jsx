@@ -61,7 +61,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.192.0';
+const EXT_ATTENDUE = '5.193.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -4532,6 +4532,45 @@ const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
   if (ca == null || !isFinite(Number(ca))) return null;
   const centimes = Math.round(Number(ca) * 100);
   return Math.round(Number((centimes * Number(tauxPct) / 100).toFixed(6))) / 100;
+};
+// ── RAPPEL URSSAF À L'ÉCHÉANCE (20 octobre) ──────────────────────────────
+// Le rappel du 30 septembre (« une notification le 1er de chaque mois ») ne
+// regardait ni le RYTHME (trimestriel : deux rappels sur trois pour une
+// déclaration qui n'existe pas encore), ni l'échéance, ni ce qu'il a DÉJÀ noté
+// « déclaré ». UNE règle (§11) : la période de la prochaine échéance
+// (`nextUrssafDeadline`) doit être FINIE, pas déjà notée dans le registre
+// (`vrm_urssaf_declare`, tous ses mois) ; on la rappelle les 3 premiers jours
+// du mois ET les 7 derniers jours avant l'échéance. Le montant vient de la
+// ligne PUBLIÉE (`vinted_urssaf_mois`) — absente : aucun montant, jamais 0 ;
+// des ventes sans date de versement : « au moins » (§5).
+// Rend null (rien à rappeler) ou { text, sub, label, dueIso, daysLeft, ca, apayer, partiel }.
+const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, taux = tauxUrssaf() } = {}) => {
+  const due = nextUrssafDeadline(freq, now);
+  if (!due) return null;
+  if (_startOfDay(now) <= _startOfDay(due.periodEnd)) return null; // période pas finie : rien à déclarer encore
+  const yms = [];
+  for (let d = new Date(due.periodStart.getFullYear(), due.periodStart.getMonth(), 1); d <= due.periodEnd; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    yms.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  if (declare && typeof declare === 'object' && yms.length && yms.every((ym) => moisDeclare(declare, ym))) return null;
+  const proche = due.daysLeft <= 7;
+  if (!(now.getDate() <= 3 || proche)) return null;
+  let ca = null, apayer = null, partiel = false;
+  if (ligne && Array.isArray(ligne.mois)) {
+    ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
+    apayer = aPayerUrssaf(ca, taux);
+    partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0);
+  }
+  const date = due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  const quand = due.daysLeft <= 0 ? "aujourd'hui" : due.daysLeft === 1 ? 'demain' : `dans ${due.daysLeft} jours`;
+  const text = proche
+    ? `Déclaration URSSAF ${due.label} à faire avant le ${date} (${quand})`
+    : `Nouveau mois : déclaration URSSAF ${due.label} à faire avant le ${date}`;
+  const eur = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+  const sub = apayer == null
+    ? 'Le montant se calcule dans Ventes (ouvre-le une fois).'
+    : `${partiel ? 'Au moins ' : ''}${eur(ca)} reçus · à payer ≈ ${partiel ? 'au moins ' : ''}${eur(apayer)}`;
+  return { text, sub, label: due.label, dueIso: `${due.dueDate.getFullYear()}-${String(due.dueDate.getMonth() + 1).padStart(2, '0')}-${String(due.dueDate.getDate()).padStart(2, '0')}`, daysLeft: due.daysLeft, ca, apayer, partiel, proche };
 };
 // ── BÉNÉFICE BRUT ET NET (19 octobre) — UNE règle, deux écrans (§11) ────────
 // L'écran Ventes (`totals`) et Comptabilité (« Ton bénéfice ») passent par ici :
@@ -34185,7 +34224,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
-          else jobs.push({id:'a-faire-'+a.ic, n:a.n, icon:a.ic||'info', color:C.text, title:a.text, tab:a.tab, prio:3});
+          else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf});
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -34298,7 +34337,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      « brouillon ». La couleur reste sur l'icône et le chevron —
                      elle sert à reconnaître la nature de l'action, pas à
                      repeindre un quart de l'écran. */
-                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
@@ -46351,9 +46390,11 @@ function AppCoeur() {
       // jours suivants, pour qui n'ouvre pas l'app le 1er). Julien, 30 sept. :
       // « enlève la déclaration URSSAF, envoie simplement une notification le
       // premier de chaque mois pour la faire, pas besoin de la laisser ».
+      // (20 oct.) À L'ÉCHÉANCE : même notification, mais selon SON rythme, son
+      // échéance et ce qu'il a déjà noté « déclaré » — `rappelUrssaf` (une règle).
       {
-        const j=new Date().getDate();
-        if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'compta', jr:true});
+        const r=rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() });
+        if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'compta', jr:true, job:'urssaf', urssaf:r});
       }
       setNotifItems(items);
       // Le mémo des conversations reste borné (les plus récentes gardées).
