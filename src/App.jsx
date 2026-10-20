@@ -5724,7 +5724,7 @@ function vmrExec(q, timeoutMs = 15000) {
   if (q && String(q.method || 'POST').toUpperCase() !== 'GET' && relaisVivant()) return relaisExec(q);
   return sondageConnu().then(() => vmrExecUn(q, timeoutMs));
 }
-function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
+function vmrExecUn({ uid, method, endpoint, body, confirme }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
     // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
@@ -5748,7 +5748,8 @@ function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
     };
     const to = setTimeout(() => { cleanup(); resolve(dernier || { ok: false, error: 'timeout' }); }, timeoutMs);
     window.addEventListener('message', onMsg);
-    try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body }, '*'); }
+    // 19 oct. : `confirme` part avec (accepter une offre : l'extension l'exige).
+    try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body, confirme: confirme === true }, '*'); }
     catch (e) { cleanup(); resolve({ ok: false, error: String(e) }); }
   });
 }
