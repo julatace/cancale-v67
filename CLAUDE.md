@@ -10209,6 +10209,37 @@ captures et liste les cibles < 44 px) :
   commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
   que si toutes ses lignes sont reliées.
 
+### « Ton bénéfice » dans Ma journée, sur son choix (20 octobre)
+Julien : « la possibilité de mettre le bénéfice dans Ma journée ». Aucun mécanisme
+de cartes personnalisables n'existait : un réglage dédié.
+- **Facultatif** : `vrm_journee_benefice` (SYNC_KEYS, défaut **éteint**, rattrapé
+  par `onCloudReady` seulement s'il est resté à `false`, `useBeneficeJournee`).
+  Le geste est dans Ma journée (« + Afficher ton bénéfice dans Ma journée », en
+  bas, discret ; « Masquer de Ma journée » sur la carte) et dans Réglages →
+  Affichage (`BeneficeJourneeSetting`, interrupteur).
+- **Aucun second calcul (§11)** : la carte de Comptabilité et celle de Ma journée
+  passent par le MÊME crochet `useBeneficeCalcul(compta, periode)` (publication
+  `vrm_benefice_jours`, charges `vrm_compta`, CA déclaré publié, `beneficePeriode`).
+  Ma journée dit le **mois** (brut, net final, couverture « prix d'achat connus
+  pour X ventes sur Y », raison du « — » : achats · frais eBay · CA déclaré) et
+  **aujourd'hui** (`beneficeDesJours` sur la même publication : brut et net des
+  ventes ; charges et cotisations se comptent au mois). Jamais publié ⇒ « se
+  calcule dans l'écran Ventes », aucun montant. Lien « Détail › » vers
+  Comptabilité. Aucune couleur (§7). Attributs `data-journee-benef-*`.
+- ⚠️ Ma journée est elle-même un lecteur des ventes (`Comptabilite only="journee"`)
+  et PUBLIE le bénéfice dès que les ventes sont lues : « pas de publication » ne
+  se voit que si les ventes sont illisibles ou sur un appareil qui n'a rien lu.
+- Preuves : banc `scripts/bancs/benefice-journee.cjs` (port `BANC_PORT`, données
+  inventées, 1512 et 390 tactile, 52 contrôles ; il GARDE la ligne `main` écrite
+  par l'app) — absente par défaut, geste dans Ma journée, « pas su » sans
+  publication, brut/net/couverture/raison = Comptabilité (prix complets + une
+  charge fixe, puis un prix manquant), Réglages l'éteint. **26 rouges sur le
+  build d'origin/main** (§6.1) ; mutation « second calcul divergent » (charges
+  ignorées dans Ma journée) ⇒ 2 rouges (net 86,13 € contre 66,13 €).
+- Non mesuré : sa vraie base (données inventées) ; un choix basculé puis la page
+  rechargée en moins de ~1,3 s revient à l'ancien (délai d'envoi au nuage, comme
+  tout réglage synchronisé).
+
 ### La vente eBay arrive dans Colis, Ma journée, la cloche, le widget et le rappel du matin (19 octobre, agent eBay K7 en partie)
 « Rien ne se passe après une vente eBay » (etat.md) : une commande eBay payée n'était visible que dans eBay → Ventes. État K par K, lu dans le code : `docs/passation/notes/agent-ebay/etat.md` (en tête).
 - **Une règle** `colisEbay` (`api/_lib/ebay-a-expedier.js`, importée par l'app ET le serveur, §11) : à poster = `etatCommandeEbay(o).peutExpedier`, pas d'annulation demandée, un envoi (`fulfillmentInstructionsType` SHIP_TO ou absent — jamais un colis caché) ; « Ne poste pas » = annulation demandée (inconnue ⇒ demandée) ; date limite `lineItemFulfillmentInstructions.shipByDate` (ancien nom lu en repli — `ebay-agent.js` ne lisait que lui) ; authentification d'eBay signalée. `null` = pas su, jamais `[]`.
