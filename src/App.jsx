@@ -61,7 +61,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.195.0';
+const EXT_ATTENDUE = '5.197.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11925,6 +11925,13 @@ function LignePanne({ children }) {
 // non empaquetée » — et proposait de TÉLÉCHARGER un zip sur un téléphone, où il
 // ne sert à rien. La seule ligne vraie (« fais-le sur un ordinateur ») était en
 // tout petit, tout en bas.
+// Les clés d'une RÉPONSE D'ERREUR de Vinted (corps `{code, message,
+// message_code, errors, payload}`) : un échantillon de « dérive de forme » qui
+// n'a QUE celles-là est un refus, pas un renommage (voir État des connexions).
+const CLES_ERREUR_VINTED = new Set(['code', 'message', 'message_code', 'errors', 'payload']);
+function estCorpsErreurVinted(cles) {
+  return Array.isArray(cles) && cles.length > 0 && cles.includes('message_code') && cles.every(k => CLES_ERREUR_VINTED.has(String(k)));
+}
 function useSansSouris() {
   const lire = () => {
     try {
@@ -44676,7 +44683,13 @@ function ConnexionsSetting() {
       const recents = Object.keys(rates)
         .filter(k => /^forme_/.test(k))
         .map(k => ({ type: k.slice('forme_'.length), ...(rates[k] || {}) }))
-        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; });
+        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; })
+        // 20 oct. : un échantillon dont les clés sont celles d'une RÉPONSE
+        // D'ERREUR de Vinted (`code`, `message`, `message_code`…) n'est pas un
+        // renommage : c'est un refus, jugé à tort comme une conversation par les
+        // extensions < 5.193 (mesuré chez Julien : 250 fausses alertes). On ne
+        // le montre pas comme « un site a changé son format ».
+        .filter(x => !estCorpsErreurVinted(x.cles));
       setDrift(recents);
     } catch (_) { setDerniereExt(null); setDrift(null); }
   })(); }, []);
