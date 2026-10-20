@@ -21,7 +21,13 @@
 //      dessine ; injoignable ⇒ la même communauté en liste.
 //  Le faux PostgREST applique les RÈGLES de la 018 (§6.3). Le VRAI api/compte.js
 //  est exécuté pour `?mode=communaute`. Aucune fixture : tout est inventé ici.
-//  BANC_MUTATION=bloque-ecrit | opt-in : le faux réaffaiblit une règle ⇒ ROUGE.
+//  019 : le pseudo Discord (facultatif, validé, montré aux membres visibles) et
+//  le CLASSEMENT opt-in (jour · semaine · mois · année) du nombre de ventes —
+//  compté par la base : le navigateur n'envoie que la période ; zéro inscrit ⇒
+//  « sois le premier » ; panne ⇒ « pas pu lire le classement » ; base sans la
+//  019 ⇒ « pas encore activé », et aucune ligne Discord.
+//  BANC_MUTATION=bloque-ecrit | opt-in | classement-tous | discord-cache :
+//  le faux réaffaiblit une règle ⇒ ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 const { execFileSync } = require('child_process');
@@ -61,20 +67,46 @@ const SECRETS = [A, Bu, ...Object.values(USERS).flatMap((u) => [u.email, u.login
 
 // ── La base : les RÈGLES de la 018, en JS ────────────────────────────────────
 let B;
-const reset = ({ installe = true, panne = false } = {}) => { B = { installe, panne, profils: {}, convs: [], msgs: [], blocages: [], signalements: [], journal: [], reponses: [] }; };
+const reset = ({ installe = true, panne = false, installe19 = true, panneClassement = false } = {}) => { B = { installe, panne, installe19, panneClassement, profils: {}, convs: [], msgs: [], blocages: [], signalements: [], journal: [], reponses: [], ventes: {}, argsClassement: [] }; };
+const FONCTIONS_019 = ['vrm_communaute_discord', 'vrm_communaute_classement_inscrire', 'vrm_communaute_classement'];
 const arr = (x) => Math.round(Math.round(Number(x) * 20) / 20 * 100) / 100;
 let nId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nId++).padStart(12, '0')}`;
 const bloque = (qui, cible) => B.blocages.some((b) => b.qui === qui && b.bloque === cible);
 const autreDe = (c, moi) => (c.a === moi ? c.b : c.a);
 function rpc(fn, args, uid) {
+  if (!B.installe19 && FONCTIONS_019.includes(fn)) return undefined;
+  if (fn === 'vrm_communaute_discord') {
+    if (!B.profils[uid]) return { ok: false, raison: 'invisible' };
+    const d = String(args.p_discord || '').trim().toLowerCase();
+    if (d && (!/^[a-z0-9._]{2,32}$/.test(d) || d.includes('..'))) return { ok: false, raison: 'discord' };
+    B.profils[uid].discord = d || null; return { ok: true, discord: d || null };
+  }
+  if (fn === 'vrm_communaute_classement_inscrire') {
+    if (!B.profils[uid]) return { ok: false, raison: 'invisible' };
+    B.profils[uid].classement = args.p_oui === true; return { ok: true, classement: args.p_oui === true };
+  }
+  if (fn === 'vrm_communaute_classement') {
+    B.argsClassement.push(args);
+    const per = String(args.p_periode || '');
+    if (!['jour', 'semaine', 'mois', 'annee'].includes(per)) return { acces: true, erreur: 'periode' };
+    // Le CHIFFRE vient de la base (ici : B.ventes), jamais de l'appel.
+    const membres = Object.entries(B.profils).filter(([o, p]) => MUTATION === 'classement-tous' || p.classement)
+      .map(([o, p]) => ({ o, p, ventes: ((B.ventes[o] || {})[per]) || 0 })).sort((x, y) => y.ventes - x.ventes || (x.p.cree_le < y.p.cree_le ? -1 : 1));
+    const rangs = membres.map((m) => ({ ...m, rang: 1 + membres.filter((z) => z.ventes > m.ventes).length }));
+    const me = rangs.find((m) => m.o === uid);
+    return { acces: true, periode: per, debut: '2026-10-20T00:00:00+02:00', fin: '2026-10-21T00:00:00+02:00', visible: !!B.profils[uid], inscrit: !!(B.profils[uid] && B.profils[uid].classement),
+      n: rangs.length, moi: me ? { rang: me.rang, ventes: me.ventes } : null,
+      lignes: rangs.filter((m) => !bloque(uid, m.o)).map((m) => ({ rang: m.rang, pid: m.p.pid, pseudo: m.p.pseudo, ville: m.p.ville, pays: m.p.pays, ventes: m.ventes, moi: m.o === uid })) };
+  }
   if (fn === 'vrm_communaute_carte') {
     const moi = B.profils[uid];
     const tous = Object.entries(B.profils);
     if (MUTATION === 'opt-in') for (const u of Object.keys(USERS)) if (!B.profils[u]) tous.push([u, { pid: 'p-' + u.slice(0, 4), pseudo: 'Revendeur', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' }]);
     const premier = (p) => !tous.some(([, q]) => q.pays === p.pays && q.ville.toLowerCase() === p.ville.toLowerCase() && q.cree_le < p.cree_le);
-    return { acces: true, moi: moi ? { pid: moi.pid, pseudo: moi.pseudo, ville: moi.ville, pays: moi.pays, lat: moi.lat, lon: moi.lon, depuis: moi.cree_le } : null,
-      profils: tous.filter(([o]) => !bloque(uid, o)).map(([o, p]) => ({ pid: p.pid, pseudo: p.pseudo, ville: p.ville, pays: p.pays, lat: p.lat, lon: p.lon, moi: o === uid, premier: premier(p) })) };
+    const plus19 = (p, champs) => (B.installe19 ? Object.fromEntries(champs.map((k) => [k, k === 'classement' ? !!p[k] : (p[k] || null)])) : {});
+    return { acces: true, moi: moi ? { pid: moi.pid, pseudo: moi.pseudo, ville: moi.ville, pays: moi.pays, lat: moi.lat, lon: moi.lon, depuis: moi.cree_le, ...plus19(moi, ['discord', 'classement']) } : null,
+      profils: tous.filter(([o]) => !bloque(uid, o)).map(([o, p]) => ({ pid: p.pid, pseudo: p.pseudo, ville: p.ville, pays: p.pays, lat: p.lat, lon: p.lon, moi: o === uid, premier: premier(p), ...plus19(p, MUTATION === 'discord-cache' ? [] : ['discord']) })) };
   }
   if (fn === 'vrm_communaute_rejoindre') {
     const ps = String(args.p_pseudo || '').trim() || 'Revendeur', vi = String(args.p_ville || '').trim();
@@ -147,6 +179,7 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
       if (!B.installe) return json({ code: 'PGRST202', message: `Could not find the function public.${fn}` }, 404);
       if (B.panne) return { status: 522, body: '<html>522 Connection timed out</html>', headers: { 'content-type': 'text/html' } };
       if (!uid) return json({ message: 'permission denied' }, 401);
+      if (B.panneClassement && fn === 'vrm_communaute_classement') return { status: 522, body: '<html>522</html>', headers: { 'content-type': 'text/html' } };
       const args = (corps && corps.json) || {};
       const r = rpc(fn, args, uid);
       if (r === undefined) return json({ code: 'PGRST202' }, 404);
@@ -237,6 +270,99 @@ async function rejoindreParNom(pg, ville) {
   await pg.click(`[data-cm-ville-choix]`);
   await pg.click('[data-cm-valider]');
   await pg.waitForSelector('[data-cm-moi="visible"]', { timeout: 8000 });
+}
+
+// ── 019 : Discord et classement ──────────────────────────────────────────────
+const posePersonnes = () => {
+  reset();
+  B.profils[A] = { pid: uuid(), pseudo: 'Alice', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-19T00:00:00Z' };
+  B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z', discord: 'bruno.vrm', classement: true };
+  B.ventes[A] = { jour: 2, semaine: 3, mois: 12, annee: 40 };
+  B.ventes[Bu] = { jour: 5, semaine: 7, mois: 9, annee: 30 };
+};
+const vers = async (pg, vue) => { await pg.click(`[data-cm-vue="${vue}"]`); await pg.waitForSelector(`[data-cm-vue-active="${vue}"]`, { timeout: 8000 }); };
+const classementLu = (pg) => pg.waitForFunction(() => { const e = document.querySelector('[data-cm-classement]'); return e && e.getAttribute('data-cm-classement') !== 'charge'; }, null, { timeout: 10000 });
+async function partie019(nav) {
+  for (const [largeur, sombre] of [[1512, false], [390, true]]) {
+    console.log(`\n── 019 · ${largeur} px${sombre ? ' tactile, sombre' : ''} · le pseudo Discord`);
+    await essaie(`discord ${largeur}`, async () => {
+      posePersonnes();
+      const { ctx, pg } = await ouvrir(nav, { qui: A, largeur, sombre });
+      dit(await attr(pg, '[data-cm-mon-discord]', 'data-cm-mon-discord') === 'non', 'Discord est vide par défaut (facultatif)');
+      await pg.click('[data-cm-discord-ajouter]');
+      await pg.fill('[data-cm-discord-champ]', 'a..b');
+      await pg.click('[data-cm-discord-valider]');
+      await pg.waitForSelector('.vrm-cm-discord-moi .vrm-cm-msg', { timeout: 5000 });
+      dit(!B.profils[A].discord, 'un pseudo Discord invalide est refusé (rien d’enregistré)', String(B.profils[A].discord));
+      await pg.fill('[data-cm-discord-champ]', '@Alice.VRM');
+      await pg.click('[data-cm-discord-valider]');
+      await pg.waitForSelector('[data-cm-mon-discord="oui"]', { timeout: 8000 });
+      dit(B.profils[A].discord === 'alice.vrm', 'un pseudo valide est enregistré (le @ de tête retiré, en minuscules)', String(B.profils[A].discord));
+      await pg.waitForSelector('[data-cm-pin]', { timeout: 15000 }).catch(() => {});
+      if (await pg.$('[data-cm-pin]')) {
+        await pg.click('[data-cm-pin]');
+        await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
+        dit(!!(await pg.$('[data-cm-discord="bruno.vrm"]')), 'le pseudo Discord de Bruno est montré aux membres visibles');
+        await pg.click('.vrm-cm-x');
+      } else dit(false, 'la carte n’a pas d’épingle à toucher');
+      await pg.click('[data-cm-discord-retirer]');
+      await pg.waitForSelector('[data-cm-mon-discord="non"]', { timeout: 8000 });
+      dit(B.profils[A].discord === null, '« Retirer » efface le pseudo Discord');
+      const largeurPage = await pg.evaluate(() => document.documentElement.scrollWidth);
+      dit(largeurPage <= largeur, 'aucun débordement horizontal', String(largeurPage));
+
+      console.log(`── 019 · ${largeur} px · le classement`);
+      await vers(pg, 'classement'); await classementLu(pg);
+      dit(await attr(pg, '[data-cm-inscrit]', 'data-cm-inscrit') === 'non', 'opt-in : Alice n’est pas dans le classement par défaut');
+      const lignes0 = await pg.$$eval('[data-cm-ligne]', (e) => e.map((x) => x.getAttribute('data-cm-ligne-moi')));
+      dit(lignes0.length === 1 && lignes0[0] === 'non', 'elle voit Bruno (inscrit), pas elle-même', JSON.stringify(lignes0));
+      dit((await pg.$eval('[data-cm-ligne]', (e) => e.getAttribute('data-cm-ligne-ventes'))) === '7', 'le chiffre est celui de la base (cette semaine : 7)');
+      pg.once('dialog', (d) => d.accept());
+      await pg.click('[data-cm-classement-entrer]');
+      await pg.waitForSelector('[data-cm-inscrit="oui"]', { timeout: 8000 });
+      await classementLu(pg);
+      dit(B.profils[A].classement === true, 'elle entre dans le classement sur son geste (confirmé)');
+      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '2' && /Tu es\s*2ᵉ\s*sur 2/.test(await texte(pg)), '« Tu es 2ᵉ sur 2 » cette semaine');
+      dit(await attr(pg, '[data-cm-ligne-moi="oui"]', 'data-cm-ligne-ventes') === '3', 'sa ligne est mise en avant avec SES ventes (3)');
+      await pg.click('[data-cm-periode="mois"]'); await classementLu(pg);
+      await pg.waitForFunction(() => document.querySelector('[data-cm-rang-moi]') && document.querySelector('[data-cm-rang-moi]').getAttribute('data-cm-rang-moi') === '1', null, { timeout: 8000 }).catch(() => {});
+      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '1' && /1er/.test(await texte(pg)), 'ce mois : elle passe 1re (12 contre 9)');
+      dit(B.argsClassement.length > 0 && B.argsClassement.every((a) => Object.keys(a).join() === 'p_periode'), 'le navigateur n’envoie QUE la période — jamais un chiffre', JSON.stringify(B.argsClassement.slice(-2)));
+      dit(!/€/.test(await pg.$eval('[data-cm-classement]', (e) => e.innerText)), 'aucun montant dans le classement');
+      const dom = await pg.evaluate(() => document.documentElement.outerHTML);
+      dit(sansSecret(dom).length === 0, 'aucun email ni identifiant de compte dans le DOM', sansSecret(dom).join(', '));
+      if (sombre) {
+        const l = await pg.evaluate(() => { const c = document.querySelector('[data-cm-classement] .vrm-cm-carton'); const v = (getComputedStyle(c).backgroundColor.match(/[\d.]+/g) || []).map(Number); return (v[0] + v[1] + v[2]) / 3; });
+        dit(l < 40, 'mode sombre : le classement est sombre', String(l));
+      }
+      const lp = await pg.evaluate(() => document.documentElement.scrollWidth);
+      dit(lp <= largeur, 'classement : aucun débordement horizontal', String(lp));
+      if (process.env.BANC_DEBUG) await pg.screenshot({ path: `${process.env.BANC_DEBUG}/classement${largeur}.png`, fullPage: true });
+      await pg.click('[data-cm-classement-sortir]');
+      await pg.waitForSelector('[data-cm-inscrit="non"]', { timeout: 8000 });
+      dit(B.profils[A].classement === false, '« Me retirer du classement » sur son geste');
+      await ctx.close();
+    });
+  }
+  for (const [nom, prep, attendu, phrase] of [
+    ['zéro inscrit', () => { posePersonnes(); B.profils[Bu].classement = false; }, 'lu', /Personne n’est encore dans le classement/],
+    ['panne du classement', () => { posePersonnes(); B.panneClassement = true; }, 'pas-su', /pas pu lire le classement/],
+    ['base sans la 019', () => { posePersonnes(); B.installe19 = false; }, 'non-installe', /Le classement n’est pas encore activé sur ta base/],
+  ]) {
+    console.log(`\n── 019 · 390 px · ${nom}`);
+    await essaie(nom, async () => {
+      prep();
+      const { ctx, pg } = await ouvrir(nav, { qui: A, largeur: 390 });
+      if (nom === 'base sans la 019') dit(!(await pg.$('[data-cm-mon-discord]')), 'sans la 019 : aucune ligne Discord (rien qu’on ne puisse enregistrer)');
+      await vers(pg, 'classement'); await classementLu(pg);
+      dit(await attr(pg, '[data-cm-classement]', 'data-cm-classement') === attendu, `${nom} : état « ${attendu} »`, await attr(pg, '[data-cm-classement]', 'data-cm-classement'));
+      const t = await texte(pg);
+      dit(phrase.test(t), `${nom} : la phrase est dite`, t.slice(0, 200).replace(/\n/g, ' '));
+      dit((await pg.$$('[data-cm-ligne]')).length === 0, `${nom} : aucune ligne de classement affichée`);
+      if (nom !== 'zéro inscrit') dit(!/Personne n’est encore dans le classement/.test(t), `${nom} : jamais « personne » sur un classement qu’on n’a pas lu`);
+      await ctx.close();
+    });
+  }
 }
 
 (async () => {
@@ -412,6 +538,7 @@ async function rejoindreParNom(pg, ville) {
       dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'Leaflet injoignable : la communauté est listée, rien n’est caché');
       await ctx.close();
     });
+    await partie019(nav);
   } finally {
     await nav.close(); srv.close();
   }

@@ -13,6 +13,10 @@
 //   POST { action: 'bloquer', conv, oui }
 //   POST { action: 'signaler', conv, raison }
 //   POST { action: 'ville', q } | { action: 'ville', lat, lon }
+//   POST { action: 'discord', discord }        (019 — vide ⇒ retiré)
+//   POST { action: 'classement', periode }     (019 — jour|semaine|mois|annee ; le
+//                                               chiffre est COMPTÉ par la base)
+//   POST { action: 'inscrire', oui }           (019 — opt-in au classement)
 // TROIS ÉTATS, JAMAIS DEUX :
 //   · 200 `ok: true`                — lu / fait ;
 //   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
@@ -44,7 +48,13 @@ const RAISONS = {
   'tu-as-bloque': 'Tu as bloqué cette personne. Débloque-la pour lui écrire.',
   'plafond-heure': '20 messages par heure au plus — réessaie un peu plus tard.',
   'plafond-jour': '5 nouvelles conversations par jour au plus — réessaie demain.',
+  discord: 'Ce pseudo Discord ne va pas : 2 à 32 caractères, lettres minuscules, chiffres, « . » ou « _ », sans « @ ».',
 };
+export const CLASSEMENT_NON_INSTALLE = "Le classement n'est pas encore activé sur ta base.";
+export const PERIODES_CLASSEMENT = ['jour', 'semaine', 'mois', 'annee'];
+// La forme des pseudos Discord actuels (la même que la contrainte de la 019).
+export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
+export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
 
 // Arrondi à 0,05° (≈ 5 km) : le serveur n'envoie jamais plus précis, et la
 // base arrondit encore (elle refuse toute autre valeur).
@@ -154,6 +164,34 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
       : await appel('vrm_communaute_signaler', { p_conv: conv, p_raison: String(corps.raison || '').slice(0, 300) }, (x) => typeof x === 'boolean');
     if (d === undefined) return;
     return d ? dire(200, { ok: true }) : dire(409, { ok: false, erreur: 'refuse', message: action === 'signaler' ? "Je n'ai pas pu ranger ton signalement (20 par jour au plus)." : "Rien n'a changé." });
+  }
+  if (action === 'discord') {
+    const d = String((corps && corps.discord) || '').trim().toLowerCase();
+    if (d && !discordValide(d)) return refus('discord');
+    const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'inscrire') {
+    const r = await rpcEquipe('vrm_communaute_classement_inscrire', { p_oui: corps.oui === true }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, classement: r.data.classement === true }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'classement') {
+    const periode = String((corps && corps.periode) || '');
+    if (!PERIODES_CLASSEMENT.includes(periode)) return dire(400, { ok: false, erreur: 'periode', message: 'Période inconnue.' });
+    // Seule la PÉRIODE part : aucun chiffre n'est jamais transmis à la base.
+    const r = await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE });
+    if (r.etat !== 'ok') return pasSu();
+    const c = objet(r.data);
+    if (!c) return refus('session');
+    if (c.acces === false) return refus('abonnement');
+    if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
+    return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
+      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes } });
   }
   return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
 }

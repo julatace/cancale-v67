@@ -90,3 +90,24 @@
 .vrm-cm-saisie textarea { resize: vertical; }
 .vrm-cm-moderation { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
 .vrm-cm-toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%); background: var(--cm-encre); color: var(--cm-carte); padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 700; z-index: 10010; max-width: calc(100vw - 32px); }
+
+/* ── 019 : onglets Carte / Classement, Discord, classement ── */
+.vrm-cm-onglets { display: flex; gap: 4px; padding: 4px; margin: 0 0 12px; background: var(--cm-carte); border: 1px solid var(--cm-bord); border-radius: 10px; overflow-x: auto; }
+.vrm-communaute .vrm-cm-onglet { flex: 1 1 0; border: 0; background: none; color: var(--cm-doux); font-weight: 700; white-space: nowrap; min-height: 44px; }
+.vrm-communaute .vrm-cm-onglet[aria-pressed="true"] { background: var(--cm-fond); color: var(--cm-encre); box-shadow: inset 0 0 0 1px var(--cm-bord); }
+.vrm-cm-moi > .vrm-cm-discord-moi { flex: 1 1 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--cm-bord); padding-top: 10px; }
+form.vrm-cm-discord-moi { display: block !important; }
+.vrm-cm-discord { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 13px; color: var(--cm-doux); margin-top: 2px; }
+.vrm-cm-discord b { color: var(--cm-encre); }
+.vrm-cm-select { user-select: all; -webkit-user-select: all; }
+.vrm-cm-rang-moi { font-size: 15px; margin: 0 0 8px !important; }
+.vrm-cm-classement { list-style: none; padding: 0; margin: 0; }
+.vrm-cm-classement li { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; padding: 10px 8px; border-top: 1px solid var(--cm-bord); border-radius: 8px; }
+.vrm-cm-classement li:first-child { border-top: 0; }
+.vrm-cm-classement li.moi { background: var(--cm-accent-fond); border-top-color: transparent; }
+.vrm-cm-rang { font-weight: 800; font-variant-numeric: tabular-nums; }
+.vrm-cm-qui { min-width: 0; overflow: hidden; }
+.vrm-cm-qui b { display: inline; overflow-wrap: anywhere; }
+.vrm-cm-qui small { display: block; color: var(--cm-doux); font-size: 12px; }
+.vrm-cm-ventes { color: var(--cm-doux); font-size: 13px; text-align: right; white-space: nowrap; }
+.vrm-cm-ventes b { color: var(--cm-encre); font-size: 17px; font-variant-numeric: tabular-nums; }
