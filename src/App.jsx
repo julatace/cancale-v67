@@ -14,6 +14,7 @@ import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
+import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -3434,9 +3435,9 @@ function FactureSousVente({ factures, compte }) {
   if(!propres.length)return null;
   const drafts=propres.filter(i=>i.status==='draft' && i.buyerEmail);
   const inv=drafts.find(i=>i._id===choix);
-  return <div className="vrm-sale-invoice">
+  return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
     {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}}>Envoyer une facture à l'acheteur</button>
+      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></button>
       {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
         <label style={{fontSize:11}}>Choisir la facture de cette vente
           <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>
@@ -13359,7 +13360,6 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
   // en reste. Mesuré sur la piste (rien n'est supposé), eBay seulement.
   const [bords, setBords] = React.useState({ g: false, d: false });
   React.useEffect(() => {
-    if (!dark) return undefined;
     const el = refPiste.current; if (!el) return undefined;
     const mesure = () => { const g = el.scrollLeft > 2, d = el.scrollLeft + el.clientWidth < el.scrollWidth - 2; setBords((b) => (b.g === g && b.d === d) ? b : { g, d }); };
     mesure();
@@ -13367,11 +13367,11 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     window.addEventListener('resize', mesure);
     return () => { el.removeEventListener('scroll', mesure); window.removeEventListener('resize', mesure); };
   }, [dark, sections.length]);
-  const masque = dark && (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
+  const masque = (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
   return (
     <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
       <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
-        data-seg-deborde={dark ? ((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined : undefined}
+        data-seg-deborde={((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined}
         style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent, ...(masque ? { WebkitMaskImage: masque, maskImage: masque } : null) }}>
         {sections.map(([id,label,point])=>{ const on = sub===id; return (
           <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
@@ -13412,7 +13412,7 @@ function RetirerArgent({ liveStats }) {
   if (!liste) return null;
   const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
   return (
-    <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
+    <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
             ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
@@ -13528,7 +13528,7 @@ function PhotoArticleAgrandissable({src,titre,children}) {
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
-  return <button type="button" className="vrm-pickup-code" aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
+  return <button type="button" className="vrm-pickup-code" data-code-long={String(code).length > 8 ? "true" : undefined} aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
@@ -13557,8 +13557,23 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVente({ photo, titre, meta, montant, actions }) {
-  return <article className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuvert = false, ...props }) {
+  const [ouvert, setOuvert] = React.useState(initialOuvert);
+  React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
+  const panneau = React.useId();
+  return <div {...props} data-ligne-ouverte={ouvert}>
+    <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
+      <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
+      <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
+      <span className="vrm-ledger-sale-state" title={etat}>{etat}</span>
+      <span className="vrm-ledger-sale-amount">{montant}</span>
+      <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
+    </button>
+    <div className="vrm-ledger-sale-content" id={panneau}>{children}</div>
+  </div>;
+}
+function LigneVente({ photo, titre, meta, montant, actions, etat, details }) {
+  return <LigneVenteCompacte photo={photo} titre={titre} etat={etat} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -13567,7 +13582,8 @@ function LigneVente({ photo, titre, meta, montant, actions }) {
       </div>
       <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}><span className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{montant}</span>{actions}</div>
     </div>
-  </article>;
+    {details}
+  </LigneVenteCompacte>;
 }
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
 // peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
@@ -13663,7 +13679,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     const posted = estFait(o);
     return (
       <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -13682,12 +13698,12 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
         {/* ACTION PRINCIPALE — comme Vinted : un gros bouton accent. « Imprimer »
             ouvre le PDF du bordereau Leboncoin ; « Générer » ouvre la vente sur
             Leboncoin pour qu'il y soit créé (l'extension le capte ensuite). */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="vrm-lbc-package-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
           {principal === 'imprimer' && extSait('lbcpdf') === 'ok'
-            ? <button type="button" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
+            ? <button type="button" className="vrm-lbc-package-primary" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
             : principal === 'imprimer'
-            ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
-            : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
+            ? <a className="vrm-lbc-package-primary" href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
+            : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
       </div>
@@ -13790,7 +13806,7 @@ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.'
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o }) {
-  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
+  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -16086,9 +16102,9 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut}
           meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
       })}
     </div>
   </>);
@@ -21338,6 +21354,10 @@ const libererNumeroDuPlan = (plan, itemId, num) => {
 // aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
 // DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
 const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
+// (19 oct.) Colis → « Suivi et message à l'acheteur » d'une vente eBay : la
+// commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
+// monté au moment du clic) ; lue une fois, valable 30 s.
+const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
 
 // ── LA PIÈCE VUE DU DESSUS (17 oct.) ────────────────────────────────────────
 // Julien : « je veux avoir la possibilité quand on crée la pièce de la créer avec
@@ -27339,6 +27359,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états pour le CA déclaré : `undefined` en cours · `null` pas su · lu.
   const [lbcLu, setLbcLu] = useState(undefined);
   const [ebayCmd, setEbayCmd] = useState(undefined);
+  const [ebayLuA, setEbayLuA] = useState(null);       // la plus ancienne capture des commandes eBay (ms)
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
   const [versements, setVersements] = useState(undefined);
@@ -27363,8 +27384,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (9 octobre) Les commandes de TOUS ses comptes eBay : le CA déclaré
     // regarde tous les comptes, quel que soit celui affiché dans l'onglet eBay.
     // Un seul compte illisible ⇒ `null` (« pas su »), jamais un total partiel.
-    setEbayCmd(await commandesEbayTous());
+    // (19 oct.) La même lecture porte aussi la date de capture de chaque compte :
+    // Colis dit quand les commandes eBay ont été lues (une liste figée ne voit
+    // ni une nouvelle vente, ni un colis déjà parti).
+    const r = await lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders');
+    setEbayCmd((!r || r.illisibles.length) ? null : r.items);
+    if (r && !r.illisibles.length) {
+      const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
+      setEbayLuA(ts.length ? Math.min(...ts) : null);
+    }
   })(); }, []);
+  // ── LES COLIS eBAY À POSTER — UNE règle (`colisEbay`, api/_lib) pour Colis,
+  //    Ma journée, la publication `vrm_colis_aposter` (la cloche), le widget et
+  //    le rappel du matin (§11). Trois états : undefined en cours · null pas su ·
+  //    { aPoster, nePasPoster, horsEnvoi }.
+  const colisEb = useMemo(() => ebayCmd === undefined ? undefined : colisEbay(ebayCmd), [ebayCmd]);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
@@ -32352,15 +32386,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // emails de bordereau lus — sinon un colis déjà parti compterait encore.
   useEffect(() => {
     if (!Array.isArray(sales.items) || !Array.isArray(emailBords)) return;
+    // (19 oct.) Les ventes eBay à poster comptent aussi (même nombre que Colis
+    // et Ma journée). On attend leur lecture ; illisible ⇒ `ebay: null`, et le
+    // total Vinted seul est dit « au moins » par qui le lit.
+    if (colisEb === undefined) return;
     try {
-      const v = { total: toShip.length, enRetard: toShip.filter(t => t.daysLeft != null && t.daysLeft < 0).length, at: Date.now() };
+      const eb = colisEb ? colisEb.aPoster : null;
+      const v = { total: toShip.length + (eb ? eb.length : 0), enRetard: toShip.filter(t => t.daysLeft != null && t.daysLeft < 0).length + (eb ? eb.filter(x => x.jours != null && x.jours < 0).length : 0),
+        vinted: toShip.length, ebay: eb ? eb.length : null, nePasPoster: colisEb ? colisEb.nePasPoster.length : null, at: Date.now() };
       const avant = load('vrm_colis_aposter', null);
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.nePasPoster !== v.nePasPoster) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
     } catch (_) {}
-  }, [toShip, sales.items, emailBords]);
+  }, [toShip, sales.items, emailBords, colisEb]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -33894,6 +33934,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : 'Bordereau + paire au stock, coche par colis';
           tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
         }
+        // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
+        // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
+        // (c'est l'acheteur qui l'a payée, §2.8). eBay pas lu ⇒ on le dit.
+        if (colisEb && colisEb.aPoster.length) {
+          const nE = colisEb.aPoster.length, lateE = colisEb.aPoster.filter(x => x.jours != null && x.jours < 0).length;
+          const dit = `${nE} vente${nE>1?'s':''} eBay${lateE?` dont ${lateE} en retard`:''} — l'étiquette se prend dans eBay`;
+          tuiles.envoyer = toShip.length
+            ? { ...tuiles.envoyer, n: toShip.length + nE, sub: `${tuiles.envoyer.sub} · ${dit}`, alerte: tuiles.envoyer.alerte || lateE > 0, ebay: nE }
+            : { n: nE, sub: dit, alerte: lateE > 0, ebay: nE };
+        } else if (colisEb === null) {
+          tuiles.envoyer = { ...tuiles.envoyer, ebay: null, sub: `${tuiles.envoyer.n ? tuiles.envoyer.sub + ' · ' : ''}ventes eBay pas lues` };
+        } else if (colisEb) tuiles.envoyer = { ...tuiles.envoyer, ebay: 0 };
+        // « NE POSTE PAS » : l'acheteur eBay a demandé l'annulation. Un colis
+        // posté quand même, c'est une paire perdue — ça passe en tête.
+        if (colisEb && colisEb.nePasPoster.length) {
+          const nb = colisEb.nePasPoster.length;
+          jobs.push({ id:'ebay-ne-pas-poster', n:nb, icon:'alert', color:C.warn, urgent:true,
+            title:`Ne poste pas ${nb>1?`ces ${nb} colis eBay`:'ce colis eBay'}`,
+            sub:`${nb>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation — accepte ou refuse dans eBay → À traiter`,
+            tab:'cat_bord', prio:0.1 });
+        }
         // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
         // même liste que l'alerte de Colis (`cochesNonPartis`, §11). Coché, le
         // colis a quitté « Expédier N colis » — sans ça, il ne réapparaissait
@@ -34043,7 +34104,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && !premierJour && (()=>{
               const ko = nomsVentesKO.length > 0;
               const T = [
-                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || (ko && !(tuiles.envoyer && tuiles.envoyer.n)) },
+                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
                 { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
                 { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:'cat_msg', pasSu: loading || convs.items == null },
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
@@ -34054,7 +34115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const n = x.t ? x.t.n : 0;
                     const vif = !x.pasSu && n > 0;
                     return (
-                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={x.id === 'envoyer' && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
                         style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
                         <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
                         <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
@@ -34246,7 +34307,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
-              : (tuiles.envoyer && tuiles.envoyer.n === 0 && tuiles.retirer && tuiles.retirer.n === 0 && !(tuiles.messages && tuiles.messages.n > 0)
+              : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && !(tuiles.messages && tuiles.messages.n > 0)
                   ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
                   : null)
             )}
@@ -34361,6 +34422,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
+        <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
@@ -34488,6 +34550,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article · état</span><span>Montant</span></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
               Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
               recréait les 60 lignes au rendu urgent PUIS au rendu différé —
@@ -34519,7 +34582,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte photo={photo} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -34657,7 +34720,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                })()}
                </details></div>
                </div>
-              </div>
+              </LigneVenteCompacte>
             );
           }}/>; })}
         </div>
@@ -36164,10 +36227,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
-            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
+            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
-            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
+            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
+            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
@@ -36382,7 +36445,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </details>
         )}
-        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary>Stock et ajustements</summary>
+        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
               affichait un instantané périmé en le faisant passer pour du direct
@@ -36797,9 +36860,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sans ouvrir. `data-places` reste sur le contenu : le banc le
                 trouve par cet attribut (invariant : aucune case eBay). */}
             <details data-places-wrap style={{marginBottom:12}}>
-              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+              <summary aria-label="Publier aussi ailleurs" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
-                <span style={{fontSize:13,fontWeight:600,color:C.text}}>Publier aussi ailleurs</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">Publier aussi ailleurs</span><span className="vrm-label-short" aria-hidden="true">Publier</span></span>
                 <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
                 <span className="vrm-chevron" style={{fontSize:14,color:C.muted}}>›</span>
               </summary>
@@ -36838,6 +36901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))',gap:12}}>
           {annShown.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
@@ -36865,7 +36929,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
-                  <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+                  <div className="vrm-ann-ledger-info" style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
@@ -37063,7 +37127,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
-          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          // (19 oct.) Dans chaque groupe, une offre en attente passe devant : elle
+          // expire, et y répondre décide d'une vente.
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
@@ -37248,6 +37314,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ « Pas su » se DIT : sans cette ligne, une lecture ratée des emails
             rangeait chaque colis en « en attente de bordereau » avec le bouton
             « Générer », alors que son PDF était en base (§4.1 retourné). */}
+        {/* ── « NE POSTE PAS » — COMMANDE eBAY DONT L'ACHETEUR A DEMANDÉ
+            L'ANNULATION (19 oct.). En tête de Colis : un colis posté quand même,
+            c'est une paire partie pour rien. La règle est `colisEbay` (§11) ; le
+            geste (accepter / refuser) vit dans eBay → À traiter. */}
+        {colisEb && colisEb.nePasPoster.length>0 && (
+          <div data-ebay-ne-pas-poster={colisEb.nePasPoster.length} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
+            <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Ne poste pas {colisEb.nePasPoster.length>1?`ces ${colisEb.nePasPoster.length} colis eBay`:'ce colis eBay'}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{colisEb.nePasPoster.length>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation. Accepte ou refuse dans eBay → À traiter : tant que ce n'est pas tranché, le colis reste chez toi.</div>
+            {colisEb.nePasPoster.map(x => {
+              const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+              return <div key={x.compte+':'+x.orderId} data-ebay-ne-pas-poster-cmd={x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`}</div>;
+            })}
+            <button type="button" onClick={()=>onNav&&onNav('ebay_agent')} style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'0 12px',minHeight:44,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Ouvrir eBay → À traiter</button>
+          </div>
+        )}
         {emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}
         {(()=>{
           if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
@@ -37270,19 +37351,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // le PDF est en base annoncés sans bordereau. Tant que la lecture n'est
           // pas complète, on écrit « au moins » et on ne dit rien de l'attente.
           const lectureComplete = labelsPrets && emailBords!==null;
+          // (19 oct.) Les ventes eBay à poster entrent dans le total (le même
+          // nombre que Ma journée et la cloche, §11). eBay illisible ⇒ « au moins ».
+          const nEb = colisEb && colisEb.aPoster ? colisEb.aPoster.length : 0;
+          const tot = aPoster.length + nEb;
           return (
-            <div data-colis-recap={aPoster.length} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+            <div data-colis-recap={tot} data-colis-recap-vinted={aPoster.length} data-colis-recap-ebay={colisEb === undefined ? 'encours' : colisEb === null ? 'passu' : String(nEb)} className="vrm-colis-recap" style={{position:'relative',display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'18px',marginBottom:16,overflow:'hidden',boxShadow:C.shadow||'none'}}>
               <div className="vrm-colis-recap-tete" style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
                 <div style={{flex:1,minWidth:180}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                    {aPoster.length>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{aPoster.length}</span>}
-                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{aPoster.length>0 ? 'colis à envoyer' : 'Aucun colis à envoyer'}</span>
+                    {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{colisEb === null ? 'au moins ' : ''}{tot}</span>}
+                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : colisEb === null ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
                   <div style={{fontSize:12.5,color:C.muted,marginTop:8,lineHeight:1.45}}>
                     {aPoster.length>0
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
                       : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
-                      : 'Vinted ne te demande aucun envoi en ce moment.'}
+                      : nEb ? '' : 'Vinted ne te demande aucun envoi en ce moment.'}
+                    {nEb>0 && <span data-colis-recap-ebay-ligne="">{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay — l'étiquette se prend dans eBay (ci-dessous)</span>}
+                    {colisEb === null && <span data-colis-recap-ebay-ligne="passu">{tot>0?' · ':''}ventes eBay pas lues pour l'instant</span>}
                   </div>
                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
                       COLIS. Le bandeau rouge juste en dessous ne compte que
@@ -37530,6 +37617,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Avant il y avait deux listes — les emails en haut, les vraies ventes
             en bas — et la paire à envoyer se retrouvait sous un bordereau
             fantôme d'un compte supprimé. */}
+        {/* ── LES VENTES eBAY À POSTER (19 oct.) — « rien ne se passe après une
+            vente eBay ». La commande n'était visible que dans eBay → Ventes.
+            Une règle (`colisEbay`, §11), lue ici, dans Ma journée, la cloche,
+            le widget et le rappel du matin. Le N° vient du SKU `VRM-{n°}`
+            (`numLigneEbay`, jamais le titre, §5). L'étiquette se prend DANS
+            eBay : l'acheteur a payé le port, VRM n'achète rien (§2.8). La phrase
+            commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
+            distingue. */}
+        {colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
+        {colisEb && colisEb.aPoster.length>0 && (()=>{
+          const L = colisEb.aPoster, n = L.length;
+          const comptes = [...new Set(L.map(x => x.pseudo || x.compte))];
+          const plusieurs = comptes.length > 1;
+          const ageH = ebayLuA ? Math.floor((Date.now() - ebayLuA) / 3600000) : null;
+          return (
+            <div data-colis-ebay={n} className="vrm-colis-ebay" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
+              <div style={{display:'flex',flexDirection:'column',gap:4,padding:'0 2px 2px'}}>
+                <span style={{fontSize:11,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:C.muted}}>Ventes eBay à poster <span style={{color:C.text,fontVariantNumeric:'tabular-nums'}}>· {n}</span></span>
+                <span data-colis-ebay-phrase="" style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>L'étiquette se prend dans eBay : elle est prépayée par le port que l'acheteur a payé. Prends-la au moment d'imprimer — l'acheter marque la commande expédiée chez eBay.{!plusieurs && comptes[0] && comptes[0]!=='principal' ? ` Compte eBay ${comptes[0]}.` : ''}</span>
+                {ageH != null && ageH >= 6 && <span data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`} : une vente plus récente ou un colis déjà parti n'y est peut-être pas. eBay → Compte → Rafraîchir.</span>}
+              </div>
+              {L.map(x => {
+                const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+                const cell = num ? garageCellOf(garageGrid, num) : null;
+                const dl = x.jours;
+                const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
+                const urgTxt = dl==null ? 'date limite non fournie par eBay' : dl<0 ? `${-dl} j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl} j pour poster`;
+                return (
+                  <div key={x.compte+':'+x.orderId} data-colis-ebay-cmd={x.orderId} data-numero={num} data-jours={dl==null?'':String(dl)} data-compte={x.compte} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,borderRadius:12}}>
+                    <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                      <span style={{fontSize:13.5,fontWeight:700,color:C.text}}>{num ? `N°${num}` : 'Sans N°'}</span>
+                      <span style={{fontSize:13,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || `Commande ${x.orderId}`}</span>
+                      {x.articles>1 && <span style={{fontSize:12,color:C.muted}}>· {x.articles} articles</span>}
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:12,marginTop:4,color:C.muted}}>
+                      <span data-colis-ebay-urgence="" style={{color:urgCol,fontWeight:dl!=null&&dl<=1?600:400}}>{urgTxt}</span>
+                      {cell && <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>}
+                      {!num && <span data-colis-ebay-sans-num="">· annonce pas reliée à une paire (pas de SKU VRM) — vérifie la paire avant d'emballer</span>}
+                      {plusieurs && <span>· {x.pseudo || x.compte}</span>}
+                    </div>
+                    {x.authentification && <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay (garantie d'authenticité) : l'étiquette d'eBay l'y envoie, pas chez l'acheteur.</div>}
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
+                      <a data-lien-etiquette-ebay="" href={lienCommandeEbay(x.orderId)} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,boxSizing:'border-box',fontSize:13,fontWeight:600,color:C.text,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,padding:'0 14px'}}>Étiquette sur eBay ↗</a>
+                      <button type="button" data-gerer-ebay={x.orderId} onClick={()=>{ DEMANDE_EBAY_CIBLE.compte = x.compte; DEMANDE_EBAY_CIBLE.id = x.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); }}
+                        style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'0 14px',minHeight:44,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Suivi et message à l'acheteur</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
         {sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {!sales.loading && !sales.error && (()=>{
@@ -37546,6 +37685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {voirPostes ? 'Cacher' : 'Afficher'} les {nbMasquesPostes} colis marqué{nbMasquesPostes>1?'s':''} « posté{nbMasquesPostes>1?'s':''} » — ils disparaissent seuls quand Vinted confirme l'envoi
             </button>) : null;
           const ex = voirPostes ? exTout : exTout.filter(x => !estPosteT(x));
+          if (!ex.length && colisEb && colisEb.aPoster.length) return lignePostes;
           if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
               Aucun colis à envoyer.<br/>
@@ -41775,7 +41915,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
       </div>
       <button type="button"
-        onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+        className="vrm-set-connect" onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
         style={{...bouton(true),marginTop:12}}>
         Aller à l'écran de connexion
       </button>
@@ -44673,6 +44813,9 @@ function AppCoeur() {
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
   // où vivent « Retirer d'eBay » et le lien vers l'annonce Vinted.
   React.useEffect(()=>{ if(tab==='ebay_annonces'){ subVoulue.current='annonces'; setTab('plat_ebay'); } },[tab]);
+  // (19 oct.) Colis mène à eBay → Ventes (la commande à poster) et à eBay → À
+  // traiter (une annulation demandée).
+  React.useEffect(()=>{ if(tab==='ebay_agent'){ subVoulue.current='agent'; setTab('plat_ebay'); } },[tab]);
   // « Compléter les prix d'achat » (Réglages, Statistiques) mène à Vinted →
   // Annonces, la même porte que le rail — plus l'ancien écran `cat_annonces`.
   React.useEffect(()=>{ if(tab==='vinted_annonces'){ subVoulue.current='annonces'; setTab('plat_vinted'); } },[tab]);
@@ -44705,7 +44848,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','vinted_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -45076,6 +45219,10 @@ function AppCoeur() {
   // nuage seulement s'il est resté au défaut (§5.49). Un compte déconnecté
   // depuis — ou un seul compte relié — ⇒ « Tous » (rien à choisir).
   const [ebayCible,setEbayCible]=useState(null);
+  React.useEffect(()=>{ if(tab!=='ebay_ventes')return;
+    const d=DEMANDE_EBAY_CIBLE;
+    if(d.id && Date.now()-d.at<30000){ setEbayVue(d.compte||'principal'); setEbayCible({compte:d.compte||'principal',section:'ventes',id:String(d.id),itemId:null}); }
+    d.id=null; subVoulue.current='ventes'; setTab('plat_ebay'); },[tab]);
   const [ebayVue,setEbayVueBrut]=useState(()=>{ const v=load('vrm_ebay_vue','*'); return (typeof v==='string'&&v)?v:'*'; });
   useEffect(()=>onCloudReady(()=>setEbayVueBrut((v)=>v==='*'?((()=>{ const n=load('vrm_ebay_vue','*'); return (typeof n==='string'&&n)?n:'*'; })()):v)),[]);
   const setEbayVue=(v)=>{ const n=(typeof v==='string'&&v)?v:'*'; setEbayCible(null); setEbayVueBrut(n); save('vrm_ebay_vue',n); };
@@ -46297,11 +46444,11 @@ function AppCoeur() {
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
-        <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
+        <div className="vrm-global-search" style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+          <div className="vrm-global-search-head" style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
             <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
-            <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
+            <input aria-label="Rechercher un article dans VRM" type="search" autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
               style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
