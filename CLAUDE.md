@@ -10645,3 +10645,23 @@ iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expér
 
 ### Messages : une offre en attente passe devant (19 octobre)
 Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.
+
+### Revue argent de l'extension : publier sur Leboncoin, gestes Vinted (20 octobre, 5.194)
+Relecture adverse des chemins qui engagent de l'argent ou une vente. Chaque défaut a été REPRODUIT en exécutant le vrai code, il est rouge sur le code d'avant (§6.1) et rouge sous mutation.
+- **Leboncoin (`lbc.js`, `publierSansBooster`)** :
+  - un bouton de publication qui NOMME une option payante sans prix (« Publier avec le logo Urgent ») était cliqué ⇒ `NOM_BOOST` est vérifié sur le bouton (publication ET « Continuer ») ;
+  - un prix écrit « 2 EUR » passait ⇒ `PRIX_ARGENT` lit « eur » ;
+  - une option en interrupteur (`aria-pressed="true"`) n'était pas vue ⇒ elle est décochée, sinon rien ne part ;
+  - ⚠️ **un prix DÉJÀ sur la page et différent de celui de VRM** (ou illisible) laissait publier : `prixRelu` était calculé et jamais lu. Désormais `noterPrixPage` le relève (sessionStorage) et `prixRefus` bloque la publication avant ET juste avant le clic, en le disant. Le champ prend des euros (mesuré le 16 octobre) ;
+  - ⚠️ **la page rechargée après le clic recliquait** (double publication) : le clic est noté dans `vrmPublieClique:{id}` AVANT d'être fait. Stockage illisible ⇒ aucun clic.
+- **Vinted (`background.js`)** :
+  - ⚠️ une offre ACCEPTÉE par l'app partait sans confirmation : le `confirme` de l'app était jeté par `vmrExecUn` et par `bridge.js`. Il est relayé, et `executerPourApp` refuse l'acceptation sans lui (`code:'confirmation'`). Le relais du téléphone le pose seulement quand la ligne porte `confirme` ;
+  - un geste `exec` ou un bordereau en attente dans la file Vinted partait après une bascule de compte : `gardeStricte` est revérifié à son tour, DANS `avecVinted`.
+- **Preuves** :
+  - `audit-argent-lbc.cjs` (vrai Chromium, six cas, quatre mutations) ;
+  - `audit-argent-vinted.cjs` (vrai `background.js`, cinq cas, trois mutations) ;
+  - `audit-exec.cjs` et `bancs/leboncoin.cjs` mis à jour : la mutation du banc retire désormais les DEUX gardes du bouton.
+- **Examiné sans défaut confirmé** : `ebay.js` (ni prix ni catégorie posés sans formulaire vu) ; `label_latest` (déjà `audit-label-latest`) ; réponses automatiques (`audit-repondre`) ; relais (vus, échéance, confirmation, prise conditionnelle). `vintedSend` part avec le jeton du compte visé : la revérification du cookie est une défense §3, pas une vente fausse.
+- **Non mesuré** :
+  - le vrai leboncoin.fr (403 d'ici) : libellés réels des boutons et des interrupteurs, forme réelle du champ prix ;
+  - une paire vendue entre la mise en file et le clic (fenêtre de quelques secondes).
