@@ -60,6 +60,10 @@ export const lbcFinalisee = (o) => {
 
 export const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
 
+export const commandeEbayEngagee = (o) => !!o
+  && !(/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')) && !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')))
+  && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
+
 export const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 export const indexDeclarations = (reg) => {
@@ -131,6 +135,10 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
+    // du remboursement, et VRM quand il accepte une annulation :
+    // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
+    if (!commandeEbayEngagee(e)) continue;
     const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     const id = 'ebay:' + e.orderId;
     if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
@@ -167,6 +175,7 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
     const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     if (tot.currency && tot.currency !== 'EUR') continue;
     const eur = Number(tot.value), t = Date.parse(e.creationDate || '');

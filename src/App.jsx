@@ -4784,6 +4784,10 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, decl
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    // (revue argent, 19 oct.) Une commande ANNULÉE garde `PAID` (eBay le temps
+    // du remboursement, et VRM quand il accepte une annulation :
+    // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
+    if (!commandeEbayEngagee(e)) continue;
     const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     const id = 'ebay:' + e.orderId;
     if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
@@ -4858,6 +4862,7 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
     const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     if (tot.currency && tot.currency !== 'EUR') continue;
     const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
@@ -7190,6 +7195,24 @@ const numeroReprenable = (num, arch = archiveNumeros()) => { const n = String(nu
 // MÊME titre ; un numéro d'archive, jamais. La même règle que le serveur
 // (`numeroDuTitreApresCoupure`, api/email-inbound.js). Avant toute remise à
 // zéro, ou pour un email d'avant la conversion (l'histoire) : admis, comme avant.
+// ── LA FACTURE D'UN BORDEREAU, APRÈS LA REMISE À ZÉRO (revue argent, 19 oct.) ──
+// Une facture manuelle (`vinted_invoices`) se relie au bordereau par le N° de la
+// paire (`productId`). La migration 013 n'a PAS converti ces factures : une
+// facture faite AVANT la remise à zéro pour l'ancienne paire « 12 » (devenue
+// B12) portait toujours « 12 » — et partait imprimée dans le colis de la
+// NOUVELLE N°12, avec le nom et l'adresse d'un autre acheteur. Après la
+// conversion, seule une facture créée APRÈS elle désigne la nouvelle série ;
+// une date de création illisible ne désigne rien (mieux vaut un blanc qu'un faux).
+const facturesDuNumero = (invs, num, m = marqueurNumerotation()) => {
+  const n = String(num == null ? '' : num).trim(); if (!n) return [];
+  const depuis = m && !m.annule ? Date.parse(m.appliqueLe || m.coupure || '') : NaN;
+  return (Array.isArray(invs) ? invs : []).filter((i) => {
+    if (!i || String(i.productId || '').trim() !== n) return false;
+    if (!isFinite(depuis)) return true;
+    const t = Date.parse(i.createdAt || '');
+    return isFinite(t) && t >= depuis;
+  });
+};
 const numeroEmailAdmis = (b, fiches) => {
   const m = marqueurNumerotation(); const arch = archiveNumeros();
   if (!m || !arch) return true;
@@ -13101,8 +13124,11 @@ function Onboarding({ setTab }) {
 // chiffre mesuré, affiché à côté du total et de l'attente).
 function caEbayPayees(orders) {
   const arr = Array.isArray(orders) ? orders : [];
-  const paid = arr.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
-  if (!paid.length) return null;
+  const payees = arr.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
+  if (!payees.length) return null;
+  // (revue argent, 19 oct.) Une commande annulée garde `PAID` : elle n'est pas
+  // du chiffre d'affaires (même règle que le CA déclaré, `commandeEbayEngagee`).
+  const paid = payees.filter(commandeEbayEngagee);
   const totals=paid.map(o=>o.pricingSummary?.total);
   if(totals.some(t=>!t || t.currency!=='EUR' || t.value==null || String(t.value).trim()==='' || !Number.isFinite(Number(t.value)) || Number(t.value)<0))return null;
   return totals.reduce((sum,t)=>sum+Number(t.value),0);
@@ -33273,7 +33299,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const num = numForBord(b); if (!num) return null;
     let invs = [];
     try { invs = load('vinted_invoices', []) || []; } catch(_) { invs = []; }
-    const cands = invs.filter(i => String(i.productId || '').trim() === String(num));
+    const cands = facturesDuNumero(invs, num);
     if (!cands.length) return null;
     if (cands.length === 1) return cands[0];
     // Plusieurs factures pour ce N° (numéro réattribué au fil du temps) : on
@@ -40081,8 +40107,13 @@ const skuEbayDouteux = (a) => !!(a && numDeSkuEbay(a.sku) && !lienEbay(a.itemId)
 const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
+// ⚠️ (revue argent, 19 oct.) « CANCEL_REJECTED » = eBay a REFUSÉ l'annulation :
+//    la vente TIENT (le serveur la traite ainsi : `etatCommandeEbay`,
+//    `ebay-a-expedier.js`). L'ancien `/CANCEL/` la prenait pour une annulation :
+//    la paire vendue sur eBay restait « à publier » ailleurs (double vente) et
+//    sortait du bénéfice.
 const commandeEbayEngagee = (o) => !!o
-  && !/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || ''))
+  && !(/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')) && !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')))
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
 // `programmees` (5 octobre) : les annonces PROGRAMMÉES sur eBay
 // (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
