@@ -8923,7 +8923,9 @@ const garderRecents = (d, max) => {
 };
 function appliquerMorceauxLbc(prev, t) {
   const next = Object.assign({ paths: [], samples: [] }, prev);
-  if (t.paths) next.paths = fusionnerCheminsLbc(next.paths, t.paths, LBC_CHEMINS_MAX);
+  // Rien de neuf (que des chemins déjà rangés) ⇒ la ligne ne bouge pas : un
+  // simple réordonnancement ne vaut pas une écriture (§ « 40 Mo par visite »).
+  if (t.paths) { const deja = new Set(next.paths || []); if (t.paths.some((x) => !deja.has(x))) next.paths = fusionnerCheminsLbc(next.paths, t.paths, LBC_CHEMINS_MAX); }
   if (t.samples) next.samples = [...t.samples, ...(next.samples || [])].slice(0, 6);
   if (t.schemas) next.schemas = garderRecents(Object.assign({}, next.schemas || {}, t.schemas), 80);
   for (const k of Object.keys(LBC_DICTS)) {

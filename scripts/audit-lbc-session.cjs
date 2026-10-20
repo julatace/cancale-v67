@@ -137,7 +137,8 @@ const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', c
   await essaie('myads', async () => {
     const env = faire();
     await compteur(env, PART);
-    await relais(env, 'https://api.leboncoin.fr/api/adfinder/v2/myads', MYADS);
+    // 5.197 : la page joint le compte de SON compteur (même document).
+    await env.envoyer({ from: 'cancale-lbc', action: 'lbcRaw', url: 'https://api.leboncoin.fr/api/adfinder/v2/myads', body: MYADS, session: PART });
     const items = Object.values(((env.base.lbc_listings || {}).items) || {});
     dit(items.length === 2 && items.every((i) => i.account === PART), 'ses 2 annonces sans référence VRM sont rangées sous SON compte', JSON.stringify(items.map((i) => [i.id, i.account])));
     // Sans compteur (session inconnue) : rien n'est deviné.

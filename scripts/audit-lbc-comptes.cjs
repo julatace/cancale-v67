@@ -160,12 +160,14 @@ const MESSAGES = { conversations: [{ interlocutor: { user_id: 999, pseudo: 'ache
       { list_id: 501, subject: 'Nike Air Max 1 noir', price: [90], images: { urls: ['https://img.leboncoin.fr/a.jpg'] } },
       { list_id: 502, subject: 'Autry reelwind gris', price: [70] },
     ] });
-    const sess = { vrmLbcCompte: { v: 2, id: 'faf3', name: 'SHOPCANCALE', type: 'particulier' } };
+    // 5.197 : le compte vient de la PAGE (compteur relu dans le même document), joint au message.
+    const SID = 'faf3fbba-0000-4000-8000-000000000003';
+    const sess = { vrmLbcCompte: { v: 2, id: SID, name: 'SHOPCANCALE', type: 'particulier' } };
     const cc = faireCtx(BG_NEUF, null, sess);
-    await cc.handleLbcRaw('https://api.leboncoin.fr/api/adfinder/v2/myads', REP);
+    await cc.handleLbcRaw('https://api.leboncoin.fr/api/adfinder/v2/myads', REP, SID);
     const w = cc.__ecrits.filter((r) => r.id === 'lbc_listings').pop();
     const items = w ? Object.values(w.data.items || {}) : [];
-    dit(items.length === 2 && items.every((it) => it.account === 'faf3'), 'ses 2 annonces sont rangées, taguées de SON compte (celui de la session)', JSON.stringify(items.map((i) => [i.id, i.account])));
+    dit(items.length === 2 && items.every((it) => it.account === SID), 'ses 2 annonces sont rangées, taguées de SON compte (celui de la session)', JSON.stringify(items.map((i) => [i.id, i.account])));
     dit(items.some((it) => Array.isArray(it.images) && it.images.length === 1), '… avec leurs images');
     // Compte de session inconnu : rien n'est tagué ni rangé (blanc plutôt que faux).
     const c2 = faireCtx(BG_NEUF, null, {});
@@ -173,7 +175,7 @@ const MESSAGES = { conversations: [{ interlocutor: { user_id: 999, pseudo: 'ache
     dit(!c2.__ecrits.some((r) => r.id === 'lbc_listings'), 'compte de session inconnu : rien n’est rangé');
     // La même forme hors de « mes annonces » (une recherche) : jamais.
     const c3 = faireCtx(BG_NEUF, null, sess);
-    await c3.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', REP);
+    await c3.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', REP, SID);
     dit(!c3.__ecrits.some((r) => r.id === 'lbc_listings'), 'la même réponse venue d’une RECHERCHE n’est pas rangée');
   });
 

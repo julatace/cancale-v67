@@ -10287,10 +10287,63 @@ et ses annonces sans réf VRM n'étaient plus rafraîchies depuis le 20 septembr
   compte ; les annonces disparues de `myads` restent « active » (pas de jugement
   sur une liste paginée) ; `lbc_ventes` toujours sans date de vente et pas relues
   depuis le 7 octobre ; `lbc_recon.paths` plein (300/300 : les chemins neufs ne
-  s'ajoutent plus).
+  s'ajoutent plus). ✅ Les quatre : corrigés en 5.197 (section suivante).
 - **Geste de Julien** : installer la 5.195, puis ouvrir leboncoin.fr → « Mes
   annonces » sur CHACUN de ses deux comptes, et « Mes transactions » une fois.
 
+
+### Leboncoin, les quatre restes : date de vente, vendue hors vente, chemins vivants, compte de la page (20 octobre, 5.197)
+Restes mesurés par la passe 5.195 (lecture seule, sa base), tous corrigés.
+- ⚠️⚠️ **Date de vente** : la date ne vit QUE dans la liste v3
+  (`[].created_at`, ISO, mesuré au format `2026-…T…Z`) — le détail v2 n'en porte
+  aucune (`updated_at`, `sent_at` seulement). Ses 3 ventes vendeur viennent du
+  détail (10-01, avant la 5.131) et la liste n'a plus été rangée depuis. Cause
+  trouvée dans le code : la liste et les détails lus juste après (5 au plus, à
+  ~150 ms) arrivaient ENSEMBLE ; chaque `rangerLbcVentes` relisait la ligne puis
+  la réécrivait entière — le dernier écrivain, parti d'une lecture d'avant,
+  effaçait les `dateVente` de la liste. Prouvé : liste + détail envoyés ensemble
+  ⇒ date perdue 5 fois sur 5 sur origin/main. ⇒ Les rangements passent à la file
+  (`_lbcVentesChaine`). Et une vente ouverte DIRECTEMENT (lien, notification),
+  jamais vue datée : `lbc-inject.js` relit les listes dont il a vu le SITE
+  demander l'adresse exacte (`vrm_lbc_listes`, localStorage de la page, 3 au
+  plus — jamais une adresse devinée), au plus une fois par 6 h ; ces relectures
+  ne relancent pas la lecture des détails (le plafond de 5 par page tient).
+  Jamais l'heure de capture.
+- **Vendue sur Leboncoin = plus en vente** : une règle, texte pour texte, dans
+  l'app, l'extension et le serveur (`<lbc-en-vente-regle>` :
+  `annoncesLbcVendues`, `annonceLbcEnVente`) — la vente prouvée (`isSeller`, non
+  annulée) prime sur un `status: 'active'` périmé ; jamais un jugement sur une
+  absence dans une liste paginée. Les lecteurs l'appliquaient déjà chacun à sa
+  façon ; ils passent tous par elle (`lireLbcAnnonces`, compteur, écran
+  Leboncoin, `annoncesLbcParNumero`). ⚠️ Un lecteur l'ignorait : la pastille
+  « Aussi sur Leboncoin » de l'écran Annonces (`vinted_lbc_posted` seul) — elle
+  ne s'affiche plus pour une paire dont la vente Leboncoin est prouvée
+  (`lbcAussi`, via `doublesVenteLbc`) ; ventes illisibles ⇒ rien n'est retiré.
+- **`lbc_recon.paths`** (300/300, vieux format, plus rien n'entrait) :
+  `fusionnerCheminsLbc` — le plus récent d'abord, un chemin revu remonte, les plus
+  anciens tombent ; les chemins qui servent (vente, transaction, bordereau, PDF,
+  ≥ 400, compte, messagerie…) gardent jusqu'à la moitié des places ; l'ancienne
+  forme nue s'efface devant sa forme neuve ; aucun nouveau chemin ⇒ aucune
+  écriture. La page envoie ses 200 chemins PLUS RÉCENTS.
+- ⚠️⚠️ **Bascule de compte dans le même onglet** : une liste « à moi » (`myads`,
+  tableau pro) part avec le compte du compteur relu DANS LE MÊME DOCUMENT
+  (avant elle, sinon elle attend le premier compteur — 90 s au plus) ; deux
+  comptes dans un document ⇒ plus rien n'est attribué. Le fond tague avec CE
+  compte (`sessionDeListe`, jamais un compte lié), plus avec `vrmLbcCompte`
+  (le dernier vu, peut-être l'ancien) ; sans compte joint ⇒ rien de tagué.
+- Preuves : `audit-lbc-restes.cjs` (vrais `background.js` + `lbc-inject.js` dans
+  un `vm`, règle de l'app et route serveur exécutées, données inventées) —
+  **15 rouges sur origin/main**, 0 après ; 7 mutations (file retirée, compte du
+  fond, chemins figés, règle app sans la vente, déjà-datée ignorée, liste sans
+  attente, bascule ignorée) ⇒ toutes rouges. `audit-lbc-session` et
+  `audit-lbc-comptes` servent la forme neuve (compte joint par la page).
+- ⚠️ **Non mesuré** : qu'une bascule de compte Leboncoin recharge toujours la
+  page (si elle ne rechargeait pas, un `myads` arrivé entre la bascule et le
+  compteur suivant serait tagué du premier compteur du document) ; la requête
+  exacte de la liste des VENTES (onglet Ventes de « Mes transactions ») — seule
+  l'adresse vue est relue ; si ses 3 ventes n'y figurent plus, rien ne les datera.
+- **Geste de Julien** : installer la 5.197, ouvrir « Mes transactions » sur
+  Leboncoin (onglet Ventes) une fois sur le compte particulier.
 
 ### eBay se relit tout seul : à l'ouverture, toutes les ~10 min, et au cron du matin (20 octobre)
 Julien : « pour eBay ça doit se relire tout seul ou se rafraîchir à l'ouverture de l'app, mais je dois rien avoir à faire ».

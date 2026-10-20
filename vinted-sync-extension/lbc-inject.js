@@ -300,6 +300,7 @@
     ecrireLS(DATEES_CLE, d);
   };
   let relectureListes = false;
+  const relusParNous = new Set();               // nos propres relectures : elles ne relancent pas la lecture des détails
   const dateSiVendeur = async (url, text) => {
     try {
       if (relectureListes) return;
@@ -315,6 +316,7 @@
       relectureListes = true;
       for (const u of listes.slice(-3)) {
         try {
+          relusParNous.add(u);
           const res = await window.fetch(u, { method: 'GET', credentials: 'include', headers: entetesLbc || { Accept: 'application/json' } });
           if (res.status === 401 || res.status === 403 || res.status === 429) break;
         } catch (_) {}
@@ -363,7 +365,7 @@
       // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
       if (VENTE_HINT.test(url)) {
         const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX });
-        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) { noterListe(url, text); setTimeout(() => { lireDetails(text); }, 800); }
+        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) { noterListe(url, text); if (relusParNous.has(url)) relusParNous.delete(url); else setTimeout(() => { lireDetails(text); }, 800); }
         else if (/consumergoods\/proxy\/v\d+\/pages\/transactions\/\d+/i.test(url)) setTimeout(() => { dateSiVendeur(url, text); }, 800);
         return;
       }
