@@ -24,6 +24,7 @@
 //    (src/accueil-scenes.jsx) arrivent à part, pendant un temps mort ; le film
 //    (src/AccueilFilm.jsx) seulement avec `?film`.
 import React from 'react';
+import './styles-accueil-studio.css';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACTE } from './accueil-jetons.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
@@ -553,9 +554,10 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-hero" data-section="hero">
           <div className="acc-in">
             <div>
-              <div className="acc-def" data-definition="">L’outil de gestion des revendeurs de seconde main</div>
-              <h1 className="acc-h1"><span className="attenue">Tu ouvres VRM.</span><span>Tu sais quoi faire.</span></h1>
-              <p className="acc-sous">Tes comptes Vinted, Leboncoin et eBay au même endroit — un compte ou dix : <em>les colis à poster, les articles vendus ailleurs, la compta pour l’URSSAF.</em></p>
+              <div className="acc-def" data-definition=""><span className="acc-def-dot" aria-hidden="true"/>L’espace de travail des revendeurs</div>
+              <div className="acc-plateformes" aria-label="Plateformes prises en charge"><span>Vinted</span><span>Leboncoin</span><span>eBay</span></div>
+              <h1 className="acc-h1"><span>Ton activité de revente.</span><span className="attenue">Enfin bien organisée.</span></h1>
+              <p className="acc-sous">Ventes, colis, comptabilité. <em>Tes comptes réunis dans un seul espace, avec les prochaines actions à portée de main.</em></p>
               <div className="acc-actions">
                 {creer({ ref: ctaHaut })}
                 {connexion({ 'data-cta': 'connexion' })}
@@ -570,14 +572,22 @@ export default function Accueil({ onEntrer }) {
                 </div>
                 <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'}>
                   {sansSouris
-                    ? 'Sur ton téléphone, crée ton compte dès maintenant : l’extension s’installe ensuite une fois, dans Chrome sur un ordinateur. Puis une notification à chaque vente, si tu l’actives.'
+                    ? 'Crée ton compte ici, puis installe l’extension une fois dans Chrome sur ordinateur.'
                     : 'S’installe une fois dans Chrome, sur ton ordinateur. Ensuite, ton téléphone suffit.'}
                 </div>
               </div>
             </div>
-            <CarteJour onVers={vers} />
+            <div className="acc-preview"><div className="acc-preview-head"><span>VRM · TON ESPACE DE TRAVAIL</span><span className="acc-preview-example">Démonstration</span></div><CarteJour onVers={vers} /><p className="acc-preview-note">Un aperçu de ta journée, avec des données d’exemple.</p></div>
           </div>
         </section>
+
+        <nav className="acc-benefices acc-in" aria-label="Découvrir les fonctions de VRM">
+          {[
+            ['colis','colis','Préparer les envois','Bordereaux, numéros et colis à déposer.'],
+            ['ailleurs','pile','Garder les annonces à jour','Repérer les articles vendus encore en ligne.'],
+            ['urssaf','euro','Retrouver ses chiffres','Ventes finalisées et rapports du mois.'],
+          ].map(([id,icone,titre,texte])=><a key={id} href={'#'+id} onClick={ancre(id)}><span className="acc-benefice-icon"><Icone nom={icone}/></span><span><b>{titre}</b><small>{texte}</small></span><Chevron/></a>)}
+        </nav>
 
         <div ref={zoneScenes}>
           <section className="acc-sec" id="colis" data-section="colis">
@@ -585,7 +595,7 @@ export default function Accueil({ onEntrer }) {
             <div className="acc-in acc-g1">
               <div>
                 <Quand heure="8 h 02" contexte="avant d’aller au relais" />
-                <h2 className="acc-h2">Quels colis je poste ce matin ?</h2>
+                <h2 className="acc-h2">Les bons colis. Dans le bon ordre.</h2>
                 <p className="acc-rep">Ceux-là, dans cet ordre : bordereau prêt d’abord, le plus pressé en haut — chacun avec le numéro de son carton imprimé dessus.</p>
                 <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu prends le carton 128, tu déposes." />
                 <Precisions items={['Un bordereau par feuille, en A4 ou sur imprimante thermique.', 'Ton numéro de rangement, en chiffres ou en série (B125…), n’est jamais redonné à un autre article.']} />
@@ -600,7 +610,7 @@ export default function Accueil({ onEntrer }) {
               <div className="acc-g2-texte">
                 <div>
                   <Quand heure="8 h 03" contexte="la Nike vient d’être vendue sur Vinted" />
-                  <h2 className="acc-h2">Vendu sur Vinted… encore en ligne sur Leboncoin ?</h2>
+                  <h2 className="acc-h2">Vendu ici. À retirer ailleurs.</h2>
                   <p className="acc-rep">VRM te le dit. Chaque annonce est reliée à son article par son numéro — jamais par son titre — et une vente prouvée sur un site te dit où le retirer ailleurs, dans les deux sens.</p>
                 </div>
                 <div>
@@ -618,7 +628,7 @@ export default function Accueil({ onEntrer }) {
               <div className="acc-g3-ecran"><Emplacement nom="urssaf" pret={scenesPretes} /></div>
               <div>
                 <Quand contexte="Fin du mois" />
-                <h2 className="acc-h2">Combien je déclare à l’URSSAF ?</h2>
+                <h2 className="acc-h2">Tes ventes, prêtes pour la comptabilité.</h2>
                 <p className="acc-rep">Ce chiffre-là. Le chiffre d’affaires de tes ventes finalisées sur Vinted, Leboncoin et eBay, mois par mois : une vente Vinted compte le mois où l’argent t’est versé ; Leboncoin et eBay, au jour de la vente.</p>
                 <Roles vrm="compte, date chaque vente et prépare le rapport du mois." toi="tu reportes le montant sur ton espace URSSAF, puis tu le notes comme déclaré." />
                 <Precisions items={['« J’ai déclaré ce mois » : une vente notée ne se recompte jamais dans un autre mois.', 'Le rapport du mois en PDF et en tableur, pour toi ou ton comptable.']} />
