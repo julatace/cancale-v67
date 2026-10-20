@@ -4883,6 +4883,54 @@ ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
   (3) `node scripts/communaute-sql/essai-annule.cjs --verifier`, coller, exiger
   `ok: true`. Ensuite : Gestion → Communauté → « Apparaître sur la carte ».
 
+### Communauté : pseudo Discord et classement des ventes — migration 019 (20 octobre) — PAS APPLIQUÉE
+Julien : « pour la carte ça peut être le compte discord » et « un classement entre
+tous les membres, sur les journées, les semaines, les mois ». Fichier
+`supabase/migrations/019-communaute-discord-classement.sql`, **sur la 018 (en
+production) sans la modifier** — deux colonnes sur `vrm_communaute_profils`
+(`discord`, `classement`), mêmes gardes (RLS forcé, aucune règle, aucun droit,
+SECURITY DEFINER `search_path` vide, identité par `auth.uid()`, empreinte AVANT —
+celle de la 018 — et APRÈS). La 018 rejouée après la 019 est REFUSÉE (empreinte) :
+voulu. **Elle ne contient aucune suppression** (l'outil SQL de Supabase demande
+une confirmation pour ce mot) : elle se colle d'un bloc.
+- **Discord** (`vrm_communaute_discord`) : facultatif, vide par défaut, retiré par
+  un pseudo vide ; 2-32 caractères `[a-z0-9._]`, jamais « .. », ni @ < > (contrainte
+  + fonction ; l'écran retire un « @ » de tête et met en minuscules). Montré aux
+  membres visibles de la carte (`vrm_communaute_carte` remplacée, +`discord`).
+  Aucun appel à Discord.
+- **Classement** (`vrm_communaute_classement(p_periode)`, `jour|semaine|mois|annee`,
+  Europe/Paris, semaine du lundi) : opt-in strict (`…_classement_inscrire`, il faut
+  être sur la carte : pseudo et ville en viennent ; quitter la carte retire du
+  classement ; y revenir ne réinscrit pas). **Le chiffre = le NOMBRE de ventes
+  Vinted, jamais des euros**, COMPTÉ PAR LA BASE (la route n'envoie que la période,
+  aucune fonction ne reçoit un nombre). **Règle mesurée le 20 oct. (lecture seule)**,
+  celle de `ventesFaites` : `harvest_{uid}_orders_sold → payload.my_orders` des
+  lignes du membre (owner = lui), comptes LIÉS à lui (`vinted_accounts.owner`) et pas
+  masqués (`main.vinted_accounts_hidden`) ; statut qui ne matche pas
+  annul|cancel|refus|rembours|retour|suspend|paiement échoué ; daté par `date` (ISO
+  avec décalage, illisible ⇒ rien, `vrm_communaute_ts`, exécutée par personne) ;
+  dédoublonné par `transaction_id` (mesuré : 554 lignes, 527 transactions — le même
+  compte porté par deux propriétaires). Limites dites : Vinted seul (pas Leboncoin
+  ni eBay), une vente n'existe qu'une fois captée. Rang `rank()` (ex aequo), top 100
+  + soi, bloqués masqués, abonnement `vrm_acces_pour`. Rend rang, pid, pseudo,
+  ville, pays, ventes — jamais l'identifiant du compte.
+- **Fermer mon compte** : rien à ajouter, `vrm_communaute_effacer` (018) efface la
+  ligne entière (colonnes comprises) — l'audit le vérifie.
+- **Route** : `action: discord | inscrire | classement` (`api/_lib/communaute.js`),
+  « pas encore activé » sur PGRST202. **Écran** : onglets Carte · Classement ;
+  Discord sur sa présence et sous chaque personne (Copier) ; classement : « Tu es
+  Xᵉ sur N », sa ligne mise en avant, zéro inscrit ⇒ « sois le premier », panne ⇒
+  « pas pu lire le classement », sans la 019 ⇒ ni Discord ni classement.
+- **Preuves** : `audit-communaute-sql.cjs` (section 019 : 137 contrôles en tout,
+  `--prouve` **30/30** dont chiffre envoyé par le client, non-inscrit visible, vente
+  annulée comptée, autre vendeur, compte non lié, compte masqué, sans dédoublonnage,
+  fuseau UTC, Discord libre, effacement) ; `essai-annule.cjs` joue maintenant la
+  019 (`--migration` répétable, vérification = 018 + 019, sans le mot interdit) ;
+  banc `communaute.cjs` +019 (1512 clair, 390 tactile sombre).
+- **Gestes de Julien** : (1) `node scripts/communaute-sql/essai-annule.cjs > essai.sql`,
+  coller, lire `essai` ; (2) coller `supabase/migrations/019-communaute-discord-classement.sql`
+  d'un bloc, VRM fermé ; (3) `… --verifier`, exiger `ok: true`.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme

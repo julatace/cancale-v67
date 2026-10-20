@@ -12,6 +12,9 @@
 //     lien n'est rendu), Bloquer et Signaler dans chaque fil ;
 //   • trois états partout : chargement · pas su · lu — et « pas encore activée
 //     sur ta base » tant que la 018 n'est pas appliquée (jamais « personne »).
+//  Migration 019 : un pseudo DISCORD facultatif sur sa présence (montré aux
+//  membres visibles), et un CLASSEMENT opt-in (jour · semaine · mois · année)
+//  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
 //  La carte : Leaflet 1.9.4 depuis cdnjs, chargé à l'ouverture de l'écran
 //  (jamais au démarrage), fond OpenStreetMap / CARTO avec leur attribution.
 //  Injoignable ⇒ la même communauté en liste.
@@ -252,7 +255,8 @@ function Personnes({ cells, moi, onEcrire, onCoucou, onFerme, envoye, FermeAuRet
       <div className="vrm-cm-feuille-tete"><h3>{villes.join(' · ')}</h3><button type="button" className="vrm-cm-x" onClick={onFerme} aria-label="Fermer">×</button></div>
       <p className="vrm-cm-note">{personnes.length} revendeur{personnes.length > 1 ? 's' : ''} ici.</p>
       <ul className="vrm-cm-liste">{personnes.map((p) => <li key={p.pid} data-cm-personne={p.pid}>
-        <div><b>{p.pseudo}</b>{p.moi && <span className="vrm-cm-badge"> toi</span>}{p.premier && <span className="vrm-cm-badge" data-cm-premier> 🥇 premier de {p.ville}</span>}<small>{p.ville}</small></div>
+        <div><b>{p.pseudo}</b>{p.moi && <span className="vrm-cm-badge"> toi</span>}{p.premier && <span className="vrm-cm-badge" data-cm-premier> 🥇 premier de {p.ville}</span>}<small>{p.ville}</small>
+          {p.discord && <DiscordDe pseudo={p.discord} />}</div>
         {!p.moi && <div className="vrm-cm-ligne-boutons">
           {moi ? <>
             <button type="button" onClick={() => onCoucou(p)} disabled={envoye.has(p.pid)} data-cm-coucou={p.pid}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
@@ -273,6 +277,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const [rejoindre, setRejoindre] = useState(false), [cellsOuvertes, setCellsOuvertes] = useState(null);
   const [filOuvert, setFilOuvert] = useState(null), [enListe, setEnListe] = useState(false);
   const [envoye, setEnvoye] = useState(() => new Set()), [toast, setToast] = useState('');
+  const [vue, setVue] = useState('carte');            // carte · classement
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {
     if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
@@ -327,8 +332,16 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
         : <><b>{PAS_SU}</b><p>Ce n’est pas que personne n’est sur la carte : je n’ai simplement pas pu la lire.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
     </div></section>;
 
-  return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-total={r.total}>
-    {entete}
+  const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
+    {[['carte', 'Carte'], ['classement', 'Classement']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
+  </div>;
+  if (vue === 'classement') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="classement">
+    {entete}{onglets}
+    <Classement api={api} moi={moi} />
+  </section>;
+
+  return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-total={r.total} data-cm-vue-active="carte">
+    {entete}{onglets}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
     {/* Ma présence : l'opt-in, toujours visible */}
@@ -339,6 +352,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
           <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
           <button type="button" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
         </div>
+        {'discord' in moi && <MonDiscord api={api} actuel={moi.discord || ''} onFait={(t) => { setToast(t); lire(true); }} />}
       </> : <>
         <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit tant que tu ne l’as pas décidé.</span></div>
         <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
@@ -364,7 +378,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
 
     {pres.length > 0 && <div className="vrm-cm-carton" data-cm-pres={pres.length}>
       <h3>Près de toi</h3>
-      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small></div>
+      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
         <div className="vrm-cm-ligne-boutons">
           <button type="button" onClick={() => coucou(p)} disabled={envoye.has(p.pid)}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
           <button type="button" className="vrm-cm-primaire" onClick={() => ouvrirEcrire(p)}>Écrire</button>
@@ -402,5 +416,122 @@ function PremierMessage({ p, onEnvoyer, onFerme, FermeAuRetour }) {
         <button type="submit" className="vrm-cm-primaire" disabled={occupe || !t.trim()} data-cm-envoyer>{occupe ? '…' : 'Envoyer'}</button>
       </form>
     </div>
+  </div>;
+}
+
+// ── LE PSEUDO DISCORD (019) ──────────────────────────────────────────────────
+// Même forme que la contrainte de la base : 2 à 32 caractères a-z 0-9 . _ ,
+// jamais « .. ». Un « @ » tapé en tête est retiré (c'est l'habitude), un « @ »
+// ailleurs est refusé.
+export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
+export const discordPropre = (x) => String(x || '').trim().replace(/^@/, '').toLowerCase();
+export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
+
+function DiscordDe({ pseudo }) {
+  const [copie, setCopie] = useState('');
+  const copier = async () => {
+    try { await navigator.clipboard.writeText(pseudo); setCopie('copié'); }
+    catch (_) { setCopie('copie impossible — sélectionne-le'); }
+  };
+  return <span className="vrm-cm-discord" data-cm-discord={pseudo}>Discord : <b className="vrm-cm-select">{pseudo}</b>
+    <button type="button" className="vrm-cm-lien" onClick={copier} data-cm-discord-copier>{copie || 'Copier'}</button></span>;
+}
+
+function MonDiscord({ api, actuel, onFait }) {
+  const [ouvert, setOuvert] = useState(false), [v, setV] = useState(actuel), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const poser = async (valeur) => {
+    const d = discordPropre(valeur);
+    if (d && !discordValide(d)) { setMsg('2 à 32 caractères : lettres minuscules, chiffres, « . » ou « _ » (comme ton pseudo Discord).'); return; }
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'discord', discord: d });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    setOuvert(false); onFait(d ? 'Ton pseudo Discord est visible des membres de la carte.' : 'Ton pseudo Discord est retiré.');
+  };
+  if (!ouvert) return <div className="vrm-cm-discord-moi" data-cm-mon-discord={actuel ? 'oui' : 'non'}>
+    {actuel ? <><span>Discord : <b>{actuel}</b></span>
+      <div className="vrm-cm-ligne-boutons"><button type="button" onClick={() => { setV(actuel); setOuvert(true); }} data-cm-discord-modifier>Modifier</button>
+        <button type="button" onClick={() => poser('')} disabled={occupe} data-cm-discord-retirer>Retirer</button></div></>
+      : <><span>Pas de pseudo Discord (facultatif).</span>
+        <button type="button" onClick={() => { setV(''); setOuvert(true); }} data-cm-discord-ajouter>Ajouter mon pseudo Discord</button></>}
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+  </div>;
+  return <form className="vrm-cm-discord-moi" onSubmit={(e) => { e.preventDefault(); poser(v); }} data-cm-mon-discord="saisie">
+    <label className="vrm-cm-champ"><span>Ton pseudo Discord</span>
+      <input value={v} maxLength={33} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setV(e.target.value)} placeholder="ton.pseudo" data-cm-discord-champ /></label>
+    <p className="vrm-cm-note">Facultatif. Les autres membres de la carte le verront pour t’écrire sur Discord. VRM ne se connecte jamais à Discord.</p>
+    <div className="vrm-cm-ligne-boutons">
+      <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-discord-valider>{occupe ? 'Un instant…' : 'Enregistrer'}</button>
+      <button type="button" onClick={() => { setOuvert(false); setMsg(''); }}>Annuler</button>
+    </div>
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+  </form>;
+}
+
+// ── LE CLASSEMENT (019) ──────────────────────────────────────────────────────
+// Le nombre de ventes Vinted de la période, COMPTÉ PAR LA BASE (le navigateur
+// n'envoie que la période). Opt-in : on n'y figure que si on l'a activé.
+export const PERIODES = [['jour', 'Aujourd’hui'], ['semaine', 'Semaine'], ['mois', 'Mois'], ['annee', 'Année']];
+export const rangTexte = (n) => (Number(n) === 1 ? '1er' : `${n}ᵉ`);
+const CLASSEMENT_PAS_SU = "Je n'ai pas pu lire le classement — rien n'est perdu, c'est la lecture qui a échoué.";
+
+function Classement({ api, moi }) {
+  const [periode, setPeriode] = useState('semaine');
+  const [etat, setEtat] = useState('charge'), [c, setC] = useState(null), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const seq = useRef(0);
+  const lire = useCallback(async (per) => {
+    const n = ++seq.current;
+    setEtat('charge'); setMsg('');
+    const r = await api({ action: 'classement', periode: per });
+    if (n !== seq.current) return;
+    if (r.ok && r.classement && Array.isArray(r.classement.lignes)) { setC(r.classement); setEtat('lu'); return; }
+    setC(null);
+    setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su');
+    setMsg(r.message || CLASSEMENT_PAS_SU);
+  }, [api]);
+  useEffect(() => { lire(periode); }, [periode, lire]);
+  const inscrire = async (oui) => {
+    if (oui && !window.confirm('Entrer dans le classement ? Les membres VRM verront ton pseudo, ta ville et ton NOMBRE de ventes Vinted sur la période — jamais un montant. Tu peux en sortir quand tu veux.')) return;
+    setOccupe(true);
+    const r = await api({ action: 'inscrire', oui });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || CLASSEMENT_PAS_SU); return; }
+    lire(periode);
+  };
+  const choix = <div className="vrm-cm-onglets vrm-cm-periodes" role="group" aria-label="Période">
+    {PERIODES.map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={periode === k} onClick={() => setPeriode(k)} data-cm-periode={k}>{t}</button>)}
+  </div>;
+  const note = <p className="vrm-cm-note" data-cm-classement-regle>Le chiffre : tes ventes Vinted faites sur la période (annulées et remboursées non comptées), comptées par VRM à partir de ce que l’extension a capté — jamais un montant. Leboncoin et eBay n’y entrent pas.</p>;
+
+  if (etat === 'non-installe' || etat === 'abonnement' || etat === 'pas-su') return <div className="vrm-cm-carton" data-cm-classement={etat}>
+    {etat === 'non-installe' ? <><b>Le classement n’est pas encore activé sur ta base.</b><p>Il s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est partagé d’ici là.</p></>
+      : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>Le classement est réservé aux abonnés.</p></>
+      : <><b>{CLASSEMENT_PAS_SU}</b><p>Ce n’est pas un classement vide : je n’ai simplement pas pu le lire.</p><button type="button" onClick={() => lire(periode)} data-cm-classement-reessayer>Réessayer</button></>}
+  </div>;
+
+  const inscrit = c && c.inscrit, visible = c ? c.visible : !!moi;
+  return <div data-cm-classement={etat} data-cm-classement-n={c ? c.n : ''}>
+    <div className="vrm-cm-carton vrm-cm-moi" data-cm-inscrit={inscrit ? 'oui' : 'non'}>
+      {!c ? <span>Lecture du classement…</span>
+        : inscrit ? <><div><b>Tu es dans le classement</b><span> sous le pseudo « {(moi && moi.pseudo) || '—'} ».</span></div>
+          <button type="button" onClick={() => inscrire(false)} disabled={occupe} data-cm-classement-sortir>Me retirer du classement</button></>
+        : !visible ? <div><b>Tu n’es pas dans le classement.</b><span> Mets-toi d’abord sur la carte (onglet Carte) : le classement montre ton pseudo et ta ville.</span></div>
+        : <><div><b>Tu n’es pas dans le classement.</b><span> Personne ne voit tes ventes tant que tu ne l’as pas décidé.</span></div>
+          <button type="button" className="vrm-cm-primaire" onClick={() => inscrire(true)} disabled={occupe} data-cm-classement-entrer>Entrer dans le classement</button></>}
+      {msg && etat === 'lu' && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+    </div>
+    {choix}
+    {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
+      : c.n === 0 ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
+      : <div className="vrm-cm-carton">
+        {c.moi ? <p className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}>Tu es <b>{rangTexte(c.moi.rang)}</b> sur {c.n} · {c.moi.ventes} vente{c.moi.ventes > 1 ? 's' : ''}</p>
+          : <p className="vrm-cm-note">{c.n} membre{c.n > 1 ? 's' : ''} dans le classement.</p>}
+        <ol className="vrm-cm-classement">{c.lignes.map((l) => <li key={l.pid} className={l.moi ? 'moi' : ''} data-cm-ligne={l.pid} data-cm-ligne-ventes={l.ventes} data-cm-ligne-moi={l.moi ? 'oui' : 'non'}>
+          <span className="vrm-cm-rang">{l.rang <= 3 ? ['🥇', '🥈', '🥉'][l.rang - 1] + ' ' : ''}{rangTexte(l.rang)}</span>
+          <span className="vrm-cm-qui"><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span>
+          <span className="vrm-cm-ventes"><b>{l.ventes}</b> vente{l.ventes > 1 ? 's' : ''}</span>
+        </li>)}</ol>
+      </div>}
+    {note}
   </div>;
 }
