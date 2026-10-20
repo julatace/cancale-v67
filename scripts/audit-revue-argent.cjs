@@ -16,6 +16,13 @@
 //     paire « 12 » partait dans le colis de la NOUVELLE N°12 (`invForBord`) —
 //     le nom et l'adresse d'un autre acheteur.
 //
+//  D. (20 oct., revue argent eBay) Le CA déclaré, le vendu, le CA payé et le
+//     bénéfice eBay lisaient `pricingSummary.total` — ce que l'ACHETEUR paie,
+//     port compris (§2.8 : le port n'est ni une recette ni une charge). La
+//     décision du 3 octobre : « l'argent que tu reçois » =
+//     `paymentSummary.totalDueSeller` − `totalMarketplaceFee`. Frais inconnus
+//     ou autre devise ⇒ commande ÉCARTÉE et dite (`montantRecuEbay`).
+//
 // `--prouve` réaffaiblit chaque correctif tour à tour : au moins un contrôle
 // doit passer au ROUGE à chaque fois.
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -42,7 +49,8 @@ const NOMS = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNu
   'lbcAnnulee', 'lbcFinalisee', 'numDeTitreLbc', 'clesAnnonceLbc', 'numDeSkuEbay', 'skuEbayDe', 'PANNE_NUMEROS', 'ficheAVerifier', 'normTitle',
   'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee',
   'numerosDejaVendus', 'doublesVenteEbay', 'classifyOrderStatus', 'tsCommande', 'montantCommande', 'venteFinalisee', 'ymDeTs',
-  'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'caEbayPayees', 'facturesDuNumero'];
+  'indexDeclarations', 'moisDeclare', 'montantRecuEbay', 'ventesDeclarables', 'ventesFaites', 'caEbayPayees', 'facturesDuNumero',
+  'ficheUniqueDuNumero', 'fraisEbayCommande', 'ventesAutresBenefice'];   // fraisEbayCommande : n'existe plus que dans le code d'avant (§6.1)
 
 function charger(src) {
   const stock = {};
@@ -70,9 +78,12 @@ const essaie = (nom, f) => { try { f(); } catch (e) { dit(false, `${nom} a levé
 function controler(src) {
   ko = 0; ok = 0;
   const c = charger(src);
-  const paye = { orderId: 'o1', orderPaymentStatus: 'PAID', creationDate: '2026-10-05T10:00:00Z', pricingSummary: { total: { value: '80.00', currency: 'EUR' } }, lineItems: [{ sku: 'VRM-31', title: 'Nike' }] };
-  const annulee = { ...paye, orderId: 'o2', pricingSummary: { total: { value: '120.00', currency: 'EUR' } }, cancelStatus: { cancelState: 'CANCELED' }, lineItems: [{ sku: 'VRM-32' }] };
-  const refusee = { ...paye, orderId: 'o3', pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, cancelStatus: { cancelState: 'CANCEL_REJECTED' }, lineItems: [{ sku: 'VRM-33' }] };
+  // L'acheteur paie le total (port compris) ; le vendeur reçoit dû − frais.
+  const eurM = (v) => ({ value: v, currency: 'EUR' });
+  const cmd = (id, total, du, frais, plus) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: '2026-10-05T10:00:00Z', pricingSummary: { total: eurM(total), deliveryCost: eurM('6.50') }, paymentSummary: { totalDueSeller: eurM(du) }, totalMarketplaceFee: eurM(frais), lineItems: [{ sku: 'VRM-31', title: 'Nike' }], ...plus });
+  const paye = cmd('o1', '86.50', '80.00', '10.00', {});                                                          // reçu 70
+  const annulee = cmd('o2', '126.50', '120.00', '15.00', { cancelStatus: { cancelState: 'CANCELED' }, lineItems: [{ sku: 'VRM-32' }] });
+  const refusee = cmd('o3', '66.50', '60.00', '7.50', { cancelStatus: { cancelState: 'CANCEL_REJECTED' }, lineItems: [{ sku: 'VRM-33' }] }); // reçu 52,50
   const commandes = [paye, annulee, refusee];
 
   essaie('ventesDeclarables', () => {
@@ -81,18 +92,48 @@ function controler(src) {
     dit(!ids.includes('ebay:o2'), `A. CA déclaré : une commande eBay ANNULÉE (PAID + CANCELED) n'y entre pas — lignes ${JSON.stringify(ids)}`);
     dit(ids.includes('ebay:o1') && ids.includes('ebay:o3'), 'A. CA déclaré (autre sens) : une payée et une à annulation REFUSÉE y restent');
     const tot = r.lignes.reduce((s, l) => s + l.eur, 0);
-    dit(Math.abs(tot - 140) < 1e-9, `A. CA déclaré eBay = 140,00 € (80 + 60) — obtenu ${tot}`);
+    dit(Math.abs(tot - 122.5) < 1e-9, `A/D. CA déclaré eBay = 122,50 € (reçu : 70 + 52,50) — obtenu ${tot}`);
   });
   essaie('ventesFaites', () => {
     const r = c.ventesFaites({ vinted: [], lbc: [], ebay: commandes });
     const eur = r.lignes.reduce((s, l) => s + l.eur, 0);
-    dit(Math.abs(eur - 140) < 1e-9, `A. « Vendu » eBay = 140,00 € sans la commande annulée — obtenu ${eur}`);
+    dit(Math.abs(eur - 122.5) < 1e-9, `A/D. « Vendu » eBay = 122,50 € (reçu) sans la commande annulée — obtenu ${eur}`);
   });
   essaie('caEbayPayees', () => {
     const v = c.caEbayPayees(commandes);
-    dit(v === 140, `A. CA eBay payé (Collectif, écran eBay) = 140 — obtenu ${v}`);
+    dit(v === 122.5, `A/D. CA eBay payé (Collectif, écran eBay) = 122,50 (reçu) — obtenu ${v}`);
     dit(c.caEbayPayees([annulee]) === 0, 'A. une seule commande payée, annulée : 0 (lu), jamais null ni 120');
     dit(c.caEbayPayees([]) === null, 'A. aucune commande payée : null (pas de vente), comme avant');
+  });
+  // ── D. le port n'entre jamais ; frais inconnus ou autre devise ⇒ écartée et dite
+  const sansFrais = cmd('o4', '56.50', '50.00', '0', { totalMarketplaceFee: undefined, lineItems: [{ sku: 'VRM-34' }] });
+  const dollars = cmd('o5', '56.50', '50.00', '5.00', { paymentSummary: { totalDueSeller: { value: '50.00', currency: 'USD' } }, lineItems: [{ sku: 'VRM-35' }] });
+  essaie('montantRecuEbay', () => {
+    const r = c.montantRecuEbay(paye);
+    dit(r && r.eur === 70, `D. argent reçu = dû au vendeur − frais eBay = 70 (pas 86,50 port compris) — obtenu ${r && r.eur}`);
+    dit(c.montantRecuEbay(sansFrais).eur === null && /frais/.test(c.montantRecuEbay(sansFrais).raison), 'D. frais eBay inconnus ⇒ pas de montant, et la raison le dit');
+    dit(c.montantRecuEbay(dollars).eur === null && /USD/.test(c.montantRecuEbay(dollars).raison), 'D. autre devise ⇒ pas de montant, jamais converti');
+  });
+  essaie('ventesDeclarables (D)', () => {
+    const r = c.ventesDeclarables({ vinted: [], lbc: [], ebay: [paye, sansFrais, dollars] });
+    const ids = [...r.lignes, ...r.aDater].map(l => l.id);
+    const ec = (r.ecartees || []).map(e => e.id + ':' + e.raison);
+    dit(!ids.includes('ebay:o4') && !ids.includes('ebay:o5'), `D. CA déclaré : frais inconnus et dollars n'y entrent pas — ${JSON.stringify(ids)}`);
+    dit(ec.some(x => x.startsWith('ebay:o4:') && /frais/.test(x)) && ec.some(x => x.startsWith('ebay:o5:') && /USD/.test(x)), `D. … et ils sont DITS (écartées, avec la raison) — ${JSON.stringify(ec)}`);
+  });
+  essaie('ventesFaites (D)', () => {
+    const r = c.ventesFaites({ vinted: [], lbc: [], ebay: [paye, sansFrais, dollars] });
+    dit(r.lignes.length === 1 && r.lignes[0].eur === 70 && r.ecartees === 2, `D. vendu : 70 € et 2 commandes écartées dites — ${JSON.stringify({ l: r.lignes.map(l => l.eur), ec: r.ecartees })}`);
+  });
+  essaie('caEbayPayees (D)', () => {
+    dit(c.caEbayPayees([paye, sansFrais]) === null, 'D. CA payé : une commande illisible ⇒ « pas su » (null), jamais un total partiel présenté comme complet');
+  });
+  essaie('ventesAutresBenefice', () => {
+    const numeros = { a31: { numero: '31', buy: 40 } };
+    const out = c.ventesAutresBenefice({ lbc: [], ebay: [paye, sansFrais], numeros, achat: (fi) => fi.buy, numLbc: () => '', numEbayLigne: () => '31' });
+    const e = out.find(x => x.id === 'ebay:o1');
+    dit(e && e.eur === 70 && e.frais === 0, `D. bénéfice : la vente eBay compte l'argent reçu (70), frais déjà retirés (0) — ${JSON.stringify(e)}`);
+    dit(!out.some(x => x.id === 'ebay:o4'), 'D. bénéfice : frais inconnus ⇒ commande écartée (jamais le total acheteur)');
   });
   essaie('numerosDejaVendus', () => {
     const numeros = { a31: { numero: '31' }, a32: { numero: '32' }, a33: { numero: '33' } };
@@ -127,7 +168,10 @@ function controler(src) {
 }
 
 const MUTATIONS = {
-  'declare-sans-annulee': (s) => s.replace("    if (!commandeEbayEngagee(e)) continue;\n    const tot = (e.pricingSummary && e.pricingSummary.total) || {};\n    const id = 'ebay:'", "    const tot = (e.pricingSummary && e.pricingSummary.total) || {};\n    const id = 'ebay:'"),
+  'port-compris': (s) => s.replace("const d = lu(o && o.paymentSummary && o.paymentSummary.totalDueSeller);", "const d = lu(o && o.pricingSummary && o.pricingSummary.total);"),
+  'frais-ignores': (s) => s.replace("if (!f) return { eur: null, raison: 'frais eBay inconnus' };", "if (!f) return { eur: Number(d.value), raison: '' };"),
+  'faites-ecartees-tues': (s) => s.replace("if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }", "if (eur == null) continue;"),
+  'declare-sans-annulee': (s) => s.replace("    if (!commandeEbayEngagee(e)) continue;\n    const id = 'ebay:'", "    const id = 'ebay:'"),
   'faites-sans-annulee': (s) => s.replace("    if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu", '    // muté'),
   'payees-sans-annulee': (s) => s.replace('const paid = payees.filter(commandeEbayEngagee);', 'const paid = payees;'),
   'rejet-annulation': (s) => s.replace("&& !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || ''))", ''),

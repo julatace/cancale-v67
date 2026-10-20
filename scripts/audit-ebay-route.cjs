@@ -2243,8 +2243,9 @@ const RA = {};
     avecR();const refusal=await app(JWT_J,{...body,confirme:false});dit(refusal.code===400 && auCompte(refusal.journal).length===0,'[Suite-edition] annuler ou omettre la confirmation ne contacte pas eBay');
   });
   await essaie('[Suite-devises]',async()=>{
-    const context={};vm.createContext(context);vm.runInContext(extraire(APP,'commandeEbayEngagee')+';'+extraire(APP,'caEbayPayees')+';this.ca=caEbayPayees;',context);
-    const order=(value,currency)=>({orderPaymentStatus:'PAID',pricingSummary:{total:{value,currency}}});
+    const context={};vm.createContext(context);vm.runInContext(extraire(APP,'commandeEbayEngagee')+';'+extraire(APP,'montantRecuEbay')+';'+extraire(APP,'caEbayPayees')+';this.ca=caEbayPayees;',context);
+    // (20 oct.) Le montant compté est l'argent REÇU (dû au vendeur − frais), jamais le total acheteur (port compris).
+    const order=(value,currency)=>({orderPaymentStatus:'PAID',pricingSummary:{total:{value:'999',currency:'EUR'}},paymentSummary:{totalDueSeller:{value,currency}},totalMarketplaceFee:{value:'0',currency:'EUR'}});
     dit(context.ca([order('25','EUR'),order('50','EUR')])===75,'[Suite-devises] les commandes payées en EUR donnent le montant exact');
     dit(context.ca([order('25','EUR'),order('50','USD')])===null && context.ca([order('25',undefined)])===null && context.ca([order('inconnu','EUR')])===null,'[Suite-devises] ni dollars ni devise ou montant inconnus ne deviennent des euros');
   });
