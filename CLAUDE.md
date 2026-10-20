@@ -10679,3 +10679,12 @@ Quatre défauts, reproduits sur le vrai `background.js` (`audit-fiabilite-fond.c
 
 ### Messages : une offre en attente passe devant (19 octobre)
 Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.
+
+### Revue argent de l'app (20 octobre) — trois défauts, reproduits puis corrigés
+Relecture adverse des chemins qui coûtent de l'argent (N° tamponné, double vente, colis à poster, URSSAF, bénéfice, emails, factures). Chaque défaut est REPRODUIT dans `scripts/audit-revue-argent.cjs` (vraies fonctions de l'app dans un `vm`) : **9 rouges sur le code d'avant**, 15 verts après, `--prouve` 5 mutations sur 5 rouges.
+- ⚠️⚠️ **Une commande eBay ANNULÉE comptait dans le CA déclaré, le vendu et le CA payé** : `annulerCommandeRangee` (serveur) pose `cancelState: 'CANCELED'` et garde `orderPaymentStatus: 'PAID'`. `ventesDeclarables`, `ventesFaites` et `caEbayPayees` passent par `commandeEbayEngagee` (une règle, §11 ; le miroir `ventes-regle.js` refabriqué par `--recopie`).
+- ⚠️⚠️ **`CANCEL_REJECTED` (annulation refusée, la vente tient) n'engageait pas la paire** : `/CANCEL/` l'attrapait. Plus d'alerte « retire-la de Vinted » ni de garde de double vente. Corrigé dans `commandeEbayEngagee` (même lecture que `etatCommandeEbay` côté serveur).
+- **Une facture manuelle faite AVANT la remise à zéro 013 pour « 12 » se joignait au bordereau de la NOUVELLE N°12** (identité d'un autre acheteur) : `facturesDuNumero` ne retient que les factures créées depuis `appliqueLe` ; sans date, rien ; sans marqueur, comme avant.
+- `audit-urssaf.cjs` et `audit-ebay-route.cjs` chargent `commandeEbayEngagee` (§6.3).
+- **Rejetés après vérification** : `label_latest` sans transaction (la transaction est exigée), ordre de `numForBord`, lot d'impression (gardé par la version de numérotation et les N° à vérifier), URSSAF (arrondi une fois), bénéfice Leboncoin/eBay (passait déjà par l'engagement).
+- ⚠️ **Noté, pas corrigé (session eBay)** : le CA et le bénéfice eBay lisent `pricingSummary.total`, port compris — contraire à §2.8 et à la décision « l'argent que tu reçois » (dû au vendeur − frais). Non mesuré : 0 commande eBay en base, aucune facture manuelle, forme réelle de `cancelState` non vue.
