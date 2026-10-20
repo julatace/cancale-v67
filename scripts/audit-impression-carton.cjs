@@ -15,6 +15,7 @@ const code = [
   prend(/const cleNum = \(v\) => \{[\s\S]*?\n\};/, 'cleNum'),
   prend(/const PANNE_NUMEROS = \{[^\n]*\};/, 'PANNE_NUMEROS'),
   prend(/const ficheAVerifier = \(f\) => \{[\s\S]*?\n\};/, 'ficheAVerifier'),
+  prend(/const reattribueAEcrire = [^\n]*;/, 'reattribueAEcrire'),
   prend(/const NUM_A_VERIFIER_ANNULE = [^\n]*;/, 'NUM_A_VERIFIER_ANNULE'),
   prend(/const confirmerNumerosAVerifier = async \(numeros\) => \{[\s\S]*?\n\};/, 'confirmerNumerosAVerifier'),
 ].join('\n') + '\n;({ confirmerNumerosAVerifier })';
@@ -38,6 +39,15 @@ const code = [
     dit((await f(['82'])) === true && demandes.length === 0, 'un numéro VÉRIFIÉ sur son carton : aucune question');
     demandes = [];
     dit((await f([])) === true && demandes.length === 0, 'sans numéro : aucune question');
+    // 20 octobre : deux fiches sous le même numéro, et un numéro neuf pas encore écrit.
+    fiches = { a: { numero: '51', auto: true, numberedAt: '2026-10-14T10:00:00Z', title: 'Patta' }, b: { numero: '51', auto: true, numberedAt: '2026-10-14T11:00:00Z', title: 'Samba' } };
+    demandes = []; reponse = false;
+    dit((await f(['51'])) === false && demandes.length === 1 && /deux paires/.test(demandes[0].title), 'N°51 porté par deux fiches : on DEMANDE, « Annuler » n\'imprime pas', `${demandes.length} question(s)`);
+    fiches = { a: { numero: '90', auto: true, numberedAt: '2026-10-20T10:00:00Z', title: 'Samba', reattribue: { de: '51', vers: '90', at: '2026-10-20T10:00:00Z' } } };
+    demandes = []; reponse = false;
+    dit((await f(['90'])) === false && demandes.length === 1 && /90/.test(demandes[0].title), 'N°90 neuf pas encore écrit sur le carton : on DEMANDE', `${demandes.length} question(s)`);
+    fiches.a.reattribue.ecrit = '2026-10-20T11:00:00Z'; demandes = [];
+    dit((await f(['90'])) === true && demandes.length === 0, '… « C\'est écrit » fait : aucune question');
   }
   // Les trois chemins d'impression l'appellent, juste après la garde de version.
   const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;

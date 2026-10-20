@@ -280,7 +280,7 @@ function Plateau({ t, W, H, portrait, court }) {
     const taille = mix(180, 56, monte);
     const y = mix(H / 2 - 90, portrait ? 150 : 72, monte);
     if (lp > 0 && part < 1) {
-      libres.push(<img key="logo" src="/vrm-logo-192.png" alt="" width="180" height="180" style={{ position: 'absolute', left: W / 2 - taille / 2, top: y, width: taille, height: taille, borderRadius: taille * 0.2,
+      libres.push(<img key="logo" src="/vrm-logo-v3-192.png" alt="" width="180" height="180" style={{ position: 'absolute', left: W / 2 - taille / 2, top: y, width: taille, height: taille, borderRadius: taille * 0.2,
         opacity: lp * (1 - part), transform: `scale(${mix(0.96, 1, lp).toFixed(4)})`, filter: lp < 1 ? `blur(${(8 * (1 - lp)).toFixed(2)}px)` : undefined }} />);
     }
   }
@@ -448,7 +448,7 @@ function Plateau({ t, W, H, portrait, court }) {
     if (t >= tf[0]) {
       const lp = sortie(seg(t, tf[0], tf[0] + 0.5));
       const y = portrait ? 640 : 230;
-      libres.push(<img key="logo-fin" src="/vrm-logo-192.png" alt="" width="120" height="120" style={{ position: 'absolute', left: W / 2 - 60, top: y, width: 120, height: 120, borderRadius: 24,
+      libres.push(<img key="logo-fin" src="/vrm-logo-v3-192.png" alt="" width="120" height="120" style={{ position: 'absolute', left: W / 2 - 60, top: y, width: 120, height: 120, borderRadius: 24,
         opacity: lp, transform: `scale(${mix(0.96, 1, lp).toFixed(4)})`, filter: lp < 1 ? `blur(${(6 * (1 - lp)).toFixed(2)}px)` : undefined }} />);
       libres.push(<Mots key="f1" texte="Tu ouvres VRM." t={t} t0={tf[1]} couleur={K.muted} style={titreStyle(y + 170)} />);
       libres.push(<Mots key="f2" texte="Tu sais quoi faire." t={t} t0={tf[2]} style={titreStyle(y + 170 + T * 1.12)} />);
