@@ -58,6 +58,8 @@ async function brancher(p){
     return r.abort();
   });
 }
+// La vente est repliée (5cdffcb, 20 octobre) : sa facture et sa photo vivent dans le détail, qu'on ouvre comme la personne.
+const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first();if(await t.isVisible().catch(()=>false)){await t.click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}};
 (async()=>{
  let b;
  try{
@@ -70,11 +72,20 @@ async function brancher(p){
   if(await p.locator('.vrm-day-greeting').count())check(await p.locator('.vrm-day-greeting').evaluate(e=>e.getBoundingClientRect().height)<=56,'accueil compact après rétablissement des chiffres');
   for(const tab of ['cat_ventes','plat_leboncoin','plat_ebay']){
     await p.goto(base+'/?tab='+tab);await p.locator('.vrm-sale-row').first().waitFor();
+    // ⚠️ (20 octobre) Depuis fc4c73e/5cdffcb (design de Julien, « les ventes mobiles sur une seule ligne »),
+    //    chaque vente est REPLIÉE : la ligne compacte est le bouton `.vrm-ledger-sale-toggle` (vignette,
+    //    titre, statut, montant) et le détail s'ouvre au toucher. On juge la ligne repliée, puis on OUVRE
+    //    la vente (le geste de la personne) pour juger sa photo, à gauche des informations.
+    const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect();return {h:r.height,visible:r.width>0&&r.height>0};}).catch(()=>null);
+    if(plie){check(plie.visible && plie.h<=64,'ligne repliée compacte '+tab+' ('+Math.round(plie.h)+' px)');
+      await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}
     const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
     // ⚠️ L'écran Ventes de Vinted a sa propre liste depuis le 16 octobre (b8d11f2, « Ventes premium », `.vrm-ventes-liste` : vignette CARRÉE 56 × 56 sur téléphone) ; Leboncoin et eBay gardent la ligne partagée 64 × 84. Chaque liste est jugée sur SA taille exacte, photo à gauche des informations.
     //    Et depuis #545 (« plateformes premium », 16 octobre) Leboncoin et eBay ont, AU TÉLÉPHONE, leur ligne d'app native
     //    (`styles-mineral.css` : vignette portrait 52 × 68). Ce banc est à 390 px : c'est cette taille-là qu'il exige.
-    const attendu=tab==='cat_ventes'?{w:56,h:56,nom:'photo carrée à gauche '}:{w:52,h:68,nom:'photo portrait à gauche '};
+    //    (20 octobre) Et depuis fc4c73e (« ventes mobiles sur une seule ligne », styles-mobile-studio.css), les DEUX listes
+    //    ont au téléphone la même vignette portrait 36 × 48, ouverte comme repliée. Une taille exacte, jugée vente ouverte.
+    const attendu={w:36,h:48,nom:'photo portrait à gauche '};
     check(pos.w===attendu.w && pos.h===attendu.h && pos.right>pos.left,attendu.nom+tab+' ('+pos.w+'×'+pos.h+')');
     // ⚠️ Ventes Vinted (b8d11f2, 16 octobre) : la LIGNE (`.vrm-sale-overview` : vignette, titre, statut, montant,
     //    bouton du bordereau sous le titre) reste sous 200 px ; les gestes du coût d'achat et « Modifier › »
@@ -92,12 +103,12 @@ async function brancher(p){
       //    NOT_STARTED · IN_PROGRESS · FULFILLED) ; « NOT_FULFILLED » n'en est pas un et vaut « Expédition à
       //    confirmer ». La commande du banc porte donc NOT_STARTED (la forme réelle, comme revendeurs.cjs), et le
       //    second filtre d'eBay s'appelle « Expédiées » (doneLabel).
-      await p.getByRole('button',{name:'À expédier',exact:true}).click();await p.getByText('Paire eBay',{exact:true}).waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'NOT_STARTED reste à expédier');
+      await p.getByRole('button',{name:'À expédier',exact:true}).click();await p.getByText('Paire eBay',{exact:true}).first().waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'NOT_STARTED reste à expédier');
       await p.getByRole('button',{name:'Expédiées',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())===0,'NOT_STARTED non expédiée');
     }
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-'+tab+'.png')});}
   }
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   await p.locator('.vrm-sale-invoice').first().waitFor();
   check((await p.locator('.vrm-sale-invoice').count())>0,'facture proposée au compte avec reçu Pro');
   await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();
@@ -112,17 +123,17 @@ async function brancher(p){
   //    On clique ce que la personne VOIT ; la croix cachée n'est pas un geste.
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())>0,'effacement restaure les ventes');
   rows.splice(rows.findIndex(x=>x.id==='email_invoice_test'),1);
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   check((await p.locator('.vrm-sale-invoice').count())===0,'pas de bouton sur compte sans preuve Pro');
   await p.addInitScript(()=>{localStorage.setItem('vrm_session',JSON.stringify({access_token:'test.test.test',refresh_token:'fake',expires_at:Date.now()+3600000,user:{id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'}}));});
   await p.route('**/auth/v1/user',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'})}));
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-sale-row img');return i && i.complete && i.naturalWidth>0;},{},{timeout:30000});
   check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo Vinted récupérée sans extension sur téléphone');
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-photo-telephone.png')});
   rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}});
   let patch=0;await p.route('**/rest/v1/app_data?**',async r=>{if(r.request().method()==='PATCH' && r.request().url().includes('email_invoice_test')){patch++;return r.fulfill({status:403,contentType:'application/json',body:'{}'});}return r.fallback();});
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-invoice').first().waitFor();
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);await p.locator('.vrm-sale-invoice').first().waitFor();
   await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();await p.getByLabel('Facture de cette vente').selectOption('email_invoice_test');
   check(patch===0,'choisir un brouillon ne déclenche pas envoi');
   await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(patch===0,'annuler confirmation ne déclenche pas envoi');

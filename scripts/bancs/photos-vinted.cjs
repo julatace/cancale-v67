@@ -920,8 +920,13 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
     cdnEtat.mode = 'corp';
     await essaie('O', async () => {
       const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { refuseHorsLigne: true } });
-      await ouvrir(pg, 'plat_vinted', 3000);
-      await section(pg, 'annonces', 4000);
+      // ⚠️ (20 octobre) Passer par Vinted d'abord affichait la section Ventes
+      //    (l'onglet s'ouvre sur elle) : l'extension y rendait les photos des
+      //    ventes, mises en cache — Ma journée les montrait hors ligne SANS
+      //    rien demander, et le contrôle « le scénario est réel » tombait. On
+      //    part d'un écran sans photo de vente : Ma journée les demande bien
+      //    hors ligne (sinon rien ne prouve qu'elles « reviennent »).
+      await ouvrir(pg, 'settings', 3000);
       await ctx.setOffline(true);
       await pg.getByRole('button', { name: /Ma journée/ }).first().click();
       await pg.waitForTimeout(5000);
