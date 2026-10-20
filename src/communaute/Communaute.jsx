@@ -411,7 +411,14 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   </section>;
 
   return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-total={r.total} data-cm-vue-active="carte">
-    {entete}{onglets}{blocGroupes}
+    {entete}{onglets}
+    {/* La carte d'abord : sous trois blocs, elle tombait sous la barre du bas sur téléphone. */}
+    {enListe ? <div className="vrm-cm-carton" data-cm-liste-secours>
+      <p className="vrm-cm-note">La carte n’a pas pu se charger (réseau). Voici la même communauté en liste.</p>
+      <ul className="vrm-cm-liste">{cells.map((c) => <li key={c.cle}><div><b>{c.villes.join(' · ')}</b><small>{c.personnes.length} revendeur{c.personnes.length > 1 ? 's' : ''}</small></div>
+        <button type="button" onClick={() => setCellsOuvertes([c])}>Voir</button></li>)}</ul>
+    </div> : <Carte cells={cells} moi={moi} sombre={sombre} onCellules={setCellsOuvertes} onEchec={() => setEnListe(true)} />}
+    {blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
     {/* Ma présence : l'opt-in, toujours visible */}
@@ -443,11 +450,6 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
       {moi && <li data-cm-chiffre="pres"><b>{r.pres}</b> à moins de {RAYON_PRES_KM} km</li>}
     </ul>}
 
-    {enListe ? <div className="vrm-cm-carton" data-cm-liste-secours>
-      <p className="vrm-cm-note">La carte n’a pas pu se charger (réseau). Voici la même communauté en liste.</p>
-      <ul className="vrm-cm-liste">{cells.map((c) => <li key={c.cle}><div><b>{c.villes.join(' · ')}</b><small>{c.personnes.length} revendeur{c.personnes.length > 1 ? 's' : ''}</small></div>
-        <button type="button" onClick={() => setCellsOuvertes([c])}>Voir</button></li>)}</ul>
-    </div> : <Carte cells={cells} moi={moi} sombre={sombre} onCellules={setCellsOuvertes} onEchec={() => setEnListe(true)} />}
 
     {pres.length > 0 && <div className="vrm-cm-carton" data-cm-pres={pres.length}>
       <h3>Près de toi</h3>
