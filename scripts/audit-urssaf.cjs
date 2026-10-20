@@ -23,6 +23,13 @@ const path = require('path');
 const vm = require('vm');
 const RACINE = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+// (revue argent, 20 oct.) la règle d'engagement eBay que ventesDeclarables
+// appelle maintenant — extraite du source, jamais recopiée (§6.3).
+const ENGAGEE_SRC = (() => {
+  const c = SRC.indexOf('const commandeEbayEngagee = ');
+  const d = c > 0 ? SRC.indexOf(';\n', c) : -1;
+  return c > 0 && d > c ? SRC.slice(c, d + 1) + '\n' : '';
+})();
 let ko = 0;
 const ok = (m) => console.log('✅ ' + m);
 const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); };
@@ -114,7 +121,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   const lbcSrc = (() => {
     const a = SRC.indexOf('const lbcAnnulee = ');
     const b = SRC.indexOf('\nconst lbcEuro', a);
-    return a > 0 && b > a ? SRC.slice(a, b) : '';
+    return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : '';
   })();
   const ctxP = {
     console, Date, Number, String, isFinite, parseFloat, Object, Math, Array,
@@ -183,7 +190,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 //    EXCLU de l'app n'entre dans AUCUN total — ni un mois, ni « à dater ». Une
 //    vente MASQUÉE d'un ✕ sur sa carte, elle, reste du chiffre d'affaires.
 {
-  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
     console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, load: (k, d) => d,
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
@@ -255,7 +262,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 //    « il faut dater la vente pour le CA du mois à la date de réception
 //    d'argent ». On juge ce que la règle REND, jamais sa formulation.
 {
-  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
     console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, load: (k, d) => d,
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
@@ -326,7 +333,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 //    Et « pas su » (registre pas encore chargé) ne déplace RIEN.
 //    On juge ce que la règle REND, dans un vm, sur le code de l'app.
 {
-  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
     console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, load: (k, d) => d,
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
@@ -412,7 +419,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
 
 // ── 1 sexies. LA REVUE DU 6 OCTOBRE — chaque constat exécuté sur le VRAI code ─
 {
-  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? ENGAGEE_SRC + SRC.slice(a, b) : ''; })();
   const c = {
     console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, load: (k, d) => d,
     classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
