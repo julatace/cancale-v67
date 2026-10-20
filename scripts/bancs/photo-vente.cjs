@@ -96,6 +96,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') +
 
 // La photo réellement peinte par une image (ou null).
 async function couleurs(pg, tx) {
+  // Les détails sont désormais dans le panneau désigné par aria-controls.
+  const bouton = pg.locator(`.vrm-sale-row[data-tx="${tx}"] > .vrm-ledger-sale-toggle`);
+  if (await bouton.count() && await bouton.getAttribute('aria-expanded') !== 'true') await bouton.click();
   return pg.evaluate((tx) => {
     const row = document.querySelector(`.vrm-sale-row[data-tx="${tx}"]`); if (!row) return null;
     // Une image PEINTE (chargée, largeur réelle) et la photo qu'elle porte (le
@@ -103,8 +106,9 @@ async function couleurs(pg, tx) {
     // origine, une image peinte le « tacherait ».
     const lit = (img) => { if (!img || !img.complete || !img.naturalWidth) return null; const m = /\/f800\/([a-z]+)\.jpeg/.exec(img.currentSrc || img.src || ''); return m ? m[1] : 'inconnue'; };
     const ligne = row.querySelector('.vrm-ledger-sale-toggle img');
-    const detail = row.querySelector('.vrm-sale-photo img');
-    const toutes = [...row.querySelectorAll('img')].map(lit).filter(Boolean);
+    const panneau = document.getElementById(row.querySelector('.vrm-ledger-sale-toggle').getAttribute('aria-controls'));
+    const detail = panneau && !panneau.closest('[hidden]') && panneau.querySelector('.vrm-sale-photo img');
+    const toutes = [...row.querySelectorAll('img'), ...(panneau ? panneau.querySelectorAll('img') : [])].map(lit).filter(Boolean);
     return { ligne: lit(ligne), detail: lit(detail), toutes };
   }, tx);
 }
@@ -164,9 +168,9 @@ const nomCouleur = (c) => c;
       for (let k = 0; k < 20; k++) { c = await couleurs(pg, 9003); if (c && c.ligne && c.detail) break; await pg.waitForTimeout(300); }
       dit(c && nomCouleur(c.ligne) === 'commandec' && nomCouleur(c.detail) === 'commandec', 'C. vente normale : ligne et détail = la photo de la commande', c && `${nomCouleur(c.ligne)} / ${nomCouleur(c.detail)}`);
       // D. L'achat relié, dans « Modifier » : sa photo est DITE comme telle.
-      await pg.evaluate(() => { const r = document.querySelector('.vrm-sale-row[data-tx="9003"]'); const d = r && r.querySelector('details.vrm-sale-details'); if (d) d.open = true; });
+      await pg.evaluate(() => { const r = document.querySelector('.vrm-sale-row[data-tx="9003"]'); const panneau = r && document.getElementById(r.querySelector('.vrm-ledger-sale-toggle').getAttribute('aria-controls')); const d = panneau && panneau.querySelector('details.vrm-sale-details'); if (d) d.open = true; });
       await pg.waitForTimeout(800);
-      const achat = await pg.evaluate(() => { const r = document.querySelector('.vrm-sale-row[data-tx="9003"]'); const im = r && r.querySelector('img[data-photo-achat]'); return { alt: im ? im.getAttribute('alt') : null, txt: r ? r.innerText : '' }; });
+      const achat = await pg.evaluate(() => { const r = document.querySelector('.vrm-sale-row[data-tx="9003"]'); const panneau = r && document.getElementById(r.querySelector('.vrm-ledger-sale-toggle').getAttribute('aria-controls')); const im = panneau && panneau.querySelector('img[data-photo-achat]'); return { alt: im ? im.getAttribute('alt') : null, txt: panneau ? panneau.innerText : '' }; });
       dit(achat.alt === "Photo de l'achat", 'D. la photo de l’achat relié porte « Photo de l’achat »', String(achat.alt));
       dit(/Achat relié/.test(achat.txt), 'D. la ligne de l’achat se dit « Achat relié »');
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

@@ -24,6 +24,7 @@
 //    (src/accueil-scenes.jsx) arrivent à part, pendant un temps mort ; le film
 //    (src/AccueilFilm.jsx) seulement avec `?film`.
 import React from 'react';
+import './styles-accueil-studio.css';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACTE } from './accueil-jetons.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
@@ -117,12 +118,14 @@ const CSS = `
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(244,246,250,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(244,246,250,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(242,245,243,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:rgba(242,245,243,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
+.acc img.vrm-brand-asset{background:#21343e;padding:2px;object-fit:contain;box-sizing:border-box}
+.acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.acc-marque img{width:32px;height:32px;border-radius:8px;display:block}
+.acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
 .acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
 .acc-ancres{display:flex;gap:2px;margin-left:22px}
 .acc-ancres a{color:${K.muted};font-size:14px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;transition:color 160ms ease}
@@ -131,12 +134,12 @@ const CSS = `
 
 /* Les boutons : une forme, trois poids. */
 .acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(36,88,230,.30)}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(43,69,72,.30)}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(36,88,230,.38)}
+  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(43,69,72,.38)}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
 .acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
@@ -179,7 +182,7 @@ const CSS = `
      (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
    Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
    Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(36,88,230,.16)}
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(43,69,72,.16)}
 /* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
    se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
    À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
@@ -363,7 +366,7 @@ const CSS = `
 /* Téléphone. */
 @media (max-width:759px){
   .acc-nav .acc-in{height:56px;gap:8px}
-  .acc-marque img{width:28px;height:28px}
+  .acc-marque img{width:32px;height:32px}
   .acc-marque b{font-size:17px}
   .acc-nav .acc-btn{height:38px;padding:0 12px;font-size:13.5px}
   .acc-nav .acc-lien{font-size:14px;padding:0 4px}
@@ -529,7 +532,7 @@ export default function Accueil({ onEntrer }) {
       <header className={`acc-nav${defile ? ' defile' : ''}`}>
         <div className="acc-in">
           <a className="acc-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
-            <img src="/vrm-logo-96.png" alt="" width="32" height="32" />
+            <img className="vrm-brand-asset" src="/vrm-logo-v3-192.png" srcSet="/vrm-logo-v3-96.png 96w, /vrm-logo-v3-192.png 192w" sizes="32px" alt="" width="32" height="32" />
             <b>VRM</b>
           </a>
           <nav className="acc-ancres" aria-label="Sections">
@@ -551,9 +554,10 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-hero" data-section="hero">
           <div className="acc-in">
             <div>
-              <div className="acc-def" data-definition="">L’outil de gestion des revendeurs de seconde main</div>
-              <h1 className="acc-h1"><span className="attenue">Tu ouvres VRM.</span><span>Tu sais quoi faire.</span></h1>
-              <p className="acc-sous">Tes comptes Vinted, Leboncoin et eBay au même endroit — un compte ou dix : <em>les colis à poster, les articles vendus ailleurs, la compta pour l’URSSAF.</em></p>
+              <div className="acc-def" data-definition=""><span className="acc-def-dot" aria-hidden="true"/>L’espace de travail des revendeurs</div>
+              <div className="acc-plateformes" aria-label="Plateformes prises en charge"><span>Vinted</span><span>Leboncoin</span><span>eBay</span></div>
+              <h1 className="acc-h1"><span>Moins de gestion.</span><span className="attenue acc-h1-long">Plus de temps pour vendre.</span><span className="attenue acc-h1-court">Place à la vente.</span></h1>
+              <p className="acc-sous">Tes ventes, tes colis et tes chiffres, réunis. <em>Une vue claire pour passer à l’action.</em></p>
               <div className="acc-actions">
                 {creer({ ref: ctaHaut })}
                 {connexion({ 'data-cta': 'connexion' })}
@@ -568,24 +572,32 @@ export default function Accueil({ onEntrer }) {
                 </div>
                 <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'}>
                   {sansSouris
-                    ? 'Sur ton téléphone, crée ton compte dès maintenant : l’extension s’installe ensuite une fois, dans Chrome sur un ordinateur. Puis une notification à chaque vente, si tu l’actives.'
+                    ? 'Crée ton compte ici, puis installe l’extension une fois dans Chrome sur ordinateur.'
                     : 'S’installe une fois dans Chrome, sur ton ordinateur. Ensuite, ton téléphone suffit.'}
                 </div>
               </div>
             </div>
-            <CarteJour onVers={vers} />
+            <div className="acc-preview"><div className="acc-preview-head"><span>UNE JOURNÉE PLUS CLAIRE</span><span className="acc-preview-example">Démonstration</span></div><CarteJour onVers={vers} /><p className="acc-preview-note">Ce qui compte aujourd’hui, visible au même endroit. Données d’exemple.</p></div>
           </div>
         </section>
 
+        <nav className="acc-benefices acc-in" aria-label="Découvrir les fonctions de VRM">
+          {[
+            ['colis','colis','Savoir quoi expédier','Tes bordereaux et les colis à déposer.'],
+            ['ailleurs','pile','Repérer les annonces à retirer','Un article vendu, les autres annonces à vérifier.'],
+            ['urssaf','euro','Voir où tu en es','Tes ventes finalisées et les rapports du mois.'],
+          ].map(([id,icone,titre,texte])=><a key={id} href={'#'+id} onClick={ancre(id)}><span className="acc-benefice-icon"><Icone nom={icone}/></span><span><b>{titre}</b><small>{texte}</small></span><Chevron/></a>)}
+        </nav>
+
         <div ref={zoneScenes}>
           <section className="acc-sec" id="colis" data-section="colis">
-            <Fil libelle="8 h 02" />
+            <Fil libelle="01" />
             <div className="acc-in acc-g1">
               <div>
-                <Quand heure="8 h 02" contexte="avant d’aller au relais" />
-                <h2 className="acc-h2">Quels colis je poste ce matin ?</h2>
-                <p className="acc-rep">Ceux-là, dans cet ordre : bordereau prêt d’abord, le plus pressé en haut — chacun avec le numéro de son carton imprimé dessus.</p>
-                <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu prends le carton 128, tu déposes." />
+                <Quand contexte="01 · Préparer les envois" />
+                <h2 className="acc-h2">Les bons colis. Dans le bon ordre.</h2>
+                <p className="acc-rep">Retrouve les colis à envoyer et leurs bordereaux. Le numéro de rangement t’aide à retrouver le bon article.</p>
+                <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu retrouves ton article et tu déposes le colis." />
                 <Precisions items={['Un bordereau par feuille, en A4 ou sur imprimante thermique.', 'Ton numéro de rangement, en chiffres ou en série (B125…), n’est jamais redonné à un autre article.']} />
               </div>
               <Emplacement nom="colis" pret={scenesPretes} />
@@ -593,13 +605,13 @@ export default function Accueil({ onEntrer }) {
           </section>
 
           <section className="acc-sec" id="ailleurs" data-section="ailleurs">
-            <Fil libelle="8 h 03" />
+            <Fil libelle="02" />
             <div className="acc-in">
               <div className="acc-g2-texte">
                 <div>
-                  <Quand heure="8 h 03" contexte="la Nike vient d’être vendue sur Vinted" />
-                  <h2 className="acc-h2">Vendu sur Vinted… encore en ligne sur Leboncoin ?</h2>
-                  <p className="acc-rep">VRM te le dit. Chaque annonce est reliée à son article par son numéro — jamais par son titre — et une vente prouvée sur un site te dit où le retirer ailleurs, dans les deux sens.</p>
+                  <Quand contexte="02 · Suivre les annonces" />
+                  <h2 className="acc-h2">Vendu ici. À retirer ailleurs.</h2>
+                  <p className="acc-rep">Un article vendu peut encore être en ligne ailleurs. VRM rassemble les annonces liées à la vente pour que tu saches lesquelles vérifier.</p>
                 </div>
                 <div>
                   <Roles vrm="relie tes annonces par leur numéro et te signale celles à retirer." toi="tu la retires d’eBay d’un clic ; sur Vinted et Leboncoin, c’est toi qui la retires — VRM te dit laquelle." />
@@ -611,13 +623,13 @@ export default function Accueil({ onEntrer }) {
           </section>
 
           <section className="acc-sec" id="urssaf" data-section="urssaf">
-            <Fil libelle="Fin du mois" />
+            <Fil libelle="03" />
             <div className="acc-in acc-g3">
               <div className="acc-g3-ecran"><Emplacement nom="urssaf" pret={scenesPretes} /></div>
               <div>
-                <Quand contexte="Fin du mois" />
-                <h2 className="acc-h2">Combien je déclare à l’URSSAF ?</h2>
-                <p className="acc-rep">Ce chiffre-là. Le chiffre d’affaires de tes ventes finalisées sur Vinted, Leboncoin et eBay, mois par mois : une vente Vinted compte le mois où l’argent t’est versé ; Leboncoin et eBay, au jour de la vente.</p>
+                <Quand contexte="03 · Retrouver ses chiffres" />
+                <h2 className="acc-h2">Tes ventes, prêtes pour la comptabilité.</h2>
+                <p className="acc-rep">Le chiffre d’affaires finalisé, mois par mois. Sur Vinted, la date est celle du versement ; sur Leboncoin et eBay, celle de la vente.</p>
                 <Roles vrm="compte, date chaque vente et prépare le rapport du mois." toi="tu reportes le montant sur ton espace URSSAF, puis tu le notes comme déclaré." />
                 <Precisions items={['« J’ai déclaré ce mois » : une vente notée ne se recompte jamais dans un autre mois.', 'Le rapport du mois en PDF et en tableur, pour toi ou ton comptable.']} />
               </div>
@@ -628,7 +640,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec" id="questions" data-section="questions">
           <div className="acc-in">
             <Quand contexte="Le reste de la journée" />
-            <h2 className="acc-h2">Et toutes les petites questions.</h2>
+            <h2 className="acc-h2">Le quotidien, dans le détail.</h2>
             <div className="acc-qs">
               {QUESTIONS.map((x) => (
                 <div key={x.q} className={`acc-q${x.horsTel ? ' acc-hors-tel' : ''}`}>
@@ -654,9 +666,9 @@ export default function Accueil({ onEntrer }) {
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
-              <p>VRM travaille comme toi : uniquement sur le compte ouvert dans ton Chrome, une action à la fois, jamais plus de 20 par heure.</p>
-              <p>Il lit tes données et prépare le bordereau de ce que tu as déjà vendu ; vendre, publier, écrire à un acheteur, c’est toi qui le décides. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
-              <p>Et VRM refuse ce qui fait repérer un robot : relancer en série les personnes qui ont mis un article en favori, republier tes annonces en boucle, accepter une offre Vinted à ta place, supprimer une annonce.</p>
+              <p>VRM agit sur le compte ouvert dans Chrome : une action à la fois, jamais plus de 20 par heure.</p>
+              <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
+              <p>Pas de relances en série aux favoris, de republication en boucle, d’acceptation automatique des offres Vinted ou de suppression d’annonce.</p>
             </div>
           </div>
         </section>
@@ -664,7 +676,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec" id="prix" data-section="prix">
           <div className="acc-in acc-g-prix">
             <div className="acc-prix">
-              <h2 className="acc-h2b">Un seul prix, et rien de caché.</h2>
+              <h2 className="acc-h2b">Tous tes comptes. Un seul espace.</h2>
               {ACCES_OFFERT && <div className="acc-offert" data-acces-offert="">Gratuit pour l’instant</div>}
               <div className="acc-gros"><b>{PRIX_MOIS} €</b><span>par mois</span></div>
               <ul>
@@ -713,8 +725,8 @@ export default function Accueil({ onEntrer }) {
               <p className="note">Ton premier article aura le N° 1.</p>
             </div>
             <div className="acc-fin-texte">
-              <h2 className="acc-h2">Demain matin, ouvre VRM.</h2>
-              <p className="texte">Crée ton compte, ajoute l’extension sur ton ordinateur, passe sur Vinted : tu sauras quoi faire.</p>
+              <h2 className="acc-h2">Place à ta prochaine vente.</h2>
+              <p className="texte">Crée ton espace, installe l’extension et retrouve tes prochaines actions au même endroit.</p>
               <div className="acc-actions">
                 {creer()}
                 {connexion()}
@@ -727,7 +739,7 @@ export default function Accueil({ onEntrer }) {
       <footer className="acc-pied">
         <div className="acc-in">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/vrm-logo-96.png" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
+            <img className="vrm-brand-asset" src="/vrm-logo-v3-192.png" srcSet="/vrm-logo-v3-96.png 96w, /vrm-logo-v3-192.png 192w" sizes="32px" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
             <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
           </div>
           <nav aria-label="Informations légales">
