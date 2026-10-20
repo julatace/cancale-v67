@@ -42,7 +42,7 @@ const V = [
   { o: vente(9105, 45, 'Commande finalisée', il(3)), vendu: il(3), recu: null, aDater: true }, // finalisée SANS date de versement
 ];
 const LBC = { A: { txId: 'A', isSeller: true, price: 4000, stepLabel: 'Paiement effectué', dateVente: il(0).toISOString(), title: 'lbc' } };
-const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: il(1).toISOString(), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'ebay' }] }];
+const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: il(1).toISOString(), pricingSummary: { total: { value: '66.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '65.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' }, lineItems: [{ title: 'ebay' }] }];
 // Ce que le banc ATTEND, calculé ici à partir des définitions — jamais lu dans l'app.
 const lignesVendu = [...V.filter((x) => x.vendu).map((x) => ({ d: x.vendu, eur: Number(x.o.price.amount) })), { d: il(0), eur: 40 }, { d: il(1), eur: 60 }];
 const lignesRecu = [...V.filter((x) => x.recu).map((x) => ({ d: x.recu, eur: Number(x.o.price.amount) })), { d: il(0), eur: 40 }, { d: il(1), eur: 60 }];

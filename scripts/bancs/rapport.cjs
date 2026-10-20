@@ -67,7 +67,7 @@ const LBC = {
   B: { txId: 'B', isSeller: true, price: 5800, stepLabel: 'Paiement effectué', title: 'Nike sans date' },
   C: { txId: 'C', price: 9900, stepStatus: 'done', dateVente: jour(Math.max(1, J - 2)), title: 'côté inconnu' },
 };
-const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: jour(Math.max(1, J - 1)), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'Salomon ebay' }] }];
+const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: jour(Math.max(1, J - 1)), pricingSummary: { total: { value: '66.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '65.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' }, lineItems: [{ title: 'Salomon ebay' }] }];
 const rows = [
   { id: 'lbc_ventes', data: { ventes: LBC } },
   { id: 'ebay_orders', data: { orders: EBAY } },

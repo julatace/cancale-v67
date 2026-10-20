@@ -45,6 +45,9 @@ global.fetch = async (url, opts = {}) => {
         : fee('AuctionLengthFee', '0.0') + fee('BoldFee', '0.0') + fee('FeaturedFee', '0.0') + fee('GalleryFee', '0.0') + fee('InsertionFee', '0.35') + fee('ListingDesignerFee', '0.0') + fee('ListingFee', '0.55') + fee('SchedulingFee', '0.2') + fee('SubtitleFee', '0.0');
       return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Fees>' + frais + '</Fees></r>', { status: 200 });
     }
+    // GetItem (13e revue, 19 oct.) : un changement de prix relit d'abord le prix
+    // chez eBay — il doit être celui que l'écran a vu (prixVu).
+    if (/GetItem/.test(lastCall)) return new Response('<?xml version="1.0"?><GetItemResponse xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Item><ItemID>' + ((/<ItemID>([^<]*)</.exec(lastBody) || [])[1] || '') + '</ItemID><SellingStatus><CurrentPrice currencyID="EUR">68.0</CurrentPrice><ListingStatus>Active</ListingStatus></SellingStatus><StartPrice currencyID="EUR">68.0</StartPrice><ListingType>FixedPriceItem</ListingType></Item></GetItemResponse>', { status: 200 });
     if (/AddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><ItemID>110555000111</ItemID></r>', { status: 200 });
     return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></r>', { status: 200 });
   }
@@ -77,14 +80,14 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
     dit(res.code === 400 && res.corps && res.corps.ok === false, 'publish sans catégorie/prix → 400'); }
 
   // 4. Modifier prix/stock OK
-  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '110555000111', price: '72', quantity: '1' } }, res);
+  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '110555000111', price: '72', prixVu: 68, quantity: '1' } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === true, 'revise → ReviseInventoryStatus OK');
     const rev = appels.slice(n0).filter((a) => a.nom === 'ReviseInventoryStatus');
     dit(rev.length === 1 && /<StartPrice>72\.00<\/StartPrice>/.test(rev[0].corps), 'le nouveau prix est envoyé (72.00), en UNE révision', appels.slice(n0).map((a) => a.nom).join(',')); }
 
   // 5. Refus de modification → remonte
   tradingMode = 'fail';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '1', price: '9' } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '1', price: '9', prixVu: 68 } }, res);
     dit(res.code >= 400 && res.corps && res.corps.ok === false, 'un refus de modification REMONTE'); }
 
   // 6. Vérifier À BLANC (VerifyAddFixedPriceItem) : rien n'est créé, les frais remontent

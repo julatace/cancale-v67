@@ -74,8 +74,8 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
      //    posés le 13 octobre, 13f6c89) : de la chrome locale, toujours
      //    visible, jamais une vignette de vente. Une photo de vente vient du
      //    CDN de Vinted (ou d'une URL objet) et reste comptée.
-     images:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|^\/brands\//i.test(i.getAttribute('src')||'')).length,
-     pasLazy:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|^\/brands\//i.test(i.getAttribute('src')||'') && i.getAttribute('loading')!=='lazy').length}));
+     images:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|vrm-logo|^\/brands\//i.test(i.getAttribute('src')||'')).length,
+     pasLazy:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm|vrm-logo|^\/brands\//i.test(i.getAttribute('src')||'') && i.getAttribute('loading')!=='lazy').length}));
   // ce que coûte un filtre : on clique « Sans prix d'achat »
   const t1=Date.now();
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Sans prix/.test(x.textContent)); if(b)b.click();});
@@ -168,7 +168,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
       if(!b) break; b.click(); await new Promise(r=>setTimeout(r,300)); }
     const reste=!![...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
     const L=document.querySelector('[data-banc-liste]');
-    const lignes=L?[...L.children]:null;
+    const lignes=L?[...L.children].filter(r=>!r.classList.contains('vrm-ledger-heading')):null; // (20 oct.) l'en-tête « Article · état » (#597) n'est pas une vente
     const retournees=lignes?lignes.filter(r=>(r.innerText||'').split('\n').some(l=>l.trim()==='Retournée')).length:null;
     const t=(document.body.innerText||'').split('\n').map(s=>s.trim());
     const apres=(re,re2)=>{const i=t.findIndex(l=>re.test(l)); if(i<0) return null;

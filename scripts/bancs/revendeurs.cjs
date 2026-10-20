@@ -149,9 +149,11 @@ async function brancher(p){
     }
     if(nom==='Vinted'){
       await p.locator('.vrm-sale-row').first().waitFor();
+      // (20 oct.) Vente « une ligne » (#596-#598) : la photo agrandissable vit dans la vente ouverte.
+      await p.evaluate(()=>{const r=document.querySelector('.vrm-sale-row[data-ligne-ouverte="false"]');if(r)r.querySelector('.vrm-ledger-sale-toggle').click();});
       await p.locator('.vrm-sale-row').first().getByRole('button',{name:/Agrandir la photo/}).waitFor();
       await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});
-      check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
+      check(await p.locator('.vrm-sale-row').first().locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
       const outil=await p.locator('.vrm-sales-workbar').boundingBox();
       const liste=await p.locator('.vrm-sale-row').first().boundingBox();
       const fin=await p.locator('.vrm-sale-row').last().boundingBox();
@@ -165,22 +167,24 @@ async function brancher(p){
    if(nom==='eBay'){
     check((await p.locator('[data-ebay-vente="inconnu-1"]').locator('.vrm-sale-price').innerText()).trim()==='—','montant vide eBay affiché inconnu plutôt que zéro');
     const search=p.getByLabel('Rechercher une vente');
-    await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'recherche eBay par acheteur');
-    await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).isVisible(),'recherche eBay sur un article secondaire et son SKU');
+    await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay par acheteur');
+    await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
     await search.fill('ABSENT-123');check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'sélection eBay vide expliquée');
-    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).isVisible(),'réinitialisation eBay restaure les commandes');
+    await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();check(await search.inputValue()==='' && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'réinitialisation eBay restaure les commandes');
     await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'Expédiées',exact:true}).click();check(await p.getByText('Aucune commande dans cette sélection',{exact:true}).isVisible(),'commandes non expédiées exclues du filtre expédiées');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
-    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText('Paire eBay',{exact:true}).isVisible(),'vente annulée exclue des commandes à expédier');
+    await p.getByRole('group',{name:'Filtrer les ventes'}).getByRole('button',{name:'À expédier',exact:true}).click();check(await p.getByText('Ordinateur annulé',{exact:true}).count()===0 && await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'vente annulée exclue des commandes à expédier');
     await p.getByRole('button',{name:'Effacer les filtres',exact:true}).click();
    }
   }
   await p.goto(base+'/?tab=plat_vinted');
   await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
-  await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});check(await p.locator('.vrm-sale-row').first().locator('img').evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente retrouvée depuis transaction sans annonce ni archive');
+  await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});check(await p.locator('.vrm-sale-row').first().locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente retrouvée depuis transaction sans annonce ni archive');
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
   await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
   const vente=p.locator('.vrm-sale-row').first();
+  // (20 oct.) La vente « une ligne » s'ouvre d'abord, puis « Modifier ».
+  if((await vente.getAttribute('data-ligne-ouverte'))==='false') await vente.locator('.vrm-ledger-sale-toggle').click();
   await vente.locator('.vrm-sale-details > summary').click();
   await vente.getByPlaceholder("prix d'achat",{exact:true}).fill('40');await vente.getByPlaceholder("prix d'achat",{exact:true}).press('Tab');
   await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
@@ -211,6 +215,8 @@ async function brancher(p){
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='', 'réinitialiser retrouve toutes les ventes');
   await p.goto(base+'/?tab=plat_ebay');
   const photo=p.getByRole('button',{name:'Agrandir la photo de Paire eBay',exact:true});
+  // (20 oct.) La photo agrandissable vit dans la vente ouverte (ventes « une ligne »).
+  await p.getByRole('button',{name:/Ouvrir les actions : Paire eBay/}).first().click();
   await photo.click();
   check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-photo-panel img');return i&&i.complete&&i.naturalWidth>0;});

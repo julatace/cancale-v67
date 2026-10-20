@@ -201,6 +201,15 @@ async function main() {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
         const row = pg.locator('.vrm-sale-row', { hasText: 'Nike Banc sans lien' }).first();
         await row.waitFor({ timeout: 12000 });
+        // (20 oct.) Depuis les listes « une ligne par vente » (#596-#598), la
+        // vente se lit repliée et s'ouvre d'un toucher sur sa ligne : on l'ouvre
+        // comme lui — jamais par « Modifier ». Le contrôle reste : le prix se
+        // saisit sur la vente ouverte, sans passer par « Modifier ».
+        if ((await row.getAttribute('data-ligne-ouverte')) === 'false') {
+          const tog = row.locator('.vrm-ledger-sale-toggle').first();
+          if (vp.width < 600) await tog.tap(); else await tog.click();
+          await pg.waitForTimeout(400);
+        }
         const btn = row.locator('[data-cout-vente-saisir]');
         dit((await btn.count()) === 1 && (await btn.isVisible()), `${T} « Saisir le prix » est visible sur la vente, sans ouvrir « Modifier »`);
         dit((await row.locator('[data-cout-vente-relier]').count()) === 1, `${T} « Relier un achat » est juste à côté`);
