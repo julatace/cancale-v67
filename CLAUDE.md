@@ -4934,7 +4934,7 @@ une confirmation pour ce mot) : elle se colle d'un bloc.
   effacer) ont été collées par Julien dans l'outil SQL (l'outil de la session attend
   une confirmation humaine pour ce mot et expire).
 
-### Communauté : les groupes à code (accompagnement) — migration 020 (20 octobre) — PAS APPLIQUÉE
+### Communauté : les groupes à code (accompagnement) — migration 020 (20 octobre) — ✅ APPLIQUÉE LE 20 OCTOBRE
 Julien : « pour le classement et la carte, un endroit où je peux mettre un code pour
 que les membres d'un accompagnement puissent comparer leurs résultats ». Fichier
 `supabase/migrations/020-communaute-groupes.sql`, sur la 019 (refusée sans elle,
@@ -4977,6 +4977,9 @@ colle d'un bloc, et l'outil de la session peut l'appliquer.
 - **Pseudo unique** (même migration, demande du même jour) : index unique sur
   `lower(pseudo)` + `vrm_communaute_rejoindre` redéfinie (« pseudo-pris », 409) ;
   vide ⇒ « Revendeur-XXXX ». L'écran propose « Utiliser mon pseudo Discord ».
+- ✅ **Appliquée en production le 20 octobre** (sur son « ok fait tout »), par l'outil.
+  Vérifiée : 7 tables, RLS forcé, aucun droit direct, 22 fonctions identiques au
+  fichier (md5), empreinte `c86baf95…`.
 - **Pas fait** : la « connexion avec Discord » (un vrai bouton OAuth) — il faut une
   application Discord à Julien (identifiant et secret sur Vercel).
 
