@@ -10924,6 +10924,10 @@ part (règles de ce dossier, pas le code).
   ne montre pas (décision « compte orphelin » toujours à trancher par Julien) ;
   Compta « Vendu juin 41 € · Finalisé 1 512,70 € » (le vendu exclut les ventes
   masquées, le finalisé non — deux règles écrites, à trancher).
+- **Reprise du 20 oct. (après fusion d'origin/main ac29d0e)** : banc refait sur le
+  build d'ac29d0e — 24 rouges, 0 après ; mutation « `updated_at` + zéro porteur
+  relié » ⇒ 8 rouges ; audits et bancs voisins (eBay, Leboncoin, annonces,
+  comptes, Ma journée, chiffres croisés) verts.
 - **Gestes de Julien** : (1) **l'annonce eBay VRM-82 « Nike air max 1 noir taille
   44 » (128137572355) est probablement la paire vendue sur Vinted le 18 (tomj606,
   N°81, à poster)** — la terminer sur eBay après avoir regardé les photos (VRM ne
