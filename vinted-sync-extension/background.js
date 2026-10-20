@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.197.0';
+const CODE_VERSION = '5.198.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2041,7 +2041,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (msg.account && msg.account.id) await storeLbcAccount(msg.account);
             sendResponse({ ok: true }); return;
           }
-          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body, msg.session); sendResponse({ ok: true }); return; }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
           // (où vivent l'état, l'acheteur, le bordereau) — sans rien analyser
@@ -8131,9 +8131,27 @@ function comptesLbcSession(accounts) {
   return s;
 }
 function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }
-// Une vente Leboncoin annulée ne fait pas partir la paire (même règle que
-// `lbcAnnulee` dans l'app).
-const venteLbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+// <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
+// serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
+// n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
+// PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
+// prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
+// vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
+// une liste paginée — seulement sur une vente vue.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+function annoncesLbcVendues(ventes) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    if (v.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((v.parcelStatus || '') + ' ' + (v.stepStatus || '') + ' ' + (v.stepLabel || ''))) continue;
+    s.add(String(v.itemId));
+  }
+  return s;
+}
+function annonceLbcEnVente(ad, vendues) {
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+}
+// </lbc-en-vente-regle>
 // Ses annonces Leboncoin : celles qu'on peut lui attribuer, moins celles qu'il
 // a VENDUES là-bas (elles n'y sont plus en vente). `ok:false` = la base n'a pas
 // répondu sur les annonces. Une lecture ratée des VENTES n'attribue rien de plus
@@ -8149,8 +8167,8 @@ async function lireLbcAnnonces() {
   const ventes = (vRows && vRows[0] && vRows[0].data && vRows[0].data.ventes) || {};
   const accs = (aRows && aRows[0] && aRows[0].data && aRows[0].data.accounts) || {};
   const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession(accs)]);
-  const vendus = new Set(Object.values(ventes).filter((v) => v && v.isSeller === true && v.itemId != null && !venteLbcAnnulee(v)).map((v) => String(v.itemId)));
-  return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && !vendus.has(String(ad.id))) };
+  const vendues = annoncesLbcVendues(ventes);
+  return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && annonceLbcEnVente(ad, vendues)) };
 }
 // Lit les annonces Leboncoin captées (ligne lbc_listings) sous forme de tableau.
 async function readLbcItems() {
@@ -8627,8 +8645,7 @@ async function buildLbcData() {
   const lbcItems = await readLbcItems();
   const lbcByRef = new Map();
   for (const ad of lbcItems) {
-    const dead = /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
-    if (dead) continue;
+    if (LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
     for (const k of adRefKeys(ad, liens, main.vrm_numerotation)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
   }
   // Clés de rapprochement d'une annonce Vinted : son numéro VRM + le « nXXXX »
@@ -8720,7 +8737,7 @@ async function buildLbcData() {
       if (m) keysKnown.add(cleNum(m[1]));
     }
     for (const ad of lbcItems) {
-      if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
+      if (LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
       const keys = adRefKeys(ad, liens, main.vrm_numerotation);
       if (!keys.length) { unlinked.push(lbcRow(ad, keys)); continue; }
       if (keys.some((k) => keysOnline.has(k))) continue;   // encore en ligne sur Vinted
@@ -8770,7 +8787,7 @@ async function buildLbcData() {
       // ⚠️ LA MÊME règle que `readLbcItems` (`estALui`), pas une copie qui dérive :
       //    celle-ci oubliait `customRef`, que l'app accepte — un troisième écart
       //    sur la même notion.
-      lbcCount = lu.items.filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
+      lbcCount = lu.items.filter((v) => !LBC_ANNONCE_MORTE.test(String(v.status || ''))).length;
     }
   } catch (_) {}
   if (lbcCount === 0) lbcJamaisLu = true;       // rien d'attribuable = rien vu
@@ -9032,7 +9049,7 @@ function fusionnerMorceauLbc(t0, patch) {
   for (const k of Object.keys(patch || {})) {
     const v = patch[k];
     if (v === undefined) continue;
-    if (k === 'paths') { t.paths = [...new Set([...(t.paths || []), ...(Array.isArray(v) ? v : [])])].slice(0, 600); continue; }
+    if (k === 'paths') { t.paths = fusionnerCheminsLbc(t.paths, v, 600); continue; }
     if (k === 'sample') { t.samples = [v, ...(t.samples || [])].slice(0, 6); continue; }
     if (k === 'schemaOne') {
       if (v && v.endpoint) { t.schemas = Object.assign({}, t.schemas || {}); t.schemas[String(v.endpoint).slice(0, 120)] = { cles: (v.cles || []).slice(0, 200), at: new Date().toISOString() }; }
@@ -9046,6 +9063,34 @@ function fusionnerMorceauLbc(t0, patch) {
   }
   return t;
 }
+// ⚠️⚠️ (20 oct., 5.196) LES CHEMINS VUS ÉTAIENT FIGÉS. `lbc_recon.paths` gardait
+//    les 300 PREMIERS chemins jamais vus : mesuré le 20 octobre, la ligne est
+//    pleine (300/300) depuis des semaines, au vieux format (sans méthode, sans
+//    statut) — aucun chemin neuf ne s'ajoutait plus, la mesure qui devait faire
+//    trouver le bordereau Leboncoin était muette. ⇒ Le plus RÉCENT d'abord : un
+//    chemin revu remonte, les plus anciens tombent. Ce qui SERT ne tombe pas
+//    avant le reste : les chemins de vente/transaction/bordereau, de compte, de
+//    messagerie, tout PDF et tout échec (≥ 400) gardent jusqu'à la moitié des
+//    places. Un ancien chemin sans méthode dont la forme neuve est là s'efface
+//    (doublon). Borné, toujours.
+const LBC_CHEMINS_MAX = 300;
+const LBC_CHEMIN_UTILE = /(transaction|purchase|order|label|parcel|shipping|deliver|voucher|myads|classifieds|account|users?\/me|messaging|counter|packages|\[pdf\]|→ [45]\d\d)/i;
+function fusionnerCheminsLbc(avant, neufs, max) {
+  const n = (Array.isArray(neufs) ? neufs : []).filter((x) => typeof x === 'string' && x).slice(-400);
+  const tous = [...new Set([...n.slice().reverse(), ...(Array.isArray(avant) ? avant : []).filter((x) => typeof x === 'string' && x)])];
+  // Forme neuve « GET host/chemin → 200 [json] » présente ⇒ l'ancienne « host/chemin » est un doublon.
+  const avecMethode = (x) => /^[A-Z]+ /.test(x);
+  const nus = new Set(tous.map((x) => { const m = /^[A-Z]+ (\S+)/.exec(x); return m ? m[1] : null; }).filter(Boolean));
+  const propres = tous.filter((x) => avecMethode(x) || !nus.has(x));
+  if (propres.length <= max) return propres;
+  // Ordre de garde : les utiles (jusqu'à la moitié), puis les chemins au format
+  // neuf du plus récent au plus ancien, puis l'ancien format (rangé jadis du plus
+  // ancien au plus récent) en partant de la FIN. L'ordre rangé, lui, ne bouge pas.
+  const neufsF = propres.filter(avecMethode), vieuxF = propres.filter((x) => !avecMethode(x));
+  const gardes = new Set(propres.filter((x) => LBC_CHEMIN_UTILE.test(x)).slice(0, Math.floor(max / 2)));
+  for (const x of [...neufsF, ...vieuxF.slice().reverse()]) { if (gardes.size >= max) break; gardes.add(x); }
+  return propres.filter((x) => gardes.has(x));
+}
 // Applique les morceaux accumulés à la ligne lue (même règles qu'avant).
 const garderRecents = (d, max) => {
   const ks = Object.keys(d);
@@ -9056,7 +9101,9 @@ const garderRecents = (d, max) => {
 };
 function appliquerMorceauxLbc(prev, t) {
   const next = Object.assign({ paths: [], samples: [] }, prev);
-  if (t.paths) next.paths = [...new Set([...(next.paths || []), ...t.paths])].slice(0, 300);
+  // Rien de neuf (que des chemins déjà rangés) ⇒ la ligne ne bouge pas : un
+  // simple réordonnancement ne vaut pas une écriture (§ « 40 Mo par visite »).
+  if (t.paths) { const deja = new Set(next.paths || []); if (t.paths.some((x) => !deja.has(x))) next.paths = fusionnerCheminsLbc(next.paths, t.paths, LBC_CHEMINS_MAX); }
   if (t.samples) next.samples = [...t.samples, ...(next.samples || [])].slice(0, 6);
   if (t.schemas) next.schemas = garderRecents(Object.assign({}, next.schemas || {}, t.schemas), 80);
   for (const k of Object.keys(LBC_DICTS)) {
@@ -9272,7 +9319,21 @@ function extraireVentesLbc(url, body) {
   }
   return [];
 }
-async function rangerLbcVentes(list) {
+// ⚠️⚠️ (20 oct., 5.196) UNE ÉCRITURE À LA FOIS. La liste des transactions (la
+//    seule qui porte la DATE de vente) et les détails lus juste après (jusqu'à
+//    5, à ~150 ms d'écart) arrivaient en même temps : chacun relisait la ligne,
+//    fusionnait SA part et réécrivait la ligne entière — le dernier écrivain,
+//    parti d'une lecture faite AVANT l'écriture de la liste, effaçait les dates
+//    qu'elle venait de poser. Prouvé (audit-lbc-restes.cjs) : la liste et un
+//    détail envoyés ensemble ⇒ plus aucune `dateVente`. Les rangements passent
+//    maintenant à la file : chacun relit ce que le précédent a écrit.
+let _lbcVentesChaine = Promise.resolve();
+function rangerLbcVentes(list) {
+  const p = _lbcVentesChaine.then(() => rangerLbcVentesUneFois(list));
+  _lbcVentesChaine = p.catch(() => {});
+  return p;
+}
+async function rangerLbcVentesUneFois(list) {
   if (!list || !list.length) return;
   const prev = await sbGet('app_data?id=eq.lbc_ventes&select=data');
   if (prev === null) return;                          // pas su ≠ vide — on n'écrase rien
@@ -9639,7 +9700,28 @@ function noterPackPhoto(data, url) {
   chainePack = fait.catch(() => false);
   return fait;
 }
-async function handleLbcRaw(url, body) {
+// ⚠️⚠️ (20 oct., 5.196) LE COMPTE D'UNE LISTE « À MOI » VIENT DE LA PAGE QUI L'A
+//    REÇUE, PLUS DU DERNIER COMPTE VU PAR LE FOND. Changer de compte Leboncoin
+//    dans le même onglet recharge la page : « mes annonces » du NOUVEAU compte
+//    peut arriver avant son compteur de messagerie, et le fond, qui gardait
+//    l'ancien `vrmLbcCompte`, la rangeait sous l'ANCIEN compte (ses annonces
+//    mélangées à celles de l'autre, §5). ⇒ `lbc-inject.js` joint à une liste
+//    « à moi » le compte du compteur relu DANS LE MÊME DOCUMENT, AVANT elle (ou
+//    la retient jusqu'au premier compteur de ce document) ; un second compte vu
+//    dans le même document ⇒ rien n'est plus joint. Ici : sans ce compte joint
+//    (ou s'il est un compte LIÉ), on ne tague rien — jamais l'ancien.
+async function sessionDeListe(sessionPage) {
+  const id = String(sessionPage || '').trim();
+  if (!/^[0-9a-f-]{8,64}$/i.test(id)) return null;
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmLbcLies', 'vrmLbcCompte']); } catch (_) { return null; }
+  const lies = local.vrmLbcLies;
+  if (lies && Array.isArray(lies.ids) && Date.now() - Number(lies.at || 0) < LBC_LIES_MS && lies.ids.includes(id)) return null;
+  const c = local.vrmLbcCompte;
+  const meme = !!(c && c.v === 2 && String(c.id) === id);
+  return { id, name: meme ? String(c.name || '') : '', type: meme ? String(c.type || '') : '' };
+}
+async function handleLbcRaw(url, body, sessionPage) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   if (LBC_URL_PACKS.test(String(url || ''))) { try { await noterPackPhoto(data, url); } catch (_) {} }
@@ -9665,6 +9747,10 @@ async function handleLbcRaw(url, body) {
       return;
     } }
   if (sess) miens.add(String(sess.id));
+  // Le compte qui TAGUE une liste « à moi » : celui que la page a joint (même
+  // document), jamais `vrmLbcCompte` (le dernier vu, peut-être l'ancien).
+  const sessListe = await sessionDeListe(sessionPage);
+  if (sessListe) miens.add(sessListe.id);
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -9710,9 +9796,9 @@ async function handleLbcRaw(url, body) {
         //    compte connecté. On les tague pour relier chaque paire à SON compte
         //    Leboncoin (il en aura plusieurs) — sans compte détecté, on laisse
         //    vide (mieux vaut un blanc qu'un faux, §5).
-        account: acct ? acct.id : (sess ? String(sess.id) : null),
-        accountName: acct ? acct.name : (sess ? (String(sess.name || '') || null) : null),
-        accountType: acct ? acct.type : (sess ? (String(sess.type || '') || null) : null),
+        account: acct ? acct.id : (sessListe ? sessListe.id : null),
+        accountName: acct ? acct.name : (sessListe ? (sessListe.name || null) : null),
+        accountType: acct ? acct.type : (sessListe ? (sessListe.type || null) : null),
         platform: 'leboncoin',
       });
     }
@@ -9747,7 +9833,7 @@ async function handleLbcRaw(url, body) {
         //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
         //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
         const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
-        const aMoiParSession = !!(listeMoi && sess && (!ownerId || ownerId === String(sess.id)));
+        const aMoiParSession = !!(listeMoi && sessListe && (!ownerId || ownerId === sessListe.id));
         if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
@@ -9760,8 +9846,8 @@ async function handleLbcRaw(url, body) {
           //    annonces et le flux « découverte » d'autrui) : on prend l'owner
           //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
           //    ici, ne prouverait pas que le chalet d'à côté est à lui, §5).
-          account: ownerId || (aMoiParSession ? String(sess.id) : null),
-          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? String(sess.name || '') || null : null),
+          account: ownerId || (aMoiParSession ? sessListe.id : null),
+          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
           platform: 'leboncoin',
         });
       }

@@ -99,21 +99,39 @@ export function annoncesEbayParNumero(lignes, idsActifs, mk, fiches, liensEbay) 
 }
 
 // Leboncoin — les mêmes règles que l'écran Leboncoin de l'app (§11) :
-// `lbcAnnulee`, `comptesLbcProuves`, `annonceLbcALui`, `isDead`.
-const lbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-const lbcMorte = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
+// `comptesLbcProuves`, `annonceLbcALui`, et la règle « en vente » ci-dessous.
+// <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
+// serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
+// n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
+// PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
+// prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
+// vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
+// une liste paginée — seulement sur une vente vue.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+function annoncesLbcVendues(ventes) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    if (v.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((v.parcelStatus || '') + ' ' + (v.stepStatus || '') + ' ' + (v.stepLabel || ''))) continue;
+    s.add(String(v.itemId));
+  }
+  return s;
+}
+function annonceLbcEnVente(ad, vendues) {
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+}
+// </lbc-en-vente-regle>
 export function annoncesLbcParNumero(items, ventes, liens, mk) {
   const out = new Map();
-  const prouves = new Set(), vendus = new Set();
+  const prouves = new Set(), vendues = annoncesLbcVendues(ventes);
   for (const v of Object.values(ventes || {})) {
     if (!v || v.isSeller !== true || v.itemId == null) continue;
     const ad = items && items[String(v.itemId)];
     if (ad && ad.account) prouves.add(String(ad.account));
-    if (!lbcAnnulee(v)) vendus.add(String(v.itemId));
   }
   const aLui = (ad) => !!(ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves.has(String(ad.account))));
   for (const ad of Object.values(items || {})) {
-    if (!ad || ad.id == null || lbcMorte(ad) || !aLui(ad) || vendus.has(String(ad.id))) continue;
+    if (!annonceLbcEnVente(ad, vendues) || !aLui(ad)) continue;
     const ks = [];
     const push = (v) => { const k = cleNum(v); if (k && NUM_OK.test(k) && !ks.includes(k)) ks.push(k); };
     const ext = (v) => { const k = cleNum(v); if (k) push(numeroExterne(k, ad.id, 'lbcAnnonces', null, mk)); };
