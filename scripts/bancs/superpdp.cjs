@@ -41,7 +41,7 @@ const VENTES = [
 ];
 const VERS = { 7001: jour(jj - 2), 7002: jour(12, -1), 7004: jour(1) };
 const SANS_VERSEMENT = vente(7005, 'Salomon test pas encore datée', 33, 'Commande finalisée', jour(jj - 1));
-const EBAY = [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: jour(jj - 2), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'Salomon test ebay' }] }];
+const EBAY = [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: jour(jj - 2), pricingSummary: { total: { value: '66.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '65.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' }, lineItems: [{ title: 'Salomon test ebay' }] }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const PROFIL_OK = { nom: 'Boutique Test', siret: '73282932000074', adresse: '1 rue des Tests', codePostal: '35260', ville: 'Cancale' };
 const ATTENDU = { total: '180.00', n: 3, siren: '732829320' };
