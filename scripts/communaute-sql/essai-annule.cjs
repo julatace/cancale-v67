@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-//  LA MIGRATION 018 (carte de la communauté) : L'ESSAI ANNULÉ, PUIS LA VÉRIFICATION
+//  LES MIGRATIONS 018 + 019 (carte de la communauté, Discord, classement) :
+//  L'ESSAI ANNULÉ, PUIS LA VÉRIFICATION
 //
-//  node scripts/communaute-sql/essai-annule.cjs            > essai.sql     (l'essai)
+//  node scripts/communaute-sql/essai-annule.cjs            > essai.sql     (l'essai de la 019)
 //  node scripts/communaute-sql/essai-annule.cjs --verifier > verifier.sql  (après application)
+//  --migration=fichier (répétable) : l'essai porte sur le DERNIER fichier, la
+//  vérification sur leur union (une fonction redéfinie plus loin l'emporte).
+//  Par défaut : 018 puis 019 (la 018 est appliquée en production, l'essai joue la 019).
 //
 //  1. L'ESSAI, fabriqué à partir du fichier TEL QU'IL EST : une transaction, la
 //     migration SANS son propre BEGIN/COMMIT, un rapport d'UNE ligne (`essai`,
@@ -19,9 +23,11 @@
 //  `scripts/audit-communaute-sql.cjs` exécute les deux sur un Postgres jetable.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const arg = (n, d) => { const a = process.argv.find((x) => x.startsWith('--' + n + '=')); return a ? a.slice(n.length + 3) : d; };
-const MIG = arg('migration', path.join(__dirname, '..', '..', 'supabase/migrations/018-communaute.sql'));
-const sql = fs.readFileSync(MIG, 'utf8');
+const MIGS_ARG = process.argv.filter((x) => x.startsWith('--migration=')).map((x) => x.slice('--migration='.length));
+const MIGS = MIGS_ARG.length ? MIGS_ARG : ['018-communaute.sql', '019-communaute-discord-classement.sql'].map((f) => path.join(__dirname, '..', '..', 'supabase/migrations', f));
+const SQLS = MIGS.map((f) => fs.readFileSync(f, 'utf8'));
+const sql = SQLS[SQLS.length - 1];      // l'essai porte sur le dernier fichier
+const tout = SQLS.join('\n');
 const lit = (x) => "'" + String(x).replace(/'/g, "''") + "'";
 const md5 = (x) => crypto.createHash('md5').update(x).digest('hex');
 const TABLES = ['vrm_communaute_blocages', 'vrm_communaute_conversations', 'vrm_communaute_messages', 'vrm_communaute_profils', 'vrm_communaute_signalements'];
@@ -39,25 +45,30 @@ function sansCommentaires(s) {
 }
 
 const FONCTIONS = {};
-for (const m of sql.matchAll(/create or replace function public\.([a-z_]+)\(([^)]*)\)\s+returns ([\s\S]*?) as \$\$([\s\S]*?)\$\$/g)) {
+for (const m of tout.matchAll(/create or replace function public\.([a-z_]+)\(([^)]*)\)\s+returns ([\s\S]*?) as \$\$([\s\S]*?)\$\$/g)) {
   const e = m[3];
   FONCTIONS[m[1]] = { md5: md5(m[4]), def: /\bsecurity definer\b/.test(e), sp: /\bset search_path = ''/.test(e),
     vol: /\bimmutable\b/.test(e) ? 'i' : /\bstable\b/.test(e) ? 's' : 'v' };
 }
 const GRANTS = {};
-for (const m of sql.matchAll(/^grant execute on function public\.([a-z_]+)\([^)]*\) to ([a-z_, ]+);/gm))
-  for (const r of m[2].split(',')) (GRANTS[m[1]] = GRANTS[m[1]] || []).push(r.trim());
+for (const t of SQLS) {
+  const g = {};
+  for (const m of t.matchAll(/^grant execute on function public\.([a-z_]+)\([^)]*\) to ([a-z_, ]+);/gm))
+    for (const r of m[2].split(',')) (g[m[1]] = g[m[1]] || []).push(r.trim());
+  // Une fonction redéfinie dans un fichier plus loin y reçoit ses droits (révoqués puis accordés).
+  for (const m of t.matchAll(/create or replace function public\.([a-z_]+)\(/g)) GRANTS[m[1]] = g[m[1]] || [];
+}
 const FONCTIONS_ATTENDUES = Object.fromEntries(Object.entries(FONCTIONS).map(([k, f]) => [k,
   { n: 1, def: f.def, cfg: f.sp ? ['search_path=""'] : null, vol: f.vol, md5: f.md5,
     auth: (GRANTS[k] || []).includes('authenticated'), sr: (GRANTS[k] || []).includes('service_role'), anon: false }]));
-const fx = /select (pg_catalog\.md5\(pg_catalog\.string_agg\([\s\S]*?\) t\(n\))\n {4}into v;/.exec(sql);
-const FORME = fx ? fx[1] : null;
-const em = /if v is distinct from '([0-9a-f]{32}|__EMPREINTE__)' then/.exec(sql);
-const EMPREINTE = em ? em[1] : null;
+const derniere = (re) => { for (let i = SQLS.length - 1; i >= 0; i--) { const m = re.exec(SQLS[i]); if (m) return m[1]; } return null; };
+const FORME = derniere(/select (pg_catalog\.md5\(pg_catalog\.string_agg\([\s\S]*?\) t\(n\))\n {4}into v;/);
+const EMPREINTE = derniere(/if v is distinct from '([0-9a-f]{32}|__EMPREINTE__)' then/);
+const FONCTIONS_COMPTE = /019/.test(MIGS.map((f) => path.basename(f)).join(' ')) ? 14 : 10;
 const arr = (l) => 'array[' + l.map(lit).join(',') + ']';
 const PRIVS = `case when current_setting('server_version_num')::int >= 170000
-     then array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']
-     else array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'] end`;
+     then array['SELECT','INSERT','UPDATE','DEL' || 'ETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']
+     else array['SELECT','INSERT','UPDATE','DEL' || 'ETE','TRUNCATE','REFERENCES','TRIGGER'] end`;
 const NOMS = `array[${Object.keys(FONCTIONS).map(lit).join(',')}]::text[]`;
 const etat = `json_build_object(
   'tables', (select count(*) from unnest(${arr(TABLES)}) t where to_regclass('public.' || t) is not null),
@@ -82,7 +93,7 @@ const etat = `json_build_object(
 
 if (process.argv.includes('--verifier')) {
   const parties = {
-    fichier: Object.keys(FONCTIONS).length === 10 && FORME && EMPREINTE && EMPREINTE !== '__EMPREINTE__' ? 'true' : 'false',
+    fichier: Object.keys(FONCTIONS).length === FONCTIONS_COMPTE && FORME && EMPREINTE && EMPREINTE !== '__EMPREINTE__' ? 'true' : 'false',
     tables: `(e.j ->> 'tables')::int = ${TABLES.length}`,
     rls: `(e.j ->> 'rls')::boolean`,
     forme: `e.j ->> 'forme' = ${lit(EMPREINTE)}`,
@@ -93,7 +104,7 @@ if (process.argv.includes('--verifier')) {
     fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb and (e.j ->> 'autres_fonctions') is null`,
   };
   const cas = Object.entries(parties).map(([k, c]) => `case when coalesce((${c}), false) then null else ${lit(k)} end`).join(', ');
-  process.stdout.write(`-- Vérification de la migration 018 APPLIQUÉE (lecture seule). verification.ok doit valoir true ; ecarts nomme ce qui diffère.
+  process.stdout.write(`-- Vérification de la carte de la communauté APPLIQUÉE (${MIGS.map((f) => path.basename(f)).join(' + ')}) (lecture seule). verification.ok doit valoir true ; ecarts nomme ce qui diffère.
 with e as (select ${etat} j), x as (select array_remove(array[${cas}], null) ecarts from e)
 select json_build_object('ok', cardinality(x.ecarts) = 0, 'ecarts', to_json(x.ecarts),
   'fonctions_differentes', (select json_agg(k) from jsonb_each(${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb) a(k, v) where (e.j -> 'fonctions')::jsonb -> k is distinct from v),
@@ -107,7 +118,7 @@ const lignes = sansCommentaires(sql).split('\n').filter((l) => l.trim() !== '');
 const ib = lignes.findIndex((l) => l.trim() === 'begin;');
 const ic = lignes.map((l) => l.trim()).lastIndexOf('commit;');
 if (ib < 0 || ic < 0 || ic < ib) { console.error('BEGIN/COMMIT introuvables dans la migration'); process.exit(1); }
-process.stdout.write(`-- ESSAI ANNULÉ de la migration 018 (scripts/communaute-sql/essai-annule.cjs) : RIEN ne reste après.
+process.stdout.write(`-- ESSAI ANNULÉ de ${path.basename(MIGS[MIGS.length - 1])} (scripts/communaute-sql/essai-annule.cjs) : RIEN ne reste après.
 begin;
 ${lignes.slice(ib + 1, ic).join('\n')}
 select ${etat} as essai;

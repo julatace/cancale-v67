@@ -31,6 +31,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync, execFileSync } = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const MIG = path.join(RACINE, 'supabase/migrations/018-communaute.sql');
+const MIG19 = path.join(RACINE, 'supabase/migrations/019-communaute-discord-classement.sql');
 const MIN = path.join(__dirname, 'agent-sql/supabase-min.sql');
 const OUTIL_SRC = path.join(__dirname, 'communaute-sql/essai-annule.cjs');
 const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql']
@@ -85,6 +86,28 @@ const MUTATIONS = {
     "                    ), '[]'::jsonb))", 'blocage-visible') },
   'forme-ignoree': { sql: (s) => sansForme(s) },
   'verifier-droits': { outil: (s) => remplace(s, "    droits: `json_array_length(e.j -> 'droits') = 0`,\n", '', 'verifier-droits') },
+  // ── 019 : Discord et classement ──
+  // Le chiffre envoyé par le navigateur : la fonction l'accepterait.
+  'chiffre-client': { sql19: (s) => remplace(remplace(remplace(remplace(s,
+    'create or replace function public.vrm_communaute_classement(p_periode text)', 'create or replace function public.vrm_communaute_classement(p_periode text, p_ventes integer default null)', 'cc1'),
+    "    select m.*, (\n      select pg_catalog.count(distinct x.tx) from (", "    select m.*, coalesce(case when m.owner = moi then p_ventes end, (\n      select pg_catalog.count(distinct x.tx) from (", 'cc2'),
+    "    ) ventes\n    from membres m", "    )) ventes\n    from membres m", 'cc3'),
+    'revoke all on function public.vrm_communaute_classement(text) from', 'revoke all on function public.vrm_communaute_classement(text, integer) from', 'cc4')
+    .replace('grant execute on function public.vrm_communaute_classement(text) to authenticated;', 'grant execute on function public.vrm_communaute_classement(text, integer) to authenticated;') },
+  'non-inscrit-visible': { sql19: (s) => remplace(s, '     where p.classement and (p.owner = moi or public.vrm_acces_pour(p.owner))', '     where (p.owner = moi or public.vrm_acces_pour(p.owner))', 'niv') },
+  'annulee-comptee': { sql19: (s) => remplace(s, "        and x.s !~* '(annul|cancel|refus|rembours|retour|suspend|paiement\\s+a\\s+[ée]chou|[ée]chec\\s+du\\s+paiement)'\n", '', 'annulee') },
+  'autre-vendeur': { sql19: (s) => remplace(s, 'join public.app_data a on a.owner = m.owner and a.id =', 'join public.app_data a on a.id =', 'autre-vendeur') },
+  'compte-non-lie': { sql19: (s) => remplace(s, '         where va.owner = m.owner\n', '         where true\n', 'compte-non-lie') },
+  'compte-masque': { sql19: (s) => remplace(s, "                              and (h.data -> 'vinted_accounts_hidden') ? va.vinted_user_id)", "                              and false)", 'masque') },
+  'sans-dedoublon': { sql19: (s) => remplace(s, 'pg_catalog.count(distinct x.tx)', 'pg_catalog.count(x.tx)', 'dedoublon') },
+  'fuseau-utc': { sql19: (s) => s.split("'Europe/Paris';").join("'UTC';") },
+  'abonnement-classement': { sql19: (s) => remplace(s, '     where p.classement and (p.owner = moi or public.vrm_acces_pour(p.owner))', '     where p.classement', 'abo-cl') },
+  'owner-classement': { sql19: (s) => remplace(s, "'pays', z.pays, 'ventes', z.ventes, 'moi', z.owner = moi)", "'pays', z.pays, 'ventes', z.ventes, 'moi', z.owner = moi, 'owner', z.owner)", 'owner-cl') },
+  'discord-libre': { sql19: (s) => remplace(remplace(s.split("if v not in ('49e9d1d958352ebb3063719036ef25b5', ").join("if false and v not in ('49e9d1d958352ebb3063719036ef25b5', ").replace("  if v is distinct from '", "  if false and v is distinct from '"),
+    "  elsif d !~ '^[a-z0-9._]{2,32}$' or pg_catalog.strpos(d, '..') > 0 then", "  elsif false then", 'dl1'),
+    "      check (discord is null or (discord ~ '^[a-z0-9._]{2,32}$' and position('..' in discord) = 0));", '      check (true);', 'dl2') },
+  'discord-sans-carte': { sql19: (s) => remplace(s, "  if not exists (select 1 from public.vrm_communaute_profils p where p.owner = moi) then\n    return jsonb_build_object('ok', false, 'raison', 'invisible');\n  end if;\n  if d = '' then", "  if d = '' then", 'dsc') },
+  'effacer-019': { apres19: "create or replace function public.vrm_communaute_effacer(p_owner uuid) returns integer language plpgsql volatile security definer set search_path = '' as $$ begin return 0; end $$;" },
 };
 
 if (PROUVE) {
@@ -387,6 +410,182 @@ const convs = (u) => J(u, 'select public.vrm_communaute_conversations();');
     DB = 'base';
   });
 
+  await partie019(mut);
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
   process.exit(ko === 0 ? 0 : 1);
 })();
+
+// ════════════════════════════════════════════════════════════════════════════
+//  019 — LE PSEUDO DISCORD ET LE CLASSEMENT
+//  Sur une base neuve : le socle, la 018 TELLE QU'ELLE EST (elle est en
+//  production), puis la 019 (éventuellement mutée).
+// ════════════════════════════════════════════════════════════════════════════
+async function partie019(mut) {
+  console.log('\n── 019 : Discord et classement ──');
+  let S19 = fs.readFileSync(MIG19, 'utf8');
+  try { if (mut && mut.sql19) S19 = mut.sql19(S19); } catch (e) { dit(false, e.message); return; }
+  const F19 = path.join(DIR, '019.sql'); fs.writeFileSync(F19, S19);
+  const F18 = path.join(DIR, '018-vrai.sql'); fs.writeFileSync(F18, fs.readFileSync(MIG, 'utf8'));
+  const outil19 = (extra) => spawnSync(process.execPath, [OUTIL, '--migration=' + F18, '--migration=' + F19, ...extra], { encoding: 'utf8' });
+  const verifier19 = (db) => {
+    const v = outil19(['--verifier']);
+    if (v.status !== 0) throw new Error('verifier : ' + v.stderr.slice(0, 200));
+    const r = run(v.stdout, { db });
+    if (!r.ok) throw new Error('verifier (SQL) : ' + r.err.slice(0, 300));
+    return JSON.parse(lignes(r.out).pop());
+  };
+  dit(!/\bdelete\b/i.test(fs.readFileSync(MIG19, 'utf8')), 'la 019 ne contient AUCUNE suppression (elle se colle d\'un bloc dans l\'outil SQL)');
+
+  const pret = await essaie('019 : socle + 018', () => { fraiche('c18', 'socle'); Q(fs.readFileSync(MIG, 'utf8')); return true; });
+  if (!pret) return;
+
+  await essaie('019 : essai annulé', () => {
+    fraiche('c19essai', 'c18');
+    const e = outil19([]);
+    if (e.status !== 0) throw new Error(e.stderr.slice(0, 200));
+    dit(!/\bdelete\b/i.test(e.stdout), "l'essai de la 019 ne contient aucune suppression");
+    const r = run(e.stdout);
+    dit(r.ok, "l'essai annulé de la 019 passe d'un bloc sur une base où la 018 est installée", r.err);
+    dit(Q("select count(*) from pg_attribute where attrelid = 'public.vrm_communaute_profils'::regclass and attname in ('discord','classement')") === '0', "après l'essai : la table de la carte n'a pas bougé");
+    dit(Q("select count(*) from pg_proc where proname like 'vrm\\_communaute\\_%'") === '10', "après l'essai : les dix fonctions de la 018, rien de plus");
+  });
+
+  fraiche('c19', 'c18');
+  const installe = await essaie('019 : installation', () => {
+    const r = run(S19); if (!r.ok) throw new Error(r.err);
+    const r2 = run(S19); dit(r2.ok, 'la 019 se rejoue sans erreur (idempotente)', r2.err);
+    if (mut && mut.apres19) ADM(mut.apres19);
+    const r3 = run(fs.readFileSync(MIG, 'utf8'));
+    dit(!r3.ok && /vrm_communaute_forme/.test(r3.err), 'la 018 rejouée APRÈS la 019 est refusée (elle remettrait l\'ancienne carte)', r3.ok ? 'rejouée' : '');
+    return true;
+  });
+  if (!installe) return;
+
+  await essaie('019 : vérification', () => {
+    const v = verifier19('c19');
+    dit(v.ok === true, '`--verifier` (018 + 019) rend ok sur une installation neuve', JSON.stringify(v.ecarts) + ' ' + JSON.stringify(v.fonctions_differentes || ''));
+  });
+
+  // Des identités INVENTÉES.
+  const U = { A: '61111111-1111-4111-8111-111111111111', B: '62222222-2222-4222-8222-222222222222', C: '63333333-3333-4333-8333-333333333333', D: '64444444-4444-4444-8444-444444444444' };
+  // Une date de vente : un instant LOCAL à Paris (jour relatif + heure), écrit en ISO UTC.
+  const iso = (jours, heure) => `to_char(((date_trunc('day', now() at time zone 'Europe/Paris') + interval '${jours} day' + interval '${heure}') at time zone 'Europe/Paris') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+  const vente = (tx, jours, heure, statut = "Commande finalisée - l'acheteur a validé la commande") =>
+    `jsonb_build_object('transaction_id', ${tx}, 'date', ${iso(jours, heure)}, 'status', ${lit(statut)}, 'price', jsonb_build_object('amount', '50.0'))`;
+  const ligne = (owner, uid, ventes) => `insert into public.app_data (owner, id, data) values ('${owner}', 'harvest_${uid}_orders_sold', jsonb_build_object('payload', jsonb_build_object('my_orders', jsonb_build_array(${ventes.join(',')}))));`;
+  const pidDe = {};
+  await essaie('019 : données inventées', () => {
+    fraiche('c19d', 'c19');
+    ADM(`insert into auth.users (id, email) values ${Object.values(U).map((u, i) => `('${u}', 'm${i}@exemple.fr')`).join(',')};`);
+    ADM(`insert into public.vinted_accounts (vinted_user_id, login, owner) values ('100', 'compte_a', '${U.A}'), ('400', 'compte_a_masque', '${U.A}'), ('200', 'compte_b', '${U.B}'), ('300', 'compte_b2', '${U.B}'), ('500', 'compte_c', '${U.C}');`);
+    ADM([
+      // A, compte 100 : 3 ventes aujourd'hui (une à 00:30 heure de Paris), la même transaction
+      // vue deux fois, une remboursée, une annulée, une hier à 23:30, une il y a deux ans, une date illisible.
+      ligne(U.A, '100', [vente(1001, 0, '00:30'), vente(1002, 0, '12:00'), vente(1003, 0, '18:00'), vente(1003, 0, '18:00'),
+        vente(1004, 0, '10:00', 'Remboursement effectué'), vente(1005, 0, '11:00', 'Commande annulée'),
+        vente(1006, -1, '23:30'), vente(1007, -730, '12:00'), `jsonb_build_object('transaction_id', 1008, 'date', 'pas une date', 'status', 'Commande livrée !')`]),
+      // A : un compte lié mais MASQUÉ dans l'app (2 ventes du jour) ; et une ligne d'un compte qui n'est PAS lié à A (300, lié à B).
+      ligne(U.A, '400', [vente(4001, 0, '09:00'), vente(4002, 0, '09:30')]),
+      ligne(U.A, '300', [vente(3901, 0, '09:00'), vente(3902, 0, '09:30'), vente(3903, 0, '09:40')]),
+      `insert into public.app_data (owner, id, data) values ('${U.A}', 'main', '{"vinted_accounts_hidden": ["400"]}'::jsonb);`,
+      // B : 5 ventes du jour sur son compte 200 ; et une ligne harvest_100 À LUI (le même compte vu chez deux vendeurs).
+      ligne(U.B, '200', [2001, 2002, 2003, 2004, 2005].map((t) => vente(t, 0, '08:00'))),
+      ligne(U.B, '100', [vente(1101, 0, '08:00'), vente(1102, 0, '08:10'), vente(1103, 0, '08:20'), vente(1104, 0, '08:30')]),
+      // C : sur la carte, des ventes, mais PAS inscrit au classement.
+      ligne(U.C, '500', [5001, 5002, 5003, 5004, 5005, 5006, 5007].map((t) => vente(t, 0, '07:00'))),
+    ].join('\n'));
+    DB = 'c19d';
+    for (const [k, u] of Object.entries(U)) if (k !== 'D') { const r = J(u, `select public.vrm_communaute_rejoindre('Membre${k}', 'Cancale', 'FR', 48.68, -1.85);`); pidDe[k] = r && r.pid; }
+    return true;
+  });
+  const cl = (u, per = 'jour') => J(u, `select public.vrm_communaute_classement(${lit(per)});`);
+  const inscrire = (u, oui) => J(u, `select public.vrm_communaute_classement_inscrire(${oui});`);
+  const discord = (u, d) => J(u, `select public.vrm_communaute_discord(${d === null ? 'null' : lit(d)});`);
+
+  await essaie('019 : opt-in du classement', () => {
+    const c0 = cl(U.A);
+    dit(c0 && c0.acces === true && c0.inscrit === false && c0.n === 0 && Array.isArray(c0.lignes) && c0.lignes.length === 0 && c0.moi === null,
+      'personne n\'est classé par défaut (invisible tant qu\'on ne l\'active pas)', JSON.stringify(c0).slice(0, 200));
+    dit(inscrire(U.D, true).raison === 'invisible', 'hors de la carte, on ne s\'inscrit pas (le classement montre le pseudo et la ville de la carte)');
+    dit(inscrire(U.A, true).ok === true && inscrire(U.B, true).ok === true, 'deux membres s\'inscrivent');
+    const n = run(ANON + "select public.vrm_communaute_classement('jour');");
+    dit(!n.ok && /permission denied/.test(n.err), 'sans compte (anon) : le classement est refusé');
+    dit(J(U.A, "select public.vrm_communaute_classement('n_importe');").erreur === 'periode', 'une période inconnue est refusée');
+  });
+
+  await essaie('019 : le chiffre, compté par la base', () => {
+    const c = cl(U.A);
+    const la = c && c.lignes.find((l) => l.moi), lb = c && c.lignes.find((l) => l.pid === pidDe.B);
+    dit(c && c.n === 2 && c.lignes.length === 2, 'deux inscrits, deux lignes', JSON.stringify(c).slice(0, 240));
+    dit(la && la.ventes === 3, 'A : 3 ventes du jour — une transaction vue deux fois compte une fois, remboursée / annulée / illisible / hier / ancienne non comptées, compte masqué et compte non lié écartés, la vente de 00:30 heure de Paris comptée', JSON.stringify(la));
+    dit(lb && lb.ventes === 5 && lb.rang === 1 && la && la.rang === 2, 'B : 5 ventes de SON compte (pas celles de la ligne harvest_100 qu\'il porte aussi) — 1er, A 2ᵉ', JSON.stringify(lb));
+    dit(c && c.moi && c.moi.rang === 2 && c.moi.ventes === 3, 'ma ligne : « tu es 2ᵉ sur 2 »', JSON.stringify(c && c.moi));
+    dit(!c.lignes.some((l) => l.pid === pidDe.C), 'C est sur la carte avec 7 ventes, mais pas inscrit : il n\'apparaît pas');
+    const txt = JSON.stringify(c);
+    for (const f of [U.A, U.B, 'm0@exemple.fr', 'owner', '"eur"', 'amount']) dit(!txt.includes(f), `le classement ne porte PAS « ${f.length > 20 ? f.slice(0, 8) + '…' : f} »`);
+    const hier = Q(`select (date_trunc('month', now() at time zone 'Europe/Paris') <= date_trunc('day', now() at time zone 'Europe/Paris') - interval '1 day')::text || ',' || (date_trunc('week', now() at time zone 'Europe/Paris') <= date_trunc('day', now() at time zone 'Europe/Paris') - interval '1 day')::text || ',' || (date_trunc('year', now() at time zone 'Europe/Paris') <= date_trunc('day', now() at time zone 'Europe/Paris') - interval '1 day')::text`).split(',').map((x) => x === 'true');
+    const m = cl(U.A, 'mois'), s2 = cl(U.A, 'semaine'), y = cl(U.A, 'annee');
+    const v = (x) => x && x.lignes.find((l) => l.moi) && x.lignes.find((l) => l.moi).ventes;
+    dit(v(m) === 3 + (hier[0] ? 1 : 0) && v(s2) === 3 + (hier[1] ? 1 : 0) && v(y) === 3 + (hier[2] ? 1 : 0), 'semaine (du lundi), mois, année : bornes au fuseau de Paris, la vente d\'il y a deux ans jamais comptée', `${v(s2)} · ${v(m)} · ${v(y)}`);
+    const triche = enRun(U.A, "select public.vrm_communaute_classement('jour', 999);");
+    dit(!triche.ok, 'un chiffre envoyé par le navigateur est refusé (aucune fonction ne le reçoit)', triche.ok ? triche.out.slice(0, 160) : '');
+    const direct = enRun(U.A, `update public.vrm_communaute_profils set classement = true where owner = '${U.C}';`);
+    dit(!direct.ok && /permission denied/.test(direct.err), 'personne n\'écrit la table en direct (ni s\'inscrire à la place d\'un autre)');
+    const args = Q("select string_agg(proname || '(' || pg_get_function_identity_arguments(oid) || ')', ' ') from pg_proc where proname like 'vrm\\_communaute\\_classement%'");
+    dit(/vrm_communaute_classement\(p_periode text\)/.test(args) && !/integer|numeric|bigint/.test(args), 'les fonctions du classement ne reçoivent aucun nombre', args);
+  });
+
+  await essaie('019 : se retirer, l\'abonnement, quitter la carte', () => {
+    dit(inscrire(U.B, false).ok === true && !cl(U.A).lignes.some((l) => l.pid === pidDe.B), 'B se retire : il disparaît du classement');
+    inscrire(U.B, true);
+    ADM("update public.vrm_reglages set valeur = '1' where cle = 'abonnement_obligatoire';");
+    ADM(`insert into public.abonnements (owner, statut) values ('${U.A}', 'active');`);
+    const c = cl(U.A);
+    dit(c && c.n === 1 && !c.lignes.some((l) => l.pid === pidDe.B), 'qui ne paie plus n\'est plus classé', JSON.stringify(c).slice(0, 160));
+    dit(JSON.stringify(cl(U.B)) === '{"acces": false}' || (cl(U.B) || {}).acces === false, 'et ne voit plus le classement');
+    ADM("update public.vrm_reglages set valeur = '0' where cle = 'abonnement_obligatoire'; truncate public.abonnements;");
+    dit(en(U.B, 'select public.vrm_communaute_quitter();') === 't' && !cl(U.A).lignes.some((l) => l.pid === pidDe.B), 'quitter la carte retire aussi du classement');
+    pidDe.B = J(U.B, "select public.vrm_communaute_rejoindre('MembreB', 'Cancale', 'FR', 48.68, -1.85);").pid;
+    dit(cl(U.A).n === 1, 'revenir sur la carte ne réinscrit PAS au classement (opt-in à refaire)');
+  });
+
+  await essaie('019 : le pseudo Discord', () => {
+    dit(discord(U.D, 'julien').raison === 'invisible', 'hors de la carte, pas de pseudo Discord');
+    for (const mauvais of ['@julien', 'a', 'jul..ien', '<b>x</b>', 'x'.repeat(33), 'jul ien', 'julien#1234'])
+      dit(discord(U.A, mauvais).raison === 'discord', `pseudo Discord refusé : « ${mauvais.length > 12 ? mauvais.slice(0, 12) + '…' : mauvais} »`);
+    const r = discord(U.A, '  Julien.VRM_35 ');
+    dit(r && r.ok === true && r.discord === 'julien.vrm_35', 'un pseudo valide est rangé (minuscules, sans espaces)', JSON.stringify(r));
+    const vu = carte(U.B).profils.find((x) => x.pid === pidDe.A);
+    dit(vu && vu.discord === 'julien.vrm_35', 'les autres membres visibles le voient sur la carte');
+    dit(carte(U.A).moi.discord === 'julien.vrm_35', 'je le vois sur ma présence');
+    dit(!carte(U.B).profils.find((x) => x.pid === pidDe.C).discord, 'qui n\'en a pas mis n\'en montre pas (vide par défaut)');
+    const brut = run(`update public.vrm_communaute_profils set discord = '@x' where owner = '${U.A}';`, { role: 'supabase_admin' });
+    dit(!brut.ok && /vrm_communaute_discord/.test(brut.err), 'la base REFUSE un pseudo Discord invalide, même écrit par le propriétaire de la table');
+    rejoindre(U.A, 'MembreA', 'Rennes', 48.11, -1.68);
+    dit(carte(U.A).moi.discord === 'julien.vrm_35' && cl(U.A).inscrit === true, 'changer de ville garde le pseudo Discord et l\'inscription');
+    dit(discord(U.A, '').ok === true && !carte(U.B).profils.find((x) => x.pid === pidDe.A).discord, 'un pseudo vide le RETIRE');
+    discord(U.A, 'julien.vrm_35');
+  });
+
+  await essaie('019 : « Fermer mon compte »', () => {
+    const n = Number(Q(SERVEUR + `select public.vrm_communaute_effacer('${U.A}');`));
+    dit(n > 0, 'la clé de service efface', String(n));
+    dit(ADM(`select count(*) from public.vrm_communaute_profils where owner = '${U.A}'`) === '0', 'sa ligne part avec son pseudo Discord et son inscription');
+    dit(!JSON.stringify(cl(U.C)).includes(pidDe.A) && !JSON.stringify(carte(U.C)).includes('julien.vrm_35'), 'ni la carte ni le classement ne le montrent plus');
+  });
+
+  await essaie('019 : la vérification voit une garde touchée', () => {
+    const touche = (nom, sql, partie) => {
+      const db = 't19_' + nom.replace(/-/g, '_');
+      fraiche(db, 'c19');
+      ADM(sql);
+      const v = verifier19(db);
+      dit(v.ok === false && v.ecarts.includes(partie), `--verifier (019) voit « ${nom} » (${partie})`, JSON.stringify(v.ecarts));
+    };
+    touche('discord-contrainte', 'alter table public.vrm_communaute_profils drop constraint vrm_communaute_discord;', 'forme');
+    touche('classement-anon', 'grant execute on function public.vrm_communaute_classement(text) to anon;', 'fonctions');
+    touche('aide-ouverte', 'grant execute on function public.vrm_communaute_ts(text) to authenticated;', 'fonctions');
+    touche('carte-018', fs.readFileSync(MIG, 'utf8').split('-- ── 2. LA CARTE')[1].split('-- ── 3.')[0].replace(/^[^\n]*\n[^\n]*\n/, ''), 'fonctions');
+    DB = 'base';
+  });
+}
