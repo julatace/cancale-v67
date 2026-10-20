@@ -122,6 +122,7 @@ const CSS = `
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
 .acc img.vrm-brand-asset{background:#21343e;padding:2px;object-fit:contain;box-sizing:border-box}
+.acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
 .acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
 .acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}

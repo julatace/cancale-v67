@@ -184,7 +184,7 @@ export function CarteJourEcran({ s, etatScene = 'joue', onVers, cible = true }) 
           return (
             <div key={o.id} ref={(e) => { ongletsRef.current[i] = e; }} className={`cj-onglet${i === 0 ? ' actif' : ''}`} style={{ zIndex: 10 - i, transform: st.transform, opacity: st.opacity }}>
               <span className="cj-lib" style={i === 0 ? vrm.ancien : undefined}><i style={{ background: o.point }} />{compact ? o.court : o.long}</span>
-              {i === 0 && <span className="cj-lib vrm" style={vrm.nouveau}><img src="/vrm-logo-96.png" alt="" width="14" height="14" />VRM</span>}
+              {i === 0 && <span className="cj-lib vrm" style={vrm.nouveau}><img className="vrm-brand-asset" src="/vrm-logo-96.png" alt="" width="14" height="14" />VRM</span>}
             </div>
           );
         })}
