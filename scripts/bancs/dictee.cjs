@@ -99,7 +99,7 @@ async function main() {
         if (mic) {
           await mic.click();
           await pg.waitForTimeout(250);
-          const val = await pg.$eval('input[placeholder^="Rechercher (titre"]', (el) => el.value);
+          const val = await pg.$eval('input[aria-label="Rechercher une annonce"]', (el) => el.value);
           dit(val === 'salomon', `${T} dicter pose le texte reconnu dans la recherche`, JSON.stringify(val));
           const lang = await pg.evaluate(() => window.__SR_LANG);
           dit(lang === 'fr-FR', `${T} la reconnaissance écoute en français`, String(lang));
