@@ -556,8 +556,8 @@ export default function Accueil({ onEntrer }) {
             <div>
               <div className="acc-def" data-definition=""><span className="acc-def-dot" aria-hidden="true"/>L’espace de travail des revendeurs</div>
               <div className="acc-plateformes" aria-label="Plateformes prises en charge"><span>Vinted</span><span>Leboncoin</span><span>eBay</span></div>
-              <h1 className="acc-h1"><span>Ton activité de revente.</span><span className="attenue">Enfin bien organisée.</span></h1>
-              <p className="acc-sous">Ventes, colis, comptabilité. <em>Tes comptes réunis dans un seul espace, avec les prochaines actions à portée de main.</em></p>
+              <h1 className="acc-h1"><span>Moins de gestion.</span><span className="attenue acc-h1-long">Plus de temps pour vendre.</span><span className="attenue acc-h1-court">Place à la vente.</span></h1>
+              <p className="acc-sous">Tes ventes, tes colis et tes chiffres, réunis. <em>Une vue claire pour passer à l’action.</em></p>
               <div className="acc-actions">
                 {creer({ ref: ctaHaut })}
                 {connexion({ 'data-cta': 'connexion' })}
@@ -577,15 +577,15 @@ export default function Accueil({ onEntrer }) {
                 </div>
               </div>
             </div>
-            <div className="acc-preview"><div className="acc-preview-head"><span>VRM · TON ESPACE DE TRAVAIL</span><span className="acc-preview-example">Démonstration</span></div><CarteJour onVers={vers} /><p className="acc-preview-note">Un aperçu de ta journée, avec des données d’exemple.</p></div>
+            <div className="acc-preview"><div className="acc-preview-head"><span>UNE JOURNÉE PLUS CLAIRE</span><span className="acc-preview-example">Démonstration</span></div><CarteJour onVers={vers} /><p className="acc-preview-note">Ce qui compte aujourd’hui, visible au même endroit. Données d’exemple.</p></div>
           </div>
         </section>
 
         <nav className="acc-benefices acc-in" aria-label="Découvrir les fonctions de VRM">
           {[
-            ['colis','colis','Préparer les envois','Bordereaux, numéros et colis à déposer.'],
-            ['ailleurs','pile','Garder les annonces à jour','Repérer les articles vendus encore en ligne.'],
-            ['urssaf','euro','Retrouver ses chiffres','Ventes finalisées et rapports du mois.'],
+            ['colis','colis','Savoir quoi expédier','Tes bordereaux et les colis à déposer.'],
+            ['ailleurs','pile','Repérer les annonces à retirer','Un article vendu, les autres annonces à vérifier.'],
+            ['urssaf','euro','Voir où tu en es','Tes ventes finalisées et les rapports du mois.'],
           ].map(([id,icone,titre,texte])=><a key={id} href={'#'+id} onClick={ancre(id)}><span className="acc-benefice-icon"><Icone nom={icone}/></span><span><b>{titre}</b><small>{texte}</small></span><Chevron/></a>)}
         </nav>
 
