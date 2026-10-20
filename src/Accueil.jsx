@@ -591,13 +591,13 @@ export default function Accueil({ onEntrer }) {
 
         <div ref={zoneScenes}>
           <section className="acc-sec" id="colis" data-section="colis">
-            <Fil libelle="8 h 02" />
+            <Fil libelle="01" />
             <div className="acc-in acc-g1">
               <div>
-                <Quand heure="8 h 02" contexte="avant d’aller au relais" />
+                <Quand contexte="01 · Préparer les envois" />
                 <h2 className="acc-h2">Les bons colis. Dans le bon ordre.</h2>
-                <p className="acc-rep">Ceux-là, dans cet ordre : bordereau prêt d’abord, le plus pressé en haut — chacun avec le numéro de son carton imprimé dessus.</p>
-                <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu prends le carton 128, tu déposes." />
+                <p className="acc-rep">Retrouve les colis à envoyer et leurs bordereaux. Le numéro de rangement t’aide à retrouver le bon article.</p>
+                <Roles vrm="prépare le bordereau de chaque vente et y imprime le titre et le numéro." toi="tu imprimes, tu retrouves ton article et tu déposes le colis." />
                 <Precisions items={['Un bordereau par feuille, en A4 ou sur imprimante thermique.', 'Ton numéro de rangement, en chiffres ou en série (B125…), n’est jamais redonné à un autre article.']} />
               </div>
               <Emplacement nom="colis" pret={scenesPretes} />
@@ -605,13 +605,13 @@ export default function Accueil({ onEntrer }) {
           </section>
 
           <section className="acc-sec" id="ailleurs" data-section="ailleurs">
-            <Fil libelle="8 h 03" />
+            <Fil libelle="02" />
             <div className="acc-in">
               <div className="acc-g2-texte">
                 <div>
-                  <Quand heure="8 h 03" contexte="la Nike vient d’être vendue sur Vinted" />
+                  <Quand contexte="02 · Suivre les annonces" />
                   <h2 className="acc-h2">Vendu ici. À retirer ailleurs.</h2>
-                  <p className="acc-rep">VRM te le dit. Chaque annonce est reliée à son article par son numéro — jamais par son titre — et une vente prouvée sur un site te dit où le retirer ailleurs, dans les deux sens.</p>
+                  <p className="acc-rep">Un article vendu peut encore être en ligne ailleurs. VRM rassemble les annonces liées à la vente pour que tu saches lesquelles vérifier.</p>
                 </div>
                 <div>
                   <Roles vrm="relie tes annonces par leur numéro et te signale celles à retirer." toi="tu la retires d’eBay d’un clic ; sur Vinted et Leboncoin, c’est toi qui la retires — VRM te dit laquelle." />
@@ -623,13 +623,13 @@ export default function Accueil({ onEntrer }) {
           </section>
 
           <section className="acc-sec" id="urssaf" data-section="urssaf">
-            <Fil libelle="Fin du mois" />
+            <Fil libelle="03" />
             <div className="acc-in acc-g3">
               <div className="acc-g3-ecran"><Emplacement nom="urssaf" pret={scenesPretes} /></div>
               <div>
-                <Quand contexte="Fin du mois" />
+                <Quand contexte="03 · Retrouver ses chiffres" />
                 <h2 className="acc-h2">Tes ventes, prêtes pour la comptabilité.</h2>
-                <p className="acc-rep">Ce chiffre-là. Le chiffre d’affaires de tes ventes finalisées sur Vinted, Leboncoin et eBay, mois par mois : une vente Vinted compte le mois où l’argent t’est versé ; Leboncoin et eBay, au jour de la vente.</p>
+                <p className="acc-rep">Le chiffre d’affaires finalisé, mois par mois. Sur Vinted, la date est celle du versement ; sur Leboncoin et eBay, celle de la vente.</p>
                 <Roles vrm="compte, date chaque vente et prépare le rapport du mois." toi="tu reportes le montant sur ton espace URSSAF, puis tu le notes comme déclaré." />
                 <Precisions items={['« J’ai déclaré ce mois » : une vente notée ne se recompte jamais dans un autre mois.', 'Le rapport du mois en PDF et en tableur, pour toi ou ton comptable.']} />
               </div>
@@ -640,7 +640,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec" id="questions" data-section="questions">
           <div className="acc-in">
             <Quand contexte="Le reste de la journée" />
-            <h2 className="acc-h2">Et toutes les petites questions.</h2>
+            <h2 className="acc-h2">Le quotidien, dans le détail.</h2>
             <div className="acc-qs">
               {QUESTIONS.map((x) => (
                 <div key={x.q} className={`acc-q${x.horsTel ? ' acc-hors-tel' : ''}`}>
@@ -666,9 +666,9 @@ export default function Accueil({ onEntrer }) {
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
-              <p>VRM travaille comme toi : uniquement sur le compte ouvert dans ton Chrome, une action à la fois, jamais plus de 20 par heure.</p>
-              <p>Il lit tes données et prépare le bordereau de ce que tu as déjà vendu ; vendre, publier, écrire à un acheteur, c’est toi qui le décides. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
-              <p>Et VRM refuse ce qui fait repérer un robot : relancer en série les personnes qui ont mis un article en favori, republier tes annonces en boucle, accepter une offre Vinted à ta place, supprimer une annonce.</p>
+              <p>VRM agit sur le compte ouvert dans Chrome : une action à la fois, jamais plus de 20 par heure.</p>
+              <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
+              <p>Pas de relances en série aux favoris, de republication en boucle, d’acceptation automatique des offres Vinted ou de suppression d’annonce.</p>
             </div>
           </div>
         </section>
@@ -676,7 +676,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec" id="prix" data-section="prix">
           <div className="acc-in acc-g-prix">
             <div className="acc-prix">
-              <h2 className="acc-h2b">Un seul prix, et rien de caché.</h2>
+              <h2 className="acc-h2b">Tous tes comptes. Un seul espace.</h2>
               {ACCES_OFFERT && <div className="acc-offert" data-acces-offert="">Gratuit pour l’instant</div>}
               <div className="acc-gros"><b>{PRIX_MOIS} €</b><span>par mois</span></div>
               <ul>
@@ -725,8 +725,8 @@ export default function Accueil({ onEntrer }) {
               <p className="note">Ton premier article aura le N° 1.</p>
             </div>
             <div className="acc-fin-texte">
-              <h2 className="acc-h2">Demain matin, ouvre VRM.</h2>
-              <p className="texte">Crée ton compte, ajoute l’extension sur ton ordinateur, passe sur Vinted : tu sauras quoi faire.</p>
+              <h2 className="acc-h2">Place à ta prochaine vente.</h2>
+              <p className="texte">Crée ton espace, installe l’extension et retrouve tes prochaines actions au même endroit.</p>
               <div className="acc-actions">
                 {creer()}
                 {connexion()}

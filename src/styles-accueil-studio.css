@@ -128,3 +128,38 @@
 @media(prefers-reduced-transparency:reduce){.acc .acc-hero{background-image:none;}}
 .acc .acc-hero .acc-actions :focus-visible,.acc .acc-preview .acc-revoir:focus-visible{outline-color:#bad7c9;outline-offset:4px;}
 @media(max-width:759px){.acc .acc-benefices{padding-top:12px;padding-bottom:0;}}
+
+/* La suite de la page : trois moments lisibles, puis une décision simple. */
+.acc .acc-sec .acc-quand{display:inline-flex;align-items:center;background:#edf2ef;border:1px solid #dce5e1;border-radius:5px;padding:4px 8px;font-size:12px;letter-spacing:.02em;margin-bottom:14px;}
+.acc .acc-sec .acc-emplacement:before{content:"";position:absolute;inset:-12px;background:#e5ede7;border-radius:14px;pointer-events:none;}
+.acc .acc-sec .acc-emplacement>.acc-ecran{position:relative;}
+.acc #ailleurs{background:#edf2ef;border-block:1px solid #dce5e1;}
+.acc #ailleurs .acc-emplacement:before{background:#e0e9e3;}
+.acc .acc-roles{border-left:2px solid #9eb9aa;padding-left:12px;}
+.acc .acc-roles>div{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px;}
+.acc .acc-roles b{margin-right:0;}
+.acc .acc-etapes .n{background:#2b4548;color:#fff;border-color:#2b4548;border-radius:50%;}
+.acc .acc-conf{background:#edf2ef;border:1px solid #dce5e1;border-radius:10px;padding:20px;}
+.acc .acc-conf h2{font-size:24px;}
+.acc .acc-conf p{font-size:14px;line-height:1.65;}
+.acc .acc-prix{background:#21343e;border-color:#385257;color:#f0f5f2;box-shadow:0 16px 40px #21343e18;}
+.acc .acc-prix :is(h2,.acc-gros b){color:#f0f5f2;}
+.acc .acc-prix :is(li,p,.acc-gros span){color:#d5dfda;}
+.acc .acc-prix .petit a{color:#f0f5f2;}
+.acc .acc-prix .acc-offert{color:#e4eee8;background:#2c4548;border-color:#58716a;}
+.acc .acc-prix .acc-p{color:#21343e;background:#eff6f0;border-color:#eff6f0;box-shadow:none;}
+.acc .acc-prix :focus-visible{outline-color:#bad7c9;}
+.acc .acc-faq details[open]{background:#edf2ef;border-radius:6px;}
+.acc .acc-faq details[open] :is(summary,p){padding-inline:12px;}
+.acc .acc-fin{background:#e5ede7;border-block:1px solid #c8d8ce;}
+.acc .acc-fin:before{display:none;}
+@media(hover:hover){.acc .acc-prix .acc-p:hover{background:#dcebe0;}}
+@media(max-width:759px){
+ .acc .acc-sec .acc-quand{margin-bottom:10px;}
+ .acc .acc-roles{padding-left:10px;}
+ .acc .acc-conf{background:transparent;border:0;padding:0;}
+ .acc .acc-conf h2{font-size:24px;}
+ .acc .acc-sec .acc-emplacement:before{inset:-8px;border-radius:10px;}
+}
+.acc #questions .acc-quand{padding-block:0;border:0;background:transparent;}
+.acc #questions .acc-quand{margin-bottom:8px;}
