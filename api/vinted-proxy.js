@@ -23,6 +23,7 @@
 // cette persistance, le refresh suivant échouerait car le refresh_token stocké
 // serait déjà consommé.
 
+import './_lib/sans-bruit.js';
 import { vendeurExige, baseCloisonnee, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
 
 // ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui

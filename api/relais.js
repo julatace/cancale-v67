@@ -7,6 +7,8 @@
 //   GET /api/relais?city=Cancale  →  { city, center:{lat,lon}, points:[...] }
 // ────────────────────────────────────────────────────────────────────────────
 
+import './_lib/sans-bruit.js';
+
 const UA = { 'User-Agent': 'VRM/1.0 (points relais)' };
 
 async function geocodeCity(city) {

@@ -14,6 +14,7 @@
 // qu'on lui donne (marque, taille, état) — jamais un état ou une matière non
 // fournis. On ne veut pas de belles annonces mensongères.
 
+import './_lib/sans-bruit.js';
 import { utilisateurDe } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { handleDetourage } from './_lib/detourage.js';
