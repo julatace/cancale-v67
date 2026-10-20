@@ -4804,6 +4804,85 @@ de l'agent eBay).
   aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
   arrive directement sur « Colis à préparer ».
 
+### La carte de la communauté : migration 018 (20 octobre) — PAS APPLIQUÉE ; écran livré
+Julien : « un onglet avec une carte où les utilisateurs de VRM peuvent mettre
+leur emplacement quand on est connecté, pour s'écrire si on est dans la même
+ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
+(`?tab=communaute`, `src/communaute/Communaute.jsx`, chargé au clic).
+- **Décisions (ne pas rediscuter)** : opt-in strict (invisible par défaut,
+  « Me retirer de la carte » SUPPRIME la ligne) ; jamais une position exacte —
+  une VILLE choisie, rangée arrondie à **0,05° (≈ 5 km)** ; « Me localiser »
+  PROPOSE la ville la plus proche, rien n'est rangé avant sa confirmation (la
+  position du téléphone n'est jamais envoyée à la base) ; des autres : un
+  pseudo (défaut `vrm_prenom`, sinon « Revendeur »), une ville, un pays — jamais
+  l'email, jamais l'identifiant du compte (un `pid` public tiré au hasard),
+  jamais un compte Vinted ; messages seulement entre personnes VISIBLES,
+  1–500 caractères, **20/h et 5 nouvelles conversations/jour** ; texte brut
+  (React échappe, aucun lien rendu) ; Bloquer (ses messages sont rangés
+  « masqués » : il ne le sait pas, et il disparaît de la carte de celui qui
+  bloque) ; Signaler (rangé avec un extrait de ses 5 derniers messages,
+  lisible par le PROPRIÉTAIRE seul : `vrm_communaute_signalements()`, pas
+  d'écran) ; rien d'IA, rien de payant ; abonnement = `vrm_acces_pour` (qui ne
+  paie plus ne voit plus, n'écrit plus, n'est plus montré).
+- **Le ludique, honnête** : épingles regroupées au zoom (le nombre de personnes,
+  `grouperParPixels`), la sienne en accent avec un pouls (coupé par « réduire
+  les animations »), « près de toi » (≤ 30 km), « N autres à {ville} »,
+  🥇 premier de sa ville (le plus ancien inscrit de la ville), « 👋 Coucou » en
+  un geste. Tout vient de la liste lue ; zéro inscrit ⇒ « Personne n'est encore
+  sur la carte — sois le premier », aucun chiffre, aucune épingle.
+- **Base** : `supabase/migrations/018-communaute.sql`, modèle de la 016 — cinq
+  tables (`vrm_communaute_profils`, `_conversations`, `_messages`, `_blocages`,
+  `_signalements`), RLS activé ET forcé, aucune règle, tous droits retirés (aux
+  deux séquences aussi), EMPREINTE de forme ; dix fonctions SECURITY DEFINER,
+  `search_path` vide, identité dans le jeton. La contrainte refuse toute
+  coordonnée non arrondie (même écrite par le propriétaire de la table).
+  Aucune table existante n'est touchée. « Fermer mon compte » appelle
+  `vrm_communaute_effacer` (clé de service) entre l'équipe et les photos ; base
+  sans la 018 ⇒ 0 ; muette ⇒ fermeture INCOMPLÈTE, dite.
+- **Route** : `api/compte.js?mode=communaute` (`api/_lib/communaute.js`, toujours
+  12 fonctions), au nom de l'appelant (jamais la clé de service) ; GET → carte +
+  conversations ; POST `rejoindre · quitter · ecrire · fil · bloquer · signaler ·
+  ville`. Trois états : 200 · 503 `non-installe` (« La carte de la communauté
+  n'est pas encore activée sur ta base ») · 503 `pas-su` (« pas pu lire », jamais
+  « personne ») · refus réel dit en clair. Le géocodage (`ville`) passe par
+  Nominatim (OpenStreetMap, gratuit), session exigée, coordonnées arrondies
+  côté serveur aussi.
+- **Carte** : Leaflet **1.9.4** depuis cdnjs, chargé à l'ouverture de l'écran
+  (jamais au démarrage), fond CARTO (voyager / dark_all — sombre suivi) avec
+  l'attribution OpenStreetMap + CARTO. Injoignable ⇒ la même communauté en
+  liste. Les épingles sont de vrais boutons (44 px) écoutés directement : le
+  « clic » de Leaflet ne partait pas au doigt dans la coque zoomée à 80 %.
+  Les feuilles (FermeAuRetour) et le toast vivent sur `<body>` (portail) : dans
+  la coque, un `position:fixed` restait sous la barre du bas.
+- **Preuves** : `scripts/audit-communaute-sql.cjs` (Postgres jetable, socle
+  `agent-sql/supabase-min.sql` + 005-007) — **82 contrôles** ; `--prouve`
+  **17/17 mutations** au rouge (lecture des messages d'autrui, position exacte
+  rangée, sans arrondi, bloqué qui écrit, anon qui lit, retrait qui garde la
+  ligne, identifiant de compte exposé, invisible qui écrit, plafonds, signalements
+  lus par tous, droits de table, effacement incomplet, abonnement ignoré, bloqué
+  encore visible, forme ignorée, vérification aveugle aux droits) ; l'essai
+  annulé ne laisse rien ; `--verifier` voit 10 gardes touchées. Banc
+  `scripts/bancs/communaute.cjs` (port `BANC_PORT`, deux personnes, faux
+  PostgREST aux règles de la 018, le VRAI `api/compte.js`, Leaflet servi à la
+  place de cdnjs — `BANC_LEAFLET_DIR`, sinon `npm pack leaflet@1.9.4` dans le
+  dossier temporaire) — **42 contrôles**, **21 rouges** sur le build d'avant (§6.1) ;
+  `BANC_MUTATION=bloque-ecrit` ⇒ 2 rouges, `opt-in` ⇒ 5 rouges.
+  `audit-fermer-compte.cjs` +3 (effacée chez lui seul, base sans la 018, muette).
+  `verif_visuel` et `verif_dark` rendent l'écran.
+- **Non mesuré** : la 018 n'a jamais tourné sur sa vraie base (Postgres 16 au
+  banc, 17.6 en production) ; Nominatim depuis Vercel (politique d'usage : un
+  appel par recherche, pas de cache) ; un vrai Leaflet au doigt sur un vrai
+  téléphone ; aucun écran de modération (le propriétaire lit les signalements par
+  `select public.vrm_communaute_signalements();` sous sa session, ou la table
+  dans l'outil SQL) ; aucune notification d'un nouveau message (relu toutes les
+  30 s écran ouvert, 15 s fil ouvert).
+- **Gestes de Julien** (rien ne change pour personne avant) : (1)
+  `node scripts/communaute-sql/essai-annule.cjs > essai.sql`, coller dans
+  l'outil SQL de Supabase, lire la ligne `essai` (`tables: 5, rls: true`) ;
+  (2) appliquer `supabase/migrations/018-communaute.sql`, VRM fermé ;
+  (3) `node scripts/communaute-sql/essai-annule.cjs --verifier`, coller, exiger
+  `ok: true`. Ensuite : Gestion → Communauté → « Apparaître sur la carte ».
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
@@ -10368,8 +10447,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **95 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **97 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **88 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -10690,8 +10769,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 96 audits
-scripts/bancs/                  les 87 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 97 audits
+scripts/bancs/                  les 88 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

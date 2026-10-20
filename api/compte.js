@@ -19,6 +19,8 @@
 //   /api/compte?mode=equipe       (GET/POST, session) LE MODE ÉQUIPE (migration
 //                                 016) : lister · inviter · accepter · révoquer ·
 //                                 quitter — voir api/_lib/equipe.js
+//   /api/compte?mode=communaute   (GET/POST, session) LA CARTE DE LA COMMUNAUTÉ
+//                                 (migration 018) — voir api/_lib/communaute.js
 //   /api/compte?mode=entreprise&siret= (GET, session) le NOM de l'entreprise
 //                                 d'un SIREN/SIRET (registre public, sans clé)
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
@@ -44,6 +46,7 @@ import { routeSuperPdp } from './_lib/superpdp.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
+import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
 import { routeOperations } from './_lib/operations.js';
 
 export const config = { api: { bodyParser: false } };
@@ -829,7 +832,10 @@ async function fermerCompte(req, res) {
   // Son équipe (migration 016) : ses invitations comme vendeur ET comme membre.
   // Base sans la 016 ⇒ 0 (rien à effacer) ; base muette ⇒ null (incomplet).
   etapes.equipe = etapes.compteurs === null ? null : await effacerEquipe(u.id, SERVICE);
-  etapes.photos = etapes.equipe === null ? null : await viderCacheDetourage(u.id, SERVICE);
+  // Sa présence sur la carte de la communauté (migration 018) : présence,
+  // conversations, blocages, signalements. Base sans la 018 ⇒ 0.
+  etapes.communaute = etapes.equipe === null ? null : await effacerCommunaute(u.id, SERVICE);
+  etapes.photos = etapes.communaute === null ? null : await viderCacheDetourage(u.id, SERVICE);
   let connexion = false;
   if (etapes.photos !== null) {
     try {
@@ -846,14 +852,16 @@ async function fermerCompte(req, res) {
   if (etapes.donnees !== null) fait.push(`tes données effacées (${nb(etapes.donnees, 'élément', 'éléments')})`);
   if (etapes.comptesVinted != null) fait.push(nb(etapes.comptesVinted, 'compte Vinted délié', 'comptes Vinted déliés'));
   if (etapes.equipe != null && etapes.equipe > 0) fait.push(nb(etapes.equipe, 'invitation d’équipe effacée', 'invitations d’équipe effacées'));
+  if (etapes.communaute != null && etapes.communaute > 0) fait.push('ta présence sur la carte de la communauté effacée');
   if (etapes.photos != null && etapes.photos > 0) fait.push(nb(etapes.photos, 'photo détourée effacée', 'photos détourées effacées'));
   if (etapes.donnees === null) pasFait.push('tes données', 'tes comptes Vinted');
   else if (etapes.comptesVinted === null) pasFait.push('tes comptes Vinted');
   else if (etapes.compteurs === null) pasFait.push('tes compteurs de détourage');
   else if (etapes.equipe === null) pasFait.push('ton équipe');
+  else if (etapes.communaute === null) pasFait.push('ta présence sur la carte de la communauté');
   else if (etapes.photos === null) pasFait.push('tes photos détourées');
   if (!connexion) pasFait.push('ton compte de connexion');
-  const ok = connexion && etapes.donnees !== null && etapes.comptesVinted !== null && etapes.compteurs !== null && etapes.equipe !== null && etapes.photos !== null;
+  const ok = connexion && etapes.donnees !== null && etapes.comptesVinted !== null && etapes.compteurs !== null && etapes.equipe !== null && etapes.communaute !== null && etapes.photos !== null;
   const message = ok
     ? `Ton compte VRM est fermé : ${fait.join(', ')}.`
     : `Fermeture INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${pasFait.join(', ')}. Reconnecte-toi et relance « Fermer mon compte ».`;
@@ -899,6 +907,14 @@ async function equipe(req, res) {
   return routeEquipe(req, res, { utilisateur, corps });
 }
 
+// ── La carte de la communauté : la session d'abord (api/_lib/communaute.js) ──
+async function communaute(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeCommunaute(req, res, { utilisateur, corps: corps || {} });
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -930,6 +946,7 @@ export default async function handler(req, res) {
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
