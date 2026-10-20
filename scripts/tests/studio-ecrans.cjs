@@ -15,6 +15,7 @@ s=s.replace(marker,fixtures+`
   for(const width of (process.env.STUDIO_WIDTHS||'320,390,1512').split(',').map(Number)){
    await p.setViewportSize({width,height:900});
    for(const [nom,tab,section] of [['ventes','plat_vinted','Ventes'],['annonces','plat_vinted','Annonces'],['achats','plat_vinted','Achats'],['messages','plat_vinted','Messages'],['annonces-ebay','plat_ebay','Annonces'],['messages-ebay','plat_ebay','Messages'],['colis','plat_leboncoin','Colis'],['retraits','cat_achats',null],['parametres','settings',null],['statistiques','dashboard',null],['comptabilite','compta',null],['stock','garage',null],['organisation','organisation',null]]){
+    if(process.env.STUDIO_SCREENS&&!process.env.STUDIO_SCREENS.split(',').includes(nom))continue;
     await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.evaluate(()=>document.fonts.ready);
     if(section)await p.locator('.vrm-platform-tabs').getByRole('button',{name:section,exact:true}).click();
     if(nom==='retraits')await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
@@ -51,13 +52,19 @@ s=s.replace(marker,fixtures+`
      check(await ouvrir.getAttribute('aria-expanded')==='false','actions repliées au départ '+width);
      await ouvrir.click();
      check(await ouvrir.getAttribute('aria-expanded')==='true','actions ouvrables au clic '+width);
+     check(await p.getByRole('dialog').isVisible(),'inspecteur visible '+width);
+     check(await p.getByRole('dialog').evaluate(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;}),'inspecteur dans la fenêtre '+width);
+     if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'inspecteur-'+width+'.png')});
     }
     if(nom==='ventes'){
+     await p.locator('.vrm-ledger-drawer-host:not([hidden]) [data-cout-vente-saisir]').click();const cout=p.locator('[data-cout-vente-champ]');await cout.fill('12,50');await cout.press('Escape');check(await cout.count()===0&&await p.getByRole('dialog').count()===1,'Échap annule la saisie sans fermer la vente '+width);
+     await p.locator('.vrm-ledger-drawer-host:not([hidden]) [data-cout-vente-relier]').click();const rechercheAchat=p.getByPlaceholder('Chercher dans tes achats (titre, marque, taille…)');await rechercheAchat.fill('ordinateur');check(await rechercheAchat.isVisible(),'sélecteur achat utilisable au-dessus de l’inspecteur '+width);await p.getByRole('button',{name:'Fermer',exact:true}).click();
      const bouton=p.getByRole('button',{name:"Envoyer une facture à l'acheteur",exact:true}).first();await bouton.click();const choix=p.getByRole('combobox',{name:'Facture de cette vente',exact:true});await choix.waitFor();
      check(await choix.evaluate(e=>{const a=e.getBoundingClientRect(),m=document.querySelector('main').getBoundingClientRect();return a.left>=m.left&&a.right<=m.right;}),'panneau facture dans la largeur '+width);
      check(await choix.inputValue()==='','aucune facture sélectionnée automatiquement '+width);
      await bouton.click();check(await choix.count()===0,'facture repliable sans envoi '+width);
-     {const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await ligne.locator('.vrm-ledger-sale-toggle').click();check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'retour à une seule ligne '+width);}
+     {const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await p.getByRole('button',{name:'Fermer les détails de la vente',exact:true}).click();check(await ligne.locator('.vrm-ledger-sale-toggle').evaluate(e=>e===document.activeElement),'focus rendu à la vente '+width);check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'retour à une seule ligne '+width);}
+     const suivante=p.locator('main .vrm-ventes-liste .vrm-sale-row').nth(1).locator('.vrm-ledger-sale-toggle');await suivante.click();check(await p.getByRole('dialog').count()===1,'un seul inspecteur visible '+width);await p.keyboard.press('Escape');check(await p.getByRole('dialog').count()===0,'Échap ferme les détails '+width);check(await suivante.evaluate(e=>e===document.activeElement),'focus rendu après Échap '+width);
     }
     if(nom==='messages'){
      await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();

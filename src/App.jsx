@@ -13585,17 +13585,35 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 
 function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
-  React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
   const panneau = React.useId();
+  const declencheur = React.useRef(null);
+  const fermer = React.useRef(null);
+  React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
+  React.useEffect(()=>{
+    const autre=e=>{if(e.detail!==panneau)setOuvert(false);};
+    window.addEventListener('vrm:vente-ouverte',autre);
+    return()=>window.removeEventListener('vrm:vente-ouverte',autre);
+  },[panneau]);
+  React.useEffect(()=>{
+    if(!ouvert)return;
+    window.dispatchEvent(new CustomEvent('vrm:vente-ouverte',{detail:panneau}));
+    fermer.current?.focus({preventScroll:true});
+  },[ouvert,panneau]);
+  const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
   return <div {...props} data-ligne-ouverte={ouvert}>
-    <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
+    <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
       <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
       <span className="vrm-ledger-sale-state" title={etat}>{etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
-    <div className="vrm-ledger-sale-content" id={panneau}>{children}</div>
+    {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
+      <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
+        <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
+        <div className="vrm-main vrm-ledger-drawer-body"><div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
+      </section>
+    </div>,document.body)}
   </div>;
 }
 function LigneVente({ photo, titre, meta, montant, actions, etat, details }) {
@@ -16130,7 +16148,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
 
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut}
           meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
       })}
     </div>
   </>);
@@ -34576,7 +34594,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
-          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article · état</span><span>Montant</span></div>
+          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
               Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
               recréait les 60 lignes au rendu urgent PUIS au rendu différé —
