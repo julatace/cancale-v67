@@ -3435,9 +3435,9 @@ function FactureSousVente({ factures, compte }) {
   if(!propres.length)return null;
   const drafts=propres.filter(i=>i.status==='draft' && i.buyerEmail);
   const inv=drafts.find(i=>i._id===choix);
-  return <div className="vrm-sale-invoice">
+  return <div className="vrm-sale-invoice" data-ouvert={ouvert ? "true" : undefined}>
     {queued?<span role="status">Facture mise en file d'envoi</span>:<>
-      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}}>Envoyer une facture à l'acheteur</button>
+      <button type="button" onClick={()=>setOuvert(!ouvert)} style={{border:0,background:'transparent',color:C.accent,fontSize:11,fontWeight:600,padding:'5px 0',cursor:'pointer'}} aria-label="Envoyer une facture à l'acheteur"><span className="vrm-invoice-full">Envoyer une facture à l'acheteur</span><span className="vrm-invoice-short" aria-hidden="true">Facture</span></button>
       {ouvert && <div style={{display:'grid',gap:6,padding:'6px 0'}}>
         <label style={{fontSize:11}}>Choisir la facture de cette vente
           <select aria-label="Facture de cette vente" value={choix} onChange={e=>setChoix(e.target.value)} style={{display:'block',width:'100%',padding:8,marginTop:4,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8}}>
@@ -13386,7 +13386,6 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
   // en reste. Mesuré sur la piste (rien n'est supposé), eBay seulement.
   const [bords, setBords] = React.useState({ g: false, d: false });
   React.useEffect(() => {
-    if (!dark) return undefined;
     const el = refPiste.current; if (!el) return undefined;
     const mesure = () => { const g = el.scrollLeft > 2, d = el.scrollLeft + el.clientWidth < el.scrollWidth - 2; setBords((b) => (b.g === g && b.d === d) ? b : { g, d }); };
     mesure();
@@ -13394,11 +13393,11 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
     window.addEventListener('resize', mesure);
     return () => { el.removeEventListener('scroll', mesure); window.removeEventListener('resize', mesure); };
   }, [dark, sections.length]);
-  const masque = dark && (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
+  const masque = (bords.g || bords.d) ? `linear-gradient(90deg, ${bords.g ? 'transparent 0, #000 28px' : '#000 0'}, ${bords.d ? '#000 calc(100% - 28px), transparent 100%' : '#000 100%'})` : undefined;
   return (
     <div className="vrm-seg-cadre" style={{ background: dark ? EBAY_SKIN.bg : 'transparent' }}>
       <nav ref={refPiste} aria-label="Sections de la plateforme" className="vrm-seg vrm-platform-tabs" data-segment=""
-        data-seg-deborde={dark ? ((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined : undefined}
+        data-seg-deborde={((bords.g ? 'g' : '') + (bords.d ? 'd' : '')) || undefined}
         style={{ '--seg-ink': T.text, '--seg-muted': T.muted, '--seg-point': T.accent, ...(masque ? { WebkitMaskImage: masque, maskImage: masque } : null) }}>
         {sections.map(([id,label,point])=>{ const on = sub===id; return (
           <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id} className="vrm-seg-btn">
@@ -13439,7 +13438,7 @@ function RetirerArgent({ liveStats }) {
   if (!liste) return null;
   const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
   return (
-    <div data-retirer-argent={liste.length} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
+    <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
             ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
@@ -13555,7 +13554,7 @@ function PhotoArticleAgrandissable({src,titre,children}) {
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
-  return <button type="button" className="vrm-pickup-code" aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
+  return <button type="button" className="vrm-pickup-code" data-code-long={String(code).length > 8 ? "true" : undefined} aria-label={`Copier ${label.toLowerCase()} ${code}`} onClick={async()=>{
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
@@ -13584,8 +13583,23 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVente({ photo, titre, meta, montant, actions }) {
-  return <article className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuvert = false, ...props }) {
+  const [ouvert, setOuvert] = React.useState(initialOuvert);
+  React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
+  const panneau = React.useId();
+  return <div {...props} data-ligne-ouverte={ouvert}>
+    <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
+      <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
+      <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
+      <span className="vrm-ledger-sale-state" title={etat}>{etat}</span>
+      <span className="vrm-ledger-sale-amount">{montant}</span>
+      <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
+    </button>
+    <div className="vrm-ledger-sale-content" id={panneau}>{children}</div>
+  </div>;
+}
+function LigneVente({ photo, titre, meta, montant, actions, etat, details }) {
+  return <LigneVenteCompacte photo={photo} titre={titre} etat={etat} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -13594,7 +13608,8 @@ function LigneVente({ photo, titre, meta, montant, actions }) {
       </div>
       <div className="vrm-sale-price" style={{textAlign:'right',flexShrink:0}}><span className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{montant}</span>{actions}</div>
     </div>
-  </article>;
+    {details}
+  </LigneVenteCompacte>;
 }
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
 // peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
@@ -13690,7 +13705,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     const posted = estFait(o);
     return (
       <div className="vrm-lbc-package" key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -13709,12 +13724,12 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
         {/* ACTION PRINCIPALE — comme Vinted : un gros bouton accent. « Imprimer »
             ouvre le PDF du bordereau Leboncoin ; « Générer » ouvre la vente sur
             Leboncoin pour qu'il y soit créé (l'extension le capte ensuite). */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="vrm-lbc-package-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
           {principal === 'imprimer' && extSait('lbcpdf') === 'ok'
-            ? <button type="button" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
+            ? <button type="button" className="vrm-lbc-package-primary" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
             : principal === 'imprimer'
-            ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
-            : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
+            ? <a className="vrm-lbc-package-primary" href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
+            : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
       </div>
@@ -13817,7 +13832,7 @@ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.'
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o }) {
-  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)}
+  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -16113,9 +16128,9 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title}
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut}
           meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
-          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)}/><EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/></div>;
+          montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
       })}
     </div>
   </>);
@@ -34433,6 +34448,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
+        <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
@@ -34560,6 +34576,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div className="vrm-ledger-heading" aria-hidden="true"><span>Article · état</span><span>Montant</span></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
               Mesuré (banc `ventes-frappe.cjs`, téléphone ×4) : chaque lettre
               recréait les 60 lignes au rendu urgent PUIS au rendu différé —
@@ -34591,7 +34608,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte photo={photo} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -34729,7 +34746,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                })()}
                </details></div>
                </div>
-              </div>
+              </LigneVenteCompacte>
             );
           }}/>; })}
         </div>
@@ -36236,10 +36253,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
-            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
+            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}</div>
-            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
+            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
+            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
@@ -36454,7 +36471,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </details>
         )}
-        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary>Stock et ajustements</summary>
+        {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
               affichait un instantané périmé en le faisant passer pour du direct
@@ -36869,9 +36886,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sans ouvrir. `data-places` reste sur le contenu : le banc le
                 trouve par cet attribut (invariant : aucune case eBay). */}
             <details data-places-wrap style={{marginBottom:12}}>
-              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+              <summary aria-label="Publier aussi ailleurs" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
-                <span style={{fontSize:13,fontWeight:600,color:C.text}}>Publier aussi ailleurs</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">Publier aussi ailleurs</span><span className="vrm-label-short" aria-hidden="true">Publier</span></span>
                 <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
                 <span className="vrm-chevron" style={{fontSize:14,color:C.muted}}>›</span>
               </summary>
@@ -36910,6 +36927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))',gap:12}}>
           {annShown.map(it=>{
             // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
@@ -36937,7 +36955,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
-                  <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+                  <div className="vrm-ann-ledger-info" style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
@@ -37135,7 +37153,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           // Le compte de l'extension d'abord (là où VRM peut répondre), puis les
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
-          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          // (19 oct.) Dans chaque groupe, une offre en attente passe devant : elle
+          // expire, et y répondre décide d'une vente.
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
@@ -41926,7 +41946,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
       </div>
       <button type="button"
-        onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+        className="vrm-set-connect" onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
         style={{...bouton(true),marginTop:12}}>
         Aller à l'écran de connexion
       </button>
@@ -46455,11 +46475,11 @@ function AppCoeur() {
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
         const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
-        <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
+        <div className="vrm-global-search" style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+          <div className="vrm-global-search-head" style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
             <Icon name="search" size={19} style={{color:C.muted,flexShrink:0}}/>
-            <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
+            <input aria-label="Rechercher un article dans VRM" type="search" autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
               style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
             <button className="vrm-icon-control" type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
