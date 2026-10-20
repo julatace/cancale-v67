@@ -172,7 +172,7 @@
   }, 800);
   onPage(); // si on arrive directement sur une annonce
 
-  // ── LE NUMÉRO VRM SUR VINTED (20 octobre, 5.200) ─────────────────────────
+  // ── LE NUMÉRO VRM SUR VINTED (20 octobre, 5.201) ─────────────────────────
   // Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à
   // côté du bouton Publier ; après, sur Vinted, qu'il y ait le numéro dessus ;
   // pareil dans les ventes ». Un numéro ne s'affiche que s'il est CONNU par

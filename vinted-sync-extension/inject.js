@@ -269,7 +269,7 @@
     } catch (_) {}
   };
 
-  // ── LA PUBLICATION D'UNE ANNONCE (20 octobre, 5.200) ───────────────────────
+  // ── LA PUBLICATION D'UNE ANNONCE (20 octobre, 5.201) ───────────────────────
   // Vinted crée l'annonce par `POST /api/v2/item_upload/items` (vu dans ses
   // chemins captés). On lit l'IDENTIFIANT de l'annonce dans la réponse (2xx
   // seulement) — c'est lui qui relie le numéro affiché à côté du bouton à
@@ -340,7 +340,7 @@
         p.then((res) => {
           try {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
-            notePublication(method, url, res.status, () => res.clone().text());   // 5.200
+            notePublication(method, url, res.status, () => res.clone().text());   // 5.201
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
@@ -382,7 +382,7 @@
         this.addEventListener('load', function () {
           try {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
-            notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''));   // 5.200
+            notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''));   // 5.201
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).

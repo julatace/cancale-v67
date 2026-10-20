@@ -2452,7 +2452,7 @@ async function rangerSuppressions() {
   } catch (_) {}
 }
 // ══════════════════════════════════════════════════════════════════════════════
-// LE NUMÉRO SUR VINTED (20 octobre, 5.200)
+// LE NUMÉRO SUR VINTED (20 octobre, 5.201)
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à côté
 // du bouton Publier, et après, quand on va sur Vinted, qu'il y ait le numéro

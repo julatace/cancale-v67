@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  « LE NUMÉRO À CÔTÉ DU BOUTON PUBLIER » (20 octobre, 5.200)
+//  « LE NUMÉRO À CÔTÉ DU BOUTON PUBLIER » (20 octobre, 5.201)
 //  Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à côté
 //  du bouton Publier ; après, sur Vinted, qu'il y ait le numéro dessus ; pareil
 //  dans les ventes ». On EXÉCUTE le vrai `background.js` (`_fond-vm.cjs`) :

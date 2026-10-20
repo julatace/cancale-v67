@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC « LE NUMÉRO SUR VINTED » (20 octobre, 5.200). Aucune fixture.
+//  BANC « LE NUMÉRO SUR VINTED » (20 octobre, 5.201). Aucune fixture.
 //   A. vinted-capture.js (le VRAI fichier, dans une fausse page Vinted, avec un
 //      faux `chrome.runtime`) : sur /items/new l'étiquette « N°74 » est posée
 //      JUSTE À CÔTÉ du bouton « Ajouter » ; base illisible ⇒ « pas pu réserver »,
