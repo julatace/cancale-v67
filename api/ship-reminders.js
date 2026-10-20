@@ -26,6 +26,7 @@ import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } fr
 import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
+import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -253,7 +254,36 @@ async function bilanDeLaSemaine(maintenant = Date.now()) {
 
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
 // vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
+// ── (20 octobre) RELIRE eBAY AVANT DE COMPTER, APP FERMÉE ──────────────────
+// Julien : « pour eBay ça doit se relire tout seul […] je dois rien avoir à
+// faire ». Les commandes eBay ne se relisaient que VRM ouvert : une vente de la
+// nuit n'entrait pas dans le rappel du matin. On les relit donc ICI, pour CE
+// vendeur, compte par compte avec SON jeton (`relireCommandesVendeur`, la
+// même lecture que l'app), puis on compte. Pas de nouveau cron (plan Hobby),
+// pas de 13e fonction. Une relecture ratée ne bloque RIEN : le rappel part sur
+// la dernière capture (eBay illisible ⇒ « au moins », comme avant), et elle
+// est bornée dans le temps (les 300 s d'une fonction Vercel se partagent entre
+// tous les vendeurs).
+const RELECTURE_EBAY_MAX_MS = 20000;
+async function relireEbayDuVendeur() {
+  const owner = proprietaireCourant() || '';
+  let minuteur;
+  try {
+    return await Promise.race([
+      relireCommandesVendeur(owner),
+      new Promise((ok) => { minuteur = setTimeout(() => ok({ fait: false, reason: 'delai' }), RELECTURE_EBAY_MAX_MS); }),
+    ]);
+  } catch (e) { return { fait: false, reason: 'erreur' }; }
+  finally { clearTimeout(minuteur); }
+}
+// Le bilan ne porte aucun jeton ni montant : l'état de chaque compte.
+const resumeRelecture = (r) => !r ? null : (!r.fait ? { fait: false, reason: r.reason } : { fait: true, ok: r.comptes.filter((c) => c.ok === true).length, ko: r.comptes.filter((c) => c.ok === false).length });
 async function traiterVendeur() {
+  const relu = await relireEbayDuVendeur();
+  const out = await traiterVendeurApresRelecture();
+  return { ...out, ebayRelu: resumeRelecture(relu) };
+}
+async function traiterVendeurApresRelecture() {
     // ⚠️ ÉGRESS : surtout PAS `select=data` — chaque bordereau embarque son PDF
     // en base64 (deux fois), ~6 Mo au total pour ~50 lignes, alors qu'on ne lit
     // que la date limite + les clés. On projette donc ces 4 champs scalaires

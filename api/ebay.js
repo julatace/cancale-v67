@@ -1,6 +1,7 @@
 import {creerLectureCommandesEbay} from './_lib/ebay-commandes-pages.js';
 import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
 import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
+import {relireCommandesCompte} from './_lib/ebay-relecture.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
 //
 // ⚠️ POURQUOI TOUT EN UN FICHIER : le plan Vercel Hobby limite à 12 fonctions
@@ -1590,6 +1591,53 @@ async function handleSync(ctx) {
   } };
 }
 
+// ── LA RELECTURE SANS GESTE (20 octobre) ─────────────────────────────────────
+// Julien : « pour eBay ça doit se relire tout seul […] je dois rien avoir à
+// faire ». L'app l'appelle à l'ouverture puis au plus toutes les ~10 min tant
+// qu'elle est visible. MESURÉ dans le code : la synchro complète coûte, par
+// compte, 3 appels eBay + jusqu'à 20 GetItem (un par annonce) + l'Inventory API
+// + la réécriture des règles d'offre. Pour ce qui compte ici — les COMMANDES
+// (colis à poster, vendu, CA) et les annonces en ligne / programmées (l'anti
+// double vente lit leur SKU) — il suffit de DEUX lectures : la page 0 des
+// commandes (la même que la synchro, rangée par la même fusion) et un seul
+// `GetMyeBaySelling`. Le détail de chaque annonce (photos, description,
+// caractéristiques) déjà rangé est GARDÉ par itemId ; les règles d'offre et le
+// stock ne sont pas touchés (la synchro complète, sur clic ou aux 6 h, s'en
+// occupe). Une source qui n'a pas répondu garde sa dernière capture.
+async function handleRelire(ctx) {
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const token = at.token;
+  const [cmd, liste] = await Promise.all([
+    relireCommandesCompte({ owner: ctx.owner, compte: ctx.compte, token }),
+    listeVendeur(token),
+  ]);
+  let annoncesRange = false, programmeesRange = false;
+  if (liste.ok) {
+    const avant = await lireDonnee(ligneDe('ebay_listings', ctx), ctx.owner);
+    // Lecture de l'ancienne ligne ratée : on ne réécrit pas (on perdrait le
+    // détail de chaque annonce) — la capture d'avant reste.
+    if (avant !== undefined) {
+      const ancien = new Map(((avant && Array.isArray(avant.items)) ? avant.items : []).filter((x) => x && x.itemId).map((x) => [String(x.itemId), x]));
+      const items = liste.actives.map((it) => {
+        const a = ancien.get(String(it.itemId));
+        if (!a) return it;
+        return { ...it, ...(a.detail && !it.detail ? { detail: a.detail } : {}), ...(!it.photo && a.photo ? { photo: a.photo } : {}) };
+      });
+      const at2 = Date.now();
+      annoncesRange = await storeData(ligneDe('ebay_listings', ctx), { items, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner) === true;
+      programmeesRange = await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: items.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner) === true;
+    }
+  }
+  const ok = cmd.ok === true;
+  return { status: ok ? 200 : (cmd.status || 502), body: {
+    ok, reason: ok ? undefined : cmd.reason,
+    lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange },
+    commandes: { lues: cmd.lues == null ? null : cmd.lues },
+    ...(ok ? {} : { error: cmd.reason === 'base' ? 'La base n\'a pas répondu — la dernière capture reste.' : 'eBay n\'a pas rendu tes commandes — la dernière capture reste.' }),
+  } };
+}
+
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
 const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
 function deletionUrl(req) {
@@ -1856,6 +1904,7 @@ async function handleApp(req, res) {
       modifierannonce:(ctx)=>handleModifierAnnonceGestion(b,ctx),
       terminerannonce:async(ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;},
       sync: (ctx) => handleSync(ctx),
+      relire: (ctx) => handleRelire(ctx),
       commandessuite:(ctx)=>chargerCommandesSuivantes(ctx),
       revise: (ctx) => handleRevise(b, ctx),
       pubinfo: (ctx) => handlePubInfo(b, ctx),
