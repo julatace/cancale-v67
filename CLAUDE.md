@@ -4865,7 +4865,7 @@ ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
   `scripts/bancs/communaute.cjs` (port `BANC_PORT`, deux personnes, faux
   PostgREST aux règles de la 018, le VRAI `api/compte.js`, Leaflet servi à la
   place de cdnjs — `BANC_LEAFLET_DIR`, sinon `npm pack leaflet@1.9.4` dans le
-  dossier temporaire) — **42 contrôles**, rouge sur le build d'avant (§6.1) ;
+  dossier temporaire) — **42 contrôles**, **21 rouges** sur le build d'avant (§6.1) ;
   `BANC_MUTATION=bloque-ecrit` ⇒ 2 rouges, `opt-in` ⇒ 5 rouges.
   `audit-fermer-compte.cjs` +3 (effacée chez lui seul, base sans la 018, muette).
   `verif_visuel` et `verif_dark` rendent l'écran.
