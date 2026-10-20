@@ -471,7 +471,7 @@ function MonDiscord({ api, actuel, onFait }) {
 // ── LE CLASSEMENT (019) ──────────────────────────────────────────────────────
 // Le nombre de ventes Vinted de la période, COMPTÉ PAR LA BASE (le navigateur
 // n'envoie que la période). Opt-in : on n'y figure que si on l'a activé.
-export const PERIODES = [['jour', 'Aujourd’hui'], ['semaine', 'Cette semaine'], ['mois', 'Ce mois'], ['annee', 'Cette année']];
+export const PERIODES = [['jour', 'Aujourd’hui'], ['semaine', 'Semaine'], ['mois', 'Mois'], ['annee', 'Année']];
 export const rangTexte = (n) => (Number(n) === 1 ? '1er' : `${n}ᵉ`);
 const CLASSEMENT_PAS_SU = "Je n'ai pas pu lire le classement — rien n'est perdu, c'est la lecture qui a échoué.";
 

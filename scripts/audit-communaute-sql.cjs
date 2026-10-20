@@ -422,6 +422,7 @@ const convs = (u) => J(u, 'select public.vrm_communaute_conversations();');
 // ════════════════════════════════════════════════════════════════════════════
 async function partie019(mut) {
   console.log('\n── 019 : Discord et classement ──');
+  if (!fs.existsSync(MIG19)) { dit(false, 'la migration 019 existe (supabase/migrations/019-communaute-discord-classement.sql)', 'absente'); return; }
   let S19 = fs.readFileSync(MIG19, 'utf8');
   try { if (mut && mut.sql19) S19 = mut.sql19(S19); } catch (e) { dit(false, e.message); return; }
   const F19 = path.join(DIR, '019.sql'); fs.writeFileSync(F19, S19);
