@@ -9,7 +9,9 @@
 //   2. « b125 » tapé sur une paire alors qu'une AUTRE paire en ligne porte
 //      « B125 » est REFUSÉ (avant : chaînes exactes → deux paires, un carton) ;
 //   3. sans réglage, la nouvelle paire reçoit le prochain ENTIER (rien ne change
-//      pour qui numérote en chiffres) ; avec la série « B », elle reçoit B1.
+//      pour qui numérote en chiffres) ; avec la série « B », elle reçoit le suivant
+//      APRÈS le plus haut de SA série (B126 : B125 est servi — §5, « jamais
+//      dans un trou », 18 octobre), jamais un numéro en chiffres.
 //  Aucune fixture : tout est synthétique.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
@@ -117,7 +119,7 @@ const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStora
       const main = { vinted_annonce_numeros: { '9201': { numero: 'B125' }, '9202': { numero: '7' } }, vinted_used_numeros: POOL, vrm_num_prefixe: 'B' };
       const { pg, ctx, errs } = await rendre(b, main);
       const nums = (await local(pg, 'vinted_annonce_numeros')) || {};
-      dit(String((nums['9203'] || {}).numero) === 'B1', 'la nouvelle paire reçoit B1 (le premier libre de SA série)', JSON.stringify(nums['9203'] || null));
+      dit(String((nums['9203'] || {}).numero) === 'B126', 'la nouvelle paire reçoit B126 (après le plus haut de SA série, jamais un trou ni un chiffre)', JSON.stringify(nums['9203'] || null));
       dit(String((nums['9201'] || {}).numero) === 'B125' && String((nums['9202'] || {}).numero) === '7', 'les numéros déjà donnés ne bougent pas (B125, 7)');
       dit(errs.length === 0, 'aucune erreur d\'app', errs.join(' | '));
       await ctx.close();

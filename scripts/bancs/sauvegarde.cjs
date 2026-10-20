@@ -113,7 +113,11 @@ async function restaurer(nav, opts, contenu) {
   try {
     const [fc] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 10000 }), pg.getByText('Restaurer une sauvegarde').first().click()]);
     await fc.setFiles(tmp);
-    const nav = pg.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true, () => false);
+    // ⚠️ (20 octobre) `framenavigated` part aussi pour un `pushState`/`back` de
+    //    l'historique (le retour ferme la feuille depuis le 18 octobre) : il
+    //    criait « rechargement » sur une feuille qui se ferme. Un VRAI
+    //    rechargement émet `load` (un changement d'historique, jamais).
+    const nav = pg.waitForEvent('load', { timeout: 6000 }).then(() => true, () => false);
     await pg.getByRole('button', { name: /Confirmer/ }).first().click({ timeout: 8000 });
     // Le message (un toast) ne reste que quelques secondes : on le guette tout de suite.
     for (let i = 0; i < 25 && !vu; i++) { try { const t = await pg.evaluate(() => document.body.innerText || ''); const m = t.match(/[^\n]*(n.a pas pu être enregistrée|Sauvegarde restaurée)[^\n]*/gi); if (m) vu = m.join(' | '); } catch (_) {} await pg.waitForTimeout(200); }
@@ -167,6 +171,7 @@ async function restaurer(nav, opts, contenu) {
     dit(!/SECRET-DU-FICHIER|SECRET-WIDGET-FICHIER/.test(JSON.stringify(p)), 'ni jetons ni clé du widget repris du fichier');
     dit(!/SECRET-ACCES|SECRET-REFRESH/.test(JSON.stringify(p)), 'et la copie qui part au nuage est allégée (aucun jeton dans main)');
     dit(d.vinted_goal === 999, 'les autres réglages sont bien restaurés', String(d.vinted_goal));
+    dit(r1.recharge, 'l\'écriture enregistrée ⇒ la page se recharge (le contrôle « pas de rechargement » plus bas n\'est pas vacant)');
 
     console.log('\n── L\'ÉCRITURE ÉCHOUE');
     const r2 = await restaurer(nav, { patchKO: true }, VIEUX);
