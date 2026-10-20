@@ -15,6 +15,14 @@ ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(locat
 // UNE fois par minute au plus : si le rechargement ne règle rien (vraie panne de
 // réseau), l'erreur repart telle quelle et le dernier filet l'affiche — jamais
 // une boucle de rechargements.
+// Retour de « Se connecter avec Discord » (#discord=…&preuve=… ou #discord-erreur=…) :
+// mis de côté TOUT DE SUITE — l'ouverture de l'écran (`?tab=`) réécrit l'adresse et
+// effacerait le fragment avant que l'écran Communauté ne le lise. L'adresse est
+// nettoyée aussitôt (la preuve ne reste ni dans la barre ni dans l'historique).
+if (typeof window !== 'undefined' && /(^|[#&])discord(-erreur)?=/.test(String(window.location.hash || ''))) {
+  try { sessionStorage.setItem('vrm_discord_retour', String(window.location.hash).replace(/^#/, '')); } catch (_) {}
+  try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search); } catch (_) {}
+}
 if (typeof window !== 'undefined') {
   window.addEventListener('vite:preloadError', (ev) => {
     let dernier = 0;

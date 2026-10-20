@@ -318,6 +318,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const [etat, setEtat] = useState('charge');          // charge · pas-su · non-installe · abonnement · lu
   const [msgEtat, setMsgEtat] = useState('');
   const [carte, setCarte] = useState(null), [convs, setConvs] = useState([]);
+  const [discordPret, setDiscordPret] = useState(false);
   const [rejoindre, setRejoindre] = useState(false), [cellsOuvertes, setCellsOuvertes] = useState(null);
   const [filOuvert, setFilOuvert] = useState(null), [enListe, setEnListe] = useState(false);
   const [envoye, setEnvoye] = useState(() => new Set()), [toast, setToast] = useState('');
@@ -328,7 +329,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
     const r = await api();
     if (!vivant.current) return;
-    if (r.ok && r.carte && Array.isArray(r.carte.profils)) { setCarte(r.carte); setConvs(Array.isArray(r.conversations) ? r.conversations : []); setEtat('lu'); return; }
+    if (r.ok && r.carte && Array.isArray(r.carte.profils)) { setCarte(r.carte); setConvs(Array.isArray(r.conversations) ? r.conversations : []); setDiscordPret(r.discordConnexion === true); setEtat('lu'); return; }
     const e = r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su';
     // Une relecture discrète ratée garde ce qu'on montrait (« pas su » ne vaut pas « personne »).
     if (discret && carte) { setMsgEtat(r.message || PAS_SU); return; }
@@ -337,6 +338,23 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   useEffect(() => { vivant.current = true; lire(); return () => { vivant.current = false; }; }, []);
   useEffect(() => { const id = setInterval(() => { if (document.visibilityState === 'visible' && !filOuvert) lire(true); }, 30000); return () => clearInterval(id); }, [lire, filOuvert]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t); }, [toast]);
+  // Retour de « Se connecter avec Discord » : le pseudo et sa preuve arrivent dans le
+  // fragment (#) de l'adresse, mis de côté par main.jsx au démarrage (l'adresse est
+  // déjà nettoyée). On les rend avec la session, une fois.
+  useEffect(() => {
+    if (etat !== 'lu') return;
+    let brut = '';
+    try { brut = sessionStorage.getItem('vrm_discord_retour') || ''; sessionStorage.removeItem('vrm_discord_retour'); } catch (_) {}
+    const h = new URLSearchParams(brut);
+    const d = h.get('discord'), preuve = h.get('preuve'), err = h.get('discord-erreur');
+    if (!d && !err) return;
+    if (err) { setToast(DISCORD_ERREURS[err] || DISCORD_ERREURS.discord); return; }
+    (async () => {
+      const r = await api({ action: 'discord-verifie', discord: d, preuve });
+      setToast(r.ok ? `Ton compte Discord « ${r.discord} » est relié : il s’affiche sur la carte.` : (r.message || PAS_SU));
+      if (r.ok) lire(true);
+    })();
+  }, [etat]);
 
   const moi = carte && carte.moi;
   const groupes = carte && Array.isArray(carte.groupes) ? carte.groupes : null;   // null : la 020 n'est pas installée
@@ -404,7 +422,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
           <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
           <button type="button" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
         </div>
-        {'discord' in moi && <MonDiscord api={api} actuel={moi.discord || ''} onFait={(t) => { setToast(t); lire(true); }} />}
+        {'discord' in moi && <MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi.discord || ''} onFait={(t) => { setToast(t); lire(true); }} />}
       </> : <>
         <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit tant que tu ne l’as pas décidé.</span></div>
         <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
@@ -492,8 +510,26 @@ function DiscordDe({ pseudo }) {
     <button type="button" className="vrm-cm-lien" onClick={copier} data-cm-discord-copier>{copie || 'Copier'}</button></span>;
 }
 
-function MonDiscord({ api, actuel, onFait }) {
+export const DISCORD_ERREURS = {
+  annule: 'Connexion Discord annulée : rien n’a changé.',
+  lien: 'Ce lien Discord a expiré ou a été ouvert dans un autre navigateur. Recommence depuis VRM, dans ce navigateur.',
+  'non-configure': 'La connexion avec Discord n’est pas encore réglée sur VRM.',
+  ancien: 'Ton compte Discord porte encore un ancien nom (avec #) : tape ton pseudo à la main.',
+  discord: 'Discord n’a pas répondu : rien n’a changé. Réessaie dans un instant.',
+};
+function MonDiscord({ api, headers, oauth, actuel, onFait }) {
   const [ouvert, setOuvert] = useState(false), [v, setV] = useState(actuel), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const connecter = async () => {
+    setOccupe(true); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=discord-debut', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await r.json().catch(() => null);
+      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { window.location.href = j.url; return; }
+      setMsg((j && j.message) || DISCORD_ERREURS.discord);
+    } catch (_) { setMsg(DISCORD_ERREURS.discord); }
+    setOccupe(false);
+  };
+  const boutonOauth = oauth && <button type="button" className="vrm-cm-primaire" onClick={connecter} disabled={occupe} data-cm-discord-oauth>{occupe ? 'Un instant…' : actuel ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>;
   const poser = async (valeur) => {
     const d = discordPropre(valeur);
     if (d && !discordValide(d)) { setMsg('2 à 32 caractères : lettres minuscules, chiffres, « . » ou « _ » (comme ton pseudo Discord).'); return; }
@@ -505,10 +541,11 @@ function MonDiscord({ api, actuel, onFait }) {
   };
   if (!ouvert) return <div className="vrm-cm-discord-moi" data-cm-mon-discord={actuel ? 'oui' : 'non'}>
     {actuel ? <><span>Discord : <b>{actuel}</b></span>
-      <div className="vrm-cm-ligne-boutons"><button type="button" onClick={() => { setV(actuel); setOuvert(true); }} data-cm-discord-modifier>Modifier</button>
+      <div className="vrm-cm-ligne-boutons">{boutonOauth}<button type="button" onClick={() => { setV(actuel); setOuvert(true); }} data-cm-discord-modifier>Modifier</button>
         <button type="button" onClick={() => poser('')} disabled={occupe} data-cm-discord-retirer>Retirer</button></div></>
       : <><span>Pas de pseudo Discord (facultatif).</span>
-        <button type="button" onClick={() => { setV(''); setOuvert(true); }} data-cm-discord-ajouter>Ajouter mon pseudo Discord</button></>}
+        <div className="vrm-cm-ligne-boutons">{boutonOauth}
+          <button type="button" onClick={() => { setV(''); setOuvert(true); }} data-cm-discord-ajouter>{oauth ? 'Le taper à la main' : 'Ajouter mon pseudo Discord'}</button></div></>}
     {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
   </div>;
   return <form className="vrm-cm-discord-moi" onSubmit={(e) => { e.preventDefault(); poser(v); }} data-cm-mon-discord="saisie">

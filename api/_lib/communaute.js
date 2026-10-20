@@ -32,6 +32,7 @@
 import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
+import { discordConfigure, lirePreuve } from './discord.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -166,7 +167,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
     const c2 = { moi: objet(carte.moi), profils: carte.profils };
     if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
-    return dire(200, { ok: true, carte: c2, conversations: l.data });
+    return dire(200, { ok: true, carte: c2, conversations: l.data, discordConnexion: discordConfigure() });
   }
 
   const action = String((corps && corps.action) || '');
@@ -223,6 +224,16 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   if (action === 'discord') {
     const d = String((corps && corps.discord) || '').trim().toLowerCase();
     if (d && !discordValide(d)) return refus('discord');
+    const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'discord-verifie') {
+    // Le pseudo vient de Discord (OAuth) : la preuve signée le lie à CE compte VRM.
+    const d = String((corps && corps.discord) || '').trim().toLowerCase();
+    if (!discordValide(d) || !lirePreuve(corps && corps.preuve, utilisateur.id, d))
+      return dire(400, { ok: false, erreur: 'preuve', message: 'Ce lien Discord a expiré ou ne vient pas de toi : reconnecte-toi avec Discord.' });
     const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
     if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
     if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
