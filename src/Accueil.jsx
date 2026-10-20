@@ -117,10 +117,11 @@ const CSS = `
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(244,246,250,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(244,246,250,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(242,245,243,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:rgba(242,245,243,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
+.acc img.vrm-brand-asset{background:#21343e;padding:2px;object-fit:contain;box-sizing:border-box}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
 .acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
 .acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
@@ -131,12 +132,12 @@ const CSS = `
 
 /* Les boutons : une forme, trois poids. */
 .acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(36,88,230,.30)}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(43,69,72,.30)}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
 .acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(36,88,230,.38)}
+  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(43,69,72,.38)}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
 .acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
@@ -179,7 +180,7 @@ const CSS = `
      (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
    Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
    Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(36,88,230,.16)}
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(43,69,72,.16)}
 /* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
    se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
    À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
