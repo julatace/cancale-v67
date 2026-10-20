@@ -1410,6 +1410,10 @@ const SYNC_KEYS = [
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
   'vrm_benefice_jours',
+  // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX,
+  // éteint par défaut, rattrapé par `onCloudReady` seulement s'il est resté au
+  // défaut (`useBeneficeJournee`).
+  'vrm_journee_benefice',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -26627,13 +26631,20 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
   return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes };
 };
-function BeneficeCompta({ compta, onNav }) {
+// (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
+// Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
+// (publication de Ventes, charges, CA déclaré publié), même `beneficePeriode`.
+function useBeneficeCalcul(compta, periode) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
-  const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
-  const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
   const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
   const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2 }) : null;
+  return { pub, etat, B };
+}
+function BeneficeCompta({ compta, onNav }) {
+  const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
+  const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
+  const { pub, etat, B } = useBeneficeCalcul(compta, periode);
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
   const sansAchat = B ? B.n - B.nCout : 0;
@@ -26685,6 +26696,122 @@ function BeneficeCompta({ compta, onNav }) {
         </>)}
       </div>
     </section>
+  );
+}
+// ── TON BÉNÉFICE DANS MA JOURNÉE (20 octobre, Julien : « la possibilité de
+//    mettre le bénéfice dans Ma journée ») ────────────────────────────────────
+// FACULTATIF : `vrm_journee_benefice` (synchronisé, défaut ÉTEINT). Les chiffres
+// ne sont PAS recalculés ici (§11) : le mois passe par `useBeneficeCalcul` — le
+// crochet de la carte de Comptabilité, mêmes entrées, même `beneficePeriode` ;
+// aujourd'hui = `beneficeDesJours` sur la même publication (`vrm_benefice_jours`).
+// Pas su ⇒ « — » et la raison ; jamais publié ⇒ « se calcule dans Ventes ».
+// Aucune couleur sur un bénéfice (§7).
+const BENEF_JOURNEE = 'vrm_journee_benefice';
+const lireBenefJournee = () => { try { return load(BENEF_JOURNEE, false) === true; } catch (_) { return false; } };
+const lireComptaSynchro = () => { try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; } catch (_) { return { ...COMPTA_DEFAUT }; } };
+function useBeneficeJournee() {
+  const [on, setOn] = React.useState(lireBenefJournee);
+  // Rattrapage nuage : seulement s'il est resté au défaut (§5.49).
+  React.useEffect(() => onCloudReady(() => setOn((v) => v === false ? lireBenefJournee() : v)), []);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.k === BENEF_JOURNEE) setOn(d.v != null ? !!d.v : lireBenefJournee()); };
+    const g = (e) => { if (e && e.key === BENEF_JOURNEE) setOn(lireBenefJournee()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('vrm:benef-journee', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:benef-journee', f); window.removeEventListener('storage', g); };
+  }, []);
+  const poser = (v) => {
+    setOn(!!v); save(BENEF_JOURNEE, !!v);
+    // Tout de suite pour les autres lecteurs de la page (`save` attend 500 ms).
+    try { window.dispatchEvent(new CustomEvent('vrm:benef-journee', { detail: { k: BENEF_JOURNEE, v: !!v } })); } catch (_) {}
+  };
+  return [on, poser];
+}
+function BeneficeJournee({ onNav, place }) {
+  const [on, poser] = useBeneficeJournee();
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
+  if (place === 'lien') {
+    if (on) return null;
+    return (
+      <div style={{ marginTop: 14, textAlign: 'center' }}>
+        <button type="button" className="vrm-lien-action" data-journee-benef-activer="" onClick={() => poser(true)}
+          style={{ background: 'none', border: 0, padding: 0, color: C.muted, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+          + Afficher ton bénéfice dans Ma journée
+        </button>
+      </div>
+    );
+  }
+  if (!on) return null;
+  const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
+  const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
+  const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
+  const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
+  const val = (x) => x == null ? '—' : fmt(x);
+  const brutDe = (r) => r ? (r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null)) : null;
+  const sansAchat = B ? B.n - B.nCout : 0;
+  const raisonNet = !B ? '' : B.raison === 'achats' ? `il manque le prix d'achat de ${sansAchat} vente${sansAchat > 1 ? 's' : ''}`
+    : B.raison === 'frais' ? 'des frais eBay ne sont pas connus'
+    : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
+    : 'après frais, charges et cotisations';
+  const allerCompta = (ev) => { if (ev) ev.preventDefault(); if (onNav) onNav('compta'); };
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  const chiffre = (lib, v, sous, ligne) => (
+    <div style={{ minWidth: 0 }} data-journee-benef-ligne={ligne}>
+      <div className="vrm-day-k" style={{ color: C.muted }}>{lib}</div>
+      <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: v == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{val(v)}</div>
+      {sous ? <div className="vrm-day-note" style={{ color: C.muted }}>{sous}</div> : null}
+    </div>
+  );
+  return (
+    <div className="vrm-day-card" data-journee-benef="" data-journee-benef-etat={etat}
+      data-journee-benef-n={B ? String(B.n) : ''} data-journee-benef-ncout={B ? String(B.nCout) : ''}
+      data-journee-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-journee-benef-net={B ? e2(B.netFinal) : ''}
+      data-journee-benef-raison={B ? B.raison : ''} data-journee-benef-couverture={B ? couvertureBenefice(B) : ''}
+      data-journee-benef-jour-n={J ? String(J.n) : ''} data-journee-benef-jour-brut={J && J.nCout > 0 ? e2(J.brut) : ''}
+      data-journee-benef-jour-net={J && J.nCout > 0 ? e2(J.net) : ''}
+      style={{ border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
+      <div className="vrm-day-head">
+        <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
+        <a href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta} style={{ color: C.accent, textDecoration: 'none' }}>Détail ›</a>
+      </div>
+      {!B ? (
+        <div className="vrm-day-note" style={{ color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+          {etat === 'encours' ? 'Je lis ton bénéfice…' : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); if (onNav) onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>), il arrivera ici.</>}
+        </div>
+      ) : (<>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
+          {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : `prix d'achat connus pour ${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n}`, 'brut')}
+          {chiffre('Net ce mois', B.netFinal, raisonNet, 'net')}
+        </div>
+        {B.nCout < B.n && (
+          <div className="vrm-day-note" style={{ marginTop: 6 }}>
+            <button type="button" className="vrm-lien-action" data-journee-benef-porte="" onClick={versSaisiePrix} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>
+          </div>
+        )}
+        <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+          {J && J.n > 0
+            ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''} — charges et cotisations se comptent au mois.</>
+            : "Aujourd'hui : aucune vente finalisée pour l'instant."}
+        </div>
+      </>)}
+      <div style={{ marginTop: 6 }}>
+        <button type="button" className="vrm-lien-action" data-journee-benef-masquer="" onClick={() => poser(false)} style={{ background: 'none', border: 0, padding: 0, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 400, fontFamily: 'inherit' }}>Masquer de Ma journée</button>
+      </div>
+    </div>
+  );
+}
+// Le même choix, dans Réglages → Affichage (là où vivent les choix de l'écran).
+function BeneficeJourneeSetting() {
+  const [on, poser] = useBeneficeJournee();
+  return (
+    <div className="vrm-set-ligne" data-reglage-benef-journee={on ? 'on' : 'off'}>
+      <IconeReglage name="chart"/>
+      <span className="vrm-set-lib">
+        <b style={{color:C.text}}>Bénéfice dans Ma journée</b>
+        <small style={{color:C.muted}}>Brut et net du mois, et d'aujourd'hui — les mêmes chiffres que Comptabilité.</small>
+      </span>
+      <Interrupteur on={on} label="Bénéfice dans Ma journée" onClick={() => poser(!on)}/>
+    </div>
   );
 }
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
@@ -34307,6 +34434,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
+            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte"/>}
+
             </div>
 
             {loading && <Skeleton variant="card" count={4}/>}
@@ -34428,6 +34557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
             )}
+            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
           </div>
         );
       })()}
@@ -41870,6 +42000,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
+      { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
     ]},
