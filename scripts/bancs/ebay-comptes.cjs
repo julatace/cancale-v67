@@ -37,7 +37,7 @@ const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: PAIRES.map((
 const FICHES = Object.fromEntries(PAIRES.map(([n, t]) => [String(idDe(n)), { numero: String(n), title: t, photo: `https://img.test/v${idDe(n)}.jpg` }]));
 const DETAILS = Object.fromEntries(PAIRES.map(([n]) => [String(idDe(n)), { photos: [`https://img.test/v${idDe(n)}.jpg`, `https://img.test/v${idDe(n)}b.jpg`] }]));
 const ann = (itemId, n, prix) => ({ itemId, title: (PAIRES.find((x) => x[0] === n) || [])[1], price: prix, sku: 'VRM-' + n, observateurs: 0, photo: '', url: 'https://www.ebay.fr/itm/' + itemId });
-const cmd = (orderId, eur, titre) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'FULFILLED', lineItems: [{ sku: '', title: titre }], pricingSummary: { total: { value: eur, currency: 'EUR' } } });
+const cmd = (orderId, eur, titre) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'FULFILLED', lineItems: [{ sku: '', title: titre }], pricingSummary: { total: { value: String(Number(eur) + 6.5), currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: String(Number(eur) + 5), currency: 'EUR' } }, totalMarketplaceFee: { value: '5', currency: 'EUR' } });   // argent reçu = eur (le port de l'acheteur n'est pas compté)
 let rows = [], envois = [], ecritures = [];
 // Trois comptes : le premier (principal, lignes d'avant), puis deux suffixés.
 // La N°31 est en vente sur le compte 1 ET sur le compte 2 (publiée à la main

@@ -202,6 +202,9 @@
   function raisonRefus(f, v) {
     if (v && v.connecte === false) return ' — connecte-toi à VRM pour que ça reparte';
     const st = String((f && f.koStatut) || '');
+    // 5.193 : rien n'est parti, faute de session VRM vivante (morte ou en pause
+    // de renouvellement) — ce n'est ni une panne ni un refus de la base.
+    if (st === 'sans_session') return ' — ta session VRM n’a pas pu être renouvelée : rien ne part en attendant. Si ça dure, clique le logo pour te reconnecter.';
     if (st === '403') return ' — ta base VRM refuse ce compte. Vérifie que ton abonnement VRM est actif, et que tu es connecté avec ton compte principal (celui qui ne paie pas). Rien ne partira tant que ce n’est pas réglé.';
     if (st === '401') return ' — la base a refusé ta session. Reconnecte-toi à VRM (clique le logo). Ça ne repartira pas tout seul.';
     if (st === '400') return ' — la base n’est pas dans l’état attendu. Rien ne part ; préviens le support VRM.';

@@ -313,7 +313,24 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       return { txt: p.innerText, geste: (p.querySelector('[data-etat-geste]') || {}).getAttribute ? p.querySelector('[data-etat-geste]').getAttribute('data-etat-geste') : null,
         dedans: r.left >= 0 && r.right <= document.documentElement.clientWidth + 1 }; });
   };
-  return { ctx, pg, errs, lire, cmds, panneau, fourches, notes };
+  // Depuis le 20 octobre (5cdffcb, choix de Julien), une vente est une ligne
+  // REPLIÉE sur ordinateur comme sur téléphone : ses gestes ne sont visibles
+  // qu'une fois la ligne ouverte (toucher la ligne, comme une personne). Un clic
+  // sur le bouton d'une ligne fermée attendait 30 s un élément caché (§6.3 :
+  // le banc doit servir la forme de l'écran d'aujourd'hui). On attend l'ÉTAT —
+  // le bouton réellement visible —, jamais un délai. Rend false si la ligne
+  // n'existe pas ou ne s'ouvre pas (un banc ne meurt pas, il rapporte).
+  const ouvrirVente = async (tx) => {
+    const sel = tx ? `[data-bouton-bord][data-tx="${tx}"]` : '[data-bouton-bord]';
+    const ouverte = await pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return null;
+      const ligne = b.closest('[data-ligne-ouverte]'); if (!ligne || ligne.getAttribute('data-ligne-ouverte') === 'true') return true;
+      const t = ligne.querySelector('.vrm-ledger-sale-toggle'); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }, sel);
+    if (ouverte === null) return false;
+    if (!ouverte) await pg.click('[data-banc-ouvrir="1"]').catch(() => {});
+    return pg.waitForFunction((sel) => { const x = document.querySelector(sel); const b = x && (x.querySelector('button') || x); if (!b) return false;
+      const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, sel, { timeout: 5000 }).then(() => true, () => false);
+  };
+  return { ctx, pg, errs, lire, cmds, panneau, fourches, notes, ouvrirVente };
 }
 
 (async () => {
@@ -373,6 +390,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       // la vente ouvrirait la boîte d'un autre compte. Le repli « sur Vinted »
       // ne sert que quand c'est l'extension qui manque (contrôlé plus bas).
       dit(v.surVinted.length === 0, 'aucun « sur Vinted ↗ » quand l’extension va bien (le geste est de basculer de compte)', JSON.stringify(v.surVinted));
+      dit(await r.ouvrirVente('7001'), 'ouvrir la ligne de la vente montre son bouton (la ligne est repliée au repos)');
       await r.pg.click('[data-bouton-bord="pret"][data-tx="7001"] button');
       await r.pg.waitForTimeout(400);
       v = await r.lire();
@@ -445,7 +463,12 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       const p = await r.panneau();
       dit(p && p.geste === 'recharger-extension' && /chrome:\/\/extensions/.test(p.txt), `${nom} : le geste est ⟳ dans chrome://extensions (recharger la page ne change rien)`, JSON.stringify(p && { geste: p.geste }));
       await r.pg.keyboard.press('Escape').catch(() => {});
-      await r.pg.click('[data-bouton-bord] button').catch(() => {}); await r.pg.waitForTimeout(400);
+      dit(await r.ouvrirVente(null), `${nom} : la ligne s’ouvre et montre le bouton grisé (sinon le clic qui suit ne prouverait rien)`);
+      // `force` : Playwright tient `aria-disabled="true"` pour désactivé et
+      // n'aurait JAMAIS cliqué (30 s d'attente avalées par le catch : contrôle
+      // vacant). Une personne, elle, peut toucher un bouton grisé : on clique
+      // vraiment, et c'est l'app qui doit refuser.
+      await r.pg.click('[data-bouton-bord] button', { force: true, timeout: 3000 }).catch(() => {}); await r.pg.waitForTimeout(400);
       const apres = await r.lire();
       dit(!apres.cmdsEnvoyees.includes('bordereau'), `${nom} : un clic n’envoie AUCUNE commande au code périmé (il n’a pas les garde-fous d’aujourd’hui)`, JSON.stringify(apres.cmdsEnvoyees));
       await r.ctx.close();
@@ -609,6 +632,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
 
     console.log('── COMMANDE LENTE avec un orphelin (l’accusé du pont vivant met 2,5 s)');
     { const r = await rendre(b, { mode: 'orphelin+ok', connecte: '111', cmdLente: 2500 });
+      await r.ouvrirVente('7001');
       await r.pg.click('[data-bouton-bord="pret"][data-tx="7001"] button');
       // Juste APRÈS la grâce de 1,5 s et AVANT l'accusé (2,5 s) : c'est là que
       // l'ancienne version disait « n'a pas répondu, réessaie ».

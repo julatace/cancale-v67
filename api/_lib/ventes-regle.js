@@ -64,6 +64,17 @@ export const commandeEbayEngagee = (o) => !!o
   && !(/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')) && !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')))
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
 
+export const montantRecuEbay = (o) => {
+  const lu = (m) => (m && typeof m === 'object' && m.value != null && String(m.value).trim() !== '' && isFinite(Number(m.value))) ? m : null;
+  const d = lu(o && o.paymentSummary && o.paymentSummary.totalDueSeller);
+  const f = lu(o && o.totalMarketplaceFee);
+  if (!d) return { eur: null, raison: 'montant reçu inconnu' };
+  if (d.currency !== 'EUR') return { eur: null, raison: 'devise ' + (d.currency || 'inconnue') };
+  if (!f) return { eur: null, raison: 'frais eBay inconnus' };
+  if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
+  return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
+};
+
 export const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 export const indexDeclarations = (reg) => {
@@ -139,12 +150,11 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     // du remboursement, et VRM quand il accepte une annulation :
     // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
     if (!commandeEbayEngagee(e)) continue;
-    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     const id = 'ebay:' + e.orderId;
-    if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
-    const eur = Number(tot.value);
+    const recu = montantRecuEbay(e);
+    if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '' }); } continue; }
+    const eur = recu.eur;
     const t = Date.parse(e.creationDate || '');
-    if (!isFinite(eur)) continue;
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
@@ -155,7 +165,7 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
 
 export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   const lignes = [], vus = new Set();
-  let sansDate = 0;
+  let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
   for (const o of (vinted || [])) {
     if (!o || (cachee && cachee(o))) continue;
@@ -176,13 +186,12 @@ export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
-    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
-    if (tot.currency && tot.currency !== 'EUR') continue;
-    const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
-    if (!isFinite(eur) || !t) continue;
+    const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
+    if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
+    if (!t) continue;
     if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
   }
-  return { lignes, sansDate };
+  return { lignes, sansDate, ecartees };
 };
 
 export const compteEcarte = (uid, masques, panneau) => {

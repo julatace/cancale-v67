@@ -316,7 +316,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
     const OV3={ ...OV1, '91004':{ buyPrice:'30' } };
     const FICHES={ ann7:{ numero:'7', buyPrice:'25', title:'Samba inventée' }, ann12:{ numero:'12', buyPrice:'30', title:'Air Max inventée' }, ann9:{ numero:'9', buyPrice:'18', title:'XT-6 inventée' } };
     const venteLbc={ txId:'L1', itemId:'501', isSeller:true, price:6000, stepStatus:'done', dateVente:iso(ceMois(1,14)), title:'Samba inventée' };
-    const cmdEbay=(orderId,sku,titre,frais)=>({ orderId, orderPaymentStatus:'PAID', creationDate:iso(ceMois(1,15)), pricingSummary:{ total:{ value:'80.00', currency:'EUR' } }, lineItems:[{ sku, legacyItemId:'9'+orderId.replace(/\D/g,''), title:titre }], ...(frais!=null?{ totalMarketplaceFee:{ value:String(frais), currency:'EUR' } }:{}) });
+    const cmdEbay=(orderId,sku,titre,frais)=>({ orderId, orderPaymentStatus:'PAID', creationDate:iso(ceMois(1,15)), pricingSummary:{ total:{ value:'86.50', currency:'EUR' } }, paymentSummary:{ totalDueSeller:{ value:'80.00', currency:'EUR' } }, lineItems:[{ sku, legacyItemId:'9'+orderId.replace(/\D/g,''), title:titre }], ...(frais!=null?{ totalMarketplaceFee:{ value:String(frais), currency:'EUR' } }:{}) });
     const lignesE=(cmds)=>({ lbc_ventes:{ ventes:{ L1:venteLbc } }, lbc_listings:{ items:{ '501':{ id:'501', subject:'Samba inventée', customRef:'VRM-7' } } }, ebay_orders:{ orders:cmds } });
     const vintedBrut=VENTES.filter(x=>/finalis/i.test(x[3])&&memeMois(x[4])).reduce((t,x)=>t+cents(x[2])-cents(OV3[x[1]].buyPrice),0);
     const vintedFrais=VENTES.filter(x=>/finalis/i.test(x[3])&&memeMois(x[4])).reduce((t,x)=>t+cents(OV3[x[1]].fees||0),0);
@@ -326,10 +326,11 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       const v=await lireVentesBenef(pg);
       const c=await lireComptaBenef(pg);
       console.log(`   rendu : Ventes ${JSON.stringify(v)} · Compta ${JSON.stringify(c)}`);
-      const brutAtt=(vintedBrut+cents(60)-cents(25)+cents(80)-cents(30))/100;
-      const netAtt=(vintedBrut-vintedFrais+cents(60)-cents(25)+cents(80)-cents(30)-cents(9.6))/100;
+      // (20 oct.) eBay compte l'argent REÇU : 80 dû − 9,60 de frais (le port de l'acheteur, 6,50, n'est pas compté).
+      const brutAtt=(vintedBrut+cents(60)-cents(25)+cents(80)-cents(9.6)-cents(30))/100;
+      const netAtt=(vintedBrut-vintedFrais+cents(60)-cents(25)+cents(80)-cents(9.6)-cents(30))/100;
       dit(!!v && Math.abs(Number(v.brut)-brutAtt)<0.005 && Number(v.n)===5 && Number(v.ncout)===5,'Ventes : la vente Leboncoin (réf VRM-7) et la commande eBay (SKU VRM-12) entrent dans le bénéfice, au prix d’achat de LEUR fiche',`${v&&v.brut} (${v&&v.ncout}/${v&&v.n}) · attendu ${brutAtt} (5/5)`);
-      dit(!!v && Math.abs(Number(v.net)-netAtt)<0.005,'Ventes : le net retire les frais eBay de la commande',`${v&&v.net} · attendu ${netAtt}`);
+      dit(!!v && Math.abs(Number(v.net)-netAtt)<0.005,'Ventes : le net ne retire pas une seconde fois les frais eBay (déjà retirés de l’argent reçu)',`${v&&v.net} · attendu ${netAtt}`);
       dit(!!v && c.brut===v.brut && c['ventes-net']===v.net && c.n===v.n && c.ncout===v.ncout,'Comptabilité = Ventes (brut, net, couverture)',`Compta ${c.brut} / ${c['ventes-net']} (${c.ncout}/${c.n})`);
       dit(/Leboncoin 1\/1/.test(c.couverture||'') && /eBay 1\/1/.test(c.couverture||'') && c.plateformes==='toutes','la couverture se dit par plateforme dans Comptabilité',`${c.couverture} · ${c.plateformes}`);
       const txt=await pg.evaluate(()=>{ const e=document.querySelector('[data-benef-etat]'); return e?e.innerText:''; });

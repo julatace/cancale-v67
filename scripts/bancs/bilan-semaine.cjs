@@ -67,7 +67,7 @@ const vendeurs = () => ({
       { transaction_id: 201, status: 'Commande finalisée', date: new Date(DANS).toISOString(), price: { amount: '777' } },
     ] } },
     txn: [{ tx: '201', s: '450', su: new Date(DANS).toISOString() }],
-    lbc: {}, ebay: [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: new Date(DANS).toISOString(), pricingSummary: { total: { value: '88', currency: 'EUR' } } }],
+    lbc: {}, ebay: [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: new Date(DANS).toISOString(), pricingSummary: { total: { value: '94', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '98', currency: 'EUR' } }, totalMarketplaceFee: { value: '10', currency: 'EUR' } }],   // reçu 98 − 10 = 88 (le port de l'acheteur n'est pas compté)
   },
 });
 
@@ -148,7 +148,7 @@ function regleApp() {
   const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
   const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
   // (les mêmes noms que le miroir — voir NOMS dans scripts/audit-bilan-semaine.cjs)
-  const noms = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesFaites', 'ventesDeclarables'];
+  const noms = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesFaites', 'ventesDeclarables'];
   const ctx = vm.createContext({});
   for (const n of ast.program.body) if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && noms.includes(d.id.name)) vm.runInContext('const ' + src.slice(d.start, d.end) + `;\nthis.${d.id.name} = ${d.id.name};`, ctx);
   return ctx;
@@ -205,7 +205,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   await essaie('deux comptes eBay', async () => {
     reset();
     const k2 = 'aaaaaaaaaaaaaaa2', k3 = 'aaaaaaaaaaaaaaa3';
-    const cmd = (id, eur) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: new Date(DANS).toISOString(), pricingSummary: { total: { value: String(eur), currency: 'EUR' } } });
+    const cmd = (id, eur) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: new Date(DANS).toISOString(), pricingSummary: { total: { value: String(eur + 6), currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: String(eur + 5), currency: 'EUR' } }, totalMarketplaceFee: { value: '5', currency: 'EUR' } });   // reçu = eur
     V.B.extra = [
       { id: 'ebay_comptes', data: { comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'b_part', principal: true }, { cle: k2, pseudo: 'b_pro', principal: false }, { cle: k3, pseudo: 'b_vieux', principal: false, deconnecteLe: 5 }] } },
       { id: 'ebay_orders_' + k2, data: { orders: [cmd('E10', 77)] } },

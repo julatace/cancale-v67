@@ -147,9 +147,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       { txId: 'E', isSeller: true, price: 4500, stepLabel: 'Colis à envoyer', dateVente: '2026-09-20T10:00:00+02:00', title: 'en cours' },
     ];
     const EBAY = [
-      { orderId: 'X1', orderPaymentStatus: 'PAID', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '60.00', currency: 'EUR' } } },
+      { orderId: 'X1', orderPaymentStatus: 'PAID', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } },   // l'argent reçu : 66 − 6 = 60 (le port de l'acheteur n'est pas compté)
       { orderId: 'X2', orderPaymentStatus: 'FULLY_REFUNDED', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '30.00', currency: 'EUR' } } },
-      { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } } },
+      { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } }, paymentSummary: { totalDueSeller: { value: '50.00', currency: 'USD' } }, totalMarketplaceFee: { value: '5.00', currency: 'USD' } },
     ];
     const VERS = { 1: '2026-09-18T09:00:00+02:00' };
     r = ctxP.ventesDeclarables({ vinted: VINTED, lbc: LBC, ebay: EBAY, versements: VERS });
@@ -541,7 +541,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {} };
       return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf } = __arg; return (${corps})(); })()`, c);
     };
-    const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '60.00', currency: 'EUR' } } }];
+    const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '72.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '66.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' } }];
     const pasSu = run(null, true, EB);
     const tot = pasSu.lignes.reduce((a, l) => a + l.eur, 0);
     pasSu.vinted === 'passu' && tot === 135 && !pasSu.lignes.some((l) => l.plateforme === 'Vinted')

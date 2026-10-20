@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LE BÉNÉFICE BRUT ET NET — UNE règle, deux écrans (19 octobre)
-//         node scripts/audit-benefice.cjs [--mutation=duplique|zero|cotis]
+//         node scripts/audit-benefice.cjs [--mutation=duplique|zero|cotis|titre|ambigu|fraiszero|port]
 // ═══════════════════════════════════════════════════════════════════════════
 // Julien : « le bénéfice brut et net ». L'écran Ventes le calculait ; l'écran
 // Comptabilité disait « ce n'est donc pas encore ton bénéfice net ». Comptabilité
@@ -46,8 +46,11 @@ if (MUT === 'duplique') {
   // Un N° porté par DEUX fiches accepté : la première prise.
   muter('return fs.length === 1 ? fs[0] : null;', 'return fs.length >= 1 ? fs[0] : null;');
 } else if (MUT === 'fraiszero') {
-  // Des frais eBay inconnus comptés à 0.
-  muter('const fInconnu = frais === null;', 'const fInconnu = false;');
+  // (20 oct.) Des frais eBay inconnus comptés à 0 : la commande n'est plus écartée.
+  muter("if (!f) return { eur: null, raison: 'frais eBay inconnus' };", "if (!f) return { eur: Number(d.value), raison: '' };");
+} else if (MUT === 'port') {
+  // (20 oct.) Le total payé par l'acheteur (port compris) au lieu de l'argent reçu.
+  muter('const d = lu(o && o.paymentSummary && o.paymentSummary.totalDueSeller);', 'const d = lu(o && o.pricingSummary && o.pricingSummary.total);');
 } else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0, ok = 0;
@@ -91,7 +94,10 @@ const MAGASIN = {
   vrm_numerotation: JSON.stringify({ version: 2, archive: 'B', coupure: COUPURE, ebayAnnonces: { '222': { '553': '12' } }, lbcAnnonces: {} }),
 };
 const FAUX_LS = { getItem: (k) => (Object.prototype.hasOwnProperty.call(MAGASIN, k) ? MAGASIN[k] : null), setItem: (k, v) => { MAGASIN[k] = String(v); }, removeItem: (k) => { delete MAGASIN[k]; } };
-const ebayCmd = (orderId, total, lignes, extra = {}) => ({ orderId, orderPaymentStatus: 'PAID', creationDate: NOW_ISO, pricingSummary: { total: { value: String(total), currency: 'EUR' } }, lineItems: lignes, ...extra });
+// (20 oct., revue argent eBay) La forme de l'API Fulfillment : l'acheteur paie
+// `pricingSummary.total` (port de 6 € compris), le vendeur est dû
+// `paymentSummary.totalDueSeller` ; l'argent reçu = dû − `totalMarketplaceFee`.
+const ebayCmd = (orderId, du, lignes, extra = {}) => ({ orderId, orderPaymentStatus: 'PAID', creationDate: NOW_ISO, pricingSummary: { total: { value: String(du + 6), currency: 'EUR' }, deliveryCost: { value: '6', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: String(du), currency: 'EUR' } }, lineItems: lignes, ...extra });
 const EBAY_TEST = [
   ebayCmd('E1', 80, [{ sku: 'VRM-12', legacyItemId: '111', title: 'Nike Air Max inventée' }], { totalMarketplaceFee: { value: '9.60', currency: 'EUR' } }),
   ebayCmd('E2', 60, [{ sku: '', legacyItemId: '112', title: 'Salomon XT-6 inventée' }], { totalMarketplaceFee: { value: '7', currency: 'EUR' } }),
@@ -210,11 +216,11 @@ essaie('Leboncoin et eBay par identité', () => {
     numLbc: (v) => F.numeroLbcIdentite(v, LBC_ITEMS, LBC_LIENS),
     numEbayLigne: (o, li) => F.numLigneEbay(o, li) });
   const par = Object.fromEntries(L.map((x) => [x.id, x]));
-  dit(par['ebay:E1'] && par['ebay:E1'].achat === 30 && par['ebay:E1'].frais === 9.6, 'eBay : SKU VRM-12 → la fiche 12 → prix d’achat 30 €, frais eBay de la commande', JSON.stringify(par['ebay:E1']));
+  dit(par['ebay:E1'] && par['ebay:E1'].achat === 30 && par['ebay:E1'].eur === 70.4 && par['ebay:E1'].frais === 0, 'eBay : SKU VRM-12 → la fiche 12 → prix d’achat 30 €, l’argent reçu (80 − 9,60 de frais, port non compté), frais déjà retirés', JSON.stringify(par['ebay:E1']));
   dit(par['ebay:E2'] && par['ebay:E2'].achat === null, 'eBay sans SKU, au titre identique à une fiche : AUCUN prix d’achat (jamais par le titre)', JSON.stringify(par['ebay:E2']));
   dit(par['ebay:E3'] && par['ebay:E3'].achat === null, 'eBay : un N° porté par DEUX fiches ⇒ aucun prix d’achat', JSON.stringify(par['ebay:E3']));
   dit(par['ebay:E4'] && par['ebay:E4'].achat === 30, 'eBay : VRM-553 traduit par la carte 013 de SON annonce → la fiche 12', JSON.stringify(par['ebay:E4']));
-  dit(par['ebay:E5'] && par['ebay:E5'].achat === 25 && par['ebay:E5'].frais === null, 'eBay : frais absents de la commande ⇒ « pas su » (null), jamais 0', JSON.stringify(par['ebay:E5']));
+  dit(!par['ebay:E5'], 'eBay : frais absents de la commande ⇒ commande écartée (montantRecuEbay), jamais le total de l’acheteur', JSON.stringify(par['ebay:E5'] || null));
   dit(!par['ebay:E6'], 'une commande remboursée n’entre pas', JSON.stringify(par['ebay:E6'] || null));
   dit(par['lbc:L1'] && par['lbc:L1'].achat === 25 && par['lbc:L1'].frais === 0, 'Leboncoin : référence VRM-7 de l’annonce → la fiche 7 (prix final, frais 0)', JSON.stringify(par['lbc:L1']));
   dit(par['lbc:L2'] && par['lbc:L2'].achat === null, 'Leboncoin : le « n°9 » d’un TITRE n’est pas une identité ⇒ aucun prix d’achat', JSON.stringify(par['lbc:L2']));
@@ -225,15 +231,15 @@ essaie('Leboncoin et eBay par identité', () => {
   F.ajouterVenteBenefice(acc, 61, 20, 2.5);                                   // une vente Vinted
   for (const x of L) F.ajouterVenteBenefice(acc, x.eur, x.achat, x.frais, x.plateforme);
   const R = F.resumeBenefice(acc);
-  dit(R.par.eBay.n === 5 && R.par.eBay.nCout === 3 && R.par.Leboncoin.n === 4 && R.par.Leboncoin.nCout === 2 && R.par.Vinted.n === 1 && R.par.Vinted.nCout === 1,
-    'la couverture par plateforme : eBay 3/5 · Leboncoin 2/4 · Vinted 1/1', F.couvertureBenefice(R));
-  const brutAtt = (cents(61) - cents(20) + cents(80) - cents(30) + cents(70) - cents(30) + cents(50) - cents(25) + cents(50) - cents(25) + cents(30) - cents(30)) / 100;
+  dit(R.par.eBay.n === 4 && R.par.eBay.nCout === 2 && R.par.Leboncoin.n === 4 && R.par.Leboncoin.nCout === 2 && R.par.Vinted.n === 1 && R.par.Vinted.nCout === 1,
+    'la couverture par plateforme : eBay 2/4 · Leboncoin 2/4 · Vinted 1/1', F.couvertureBenefice(R));
+  const brutAtt = (cents(61) - cents(20) + cents(70.4) - cents(30) + cents(62) - cents(30) + cents(50) - cents(25) + cents(30) - cents(30)) / 100;
   dit(Math.abs(R.brut - brutAtt) < 0.005, 'BRUT = Σ (vente − achat) des seules ventes reliées', `${R.brut} · attendu ${brutAtt}`);
-  dit(R.net === null && R.fraisInconnus === 1, 'des frais eBay pas sus ⇒ net « — » (null), jamais compté à 0', `${R.net} · ${R.fraisInconnus}`);
+  dit(R.fraisInconnus === 0 && Math.abs(R.net - (brutAtt - 2.5)) < 0.005, 'eBay compte l’argent reçu : aucun frais eBay à soustraire une seconde fois (net = brut − frais Vinted)', `${R.net} · ${R.fraisInconnus}`);
   // Publiée par jour (tableau) puis relue par Comptabilité : mêmes nombres.
   const k = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
   const P = F.beneficePeriode({ jours: { [k]: F.jourBeneficeEnTableau(acc) }, compta: {}, ligneUrssaf: { mois: [] }, taux: 13.5, periode: 'mois', toutes: true });
-  dit(P.brut === R.brut && P.nCout === R.nCout && P.n === R.n && P.net === null && F.couvertureBenefice(P) === F.couvertureBenefice(R), 'Comptabilité relit la même couverture et le même brut que Ventes', `${P.brut} ${F.couvertureBenefice(P)}`);
+  dit(P.brut === R.brut && P.nCout === R.nCout && P.n === R.n && P.net === R.net && F.couvertureBenefice(P) === F.couvertureBenefice(R), 'Comptabilité relit la même couverture et le même brut que Ventes', `${P.brut} ${F.couvertureBenefice(P)}`);
   const ancien = F.beneficeDesJours({ [k]: [1, 6100, 250, 1, 2000, 6100, 250] }, new Date(Date.now() - 86400000 * 40), new Date(Date.now() + 86400000));
   dit(ancien.n === 1 && ancien.net === 38.5 && ancien.par.Vinted.n === 1, 'une publication d’avant (7 nombres) se relit telle quelle', JSON.stringify(ancien.par));
   const ym = k.slice(0, 7);

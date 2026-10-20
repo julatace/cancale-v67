@@ -39,7 +39,7 @@ const VENTES = [
   vente(8004, 'Asics test vendue le mois dernier', 40, 'Commande finalisée', jour(20, -1)),
 ];
 const VERS = { 8001: jour(Math.max(1, jj - 2)), 8004: jour(1) };
-const EBAY = [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: jour(Math.max(1, jj - 2)), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'Salomon test ebay' }] }];
+const EBAY = [{ orderId: 'E9', orderPaymentStatus: 'PAID', creationDate: jour(Math.max(1, jj - 2)), pricingSummary: { total: { value: '66.50', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '65.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' }, lineItems: [{ title: 'Salomon test ebay' }] }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const rows = [
   { id: 'lbc_ventes', data: { ventes: {} } },

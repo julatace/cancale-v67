@@ -166,6 +166,10 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
   });
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
+  // Machine chargée : la liste des ventes peut arriver après 4,5 s (10 rouges
+  // sur un écran intact le 20 oct.). On attend l'ÉTAT — les ventes rendues —,
+  // borné ; les contrôles restent exacts.
+  if (onglet === 'cat_ventes') await pg.waitForSelector('[data-bouton-bord]', { state: 'attached', timeout: 15000 }).catch(() => {});
   const lire = () => pg.evaluate(() => ({
     boutons: [...document.querySelectorAll('[data-bouton-bord]')].map((x) => ({ etat: x.getAttribute('data-bouton-bord'), tx: x.getAttribute('data-tx'), txt: x.innerText })),
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => ({ code: x.getAttribute('data-raison-bord'), txt: x.innerText })),
@@ -181,7 +185,19 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       const g = p.querySelector('[data-etat-geste]');
       return { txt: p.innerText, geste: g ? g.getAttribute('data-etat-geste') : null, recharger: !!p.querySelector('[data-etat-geste-recharger]') }; });
   };
-  return { ctx, pg, errs, lire, panneau };
+  // Depuis 5cdffcb (20 oct., choix de Julien) une vente est une ligne REPLIÉE :
+  // son bouton n'est visible qu'une fois la ligne touchée. On l'ouvre comme une
+  // personne, puis on attend le bouton visible (un état, pas un délai).
+  const ouvrirVente = async (sel = '[data-bouton-bord]') => {
+    const ouverte = await pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return null;
+      const ligne = b.closest('[data-ligne-ouverte]'); if (!ligne || ligne.getAttribute('data-ligne-ouverte') === 'true') return true;
+      const t = ligne.querySelector('.vrm-ledger-sale-toggle'); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }, sel);
+    if (ouverte === null) return false;
+    if (!ouverte) await pg.click('[data-banc-ouvrir="1"]').catch(() => {});
+    return pg.waitForFunction((sel) => { const x = document.querySelector(sel); const b = x && (x.querySelector('button') || x); if (!b) return false;
+      const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, sel, { timeout: 5000 }).then(() => true, () => false);
+  };
+  return { ctx, pg, errs, lire, panneau, ouvrirVente };
 }
 
 (async () => {
@@ -253,10 +269,7 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       const v = await r.lire();
       dit(v.etat && v.etat.code !== 'plusieurs' && v.raisons.length === 0, 'PAS « plusieurs » (même identifiant : une extension)', JSON.stringify({ e: v.etat, r: v.raisons }));
       dit(v.boutons[0] && v.boutons[0].etat === 'pret', 'le bouton est ACTIF', JSON.stringify(v.boutons));
-      // (20 oct.) Depuis les ventes « une ligne » (#596-#598), le bouton vit dans
-      // la vente OUVERTE : on l'ouvre d'abord, comme lui.
-      await r.pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pret"] button'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); });
-      await r.pg.waitForTimeout(400);
+      dit(await r.ouvrirVente('[data-bouton-bord="pret"]'), 'la ligne de la vente s’ouvre et montre le bouton (repliée au repos)');
       await r.pg.click('[data-bouton-bord="pret"] button');
       await r.pg.waitForTimeout(800);
       const v2 = await r.lire();
