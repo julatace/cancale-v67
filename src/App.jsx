@@ -7555,6 +7555,14 @@ const fusionNumerosAuChargement = (k, nuage, local) => {
         const c = out[id];
         const nLocal = String(e.numero == null ? '' : e.numero).trim();
         if (!c) { out[id] = e; ajoute++; continue; }
+        // Un doublon réglé sur l'appareil (20 oct.) et pas encore arrivé au
+        // nuage : le nuage porte encore l'ANCIEN numéro. Sans ça, chaque
+        // rechargement repartait du doublon et lui donnait un AUTRE numéro neuf
+        // (un carton ne peut pas suivre). L'appareil gagne, et seulement là.
+        const r = e.reattribue;
+        if (r && nLocal && cleNum(nLocal) === cleNum(r.vers) && cleNum(c.numero) === cleNum(r.de) && !c.reattribue) {
+          out[id] = { ...c, ...e }; ajoute++; continue;
+        }
         if (nLocal && !String(c.numero == null ? '' : c.numero).trim()) {
           out[id] = { ...c, numero: e.numero, numberedAt: e.numberedAt || c.numberedAt, ...(e.auto != null ? { auto: e.auto } : {}), ...(e.manuelAt ? { manuelAt: e.manuelAt } : {}) };
           ajoute++;
@@ -7574,6 +7582,7 @@ const CLES_FUSION_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros'];
 // confirme ou la corrige (`cartonVerifie`). Une donnée datée, pas une règle :
 // rien d'autre ne lit cette fenêtre.
 const PANNE_NUMEROS = { de: '2026-10-11T14:58:00.000Z', a: '2026-10-18T09:30:00.000Z' };
+const DOUBLONS_FAITS = new Set();
 const ficheAVerifier = (f) => {
   if (!f || typeof f !== 'object' || !String(f.numero == null ? '' : f.numero).trim() || f.cartonVerifie) return false;
   if (f.auto === false) return false;
@@ -8311,6 +8320,29 @@ const confirmerNumerosAVerifier = async (numeros) => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const cles = new Set((numeros || []).filter(Boolean).map((n) => cleNum(n)));
     if (!cles.size) return true;
+    // ⚠️ 20 octobre (« j'ai failli perdre 100 euros ») : DEUX fiches sous le même
+    // numéro, c'est deux paires — tamponner ce numéro peut envoyer la mauvaise.
+    const parCle = {};
+    for (const f of Object.values(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push(f); }
+    const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
+    if (doubles.length) {
+      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'une paire').join(' · ')}`).join('\n');
+      const ok = await askConfirm({
+        title: doubles.length > 1 ? `${doubles.length} numéros portés par deux paires` : `Le N°${doubles[0]} est porté par deux paires`,
+        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner la mauvaise paire. Vérifie la photo et le titre avant d'imprimer.`,
+        ok: 'C\'est la bonne paire, imprimer', cancel: 'Annuler',
+      });
+      if (!ok) return false;
+    }
+    const pasEcrit = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
+    if (pasEcrit.length) {
+      const ok = await askConfirm({
+        title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'une paire'}`).join('\n')}\n\nCette paire a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
+        ok: 'Oui, c\'est écrit', cancel: 'Annuler',
+      });
+      if (!ok) return false;
+    }
     const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
@@ -24607,6 +24639,43 @@ function conflitsDeNumeros(porteurs) {
   return out.sort((a, b) => triNum(a.numero, b.numero));
 }
 // </conflits-numeros-regle>
+// <doublons-reattribuer-regle>
+// ⚠️⚠️ 20 OCTOBRE — DÉCISION DE JULIEN : « pour les numéros qui ont été en
+// double, je veux que l'app fasse elle-même les changements : elle redonne des
+// nouveaux numéros et on n'en parle plus ; par contre elle ne doit plus jamais
+// se tromper — tout à l'heure j'ai failli perdre 100 euros ». Ça remplace, POUR
+// LES DOUBLONS SEULEMENT, la règle « rien ne change un numéro tout seul » (§5).
+// Qui GARDE le numéro (une seule paire), qui en reçoit un NEUF :
+//   · une vente À POSTER le porte ⇒ elle le garde (son bordereau peut déjà être
+//     imprimé avec) ; toutes les annonces en ligne qui le portent changent ;
+//   · sinon, deux annonces en ligne ou plus : garde celle dont le numéro a été
+//     saisi À LA MAIN, puis celle numérotée la PREMIÈRE ; les autres changent ;
+//   · tout autre cas (deux cases du garage, une vente annulée encore là…) n'est
+//     PAS réglé tout seul : on ne devine pas (§5), le bloc rouge reste.
+// Rend [{ id, ancien }] — les annonces à renuméroter. Fonction PURE.
+function doublonsAReattribuer(conflits, fiches) {
+  const out = [];
+  for (const c of (conflits || [])) {
+    const p = c.porteurs || [];
+    const annonces = p.filter((x) => x.type === 'annonce' && fiches && fiches[x.id] && cleNum(fiches[x.id].numero) === cleNum(c.numero));
+    if (!annonces.length) continue;
+    const ventes = p.filter((x) => x.type === 'vente');
+    const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
+    if (autres.length) continue;                       // garage / annulée : pas deviné
+    let bouger;
+    if (ventes.length === 1) bouger = annonces;
+    else if (!ventes.length && annonces.length >= 2) {
+      const rang = (x) => { const f = fiches[x.id] || {}; return [f.auto === false || f.manuelAt ? 0 : 1, String(f.numberedAt || '9999'), String(x.id)]; };
+      const tri = [...annonces].sort((a, b) => { const ra = rang(a), rb = rang(b); for (let i = 0; i < 3; i++) { if (ra[i] < rb[i]) return -1; if (ra[i] > rb[i]) return 1; } return 0; });
+      bouger = tri.slice(1);
+    } else continue;
+    for (const x of bouger) out.push({ id: String(x.id), ancien: String(fiches[x.id].numero) });
+  }
+  return out;
+}
+// Une paire qui a reçu un numéro neuf et dont le carton porte encore l'ancien.
+const reattribueAEcrire = (f) => !!(f && f.reattribue && !f.reattribue.ecrit && cleNum(f.numero) === cleNum(f.reattribue.vers));
+// </doublons-reattribuer-regle>
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
@@ -30241,6 +30310,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // panne de synchronisation : leur N° a pu être redonné (`PANNE_NUMEROS`).
   const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer].filter((it) => ficheAVerifier(numeros[it.id])),
   [annBase, annAConfirmer, numeros]);
+  // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
+  // porte encore l'ancien : dites jusqu'à « C'est écrit » (sinon le bordereau
+  // dit N°90 et le carton N°51 — la mauvaise paire part).
+  const aEcrireCarton = useMemo(() => [...(listings.items || []), ...(listings.aConfirmer || [])].filter((it) => reattribueAEcrire(numeros[it.id])),
+  [listings.items, listings.aConfirmer, numeros]);
   // Le numéro que porte la paire sur eBay, par IDENTITÉ seulement : un brouillon
   // eBay préparé depuis CETTE annonce (`pairId`), et la référence (SKU) de
   // l'annonce eBay qu'il a créée. Jamais un rapprochement par titre (§5).
@@ -30310,6 +30384,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast(`« ${it.title} » → N°${prov} · écris-le sur son étiquette`);
     return true;
   };
+  // ── LES DOUBLONS SE RÈGLENT TOUT SEULS (20 octobre, sa décision) ─────────
+  // `doublonsAReattribuer` dit qui change ; ici on donne les numéros NEUFS
+  // (jamais un numéro déjà servi : `prochainLibre` part du plus haut) et on les
+  // brûle. « Pas su » ne change rien : nuage pas chargé, version de la
+  // numérotation pas relue, une liste d'annonces incomplète (un compte pas lu
+  // peut porter la paire qui GARDE le numéro). Une paire n'est renumérotée
+  // qu'UNE fois par ouverture (`DOUBLONS_FAITS`, module : deux écrans montés
+  // ensemble ne lui donneraient pas deux numéros).
+  useEffect(() => {
+    if (!cloudReady || !numerotationPermise()) return;
+    if (!listings.items || listings.loading || listings.incomplet || listings.error) return;
+    if (!sales.items || (Array.isArray(sales.failedUids) && sales.failedUids.length)) return;
+    const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
+    if (!a.length) return;
+    const pris = new Set([...takenNums, ...numsOccupes]), prisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
+    const tous = [...(listings.items || []), ...(listings.aConfirmer || [])];
+    const now = new Date().toISOString(), faits = [];
+    for (const x of a) {
+      const it = tous.find((y) => String(y.id) === x.id); if (!it) continue;
+      DOUBLONS_FAITS.add(x.id + ':' + cleNum(x.ancien));
+      const neuf = prochainLibre(pris, prisK, prefNum);
+      updatePair(it, { numero: neuf, auto: true, numberedAt: now, cartonVerifie: null, reattribue: { de: x.ancien, vers: neuf, at: now } });
+      recordUsed(neuf);
+      faits.push(`N°${x.ancien} → N°${neuf}`);
+    }
+    if (faits.length) toast(`Numéros en double réglés : ${faits.join(' · ')} — écris le nouveau sur le carton`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, conflitsNum, listings.items, listings.loading, listings.incomplet, sales.items, sales.failedUids]);
+  const marquerReattribueEcrit = (it) => {
+    const f = numeros[String(it.id)] || {};
+    if (!f.reattribue) return;
+    updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
+  };
+  const blocAEcrire = () => aEcrireCarton.length > 0 && (
+    <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux paires : VRM a donné un numéro neuf à l'une d'elles. Barre l'ancien sur son carton et écris le nouveau.</div>
+      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
+        <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
+          <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
+        </div>); })}
+    </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
     const autres = autresPorteurs(it);
@@ -36886,6 +37003,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
+          {blocAEcrire()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
@@ -38051,6 +38169,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ DEUX PAIRES, UN SEUL NUMÉRO = la mauvaise chaussure part. C'est le
             risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
             rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
+        {blocAEcrire()}
         {conflitsNum.length > 0 && (
           <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:10,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>

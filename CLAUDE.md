@@ -178,6 +178,28 @@ qu'aucune règle n'en désigne une.
   Seule exception : une annonce **sans** numéro en reçoit un automatiquement.
 - **Deux paires présentes sous le même numéro** est le seul risque irréversible de
   l'app : c'est le seul endroit où le rouge est justifié.
+- ⚠️⚠️ **LES DOUBLONS SE RÈGLENT TOUT SEULS (20 octobre, décision de Julien :
+  « l'app fait elle-même les changements… elle ne doit plus jamais se tromper,
+  j'ai failli perdre 100 euros »).** Seule exception à « rien ne change un numéro
+  tout seul ». Règle pure `doublonsAReattribuer` (App.jsx) : une vente À POSTER
+  garde le N° (les annonces qui le portent changent) ; sinon, entre annonces en
+  ligne, le N° saisi à la main gagne, puis le plus ANCIEN (`numberedAt`) ; garage
+  ou vente annulée en jeu ⇒ rien n'est deviné, le bloc rouge reste. Le numéro
+  neuf vient de `prochainLibre` (jamais servi), est brûlé, et la fiche porte
+  `reattribue: {de, vers, at, ecrit?}`. « Pas su » ne change rien (nuage pas
+  chargé, numérotation pas relue, annonces ou ventes d'un compte pas lues). Une
+  fois par paire et par ouverture (`DOUBLONS_FAITS`) ; au chargement, une
+  réattribution faite sur l'appareil et pas encore au nuage GAGNE
+  (`fusionNumerosAuChargement`), sinon chaque rechargement redonnait un AUTRE
+  numéro. La liste « nouveaux numéros à écrire sur tes cartons »
+  (`data-numeros-a-ecrire`, Annonces et Colis) reste jusqu'à « C'est écrit » ;
+  l'impression demande si un N° est porté par deux fiches ou si son nouveau N°
+  n'est pas encore écrit (`confirmerNumerosAVerifier`). Preuves : banc
+  `numeros-doublons.cjs` (7 rouges sur l'avant ; sans la garde du chargement ⇒
+  rouge), `audit-impression-carton.cjs` (4 rouges sur l'avant). Mesuré le
+  20 oct. : N°51, 52, 59, 73 en double (une paire du 14 oct., une renumérotée le
+  18) — la seconde de chaque paire reçoit un numéro neuf à la prochaine
+  ouverture de VRM.
 
 ### Les chiffres
 - **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184
