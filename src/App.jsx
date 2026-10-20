@@ -19,7 +19,7 @@ import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -62,7 +62,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.198.0';
+const EXT_ATTENDUE = '5.199.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6297,6 +6297,14 @@ function versExtension(id, msg, timeoutMs = 5000) {
   if ((!rt0 || !/^[a-p]{32}$/.test(String(id || ''))) && ID_EXT.test(String(id || '')) && __vmrExtReady) {
     return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
   }
+  // 20 octobre (Orion iPhone) : la page peut AVOIR `chrome.runtime.sendMessage`
+  // sans que le canal adressé n'arrive (Orion : « externally_connectable.matches
+  // avec runtime.sendMessage échoue », note de version, ticket 13767). Un refus
+  // CERTAIN du canal (erreur levée, `lastError` : rien n'a été livré) repasse par
+  // le pont, toujours adressé à CETTE extension par son identifiant (bridge.js
+  // ne relaie que pour le sien). Jamais sur un simple délai : un message peut
+  // être en route, l'envoyer deux fois ne se rattrape pas.
+  const parLePont = () => (ID_EXT.test(String(id || '')) && __vmrExtReady) ? vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs) : Promise.resolve(null);
   return new Promise((res) => {
     const rt = canalExt();
     if (!rt || !/^[a-p]{32}$/.test(String(id || ''))) { res(null); return; }
@@ -6306,9 +6314,10 @@ function versExtension(id, msg, timeoutMs = 5000) {
       rt.sendMessage(String(id), msg, (r) => {
         if (fini) return; fini = true; clearTimeout(t);
         let e = null; try { e = rt.lastError; } catch (_) { e = null; }
-        res(e ? null : (r || null));
+        if (e) { parLePont().then(res, () => res(null)); return; }
+        res(r || null);
       });
-    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); parLePont().then(res, () => res(null)); } }
   });
 }
 // « SE CONNECTER AVEC VRM » : l'extension ouvre VRM avec `?lier-extension=<son
@@ -12896,6 +12905,10 @@ function EtatActions({ onNav, ordi, sombre }) {
               n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
           {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
           {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
+              navigateur — les API qui lui manquent, remplacées ou non. Une
+              phrase, une fois ; rien sur Chrome (tout y est). */}
+          {(() => { const nv = __vmrEtat && __vmrEtat.nav; const p = !extKo && phraseNavigateur(nv); return p ? <div data-etat-nav={(nv.indispo || []).length ? 'indispo' : 'remplace'} style={{ padding: '5px 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>{p}</div> : null; })()}
           {/* Le constat qui vaut aussi d'un téléphone : quand l'extension (où
               qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
               quand tu passes sur Vinted : un long silence n'est pas une panne,
@@ -13026,9 +13039,11 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       )}
       {/* 19 octobre : le BON geste selon le navigateur du téléphone (mesuré,
           docs/boutiques-extension.md) — jamais une boutique qui n'existe pas. */}
-      {(mobile === 'samsung' || mobile === 'android') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
+      {(mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
         {mobile === 'samsung'
           ? <><b style={{color:C.text}}>Samsung Internet</b> n’accepte pas cette extension&nbsp;: ses modules sont réservés aux développeurs que Samsung choisit.</>
+          : mobile === 'duckduckgo'
+          ? <><b style={{color:C.text}}>DuckDuckGo</b> n’accepte aucune extension.</>
           : <>{nomNavigateurIci()} sur Android n’accepte aucune extension.</>}{' '}
         {LIENS_BOUTIQUES.firefox
           ? <>Sur ce téléphone, <b style={{color:C.text}}>Firefox pour Android</b> (gratuit) l’accepte&nbsp;: installe Firefox (bouton ci-dessous), ouvre <b style={{color:C.text}}>vrm.center</b> dedans, et l’écran te guidera.</>
@@ -13036,11 +13051,12 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       </p>}
       {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">Firefox pour Android accepte l’extension, mais sa version Firefox n’est pas encore en ligne dans la boutique de Firefox.</p>}
       <p style={{margin:0}}>
-        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android'
+        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
           ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: </>
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. </>}
         ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>
+      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Tu es dans <b style={{color:C.text}}>Orion</b>&nbsp;: il installe l’extension depuis la boutique de Firefox{orion ? <> (bouton ci-dessous) — puis reviens ici, l’écran avance tout seul</> : <>, où elle n’est pas encore en ligne</>}. VRM n’y a pas encore été essayé sur un vrai iPhone&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
@@ -13051,7 +13067,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
     </>
-  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung') ? (
+  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion') ? (
     /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
        Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
        Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
@@ -13060,7 +13076,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
-        {boutique.nav === 'firefox'
+        {boutique.nav === 'orion'
+          ? <>Orion installe l’extension depuis la boutique de Firefox, où elle n’est pas encore en ligne. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
+          : boutique.nav === 'firefox'
           ? <>La version Firefox de l’extension n’est pas encore en ligne dans la boutique de Firefox. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
           : <>{nomNavigateurIci()} n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
       </p>
@@ -13093,13 +13111,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
-    : (!fait.ext && orion && boutique.nav === 'safari' && !(sansSouris && estAndroid()))
+    : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
     ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
-    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android'))
+    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'))
     ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer Firefox pour Android</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
-    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung'))
+    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion'))
     ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
@@ -13225,7 +13243,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
   const caEbay = ebayCa != null ? ebayCa : null;
   return [
-    { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
+    { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note:caEbay==null?'total des ventes payées en euros indisponible':'ventes payées' },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
@@ -13359,8 +13377,18 @@ function PrixMarche({ data, baseKO }) {
 //    (« Ventes Vinted à jour »), et elle ne s'affiche pas au-dessus de la section
 //    Annonces, où le dressing a sa propre date (`FraicheurAnnonces`) : on y lisait
 //    « ✓ à jour » et, trois lignes plus bas, « annonces lues hier ».
-function FraicheurDonnees({ jours, compte, siAJour = true }) {
+function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
   if (jours == null) return null;
+  // (20 oct.) Plusieurs comptes en retard : chacun nommé, avec son âge.
+  const liste = Array.isArray(comptes) ? comptes.filter((x) => x && x.login) : [];
+  if (jours > 1 && liste.length > 1) {
+    const noms = liste.map((x, i) => <React.Fragment key={x.login}>{i ? (i === liste.length - 1 ? ' et ' : ', ') : ''}<b>{x.login}</b> ({x.jours} j)</React.Fragment>);
+    return (
+      <div data-fraicheur-comptes={liste.map((x) => x.login + ':' + x.jours).join(',')} style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
+        Les données de {noms} ne sont plus à jour : une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître. Repasse sur Vinted connecté sur chacun de ces comptes pour les rafraîchir.
+      </div>
+    );
+  }
   // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
   // seule l'alerte d'une capture ancienne y a sa place.
   if (jours <= 1 && !siAJour) return null;
@@ -13558,7 +13586,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
     </div></ResumePlateforme>
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
-    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/></div>
+    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={siAJour}/></div>
     </>
   );
 }
@@ -15923,7 +15951,11 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   }, []);
   React.useEffect(() => {
     let stop = false;
-    fetch('/api/ebay').then(r => r.json()).then(j => { if (!stop) setSt({ ready: !!(j && j.ready), canConsent: !!(j && j.canConsent) }); }).catch(() => { if (!stop) setSt({ ready: false, canConsent: false }); });
+    // (20 oct., audit) TROIS ÉTATS : une route qui ne répond pas (503, coupure,
+    // réponse illisible) n'est PAS « eBay pas configuré ». Avant, tout échec
+    // affichait « Ajoute tes clés eBay dans Vercel » — le mauvais geste, sur un
+    // simple hoquet. Seul un `ready` booléen rendu par la route décide.
+    fetch('/api/ebay').then(r => r.ok ? r.json() : null).then(j => { if (stop) return; setSt(j && typeof j.ready === 'boolean' ? { ready: j.ready, canConsent: !!j.canConsent } : { passu: true }); }).catch(() => { if (!stop) setSt({ passu: true }); });
     lireStatut();
     return () => { stop = true; };
   }, [lireStatut]);
@@ -16056,8 +16088,12 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
+      ) : st.passu ? (
+        <div data-ebay-statut="passu" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          Je n'ai pas pu vérifier la connexion eBay : le serveur n'a pas répondu. Rien n'est perdu — rouvre cet écran dans un instant.
+        </div>
       ) : !st.ready ? (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+        <div data-ebay-statut="non-configure" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
           eBay n'est <b>pas encore configuré</b>. Ajoute tes clés eBay dans Vercel (App ID, Dev ID, Cert ID), puis le RuName — la marche à suivre est dans <b>docs/ebay-api.md</b>. Tant que ce n'est pas fait, rien ne part sur eBay.
         </div>
       ) : !st.canConsent ? (
@@ -18997,7 +19033,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
-        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
+        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes}/>
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
@@ -19433,6 +19469,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             (l'ombre « -1px » de StatBox compact). */}
         <div className="vrm-display" style={{...sHero,fontSize:28,marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
         <div style={{...sNote,marginTop:6}}>Ventes finalisées, Vinted seul (tous comptes) · au jour de la vente · Leboncoin et eBay sont dans « Finalisé par plateforme »</div>
+        {liveStats && liveStats.nMasque > 0 && liveStats.caEncaisse != null && (
+          <div data-finalise-masquees={liveStats.nMasque} data-finalise-masquees-eur={Math.round(liveStats.caMasque*100)} style={{...sNote,marginTop:4}}>
+            {liveStats.nMasque>1 ? `Sans tes ${liveStats.nMasque} ventes masquées (${fmt(liveStats.caMasque)}) — elles restent dans ton CA déclaré (Comptabilité).` : `Sans ta vente masquée (${fmt(liveStats.caMasque)}) — elle reste dans ton CA déclaré (Comptabilité).`}
+          </div>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
           {/* Bénéfice/marge : un tiret tant qu'aucun prix d'achat n'est saisi
               (sinon on afficherait le CA comme « bénéfice », ce qui est faux —
@@ -24356,7 +24397,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       {/* ⚠️ « maj » est de l'abréviation d'informaticien (§7), et
                           l'heure À LA SECONDE ne sert à rien : on lit cette ligne
                           pour savoir si c'est frais, pas pour horodater. */}
-                      {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
+                      {/* (20 oct., audit sur données réelles) « lié le » lisait
+                          `updated_at` — la date du dernier RENOUVELLEMENT des
+                          jetons (§4.3 : `updated_at` ment) : ses sept comptes,
+                          liés en juillet et août, se disaient « liés le
+                          20/10/2026 ». La date de liaison est `created_at`. */}
+                      {acc.created_at ? `lié le ${new Date(acc.created_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
                     </div>
                     {(()=>{ const h=acctHealth(acc); return (<>
                       <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
@@ -34332,6 +34378,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tab:'cat_bord',prio:limite?0.2:1.5,
             photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
+        // (20 oct., audit sur données réelles) DEUX PAIRES SOUS UN MÊME N° — le
+        // seul risque irréversible (§5) — n'étaient dites QUE sur Colis. Mesuré
+        // chez Julien : 4 numéros (dont 3 sur une paire à poster), et Ma journée,
+        // l'écran qu'il ouvre le matin, n'en disait rien. La même liste que Colis
+        // (`conflitsNum`, §11), une ligne, le geste là-bas.
+        if(conflitsNum.length){
+          const nb=conflitsNum.length;
+          jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
+            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon la mauvaise paire part`,
+            tab:'cat_bord',prio:0.05});
+        }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
         // Mesuré le 1er septembre : « Retirer 15 colis — récupère-les avec ton
@@ -37673,7 +37731,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
-        <div style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>
+        <div style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes}/></div>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
@@ -40506,6 +40564,14 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   // puis revenue — la règle de `conflitsDeNumeros`, §11) ; sinon il ne désigne personne.
   if (porteurs.length > 2 || (porteurs.length === 2 && normTitle(porteurs[0].title || '') !== normTitle(porteurs[1].title || ''))) return null;
   if (porteurs.length === 2 && porteurs.some((f) => ficheAVerifier(f))) return null;
+  // (20 oct., audit sur données réelles) AUCUNE fiche ne porte ce N° : l'annonce
+  // ne désigne personne. Mesuré chez Julien : VRM-48 (publiée le 15, pendant la
+  // panne) — sa paire est devenue la N°53 le 18 et plus aucune fiche ne porte
+  // « 48 » ; l'écran eBay affichait pourtant « N°48 » comme une annonce reliée,
+  // et la comptait hors des « pas reliées ». Une paire revendue sur Vinted n'y
+  // aurait déclenché aucun retrait. ⚠️ Seulement quand les fiches SONT lues : un
+  // appareil neuf, avant l'arrivée du nuage, n'en a aucune (« pas su »).
+  if (!porteurs.length && Object.keys(fiches).length) return null;
   if (porteurs.length === 1) {
     const f = porteurs[0], pub = id ? _depuisEbay.get(id) : undefined;
     const quand = Date.parse(f.manuelAt || f.numberedAt || '');
@@ -41294,6 +41360,18 @@ function LeboncoinScreen() {
       for (const id in numeros) { const en = numeros[id] || {}; const k2 = cleNum(en.numero); if (k2 && ks.includes(k2)) { etat = etatDe(id); break; } }
       removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '', etat });
     }
+    // (20 oct., audit sur données réelles) UNE PAIRE, UNE LIGNE. La même paire
+    // arrivait par les deux sources — marquée « publiée » par VRM ET vue sur
+    // Leboncoin avec sa référence : « 2 vendues sur Vinted — à retirer » pour
+    // UNE paire (N°18, écrite deux fois). L'annonce vue sur Leboncoin l'emporte
+    // (elle porte son lien) ; le N° est l'identité, jamais le titre.
+    {
+      const vuesLbc = new Set(removals.filter((r) => r.lbc).map((r) => cleNum(r.numero)).filter(Boolean));
+      for (let i = removals.length - 1; i >= 0; i--) {
+        const r = removals[i];
+        if (!r.lbc && r.numero !== '?' && vuesLbc.has(cleNum(r.numero))) removals.splice(i, 1);
+      }
+    }
     removals.sort((a, b) => triNum(a.numero, b.numero));
     // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
     // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
@@ -41486,7 +41564,7 @@ function LeboncoinScreen() {
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-les de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger))}
               </Card>
             )}
@@ -45969,6 +46047,7 @@ function AppCoeur() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, soldTotal=0, ok=false;
+      let nMasque=0, caMasque=0;
       // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
       // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
       // compte — les deux sont décalés de plusieurs jours chez Vinted.
@@ -46073,7 +46152,11 @@ function AppCoeur() {
       for(const { a, sold, list, conv, actif } of perAcc){
         if(!actif) continue;
         if(sold.ok){ ok=true; for(const o of sold.items){
-          if(hiddenTx.has(String(o.transaction_id))) continue;
+          // (20 oct., audit) Une vente masquée d'un ✕ sort de ces chiffres — mais
+          // elle RESTE du CA déclaré (décision du 3 octobre). On la compte à part
+          // pour que le « finalisé » le DISE (§5 : un total partiel ne se présente
+          // pas comme complet) : chez Julien, 99 ventes, 2 157,80 €.
+          if(hiddenTx.has(String(o.transaction_id))){ if(classifyOrderStatus(o.status)==='completed'){ nMasque++; caMasque+=(o.price?.amount!=null?Number(o.price.amount):0); } continue; }
           const st=classifyOrderStatus(o.status);
           const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
@@ -46173,7 +46256,7 @@ function AppCoeur() {
       //    n'est pas une panne » (§5) sur la fraîcheur. On ne compte que les
       //    comptes ACTIFS, et on NOMME celui qui est en retard : sans son nom,
       //    impossible de savoir sur quel compte repasser (il en a neuf).
-      let dataAgeJours=null, dataAgeCompte='';
+      let dataAgeJours=null, dataAgeCompte='', dataAgeComptes=null;
       try{
         const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
         const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
@@ -46182,10 +46265,17 @@ function AppCoeur() {
         if(rf.ok){ const rows=rf.rows; let vieux=null, qui='';
           for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
           if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
+          // (20 oct., audit) TOUS les comptes en retard, pas le seul plus vieux :
+          // chez Julien jujuf38 (6 j) ET julatace35260 (3 j) — seul le premier
+          // était nommé, et il ne savait pas qu'il fallait repasser sur l'autre
+          // (la règle de la revue 5.165 : chaque compte nommé, avec son âge).
+          const parUid={};
+          for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(parUid[m[1]]==null||t<parUid[m[1]])) parUid[m[1]]=t; }
+          dataAgeComptes=Object.entries(parUid).map(([u,t])=>({login:loginDe(u)||u,jours:Math.max(0,Math.round((Date.now()-t)/86400000))})).filter(x=>x.jours>1).sort((x,y)=>y.jours-x.jours);
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
+      setLiveStats({caMois,caEncaisse,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
