@@ -43,6 +43,9 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     const ctx = vm.createContext({
       SUPABASE_URL: 'https://base.test', SUPABASE_KEY: 'cle-publique', AUTH: { session: { access_token: 'a.b.c' } },
       writeSession: () => {}, sessionFrom: (x) => x, encodeURIComponent, JSON, String, Promise,
+      // src/captcha.js tel qu'il est livré (clé de site vide : rien ne change)
+      captchaActif: () => false, routeProtegee: () => false, jetonCaptcha: () => null, etatCaptcha: () => ({ statut: 'inactif' }),
+      consommerCaptcha: () => {}, corpsAvecCaptcha: (p, b) => b, MSG_CAPTCHA_ATTENTE: '', MSG_CAPTCHA_REFUS: '', MSG_CAPTCHA_ERREUR: '',
       window: { location: { origin: 'https://vrm.center', pathname: '/' } },
       fetch: async (url, o) => { appels.push({ url: String(url), methode: (o && o.method) || 'GET' }); return { ok: true, status: 200, json: async () => ({}) }; },
     });

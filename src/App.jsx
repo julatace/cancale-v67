@@ -19,6 +19,7 @@ import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
+import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -678,15 +679,28 @@ const withOwner = (row) => {
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
+// ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
+// protège, le jeton Turnstile part dans le corps. Clé de site vide ⇒ le corps
+// est EXACTEMENT celui d'avant. Un jeton ne sert qu'une fois : il est consommé
+// après chaque appel protégé, et le widget en redemande un.
 const authCall = async (path, body) => {
+  const protege = captchaActif() && routeProtegee(path);
+  if (protege && !jetonCaptcha()) return { ok: false, status: 0, captcha: true, error: etatCaptcha().statut === 'erreur' ? MSG_CAPTCHA_ERREUR : MSG_CAPTCHA_ATTENTE };
+  const corps = corpsAvecCaptcha(path, body);
+  if (protege) consommerCaptcha();
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(corps),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, status: res.status, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
+    if (!res.ok) {
+      const brut = json.error_description || json.msg || json.message || `Erreur ${res.status}`;
+      // GoTrue : « captcha protection: request disallowed (…) » / code captcha_failed.
+      if (/captcha/i.test(String(brut) + ' ' + String(json.error_code || json.code || ''))) return { ok: false, status: res.status, captcha: true, error: MSG_CAPTCHA_REFUS };
+      return { ok: false, status: res.status, error: brut };
+    }
     return { ok: true, status: res.status, json };
   } catch (e) { return { ok: false, status: 0, error: 'Pas de connexion internet.' }; }
 };
@@ -11374,6 +11388,35 @@ function PorteMfa({ session }) {
   );
 }
 
+// ── La vérification anti-robot de l'écran de connexion (src/captcha.js) ─────
+// Rendue SEULEMENT quand une clé de site Turnstile est posée : sans clé, rien —
+// ni widget, ni requête vers Cloudflare. Le widget se recharge sur « Réessayer ».
+function useCaptcha() {
+  const [e, setE] = React.useState(etatCaptcha);
+  React.useEffect(() => abonnerCaptcha(setE), []);
+  return e;
+}
+function CaptchaConnexion({ etat }) {
+  const ref = React.useRef(null);
+  const [essai, setEssai] = React.useState(0);
+  React.useEffect(() => monterWidget(ref.current, { sombre: C === THEMES.dark }), [essai]);
+  if (!captchaActif()) return null;
+  return (
+    <div data-captcha={etat.statut} style={{marginBottom:10}}>
+      <div ref={ref} data-captcha-widget="" style={{minHeight:etat.statut==='erreur'?0:65}}/>
+      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Vérification anti-robot en cours…</div>}
+      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>Coche la case de vérification ci-dessus pour continuer.</div>}
+      {etat.statut === 'erreur' && (
+        <div data-captcha-erreur="" style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
+          {MSG_CAPTCHA_ERREUR}
+          <div><button type="button" data-captcha-reessayer="" onClick={() => setEssai((n) => n + 1)}
+            style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuthScreen() {
   // Trois états : `undefined` = on sonde · `true` = la clé publique lit encore
   // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
@@ -11402,6 +11445,9 @@ function AuthScreen() {
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
   const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
+  const captcha = useCaptcha();
+  // Sans jeton anti-robot, les appels protégés ne partent pas : le bouton le DIT.
+  const attendCaptcha = captchaActif() && mode !== 'newpw' && captcha.statut !== 'pret';
 
   const oauth = async (p) => {
     setErr(''); setBusy(true);
@@ -11424,7 +11470,8 @@ function AuthScreen() {
         if (!r.ok) setErr(r.error);
         else { setInfo('Mot de passe enregistré. Tu es connecté.'); setTimeout(()=>location.reload(), 900); }
       } else if (mode === 'reset') {
-        await authReset(email);
+        const rr = await authReset(email);
+        if (rr && rr.captcha) { setErr(rr.error); return; }
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
@@ -11536,6 +11583,7 @@ function AuthScreen() {
               value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
           )}
 
+          {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {needConfirm && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
@@ -11578,9 +11626,9 @@ function AuthScreen() {
           )}
           {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          <button type="submit" disabled={busy} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
-            borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
-            {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+          <button type="submit" data-auth-valider="" disabled={busy||attendCaptcha} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
+            borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:(busy||attendCaptcha)?'default':'pointer',opacity:(busy||attendCaptcha)?0.6:1,fontFamily:'inherit'}}>
+            {busy ? '…' : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
