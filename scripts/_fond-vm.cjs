@@ -63,10 +63,13 @@ function filtreOk(row, u) {
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
-  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null } = {}) {
+  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
-  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0 };
+  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [] };
+  // `chrome.storage.onChanged` à état (20 octobre : la boîte aux lettres du relais de la page l'utilise).
+  const ecoutesStockage = [];
+  const signaler = (changes) => { if (!Object.keys(changes).length) return; for (const f of ecoutesStockage.slice()) { try { f(changes, 'local'); } catch (_) {} } };
   const rep = (status, body, ctype = 'application/json') => {
     const texte = typeof body === 'string' ? body : JSON.stringify(body == null ? null : body);
     return { ok: status >= 200 && status < 400, status, headers: { get: () => ctype },
@@ -87,7 +90,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   };
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
-    setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: () => 0, clearInterval,
+    setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: (fn, ms) => { j.minuteries.push(ms); return 0; }, clearInterval,
     URL, TextDecoder, TextEncoder, Buffer, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
@@ -102,9 +105,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
         sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); }, create: dual({}) },
       storage: { local: {
         get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = copie(store[c]); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
-        set(o, cb) { Object.assign(store, copie(o)); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
+        set(o, cb) { const ch = {}; for (const k of Object.keys(o || {})) ch[k] = { oldValue: copie(store[k]), newValue: copie(o[k]) }; Object.assign(store, copie(o)); setTimeout(() => signaler(ch), 0); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
         remove(k, cb) { for (const c of [].concat(k)) delete store[c]; if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
-      }, onChanged: { addListener() {} } },
+      }, onChanged: { addListener(f) { ecoutesStockage.push(f); }, removeListener(f) { const i = ecoutesStockage.indexOf(f); if (i >= 0) ecoutesStockage.splice(i, 1); } } },
       webNavigation: { onCompleted: { addListener() {} } },
       scripting: { executeScript: async ({ target, func, args }) => {
         // Le document COURANT de l'onglet (aucune épingle d'origine, comme Chrome).
@@ -154,6 +157,16 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  // `retirer` (20 octobre) : imite un navigateur à qui il MANQUE des API
+  // (Orion iPhone, Safari, Firefox pour Android) — chaque chemin pointé
+  // (`alarms`, `windows.update`, `runtime.onMessageExternal`…) est SUPPRIMÉ
+  // avant que le fond ne démarre, exactement comme s'il n'existait pas.
+  for (const chemin of retirer || []) {
+    const parts = String(chemin).split('.'); let o = ctx.chrome;
+    for (const k of parts.slice(0, -1)) o = o && o[k];
+    if (o) delete o[parts[parts.length - 1]];
+  }
+  if (!ctx.chrome.runtime.onMessageExternal && !(retirer || []).includes('runtime.onMessageExternal')) ctx.chrome.runtime.onMessageExternal = { addListener() {} };
   // `firefox` (5.188) : imite Firefox — `browser.*` rend des promesses,
   // `chrome.*` n'accepte QUE des rappels (sans rappel il ne rend rien : le pire
   // cas). `firefox.compat` = le source de compat-firefox.js, exécuté AVANT le
@@ -189,6 +202,6 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     const r = ecouteur(msg, sender || { origin: 'https://vrm.center', url: 'https://vrm.center/' }, res);
     if (r !== true) setTimeout(() => res(undefined), 5);
   });
-  return { ctx, j, store, lignes, envoyer };
+  return { ctx, j, store, lignes, envoyer, signaler };
 }
 module.exports = { faireFond, cheminSource, projette };

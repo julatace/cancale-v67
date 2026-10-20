@@ -171,6 +171,263 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     dit(!sess.relaye.length || !sess.relaye.some((m) => m.action === 'session'), 'pont : l\'ancien message « session » n\'est toujours pas relayé');
   });
 
+
+  // ── G. Un navigateur à qui il MANQUE des API (20 octobre : Orion iPhone,
+  //    Safari, Firefox pour Android) — le vrai fond, des profils tirés des
+  //    sources (docs/boutiques-extension.md, table des API) ────────────────────
+  //  · safari-ios / firefox-android : ce que MDN (browser-compat-data) dit
+  //    absent — `downloads`, `windows.update` (Safari iOS) ; `downloads`,
+  //    `windows` (Firefox Android) ;
+  //  · orion-ios : tout ce que Kagi ne DOCUMENTE pas pour iOS (réveil, monde
+  //    MAIN, téléchargements, fenêtres, canal externe, ouverture du popup) ;
+  //  · orion-ios-pire : en plus `cookies`, `scripting` et `tabs.sendMessage` —
+  //    le pire cas, pour prouver que chaque repli tient seul.
+  // `--mutation cookies|alarms|main` retire UNE garde de capacité du fond :
+  // le contrôle qui la vise doit passer au rouge (preuve, §6.1).
+  const iMut = process.argv.indexOf('--mutation');
+  const MUT = iMut > 0 ? String(process.argv[iMut + 1] || '') : '';
+  let SRC_G = SRC_BG;
+  if (MUT) {
+    let t = lire(SRC_BG) || '';
+    const avant = t;
+    if (MUT === 'cookies') t = t.replace("  if (!CAP.cookies) return cookieDeLaPage(domain, name);\n", '');
+    if (MUT === 'alarms') t = t.replace('if (CAP.alarms) {\n  try {\n    for (const nom', 'if (true) {\n  try {\n    for (const nom');
+    if (MUT === 'main') t = t.replace('  if (CAP.scripting && !CAP_MAIN_REFUSE) {\n    try { return await chrome.scripting', '  if (true) {\n    try { return await chrome.scripting');
+    dit(t !== avant, `mutation « ${MUT} » posée`);
+    SRC_G = path.join(tmp, 'background-mute.js'); fs.writeFileSync(SRC_G, t);
+  }
+  const PROFILS = {
+    chromium: [],
+    'firefox-android': ['downloads', 'windows'],
+    'safari-ios': ['downloads', 'windows.update'],
+    'orion-ios': ['alarms', 'downloads', 'windows', 'runtime.onMessageExternal', 'action.openPopup'],
+    'orion-ios-pire': ['alarms', 'downloads', 'windows', 'runtime.onMessageExternal', 'action.openPopup', 'cookies', 'scripting', 'tabs.sendMessage'],
+  };
+  const ATTENDU = {
+    chromium: null,
+    'firefox-android': { remplace: ['downloads'], indispo: [] },
+    'safari-ios': { remplace: ['downloads'], indispo: [] },
+    'orion-ios': { remplace: ['alarms', 'downloads', 'externe'], indispo: [] },
+    'orion-ios-pire': { remplace: ['alarms', 'scripting', 'downloads', 'externe'], indispo: ['cookies'] },
+  };
+  const APP_SENDER = { origin: 'https://vrm.center', url: 'https://vrm.center/', tab: { id: 3, url: 'https://vrm.center/' } };
+  const VINTED_SENDER = { tab: { id: 7, url: 'https://www.vinted.fr/member/5' }, url: 'https://www.vinted.fr/member/5' };
+  const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+  const vintedBanc = (e) => {
+    const c = e.chemin;
+    if (/\/users\/current/.test(c)) return { status: 200, body: { user: { id: 5, login: 'compte_banc' } } };
+    if (/\/wardrobe\/5\/items/.test(c)) return { status: 200, body: { items: [{ id: 901, title: 'Paire de banc', price: { amount: '30.0' } }], pagination: { total_pages: 1, total_entries: 1 } } };
+    if (/my_orders/.test(c)) return { status: 200, body: { my_orders: [], pagination: { total_pages: 1 } } };
+    if (/\/inbox/.test(c)) return { status: 200, body: { conversations: [] } };
+    return { status: 200, body: {} };
+  };
+  // Le script de contenu, imité : il répond au relais comme content.js +
+  // inject.js le font (la requête part de LA PAGE : `ctx.location` = Vinted).
+  const contenuImite = (f, voie) => {
+    // Le banc raccourcit tous les délais à 2 ms ; l'échéance du relais (25 s)
+    // garde ici 2 s, sinon elle tomberait avant la réponse de la « page ».
+    f.ctx.setTimeout = (fn, ms) => setTimeout(fn, (ms || 0) >= 20000 ? 2000 : Math.min(ms || 0, 2));
+    const repondre = async (m) => {
+      f.ctx.location = new URL('https://www.vinted.fr/');
+      const r = await f.ctx.fetch(m.p, { credentials: 'include', headers: m.h || {} });
+      let json = null; try { json = await r.json(); } catch (_) {}
+      return { id: m.id, status: r.status, ok: r.ok, json, origine: 'https://www.vinted.fr' };
+    };
+    if (voie === 'message') {
+      f.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.vrm === 'fetchPage') { repondre(m).then((o) => cb && cb(o)); return; } if (typeof cb === 'function') cb(); };
+    } else {
+      f.ctx.chrome.storage.onChanged.addListener((ch) => { const req = ch.vrmPageReq && ch.vrmPageReq.newValue; if (req && req.vrm === 'fetchPage') repondre(req).then((o) => f.ctx.chrome.storage.local.set({ vrmPageRep: o })); });
+    }
+  };
+  const resultats = {};
+  for (const [nom, retirer] of Object.entries(PROFILS)) {
+    await essaie(`profil ${nom}`, async () => {
+      let f = null, leve = null;
+      const appels = { sync: 0, active: 0, photos: 0, relais: 0, capture: 0 };
+      try { f = faireFond({ src: SRC_G, retirer, vinted: vintedBanc }); } catch (e) { leve = e; }
+      dit(!!f && !leve, `${nom} : le fond démarre sans lever`, leve ? String(leve.message || leve) : '');
+      if (!f) return;
+      f.ctx.captureAllAccounts = async () => { appels.sync++; };
+      f.ctx.runActive = async () => { appels.active++; };
+      f.ctx.tickPhotos = async () => { appels.photos++; };
+      f.ctx.relaisTick = async () => { appels.relais++; };
+      f.ctx.captureDomain = async () => { appels.capture++; return null; };
+      await attendre(30);
+      const sansAlarmes = retirer.includes('alarms');
+      if (sansAlarmes) {
+        dit(f.j.minuteries.includes(30000), `${nom} : sans \`alarms\`, une minuterie de secours tourne`, JSON.stringify(f.j.minuteries));
+        const m = f.store.vrmMinuteries || {};
+        dit(['cancale-sync', 'cancale-active', 'vrm-session', 'vrm-photos', 'vrm-relais'].every((k) => Number(m[k]) > 0) && appels.sync === 1 && appels.active === 1 && appels.photos === 1 && appels.relais === 1,
+          `${nom} : au réveil, chaque tâche périodique repart UNE fois, datée dans chrome.storage.local`, JSON.stringify({ m: Object.keys(m), appels }));
+        await f.envoyer({ from: 'vrm-badge', action: 'rien' }, VINTED_SENDER); await attendre(20);
+        dit(appels.sync === 1 && appels.active === 1, `${nom} : un second réveil aussitôt ne rejoue rien (aucune rafale)`, JSON.stringify(appels));
+        // iOS a suspendu le fond 25 min : au retour, ce qui est dû repart.
+        f.store.vrmMinuteries = Object.fromEntries(Object.entries(f.store.vrmMinuteries || {}).map(([k, v]) => [k, v - 25 * 60000]));
+        if (typeof f.ctx.rattraperMinuteries === "function") f.ctx.rattraperMinuteries(true); await attendre(20);
+        dit(appels.sync === 2 && appels.active === 2 && appels.photos === 2, `${nom} : après une suspension (25 min), les tâches en retard repartent une fois`, JSON.stringify(appels));
+      } else {
+        dit(!f.j.minuteries.includes(30000) && appels.sync === 0, `${nom} : avec \`alarms\`, aucune minuterie de secours (le chemin de Chrome)`);
+      }
+      // Les cookies de session.
+      const veux = await f.envoyer({ from: 'vrm-cookies', action: 'veux' }, VINTED_SENDER);
+      const jwt = 'x.' + Buffer.from(JSON.stringify({ account_id: 111 })).toString('base64url') + '.y';
+      if (retirer.includes('cookies')) {
+        dit(veux && veux.veux === true, `${nom} : sans \`cookies\`, l'extension demande ceux de la page`);
+        const etat0 = await f.envoyer({ from: 'vmr-bridge', action: 'etat' }, APP_SENDER);
+        dit(etat0 && etat0.nav && (etat0.nav.indispo || []).includes('cookies'), `${nom} : tant que la page n'a rien montré, l'état DIT que la session n'est pas vue`, JSON.stringify(etat0 && etat0.nav));
+        const pirate = await f.envoyer({ from: 'vrm-cookies', domain: 'www.vinted.fr', c: { access_token_web: jwt } }, { tab: { id: 9, url: 'https://www.leboncoin.fr/' } });
+        dit(pirate && pirate.ok === false && !f.store.vrmCookiesPage, `${nom} : des cookies envoyés depuis un autre site sont refusés`, JSON.stringify(pirate));
+        const r = await f.envoyer({ from: 'vrm-cookies', domain: 'www.vinted.fr', c: { access_token_web: jwt, refresh_token_web: 'r1', anon_id: 'a1', autre: 'secret' } }, VINTED_SENDER);
+        const rangé = ((f.store.vrmCookiesPage || {})['www.vinted.fr'] || {}).c || {};
+        dit(r && r.ok && r.vu === true && Object.keys(rangé).sort().join() === 'access_token_web,anon_id,refresh_token_web', `${nom} : les trois cookies utiles sont rangés (et rien d'autre)`, JSON.stringify(Object.keys(rangé)));
+        const lu = await f.ctx.getCookie('www.vinted.fr', 'access_token_web');
+        dit(lu === jwt, `${nom} : \`getCookie\` lit le cookie donné par la page (même valeur que Chrome lirait)`, String(lu).slice(0, 20));
+        await attendre(30);
+        dit(appels.capture >= 1, `${nom} : une session neuve relance la capture (l'équivalent de cookies.onChanged)`, String(appels.capture));
+      } else {
+        dit(veux && veux.veux === false, `${nom} : avec \`cookies\`, la page n'envoie rien (Chrome : un seul « non »)`);
+        const r = await f.envoyer({ from: 'vrm-cookies', domain: 'www.vinted.fr', c: { access_token_web: jwt } }, VINTED_SENDER);
+        dit(r && r.ignore === true && !f.store.vrmCookiesPage, `${nom} : avec \`cookies\`, des cookies de page sont ignorés`);
+      }
+      // L'état que l'app lit : ce qui manque, remplacé ou non.
+      const etat = await f.envoyer({ from: 'vmr-bridge', action: 'etat' }, APP_SENDER);
+      const nav = (etat && etat.nav) || null;
+      const att = ATTENDU[nom];
+      const memes = (a, b) => JSON.stringify((a || []).slice().sort()) === JSON.stringify((b || []).slice().sort());
+      const attNav = att && retirer.includes('cookies') ? { remplace: att.remplace.concat('cookies'), indispo: [] } : att;
+      dit(etat && etat.ok && (attNav === null ? nav === null : (nav && memes(nav.remplace, attNav.remplace) && memes(nav.indispo, attNav.indispo))),
+        `${nom} : l'état du pont dit ${attNav === null ? 'rien (tout est là)' : 'ce qui est remplacé / impossible'}`, JSON.stringify(nav));
+      // Le monde MAIN : la moisson de la page, par Chrome ou par le relais.
+      const sansScripting = retirer.includes('scripting');
+      if (sansScripting) contenuImite(f, retirer.includes('tabs.sendMessage') ? 'stockage' : 'message');
+      f.j.vinted.length = 0;
+      let rep = null; try { rep = await f.ctx.pageActiveFetch(); } catch (e) { rep = 'leve:' + (e && e.message); }
+      const chemins = f.j.vinted.filter((x) => x.origine === 'page').map((x) => x.chemin.replace(/\?.*$/, '')).sort();
+      resultats[nom] = { chemins, injections: f.j.injections, rep };
+      dit(chemins.includes('/api/v2/users/current') && chemins.includes('/api/v2/wardrobe/5/items'), `${nom} : la moisson part DE LA PAGE${sansScripting ? ' (par le relais' + (retirer.includes('tabs.sendMessage') ? ', boîte aux lettres' : '') + ')' : ''}`, JSON.stringify({ chemins, rep }));
+      if (sansScripting) dit(f.j.injections === 0, `${nom} : sans \`scripting\`, rien n'est injecté`);
+    });
+  }
+  if (resultats.chromium && resultats['orion-ios-pire']) {
+    dit(JSON.stringify(resultats.chromium.chemins) === JSON.stringify(resultats['orion-ios-pire'].chemins),
+      'parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que sur Chrome', JSON.stringify([resultats.chromium.chemins, resultats['orion-ios-pire'].chemins]));
+  }
+  // Un `executeScript` qui refuse le monde MAIN (sans manquer) : le relais prend la suite.
+  await essaie('monde MAIN refusé', async () => {
+    const f = faireFond({ src: SRC_G, vinted: vintedBanc });
+    f.ctx.chrome.scripting.executeScript = async () => { throw new Error("Unexpected property: 'world'"); };
+    contenuImite(f, 'message');
+    f.j.vinted.length = 0;
+    await f.ctx.pageActiveFetch();
+    const chemins = f.j.vinted.filter((x) => x.origine === 'page').map((x) => x.chemin.replace(/\?.*$/, ''));
+    dit(chemins.includes('/api/v2/wardrobe/5/items'), 'monde MAIN refusé par `executeScript` : la même moisson passe par le relais', JSON.stringify(chemins));
+    const etat = await f.envoyer({ from: 'vmr-bridge', action: 'etat' }, APP_SENDER);
+    dit(etat && etat.nav && etat.nav.remplace.includes('scripting'), 'et l\'état le dit (`scripting` remplacé)', JSON.stringify(etat && etat.nav));
+    const f2 = faireFond({ src: SRC_G, vinted: vintedBanc });
+    let tente = 0;
+    f2.ctx.chrome.scripting.executeScript = async () => { tente++; throw new Error('No tab with id: 7'); };
+    f2.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.vrm === 'fetchPage') { tente += 100; } if (cb) cb(); };
+    const r2 = await f2.ctx.pageActiveFetch();
+    dit(tente === 1 && !r2, 'un refus ordinaire (onglet fermé) reste un refus, comme sur Chrome — aucun relais', String(tente));
+  });
+
+  // ── H. Les scripts de la page, exécutés : le relais (content.js ↔ inject.js),
+  //    les cookies de page, et lbc-inject / vc-inject hors du monde MAIN ────────
+  await essaie('relais de la page', async () => {
+    const SRC_C = lire(path.join(EXT, 'content.js')), SRC_I = lire(path.join(EXT, 'inject.js'));
+    const faireMondes = ({ veux, cookie }) => {
+      const ecPage = [], ecContenu = [], envoyes = [], fetchs = [];
+      let ecouteMsg = null;
+      const winI = {}, winC = {};
+      // ⚠️ La « fenêtre » vue DEPUIS le vm n'est pas l'objet passé (vm la contextifie) :
+      // on prend celle que chaque script voit, sinon `event.source !== window`.
+      let vueI = winI, vueC = winC;
+      const poster = (data) => setTimeout(() => { for (const f of ecPage.slice()) f({ source: vueI, data }); for (const f of ecContenu.slice()) f({ source: vueC, data }); }, 0);
+      Object.assign(winI, { console: { log() {}, warn() {}, error() {} }, setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: () => 0, clearInterval, URL, Headers: class {},
+        btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+        location: { host: 'www.vinted.fr', hostname: 'www.vinted.fr', origin: 'https://www.vinted.fr', href: 'https://www.vinted.fr/' },
+        document: { hidden: true, addEventListener() {} }, localStorage: { getItem: () => String(Date.now()), setItem() {} },
+        addEventListener: (t, f) => { if (t === 'message') ecPage.push(f); }, postMessage: (d) => poster(d),
+        XMLHttpRequest: class { open() {} setRequestHeader() {} addEventListener() {} send() {} },
+        fetch: async (url, init) => { fetchs.push({ url: String(url), credentials: init && init.credentials, headers: (init && init.headers) || {} }); return { ok: true, status: 200, headers: { get: () => 'application/json' }, clone() { return this; }, text: async () => '{"user":{"id":5}}', json: async () => ({ user: { id: 5 } }) }; } });
+      winI.window = winI; winI.self = winI; winI.globalThis = winI;
+      vm.createContext(winI); vm.runInContext(SRC_I, winI, { filename: 'inject.js' }); vueI = vm.runInContext('window', winI);
+      Object.assign(winC, { console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval,
+        location: { host: 'www.vinted.fr', hostname: 'www.vinted.fr', origin: 'https://www.vinted.fr' },
+        document: { cookie: cookie || '', visibilityState: 'visible', addEventListener() {}, createElement: () => ({ remove() {} }), head: { appendChild() {} }, documentElement: { appendChild() {} } },
+        addEventListener: (t, f) => { if (t === 'message') ecContenu.push(f); }, postMessage: (d) => poster(d),
+        chrome: { runtime: { getURL: (p) => 'chrome-extension://x/' + p, lastError: null,
+          sendMessage: (m, cb) => { envoyes.push(m); if (typeof cb === 'function') cb(m && m.action === 'veux' ? { ok: true, veux } : { ok: true }); },
+          onMessage: { addListener: (f) => { ecouteMsg = f; } } },
+          storage: { local: { get: (k, cb) => cb({}), set() {} }, onChanged: { addListener() {} } } } });
+      winC.window = winC; winC.self = winC; winC.globalThis = winC;
+      vm.createContext(winC); vm.runInContext(SRC_C, winC, { filename: 'content.js' }); vueC = vm.runInContext('window', winC);
+      return { envoyes, fetchs, demander: (m) => new Promise((res) => { const r = ecouteMsg && ecouteMsg(m, {}, res); if (r !== true) res(undefined); }) };
+    };
+    const m = faireMondes({ veux: false, cookie: 'access_token_web=AAA; refresh_token_web=RRR; v_sid=zz' });
+    const rep = await m.demander({ vrm: 'fetchPage', id: 'r1', p: '/api/v2/users/current', h: { accept: 'application/json', 'x-csrf-token': 'tok', cookie: 'interdit' } });
+    dit(rep && rep.id === 'r1' && rep.status === 200 && rep.json && rep.json.user && rep.json.user.id === 5 && rep.origine === 'https://www.vinted.fr', 'relais : le fond demande, inject.js (monde de la page) fait la requête, la réponse revient', JSON.stringify(rep));
+    const f0 = m.fetchs[0] || {};
+    dit(f0.url === '/api/v2/users/current' && f0.credentials === 'include' && f0.headers['x-csrf-token'] === 'tok' && !('cookie' in f0.headers), 'relais : requête de la page, ses cookies, et seulement les en-têtes permis', JSON.stringify(f0));
+    const hors = await m.demander({ vrm: 'fetchPage', id: 'r2', p: 'https://autre-site.test/vol', h: {} });
+    dit(m.fetchs.length === 1, 'relais : une adresse hors de l\'API Vinted ne part pas', JSON.stringify(m.fetchs.map((x) => x.url)));
+    void hors;
+    dit(m.envoyes.filter((x) => x.from === 'vrm-cookies').length === 1 && m.envoyes.filter((x) => x.from === 'vrm-cookies')[0].action === 'veux', 'cookies (Chrome, `veux` = non) : un seul message, rien d\'autre ne part', JSON.stringify(m.envoyes.filter((x) => x.from === 'vrm-cookies')));
+    const m2 = faireMondes({ veux: true, cookie: 'access_token_web=AAA; refresh_token_web=RRR; v_sid=zz' });
+    await attendre(10);
+    const c = m2.envoyes.find((x) => x.from === 'vrm-cookies' && x.c);
+    dit(c && c.c.access_token_web === 'AAA' && c.c.refresh_token_web === 'RRR' && !('v_sid' in c.c) && c.domain === 'www.vinted.fr', 'cookies (navigateur sans API) : la page donne les cookies de session utiles, et seulement eux', JSON.stringify(c));
+  });
+  await essaie('lbc-inject / vc-inject hors du monde MAIN', async () => {
+    for (const [fic, drapeau] of [['lbc-inject.js', '__vrmLbcInjected'], ['vc-inject.js', '__vrmVcInjected']]) {
+      const SRC = lire(path.join(EXT, fic));
+      const monde = (isole) => {
+        const poses = [];
+        const g = { console: { log() {}, warn() {}, error() {} }, setTimeout: () => 0, clearTimeout, setInterval: () => 0, URL, Headers: class {},
+          location: { host: 'www.leboncoin.fr', hostname: 'www.leboncoin.fr', origin: 'https://www.leboncoin.fr', href: 'https://www.leboncoin.fr/', pathname: '/' },
+          document: { currentScript: null, readyState: 'complete', addEventListener() {}, querySelector: () => null, querySelectorAll: () => [],
+            createElement: () => ({ set src(v) { this._src = v; }, get src() { return this._src; }, remove() {} }),
+            head: { appendChild: (s) => poses.push(s._src) }, documentElement: { appendChild: (s) => poses.push(s._src) } },
+          addEventListener() {}, postMessage() {},
+          XMLHttpRequest: class { open() {} send() {} addEventListener() {} setRequestHeader() {} },
+          fetch: async () => ({ ok: true, status: 200, headers: { get: () => '' }, clone() { return this; }, text: async () => '' }),
+          history: { pushState() {}, replaceState() {} }, MutationObserver: class { observe() {} } };
+        if (isole) g.chrome = { runtime: { id: 'extid', getURL: (p) => 'chrome-extension://extid/' + p } };
+        g.window = g; g.self = g; g.globalThis = g;
+        vm.createContext(g);
+        try { vm.runInContext(SRC, g, { filename: fic }); } catch (_) {}
+        return { poses, pose: !!g[drapeau], fetchEnveloppe: g.fetch && !/async \(\) =>/.test(String(g.fetch)) };
+      };
+      const iso = monde(true);
+      dit(iso.poses.length === 1 && /extid\/(lbc|vc)-inject\.js$/.test(iso.poses[0]) && !iso.pose, `${fic} : dans le monde ISOLÉ (monde MAIN ignoré), il se pose dans la page par une balise <script> et n'enveloppe rien ici`, JSON.stringify(iso));
+      const main = monde(false);
+      dit(main.poses.length === 0 && main.pose, `${fic} : dans le monde MAIN (Chrome, Firefox), comportement d'avant`, JSON.stringify(main));
+    }
+  });
+
+  // ── I. Le paquet Safari (dossier pour le convertisseur d'Apple) ─────────────
+  await essaie('paquet Safari', async () => {
+    const zipSa = path.join(tmp, 'sa.zip'), sa = path.join(tmp, 'sa');
+    execFileSync('node', [path.join(RACINE, 'scripts', 'zip-extension.cjs'), '--safari', zipSa], { stdio: 'pipe' });
+    fs.mkdirSync(sa); execFileSync('unzip', ['-q', zipSa, '-d', sa]);
+    const d = path.join(sa, 'VRM-safari');
+    const m = JSON.parse(lire(path.join(d, 'manifest.json')) || '{}');
+    const bg = m.background || {};
+    dit(bg.scripts && bg.scripts[0] === 'compat-firefox.js' && bg.scripts.includes('background.js') && bg.persistent === false && !bg.service_worker,
+      'Safari : fond NON persistant (exigé sur iOS), compat d\'abord', JSON.stringify(bg));
+    dit(!(m.permissions || []).includes('downloads') && (m.permissions || []).includes('cookies'), 'Safari : `downloads` retiré (Safari ne l\'a pas), le reste gardé', JSON.stringify(m.permissions));
+    dit(((m.browser_specific_settings || {}).safari || {}).strict_min_version === '16.4', 'Safari : version minimale déclarée (16.4)');
+    dit(!!m.externally_connectable, 'Safari : `externally_connectable` gardé (Safari le prend en charge, matches seuls)');
+    const cs = m.content_scripts || [];
+    dit(cs.filter((c) => c.world !== 'MAIN').every((c) => c.js[0] === 'compat-firefox.js') && cs.filter((c) => c.world === 'MAIN').every((c) => !c.js.includes('compat-firefox.js')), 'Safari : compat devant chaque script de contenu, jamais dans le monde de la page');
+    const ph = lire(path.join(d, 'popup.html')) || '';
+    dit(ph.indexOf('compat-firefox.js') >= 0 && ph.indexOf('compat-firefox.js') < ph.indexOf('popup.js'), 'Safari : la fenêtre charge la compat avant popup.js');
+    const diff = fs.readdirSync(EXT).filter((f) => /\.(js|png)$/.test(f)).filter((f) => !fs.existsSync(path.join(d, f)) || !fs.readFileSync(path.join(d, f)).equals(fs.readFileSync(path.join(EXT, f))));
+    dit(diff.length === 0, 'Safari : le code est celui de la source, octet pour octet', diff.join(', '));
+    const war = (m.web_accessible_resources || []).flatMap((w) => w.resources || []);
+    dit(war.includes('vc-inject.js') && war.includes('lbc-inject.js'), 'Safari (et partout) : lbc-inject.js et vc-inject.js sont web-accessibles (le repli du monde MAIN en a besoin)');
+  });
+
   // ── F. L'app ───────────────────────────────────────────────────────────────
   const APP = lire(path.join(RACINE, 'src', 'App.jsx')) || '';
   await essaie('app : identifiants', () => {
@@ -210,17 +467,44 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     try {
       for (const k of Object.keys(liens)) liens[k] = '';
       const vide = mod.boutiqueOrion();
-      liens.firefox = 'https://addons.mozilla.org/firefox/addon/vrm/';
-      const fx = mod.boutiqueOrion();
       liens.chrome = 'https://chromewebstore.google.com/detail/x';
       const ch = mod.boutiqueOrion();
-      dit(vide === '' && fx === liens.firefox && ch === liens.chrome, 'app : Orion n\'est proposé qu\'avec une boutique publiée (Chrome d\'abord, Firefox sinon)', JSON.stringify([vide, fx, ch]));
+      liens.firefox = 'https://addons.mozilla.org/firefox/addon/vrm/';
+      const fx = mod.boutiqueOrion();
+      // 20 octobre : Firefox d'abord (Orion préfère `background.scripts`, la forme du paquet Firefox).
+      dit(vide === '' && ch === liens.chrome && fx === liens.firefox, 'app : Orion n\'est proposé qu\'avec une boutique publiée (Firefox d\'abord, Chrome sinon)', JSON.stringify([vide, ch, fx]));
     } finally { Object.assign(liens, sauf); }
-    dit(/data-premiers-orion="safari"/.test(APP) && /data-premiers-orion="telephone"/.test(APP) && /orion && boutique\.nav === 'safari'/.test(APP), 'app : Orion proposé sur Safari et sur iPhone, seulement avec un lien');
+    dit(/data-premiers-orion="safari"/.test(APP) && /data-premiers-orion="telephone"/.test(APP) && /orion && \(boutique\.nav === 'safari' \|\| boutique\.nav === 'orion'\)/.test(APP), 'app : Orion proposé sur Safari et sur iPhone, seulement avec un lien');
     dit(faux.length === 0, 'app : un lien de boutique est vide (pas encore publié) ou pointe vers la vraie boutique', faux.map((f) => f.join('=')).join(' ; '));
+    // 20 octobre — tous les navigateurs : chacun reconnu par SON marqueur, et
+    // ce qu'il accepte (jamais un lien deviné).
+    const UA2 = {
+      ddgAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141.0.0.0 Mobile Safari/537.36 DuckDuckGo/5',
+      ddgIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1 Ddg/18.6',
+      yandex: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36',
+      vivaldi: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Vivaldi/7.6',
+      samsung: 'Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Mobile Safari/537.36',
+      chromeAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
+      chromeIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0 Mobile/15E148 Safari/604.1',
+    };
+    const nav2 = Object.fromEntries(Object.entries(UA2).map(([k, u]) => [k, mod.navigateurIci(u)]));
+    dit(nav2.ddgAndroid === 'duckduckgo' && nav2.ddgIos === 'duckduckgo' && nav2.yandex === 'yandex' && nav2.vivaldi === 'vivaldi' && nav2.samsung === 'samsung', 'app : DuckDuckGo, Yandex, Vivaldi, Samsung reconnus par leur marqueur', JSON.stringify(nav2));
+    const acc = Object.fromEntries(Object.entries({ ...UA, ...UA2 }).map(([k, u]) => [k, mod.extensionIci(u).accepte + ':' + (mod.extensionIci(u).paquet || '-')]));
+    dit(acc.chrome === 'oui:chromium' && acc.edge === 'oui:chromium' && acc.opera === 'oui:chromium' && acc.vivaldi === 'oui:chromium' && acc.yandex === 'oui:chromium'
+      && acc.firefox === 'oui:firefox' && acc.fxandroid === 'oui:firefox'
+      && acc.safari === 'non:-' && acc.chromeIos === 'non:-' && acc.ddgIos === 'non:-' && acc.ddgAndroid === 'non:-' && acc.samsung === 'non:-' && acc.chromeAndroid === 'non:-',
+      'app : ce que chaque navigateur accepte (paquet Chromium, Firefox, ou rien — le relais)', JSON.stringify(acc));
+    dit(mod.estOrionIci({ KAGI: {} }) === true && mod.estOrionIci({}) === false, 'app : Orion reconnu par `window.KAGI` (le repère documenté par Kagi)');
+    dit(mod.phraseNavigateur(null) === '' && mod.phraseNavigateur({ remplace: [], indispo: [] }) === '', 'app : rien à dire quand rien ne manque (Chrome)');
+    const ph1 = mod.phraseNavigateur({ remplace: ['alarms', 'scripting'], indispo: [] }, UA.safari);
+    const ph2 = mod.phraseNavigateur({ remplace: ['scripting'], indispo: ['cookies'] }, UA.safari);
+    dit(/réveil/.test(ph1) && /même chose/.test(ph1) && /arrière-plan/.test(ph1) && !/session/.test(ph1), 'app : une API remplacée se dit comme telle (la fonction tient), avec la contrainte d\'iOS', ph1);
+    dit(/session Vinted/.test(ph2) && /ordinateur/.test(ph2), 'app : une API impossible ici se dit, avec le geste', ph2);
+    dit(/data-etat-nav=/.test(APP) && /phraseNavigateur\(nv\)/.test(APP), 'app : le panneau de l\'extension dit, une fois, ce que l\'extension a relevé de ce navigateur');
+    dit(/data-premiers-mobile=\{mobile\}/.test(APP) && /mobile === 'duckduckgo'/.test(APP) && /data-premiers-orion="dans-orion"/.test(APP), 'app : premiers pas — DuckDuckGo dit « aucune extension », Orion sur iPhone a sa consigne');
   });
 
   fs.rmSync(tmp, { recursive: true, force: true });
-  console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ l\'extension se construit et se connecte sur Chrome, Edge, Opera, Brave et Firefox (ordinateur et Android)');
+  console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ l\'extension se construit et se connecte sur Chrome, Edge, Opera, Brave, Vivaldi, Firefox (ordinateur et Android), Safari (paquet) et un navigateur à API manquantes (Orion iPhone)');
   process.exit(ko ? 1 : 0);
 })();

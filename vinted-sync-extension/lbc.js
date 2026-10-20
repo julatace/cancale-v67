@@ -1476,6 +1476,16 @@
       '<button id="vrm-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 11px;font-size:11.5px;cursor:pointer">✕</button>' +
       '</div>' +
       '<div style="color:#6B7485;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>');
+    // 20 octobre (iPhone, Orion · Firefox Android) : AU DOIGT, le bandeau tient
+    // dans l'écran (390 px) et ses boutons font 44 px — à la souris, rien ne change.
+    let auDoigt = false;
+    try { auDoigt = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(hover: none)').matches); } catch (_) { auDoigt = false; }
+    if (auDoigt) {
+      el.style.maxWidth = 'calc(100vw - 32px)';
+      el.style.right = '16px';
+      el.style.fontSize = '13px';
+      for (const b of el.querySelectorAll('button')) { b.style.minHeight = '44px'; b.style.minWidth = '44px'; b.style.fontSize = '13px'; }
+    }
     const refill = el.querySelector('#vrm-refill');
     if (refill) refill.onclick = reprendre;
     // Fermer le bandeau, c'est laisser tomber CE dépôt : l'app doit le savoir
