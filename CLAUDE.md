@@ -10642,3 +10642,6 @@ iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expér
 - ⚠️ **Non mesuré** : un vrai Firefox Android, un vrai Orion, un vrai Samsung.
 - **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
   Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).
+
+### Messages : une offre en attente passe devant (19 octobre)
+Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.

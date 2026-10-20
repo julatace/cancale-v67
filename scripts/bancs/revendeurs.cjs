@@ -100,7 +100,9 @@ async function brancher(p){
   await p.waitForFunction(()=>document.querySelector('[data-stock-en-ligne]')?.dataset.stockEnLigne==='1');
   await p.evaluate(()=>document.fonts.ready);
   for(const zoom of [.65,1]){
-    await p.evaluate(z=>{document.documentElement.style.zoom=String(z);document.documentElement.style.minWidth='';document.documentElement.style.setProperty('--vrm-zoom',String(z));document.querySelector('main').scrollTop=0;},zoom);
+    await p.evaluate(z=>{localStorage.setItem('vrm_zoom',String(z));document.documentElement.style.zoom=String(z);document.documentElement.style.minWidth='';document.documentElement.style.setProperty('--vrm-zoom',String(z));document.querySelector('main').scrollTop=0;},zoom);
+    // Le graphique mesure sa largeur via ResizeObserver après le changement de densité.
+    await p.waitForFunction(()=>{const svg=document.querySelector('[data-courbe-semaine]');return svg&&Math.abs(Number(svg.getAttribute('width'))-svg.parentElement.clientWidth)<2;},null,{timeout:5000});
     await p.waitForTimeout(200);
     const bar=await p.locator('[data-barre-jour]').boundingBox(),recent=await p.locator('.vrm-day-recent').boundingBox(),stock=await p.locator('.vrm-day-stock').boundingBox();
     check(bar.y<160,'actions quotidiennes en haut à densité '+zoom);

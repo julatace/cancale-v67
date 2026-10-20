@@ -231,8 +231,9 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       //    répond agit ICI — la même priorité vaut donc aux deux tailles (le
       //    téléphone SANS extension est jugé par `pont.cjs`). (L'ancien contrôle
       //    « non lues d'abord » était rouge depuis longtemps : l'app trie par date.)
-      const attendu = ['303', '301', '402'];
-      dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
+      //    (19 octobre) Dans chaque groupe, une offre en attente passe devant (301).
+      const attendu = ['301', '303', '402'];
+      dit(JSON.stringify(liste.map((x) => x.id)) === JSON.stringify(attendu), 'le compte de Chrome d’abord (s’il peut agir), puis les offres en attente, puis les plus récentes', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
       // 7. (19 oct.) la paire, l'état, le dernier auteur, l'heure — sur chaque ligne.
       await r.pg.waitForTimeout(900);
@@ -251,6 +252,10 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const offL = await r.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => [x.getAttribute('data-conv'), { o: x.getAttribute('data-conv-offre'), p: (x.querySelector('[data-offre-liste]') || {}).innerText || null }])));
       dit(offL['301'] && offL['301'].o === '45' && /Offre 45\s?€ en attente/.test(offL['301'].p || ''), 'la ligne dit « Offre 45 € en attente » — le montant de l’OFFRE (l’annonce est à 59 €)', JSON.stringify(offL['301']));
       dit(offL['303'] && !offL['303'].o && !offL['303'].p && offL['402'] && !offL['402'].o, 'aucune pastille sur une conversation sans offre en attente', JSON.stringify({ a: offL['303'], b: offL['402'] }));
+      // (19 oct.) l'offre en attente passe DEVANT une conversation plus récente du même compte.
+      const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), c: x.getAttribute('data-conv-compte'), q: x.getAttribute('data-conv-quand') })));
+      const i301 = ordre.findIndex((x) => x.id === '301'), i303 = ordre.findIndex((x) => x.id === '303');
+      dit(i301 >= 0 && i303 >= 0 && i301 < i303, 'une conversation avec une offre en attente passe devant une plus récente sans offre', JSON.stringify(ordre));
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
