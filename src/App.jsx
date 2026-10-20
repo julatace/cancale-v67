@@ -7468,9 +7468,16 @@ const rejouerSaisies = () => {
   }
   return { n, prix, nonRejoue };
 };
+const RECHARGE_SANS_FICHES = 'vrm_recharge_sans_fiches';
 const rechargerEnGardantLesSaisies = () => {
   memoriserSaisies();
   try { const v = _verNum.nuage; if (v != null) sessionStorage.setItem('vrm_recharge_numerotation', String(v)); } catch (_) {}
+  // ⚠️ (20 octobre) Les FICHES de cet écran sont périmées — c'est pour ça qu'on
+  //    recharge. Sans ce drapeau, la fusion du chargement (18 octobre) gardait
+  //    leurs numéros (« fiche que le nuage ne connaît pas ») et le « 999 » tapé
+  //    sur l'écran périmé repartait au nuage. Les saisies, elles, sont rejouées
+  //    SANS numéro par `rejouerSaisies`. Le pool reste une union (toujours sûr).
+  try { sessionStorage.setItem(RECHARGE_SANS_FICHES, '1'); } catch (_) {}
   try { window.location.reload(); } catch (_) {}
 };
 // Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
@@ -45702,11 +45709,12 @@ function AppCoeur() {
         const verLocale = versionNumerotation();
         const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
         let ajoutsLocaux = 0;
+        let sansFiches = false; try { sansFiches = sessionStorage.getItem(RECHARGE_SANS_FICHES) === '1'; sessionStorage.removeItem(RECHARGE_SANS_FICHES); } catch (_) {}
         SYNC_KEYS.forEach(k => {
           if (k === 'vinted_accounts') return;
           if (cloud[k] === undefined || cloud[k] === null) return;
           let val = cloud[k];
-          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale) {
+          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale && !(sansFiches && k === 'vinted_annonce_numeros')) {
             let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
             const f = fusionNumerosAuChargement(k, val, loc);
             val = f.val; ajoutsLocaux += f.ajoute;

@@ -17,6 +17,7 @@
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
+import './_lib/sans-bruit.js';
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';

@@ -15,6 +15,7 @@
 // d'anonymisation / fingerprint : on ne cherche pas à masquer quoi que ce soit
 // à Vinted, juste à connecter un compte proprement depuis l'app.
 
+import './_lib/sans-bruit.js';
 import { withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
