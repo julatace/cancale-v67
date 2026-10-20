@@ -8,6 +8,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import { vendeurExige } from './_lib/session.js';
+
+// ⚠️ ANTI-ABUS (20 octobre) : cette route était PUBLIQUE, sans session — un
+// relais gratuit vers Nominatim et Overpass depuis l'adresse de Vercel, pour
+// n'importe qui sur internet. Mesuré : l'app ne l'appelle PLUS nulle part
+// (recherche par ville retirée, cf. src/App.jsx). Un abus coûtait deux fois :
+// des appels de fonction Vercel, et l'adresse de VRM bannie par Nominatim
+// (politique d'usage : un appel par seconde) — ce qui casserait aussi la ville
+// de la communauté. Elle exige maintenant une session VRM, et sa réponse n'est
+// plus mise en cache par le CDN (un cache public servirait sans session).
 
 const UA = { 'User-Agent': 'VRM/1.0 (points relais)' };
 
@@ -68,6 +78,7 @@ function carrierFromTags(t) {
 }
 
 export default async function handler(req, res) {
+  if (!(await vendeurExige(req, res))) return;
   let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;
   try {
@@ -112,8 +123,8 @@ export default async function handler(req, res) {
     }).filter(Boolean)
       // Casiers/points de transporteur d'abord (les plus pertinents), puis alpha.
       .sort((a, b) => (b.carrier ? 1 : 0) - (a.carrier ? 1 : 0) || a.nom.localeCompare(b.nom));
-    // Cache CDN 24h : la liste des commerces d'une ville bouge très peu.
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+    // Cache 24 h DANS LE NAVIGATEUR seulement (privé : la route exige une session).
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     res.status(200).json({ city, center: { lat: +g.lat, lon: +g.lon }, points });
   } catch (e) {
     res.status(200).json({ city, points: [], error: String(e) });
