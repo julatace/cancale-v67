@@ -61,7 +61,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.195.0';
+const EXT_ATTENDUE = '5.198.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -7468,9 +7468,16 @@ const rejouerSaisies = () => {
   }
   return { n, prix, nonRejoue };
 };
+const RECHARGE_SANS_FICHES = 'vrm_recharge_sans_fiches';
 const rechargerEnGardantLesSaisies = () => {
   memoriserSaisies();
   try { const v = _verNum.nuage; if (v != null) sessionStorage.setItem('vrm_recharge_numerotation', String(v)); } catch (_) {}
+  // ⚠️ (20 octobre) Les FICHES de cet écran sont périmées — c'est pour ça qu'on
+  //    recharge. Sans ce drapeau, la fusion du chargement (18 octobre) gardait
+  //    leurs numéros (« fiche que le nuage ne connaît pas ») et le « 999 » tapé
+  //    sur l'écran périmé repartait au nuage. Les saisies, elles, sont rejouées
+  //    SANS numéro par `rejouerSaisies`. Le pool reste une union (toujours sûr).
+  try { sessionStorage.setItem(RECHARGE_SANS_FICHES, '1'); } catch (_) {}
   try { window.location.reload(); } catch (_) {}
 };
 // Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
@@ -11918,6 +11925,13 @@ function LignePanne({ children }) {
 // non empaquetée » — et proposait de TÉLÉCHARGER un zip sur un téléphone, où il
 // ne sert à rien. La seule ligne vraie (« fais-le sur un ordinateur ») était en
 // tout petit, tout en bas.
+// Les clés d'une RÉPONSE D'ERREUR de Vinted (corps `{code, message,
+// message_code, errors, payload}`) : un échantillon de « dérive de forme » qui
+// n'a QUE celles-là est un refus, pas un renommage (voir État des connexions).
+const CLES_ERREUR_VINTED = new Set(['code', 'message', 'message_code', 'errors', 'payload']);
+function estCorpsErreurVinted(cles) {
+  return Array.isArray(cles) && cles.length > 0 && cles.includes('message_code') && cles.every(k => CLES_ERREUR_VINTED.has(String(k)));
+}
 function useSansSouris() {
   const lire = () => {
     try {
@@ -27673,6 +27687,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  // (20 oct.) « Aussi sur Leboncoin » = EN VENTE là-bas. Une paire marquée publiée
+  // dont la vente Leboncoin est PROUVÉE (la même règle que l'écran Leboncoin,
+  // `annoncesLbcVendues` → `doublesVenteLbc`) n'y est plus en vente : la pastille
+  // ne le dit plus (l'alerte « vendue sur Leboncoin, encore sur Vinted » le dit).
+  // Ventes illisibles ⇒ rien n'est retiré (pas su ≠ vendue).
+  const [lbcVentesAnn, setLbcVentesAnn] = useState(null);
+  const [lbcItemsAnn, setLbcItemsAnn] = useState(null);
+  const lbcAussi = React.useMemo(() => {
+    if (!lbcVentesAnn || !lbcPosted.size || !annoncesLbcVendues(lbcVentesAnn).size) return lbcPosted;
+    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: lbcPosted });
+    const ici = new Set(doublons.flatMap((d) => d.surVinted || []));
+    if (!ici.size) return lbcPosted;
+    return new Set([...lbcPosted].filter((id) => !ici.has(id)));
+  }, [lbcPosted, lbcVentesAnn, lbcItemsAnn, numeros]);
   // (16 oct.) Les N° des paires EN LIGNE sur eBay — par le SKU « VRM-{n°} »
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
@@ -27693,6 +27722,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const rows = await r.json();
       const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
+      if (!Array.isArray(ids) || !ids.length) return;
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      if (!vr.ok) return;
+      const vrows = await vr.json();
+      const ventes = (Array.isArray(vrows) && vrows[0] && vrows[0].ventes) || {};
+      setLbcVentesAnn(ventes);
+      if (annoncesLbcVendues(ventes).size) { const it = await lbcAnnoncesSession(); if (it) setLbcItemsAnn(it); }
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
@@ -30644,7 +30680,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
     for (const it of arr) {
       if (it.promoted === true) boostees++;
-      if (lbcPosted.has(String(it.id))) aussiLbc++;
+      if (lbcAussi.has(String(it.id))) aussiLbc++;
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
@@ -30663,7 +30699,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, listingDates, lbcPosted]);
+  }, [annBase, numeros, listingDates, lbcAussi]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
@@ -37061,7 +37097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const {it,price,sugg,why,atFloor} = rp;
                     const num = numeros[it.id]?.numero;
                     const eb = baisseEbayDe(rp);
-                    const surLbcAussi = lbcPosted.has(String(it.id));
+                    const surLbcAussi = lbcAussi.has(String(it.id));
                     return (
                       <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
                       <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
@@ -37286,7 +37322,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const achat = prixAchatDe(e, buyByNum);
             const boost = feesOf(e);
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
-            const ailleurs = lbcPosted.has(String(it.id));
+            const ailleurs = lbcAussi.has(String(it.id));
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
@@ -40326,6 +40362,28 @@ function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
 
+// <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
+// serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
+// n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
+// PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
+// prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
+// vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
+// une liste paginée — seulement sur une vente vue.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+function annoncesLbcVendues(ventes) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    if (v.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((v.parcelStatus || '') + ' ' + (v.stepStatus || '') + ' ' + (v.stepLabel || ''))) continue;
+    s.add(String(v.itemId));
+  }
+  return s;
+}
+function annonceLbcEnVente(ad, vendues) {
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+}
+// </lbc-en-vente-regle>
+
 // Les annonces Leboncoin captées (226 Ko mesurés le 4 octobre) : lues une fois
 // par session au plus pour le centre de notifications. `null` = pas su.
 let _lbcAnnoncesSession = null;
@@ -41182,7 +41240,6 @@ function LeboncoinScreen() {
     // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
     // côtés — la même règle que l'extension (`adRefKeys`, §11).
     const adKeys = (ad) => clesAnnonceLbc(ad, liens);
-    const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
     // ⚠️ ET ON NE GARDE QUE CE QU'ON PEUT LUI ATTRIBUER. Mesuré le 13 septembre :
     //    81 annonces rangées par la capture n'étaient pas les siennes (chalets,
     //    gîtes — le flux « découverte » de la page qu'il regardait). Sans ce
@@ -41195,8 +41252,8 @@ function LeboncoinScreen() {
     // Une annonce qu'il a VENDUE sur Leboncoin n'y est plus en vente : elle ne
     // compte ni « en ligne », ni « à retirer », ni « non reliée » — elle a son
     // propre bloc (vendue ici, encore sur Vinted ?).
-    const { vendusLbc } = doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros });
-    const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad) && !vendusLbc.has(String(ad.id)));
+    const vendusLbc = annoncesLbcVendues(ventesLbc);
+    const liveAds = lbcAds.filter(ad => annonceLbcEnVente(ad, vendusLbc) && aLui(ad));
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
     const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(cleNum(e.numero)); const m = numFrom(title || e.title); if (m) ks.push(cleNum(m)); return ks; };
@@ -44729,7 +44786,13 @@ function ConnexionsSetting() {
       const recents = Object.keys(rates)
         .filter(k => /^forme_/.test(k))
         .map(k => ({ type: k.slice('forme_'.length), ...(rates[k] || {}) }))
-        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; });
+        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; })
+        // 20 oct. : un échantillon dont les clés sont celles d'une RÉPONSE
+        // D'ERREUR de Vinted (`code`, `message`, `message_code`…) n'est pas un
+        // renommage : c'est un refus, jugé à tort comme une conversation par les
+        // extensions < 5.193 (mesuré chez Julien : 250 fausses alertes). On ne
+        // le montre pas comme « un site a changé son format ».
+        .filter(x => !estCorpsErreurVinted(x.cles));
       setDrift(recents);
     } catch (_) { setDerniereExt(null); setDrift(null); }
   })(); }, []);
@@ -45719,11 +45782,12 @@ function AppCoeur() {
         const verLocale = versionNumerotation();
         const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
         let ajoutsLocaux = 0;
+        let sansFiches = false; try { sansFiches = sessionStorage.getItem(RECHARGE_SANS_FICHES) === '1'; sessionStorage.removeItem(RECHARGE_SANS_FICHES); } catch (_) {}
         SYNC_KEYS.forEach(k => {
           if (k === 'vinted_accounts') return;
           if (cloud[k] === undefined || cloud[k] === null) return;
           let val = cloud[k];
-          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale) {
+          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale && !(sansFiches && k === 'vinted_annonce_numeros')) {
             let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
             const f = fusionNumerosAuChargement(k, val, loc);
             val = f.val; ajoutsLocaux += f.ajoute;

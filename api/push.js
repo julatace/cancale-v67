@@ -6,6 +6,7 @@
 //   POST { action:'test' }                   → envoie une notification d'essai
 // ────────────────────────────────────────────────────────────────────────────
 
+import './_lib/sans-bruit.js';
 import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';

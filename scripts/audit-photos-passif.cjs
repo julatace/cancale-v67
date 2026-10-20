@@ -38,7 +38,7 @@ const LISTINGS = [
   { id: 555, nPhotos: 5, is_closed: false, is_hidden: false },  // déjà 5/5 → complet
 ];
 
-function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOverride = null, detailKO = false, vraiGarde = false, store = {} } = {}) {
+function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOverride = null, detailKO = false, vraiGarde = false, store = {}, pageHtml = null } = {}) {
   const journal = { gets: [], ecrits: [] };
   const lignes = {
     [`harvest_${UID}_listings`]: { data: { payload: { items } } },
@@ -106,7 +106,8 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
   if (!vraiGarde) { ctx.garde = async () => gardeStop; ctx.gardeLecture = async () => gardeStop; }
   else { ctx.compteConnecte = async () => UID; }
   ctx.logActivity = async () => {};
-  ctx.noterDiag = async () => {};
+  journal.diag = [];
+  ctx.noterDiag = async (k) => { journal.diag.push(k); };
   ctx.echantillonRate = async () => {};
   // La porte vers Vinted : on COMPTE et on sert la PAGE de l'annonce (rendu
   // serveur, __NEXT_DATA__ avec TOUTES les photos) — c'est la vraie forme depuis
@@ -116,6 +117,7 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
     journal.gets.push(endpoint);
     const id = (endpoint.match(/items\/(\d+)/) || [])[1];
     if (detailKO) return { ok: false, status: 502, text: '' };
+    if (pageHtml) return { ok: true, status: 200, text: pageHtml(id) };
     const nb = { '111': 9, '222': 3, '333': 12, '555': 5 }[id] || 0;
     // La page porte aussi les CODES de la fiche (forme Vinted : ids numériques,
     // brand_dto, price objet) — c'est ce que la republication réutilisera.
@@ -234,6 +236,91 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
     const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)), codes: { catalog_id: 1242 } } } });
     await ctx.capterPhotosAnnonces(UID);
     dit(idsVus(ctx.__journal).length === 0, 'aucune lecture quand photos ET fiche sont déjà captées');
+  });
+
+
+  // ══ 6. 20 oct. (5.197) — MESURÉ CHEZ JULIEN : 650 pages lues, 650 « fiche
+  //   codes absents », `cles=` vide. La page ne porte plus `__NEXT_DATA__` : les
+  //   données de l'annonce arrivent dans `self.__next_f.push([1,"…"])`. Forme
+  //   servie ici : celle du routeur « app » de Next (données INVENTÉES).
+  const itemFlux = (id, nb) => ({ id: Number(id), title: 'Paire ' + id, description: 'desc flux ' + id, catalog_id: 1242, brand_dto: { id: 53, title: 'Nike' }, size_id: 789, status_id: 2, color1: { title: 'Blanc' },
+    photos: Array.from({ length: nb }, (_, i) => ({ id: 40000 + i, url: img(id, i), full_size_url: img(id, i) })) });
+  const pageFlux = (id) => {
+    const autre = itemFlux(99999, 2);                     // un AUTRE article sur la page (§5 : jamais lui)
+    const charge = '6:' + JSON.stringify(['$', 'div', null, { similaires: [autre] }]) + '\n7:' + JSON.stringify({ voisin: itemFlux(88888, 3), item: itemFlux(id, 4) }) + '\n';
+    const a = charge.slice(0, 40), b = charge.slice(40);   // le flux arrive en MORCEAUX
+    return '<!doctype html><html><body><script>self.__next_f.push([1,' + JSON.stringify(a) + '])</script>'
+      + '<script>self.__next_f.push([1,' + JSON.stringify(b) + '])</script></body></html>';
+  };
+  await essaie('page au format « flux Next » : la fiche et les photos de L\'ANNONCE sont lues', async () => {
+    const ctx = faireCtx({ items: [{ id: 222, nPhotos: 4, is_closed: false, is_hidden: false }], pageHtml: pageFlux });
+    await ctx.capterPhotosAnnonces(UID);
+    const r = photosRangees(ctx.__journal)['222'] || {};
+    dit(r.codes && r.codes.catalog_id === 1242 && r.codes.brand_id === 53, 'la fiche (catégorie, marque) est trouvée dans le flux', JSON.stringify(r.codes || null));
+    dit(Array.isArray(r.photos) && r.photos.length === 4 && r.photos.every((u) => /aa_222\//.test(u)), 'ses 4 photos, et aucune de l\'article voisin', ((r.photos || []).length) + ' photos');
+    dit(r.couleur === 'Blanc', 'la couleur affichée par Vinted est gardée', JSON.stringify(r.couleur));
+    dit(r.pageFormat === 'next_f' && ctx.__journal.diag.includes('fiche_format_next_f'), 'le format servi est NOTÉ (mesure pour la passe suivante)', r.pageFormat);
+  });
+
+  // ══ 7. BALAYAGE D'IMAGES : une image étrangère APRÈS les siennes ═════════
+  //   Mesuré : la même photo d'un autre fichier en position nPhotos+1 sur 29
+  //   annonces. Quand Vinted dit combien l'annonce en a, on n'en garde pas plus.
+  const pageHtmlSeule = (id) => '<html><body>' + [0, 1, 2].map((i) => '<img src="' + img(id, i) + '?s=x">').join('')
+    + '<img src="https://images1.vinted.net/t/zz_banniere/f800/b.webp?s=y"></body></html>';
+  await essaie('page sans données : au plus nPhotos photos, l\'image étrangère qui suit est écartée', async () => {
+    const ctx = faireCtx({ items: [{ id: 222, nPhotos: 3, is_closed: false, is_hidden: false }], pageHtml: pageHtmlSeule });
+    await ctx.capterPhotosAnnonces(UID);
+    const r = photosRangees(ctx.__journal)['222'] || {};
+    dit((r.photos || []).length === 3 && !(r.photos || []).some((u) => /zz_banniere/.test(u)), 'les 3 photos de l\'annonce, pas la bannière', JSON.stringify((r.photos || []).map((u) => u.split('/t/')[1].split('/')[0])));
+  });
+
+  // ══ 8. UNE PAGE DÉJÀ LUE ET RESTÉE INCOMPLÈTE N'EST PAS RELUE TOUTES LES 6 H
+  //   (650 lectures pour rien chez Julien, et les 17 freins 429 de Vinted).
+  const recent = new Date(Date.now() - 3600e3).toISOString();
+  const vieux = new Date(Date.now() - 4 * 864e5).toISOString();
+  await essaie('lue par la page il y a 1 h, sans fiche : pas relue', async () => {
+    const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)), pageAt: recent } } });
+    await ctx.capterPhotosAnnonces(UID);
+    dit(idsVus(ctx.__journal).length === 0, 'aucune lecture Vinted (elle a déjà donné tout ce qu\'elle avait)', idsVus(ctx.__journal).length + ' lue(s)');
+  });
+  await essaie('lue par la page il y a 4 jours, sans fiche : relue', async () => {
+    const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)), pageAt: vieux } } });
+    await ctx.capterPhotosAnnonces(UID);
+    dit(idsVus(ctx.__journal).includes('555'), 'elle est relue (nouvel essai borné)');
+  });
+  await essaie('aucune photo captée : lue même si une lecture récente a échoué', async () => {
+    const ctx = faireCtx({ items: [{ id: 222, nPhotos: 3, is_closed: false, is_hidden: false }], dejaPhotos: { '222': { photos: [], pageAt: recent } } });
+    await ctx.capterPhotosAnnonces(UID);
+    dit(idsVus(ctx.__journal).includes('222'), 'une annonce sans aucune photo n\'attend pas 3 jours');
+  });
+
+  // ══ 9. UNE PHOTO QUI N'EST À AUCUNE ANNONCE (§5, par identité de fichier) ═
+  await essaie('retirerPhotosEtrangeres : un fichier dans 3 annonces aux couvertures différentes part', async () => {
+    const ctx = faireCtx({});
+    const et = 'https://images1.vinted.net/t/ET_tranger/f800/e.webp?s=1';
+    const carte = {
+      '1': { photos: [img(1, 0), img(1, 1), et] }, '2': { photos: [img(2, 0), et, img(2, 1)] }, '3': { photos: [img(3, 0), et] },
+      // deux annonces de la MÊME paire (mêmes photos, même couverture) : rien ne bouge
+      '4': { photos: [img(4, 0), img(4, 1)] }, '5': { photos: [img(4, 0), img(4, 1)] },
+    };
+    const n = ctx.retirerPhotosEtrangeres(carte);
+    dit(n === 3 && !JSON.stringify(carte).includes('ET_tranger'), 'les 3 copies de l\'image étrangère sont retirées', 'retirées : ' + n);
+    dit(carte['4'].photos.length === 2 && carte['5'].photos.length === 2 && carte['1'].photos[0] === img(1, 0), 'la couverture et les photos d\'une paire en double restent');
+    const carte2 = { 'a': { photos: [img(7, 0), et] }, 'b': { photos: [img(8, 0), et] } };
+    dit(ctx.retirerPhotosEtrangeres(carte2) === 0, 'présent dans 2 annonces seulement : on ne tranche pas (mieux vaut un blanc qu\'un faux)');
+    const carte3 = { 'a': { photos: [et, img(7, 1)] }, 'b': { photos: [img(8, 0), et] }, 'c': { photos: [img(9, 0), et] }, 'd': { photos: [img(10, 0), et] } };
+    dit(ctx.retirerPhotosEtrangeres(carte3) === 0, 'un fichier qui est la COUVERTURE d\'une annonce n\'est jamais étranger');
+  });
+  await essaie('l\'écriture du panneau nettoie la ligne entière et garde la fiche de la page', async () => {
+    const et = 'https://images1.vinted.net/t/ET_tranger/f800/e.webp?s=1';
+    const ctx = faireCtx({ dejaPhotos: {
+      '1': { photos: [img(1, 0), et] }, '2': { photos: [img(2, 0), et] }, '3': { photos: [img(3, 0), et] },
+      '9': { photos: [img(9, 0)], codes: { catalog_id: 1242 }, pageAt: recent },
+    } });
+    await ctx.saveItemDetailMaintenant('9', { description: 'neuve', photos: [img(9, 0), img(9, 1)] });
+    const r = photosRangees(ctx.__journal);
+    dit(r['9'] && r['9'].codes && r['9'].codes.catalog_id === 1242 && r['9'].pageAt === recent, 'la fiche lue sur la page n\'est plus effacée par une lecture du panneau', JSON.stringify(r['9'] && r['9'].codes));
+    dit(!JSON.stringify(r).includes('ET_tranger'), 'et l\'image étrangère des annonces 1-3 est partie de la ligne');
   });
 
   console.log(`\n${ko ? '❌ ' + ko + ' rouge(s)' : '✅ tout vert'} · ${ok} contrôle(s)`);

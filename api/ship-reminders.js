@@ -16,6 +16,7 @@
 //   Supabase et envoie une notification. Déclenché par le cron Vercel (vercel.json).
 // ────────────────────────────────────────────────────────────────────────────
 
+import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { semainePassee, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de

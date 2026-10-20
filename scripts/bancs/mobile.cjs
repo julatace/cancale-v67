@@ -51,6 +51,9 @@ async function brancher(p){
     return r.abort();
   });
 }
+// ⚠️ (20 octobre) Au téléphone, le menu de tous les écrans s'ouvre par le bouton « Gestion » de la barre du bas
+//    (`vrm-nav-more`, aria-label « Gestion » depuis le design de Julien du 19 octobre) ; l'en-tête n'en porte plus.
+const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
 (async()=>{
  let b;
  try{
@@ -76,7 +79,10 @@ async function brancher(p){
       check(geometrie.nav.bottom<=844.5&&geometrie.main.bottom<=geometrie.nav.top+.5,largeur+' '+tab+' navigation hors du contenu');
       if(tab==='cat_ventes'){
         await p.locator('.vrm-sale-row').first().waitFor();
-        {const lg=(await p.locator('.vrm-sale-photo').first().boundingBox()).width;check(lg>=52&&lg<=64,largeur+' photo de vente compacte ('+lg+' px)');}
+        // ⚠️ (20 octobre) La vente est REPLIÉE depuis fc4c73e/5cdffcb (design de Julien) : on l'ouvre au doigt,
+        //    et la vignette du détail a la taille du design (36 px de large au téléphone, comme compact.cjs).
+        await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().tap();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});
+        {const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg===36,largeur+' photo de vente compacte ('+lg+' px)');}
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');
@@ -85,12 +91,12 @@ async function brancher(p){
         check(await p.getByRole('button',{name:'7 derniers jours',exact:true}).isVisible(),largeur+' période secondaire sélectionnable');
       }
     }
-    await p.getByRole('button',{name:'Tous les écrans',exact:true}).tap();
+    await menuEcrans(p).tap();
     await p.getByRole('menuitem',{name:'Colis',exact:true}).waitFor();
     check(await p.getByRole('menu').getByText('Gestion',{exact:true}).isVisible(),largeur+' menu: gestion regroupée');
     await p.keyboard.press('Escape');
-    check(await p.getByRole('button',{name:'Tous les écrans',exact:true}).evaluate(e=>e===document.activeElement),largeur+' menu: retour du focus');
-    await p.getByRole('button',{name:'Tous les écrans',exact:true}).tap();await p.getByRole('menuitem',{name:'Réglages',exact:true}).tap();check(await p.getByText("Taille de l'affichage",{exact:true}).isVisible(),largeur+' réglages accessibles depuis le menu');
+    check(await menuEcrans(p).evaluate(e=>e===document.activeElement),largeur+' menu: retour du focus');
+    await menuEcrans(p).tap();await p.getByRole('menuitem',{name:'Réglages',exact:true}).tap();check(await p.getByText("Taille de l'affichage",{exact:true}).isVisible(),largeur+' réglages accessibles depuis le menu');
     const champs=p.locator('main input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])');
     check((await champs.evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().height>0).every(e=>parseFloat(getComputedStyle(e).fontSize)>=16))),largeur+' champs lisibles sans zoom automatique');
     await p.getByRole('button',{name:'Voir la synchronisation'}).tap();
@@ -114,7 +120,7 @@ async function brancher(p){
     await ctx.close();
   }
   const ctx=await b.newContext({viewport:{width:1512,height:950}});const p=await ctx.newPage();await brancher(p);await p.addInitScript(()=>localStorage.setItem('vrm_zoom','1'));await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();
-  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');{const lg=(await p.locator('.vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine ('+lg+' px)');};
+  check((await p.getByRole('navigation',{name:'Navigation principale'}).count())===1,'ordinateur: une seule navigation');check(await p.getByRole('button',{name:'Paramètres',exact:true}).isVisible(),'ordinateur: paramètres toujours accessibles (bas du rail)');await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});{const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg>=64&&lg<=88,'ordinateur: photo de vente pleine, vente ouverte ('+lg+' px)');};
   // (17 oct.) Le rail n'a plus de groupes repliés : Gestion est toujours visible, Factures vit dans Comptabilité.
   const rail=p.locator('.vrm-atelier-rail');
   check(await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');

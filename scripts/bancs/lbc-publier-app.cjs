@@ -121,7 +121,8 @@ async function ouvrir(b, vp, pont) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.addInitScript(PONT, Object.assign({}, pont, { etatCode: auMoins(pont.version, CODE_DANS_ETAT) ? { code: pont.version, ext: 'banc-ext' } : {} }));
+  if (pont) await pg.addInitScript(PONT, Object.assign({}, pont, { etatCode: auMoins(pont.version, CODE_DANS_ETAT) ? { code: pont.version, ext: 'banc-ext' } : {} }));
+  else await pg.addInitScript(() => { window.__cmds = []; });   // aucune extension ici (un iPhone)
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (rt) => {
     const u = rt.request().url();
     const m = /images1\.vinted\.net\/t\/0(\d)_banc/.exec(u);
@@ -250,12 +251,25 @@ const lireFiche = (pg) => pg.evaluate(() => {
     });
     console.log('── 390 px · téléphone (sans souris)');
     await essaie('H', async () => {
-      const { ctx, pg } = await ouvrir(b, { width: 390, height: 844, tactile: true }, { version: EXT_ATTENDUE, suite: 'fait' });
+      // ⚠️ (20 octobre) Depuis la 5.188, un téléphone dont l'extension RÉPOND
+      //    (Firefox pour Android) agit ici : le téléphone qui ne publie pas est
+      //    celui SANS extension (un iPhone), et c'est lui que H rend. L'autre
+      //    sens (H2) : avec l'extension qui répond, la fiche s'ouvre.
+      const { ctx, pg } = await ouvrir(b, { width: 390, height: 844, tactile: true }, null);
       const etat = await pg.evaluate(() => document.querySelector('[data-bouton-publier]').getAttribute('data-bouton-publier'));
       await pg.click('[data-bouton-publier] button', { force: true });
       await pg.waitForTimeout(400);
       const h = await pg.evaluate(() => ({ fiche: !!document.querySelector('[data-fiche-lbc]'), refus: (document.querySelector('[data-refus-publier]') || {}).innerText || '', cmds: window.__cmds.length }));
-      dit(etat === 'grise' && !h.fiche && /ordinateur/.test(h.refus) && h.cmds === 0, 'H · sur un téléphone : bouton grisé, « depuis ton ordinateur » — aucune fiche qui ne pourrait pas partir, rien n’est envoyé', JSON.stringify({ etat, ...h }));
+      dit(etat === 'grise' && !h.fiche && /ordinateur/.test(h.refus) && h.cmds === 0, 'H · sur un téléphone SANS extension : bouton grisé, « depuis ton ordinateur » — aucune fiche qui ne pourrait pas partir, rien n’est envoyé', JSON.stringify({ etat, ...h }));
+      await ctx.close();
+    });
+    await essaie('H2', async () => {
+      const { ctx, pg } = await ouvrir(b, { width: 390, height: 844, tactile: true }, { version: EXT_ATTENDUE, suite: 'fait' });
+      const etat = await pg.evaluate(() => document.querySelector('[data-bouton-publier]').getAttribute('data-bouton-publier'));
+      await pg.click('[data-bouton-publier] button', { force: true });
+      await pg.waitForSelector('[data-fiche-lbc]', { timeout: 5000 }).catch(() => {});
+      const fiche = await pg.evaluate(() => !!document.querySelector('[data-fiche-lbc]'));
+      dit(etat !== 'grise' && fiche, 'H2 · téléphone dont l’extension répond (Firefox pour Android) : le bouton agit, la fiche s’ouvre', JSON.stringify({ etat, fiche }));
       await ctx.close();
     });
     const ancienne = '5.181.0';

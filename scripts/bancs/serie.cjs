@@ -41,15 +41,17 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   await pg.waitForTimeout(4000);
   // (30 sept.) Sans aucun prix d'achat, la case « Coût d'achat » se tait et c'est
   // « Bénéfice estimé — » qui ouvre la saisie : une absence, une case (§7).
-  const PORTE=/Coût d'achat|Bénéfice estimé/i;
+  // (20 oct.) La case s'appelle « Bénéfice » (« — ») depuis la carte brut/net du 19 octobre ; on la reconnaît à
+  // ce qu'elle FAIT (son titre « … prix d'achat, paire par paire »), pas à son seul libellé.
+  const PORTE=/Coût d'achat|Bénéfice/i;
   // Les totaux vivent dans « Analyse de tes ventes » (repliée par défaut).
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Analyse de tes ventes/.test(x.textContent)&&/voir/.test(x.textContent)); if(b) b.click();});
   await pg.waitForTimeout(600);
-  const n=await pg.evaluate((src)=>{const re=new RegExp(src,'i');return [...document.querySelectorAll('button')].filter(b=>re.test(b.textContent)).length;}, PORTE.source);
+  const n=await pg.evaluate((src)=>{const re=new RegExp(src,'i');return [...document.querySelectorAll('button')].filter(b=>re.test(b.textContent)&&/prix d'achat/i.test(b.title||'')).length;}, PORTE.source);
   dit(n>0, 'la case qui ouvre la saisie des prix d\'achat (« Coût d\'achat » ou « Bénéfice estimé ») est cliquable sur l\'écran Ventes', n+' trouvée(s)');
   if(!n){ await pg.screenshot({path:SC+'/s-ventes.png'}); await b.close(); srv.close(); process.exit(1); }
   const t0=Date.now();
-  await pg.evaluate((src)=>{const re=new RegExp(src,'i');[...document.querySelectorAll('button')].find(b=>re.test(b.textContent)).click();}, PORTE.source);
+  await pg.evaluate((src)=>{const re=new RegExp(src,'i');[...document.querySelectorAll('button')].find(b=>re.test(b.textContent)&&/prix d'achat/i.test(b.title||'')).click();}, PORTE.source);
   for(let i=0;i<300;i++){ const ok=await pg.evaluate(()=>/Prix d'achat à compléter|prix d'achat/i.test(document.body.innerText||'')&&document.querySelectorAll('input').length>20); if(ok) break; await pg.waitForTimeout(20); }
   // ⚠️ PLANCHER MESURÉ. Avant `prepAchat`, la modale comparait 288 paires ×
   // 544 achats en ré-épluchant le titre à chaque fois — **3 530 ms** pour
@@ -111,7 +113,11 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // un tap sur une suggestion
   const avant=ecrits.length;
   const sugg=await pg.evaluate(()=>{
-    const b=[...document.querySelectorAll('button')].filter(x=>/€/.test(x.textContent)&&/Adidas|Nike|Salomon|Baskets/i.test(x.textContent));
+    // ⚠️ (20 oct.) Chercher « un bouton avec € et une marque » sur toute la page attrapait la LIGNE DE VENTE repliée
+    //    de l'écran derrière la modale (« N°25 · adidas spezial… 54 € ⋯ », 5cdffcb) : le banc cliquait une vente, pas
+    //    une suggestion. On ne prend qu'un bouton « C'est ça » rendu DANS une ligne de la saisie en série.
+    const ligne=inp=>{ let n=inp; while(n.parentElement && n.parentElement.querySelectorAll('[data-fillbuy]').length===1) n=n.parentElement; return n; };
+    const b=[...document.querySelectorAll('[data-fillbuy]')].map(ligne).flatMap(n=>[...n.querySelectorAll('button')]).filter(x=>/C'est [çc]a/i.test(x.innerText||''));
     if(!b.length) return null; const t=b[0].textContent.trim().slice(0,70); b[0].click(); return t;
   });
   await pg.waitForTimeout(3000);
