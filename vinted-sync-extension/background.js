@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.194.0';
+const CODE_VERSION = '5.195.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2027,8 +2027,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
           // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
-          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); sendResponse({ ok: true }); return; }
-          if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); try { await noterSessionLbc(String(msg.userId).slice(0, 64)); } catch (_) {} sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { try { await noterComptesLies(msg.comptes); } catch (_) {} await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
           // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
           // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
           // vraie mécanique de l'uploader Leboncoin (blob ? http ? multiple ?),
@@ -7945,6 +7945,13 @@ function comptesLbcProuves(ventes, items) {
   }
   return s;
 }
+// 5.195 : un compte dont la SESSION a été vue dans son navigateur (`sessionAt`)
+// est le sien aussi (même règle que `comptesLbcSession` dans l'app, §11).
+function comptesLbcSession(accounts) {
+  const s = new Set();
+  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
+  return s;
+}
 function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }
 // Une vente Leboncoin annulée ne fait pas partir la paire (même règle que
 // `lbcAnnulee` dans l'app).
@@ -7954,14 +7961,16 @@ const venteLbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|ref
 // répondu sur les annonces. Une lecture ratée des VENTES n'attribue rien de plus
 // (on retombe sur la règle d'avant) — jamais l'inverse.
 async function lireLbcAnnonces() {
-  const [rows, vRows] = await Promise.all([
+  const [rows, vRows, aRows] = await Promise.all([
     sbGet('app_data?id=eq.lbc_listings&select=data'),
     sbGet('app_data?id=eq.lbc_ventes&select=data'),
+    sbGet('app_data?id=eq.lbc_accounts&select=data'),
   ]);
   if (rows === null) return { ok: false, ligne: false, items: [] };
   const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
   const ventes = (vRows && vRows[0] && vRows[0].data && vRows[0].data.ventes) || {};
-  const prouves = comptesLbcProuves(ventes, items);
+  const accs = (aRows && aRows[0] && aRows[0].data && aRows[0].data.accounts) || {};
+  const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession(accs)]);
   const vendus = new Set(Object.values(ventes).filter((v) => v && v.isSeller === true && v.itemId != null && !venteLbcAnnulee(v)).map((v) => String(v.itemId)));
   return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && !vendus.has(String(ad.id))) };
 }
@@ -8720,9 +8729,13 @@ async function storeLbcAccount(acc) {
     //    `linked_accounts`, ne matche pas et reste.
     for (const id of Object.keys(merged)) {
       const s = merged[id] && merged[id].source;
-      if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
+      if (s && LBC_URL_AUTRUI.test(String(s)) && !merged[id].sessionAt) delete merged[id];
     }
-    { const { courant: _c, ...sansCourant } = acc; merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], sansCourant, { seenAt: new Date().toISOString() }); }
+    { const { courant: _c, session: _s, ...sansCourant } = acc; const nowIso = new Date().toISOString();
+      const ancien = merged[String(acc.id)] || {};
+      // Une entrée de SESSION garde sa source d'avant si elle en avait une « moi »
+      // (on ne remplace pas un nom lu par une source sans nom).
+      merged[String(acc.id)] = Object.assign({}, ancien, sansCourant, { seenAt: nowIso }, acc.session === true ? { sessionAt: nowIso } : {}); }
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
@@ -8734,6 +8747,79 @@ async function storeLbcAccount(acc) {
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
     noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
+}
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ LE COMPTE LEBONCOIN CONNECTÉ, ENFIN LU (20 octobre, 5.195). Julien : « il
+//    capte pas les bonnes données ni le bon compte ». MESURÉ sur sa base (lecture
+//    seule) : il a DEUX comptes Leboncoin — `Totomondu` (8442c3e8…, particulier,
+//    ses 10 annonces de baskets) et `SHOPCANCALE` (faf3fbba…, pro). Connecté sur
+//    Totomondu à 11:14, la base disait « SHOPCANCALE, particulier » :
+//    · `members/me/account` (la seule source « session » de la 5.186) a la forme
+//      `{account:{account_id,type}, member:{account_id, first_name, nickname:{value}}}`
+//      — aucun couple id + nom que `detectLbcAccount` sache lire : le compte de
+//      session n'a JAMAIS été reconnu, donc `vrmLbcCompte` jamais posé, donc
+//      « mes annonces » (`myads`) jamais rangées sans réf VRM ;
+//    · `users/me/linked_accounts` liste les AUTRES comptes liés (connecté sur
+//      Totomondu, il rend SHOPCANCALE seul), et `is_business_user` n'était pas lu
+//      ⇒ SHOPCANCALE rangé « particulier » alors qu'il est pro.
+// ⇒ L'identité de la session : le compteur de messagerie
+//   `messaging/proxy/api/hal/{userId}/counter` — la page ne le relit QUE pour le
+//   compte connecté (mesuré : 8442c3e8 à 11:16, pendant que linked_accounts
+//   listait faf3fbba ; et le compteur de faf3fbba quand il était sur le compte
+//   pro). Garde : un id présent dans la dernière liste des comptes LIÉS n'est
+//   jamais pris pour la session (c'est un autre compte). Le NOM ne vient que
+//   d'une fiche dont l'`user_id` est EXACTEMENT celui de la session
+//   (`user-card/v2/{id}/infos`) ou d'une entrée déjà connue sous cet id — jamais
+//   d'un titre, jamais d'une fréquence (§5). Nom pas encore lu ⇒ id seul.
+const LBC_LIES_MS = 12 * 3600e3;
+async function noterComptesLies(comptes) {
+  const ids = (comptes || []).map((c) => String((c && c.id) || '')).filter(Boolean).slice(0, 10);
+  if (!ids.length) return;
+  try { await chrome.storage.local.set({ vrmLbcLies: { ids, at: Date.now() } }); } catch (_) {}
+  // Le compte de session courant ne peut pas être dans sa propre liste de
+  // comptes liés : s'il y est, ce qu'on croyait la session ne l'est plus.
+  try {
+    const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte;
+    if (c && c.v === 2 && c.id && ids.includes(String(c.id))) await chrome.storage.local.remove('vrmLbcCompte');
+  } catch (_) {}
+}
+function typeLbcDe(v) {
+  const t = String(v == null ? '' : v);
+  if (v === true || /^pro|business|company|store/i.test(t)) return 'pro';
+  if (v === false || /^(part|priv|individual|personal)/i.test(t)) return 'particulier';
+  return '';
+}
+async function noterSessionLbc(userId, ident) {
+  const id = String(userId || '').trim();
+  if (!/^[0-9a-f-]{8,64}$/i.test(id)) return false;
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmLbcLies', 'vrmLbcCompte', 'vrmLbcSessionEcrit']); } catch (_) { return false; }
+  const lies = local.vrmLbcLies;
+  if (lies && Array.isArray(lies.ids) && Date.now() - Number(lies.at || 0) < LBC_LIES_MS && lies.ids.includes(id)) { noterDiag('lbc_session_compte_lie'); return false; }
+  const avant = local.vrmLbcCompte;
+  const meme = !!(avant && avant.v === 2 && String(avant.id) === id);
+  let name = (ident && ident.name) || (meme ? String(avant.name || '') : '');
+  let type = (ident && ident.type) || (meme ? String(avant.type || '') : '');
+  // Un nom déjà rangé SOUS CET ID (une fiche à son id, une capture d'avant).
+  if (!name || !type) {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+      const a = rows && rows[0] && rows[0].data && rows[0].data.accounts && rows[0].data.accounts[id];
+      if (a && !(a.source && LBC_URL_AUTRUI.test(String(a.source)) && !a.sessionAt)) { name = name || String(a.name || ''); type = type || String(a.type || ''); }
+    } catch (_) {}
+  }
+  const neuf = { v: 2, id, name, type, at: Date.now(), source: 'compteur' };
+  try { await chrome.storage.local.set({ vrmLbcCompte: neuf }); } catch (_) {}
+  // Écrit dans `lbc_accounts` au changement de compte, à un nom/type appris, ou
+  // toutes les 6 h — jamais à chaque relevé du compteur.
+  const e = local.vrmLbcSessionEcrit || {};
+  if (e.id === id && e.name === name && e.type === type && Date.now() - Number(e.at || 0) < 6 * 3600e3) return true;
+  const acc = { id, session: true, platform: 'leboncoin', source: 'session:messagerie' };
+  if (name) acc.name = name;
+  if (type) acc.type = type;
+  await storeLbcAccount(acc);
+  try { await chrome.storage.local.set({ vrmLbcSessionEcrit: { id, name, type, at: Date.now() } }); } catch (_) {}
+  return true;
 }
 // RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout
 // de corps) pour brancher l'extraction au millimètre. Ligne dédiée lbc_recon.
@@ -9262,7 +9348,7 @@ function detectLbcAccount(data, url) {
   // d'autrui (voir le bloc ci-dessus). Sinon on ne prend rien.
   if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
-    || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
+    || o.siren || o.siret || o.is_pro != null || o.is_business_user != null || o.store_id || o.storeId || o.company_name);
   const session = LBC_URL_SESSION.test(u);
   const walk = (node, depth, key, dansListe) => {
     if (best || !node || depth > 8 || typeof node !== 'object') return;
@@ -9272,7 +9358,10 @@ function detectLbcAccount(data, url) {
       || node.pseudo || node.pseudonym || node.name || node.display_name || node.displayName;
     const cleMoi = /^(user|account|store|owner|me|profile|pro|seller|self|current)/i.test(String(key || ''));
     if (id && name && (marqueurMoi(node) || (cleMoi && (node.pseudo || node.pseudonym || node.email)))) {
-      const pro = !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
+      // 5.195 : `linked_accounts` dit `is_business_user` (mesuré) — c'est LUI qui
+      // tranche quand il est présent (SHOPCANCALE était rangé « particulier »).
+      const pro = typeof node.is_business_user === 'boolean' ? node.is_business_user
+        : !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
       best = { id: String(id), name: String(name), type: pro ? 'pro' : 'particulier', platform: 'leboncoin', source: String(url || '').slice(0, 120) };
       if (session && !dansListe) best.courant = true;
       return;
@@ -9294,7 +9383,7 @@ async function comptesMiens() {
   try {
     const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const accs = (rows && rows[0] && rows[0].data && rows[0].data.accounts) || {};
-    for (const id in accs) { const src = accs[id] && accs[id].source; if (!src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
+    for (const id in accs) { const src = accs[id] && accs[id].source; if ((accs[id] && accs[id].sessionAt) || !src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
   } catch (_) {}
   return s;
 }
@@ -9389,7 +9478,15 @@ async function handleLbcRaw(url, body) {
   //    Compte de session inconnu ⇒ on ne tague rien (blanc plutôt que faux, §5).
   const listeMoi = /\/adfinder\/v\d+\/myads\b/i.test(String(url || ''));
   let sess = null;
-  if (listeMoi) { try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {} }
+  try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {}
+  // 5.195 : la fiche publique DU compte de session (même id, exactement) donne
+  // son nom et son type. Jamais celle d'un autre id (§5).
+  { const m = /\/user-card\/v\d+\/([0-9a-f-]{8,64})\/infos/i.exec(String(url || ''));
+    if (m && sess && String(m[1]) === String(sess.id) && data && String(data.user_id || '') === String(sess.id) && data.name) {
+      try { await noterSessionLbc(sess.id, { name: String(data.name).slice(0, 60), type: typeLbcDe(data.account_type) }); } catch (_) {}
+      return;
+    } }
+  if (sess) miens.add(String(sess.id));
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -9435,9 +9532,9 @@ async function handleLbcRaw(url, body) {
         //    compte connecté. On les tague pour relier chaque paire à SON compte
         //    Leboncoin (il en aura plusieurs) — sans compte détecté, on laisse
         //    vide (mieux vaut un blanc qu'un faux, §5).
-        account: acct ? acct.id : null,
-        accountName: acct ? acct.name : null,
-        accountType: acct ? acct.type : null,
+        account: acct ? acct.id : (sess ? String(sess.id) : null),
+        accountName: acct ? acct.name : (sess ? (String(sess.name || '') || null) : null),
+        accountType: acct ? acct.type : (sess ? (String(sess.type || '') || null) : null),
         platform: 'leboncoin',
       });
     }

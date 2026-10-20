@@ -10247,6 +10247,50 @@ de cartes personnalisables n'existait : un réglage dédié.
 - ⚠️ **Les commandes eBay ne se relisent que sur synchro** (Compte eBay → Rafraîchir, ou la relecture des 6 h quand une règle d'offre est posée) tant que K5 (VRM fermé, migrations 014 + 015) n'existe pas : Colis dit leur âge.
 - Preuves : `audit-ebay-colis.cjs` (règle + vraies routes widget et rappel, 9 rouges sur 65eec06, 3 mutations rouges) ; banc `ebay-colis.cjs` (`BANC_PORT`, 390/1512, 28 rouges sur le build de 65eec06, mutation « Ma journée sans eBay » rouge). Aucun appel réel à eBay ; formes de l'API Fulfillment tirées de la doc.
 
+### Leboncoin : le compte connecté lu sur le compteur de messagerie (20 octobre, 5.195)
+Julien : « pour Leboncoin il capte pas les bonnes données ni le bon compte ».
+**Mesuré (lecture seule, extension installée 5.194)** : il a DEUX comptes
+Leboncoin — un **particulier** (ses 10 annonces de baskets, 3 avec réf VRM) et un
+**pro** (`SHOPCANCALE`). Connecté sur le particulier (compteur de messagerie relevé
+à 11:16), `lbc_accounts` ne contenait QUE le pro, rangé « particulier », venu de
+`linked_accounts` ; « dernier vu » dans la fiche Leboncoin nommait donc le mauvais
+compte, Messages Leboncoin affichait « Compte Leboncoin » sans nom pour le vrai,
+et ses annonces sans réf VRM n'étaient plus rafraîchies depuis le 20 septembre
+(3 d'entre elles, vendues sur Leboncoin, encore « active » en base).
+- **Causes (code actuel, pas la version installée)** : `members/me/account` (seule
+  source « session » de la 5.186) a la forme `{account:{account_id,type},
+  member:{account_id, nickname:{value}, contact:{email}}}` — aucun couple id + nom
+  lisible : la session n'a JAMAIS été reconnue, `vrmLbcCompte` jamais posé,
+  `myads` jamais rangé sans réf ; `linked_accounts` = les AUTRES comptes liés, et
+  `is_business_user` n'était pas lu.
+- **La session = le compteur `messaging/proxy/api/hal/{userId}/counter`** (relu par
+  la page pour le seul compte connecté — mesuré dans les deux sens). Garde : un id
+  présent dans la dernière liste des comptes liés (`vrmLbcLies`, 12 h) n'est jamais
+  la session. Nom et type : seulement la fiche `user-card/v2/{id}/infos` dont
+  `user_id` = l'id de session, ou une entrée déjà rangée sous cet id. Changer de
+  compte efface le nom d'avant (`noterSessionLbc`). Écrit dans `lbc_accounts` avec
+  `sessionAt`, au changement, à un nom appris, sinon toutes les 6 h.
+- `is_business_user` tranche pro/particulier (`detectLbcAccount`). Les ads de
+  `myads` et du tableau pro sont taguées du compte de session ; inconnu ⇒ rien.
+- **Une règle des deux côtés (§11)** : un compte à `sessionAt` est à lui
+  (`comptesLbcSession`, app + extension), comme un compte prouvé par une vente.
+  L'app : la fiche dit « connecté en dernier : X, pro/particulier »
+  (`compteLbcConnecte`, jamais le dernier vu), la liste des comptes compte les
+  annonces par `account` (elle comptait `lbcUser`, donc 0), Messages nomme le type.
+- Preuves : `audit-lbc-session.cjs` (formes réelles, données inventées, le vrai
+  `background.js` à état) **8 rouges sur origin/main**, 0 après ; 3 mutations
+  (garde des comptes liés, fiche d'un autre id, règle de session des files) ⇒ rouges.
+- ⚠️ **Non mesuré / non corrigé** : que le compteur ne soit jamais relevé pour un
+  compte lié (mesuré deux fois, pas prouvé) ; `account.account_id` de
+  `members/me/account` vs `user_id` (pas lu exprès) ; une bascule de compte dans
+  le même onglet où `myads` arrive avant le nouveau compteur taguerait l'ancien
+  compte ; les annonces disparues de `myads` restent « active » (pas de jugement
+  sur une liste paginée) ; `lbc_ventes` toujours sans date de vente et pas relues
+  depuis le 7 octobre ; `lbc_recon.paths` plein (300/300 : les chemins neufs ne
+  s'ajoutent plus).
+- **Geste de Julien** : installer la 5.195, puis ouvrir leboncoin.fr → « Mes
+  annonces » sur CHACUN de ses deux comptes, et « Mes transactions » une fois.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
