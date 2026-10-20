@@ -1,132 +1,261 @@
-# Publier l'extension VRM partout où elle peut tourner (5.188)
+# Publier l'extension VRM partout où elle peut tourner (5.188 → 5.198)
 
-Deux paquets suffisent pour tous les navigateurs qui acceptent les extensions :
+Trois paquets couvrent tous les navigateurs qui acceptent des extensions :
 
 ```
-node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zip
+node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zip --safari VRM-safari.zip
 ```
 
-| navigateur | ordinateur | téléphone | paquet | boutique |
+| navigateur | ordinateur | téléphone | paquet | où il s'installe |
 |---|---|---|---|---|
-| **Chrome** | ✅ | ❌ (Chrome mobile n'accepte aucune extension) | `VRM-chromium.zip` | Chrome Web Store |
-| **Edge** | ✅ | ❌ pas encore pour tout le monde | `VRM-chromium.zip` | Microsoft Edge Add-ons |
-| **Brave** | ✅ | ❌ | — | il installe depuis le Chrome Web Store |
+| **Chrome** | ✅ | ❌ Chrome mobile n'accepte aucune extension | `VRM-chromium.zip` | Chrome Web Store |
+| **Edge** | ✅ | ❌ catalogue choisi par Microsoft | `VRM-chromium.zip` | Microsoft Edge Add-ons |
+| **Brave**, **Arc**, **Vivaldi** | ✅ | ❌ | `VRM-chromium.zip` | ils installent depuis le Chrome Web Store |
 | **Opera** | ✅ | ❌ | `VRM-chromium.zip` | Opera Add-ons |
-| **Firefox** | ✅ | ✅ **Android** (Firefox 128 et plus) | `VRM-firefox.zip` | addons.mozilla.org |
-| **Samsung Internet** | — | ❌ programme d'extensions fermé (Galaxy Store, développeurs choisis par Samsung) | — | — |
-| **Orion** (Kagi, Mac et iPhone) | ⚠️ non essayé | ⚠️ **iPhone**, non essayé | — | il installe depuis le Chrome Web Store ou addons.mozilla.org |
-| **Safari** (Mac, iPhone) | ❌ | ❌ | — | demande une app signée par Apple (voir plus bas) |
+| **Yandex Browser** | ✅ (Chromium) | ⚠️ « Alpha », expérimental | `VRM-chromium.zip` | Chrome Web Store |
+| **Firefox** | ✅ | ✅ **Android** (Firefox 128+) | `VRM-firefox.zip` | addons.mozilla.org |
+| **Orion** (Kagi) | ⚠️ non essayé | ⚠️ **iPhone**, non essayé — voir plus bas | `VRM-firefox.zip` (conseillé) ou `VRM-chromium.zip` | addons.mozilla.org ou Chrome Web Store |
+| **Safari** | ⚠️ app conteneur | ⚠️ app conteneur | `VRM-safari.zip` (dossier à convertir) | App Store, après Xcode + compte Apple |
+| **Samsung Internet** | — | ❌ programme d'extensions fermé | — | — |
+| **DuckDuckGo** | ❌ | ❌ aucune extension | — | — |
+| **Kiwi** (Android) | — | ❌ abandonné (janvier 2025) | — | — |
+| **Lemur, Quetta, Mises** (Android) | — | ⚠️ ils chargent des extensions Chrome — non essayé, jamais proposé par l'app | `VRM-chromium.zip` | Chrome Web Store |
 
-Le CODE est le même partout, octet pour octet. Le paquet Firefox ne change que
-le manifeste et ajoute `compat-firefox.js` devant chaque script
+Le CODE est le même partout, octet pour octet. Les paquets Firefox et Safari ne
+changent que le manifeste et ajoutent `compat-firefox.js` devant chaque script
 (`scripts/audit-extension-navigateurs.cjs` le vérifie, et exécute le vrai code
-dans un Firefox imité). Le validateur officiel de Mozilla (`web-ext lint`)
-ne relève **aucune erreur et aucun avertissement** sur le paquet Firefox de la
-5.188.
+dans des navigateurs imités, dont un à API manquantes). Le validateur officiel
+de Mozilla (`web-ext lint`) ne relève **aucune erreur, aucun avertissement,
+aucune remarque** sur le paquet Firefox de la 5.198.
 
-⚠️ **Ce qui n'a pas été essayé dans un vrai Firefox** (ce conteneur n'y a pas
-accès) : le premier essai réel se fera chez Julien. Si quelque chose ne marche
-pas, la carte du logo et l'en-tête de l'app le disent (« l'extension ne répond
-pas ») — rien n'est envoyé au mauvais endroit.
+---
 
-## Ce que Julien doit faire (personne d'autre ne peut)
+## 1. Les API, navigateur par navigateur (20 octobre 2026)
+
+⚠️ **Comment c'est mesuré.** Recherches du 20 octobre. Les sources primaires de
+Kagi (`help.kagi.com`, `kagi.com`, `orionfeedback.org`, la feuille Google de
+Kagi) sont **bloquées depuis ce conteneur** ; ce qui est dit d'Orion vient de la
+copie publique des pages d'aide de Kagi (dépôt `kagisearch/kagi-docs`, lu
+directement), de ses notes de version (copie publique `orion-updates-cdn`) et
+d'extraits indexés du forum. Safari et Firefox Android : **données de
+compatibilité de MDN** (`mdn/browser-compat-data`, lues directement).
+
+| API utilisée par VRM | Chromium | Firefox Android | Safari iOS (MDN) | Orion iOS | ce que fait VRM s'il manque |
+|---|---|---|---|---|---|
+| fond : service worker | ✅ | ❌ page de fond (`scripts`) | ✅ 15.4 (non persistant) | ⚠️ 2023 : extensions MV3 à service worker « Not compatible » (forum, fil 3914) ; **Orion préfère `background.scripts`** quand les deux sont déclarés (forum, fil 13760) | paquet Firefox / Safari : page de fond |
+| `storage.local` | ✅ | ✅ | ✅ | ✅ (implicite : ses extensions vedettes en dépendent) | — |
+| `runtime.sendMessage` / `onMessage` | ✅ | ✅ 48 | ✅ 15 | ✅ (corrigé en 0.99.120, macOS) | — |
+| `alarms` | ✅ | ✅ 48 | ✅ 15 | **non documenté** (bug « alarms ne marche pas » #9071 sur macOS, résolu) | **minuteries + rattrapage daté** dans `chrome.storage.local` |
+| `scripting.executeScript` monde MAIN | ✅ | ✅ 128 | ✅ 15.4 | `scripting` ajouté (iOS 1.3.x) ; « executeScript avec function » listé comme défaut ouvert (iOS 1.3.9, 2024) ; monde MAIN **non documenté** | **relais de la page** : content.js ↔ inject.js |
+| scripts de contenu `world: "MAIN"` | ✅ 111 | ✅ 128 | ✅ **18** | **non documenté** | `lbc-inject.js` / `vc-inject.js` se posent eux-mêmes dans la page |
+| `tabs.query/get/create/update` | ✅ | ✅ 54 | ✅ 15 | ✅ (`tabs.query` corrigé en 1.4.17, mai 2026) | — |
+| `tabs.sendMessage` | ✅ | ✅ | ✅ | ✅ (corrigé en 0.99.115, macOS) | boîte aux lettres dans `chrome.storage.local` |
+| `cookies.get` / `onChanged` | ✅ | ✅ 48 | ✅ 15 — **HttpOnly lus seulement depuis Safari 18** | « cookies.get & cookies.remove corrigés » (notes 2023) | **la page donne ses cookies** (`document.cookie`) |
+| `downloads.onCreated` | ✅ | ❌ (retiré en 79) | ❌ | non documenté | les deux autres portes du bordereau (API Vinted, inject.js) |
+| `externally_connectable` | ✅ | ❌ | ✅ 15.4 (matches seuls) | ⚠️ « externally_connectable.matches avec runtime.sendMessage échoue » (ticket 13767) | **le pont de la page** (`adresse`, bridge.js) |
+| `action.setPopup/openPopup` | ✅ | ✅ 109 | ✅ 15.4 / 16 | « action ajouté » (iOS 1.3.x) | la fenêtre ouvre VRM elle-même (`window.open` en dernier recours) |
+| `windows.update` | ✅ | ❌ | ❌ sur iOS | non documenté | déjà en `try` (rien d'autre n'en dépend) |
+| `fetch` du fond vers Vinted/Supabase | ✅ | ✅ | ✅ | « requêtes du fond qui ne marchaient plus » corrigé (1.3.20 · #11848, 1.3.28, 2025) | — |
+
+Repère Orion documenté par Kagi : l'objet `window.KAGI` (page « technical »).
+L'app s'en sert pour CHOISIR une phrase, jamais pour décider d'une capacité.
+
+## 2. Orion sur l'iPhone — ce qui marchera, ce qui a été adapté
+
+Julien : « elle doit tout faire pareil que sur Chrome ». L'extension ne lit pas
+l'agent utilisateur : **au démarrage, le fond regarde quelles API existent**
+(`mesurerCapacites`, `background.js`). Une API présente garde le chemin de
+Chrome à l'identique ; une API absente prend un **vrai chemin de remplacement
+qui garde la fonction** :
+
+| fonction | sans l'API, sur Orion iPhone | parité |
+|---|---|---|
+| savoir quel compte Vinted est ouvert, ses jetons | content.js lit `document.cookie` sur vinted.fr et le donne au fond (seulement les 3 cookies utiles, seulement depuis un onglet Vinted, pour SON domaine) ; une session neuve relance la capture | ✅ **si** ces cookies ne sont pas HttpOnly (non mesuré) — sinon l'app le DIT |
+| moisson, relecture publique des autres comptes | la même fonction, exécutée par le fond, chaque requête part DE LA PAGE par le relais (mêmes requêtes, même origine, même file Vinted, mêmes garde-fous §3) — prouvé au banc : exactement les mêmes requêtes que Chrome | ✅ |
+| tâches périodiques (capture 10 min, moisson 20 min, session 40 min, photos, relais) | minuteries tant que le fond est éveillé ; la date de chaque tâche dans `chrome.storage.local` ; au réveil (iOS a suspendu le fond), ce qui est en retard repart **une fois**, jamais en rafale | ✅ (rythme seulement quand Orion est ouvert) |
+| Leboncoin, Vestiaire (scripts du monde de la page) | ils se posent dans la page par une balise `<script>` s'ils se retrouvent dans le monde isolé | ✅ |
+| bordereau téléchargé | capté par les deux autres portes | ✅ |
+| connexion VRM ↔ extension | le pont de la page, adressé par identifiant ; et si le canal direct d'Orion refuse (ticket 13767), l'app repasse par le pont | ✅ |
+| fenêtre de l'icône | déjà en plein écran mobile (5.192) ; ouvre VRM par `window.open` si `tabs` refuse | ✅ |
+
+**Ce qui ne peut pas être garanti, et pourquoi.**
+- **Les cookies HttpOnly** : si Orion n'a pas d'API `cookies` utilisable ET que
+  Vinted pose `access_token_web` en HttpOnly, aucun script ne peut le lire —
+  c'est la protection même d'HttpOnly. L'extension ne devine pas une identité :
+  l'état du pont dit `indispo: ['cookies']` et l'app écrit « Orion ne laisse
+  pas encore l'extension voir ta session Vinted … passe par un ordinateur ».
+- **iOS suspend tout en arrière-plan** : une capture ne tourne que pendant
+  qu'Orion est au premier plan ; l'app le dit dans la même phrase.
+- Le reste du panneau (bordereaux, réponses, publication) dépend des mêmes
+  chemins que ci-dessus : s'ils tiennent, tout tient.
+
+L'extension **le dit elle-même** : l'état du pont porte `nav: { remplace: […],
+indispo: […] }` (absent sur Chrome) ; le panneau « Actions possibles / Lecture
+seule » de l'app l'écrit en **une** phrase (`phraseNavigateur`).
+
+**Quel paquet pour Orion ?** Le paquet **Firefox** (`background.scripts`) : c'est
+la forme qu'Orion choisit quand il a le choix, et la seule dont rien ne dit
+qu'elle soit « Not compatible » sur iOS. L'app propose donc la boutique Firefox
+d'abord (`boutiqueOrion`). ⚠️ Non essayé sur un vrai iPhone.
+
+### Marche à suivre Orion, pas à pas (une fois la fiche Firefox publiée)
+1. Sur l'iPhone : App Store → **Orion Browser by Kagi** (gratuit) → Obtenir.
+2. Orion → **•••** (en bas à droite) → **Réglages** → groupe **Extensions** →
+   allumer **Firefox extensions** (et Chrome extensions si besoin).
+3. Ouvrir dans Orion la fiche addons.mozilla.org de VRM (le lien que l'app
+   montre, ou `LIENS_BOUTIQUES.firefox`) → **Ajouter à Firefox** → accepter les
+   permissions.
+4. Ouvrir **vrm.center** dans Orion, se connecter : l'app connecte l'extension
+   toute seule. Puis ouvrir **vinted.fr** connecté sur un compte.
+5. Toucher le logo VRM en bas à droite de Vinted : la carte dit le compte VRM,
+   le compte Vinted et si les données partent. Le panneau d'état de l'app dit
+   ce qu'Orion a remplacé.
+6. Si l'écran n'avance pas : Orion → ••• → Extensions → VRM → la console du
+   fond (aide Kagi, « Troubleshooting Extension Issues ») et l'envoyer.
+
+Sans fiche publiée, Orion propose aussi « installer depuis un fichier » (le
+bouton **+** de ses Extensions, aide Kagi) — **format accepté non vérifié** ;
+à essayer avec `VRM-firefox.zip`, sans compter dessus.
+
+## 3. Le kit de publication addons.mozilla.org (Firefox ordinateur, Android, Orion)
+
+Compte gratuit : https://addons.mozilla.org/developers/ → **Soumettre un
+nouveau module** → envoyer `VRM-firefox.zip`.
+
+- **Distribution** : « Sur ce site » (fiche publique — nécessaire pour qu'Orion
+  la trouve et que l'app propose le bouton) ; « Moi-même » sinon (non listée).
+- **Plateformes** : cocher **Firefox** ET **Firefox pour Android**.
+- **Nom** : VRM — outil du revendeur
+- **Résumé (≤ 250 car.)** : « Relie tes comptes Vinted, Leboncoin et eBay à VRM :
+  tes annonces, ventes, colis et bordereaux arrivent dans ton tableau de bord,
+  depuis ton navigateur. Il faut un compte VRM (vrm.center). »
+- **Description** : « VRM est l'outil de gestion des revendeurs. Cette extension
+  lit les pages Vinted, Leboncoin et eBay que tu ouvres toi-même, et range dans
+  TON compte VRM tes annonces, ventes, achats, messages, colis et bordereaux.
+  Elle ne publie rien et n'accepte aucune offre toute seule ; elle agit
+  seulement au nom du compte ouvert dans l'onglet, au plus 20 actions par heure,
+  une requête à la fois. Ton mot de passe Vinted n'est jamais lu. »
+- **Catégorie** : « Boutiques et achats » (Shopping) ; secondaire « Productivité ».
+- **Étiquettes** : vinted, leboncoin, ebay, revente, colis.
+- **Site / assistance** : https://vrm.center · l'adresse de contact de
+  `src/contact.js` (à remplir d'abord).
+- **Politique de confidentialité** : https://vrm.center/legal/confidentialite.html
+- **Licence** : « Tous droits réservés ».
+- **Notes pour le relecteur** (à coller tel quel) :
+  > Extension compagnon du service VRM (https://vrm.center), utilisable avec un
+  > compte VRM. Code non minifié, aucune source à joindre.
+  > Permissions : `cookies` — lire les cookies de session Vinted
+  > (access_token_web, refresh_token_web, anon_id) pour savoir quel compte est
+  > ouvert et ranger ses données sous ce compte ; `storage` — état local
+  > (session VRM, files, compteurs de plafond) ; `alarms` — tâches périodiques
+  > (capture des comptes, entretien de la session) ; `scripting` — exécuter
+  > des requêtes en lecture dans la page Vinted déjà ouverte ; `tabs` — trouver
+  > l'onglet Vinted ou VRM ; `downloads` — reconnaître un bordereau PDF
+  > téléchargé par l'utilisateur. Hôtes : les sites Vinted, Leboncoin, eBay,
+  > Vestiaire Collective (lecture des pages ouvertes par l'utilisateur), la base
+  > Supabase de VRM et vrm.center.
+  > `data_collection_permissions` : authenticationInfo (jetons de session
+  > Vinted, session VRM), personallyIdentifyingInfo (nom/pseudo du vendeur, des
+  > acheteurs sur les commandes), personalCommunications (messages Vinted),
+  > financialAndPaymentInfo (montants des ventes, solde Vinted), websiteContent
+  > et websiteActivity (annonces, commandes, pages visitées sur ces sites). Tout
+  > part UNIQUEMENT dans le compte VRM de l'utilisateur ; rien n'est vendu ni
+  > partagé.
+  > Pour tester : créer un compte sur vrm.center, ouvrir vinted.fr connecté.
+- **Captures (1280×800 ou 640×400, 3 à 5)** : (1) la carte du logo VRM sur
+  vinted.fr ; (2) l'écran Ventes de VRM ; (3) Colis avec « Générer le
+  bordereau » ; (4) la fenêtre de connexion de l'extension ; (5) sur Android, la
+  carte au toucher. Sans aucune donnée réelle (compte de démonstration).
+- **Icône** : `icon-128.png` (déjà dans le paquet).
+- **L'identifiant `vrm@vrm.center` est définitif.**
+- Une fois validée : recopier l'adresse de la fiche dans `LIENS_BOUTIQUES.firefox`
+  (`src/navigateurExtension.js`).
+
+## 4. Safari (Mac et iPhone) — la marche exacte
+
+Safari n'installe pas un zip : une « Safari Web Extension » vit **dans une app**,
+construite sur un Mac et signée par Apple.
+
+Ce qu'il faut : **un Mac** (macOS récent), **Xcode** (gratuit, Mac App Store),
+un **compte Apple Developer Program (99 $ par an)**, et la revue de l'App Store.
+
+1. `node scripts/zip-extension.cjs --safari VRM-safari.zip` puis dézipper :
+   un dossier `VRM-safari/`.
+2. Sur le Mac, dans le Terminal :
+   ```
+   xcrun safari-web-extension-converter VRM-safari --app-name "VRM" --bundle-identifier center.vrm.extension
+   ```
+   (le convertisseur crée un projet Xcode pour macOS **et** iOS ; il signale les
+   clés du manifeste que Safari ne prend pas.)
+3. Ouvrir le projet dans Xcode → **Signing & Capabilities** → choisir l'équipe
+   du compte développeur, pour la cible macOS et la cible iOS.
+4. Essayer : Product → Run (Mac), puis sur un iPhone branché. Sur le Mac :
+   Safari → Réglages → Extensions → cocher VRM. Sur l'iPhone : Réglages →
+   Apps → Safari → Extensions → VRM → Autoriser, et « Toujours autoriser » sur
+   vinted.fr, leboncoin.fr, ebay.fr, vrm.center (Safari demande l'accès site par
+   site avant d'injecter).
+5. Product → Archive → **Distribute App** → App Store Connect → créer la fiche
+   (même texte et confidentialité qu'ailleurs) → soumettre à la revue.
+6. Une fois en ligne : `LIENS_BOUTIQUES.safari`.
+
+Ce que le paquet Safari change (et pourquoi — données MDN) : fond **non
+persistant** en `background.scripts` (iOS n'accepte rien d'autre), `downloads`
+retiré (Safari ne l'a pas), `strict_min_version` 16.4, `externally_connectable`
+gardé (pris en charge, matches seuls), `compat-firefox.js` devant chaque script.
+⚠️ Avant Safari 18, `cookies.get` ne lit pas les cookies HttpOnly et le monde
+MAIN des scripts de contenu n'existe pas : le second est compensé (les scripts
+se posent eux-mêmes), le premier non si les cookies de Vinted sont HttpOnly.
+**Rien n'a été essayé dans Safari** : le convertisseur et Xcode n'existent que
+sur un Mac.
+
+## 5. Les autres boutiques (Chromium) — rappel
 
 0. **Remplir l'adresse de contact** dans `public/legal/editeur.js` et
-   `src/contact.js` — les quatre boutiques l'exigent.
-1. **Chrome Web Store** — voir `docs/chrome-web-store/README.md` (5 $ une fois).
-   Brave en profite sans rien faire de plus.
-2. **Microsoft Edge Add-ons** — compte gratuit sur
-   https://partner.microsoft.com/dashboard/microsoftedge (Partner Center).
-   Envoyer `VRM-chromium.zip`. Les textes, les justifications des permissions,
-   la politique de confidentialité et les images sont **les mêmes** que pour
-   Chrome (`docs/chrome-web-store/`). Validation : jusqu'à 7 jours ouvrés.
-3. **Opera Add-ons** — compte gratuit sur https://addons.opera.com/developer/.
-   Même paquet, mêmes textes. Validation manuelle (quelques jours).
-4. **Firefox (ordinateur ET Android)** — compte gratuit sur
-   https://addons.mozilla.org/developers/. Envoyer `VRM-firefox.zip`.
-   - Choisir « Sur ce site » (fiche publique) ou « Moi-même » (non listée : le
-     fichier signé s'installe depuis un lien). Conseillé : « Moi-même » d'abord.
-   - Cocher **Firefox pour Android** parmi les plateformes : c'est ce qui la
-     rend installable sur son téléphone Android.
-   - Le code n'est pas compressé ni minifié : aucune « source » à joindre.
-   - Les données transmises sont déjà déclarées dans le manifeste
-     (`data_collection_permissions` : identifiants de connexion, informations
-     d'identification, messages, informations financières, contenu et activité
-     des sites — c'est ce que VRM range dans SA base).
-   - L'identifiant `vrm@vrm.center` est **définitif** : ne jamais le changer
-     (Firefox ne mettrait plus l'extension à jour).
-5. **Une fois chaque fiche VALIDÉE**, recopier son adresse dans
-   `src/navigateurExtension.js` (`LIENS_BOUTIQUES`). Tant qu'un lien est vide,
-   l'app ne promet aucune boutique : elle propose le zip (Chrome, Edge, Brave,
-   Opera) ou dit que la version de ce navigateur n'est pas encore en ligne
-   (Firefox). Dès qu'il est rempli, l'écran des premiers pas montre
-   « Installer depuis la boutique » dans CE navigateur (et sur Firefox pour
-   Android).
+   `src/contact.js` — toutes les boutiques l'exigent.
+1. **Chrome Web Store** — `docs/chrome-web-store/README.md` (5 $ une fois).
+   Brave, Arc, Vivaldi, Yandex en profitent sans rien de plus.
+2. **Microsoft Edge Add-ons** — compte gratuit (Partner Center), `VRM-chromium.zip`,
+   mêmes textes que Chrome. Validation : jusqu'à 7 jours ouvrés.
+3. **Opera Add-ons** — compte gratuit, même paquet, mêmes textes.
+4. **Firefox** — section 3.
+5. Chaque fiche VALIDÉE ⇒ son adresse dans `LIENS_BOUTIQUES`. Vide ⇒ l'app ne
+   promet aucune boutique.
 6. Après l'installation depuis une boutique : retirer la copie installée à la
-   main (`chrome://extensions`, `edge://extensions`…). Deux extensions VRM dans
-   le même navigateur : l'app le dit et coupe les commandes.
+   main. Deux extensions VRM dans un navigateur : l'app le dit et coupe les
+   commandes.
 
-## Ce qui change selon le navigateur — et pourquoi
+## 6. Navigateurs sans extension — ce que dit l'app
 
-- **Firefox n'a pas de service worker d'extension** : il charge une page de
-  fond (`background.scripts`), avec les mêmes API.
-- **Firefox ne connaît pas `externally_connectable`** : l'app ne peut pas
-  parler directement à l'extension. La connexion de l'extension à son compte
-  VRM passe alors par le pont de la page (`bridge.js`, message `adresse`),
-  **toujours adressée à cette extension par son identifiant**, avec les mêmes
-  règles qu'ailleurs : origine de l'app, nonce de 2 minutes servant une fois,
-  compte annoncé. Sur Chrome, Edge, Opera et Brave, rien ne change.
-- **Firefox 128 minimum** : c'est la première version qui exécute les scripts
-  « dans le monde de la page » (Leboncoin, Vestiaire).
-- **Firefox : pas de ⟳** dans `about:addons` ; si l'extension ne répond plus,
-  l'app dit de la désactiver puis la réactiver.
+`extensionIci()` (`src/navigateurExtension.js`) range chaque navigateur, par son
+marqueur dans l'agent utilisateur (SamsungBrowser, DuckDuckGo/Ddg, YaBrowser,
+Vivaldi, Edg, OPR, Firefox) ou `window.KAGI` (Orion) :
+- **Samsung Internet, DuckDuckGo, Chrome Android** : « n'accepte aucune
+  extension » ; Firefox pour Android proposé dès que sa fiche est publiée ;
+  sinon l'ordinateur. Un navigateur Android inconnu qui se dit « Chrome »
+  (Lemur, Quetta, Edge…) est rangé avec Chrome Android : si son extension
+  répond quand même, le pont le dit et fait foi.
+- **iPhone (Safari, Chrome, Firefox, Edge, DuckDuckGo)** : l'ordinateur, puis le
+  **relais** (5.183 : l'iPhone fait agir l'extension de l'ordinateur allumé) ;
+  Orion proposé seulement avec une fiche publiée.
+- **Dans Orion** : sa consigne propre (boutique Firefox), et « non essayé ».
+- **Safari Mac sans app** : « n'accepte pas cette extension » ; Chrome, Edge,
+  Brave ou Opera sur cet ordinateur.
 
-## Le téléphone — mesuré le 19 octobre 2026 (« l'extension pour iPhone et Samsung »)
+Sources Android : Kiwi abandonné (presse, MakeUseOf 2025) ; Edge Android :
+catalogue de 22 extensions (Windows Latest, Android Authority, mars 2025) ;
+Yandex « Alpha, expérimental » (guide Quetta, source intéressée) ; Lemur, Quetta,
+Mises : seulement des articles promotionnels ou secondaires — **non vérifié,
+jamais proposé**.
 
-⚠️ **Comment c'est mesuré** : recherches web le 19 octobre. Deux sources
-primaires étaient **bloquées depuis ce conteneur** (DNS) :
-`developer.samsung.com` (guide des extensions Samsung Internet) et
-`help.kagi.com` (aide d'Orion). Ce qui en est dit ci-dessous vient des extraits
-indexés de ces pages et de la presse spécialisée — pas d'une lecture directe.
-Aucun navigateur mobile n'a été essayé avec VRM : rien n'est promis tant que
-Julien ne l'a pas vu marcher sur son téléphone.
+## 7. Ce qui n'a PAS été mesuré
 
-| téléphone · navigateur | extension VRM ? | ce qu'il faut | source |
-|---|---|---|---|
-| **Samsung · Firefox pour Android** | ✅ **oui** (paquet Firefox, 5.188) | publier `VRM-firefox.zip` sur addons.mozilla.org en cochant « Firefox pour Android » (étape 4 ci-dessus) | manifeste `gecko_android`, `web-ext lint` 0 erreur |
-| **Samsung · Samsung Internet** | ❌ **impossible pour VRM** | ses modules passent par le Galaxy Store, dans un programme **fermé** (« closed beta » : seuls les développeurs que Samsung autorise) ; aucune installation d'une extension non publiée | guide Samsung (extrait indexé), forum développeurs Samsung — des développeurs y réclament encore l'ouverture de l'API |
-| **Samsung · Chrome pour Android** | ❌ | Chrome mobile n'accepte aucune extension | — |
-| **Samsung · Edge pour Android** | ❌ aujourd'hui | Edge stable n'ouvre qu'un **catalogue choisi par Microsoft** (22 extensions au lancement, mars 2025) ; Edge Canary installe une extension par identifiant derrière une option développeur — pas un geste à demander | presse (Windows Latest, Android Authority, mars 2025) ; rien de plus récent trouvé |
-| **Kiwi** (Android) | ❌ | **abandonné** en janvier 2025 (dépôt archivé, retiré du Play Store) | annonce du développeur, presse |
-| **Lemur, Quetta, Yandex** (Android, Chromium) | ⚠️ peut-être | ils installent depuis le Chrome Web Store — donc seulement une fois la fiche Chrome publiée ; VRM utilise un service worker MV3, des menus de page et le monde « MAIN » : rien ne dit qu'ils les exécutent. **Non essayé — ne pas le proposer dans l'app.** | presse secondaire seulement |
-| **iPhone · Safari** | ❌ sans Apple | une « Safari Web Extension » doit être **emballée dans une app iOS** : un Mac avec Xcode, `xcrun safari-web-extension-converter`, le **programme développeur Apple (99 $/an)**, puis la revue de l'App Store. Et des API que VRM utilise ne sont pas toutes dans Safari (à mesurer). Gros chantier, pas un réglage. | documentation Apple (« Packaging a web extension for Safari ») |
-| **iPhone · Chrome, Firefox, Edge** | ❌ | sur iPhone tous utilisent le moteur de Safari, sans extensions | — |
-| **iPhone · Orion (Kagi)** | ⚠️ **expérimental** | il installe en un toucher depuis le Chrome Web Store ou addons.mozilla.org (donc seulement une fois une fiche publiée) ; Kagi dit lui-même que « seul un petit nombre d'extensions marche complètement » sur iOS (API limitées par Apple). Il se présente comme Safari : l'app ne peut pas le reconnaître. | page Orion de Kagi, aide Orion (extrait indexé), forum Orion |
-
-**Ce que fait l'app selon le téléphone** (`mobileIci`, `src/navigateurExtension.js`) :
-- **Samsung Internet** (reconnu par « SamsungBrowser » dans l'agent utilisateur)
-  et **Chrome Android** : la carte des premiers pas dit qu'il n'accepte pas
-  l'extension ; dès que la fiche Firefox est publiée (`LIENS_BOUTIQUES.firefox`),
-  elle propose **« Installer Firefox pour Android »** (fiche Google Play de
-  Mozilla) ; d'ici là, l'étape se fait sur l'ordinateur.
-- **Firefox pour Android** : fiche publiée ⇒ « Installer depuis la boutique » ;
-  sinon « pas encore en ligne », et l'ordinateur.
-- **iPhone** : l'ordinateur d'abord, puis **le relais** (5.183 — depuis l'iPhone,
-  VRM fait agir l'extension de l'ordinateur allumé) ; Orion seulement avec une
-  fiche publiée, et en disant qu'il n'a pas été essayé.
-- **Au doigt** (Firefox pour Android, Orion), la carte du logo s'ouvre au
-  toucher (il n'y a pas de survol), porte « Ouvrir VRM », et le retour sur un
-  « Non » (« Capter ce compte ») se fait au toucher (banc `badge.cjs`).
-
-**Les gestes de Julien pour le téléphone** :
-1. **Samsung** : publier la version Firefox (étape 4 : compte gratuit AMO,
-   `VRM-firefox.zip`, cocher **Firefox pour Android**), puis recopier l'adresse
-   de la fiche dans `LIENS_BOUTIQUES.firefox`. Sur son Samsung : installer
-   Firefox depuis le Play Store, ouvrir vrm.center dedans, installer l'extension.
-2. **iPhone, sans rien publier** : rien à faire — le relais marche déjà depuis
-   l'iPhone tant que l'ordinateur est allumé avec l'extension.
-3. **iPhone, Orion** : après la publication Chrome OU Firefox — installer Orion,
-   ouvrir la fiche dans Orion, « Ajouter ». À essayer avant de compter dessus.
-4. **iPhone, Safari** : seulement s'il décide d'y consacrer un chantier — compte
-   développeur Apple (99 $/an), un Mac avec Xcode, et une revue de l'App Store.
-   Rien n'est commencé, rien n'est promis.
+- **Aucun vrai Orion, aucun vrai iPhone, aucun vrai Safari, aucun vrai Firefox
+  Android** : tout a été exécuté dans des navigateurs IMITÉS (`_fond-vm.cjs`,
+  profils `orion-ios`, `orion-ios-pire`, `safari-ios`, `firefox-android`). Le
+  premier essai réel se fera chez Julien.
+- La liste officielle des API d'Orion (feuille Google de Kagi) n'est pas
+  joignable d'ici.
+- Si les cookies de session de Vinted sont HttpOnly (déterminant pour Orion sans
+  API `cookies` et Safari < 18).
+- WebKit (Playwright) n'est pas installé dans ce conteneur : les scripts de
+  contenu n'ont pas été exécutés dans WebKit.
