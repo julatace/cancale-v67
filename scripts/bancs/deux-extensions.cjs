@@ -36,7 +36,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4793;
+const PORT = Number(process.env.BANC_PORT) || 4793;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -253,6 +253,10 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       const v = await r.lire();
       dit(v.etat && v.etat.code !== 'plusieurs' && v.raisons.length === 0, 'PAS « plusieurs » (même identifiant : une extension)', JSON.stringify({ e: v.etat, r: v.raisons }));
       dit(v.boutons[0] && v.boutons[0].etat === 'pret', 'le bouton est ACTIF', JSON.stringify(v.boutons));
+      // (20 oct.) Depuis les ventes « une ligne » (#596-#598), le bouton vit dans
+      // la vente OUVERTE : on l'ouvre d'abord, comme lui.
+      await r.pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pret"] button'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); });
+      await r.pg.waitForTimeout(400);
       await r.pg.click('[data-bouton-bord="pret"] button');
       await r.pg.waitForTimeout(800);
       const v2 = await r.lire();

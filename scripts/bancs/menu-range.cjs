@@ -121,7 +121,12 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
     console.log('── téléphone : la feuille du menu');
     {
       const { ctx, pg } = await page(nav, true, 'journee');
-      await clique(pg, 'button[aria-label="Gestion"], button[aria-label="Tous les écrans"]', '');
+      // (20 oct.) Depuis la coque iPhone (#596), l'en-tête garde un bouton
+      // « Tous les écrans » CACHÉ sur téléphone : la feuille s'ouvre par
+      // « Gestion », dans la barre du bas. On vise le bouton VISIBLE, et on
+      // attend qu'il le soit (la porte de connexion peut prendre quelques secondes).
+      await pg.locator('button[aria-label="Gestion"]:visible, button[aria-label="Tous les écrans"]:visible').first().waitFor({ timeout: 12000 }).catch(() => {});
+      await clique(pg, 'button[aria-label="Gestion"]:visible, button[aria-label="Tous les écrans"]:visible', '');
       const feuille = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); return m ? m.innerText : ''; });
       dit(!!feuille, 'la feuille du menu s’ouvre', '');
       for (const m of INTERDITS) dit(!feuille.includes(m), `la feuille ne porte plus « ${m} »`, feuille.replace(/\n+/g, ' · '));

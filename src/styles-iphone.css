@@ -211,4 +211,17 @@
  :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
  :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
  :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:40px!important;}
+ /* (20 oct., revue) La marge négative des liens-textes suivait encore les 55 px
+    de l'ancien zoom (-16 px) : à 44 px, la boîte ne gardait que 12 px dans la
+    ligne — « Retirer mon argent » sortait de sa carte, « voir », « tout voir »,
+    « Compléter les prix d'achat » mordaient sur les lignes voisines. */
+ :root body .vrm-main button.vrm-lien-action,
+ :root body .vrm-main button:is([style*="background: transparent"],[style*="background: none"]):is([style*="border: none"],[style*="border-style: none"],[style*="border: 0px"]):is([style*="padding: 0px;"]){margin-block:-12px;}
+ /* Le tableau « Chiffre d'affaires par période » : ses quatre colonnes tiennent
+    dans l'écran (la dernière, « Reçu (versé) », était coupée au bord). */
+ .vrm-main .vrm-ca-table :is(th,td){padding-left:6px!important;padding-right:6px!important;}
+ .vrm-main .vrm-ca-table :is(th,td):first-child{padding-left:12px!important;}
+ .vrm-main .vrm-ca-table :is(th,td):last-child{padding-right:12px!important;}
+ .vrm-main .vrm-ca-table th{white-space:normal!important;}
+ .vrm-main .vrm-ca-table{font-size:12px!important;}
 }

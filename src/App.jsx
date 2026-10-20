@@ -9739,7 +9739,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 // complet, §5). Sur téléphone, douze valeurs ne tiennent pas côte à côte : on
 // n'écrit que le meilleur mois, le dernier et celui qu'on a touché ; les
 // autres sont dans l'infobulle et au toucher (`onChoisir`).
-function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois' }) {
+function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
   const ref=React.useRef(null);
   const [W,setW]=React.useState(340);
   const [compact,setCompact]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
@@ -9779,8 +9779,8 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
-    <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>
-    {lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{format(vals[lu-1])}</strong></div>}
+    {legende && <div className="vrm-chart-caption" data-chart-caption=""><span>{mois[lu].long||mois[lu].nomComplet||cleDe(mois[lu])}{mois[lu].enCours?' · en cours':''}</span><strong>{format(vals[lu])}</strong></div>}
+    {legende && lu>0 && <div className="vrm-chart-compare" data-chart-compare=""><span>Précédent · {mois[lu-1].long||mois[lu-1].nomComplet||cleDe(mois[lu-1])}{mois[lu].enCours?' · mois complet':''}</span><strong>{format(vals[lu-1])}</strong></div>}
   </div>;
 }
 
@@ -13439,7 +13439,7 @@ function RetirerArgent({ liveStats }) {
   const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
   return (
     <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
-      <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
+      <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: '2px 0', minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
         <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Retirer mon argent</span><span style={{ display: 'block', fontSize: 12, color: C.muted }}>{/* Le total disponible est déjà écrit dans le résumé juste au-dessus : la
             ligne repliée ne le redit pas (le même nombre deux fois, §7), elle dit
             OÙ il est. */}{total > 0 ? (() => { const n = liste.filter((x) => x.dispo > 0).length; return n > 1 ? `Disponible sur ${n} comptes — détail par compte` : `Disponible sur ${liste.find((x) => x.dispo > 0)?.login || 'un compte'} — ouvre ton porte-monnaie`; })() : 'Rien de disponible pour l\'instant'}</span></span>
@@ -13583,7 +13583,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuvert = false, ...props }) {
+function LigneVenteCompacte({ photo, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   React.useEffect(()=>{if(initialOuvert)setOuvert(true);},[initialOuvert]);
   const panneau = React.useId();
@@ -13591,15 +13591,15 @@ function LigneVenteCompacte({ photo, titre, etat, montant, children, initialOuve
     <button type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-label={`${ouvert?'Fermer':'Ouvrir'} les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
       <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
-      <span className="vrm-ledger-sale-state" title={etat}>{etat}</span>
+      <span className="vrm-ledger-sale-state" title={etat}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
     <div className="vrm-ledger-sale-content" id={panneau}>{children}</div>
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, details }) {
-  return <LigneVenteCompacte photo={photo} titre={titre} etat={etat} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details }) {
+  return <LigneVenteCompacte photo={photo} titre={titre} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -13739,7 +13739,12 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     <div style={{ padding: 16 }}>
       <ScreenHead icon="box" title="Colis Leboncoin" desc="Génère tes bordereaux, poste tes colis — comme sur Vinted" />
       {colis.length === 0 ? (
-        <Card><div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun colis Leboncoin pour l'instant. Dès qu'une vente Leboncoin est captée, elle apparaît ici — avec son bordereau, son QR et son numéro.</div></Card>
+        // (20 oct., revue) Jamais lu n'est pas « aucun colis » : Ventes dit « — »
+        // tant que « Mes transactions » n'a pas été relue, Colis disait « Aucun
+        // colis » sur la même absence de lecture (« rien lu » ne vaut pas « rien »).
+        <Card><div data-lbc-colis-vide={lbcVentes.maj ? 'lu' : 'jamais'} style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{lbcVentes.maj
+          ? <>Aucun colis Leboncoin à envoyer dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}). Dès qu'une vente Leboncoin est captée, elle apparaît ici — avec son bordereau, son QR et son numéro.</>
+          : <>Tes colis Leboncoin arrivent avec tes ventes, quand l’extension passe sur leboncoin.fr (« Mes transactions ») — pas encore lu pour l’instant.</>}</div></Card>
       ) : (<>
         {/* ── À GÉNÉRER : vendu, mais le bordereau n'existe pas encore ──────────
             Générer un bordereau Leboncoin est une action SUR leboncoin.fr (API de
@@ -16079,7 +16084,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   })();return()=>{stop=true;};},[comptesEbay]);
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
   const orders=lu===undefined?undefined:lu===null?null:lu.items.filter(o=>dansVueEbay(o,vue));
-  const wrap = (kids) => <div className="vrm-ebay-sales" style={{ background: E.bg, padding: 16, paddingBottom: 48 }}>{kids}</div>;
+  const wrap = (kids) => <div className="vrm-ebay-sales" style={{ padding: 16, paddingBottom: 48 }}>{kids}</div>;
   const head = <ScreenHead icon="cash" title="Ventes eBay"/>;
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<Skeleton variant="row" count={3}/></>);
@@ -16129,7 +16134,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const statut=etat.label;
 
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut}
-          meta={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
+          etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{comptesEbay?.length>1 && <span data-ebay-ligne-compte="" style={{color:C.muted,fontWeight:500}}>{' · '}{o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}</span>}</>}
+          meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
       })}
     </div>
@@ -18164,7 +18170,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     } else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est retirée. Regarde sur eBay avant de recommencer.' }));
     else setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay a refusé le retrait.' }));
   };
-  const wrap = (kids) => <div className="vrm-ebay-annonces" style={{ background: E.bg, padding: 16, paddingBottom: 24 }}>{kids}</div>;
+  const wrap = (kids) => <div className="vrm-ebay-annonces" style={{ padding: 16, paddingBottom: 24 }}>{kids}</div>;
   const head = (n) => <ScreenHead icon="tag" title={`Annonces eBay${n != null ? ` (${n})` : ''}`}/>;
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
@@ -19361,7 +19367,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={sLib}>Vendu · 12 derniers mois</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
-            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu"/></div>
+            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" legende={false}/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
@@ -19620,10 +19626,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                   <circle key={p.nom} cx={cx} cy={cy} r={r} fill="none" stroke={C.accent} strokeOpacity={op[p.nom]!=null?op[p.nom]:0.3} strokeWidth="14"
                     strokeDasharray={`${len} ${CIRC-len}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"/>);
                   acc+=len; return el; })}
-                <text x="66" y="62" textAnchor="middle" className="vrm-display" style={{fontSize:'15px',fontWeight:800,fill:C.text}}>{Math.round(platParts.total)} €</text>
+                {/* (20 oct., revue) Le centre disait « 6984 € » à côté de « 6983,57 € » dans la
+                    légende : le même total, arrondi deux fois (§7). Le montant exact. */}
+                <text x="66" y="62" textAnchor="middle" className="vrm-display" data-anneau-total={Math.round(platParts.total*100)} style={{fontSize:fmt(platParts.total).length>9?'12px':'14px',fontWeight:800,fill:C.text}}>{fmt(platParts.total)}</text>
                 <text x="66" y="79" textAnchor="middle" style={{fontSize:'11px',fill:C.muted}}>CA total</text>
               </svg>
-              <div style={{flex:'1 1 150px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
+              {/* 220 px : sur téléphone la légende passe SOUS l'anneau — à 150 px elle
+                  tenait à côté et le nom de la plateforme tombait à « Vin… ». */}
+              <div data-anneau-legende="" style={{flex:'1 1 220px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
                 {platParts.arr.map((p)=>(
                   <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:13}}>
                     <span style={{width:11,height:11,borderRadius:999,background:C.accent,opacity:op[p.nom]!=null?op[p.nom]:0.3,flexShrink:0}}/>
@@ -25601,7 +25611,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
             ))}
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table data-ca-table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table data-ca-table className="vrm-ca-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ color: C.muted, textAlign: 'right' }}>
                   <th style={{ textAlign: 'left', fontWeight: 600, padding: '9px 16px', fontSize: 11 }}>Période</th>
@@ -26128,7 +26138,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
   return (
     <section data-compta-urssaf="" style={{display:'flex',flexDirection:'column',gap:8}}>
-      <h3 className="vrm-set-titre" style={{color:C.muted,margin:'0 16px'}}>Ta déclaration URSSAF</h3>
+      <h3 className="vrm-set-titre vrm-titre-compta" style={{color:C.muted,margin:'0 16px'}}>Ta déclaration URSSAF</h3>
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
           (« Mois en cours — septembre », puis « À payer pour septembre »), et
@@ -26546,7 +26556,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
   return (
     <section className="vrm-set-groupe vrm-compta-groupe" data-compta-section={data} style={{ margin: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0 }}>{titre}</h3>
+        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0 }}>{titre}</h3>
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
@@ -26653,7 +26663,7 @@ function BeneficeCompta({ compta, onNav }) {
       data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
+        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
       </div>
@@ -26905,7 +26915,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
       <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
-        <h3 className="vrm-set-titre" style={{ color: C.muted }}>Tes charges</h3>
+        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes charges</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           {[
             { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },

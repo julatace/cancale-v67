@@ -161,8 +161,11 @@
 
 /* Les deux volets de l'écran Statistiques (activité, stock) portent des chiffres
    DANS leur ligne : ils gardent leur texte en ligne, mais perdent le triangle du
-   navigateur pour le même chevron que les autres replis (revue du 17 oct.). */
-.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary { list-style: none; position: relative; padding-right: 22px !important; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; flex-wrap: wrap; }
+   navigateur pour le même chevron que les autres replis (revue du 17 oct.).
+   ⚠️ En bloc, PAS en flex : dans un conteneur flex, « Ventes enregistrées · »
+   devient un élément anonyme dont l'espace de bord est retiré — l'écran
+   affichait « ·aujourd'hui 0,00 €· ce mois » (revue du 20 oct.). */
+.vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary { list-style: none; position: relative; padding-right: 22px !important; min-height: 44px; box-sizing: border-box; display: block; }
 .vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::-webkit-details-marker { display: none; }
 .vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::marker { content: ''; }
 .vrm-main :is(.vrm-finance-activity, .vrm-finance-stock) > summary::after {

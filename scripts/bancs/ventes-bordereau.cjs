@@ -143,6 +143,8 @@ const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toStr
       ctx.on('page', (p) => onglets.push(p));
       pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
       const avant = pdfDemandes.length;
+      // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
+      await pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pdf"][data-tx="9001"]'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); }); await pg.waitForTimeout(300); 
       try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
       await pg.waitForTimeout(2500);
       const urls = onglets.map((p) => p.url());
@@ -192,6 +194,8 @@ const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toStr
       await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
+      await pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pdf"][data-tx="9001"]'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); }); await pg.waitForTimeout(300); 
       try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }
       let txt = '';
       for (let i = 0; i < 20; i++) { await pg.waitForTimeout(150); txt = await pg.evaluate(() => document.body.innerText); if (attendu.test(txt) || interdit.test(txt)) break; }
