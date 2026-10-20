@@ -32,7 +32,7 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // `indexDeclarations` et `moisDeclare` : le registre « J'ai déclaré ce mois »
 // (6 octobre), lu par `ventesDeclarables`. Le miroir doit les porter pour que la
 // règle s'exécute ; le BILAN, lui, ne lui passe aucun registre (voir plus bas).
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return null; } };
 // Les déclarations de premier niveau `const X = …` d'un fichier, par nom.
 function declarations(src, plugins) {

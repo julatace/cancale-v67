@@ -148,7 +148,7 @@ function regleApp() {
   const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
   const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
   // (les mêmes noms que le miroir — voir NOMS dans scripts/audit-bilan-semaine.cjs)
-  const noms = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesFaites', 'ventesDeclarables'];
+  const noms = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesFaites', 'ventesDeclarables'];
   const ctx = vm.createContext({});
   for (const n of ast.program.body) if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && noms.includes(d.id.name)) vm.runInContext('const ' + src.slice(d.start, d.end) + `;\nthis.${d.id.name} = ${d.id.name};`, ctx);
   return ctx;
