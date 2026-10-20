@@ -269,6 +269,30 @@
     } catch (_) {}
   };
 
+  // ── LA PUBLICATION D'UNE ANNONCE (20 octobre, 5.200) ───────────────────────
+  // Vinted crée l'annonce par `POST /api/v2/item_upload/items` (vu dans ses
+  // chemins captés). On lit l'IDENTIFIANT de l'annonce dans la réponse (2xx
+  // seulement) — c'est lui qui relie le numéro affiché à côté du bouton à
+  // CETTE annonce (§5). Jamais le corps envoyé, jamais un titre. Forme
+  // inconnue ⇒ on dit seulement les NOMS de clés (rien de lié).
+  const RE_PUBLIE = /^\/api\/v\d+\/item_upload\/items\/?$/;
+  const notePublication = (method, url, status, lireTexte) => {
+    try {
+      if (String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RE_PUBLIE.test(U.pathname)) return;
+      Promise.resolve().then(lireTexte).then((t) => {
+        let j = null; try { j = JSON.parse(t); } catch (_) {}
+        const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+        const id = it && it.id != null ? String(it.id) : '';
+        if (/^\d{4,15}$/.test(id)) post({ kind: 'publication', itemId: id, status: st });
+        else post({ kind: 'publication', itemId: null, status: st, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   // Convertit un ArrayBuffer en base64 (par morceaux pour eviter le débordement
   // de pile sur les gros PDF).
   const abToB64 = (buf) => {
@@ -316,6 +340,7 @@
         p.then((res) => {
           try {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
+            notePublication(method, url, res.status, () => res.clone().text());   // 5.200
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
@@ -357,6 +382,7 @@
         this.addEventListener('load', function () {
           try {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
+            notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''));   // 5.200
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).

@@ -1,4 +1,4 @@
-// vinted-capture.js — CE QUI RESTE SUR VINTED : LIRE LA PAGE, RIEN AFFICHER.
+// vinted-capture.js — CE QUI RESTE SUR VINTED : LIRE LA PAGE, ET LE NUMÉRO VRM (20 oct.).
 //
 // Julien, 2 octobre : « l'extension est simplement là pour capter ; tout doit
 // être centralisé dans VRM ». Le panneau VRM (bouton orange, 14 onglets, fenêtre
@@ -171,4 +171,102 @@
     if (location.pathname !== lastPath) { lastPath = location.pathname; onPage(); }
   }, 800);
   onPage(); // si on arrive directement sur une annonce
+
+  // ── LE NUMÉRO VRM SUR VINTED (20 octobre, 5.200) ─────────────────────────
+  // Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à
+  // côté du bouton Publier ; après, sur Vinted, qu'il y ait le numéro dessus ;
+  // pareil dans les ventes ». Un numéro ne s'affiche que s'il est CONNU par
+  // identité (annonce, transaction, conversation) — jamais deviné d'un titre.
+  // Sur la page de dépôt, le numéro est RÉSERVÉ par le fond avant d'être montré.
+  // Rien ne clique, rien n'envoie à Vinted : on pose une étiquette dans la page.
+  const NUM_ATTR = 'data-vrm-num';
+  const STYLE_PILULE = 'display:inline-flex;align-items:center;gap:4px;font:700 12px/1 -apple-system,system-ui,sans-serif;'
+    + 'color:#fff;background:#10141B;border:1px solid #3D7BFF;border-radius:999px;padding:4px 8px;white-space:nowrap;letter-spacing:.01em;';
+  const pilule = (texte, titre) => { const e = document.createElement('span'); e.setAttribute(NUM_ATTR, '1'); e.style.cssText = STYLE_PILULE; e.textContent = texte; if (titre) e.title = titre; return e; };
+  const demander = (msg) => new Promise((res) => {
+    if (!vivant()) return res(null);
+    try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vcapture', domain: location.host }, msg), (r) => { void chrome.runtime.lastError; res(r || null); }); } catch (_) { res(null); }
+  });
+  const estDepot = () => /^\/items\/new\/?$/.test(location.pathname);
+  // Le bouton qui publie : un bouton d'envoi du formulaire de dépôt. On ne le
+  // touche pas — on pose l'étiquette juste à côté.
+  const boutonPublier = () => {
+    const cands = [...document.querySelectorAll('button[type="submit"], button')];
+    return cands.find((b) => /^(ajouter|publier|mettre en ligne|upload|add item|valider)\b/i.test((b.textContent || '').trim())) || null;
+  };
+  let resa = null, resaDemandee = false;
+  async function poserNumeroDepot() {
+    if (!estDepot()) return;
+    if (!resaDemandee) { resaDemandee = true; resa = await demander({ action: 'numeroPourPublier' }); }
+    const b = boutonPublier();
+    const deja = document.querySelector('[data-vrm-num-depot]');
+    if (deja && b && deja.previousElementSibling === b) return;
+    if (deja) deja.remove();
+    const texte = resa && resa.ok && resa.numero ? `N°${resa.numero} — écris-le sur le carton` : 'VRM n’a pas pu réserver de numéro : il sera donné dans VRM';
+    const e = pilule(texte, resa && resa.ok ? 'Ce numéro est réservé pour cette annonce : VRM le lui donnera après la publication.' : '');
+    e.setAttribute('data-vrm-num-depot', resa && resa.ok ? String(resa.numero) : 'pas-su');
+    e.style.whiteSpace = 'normal'; e.style.maxWidth = 'min(100%, 320px)'; e.style.lineHeight = '1.3';
+    if (!(resa && resa.ok)) e.style.borderColor = '#B45309';
+    if (b && b.parentElement) { e.style.marginLeft = '10px'; b.insertAdjacentElement('afterend', e); }
+    else { e.style.position = 'fixed'; e.style.left = '16px'; e.style.bottom = '16px'; e.style.zIndex = '2147483000'; document.body.appendChild(e); }
+  }
+  // Annonces, ventes : les numéros connus pour les liens de la page.
+  const connus = { items: {}, convs: {}, txs: {} }, demandes = { items: new Set(), convs: new Set(), txs: new Set() };
+  let enVol = false;
+  async function completer() {
+    if (enVol || !vivant()) return;
+    const items = [], convs = [], txs = [];
+    for (const a of document.querySelectorAll('a[href*="/items/"], a[href*="/inbox/"], a[href*="/transactions/"]')) {
+      const h = a.getAttribute('href') || '';
+      let m = /\/items\/(\d{4,15})/.exec(h); if (m && !demandes.items.has(m[1])) { demandes.items.add(m[1]); items.push(m[1]); }
+      m = /\/inbox\/(\d{4,15})/.exec(h); if (m && !demandes.convs.has(m[1])) { demandes.convs.add(m[1]); convs.push(m[1]); }
+      m = /\/transactions\/(\d{4,15})/.exec(h); if (m && !demandes.txs.has(m[1])) { demandes.txs.add(m[1]); txs.push(m[1]); }
+    }
+    const ici = currentItemId(); if (ici && !demandes.items.has(ici)) { demandes.items.add(ici); items.push(ici); }
+    const conv = /^\/inbox\/(\d{4,15})/.exec(location.pathname); if (conv && !demandes.convs.has(conv[1])) { demandes.convs.add(conv[1]); convs.push(conv[1]); }
+    if (!items.length && !convs.length && !txs.length) return;
+    enVol = true;
+    const r = await demander({ action: 'numeros', items, convs, txs });
+    enVol = false;
+    if (!r || !r.ok) { items.forEach((x) => demandes.items.delete(x)); convs.forEach((x) => demandes.convs.delete(x)); txs.forEach((x) => demandes.txs.delete(x)); return; }
+    Object.assign(connus.items, r.items || {}); Object.assign(connus.convs, r.convs || {}); Object.assign(connus.txs, r.txs || {});
+  }
+  function poserSurLiens() {
+    for (const a of document.querySelectorAll('a[href*="/items/"], a[href*="/inbox/"], a[href*="/transactions/"]')) {
+      if (a.querySelector('[' + NUM_ATTR + ']') || a.closest('[' + NUM_ATTR + ']')) continue;
+      const h = a.getAttribute('href') || '';
+      let m = /\/items\/(\d{4,15})/.exec(h), n = m && connus.items[m[1]];
+      if (!n) { m = /\/inbox\/(\d{4,15})/.exec(h); n = m && connus.convs[m[1]]; }
+      if (!n) { m = /\/transactions\/(\d{4,15})/.exec(h); n = m && connus.txs[m[1]]; }
+      if (!n) continue;
+      const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+      if (a.querySelector('img')) {
+        if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
+        e.style.position = 'absolute'; e.style.top = '6px'; e.style.left = '6px'; e.style.zIndex = '2';
+      } else e.style.marginLeft = '6px';
+      a.appendChild(e);
+    }
+  }
+  function poserSurPage() {
+    const ici = currentItemId();
+    const conv = /^\/inbox\/(\d{4,15})/.exec(location.pathname);
+    const n = (ici && connus.items[ici]) || (conv && connus.convs[conv[1]]) || null;
+    const deja = document.querySelector('[data-vrm-num-page]');
+    if (!n) { if (deja) deja.remove(); return; }
+    if (deja && deja.getAttribute('data-vrm-num-page') === String(n)) return;
+    if (deja) deja.remove();
+    const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+    e.setAttribute('data-vrm-num-page', String(n));
+    const h1 = document.querySelector('h1');
+    if (h1 && !conv) { e.style.marginLeft = '8px'; e.style.verticalAlign = 'middle'; h1.appendChild(e); }
+    else { e.style.position = 'fixed'; e.style.left = '16px'; e.style.top = '76px'; e.style.zIndex = '2147483000'; document.body.appendChild(e); }
+  }
+  let dernierChemin = '';
+  // Une paire numérotée pendant qu'on regarde : on redemande ce qui n'était pas connu.
+  setInterval(() => { demandes.items.clear(); demandes.convs.clear(); demandes.txs.clear(); }, 60000);
+  setInterval(async () => {
+    if (!vivant()) return;
+    if (location.pathname !== dernierChemin) { dernierChemin = location.pathname; resaDemandee = estDepot() ? resaDemandee : false; }
+    try { await poserNumeroDepot(); await completer(); poserSurLiens(); poserSurPage(); } catch (_) {}
+  }, 1200);
 })();

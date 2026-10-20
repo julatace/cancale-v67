@@ -62,7 +62,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.199.0';
+const EXT_ATTENDUE = '5.200.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -24676,6 +24676,30 @@ function doublonsAReattribuer(conflits, fiches) {
 // Une paire qui a reçu un numéro neuf et dont le carton porte encore l'ancien.
 const reattribueAEcrire = (f) => !!(f && f.reattribue && !f.reattribue.ecrit && cleNum(f.numero) === cleNum(f.reattribue.vers));
 // </doublons-reattribuer-regle>
+// <reserves-num-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11.
+// 20 octobre, Julien : « quand on publie sur Vinted je veux que le numéro soit
+// écrit à côté du bouton Publier ». L'extension RÉSERVE ce numéro au moment où
+// la page de dépôt s'ouvre (`panel_num_reserves.attente`, 3 h), puis le LIE à
+// l'annonce que Vinted crée (`items[itemId]`, par l'identifiant rendu par
+// `POST /api/v2/item_upload/items` — une identité, §5). L'app : (1) ne donne
+// jamais un numéro réservé à une autre paire, (2) donne à l'annonce publiée le
+// numéro qui était affiché à côté du bouton. Fonction PURE.
+const RESA_ATTENTE_MS = 3 * 3600e3;
+function numerosReserves(data, maintenant) {
+  const out = { cles: new Set(), parItem: {} };
+  if (!data || typeof data !== 'object') return out;
+  const t = Number(maintenant) || Date.now();
+  for (const [n, v] of Object.entries((data.attente && typeof data.attente === 'object') ? data.attente : {})) {
+    const at = Date.parse((v && v.at) || '');
+    if (!isNaN(at) && t - at < RESA_ATTENTE_MS) { const c = cleNum(n); if (c) out.cles.add(c); }
+  }
+  for (const [id, v] of Object.entries((data.items && typeof data.items === 'object') ? data.items : {})) {
+    const c = cleNum(v && v.numero); if (!c || !/^\d{4,15}$/.test(id)) continue;
+    out.cles.add(c); out.parItem[id] = String(v.numero);
+  }
+  return out;
+}
+// </reserves-num-regle>
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
