@@ -4883,7 +4883,7 @@ ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
   (3) `node scripts/communaute-sql/essai-annule.cjs --verifier`, coller, exiger
   `ok: true`. Ensuite : Gestion → Communauté → « Apparaître sur la carte ».
 
-### Communauté : pseudo Discord et classement des ventes — migration 019 (20 octobre) — PAS APPLIQUÉE
+### Communauté : pseudo Discord et classement des ventes — migration 019 (20 octobre) — ✅ APPLIQUÉE LE 20 OCTOBRE
 Julien : « pour la carte ça peut être le compte discord » et « un classement entre
 tous les membres, sur les journées, les semaines, les mois ». Fichier
 `supabase/migrations/019-communaute-discord-classement.sql`, **sur la 018 (en
@@ -4927,9 +4927,55 @@ une confirmation pour ce mot) : elle se colle d'un bloc.
   fuseau UTC, Discord libre, effacement) ; `essai-annule.cjs` joue maintenant la
   019 (`--migration` répétable, vérification = 018 + 019, sans le mot interdit) ;
   banc `communaute.cjs` +019 (1512 clair, 390 tactile sombre).
-- **Gestes de Julien** : (1) `node scripts/communaute-sql/essai-annule.cjs > essai.sql`,
-  coller, lire `essai` ; (2) coller `supabase/migrations/019-communaute-discord-classement.sql`
-  d'un bloc, VRM fermé ; (3) `… --verifier`, exiger `ok: true`.
+- ✅ **Appliquée en production le 20 octobre** (sur son « ok on fait discord »), par
+  l'outil (aucune suppression dedans). Vérifiée : 5 tables, RLS forcé, aucun droit
+  direct, les 14 fonctions identiques au fichier (md5). La 018 avait été complétée
+  juste avant : ses 3 fonctions qui contiennent le mot « delete » (quitter, bloquer,
+  effacer) ont été collées par Julien dans l'outil SQL (l'outil de la session attend
+  une confirmation humaine pour ce mot et expire).
+
+### Communauté : les groupes à code (accompagnement) — migration 020 (20 octobre) — PAS APPLIQUÉE
+Julien : « pour le classement et la carte, un endroit où je peux mettre un code pour
+que les membres d'un accompagnement puissent comparer leurs résultats ». Fichier
+`supabase/migrations/020-communaute-groupes.sql`, sur la 019 (refusée sans elle,
+empreinte d'avant), deux tables `vrm_communaute_groupes` (nom, code, créateur) et
+`vrm_communaute_membres` (groupe, `pid`, `quitte_le`), mêmes gardes que la 018 (RLS
+forcé, aucune règle ni droit, SECURITY DEFINER, empreinte des 7 tables). **Aucune
+suppression dans le fichier** (pas même une clé étrangère « on delete ») : il se
+colle d'un bloc, et l'outil de la session peut l'appliquer.
+- **Le code** : 8 caractères de l'alphabet sans I, O, 0, 1 (32⁸), tiré par la base ;
+  tapé avec tirets, espaces, minuscules, il est normalisé. Seul le créateur le change
+  (l'ancien ne marche plus ; les membres restent). 5 groupes créés, 10 rejoints, 200
+  membres au plus.
+- **Une adhésion porte le `pid` public de la carte, jamais le compte** : quitter la
+  carte (la ligne part) fait quitter tous ses groupes ; y revenir donne un nouveau
+  `pid`, dans aucun groupe. « Fermer mon compte » : `vrm_communaute_effacer` (018)
+  efface la ligne de la carte, ses adhésions ne se relient plus à rien (un `pid` au
+  hasard, ni compte ni email) ; un groupe qu'il avait créé perd seulement son
+  créateur. ⚠️ Le NOM d'un groupe reste (c'est le groupe des autres membres).
+- **Entrer dans un groupe est un consentement dit avant** (« ses membres verront ton
+  pseudo, ta ville et ton NOMBRE de ventes ») : le classement du groupe montre ses
+  membres SANS l'opt-in du classement public (qui reste à part). Il faut être sur la
+  carte. Blocages et abonnement : comme la carte.
+- **Une règle de comptage** : `vrm_communaute_classement_calc(periode, groupe)`
+  (aide interne, exécutée par personne) porte le comptage de la 019 mot pour mot ;
+  `vrm_communaute_classement(text)` (public) et `vrm_communaute_classement_groupe`
+  (membres seulement, sinon `erreur: 'groupe'`) l'appellent. `vrm_communaute_carte`
+  rend en plus `groupes` (les miens : nom, code, créateur ?, `pid` des membres).
+- **Route** : `action: groupe-creer | groupe-entrer | groupe-quitter | groupe-code`,
+  et `classement` avec `groupe` (`api/_lib/communaute.js`) ; sans la 020 : « Les
+  groupes ne sont pas encore activés sur ta base ». **Écran** (Carte et Classement) :
+  bloc « Groupe d'accompagnement » (Entrer un code · Créer un groupe · choix « Tous
+  les membres » / un groupe · code lisible ABCD-2345, Copier, Nouveau code pour le
+  créateur, Quitter) ; le groupe choisi filtre la carte, ses chiffres et le
+  classement. Base sans la 020 : aucun bloc (`carte.groupes` absent).
+- **Preuves** : `audit-communaute-sql.cjs` section 020 (~60 contrôles ; 6 mutations
+  rouges : non-membre qui lit, code changé par un autre, groupe qui compte tout le
+  monde, membre parti compté, bloqué visible, groupes d'autrui) ; banc
+  `communaute.cjs` partie 020 (1512 clair, 390 tactile sombre, et base sans la 020) ;
+  mutation de l'écran « filtre de groupe retiré » ⇒ 4 rouges.
+- **Pas fait** : la « connexion avec Discord » (un vrai bouton OAuth) — il faut une
+  application Discord à Julien (identifiant et secret sur Vercel), voir ci-dessous.
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets

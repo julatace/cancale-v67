@@ -67,7 +67,13 @@ const SECRETS = [A, Bu, ...Object.values(USERS).flatMap((u) => [u.email, u.login
 
 // ── La base : les RÈGLES de la 018, en JS ────────────────────────────────────
 let B;
-const reset = ({ installe = true, panne = false, installe19 = true, panneClassement = false } = {}) => { B = { installe, panne, installe19, panneClassement, profils: {}, convs: [], msgs: [], blocages: [], signalements: [], journal: [], reponses: [], ventes: {}, argsClassement: [] }; };
+const reset = ({ installe = true, panne = false, installe19 = true, installe20 = true, panneClassement = false } = {}) => { B = { installe, panne, installe19, installe20, panneClassement, profils: {}, convs: [], msgs: [], blocages: [], signalements: [], journal: [], reponses: [], ventes: {}, argsClassement: [], groupes: [] }; };
+const FONCTIONS_020 = ['vrm_communaute_groupe_creer', 'vrm_communaute_groupe_rejoindre', 'vrm_communaute_groupe_quitter', 'vrm_communaute_groupe_code', 'vrm_communaute_classement_groupe'];
+const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let nCode = 0;
+const codeNeuf = () => { let c = ''; let x = 1234567 + 7919 * ++nCode; for (let i = 0; i < 8; i++) { c += ALPHA[x % 32]; x = Math.floor(x / 3) + 17 * i; } return c; };
+const pidDe = (uid) => B.profils[uid] && B.profils[uid].pid;
+const membresActifs = (g) => g.membres.filter((m) => !m.quitte).map((m) => m.pid);
 const FONCTIONS_019 = ['vrm_communaute_discord', 'vrm_communaute_classement_inscrire', 'vrm_communaute_classement'];
 const arr = (x) => Math.round(Math.round(Number(x) * 20) / 20 * 100) / 100;
 let nId = 1;
@@ -76,6 +82,44 @@ const bloque = (qui, cible) => B.blocages.some((b) => b.qui === qui && b.bloque 
 const autreDe = (c, moi) => (c.a === moi ? c.b : c.a);
 function rpc(fn, args, uid) {
   if (!B.installe19 && FONCTIONS_019.includes(fn)) return undefined;
+  if (!B.installe20 && FONCTIONS_020.includes(fn)) return undefined;
+  if (fn === 'vrm_communaute_groupe_creer') {
+    if (!B.profils[uid]) return { ok: false, raison: 'invisible' };
+    const n = String(args.p_nom || '').trim();
+    if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) return { ok: false, raison: 'nom-groupe' };
+    const g = { id: uuid(), nom: n, code: codeNeuf(), cree_par: pidDe(uid), membres: [{ pid: pidDe(uid) }] }; B.groupes.push(g);
+    return { ok: true, id: g.id, code: g.code, nom: n };
+  }
+  if (fn === 'vrm_communaute_groupe_rejoindre') {
+    if (!B.profils[uid]) return { ok: false, raison: 'invisible' };
+    const g = B.groupes.find((x) => x.code === String(args.p_code || ''));
+    if (!g) return { ok: false, raison: 'code' };
+    const m = g.membres.find((x) => x.pid === pidDe(uid));
+    if (m && !m.quitte) return { ok: true, id: g.id, nom: g.nom, deja: true };
+    if (m) m.quitte = false; else g.membres.push({ pid: pidDe(uid) });
+    return { ok: true, id: g.id, nom: g.nom };
+  }
+  if (fn === 'vrm_communaute_groupe_quitter') {
+    const g = B.groupes.find((x) => x.id === args.p_groupe); const m = g && g.membres.find((x) => x.pid === pidDe(uid) && !x.quitte);
+    if (m) m.quitte = true; return { ok: true, quitte: !!m };
+  }
+  if (fn === 'vrm_communaute_groupe_code') {
+    const g = B.groupes.find((x) => x.id === args.p_groupe);
+    if (!g || g.cree_par !== pidDe(uid)) return { ok: false, raison: 'pas-createur' };
+    g.code = codeNeuf(); return { ok: true, code: g.code };
+  }
+  if (fn === 'vrm_communaute_classement_groupe') {
+    B.argsClassement.push(args);
+    const g = B.groupes.find((x) => x.id === args.p_groupe);
+    if (MUTATION !== 'groupe-non-membre' && (!g || !membresActifs(g).includes(pidDe(uid)))) return { acces: true, erreur: 'groupe' };
+    const per = String(args.p_periode || '');
+    const membres = Object.entries(B.profils).filter(([o, p]) => g && membresActifs(g).includes(p.pid))
+      .map(([o, p]) => ({ o, p, ventes: ((B.ventes[o] || {})[per]) || 0 })).sort((x, y) => y.ventes - x.ventes);
+    const rangs = membres.map((m) => ({ ...m, rang: 1 + membres.filter((z) => z.ventes > m.ventes).length }));
+    const me = rangs.find((m) => m.o === uid);
+    return { acces: true, periode: per, groupe: g && g.id, visible: true, inscrit: false, n: rangs.length, moi: me ? { rang: me.rang, ventes: me.ventes } : null,
+      lignes: rangs.filter((m) => !bloque(uid, m.o)).map((m) => ({ rang: m.rang, pid: m.p.pid, pseudo: m.p.pseudo, ville: m.p.ville, pays: m.p.pays, ventes: m.ventes, moi: m.o === uid })) };
+  }
   if (fn === 'vrm_communaute_discord') {
     if (!B.profils[uid]) return { ok: false, raison: 'invisible' };
     const d = String(args.p_discord || '').trim().toLowerCase();
@@ -106,7 +150,9 @@ function rpc(fn, args, uid) {
     const premier = (p) => !tous.some(([, q]) => q.pays === p.pays && q.ville.toLowerCase() === p.ville.toLowerCase() && q.cree_le < p.cree_le);
     const plus19 = (p, champs) => (B.installe19 ? Object.fromEntries(champs.map((k) => [k, k === 'classement' ? !!p[k] : (p[k] || null)])) : {});
     return { acces: true, moi: moi ? { pid: moi.pid, pseudo: moi.pseudo, ville: moi.ville, pays: moi.pays, lat: moi.lat, lon: moi.lon, depuis: moi.cree_le, ...plus19(moi, ['discord', 'classement']) } : null,
-      profils: tous.filter(([o]) => !bloque(uid, o)).map(([o, p]) => ({ pid: p.pid, pseudo: p.pseudo, ville: p.ville, pays: p.pays, lat: p.lat, lon: p.lon, moi: o === uid, premier: premier(p), ...plus19(p, MUTATION === 'discord-cache' ? [] : ['discord']) })) };
+      profils: tous.filter(([o]) => !bloque(uid, o)).map(([o, p]) => ({ pid: p.pid, pseudo: p.pseudo, ville: p.ville, pays: p.pays, lat: p.lat, lon: p.lon, moi: o === uid, premier: premier(p), ...plus19(p, MUTATION === 'discord-cache' ? [] : ['discord']) })),
+      ...(B.installe20 ? { groupes: B.groupes.filter((g) => moi && membresActifs(g).includes(moi.pid)).map((g) => ({ id: g.id, nom: g.nom, code: g.code, createur: g.cree_par === moi.pid,
+        membres: membresActifs(g).filter((pid) => Object.entries(B.profils).some(([o, p]) => p.pid === pid && !bloque(uid, o))) })) } : {}) };
   }
   if (fn === 'vrm_communaute_rejoindre') {
     const ps = String(args.p_pseudo || '').trim() || 'Revendeur', vi = String(args.p_ville || '').trim();
@@ -539,9 +585,87 @@ async function partie019(nav) {
       await ctx.close();
     });
     await partie019(nav);
+    await partie020(nav);
   } finally {
     await nav.close(); srv.close();
   }
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
   process.exit(ko ? 1 : 0);
 })();
+
+// ── 020 : les groupes à code ─────────────────────────────────────────────────
+async function partie020(nav) {
+  const C3 = '33333333-3333-4333-8333-333333333333', E5 = '55555555-5555-4555-8555-555555555555';
+  for (const [largeur, sombre] of [[1512, false], [390, true]]) {
+    console.log(`\n── 020 · ${largeur} px${sombre ? ' tactile, sombre' : ''} · les groupes à code`);
+    await essaie(`groupes ${largeur}`, async () => {
+      posePersonnes();
+      B.profils[C3] = { pid: uuid(), pseudo: 'Chloé', ville: 'Rennes', pays: 'FR', lat: 48.1, lon: -1.7, cree_le: '2026-10-18T00:00:00Z' };
+      B.profils[E5] = { pid: uuid(), pseudo: 'Émile', ville: 'Lyon', pays: 'FR', lat: 45.75, lon: 4.85, cree_le: '2026-10-17T00:00:00Z' };
+      B.ventes[C3] = { semaine: 4 }; B.ventes[E5] = { semaine: 11 };
+      const G = { id: uuid(), nom: 'Coaching Julien', code: 'ABCD2345', cree_par: B.profils[Bu].pid, membres: [{ pid: B.profils[Bu].pid }, { pid: B.profils[C3].pid }] };
+      B.groupes.push(G);
+      const { ctx, pg } = await ouvrir(nav, { qui: A, largeur, sombre });
+      dit(!!(await pg.$('[data-cm-groupes]')), 'la carte propose « Groupe d’accompagnement »');
+      dit(await attr(pg, '[data-communaute-etat]', 'data-cm-total') === '4', 'sans groupe : les 4 membres de la carte', await attr(pg, '[data-communaute-etat]', 'data-cm-total'));
+      await pg.click('[data-cm-groupe-entrer]');
+      await pg.fill('[data-cm-groupe-champ]', 'ZZZZ');
+      await pg.click('[data-cm-groupe-valider]');
+      await pg.waitForSelector('.vrm-cm-groupes .vrm-cm-msg', { timeout: 5000 });
+      dit(!G.membres.some((m) => m.pid === B.profils[A].pid), 'un code mal formé n’entre nulle part');
+      let dialogue = '';
+      pg.once('dialog', (d) => { dialogue = d.message(); d.dismiss(); });
+      await pg.fill('[data-cm-groupe-champ]', ' abcd-2345 ');
+      await pg.click('[data-cm-groupe-valider]');
+      await pg.waitForTimeout(400);
+      dit(/NOMBRE de ventes/.test(dialogue) && !G.membres.some((m) => m.pid === B.profils[A].pid), 'le consentement est demandé AVANT ; « Annuler » n’entre pas', dialogue.slice(0, 80));
+      pg.once('dialog', (d) => d.accept());
+      await pg.click('[data-cm-groupe-valider]');
+      await pg.waitForSelector(`[data-cm-groupe-actif="${G.id}"]`, { timeout: 8000 });
+      dit(G.membres.some((m) => m.pid === B.profils[A].pid), 'le code tapé en minuscules avec tiret fait entrer Alice');
+      await pg.waitForFunction(() => document.querySelector('[data-communaute-etat]').getAttribute('data-cm-total') === '3', null, { timeout: 8000 }).catch(() => {});
+      dit(await attr(pg, '[data-communaute-etat]', 'data-cm-total') === '3', 'le groupe choisi : la carte ne montre que ses 3 membres (pas Émile)', await attr(pg, '[data-communaute-etat]', 'data-cm-total'));
+      { const t = await texte(pg); dit(/3\s*membres dans « Coaching Julien »/.test(t) && /ABCD-2345/.test(t), 'les chiffres et le code lisible suivent le groupe', (t.match(/.{0,40}membres dans.{0,30}/) || [''])[0] + ' / ' + (t.match(/code.{0,15}/) || [''])[0]); }
+      dit(!(await pg.$('[data-cm-groupe-nouveau-code]')), 'Alice n’a pas créé le groupe : pas de « Nouveau code »');
+      await vers(pg, 'classement'); await classementLu(pg);
+      const l = await pg.$$eval('[data-cm-ligne]', (e) => e.map((x) => x.getAttribute('data-cm-ligne-ventes')));
+      dit(l.join(',') === '7,4,3' && !!(await pg.$('[data-cm-classement-de-groupe]')) && !(await pg.$('[data-cm-classement-entrer]')), 'le classement du groupe : ses 3 membres (7, 4, 3), même Alice qui n’est pas au classement public', l.join(','));
+      const dernier = B.argsClassement[B.argsClassement.length - 1];
+      dit(dernier && dernier.p_groupe === G.id && Object.keys(dernier).sort().join() === 'p_groupe,p_periode', 'le navigateur envoie la période et le groupe — jamais un chiffre', JSON.stringify(dernier));
+      await pg.click('[data-cm-groupe-choix="tous"]'); await classementLu(pg);
+      dit(!!(await pg.$('[data-cm-classement-entrer]')) && (await pg.$$('[data-cm-ligne]')).length === 1, '« Tous les membres » : le classement public (opt-in), comme avant');
+      await vers(pg, 'carte');
+      await pg.click(`[data-cm-groupe-choix="${G.id}"]`);
+      pg.once('dialog', (d) => d.accept());
+      await pg.click('[data-cm-groupe-quitter]');
+      await pg.waitForFunction(() => !document.querySelector('[data-cm-groupe-actif]'), null, { timeout: 8000 }).catch(() => {});
+      dit(G.membres.find((m) => m.pid === B.profils[A].pid).quitte === true && !(await pg.$('[data-cm-groupe-choix]')), 'quitter : le groupe disparaît, retour à tous les membres');
+      await pg.click('[data-cm-groupe-creer]');
+      await pg.fill('[data-cm-groupe-champ]', 'Mes élèves');
+      await pg.click('[data-cm-groupe-valider]');
+      await pg.waitForSelector('[data-cm-groupe-nouveau-code]', { timeout: 8000 });
+      const cree = B.groupes.find((g) => g.nom === 'Mes élèves');
+      dit(cree && await attr(pg, '[data-cm-groupe-code]', 'data-cm-groupe-code') === cree.code, 'créer un groupe : son code est affiché, avec « Nouveau code » pour le créateur');
+      pg.once('dialog', (d) => d.accept());
+      const avant = cree.code;
+      await pg.click('[data-cm-groupe-nouveau-code]');
+      await pg.waitForFunction((c) => document.querySelector('[data-cm-groupe-code]') && document.querySelector('[data-cm-groupe-code]').getAttribute('data-cm-groupe-code') !== c, avant, { timeout: 8000 }).catch(() => {});
+      dit(cree.code !== avant && await attr(pg, '[data-cm-groupe-code]', 'data-cm-groupe-code') === cree.code, 'le créateur change le code, l’écran montre le nouveau');
+      dit(sansSecret(await texte(pg)).length === 0, 'aucun identifiant de compte ni email à l’écran');
+      const largeurPage = await pg.evaluate(() => document.documentElement.scrollWidth);
+      dit(largeurPage <= largeur, 'aucun débordement horizontal', String(largeurPage));
+      if (largeur < 600) {
+        const petits = await pg.$$eval('.vrm-cm-groupes button', (bs) => bs.filter((b) => b.offsetParent && b.getBoundingClientRect().height < 43).map((b) => b.textContent.trim()));
+        dit(petits.length === 0, 'au doigt : chaque bouton des groupes fait au moins 44 px', petits.join(' | '));
+      }
+      await ctx.close();
+    });
+  }
+  console.log('\n── 020 · sans la 020 sur la base');
+  await essaie('sans 020', async () => {
+    posePersonnes(); B.installe20 = false;
+    const { ctx, pg } = await ouvrir(nav, { qui: A });
+    dit(await etatDe(pg) === 'lu' && !(await pg.$('[data-cm-groupes]')), 'base sans la 020 : la carte marche, aucun bloc de groupes (rien de cassé)');
+    await ctx.close();
+  });
+}

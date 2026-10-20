@@ -111,3 +111,11 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-qui small { display: block; color: var(--cm-doux); font-size: 12px; }
 .vrm-cm-ventes { color: var(--cm-doux); font-size: 13px; text-align: right; white-space: nowrap; }
 .vrm-cm-ventes b { color: var(--cm-encre); font-size: 17px; font-variant-numeric: tabular-nums; }
+
+/* ── Les groupes à code (020) ─────────────────────────────────────────────── */
+.vrm-cm-groupes { display: grid; gap: 10px; }
+.vrm-cm-groupes-tete { display: block; }
+.vrm-communaute .vrm-cm-choix-groupe { margin: 0; }
+.vrm-communaute .vrm-cm-choix-groupe .vrm-cm-onglet { flex: 0 0 auto; padding: 0 14px; }
+.vrm-cm-groupe-actif { display: grid; gap: 8px; }
+.vrm-cm-groupe-actif b { font-variant-numeric: tabular-nums; letter-spacing: .04em; }

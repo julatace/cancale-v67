@@ -15,6 +15,8 @@
 //  Migration 019 : un pseudo DISCORD facultatif sur sa présence (montré aux
 //  membres visibles), et un CLASSEMENT opt-in (jour · semaine · mois · année)
 //  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
+//  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
+//  classement peuvent n'afficher que les membres d'un groupe.
 //  La carte : Leaflet 1.9.4 depuis cdnjs, chargé à l'ouverture de l'écran
 //  (jamais au démarrage), fond OpenStreetMap / CARTO avec leur attribution.
 //  Injoignable ⇒ la même communauté en liste.
@@ -278,6 +280,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const [filOuvert, setFilOuvert] = useState(null), [enListe, setEnListe] = useState(false);
   const [envoye, setEnvoye] = useState(() => new Set()), [toast, setToast] = useState('');
   const [vue, setVue] = useState('carte');            // carte · classement
+  const [groupeId, setGroupeId] = useState(null);     // null = tous les membres
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {
     if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
@@ -294,11 +297,15 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t); }, [toast]);
 
   const moi = carte && carte.moi;
-  const profils = (carte && carte.profils) || [];
-  const cells = useMemo(() => cellules(profils, moi), [carte]);
-  const r = useMemo(() => resume(profils, moi), [carte]);
+  const groupes = carte && Array.isArray(carte.groupes) ? carte.groupes : null;   // null : la 020 n'est pas installée
+  const groupe = (groupes && groupeId && groupes.find((g) => g.id === groupeId)) || null;
+  useEffect(() => { if (groupeId && groupes && !groupe) setGroupeId(null); }, [groupeId, groupes, groupe]);
+  const tousProfils = (carte && carte.profils) || [];
+  const profils = useMemo(() => (groupe ? tousProfils.filter((p) => p.moi || groupe.membres.includes(p.pid)) : tousProfils), [carte, groupe]);
+  const cells = useMemo(() => cellules(profils, moi), [profils]);
+  const r = useMemo(() => resume(profils, moi), [profils]);
   const nonLus = convs.reduce((s, c) => s + (Number(c.nonLus) || 0), 0);
-  const pres = useMemo(() => (moi ? profils.filter((p) => !p.moi && distanceKm({ lat: +moi.lat, lon: +moi.lon }, { lat: +p.lat, lon: +p.lon }) <= RAYON_PRES_KM) : []), [carte]);
+  const pres = useMemo(() => (moi ? profils.filter((p) => !p.moi && distanceKm({ lat: +moi.lat, lon: +moi.lon }, { lat: +p.lat, lon: +p.lon }) <= RAYON_PRES_KM) : []), [profils]);
 
   const quitter = async () => {
     const x = await api({ action: 'quitter' });
@@ -335,13 +342,16 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
     {[['carte', 'Carte'], ['classement', 'Classement']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
   </div>;
+  const blocGroupes = groupes && <Groupes api={api} moi={moi} groupes={groupes} actif={groupe} onChoisir={setGroupeId}
+    onFait={async (t, id) => { setToast(t); await lire(true); if (id !== undefined) setGroupeId(id); }} />;
   if (vue === 'classement') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="classement">
-    {entete}{onglets}
-    <Classement api={api} moi={moi} />
+    {entete}{onglets}{blocGroupes}
+    <Classement key={groupe ? groupe.id : 'tous'} api={api} moi={moi} groupe={groupe} />
+    {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
   </section>;
 
   return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-total={r.total} data-cm-vue-active="carte">
-    {entete}{onglets}
+    {entete}{onglets}{blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
     {/* Ma présence : l'opt-in, toujours visible */}
@@ -360,11 +370,14 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     </div>
 
     {/* Ce qui se passe : uniquement ce qui est lu */}
-    {r.autres === 0 ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide>
+    {r.autres === 0 ? (groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide="groupe">
+      <b>Personne d’autre que toi dans « {groupe.nom} » pour l’instant.</b>
+      <p>Donne le code <b>{codeLisible(groupe.code)}</b> aux membres de ton accompagnement : ils apparaîtront ici dès qu’ils l’auront tapé.</p>
+    </div> : <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide>
       <b>{moi ? 'Personne d’autre que toi sur la carte pour l’instant.' : 'Personne n’est encore sur la carte.'}</b>
       <p>{moi ? 'Dès qu’un autre revendeur VRM y mettra sa ville, il apparaîtra ici — et vous pourrez vous écrire.' : 'Sois le premier : mets ta ville, les prochains revendeurs te trouveront.'}</p>
-    </div> : <ul className="vrm-cm-chiffres" aria-label="La communauté en chiffres">
-      <li data-cm-chiffre="total"><b>{r.total}</b> revendeur{r.total > 1 ? 's' : ''} sur la carte</li>
+    </div>) : <ul className="vrm-cm-chiffres" aria-label="La communauté en chiffres">
+      <li data-cm-chiffre="total"><b>{r.total}</b> {groupe ? `membre${r.total > 1 ? 's' : ''} dans « ${groupe.nom} »` : `revendeur${r.total > 1 ? 's' : ''} sur la carte`}</li>
       <li data-cm-chiffre="villes"><b>{r.villes}</b> ville{r.villes > 1 ? 's' : ''}</li>
       {moi && <li data-cm-chiffre="ville"><b>{r.dansMaVille}</b> autre{r.dansMaVille > 1 ? 's' : ''} à {moi.ville}</li>}
       {moi && <li data-cm-chiffre="pres"><b>{r.pres}</b> à moins de {RAYON_PRES_KM} km</li>}
@@ -475,20 +488,20 @@ export const PERIODES = [['jour', 'Aujourd’hui'], ['semaine', 'Semaine'], ['mo
 export const rangTexte = (n) => (Number(n) === 1 ? '1er' : `${n}ᵉ`);
 const CLASSEMENT_PAS_SU = "Je n'ai pas pu lire le classement — rien n'est perdu, c'est la lecture qui a échoué.";
 
-function Classement({ api, moi }) {
+function Classement({ api, moi, groupe }) {
   const [periode, setPeriode] = useState('semaine');
   const [etat, setEtat] = useState('charge'), [c, setC] = useState(null), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
   const seq = useRef(0);
   const lire = useCallback(async (per) => {
     const n = ++seq.current;
     setEtat('charge'); setMsg('');
-    const r = await api({ action: 'classement', periode: per });
+    const r = await api(groupe ? { action: 'classement', periode: per, groupe: groupe.id } : { action: 'classement', periode: per });
     if (n !== seq.current) return;
     if (r.ok && r.classement && Array.isArray(r.classement.lignes)) { setC(r.classement); setEtat('lu'); return; }
     setC(null);
     setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su');
     setMsg(r.message || CLASSEMENT_PAS_SU);
-  }, [api]);
+  }, [api, groupe]);
   useEffect(() => { lire(periode); }, [periode, lire]);
   const inscrire = async (oui) => {
     if (oui && !window.confirm('Entrer dans le classement ? Les membres VRM verront ton pseudo, ta ville et ton NOMBRE de ventes Vinted sur la période — jamais un montant. Tu peux en sortir quand tu veux.')) return;
@@ -510,8 +523,9 @@ function Classement({ api, moi }) {
   </div>;
 
   const inscrit = c && c.inscrit, visible = c ? c.visible : !!moi;
-  return <div data-cm-classement={etat} data-cm-classement-n={c ? c.n : ''}>
-    <div className="vrm-cm-carton vrm-cm-moi" data-cm-inscrit={inscrit ? 'oui' : 'non'}>
+  return <div data-cm-classement={etat} data-cm-classement-n={c ? c.n : ''} data-cm-classement-groupe={groupe ? groupe.id : ''}>
+    {groupe ? <div className="vrm-cm-carton" data-cm-classement-de-groupe><b>Classement de « {groupe.nom} »</b><span> · les membres du groupe, entre eux.</span></div>
+    : <div className="vrm-cm-carton vrm-cm-moi" data-cm-inscrit={inscrit ? 'oui' : 'non'}>
       {!c ? <span>Lecture du classement…</span>
         : inscrit ? <><div><b>Tu es dans le classement</b><span> sous le pseudo « {(moi && moi.pseudo) || '—'} ».</span></div>
           <button type="button" onClick={() => inscrire(false)} disabled={occupe} data-cm-classement-sortir>Me retirer du classement</button></>
@@ -519,10 +533,10 @@ function Classement({ api, moi }) {
         : <><div><b>Tu n’es pas dans le classement.</b><span> Personne ne voit tes ventes tant que tu ne l’as pas décidé.</span></div>
           <button type="button" className="vrm-cm-primaire" onClick={() => inscrire(true)} disabled={occupe} data-cm-classement-entrer>Entrer dans le classement</button></>}
       {msg && etat === 'lu' && <p className="vrm-cm-msg" role="alert">{msg}</p>}
-    </div>
+    </div>}
     {choix}
     {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
-      : c.n === 0 ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
+      : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
       : <div className="vrm-cm-carton">
         {c.moi ? <p className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}>Tu es <b>{rangTexte(c.moi.rang)}</b> sur {c.n} · {c.moi.ventes} vente{c.moi.ventes > 1 ? 's' : ''}</p>
           : <p className="vrm-cm-note">{c.n} membre{c.n > 1 ? 's' : ''} dans le classement.</p>}
@@ -533,5 +547,88 @@ function Classement({ api, moi }) {
         </li>)}</ol>
       </div>}
     {note}
+  </div>;
+}
+
+// ── LES GROUPES À CODE (020) ─────────────────────────────────────────────────
+// Un accompagnement : celui qui crée le groupe reçoit un code de 8 caractères et
+// le donne à ses membres ; la carte et le classement peuvent ne montrer qu'eux.
+// Entrer dans un groupe est un consentement dit AVANT le geste.
+export const codeLisible = (c) => (String(c || '').length === 8 ? c.slice(0, 4) + '-' + c.slice(4) : String(c || ''));
+export const codeTape = (x) => String(x || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+export const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+
+function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
+  const [mode, setMode] = useState(''), [v, setV] = useState(''), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false), [copie, setCopie] = useState('');
+  const fermer = () => { setMode(''); setV(''); setMsg(''); };
+  const entrer = async (e) => {
+    e.preventDefault();
+    const c = codeTape(v);
+    if (!CODE_RE.test(c)) { setMsg('Un code fait 8 caractères (lettres et chiffres), par exemple ABCD-2345.'); return; }
+    if (!window.confirm('Entrer dans ce groupe ? Ses membres verront ton pseudo, ta ville et ton NOMBRE de ventes Vinted (jamais un montant). Tu pourras le quitter quand tu veux.')) return;
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'groupe-entrer', code: c });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    fermer(); onFait(r.deja ? `Tu es déjà dans « ${r.nom} ».` : `Bienvenue dans « ${r.nom} » !`, r.id);
+  };
+  const creer = async (e) => {
+    e.preventDefault();
+    const n = v.trim();
+    if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) { setMsg('Un nom de 2 à 40 caractères, sans « @ ».'); return; }
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'groupe-creer', nom: n });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    fermer(); onFait(`Groupe créé. Son code : ${codeLisible(r.code)} — donne-le à tes membres.`, r.id);
+  };
+  const quitter = async () => {
+    if (!actif || !window.confirm(`Quitter « ${actif.nom} » ? Tu n’y apparaîtras plus. Pour revenir, il faudra le code.`)) return;
+    const r = await api({ action: 'groupe-quitter', groupe: actif.id });
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    onFait(`Tu as quitté « ${actif.nom} ».`, null);
+  };
+  const nouveauCode = async () => {
+    if (!actif || !window.confirm('Changer le code ? L’ancien ne marchera plus pour entrer (les membres déjà dedans restent).')) return;
+    const r = await api({ action: 'groupe-code', groupe: actif.id });
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    onFait(`Nouveau code : ${codeLisible(r.code)}`);
+  };
+  const copier = async () => {
+    try { await navigator.clipboard.writeText(codeLisible(actif.code)); setCopie('copié'); }
+    catch (_) { setCopie('copie impossible — sélectionne-le'); }
+  };
+  return <div className="vrm-cm-carton vrm-cm-groupes" data-cm-groupes={groupes.length}>
+    <div className="vrm-cm-groupes-tete"><b>Groupe d’accompagnement</b>
+      <span className="vrm-cm-note"> Entre le code de ton accompagnement pour vous comparer entre vous.</span></div>
+    {groupes.length > 0 && <div className="vrm-cm-onglets vrm-cm-choix-groupe" role="group" aria-label="Qui afficher">
+      <button type="button" className="vrm-cm-onglet" aria-pressed={!actif} onClick={() => onChoisir(null)} data-cm-groupe-choix="tous">Tous les membres</button>
+      {groupes.map((g) => <button key={g.id} type="button" className="vrm-cm-onglet" aria-pressed={!!actif && actif.id === g.id} onClick={() => onChoisir(g.id)} data-cm-groupe-choix={g.id}>{g.nom}</button>)}
+    </div>}
+    {actif && <div className="vrm-cm-groupe-actif" data-cm-groupe-actif={actif.id}>
+      <span>{actif.membres.length} membre{actif.membres.length > 1 ? 's' : ''} · code <b className="vrm-cm-select" data-cm-groupe-code={actif.code}>{codeLisible(actif.code)}</b></span>
+      <div className="vrm-cm-ligne-boutons">
+        <button type="button" onClick={copier} data-cm-groupe-copier>{copie || 'Copier le code'}</button>
+        {actif.createur && <button type="button" onClick={nouveauCode} data-cm-groupe-nouveau-code>Nouveau code</button>}
+        <button type="button" onClick={quitter} data-cm-groupe-quitter>Quitter le groupe</button>
+      </div>
+    </div>}
+    {!moi ? <p className="vrm-cm-note" data-cm-groupe-carte-requise>Mets-toi d’abord sur la carte (onglet Carte) : un groupe montre ton pseudo et ta ville à ses membres.</p>
+      : mode === '' ? <div className="vrm-cm-ligne-boutons">
+        <button type="button" className="vrm-cm-primaire" onClick={() => setMode('entrer')} data-cm-groupe-entrer>Entrer un code</button>
+        <button type="button" onClick={() => setMode('creer')} data-cm-groupe-creer>Créer un groupe</button>
+      </div>
+      : <form className="vrm-cm-ville" onSubmit={mode === 'entrer' ? entrer : creer} data-cm-groupe-form={mode}>
+        <label className="vrm-cm-champ"><span>{mode === 'entrer' ? 'Le code du groupe' : 'Le nom du groupe'}</span>
+          <input value={v} maxLength={mode === 'entrer' ? 12 : 40} autoCapitalize={mode === 'entrer' ? 'characters' : 'sentences'} autoCorrect="off" spellCheck={false}
+            onChange={(e) => setV(e.target.value)} placeholder={mode === 'entrer' ? 'ABCD-2345' : 'Accompagnement de Julien'} data-cm-groupe-champ /></label>
+        {mode === 'entrer' ? <p className="vrm-cm-note">Ses membres verront ton pseudo, ta ville et ton nombre de ventes Vinted — jamais un montant.</p>
+          : <p className="vrm-cm-note">Tu recevras un code à donner aux membres de ton accompagnement. Toi seul pourras le changer.</p>}
+        <div className="vrm-cm-ligne-boutons">
+          <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-groupe-valider>{occupe ? 'Un instant…' : mode === 'entrer' ? 'Entrer dans le groupe' : 'Créer le groupe'}</button>
+          <button type="button" onClick={fermer}>Annuler</button>
+        </div>
+      </form>}
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
   </div>;
 }

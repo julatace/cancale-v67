@@ -17,6 +17,11 @@
 //   POST { action: 'classement', periode }     (019 — jour|semaine|mois|annee ; le
 //                                               chiffre est COMPTÉ par la base)
 //   POST { action: 'inscrire', oui }           (019 — opt-in au classement)
+//   POST { action: 'classement', periode, groupe }  (020 — le classement d'UN groupe)
+//   POST { action: 'groupe-creer', nom }       (020 — rend le code du groupe)
+//   POST { action: 'groupe-entrer', code }     (020 — le code d'un accompagnement)
+//   POST { action: 'groupe-quitter', groupe }  (020)
+//   POST { action: 'groupe-code', groupe }     (020 — le créateur change le code)
 // TROIS ÉTATS, JAMAIS DEUX :
 //   · 200 `ok: true`                — lu / fait ;
 //   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
@@ -48,9 +53,20 @@ const RAISONS = {
   'tu-as-bloque': 'Tu as bloqué cette personne. Débloque-la pour lui écrire.',
   'plafond-heure': '20 messages par heure au plus — réessaie un peu plus tard.',
   'plafond-jour': '5 nouvelles conversations par jour au plus — réessaie demain.',
+  'nom-groupe': 'Le nom du groupe fait de 2 à 40 caractères, sans « @ ».',
+  code: 'Ce code ne correspond à aucun groupe. Vérifie-le (8 caractères, lettres et chiffres).',
+  'trop-crees': 'Tu as déjà créé 5 groupes : c’est le maximum.',
+  'trop-groupes': 'Tu es déjà dans 10 groupes : quittes-en un d’abord.',
+  'groupe-plein': 'Ce groupe est complet (200 membres).',
+  'pas-createur': 'Seule la personne qui a créé le groupe peut changer son code.',
+  groupe: 'Tu ne fais pas partie de ce groupe.',
   discord: 'Ce pseudo Discord ne va pas : 2 à 32 caractères, lettres minuscules, chiffres, « . » ou « _ », sans « @ ».',
 };
 export const CLASSEMENT_NON_INSTALLE = "Le classement n'est pas encore activé sur ta base.";
+export const GROUPES_NON_INSTALLE = "Les groupes ne sont pas encore activés sur ta base.";
+// Un code de groupe : 8 caractères parmi l'alphabet sans I, O, 0, 1 (la forme de la 020).
+export const codeGroupe = (x) => String(x || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+export const CODE_GROUPE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
 export const PERIODES_CLASSEMENT = ['jour', 'semaine', 'mois', 'annee'];
 // La forme des pseudos Discord actuels (la même que la contrainte de la 019).
 export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
@@ -111,7 +127,9 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (!carte) return refus('session');
     if (carte.acces === false) return refus('abonnement');
     if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
-    return dire(200, { ok: true, carte: { moi: objet(carte.moi), profils: carte.profils }, conversations: l.data });
+    const c2 = { moi: objet(carte.moi), profils: carte.profils };
+    if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
+    return dire(200, { ok: true, carte: c2, conversations: l.data });
   }
 
   const action = String((corps && corps.action) || '');
@@ -182,16 +200,44 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   if (action === 'classement') {
     const periode = String((corps && corps.periode) || '');
     if (!PERIODES_CLASSEMENT.includes(periode)) return dire(400, { ok: false, erreur: 'periode', message: 'Période inconnue.' });
-    // Seule la PÉRIODE part : aucun chiffre n'est jamais transmis à la base.
-    const r = await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
-    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE });
+    const groupe = corps && corps.groupe ? String(corps.groupe) : '';
+    if (groupe && !UUID_RE.test(groupe)) return refus('groupe', 404);
+    // Seule la PÉRIODE (et le groupe) part : aucun chiffre n'est jamais transmis à la base.
+    const r = groupe
+      ? await rpcEquipe('vrm_communaute_classement_groupe', { p_periode: periode, p_groupe: groupe }, qui)
+      : await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: groupe ? GROUPES_NON_INSTALLE : CLASSEMENT_NON_INSTALLE });
     if (r.etat !== 'ok') return pasSu();
     const c = objet(r.data);
     if (!c) return refus('session');
     if (c.acces === false) return refus('abonnement');
+    if (c.erreur === 'groupe') return refus('groupe', 404);
     if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
     return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
-      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes } });
+      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes, groupe: c.groupe || null } });
+  }
+  if (action.startsWith('groupe-')) {
+    const nonInst = () => dire(503, { ok: false, erreur: 'non-installe', message: GROUPES_NON_INSTALLE });
+    let nom, args;
+    if (action === 'groupe-creer') {
+      const n = String((corps && corps.nom) || '').trim();
+      if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) return refus('nom-groupe');
+      nom = 'vrm_communaute_groupe_creer'; args = { p_nom: n };
+    } else if (action === 'groupe-entrer') {
+      const c = codeGroupe(corps && corps.code);
+      if (!CODE_GROUPE_RE.test(c)) return refus('code');
+      nom = 'vrm_communaute_groupe_rejoindre'; args = { p_code: c };
+    } else if (action === 'groupe-quitter' || action === 'groupe-code') {
+      const g = String((corps && corps.groupe) || '');
+      if (!UUID_RE.test(g)) return refus('groupe', 404);
+      nom = action === 'groupe-quitter' ? 'vrm_communaute_groupe_quitter' : 'vrm_communaute_groupe_code'; args = { p_groupe: g };
+    } else return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
+    const r = await rpcEquipe(nom, args, qui);
+    if (r.etat === 'absent') return nonInst();
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    if (r.data.ok !== true) return refus(String(r.data.raison || 'inconnue'), 409);
+    const { ok: _ok, ...reste } = r.data;
+    return dire(200, { ok: true, ...reste });
   }
   return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
 }
