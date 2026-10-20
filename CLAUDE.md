@@ -10878,6 +10878,62 @@ Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), ca
 - Bancs mis à la forme « une ligne par vente » sans les affaiblir (ouvrir la vente comme lui, viser le bouton VISIBLE) : achats-hors-plateforme, deux-extensions (+ `BANC_PORT`), menu-range (le bouton caché « Tous les écrans » de l'en-tête), ventes-bordereau, revendeurs, perfv (logo renommé `/vrm-logo-*`, l'en-tête « Article · état » n'est pas une vente), journee-premium (le bonjour à 0 px sur téléphone est compact), prouve-regle-offre (5 ancres suivies jusqu'au code actuel).
 - **Rouges AVANT #596, laissés (cause à part, notés)** : compact, dictee, lbc-publier-app (H : téléphone), mobile, numeros-lettres, numeros-remise-a-zero, photos-vinted, pont, sauvegarde, serie (la porte « Coût d'achat » introuvable sur Ventes), session, stats-premium (choix de Julien du 18 oct.), prouve-regle-offre (« base d'avant » : l'arbre `/tmp/avant-regle` n'existe que chez qui le fabrique).
 
+### Audit de bout en bout sur ses données du 20 octobre — 7 écarts corrigés, le reste juste
+Copie fraîche de sa base (lecture seule, `execute_sql` ; un résultat trop gros
+est rangé par l'outil dans un fichier, lu sans passer par le contexte), rangée
+dans `scripts/bancs/fx/rows.json` (gitignoré, PDF remplacés par 12 octets, jetons
+retirés), servie à l'app par un mini-PostgREST (`scripts/bancs/_minipgrest.cjs` :
+`meta->>`, `data->>`, `or=`, `cs.`, projection, `Range`). Chaque écran et chaque
+section rendus à 390 tactile et 1512, clair et sombre : aucun écran mort, aucun
+débordement, aucune erreur. Chaque chiffre comparé à une requête SQL écrite à
+part (règles de ce dossier, pas le code).
+- **Justes** (mesure = écran) : à envoyer 16 · à retirer 6 et leurs 6 codes ·
+  bordereaux prêts 16 · annonces en ligne 52 (11+0+14+9+8+10+0, la lecture
+  complète la plus récente de chaque compte) · « à vérifier sur carton » 34 ·
+  vendu octobre 2 626,80 € / 47 ventes · aujourd'hui 45 € · reçu octobre
+  1 145,67 € (19 versements) · CA déclaré août 2 311,40 · sept. 4 330,90 ·
+  2026 10 349,77 € · en attente 2 145,80 € sur 6 porte-monnaie, disponible
+  0,67 € · messages non lus < 7 j : 8 · 4 doublons de N° sur Colis · Leboncoin
+  finalisé 133 € (2 sans date, « à dater »).
+- **Corrigés** (banc `audit-reel-20oct.cjs`, données inventées, 24 rouges sur
+  11bac30, chaque correctif réaffaibli ⇒ rouge) :
+  1. Comptes liés : « lié le » lisait `updated_at` (renouvellement des jetons) —
+     sept comptes de juillet-août « liés le 20/10/2026 » ⇒ `created_at`.
+  2. Statistiques : « Finalisé sur Vinted » 8 480,97 € excluait **99 ventes
+     masquées (2 157,80 €)** sans le dire, pendant que le CA déclaré (10 638,77 €)
+     les compte ⇒ le chiffre ne bouge pas, la carte et la ligne « Vinted » de
+     « par plateforme » le DISENT (`nMasque`/`caMasque`, `data-finalise-masquees`).
+  3. Leboncoin : « 2 vendues sur Vinted — à retirer » pour UNE paire (N°18 marquée
+     publiée ET vue sur Leboncoin) ⇒ une ligne par N°, celle qui a le lien.
+  4. eBay : VRM-48 (publiée le 15) affichée « N°48 », reliée — aucune fiche ne
+     porte plus 48 (sa paire est la N°53 depuis le 18) ⇒ « à vérifier · pas
+     reliée » (`numEbayLu` : zéro porteur, fiches lues ⇒ `null`).
+  5. eBay → Compte : une route muette affichait « eBay pas encore configuré —
+     ajoute tes clés dans Vercel » ⇒ trois états (`data-ebay-statut`).
+  6. Ma journée ne disait pas les **deux paires sous un même N°** (N°50, 58, 60,
+     88 ; trois sur une paire à poster) ⇒ une ligne urgente, la liste de Colis.
+  7. Fraîcheur : seul jujuf38 (6 j) était nommé, pas julatace35260 (3 j) ⇒ tous
+     les comptes en retard, chacun avec son âge (`dataAgeComptes`).
+- **Notés, pas corrigés** : Messages « Non lues 156 » compte de vieux drapeaux
+  (comptes pas relus : jujuf38 48) quand Ma journée dit 8 (< 7 j, libellé dit) ;
+  « total des ventes payées eBay indisponible » alors qu'eBay est lu à 0 commande ;
+  Leboncoin → Messages : le compteur (id `8442c3e8…`, celui des annonces) et le
+  compte SHOPCANCALE (`faf3fbba…`, comptes liés) font deux lignes — c'est
+  l'extension 5.195 (#610) qui les rapproche ; l'écran Leboncoin compte « 1 à
+  confirmer » (une annonce du compte orphelin `3170782324`) que l'écran Annonces
+  ne montre pas (décision « compte orphelin » toujours à trancher par Julien) ;
+  Compta « Vendu juin 41 € · Finalisé 1 512,70 € » (le vendu exclut les ventes
+  masquées, le finalisé non — deux règles écrites, à trancher).
+- **Reprise du 20 oct. (après fusion d'origin/main ac29d0e)** : banc refait sur le
+  build d'ac29d0e — 24 rouges, 0 après ; mutation « `updated_at` + zéro porteur
+  relié » ⇒ 8 rouges ; audits et bancs voisins (eBay, Leboncoin, annonces,
+  comptes, Ma journée, chiffres croisés) verts.
+- **Gestes de Julien** : (1) **l'annonce eBay VRM-82 « Nike air max 1 noir taille
+  44 » (128137572355) est probablement la paire vendue sur Vinted le 18 (tomj606,
+  N°81, à poster)** — la terminer sur eBay après avoir regardé les photos (VRM ne
+  peut pas la relier par identité) ; (2) corriger les 4 doublons de N° avant
+  d'imprimer (Colis) ; (3) repasser sur Vinted connecté sur **jujuf38** (6 j) et
+  **julatace35260** (3 j) ; (4) les 34 numéros à vérifier sur carton.
 ### Ce qui casse en production côté serveur — mesuré le 20 octobre
 Lecture seule : Vercel (erreurs 7 j, journaux 50 min, déploiements), Supabase (journaux
 edge/PostgREST/Postgres/auth sur 24 h glissantes, conseillers, `pg_stat_statements`),
