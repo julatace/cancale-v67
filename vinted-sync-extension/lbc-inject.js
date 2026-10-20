@@ -180,10 +180,15 @@
       chemin = sansUuid(chemin).replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
       const rec = ((methode ? String(methode).toUpperCase() + ' ' : '') + host + chemin
         + (s ? ' → ' + s : '') + (t ? ' [' + t + ']' : '')).slice(0, 160);
-      if (!seenPaths.has(rec)) { seenPaths.add(rec); seenDirty = true; }
+      // (20 oct.) Un chemin revu remonte en dernier (ordre = du plus ancien au
+      // plus récent), et ce sont les 200 PLUS RÉCENTS qui partent : la ligne de
+      // base, pleine, remplace désormais les plus anciens par ceux-là.
+      if (seenPaths.has(rec)) seenPaths.delete(rec); else seenDirty = true;
+      seenPaths.add(rec);
+      if (seenPaths.size > 400) seenPaths.delete(seenPaths.values().next().value);
     } catch (_) {}
   };
-  setInterval(() => { if (seenDirty) { seenDirty = false; post({ kind: 'lbcpaths', paths: [...seenPaths].slice(0, 200) }); } }, 4000);
+  setInterval(() => { if (seenDirty) { seenDirty = false; post({ kind: 'lbcpaths', paths: [...seenPaths].slice(-200) }); } }, 4000);
 
   // ── LA CARTE COMPLÈTE DE LEBONCOIN (Julien, 23 sept. : « capte tout ») ─────
   //    Pour CHAQUE réponse JSON Leboncoin, on relève sa STRUCTURE — chemins de
@@ -260,6 +265,82 @@
     } finally { detailEnCours = false; }
   };
 
+  // ── LE COMPTE DE CE DOCUMENT (20 oct., 5.196) ─────────────────────────────
+  // Changer de compte Leboncoin recharge la page : « mes annonces » du nouveau
+  // compte peut arriver AVANT le compteur de messagerie (seule preuve du compte
+  // connecté), et le fond, qui gardait l'ancien compte, la rangeait sous
+  // l'ancien. ⇒ Une liste « à moi » ne part qu'avec le compte du compteur relu
+  // DANS CE DOCUMENT : relu avant elle ⇒ elle part tout de suite avec lui ; pas
+  // encore relu ⇒ elle attend le premier compteur de ce document (90 s au plus,
+  // sinon elle est jetée — la prochaine visite la reprendra) ; deux comptes
+  // différents dans le même document ⇒ plus rien n'est attribué ici.
+  const MOI_LISTE = /(\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list)/i;
+  let sessDoc = '', basculeDoc = false;
+  const listesEnAttente = [];
+  const noterCompteurDoc = (id) => {
+    if (!sessDoc) {
+      sessDoc = id;
+      while (listesEnAttente.length) { const x = listesEnAttente.shift(); clearTimeout(x.t); post({ kind: 'lbcraw', url: x.url, body: x.body, session: id }); }
+    } else if (id !== sessDoc && !basculeDoc) {
+      basculeDoc = true;
+      while (listesEnAttente.length) clearTimeout(listesEnAttente.shift().t);
+    }
+  };
+  const posterListeMoi = (url, body) => {
+    if (basculeDoc) return;                                   // deux comptes ici : rien d'attribué
+    if (sessDoc) { post({ kind: 'lbcraw', url, body, session: sessDoc }); return; }
+    if (listesEnAttente.length >= 3) clearTimeout(listesEnAttente.shift().t);
+    const x = { url, body, t: 0 };
+    x.t = setTimeout(() => { const i = listesEnAttente.indexOf(x); if (i >= 0) listesEnAttente.splice(i, 1); }, 90000);
+    listesEnAttente.push(x);
+  };
+
+  // ── LA DATE DES VENTES (20 oct., 5.196) ────────────────────────────────────
+  // La date de VENTE n'est que dans la LISTE des transactions (`created_at`) ;
+  // le détail n'en porte aucune. Une vente ouverte directement (un lien, une
+  // notification) n'était donc jamais datée tant qu'il ne repassait pas par
+  // « Mes transactions ». ⇒ On retient les adresses EXACTES des listes que le
+  // site a lui-même demandées (jamais une adresse devinée) et les ventes qu'on
+  // y a vues datées ; quand un détail « je suis le vendeur » arrive pour une
+  // vente jamais vue datée, on relit ces listes — LECTURE de ses données (§3),
+  // 3 au plus, une par une, pas avant 6 h.
+  const LISTES_CLE = 'vrm_lbc_listes', DATEES_CLE = 'vrm_lbc_datees', RELU_CLE = 'vrm_lbc_listes_relues';
+  const lireLS = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (_) { return d; } };
+  const ecrireLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+  const noterListe = (url, text) => {
+    let arr; try { arr = JSON.parse(text); } catch (_) { return; }
+    if (!Array.isArray(arr)) return;
+    const l = lireLS(LISTES_CLE, []).filter((u) => u !== url); l.push(url); ecrireLS(LISTES_CLE, l.slice(-3));
+    const d = lireLS(DATEES_CLE, {});
+    for (const t of arr) { const id = String((t && ((t.id && t.id.purchase_id) || t.purchase_id)) || ''); if (id && t && typeof t.created_at === 'string' && !isNaN(Date.parse(t.created_at))) d[id] = 1; }
+    const ks = Object.keys(d); if (ks.length > 500) for (const k of ks.slice(0, ks.length - 500)) delete d[k];
+    ecrireLS(DATEES_CLE, d);
+  };
+  let relectureListes = false;
+  const relusParNous = new Set();               // nos propres relectures : elles ne relancent pas la lecture des détails
+  const dateSiVendeur = async (url, text) => {
+    try {
+      if (relectureListes) return;
+      const m = /pages\/transactions\/(\d+)/.exec(url); if (!m) return;
+      let j; try { j = JSON.parse(text); } catch (_) { return; }
+      const d = (j && j.pageProps && j.pageProps.transaction) || j;
+      if (!d || d.is_seller !== true) return;
+      if (lireLS(DATEES_CLE, {})[m[1]]) return;                  // déjà vue datée
+      if (Date.now() - Number(lireLS(RELU_CLE, 0)) < DETAIL_REVOIR_MS) return;
+      const listes = lireLS(LISTES_CLE, []);
+      if (!listes.length) return;                                 // aucune adresse du site : rien deviné
+      ecrireLS(RELU_CLE, Date.now());
+      relectureListes = true;
+      for (const u of listes.slice(-3)) {
+        try {
+          relusParNous.add(u);
+          const res = await window.fetch(u, { method: 'GET', credentials: 'include', headers: entetesLbc || { Accept: 'application/json' } });
+          if (res.status === 401 || res.status === 403 || res.status === 429) break;
+        } catch (_) {}
+      }
+    } finally { relectureListes = false; }
+  };
+
   const handle = (url, text, ctype) => {
     try {
       if (NOISE.test(url)) return;
@@ -279,7 +360,7 @@
       // forme (un passage de Julien), pas avant.
       if (/\/messaging\//i.test(url)) {
         const m = /\/messaging\/proxy\/api\/hal\/([0-9a-f-]{8,64})\/counter\/?(?:\?|$)/i.exec(url);
-        if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); } catch (_) {} }
+        if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) { post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); noterCompteurDoc(m[1]); } } catch (_) {} }
         return;
       }
       // Ses comptes Leboncoin liés (le sélecteur de compte) : identifiant, nom,
@@ -301,10 +382,12 @@
       // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
       if (VENTE_HINT.test(url)) {
         const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX });
-        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) setTimeout(() => { lireDetails(text); }, 800);
+        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) { noterListe(url, text); if (relusParNous.has(url)) relusParNous.delete(url); else setTimeout(() => { lireDetails(text); }, 800); }
+        else if (/consumergoods\/proxy\/v\d+\/pages\/transactions\/\d+/i.test(url)) setTimeout(() => { dateSiVendeur(url, text); }, 800);
         return;
       }
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
+      if (MOI_LISTE.test(url)) { posterListeMoi(url, text); return; }
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
   };
