@@ -7,33 +7,31 @@
 //    le fond du bouton principal (`cta`) et l'anneau de focus — rien d'autre.
 //    L'ambre (`warn`) et les points de plateforme ne vivent QUE dans les
 //    écrans dessinés et le film.
-// ⚠️ `faint` vaut #8A93A3 (6,4:1 sur le fond) : l'ancien #687284 échouait à
-//    4,11:1. `cta` vaut #2458E6 : le blanc dessus tient 5,8:1 (sur #3D7BFF, le
-//    bouton d'avant, 3,84:1 — sous le seuil AA).
+// Les textes secondaires et le bouton ardoise restent contrastés sur le fond minéral.
 export const K = {
-  bg: '#F4F6FA',           // fond clair (contenu de la maquette)
+  bg: '#F2F5F3',           // fond clair (contenu de la maquette)
   surface: '#FFFFFF',
   card: '#FFFFFF',
-  card2: '#EEF2F8',        // puce / zone intérieure
+  card2: '#EDF2EF',        // puce / zone intérieure
   line: 'rgba(18,27,44,0.09)',
   line2: 'rgba(18,27,44,0.15)',
-  text: '#121B2C',         // encre (15:1 sur le fond)
-  muted: '#566077',        // 6:1
-  faint: '#5E6878',        // 5:1 — jamais sous AA
-  cta: '#2458E6',          // bleu de marque, blanc dessus 5,8:1
-  accent: '#2E6BFF',
-  accentSoft: 'rgba(46,107,255,0.12)',
+  text: '#243D43',         // encre (15:1 sur le fond)
+  muted: '#52636B',        // 6:1
+  faint: '#52636B',        // 5:1 — jamais sous AA
+  cta: '#2B4548',          // ardoise de marque, texte blanc contrasté
+  accent: '#355F61',
+  accentSoft: 'rgba(53,95,97,0.12)',
   warn: '#B45309',         // ambre lisible sur clair (texte)
   warnDot: '#F59E0B',      // la pastille ambre (décor, pas du texte)
   paper: '#FFFFFF',
-  ink: '#121B2C',
-  // ── Bleu nuit du rail et du héros (identité de la maquette) ──
-  rail: '#0E1A2B',
-  rail2: '#0A1420',
-  railText: '#EAEFF7',
-  railMuted: '#93A1B8',
+  ink: '#243D43',
+  // ── Ardoise du rail et du héros ──
+  rail: '#21343E',
+  rail2: '#192C34',
+  railText: '#F0F5F2',
+  railMuted: '#B0C5BC',
   railLine: 'rgba(255,255,255,0.08)',
-  railActive: '#17263B',
+  railActive: '#2C4548',
 };
 
 // Les deux courbes, en CSS (les mêmes que `sortie` et `trajet` du moteur).
