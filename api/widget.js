@@ -1,3 +1,4 @@
+import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { accesVendeur } from './_lib/abonnement.js';

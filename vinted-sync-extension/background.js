@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.195.0';
+const CODE_VERSION = '5.197.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1024,6 +1024,10 @@ async function noterRefus(uid, domain, raison) {
     const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
     cur[String(uid)] = { at: Date.now(), domain, raison };
     await chrome.storage.local.set({ vrmRefus: cur });
+    // 5.197 : un compte refusé/supprimé n'est plus « déjà écrit » — réautorisé,
+    // sa ligne repart tout de suite (pas dans 30 min).
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    if (m[String(uid)]) { delete m[String(uid)]; await chrome.storage.local.set({ vrmCompteEcrit: m }); }
   } catch (_) {}
 }
 async function oublierRefus(uid) {
@@ -1071,8 +1075,44 @@ async function captureDomain(domain) {
     updated_at: new Date().toISOString(),
   };
   if (lastCsrfByDomain[domain]) row.csrf_token = lastCsrfByDomain[domain];
-  await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  // ⚠️⚠️ 20 octobre (5.197) — UNE ÉCRITURE PAR CHANGEMENT, PAS PAR REQUÊTE.
+  //    Mesuré en production (journaux du 20 octobre) : jusqu'à 90 écritures de
+  //    `vinted_accounts` PAR MINUTE, 687 en 73 min. Chaque requête de la page
+  //    Vinted portant un `x-csrf-token` envoie un message `csrf` → ici → la
+  //    ligne entière réécrite, jetons identiques. On n'écrit que si les jetons
+  //    (ou le csrf) ont CHANGÉ, ou une fois toutes les 30 min au plus.
+  //    L'empreinte vit dans `chrome.storage.local` (§4.9) ; perdue, elle ne
+  //    coûte qu'une écriture de plus. Elle n'est posée qu'après une écriture
+  //    RÉUSSIE : un refus de la base fait réessayer à la requête suivante.
+  const sig = empreinteCompte(row);
+  if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
+  const ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  if (ok !== false) await noterCompteEcrit(uid, sig);
   return uid;
+}
+
+const COMPTE_REECRIT_MS = 30 * 60 * 1000;
+// Empreinte courte (FNV-1a 32 bits) : on ne garde JAMAIS un jeton en clair
+// dans le stockage de l'extension pour cette comparaison.
+function empreinteCompte(row) {
+  const s = [row.vinted_user_id, row.domain, row.access_token, row.refresh_token, row.anon_id, row.csrf_token || ''].join('|');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16) + ':' + s.length;
+}
+async function compteDejaEcrit(uid, sig) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    const e = m[String(uid)];
+    return !!(e && e.sig === sig && Date.now() - Number(e.at || 0) < COMPTE_REECRIT_MS);
+  } catch (_) { return false; }                    // pas su : on écrit (comme avant)
+}
+async function noterCompteEcrit(uid, sig) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    m[String(uid)] = { sig, at: Date.now() };
+    await chrome.storage.local.set({ vrmCompteEcrit: m });
+  } catch (_) {}
 }
 
 async function captureAllAccounts() {
@@ -3442,24 +3482,84 @@ async function vintedGetHtml(acc, endpoint) {
 // photos — on ne prend QUE l'objet dont l'id == celui de l'annonce (§5,
 // l'identité prime, jamais un autre article). Repli : balayage des grandes
 // images vinted.net du HTML.
+// Le texte du flux Next « app router » : la page porte des
+// `<script>self.__next_f.push([1,"…"])</script>` dont le 2ᵉ élément est une
+// chaîne JSON. On ne garde que ce qui se décode proprement.
+function texteDuFluxNext(html) {
+  try {
+    const re = /self\.__next_f\.push\(\[\s*\d+\s*,\s*("(?:[^"\\]|\\[\s\S])*")\s*\]\)/g;
+    let txt = '', m, n = 0;
+    while ((m = re.exec(html)) && n < 2000) { n++; try { const v = JSON.parse(m[1]); if (typeof v === 'string') txt += v; } catch (_) {} }
+    return txt;
+  } catch (_) { return ''; }
+}
+// Les objets JSON COMPLETS et bien fermés qui entourent une mention de l'id de
+// l'annonce (`"id":123`). Un fragment tronqué est ignoré, jamais deviné.
+function objetsAutourDeLId(txt, cible) {
+  const out = [];
+  try {
+    const re = new RegExp('"id"\\s*:\\s*"?' + String(cible).replace(/\D/g, '') + '(?!\\d)', 'g');
+    let m, essais = 0;
+    while ((m = re.exec(txt)) && essais < 12 && out.length < 6) {
+      essais++;
+      // On remonte jusqu'à 40 accolades ouvrantes en arrière : la plus proche
+      // qui s'ouvre AVANT la mention et se ferme APRÈS est l'objet qui la porte.
+      let k = m.index, tours = 0;
+      while (k > 0 && tours < 40) {
+        k = txt.lastIndexOf('{', k - 1); if (k < 0) break; tours++;
+        let p = 0, fin = -1, chaine = false, ech = false;
+        for (let j = k; j < txt.length && j < k + 400000; j++) {
+          const c = txt[j];
+          if (ech) { ech = false; continue; }
+          if (c === '\\') { ech = true; continue; }
+          if (c === '"') { chaine = !chaine; continue; }
+          if (chaine) continue;
+          if (c === '{') p++;
+          else if (c === '}') { p--; if (!p) { fin = j; break; } }
+        }
+        if (fin < 0 || fin < m.index) continue;
+        try { const o = JSON.parse(txt.slice(k, fin + 1)); if (o && typeof o === 'object') { out.push(o); break; } } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  return out;
+}
 function extraireDetailPage(html, id) {
-  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '' };
+  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '', format: 'aucun', nextData: false, nextFlux: false, idVu: false };
   if (!html) return out;
   try {
+    const cible = String(id);
+    out.idVu = html.indexOf(cible) >= 0;
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     let data = null;
-    if (m) { try { data = JSON.parse(m[1]); } catch (_) {} }
-    if (data) {
-      const cible = String(id);
-      let found = null;
-      const vu = new Set();
-      const walk = (o, prof) => {
-        if (!o || found || prof > 9 || typeof o !== 'object') return;
-        if (vu.has(o)) return; vu.add(o);
-        if (String(o.id) === cible && Array.isArray(o.photos) && o.photos.length) { found = o; return; }
-        for (const k of Object.keys(o)) walk(o[k], prof + 1);
-      };
-      walk(data, 0);
+    if (m) { out.nextData = true; try { data = JSON.parse(m[1]); } catch (_) {} }
+    let found = null;
+    const vu = new Set();
+    const walk = (o, prof) => {
+      if (!o || found || prof > 12 || typeof o !== 'object') return;
+      if (vu.has(o)) return; vu.add(o);
+      if (String(o.id) === cible && Array.isArray(o.photos) && o.photos.length) { found = o; return; }
+      for (const k of Object.keys(o)) walk(o[k], prof + 1);
+    };
+    if (data) { walk(data, 0); if (found) out.format = 'next_data'; }
+    // ⚠️⚠️ 20 octobre (5.197) — MESURÉ CHEZ JULIEN : `fiche_codes_absents` = 650
+    //    = `photos_page_ecrit` 650, et l'échantillon dit `cles=` (vide). Sur ses
+    //    pages d'annonce, `__NEXT_DATA__` ne porte plus l'objet de l'annonce :
+    //    les photos venaient TOUTES du balayage d'images ci-dessous, et les
+    //    codes (catégorie, marque, couleur) n'étaient JAMAIS trouvés. Le routeur
+    //    « app » de Next diffuse ses données dans `self.__next_f.push([1,"…"])`
+    //    (comme Leboncoin, 12 sept.) : on lit ce flux, et on n'y prend QUE
+    //    l'objet dont l'id est celui de l'annonce (§5). Je n'ai jamais vu la
+    //    page (403) : `out.format` dit ce qui a servi, pour la passe suivante.
+    if (!found) {
+      const flux = texteDuFluxNext(html);
+      if (flux) {
+        out.nextFlux = true;
+        for (const o of objetsAutourDeLId(flux, cible)) { walk(o, 0); if (found) break; }
+        if (found) out.format = 'next_f';
+      }
+    }
+    {
       if (found) {
         for (const p of found.photos) { const u = p && (p.full_size_url || p.url || (p.thumbnails && p.thumbnails.length && p.thumbnails[p.thumbnails.length - 1].url)); if (typeof u === 'string' && /vinted\.net\//i.test(u) && !out.photos.includes(u)) out.photos.push(u); }
         if (typeof found.description === 'string') out.description = found.description;
@@ -3490,6 +3590,7 @@ function extraireDetailPage(html, id) {
       }
     }
     if (!out.photos.length) {
+      out.format = 'html';
       const re = /https:\/\/images\d*\.vinted\.net\/[^"'\\\s)]+/gi;
       const vus = new Set(); let mm;
       while ((mm = re.exec(html)) && out.photos.length < 25) {
@@ -3502,6 +3603,71 @@ function extraireDetailPage(html, id) {
     }
   } catch (_) {}
   return out;
+}
+// ⚠️⚠️ 20 octobre (5.197) — QUAND RELIRE LA PAGE D'UNE ANNONCE.
+//    Mesuré chez Julien : 650 pages lues, 650 « fiche_codes_absents », et les
+//    17 freins 429 de Vinted (`photos_page_refuse_429` = `vinted_frein_429`) —
+//    la pause qui suit refuse aussi les bordereaux et les réponses. Cause : une
+//    annonce était relue toutes les 6 h tant que ses CODES manquaient… or la
+//    page ne les donnait jamais. Une annonce déjà lue par la page et restée
+//    incomplète n'est relue qu'après `PAGE_REESSAI_INCOMPLET_MS` (3 jours) ; une
+//    annonce jamais lue par la page (ou à qui il manque ENCORE des photos alors
+//    qu'on n'en a aucune) passe tout de suite.
+const PAGE_REESSAI_INCOMPLET_MS = 3 * 24 * 3600 * 1000;
+function aRelirePageAnnonce(it, d0, maintenant) {
+  const d = d0 || {};
+  const veut = Number((it && it.nPhotos) || 0);
+  const a = (d.photos || []).length;
+  const manquePhotos = veut > 1 && a < veut;
+  const manqueCodes = !d.codes;
+  if (!manquePhotos && !manqueCodes) return false;
+  if (a === 0) return true;                                   // rien capté : on lit
+  const lu = Date.parse(d.pageAt || '');
+  if (isFinite(lu) && (maintenant || Date.now()) - lu < PAGE_REESSAI_INCOMPLET_MS) return false;
+  return true;
+}
+// La photo d'une annonce s'identifie par son fichier sur le CDN
+// (`/t/{empreinte}/f800/…`), jamais par sa taille ni sa signature `?s=`.
+function clePhotoVinted(u) {
+  const s = String(u || '').split('?')[0];
+  const m = /\/t\/([^/]+)\//.exec(s);
+  return m ? m[1] : s.replace(/\/(f\d+|tc|large|full)\//, '/');
+}
+// ⚠️⚠️ 20 octobre (5.197) — UNE PHOTO QUI N'EST PAS DE L'ANNONCE (§5).
+//    Mesuré : le même fichier (`02_024a3_…`) dans les photos de 29 annonces
+//    DIFFÉRENTES, un autre (`06_01e6b_…`) dans 17 — une image de la page
+//    (bandeau, autre article), jamais une paire. Elle partait sur Leboncoin et
+//    eBay comme photo de la paire. Règle, par IDENTITÉ de fichier, jamais par
+//    ressemblance : un fichier présent dans des annonces aux couvertures
+//    (1re photo) TOUTES différentes — au moins 3 — et qui n'est la couverture
+//    d'aucune n'appartient à aucune. Deux annonces de la même paire (mêmes
+//    photos, même couverture) ne déclenchent jamais rien.
+function retirerPhotosEtrangeres(carte) {
+  if (!carte || typeof carte !== 'object') return 0;
+  const couvertures = new Set();
+  const parCle = new Map();                       // clé → Set des couvertures des annonces qui la portent
+  for (const k of Object.keys(carte)) {
+    const ph = carte[k] && Array.isArray(carte[k].photos) ? carte[k].photos : [];
+    if (!ph.length) continue;
+    const couv = clePhotoVinted(ph[0]);
+    couvertures.add(couv);
+    for (const u of ph.slice(1)) {
+      const c = clePhotoVinted(u);
+      if (!parCle.has(c)) parCle.set(c, new Set());
+      parCle.get(c).add(couv);
+    }
+  }
+  const etrangeres = new Set();
+  for (const [c, couvs] of parCle) if (couvs.size >= 3 && !couvertures.has(c)) etrangeres.add(c);
+  if (!etrangeres.size) return 0;
+  let n = 0;
+  for (const k of Object.keys(carte)) {
+    const e = carte[k];
+    if (!e || !Array.isArray(e.photos) || e.photos.length < 2) continue;
+    const garde = [e.photos[0]].concat(e.photos.slice(1).filter((u) => !etrangeres.has(clePhotoVinted(u))));
+    if (garde.length !== e.photos.length) { n += e.photos.length - garde.length; carte[k] = Object.assign({}, e, { photos: garde }); }
+  }
+  return n;
 }
 async function capterPhotosAnnonces(uid) {
   try {
@@ -3530,15 +3696,11 @@ async function capterPhotosAnnonces(uid) {
       if (dr === null) return 0;                          // pas su ≠ « rien capté » : on ne rejoue pas à l'aveugle
       dej = (dr[0] && dr[0].data) || {};
     } catch (_) {}
+    const maintenant = Date.now();
     const manquants = items.filter((it) => {
       if (!it || !it.id) return false;
       if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
-      const veut = Number(it.nPhotos || 0);
-      const d0 = dej[String(it.id)] || {};
-      const a = (d0.photos || []).length;
-      // Il manque des photos, OU la fiche de codes (pour republier). La même
-      // lecture de page donne les deux : aucune requête de plus par annonce.
-      return (veut > 1 && a < veut) || !d0.codes;
+      return aRelirePageAnnonce(it, dej[String(it.id)], maintenant);
     }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
@@ -3575,7 +3737,12 @@ async function capterPhotosAnnonces(uid) {
       const kk = String(it.id);
       const prev = dej[kk] || {};
       const desc = String(it2.description || '').trim();
-      const photos = urls.filter(Boolean).slice(0, 24);
+      // 5.197 : le balayage d'images de la page (`format: 'html'`) attrapait
+      // aussi une image qui n'est PAS de l'annonce, toujours APRÈS les siennes
+      // (mesuré : la même photo étrangère en position nPhotos+1 sur 29 de ses
+      // annonces). Quand Vinted dit combien l'annonce en a, on n'en garde pas plus.
+      const veutN = Number(it.nPhotos || 0);
+      const photos = urls.filter(Boolean).slice(0, (det.format === 'html' && veutN > 0) ? veutN : 24);
       // MESURE (§6, « on ne prend que 5 photos », 29 sept.) : si on en récupère
       // MOINS que Vinted n'en annonce (`nPhotos`), on note combien + les CLÉS de
       // la réponse (jamais le corps) — pour trancher si l'API de détail limite,
@@ -3583,12 +3750,13 @@ async function capterPhotosAnnonces(uid) {
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
         codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
-        couleur: det.couleur || prev.couleur || '' };
+        couleur: det.couleur || prev.couleur || '', pageAt: new Date().toISOString(), pageFormat: det.format || '' };
       dirty = true; lues.push(kk);
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
-      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
+      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'format=' + det.format + ' next_data=' + (det.nextData ? 'oui' : 'non') + ' next_f=' + (det.nextFlux ? 'oui' : 'non') + ' id_vu=' + (det.idVu ? 'oui' : 'non') + ' cles=' + (det.cles || []).join(',').slice(0, 560)); }
+      noterDiag('fiche_format_' + (det.format || 'aucun'));
     }
     // ⚠️ 5.193 — on RELIT la ligne au moment d'écrire et on n'y pose que NOS
     //    fiches (`lues`) : une fiche rangée pendant la boucle (page d'annonce
@@ -3601,6 +3769,8 @@ async function capterPhotosAnnonces(uid) {
         if (rr === null) return false;
         const cur = (rr[0] && rr[0].data) || {};
         for (const kk of lues) cur[kk] = dej[kk];
+        const retirees = retirerPhotosEtrangeres(cur);
+        if (retirees) noterDiag('photos_etrangeres_retirees');
         return supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
       });
       if (!ecrit) for (const kk of lues) delete memo[`${uid}_${kk}`];
@@ -4412,7 +4582,7 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
   if (suivi) suivi.pagesLues = 0;
   for (let page = 1; page <= maxPages; page++) {
     const r = await vintedGet(acc, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
-    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) suivi.statut = r && r.status; break; }
+    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) { suivi.statut = r && r.status; if (r && r.pause) suivi.pause = true; } break; }
     if (suivi) suivi.pagesLues++;
     all = all.concat(r.json.my_orders);
     pagination = r.json.pagination || pagination;
@@ -5004,9 +5174,13 @@ async function rafraichirVentes(uid) {
   // Aucune page rendue par Vinted : c'est une lecture RATÉE, pas « aucune vente ».
   if (!sold || !Array.isArray(sold.my_orders) || !suivi.pagesLues) {
     noterDiag('ventes_lecture_ratee');
+    // 5.197 : 164 lectures ratées sur 615 chez Julien, sans savoir pourquoi —
+    // on note le statut (une pause demandée par Vinted, un 401, une coupure).
+    noterDiag('ventes_lecture_ratee_' + (suivi.pause ? 'pause' : String(suivi.statut || 0)));
     // 429 / 403 : c'est VINTED qui dit « ralentis » ou « non ». Ce n'est pas un
     // échec à réessayer vite — la garde entière reste (§3, la limite de volume).
-    const freine = suivi.statut === 429 || suivi.statut === 403;
+    // Pendant une pause déjà ouverte non plus : aucune requête n'est partie.
+    const freine = suivi.pause || suivi.statut === 429 || suivi.statut === 403;
     return { ok: false, ecrit: false, raison: freine ? 'vinted-freine' : 'lecture', garder: freine };
   }
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
@@ -5321,6 +5495,10 @@ async function saveItemDetailMaintenant(id, detail) {
     // La couleur affichée par Vinted : jamais écrasée par du vide.
     couleur: String(detail.couleur || '').trim().slice(0, 60) || prev.couleur || '',
   };
+  // On garde ce que la page de l'annonce a appris (codes, date de lecture) :
+  // l'écrasement par une lecture du panneau les perdait.
+  for (const k of ['codes', 'photoIds', 'pageAt', 'pageFormat']) if (prev[k] !== undefined && cur[key][k] === undefined) cur[key][k] = prev[k];
+  if (retirerPhotosEtrangeres(cur)) noterDiag('photos_etrangeres_retirees');
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
 

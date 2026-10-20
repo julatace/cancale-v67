@@ -10825,9 +10825,54 @@ Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), ca
 - Bancs mis à la forme « une ligne par vente » sans les affaiblir (ouvrir la vente comme lui, viser le bouton VISIBLE) : achats-hors-plateforme, deux-extensions (+ `BANC_PORT`), menu-range (le bouton caché « Tous les écrans » de l'en-tête), ventes-bordereau, revendeurs, perfv (logo renommé `/vrm-logo-*`, l'en-tête « Article · état » n'est pas une vente), journee-premium (le bonjour à 0 px sur téléphone est compact), prouve-regle-offre (5 ancres suivies jusqu'au code actuel).
 - **Rouges AVANT #596, laissés (cause à part, notés)** : compact, dictee, lbc-publier-app (H : téléphone), mobile, numeros-lettres, numeros-remise-a-zero, photos-vinted, pont, sauvegarde, serie (la porte « Coût d'achat » introuvable sur Ventes), session, stats-premium (choix de Julien du 18 oct.), prouve-regle-offre (« base d'avant » : l'arbre `/tmp/avant-regle` n'existe que chez qui le fabrique).
 
+### Ce qui casse en production côté serveur — mesuré le 20 octobre
+Lecture seule : Vercel (erreurs 7 j, journaux 50 min, déploiements), Supabase (journaux
+edge/PostgREST/Postgres/auth sur 24 h glissantes, conseillers, `pg_stat_statements`),
+lignes `plantage_*`, `email_inconnu_*`, quarantaine, journal des emails.
+- **La base va bien.** Plus AUCUNE réponse 5xx de PostgREST depuis la 017 (dernière :
+  18 oct. 02:51 ; 101 le 17-18, 112 le 13-14) ; écritures de `main` toutes en 2xx
+  (≤ 1 s). Postgres : 3 erreurs de syntaxe (l'outil SQL) et rien d'autre. Auth : un
+  500 « unexpected EOF » isolé, aucun `refresh_token_already_used`, aucun 429. Aucun
+  déploiement en échec sur 7 jours. Plantages : 2 lignes (15 et 16 oct.), rien depuis.
+  Quarantaine : vide (593 lignes déjà rejouées). `email_inconnu_*` : des « Commande
+  mise à jour », « transfert bancaire », « remboursée » — gardés EXPRÈS sans action.
+- **Corrigé : le tableau des erreurs de production n'affichait que du bruit.** Le seul
+  groupe (1 336 lignes, 6 routes, depuis le 31 juillet) était `[DEP0169] url.parse()`,
+  émis par Node 24 de Vercel et `web-push` — aucune ligne de `api/` ne l'appelle.
+  `api/_lib/sans-bruit.js`, importé EN PREMIER par les 12 routes, retire CE code et
+  rien d'autre. `audit-sans-bruit.cjs` (charge chaque route pour de vrai,
+  `--pending-deprecation`) : 44 contrôles, 29 rouges sur l'avant, 4 rouges sous la
+  mutation « tout couper ». ⚠️ À vérifier après déploiement : si la plateforme émet
+  l'avertissement AVANT de charger le module, il reviendra (une fois par instance).
+- **Geste de Julien — l'ANCIEN script Gmail tourne encore, toutes les minutes** :
+  ~1 390 lectures × 3 par jour, directement sur la base avec l'ancienne clé publique
+  (`vrm_email_config`, `email_invoice_*`, `vrm_pro_facture`), toutes en **401** (les
+  clés JWT d'avant sont refusées). Les emails passent quand même (il retombe sur sa
+  date de secours) mais **aucune facture Pro ne peut partir**. Recoller
+  `scripts/gmail-forwarder.gs` du dépôt (avec sa clé), puis poser
+  `EMAIL_INBOUND_SECRET` sur Vercel — absente aujourd'hui, la route des emails
+  accepte donc encore un envoi sans clé (§ « la route des emails exige sa clé »).
+- Noté, normal : `rpc/vrm_equipe_lister` → 404 (~60/jour, une par ouverture) tant que
+  la 016 n'est pas appliquée (la route dit « pas encore activé ») ; quelques 401 au
+  réveil de l'iPhone (jeton expiré, le renouvellement et la reprise d'envoi existent).
+- Noté pour Julien : `STRIPE_SECRET_KEY` absente de Vercel (paiement non branché) ; le
+  commentaire de `STRIPE_PRICE_LOOKUP` dit encore « 9,99 € ».
+
 ### Les bancs rouges sur `main` au 20 octobre — causes, et ceux laissés rouges
 Chaque banc lancé SEUL, la cause trouvée avant de toucher quoi que ce soit.
 - ⚠️⚠️ **`numeros-remise-a-zero` — défaut de l'APP, sur les numéros.** Après le bloc « Recharger » (écran périmé, écriture refusée par `vrm_numeros_perimes`), le « 999 » tapé sur l'écran périmé REPARTAIT au nuage : la fusion du chargement du 18 octobre (`fusionNumerosAuChargement`) gardait la fiche de l'appareil « inconnue du nuage ». `rechargerEnGardantLesSaisies` pose maintenant `vrm_recharge_sans_fiches` (sessionStorage) et le chargement suivant ne fusionne pas les FICHES (le pool reste une union, les saisies sont rejouées sans numéro par `rejouerSaisies`). Rouge sur le build d'avant, vert après ; `numeros-panne` (la fusion qui sauve les numéros de la panne) reste vert.
 - **Bancs périmés, mis à jour sans les affaiblir** : `numeros-lettres` (série « B » : B126 après le plus haut, règle « jamais dans un trou » du 18 oct.) · `sauvegarde` (`framenavigated` part aussi pour un `pushState`/`back` d'une feuille qui se ferme : un vrai rechargement se juge sur `load`, et un contrôle positif « l'écriture réussie recharge » prouve que l'autre n'est pas vacant) · `lbc-publier-app` H (un téléphone dont l'extension répond agit ici depuis la 5.188 : H rend un iPhone SANS extension, H2 l'autre sens) · `photos-vinted` O (passer par Vinted affichait Ventes, l'extension en mettait les photos en cache, et Ma journée ne demandait rien hors ligne : le scénario n'était plus réel) · `compact`, `mobile` (vente repliée depuis fc4c73e/5cdffcb : on OUVRE la ligne ; vignette 36 × 48 du design ; le menu des écrans s'ouvre par « Gestion » en bas) · `dictee` (le champ se trouve par son `aria-label`) · `serie` (la case s'appelle « Bénéfice », reconnue à son titre ; la « suggestion » cliquée était la ligne de vente derrière la modale — on ne prend qu'un « C'est ça » d'une ligne de la saisie).
 - **Instables sous charge seulement** (verts lancés seuls) : `pont`, `session`.
 - **Laissés rouges, choix de design de Julien** : `stats-premium` (866a90d) et `mobile` — « navigation lisible » : les libellés de la barre du bas sont à **9 px** depuis 0bbc78e (`styles-mobile-studio.css`, 19 oct.) contre 11 px exigés. Tout le reste du banc est vert (vérifié en neutralisant ce seul contrôle). À trancher par Julien : remonter la taille, ou accepter 9 px.
+
+### L'extension d'après ce qu'elle fait VRAIMENT chez lui (20 octobre, 5.197)
+Audit en lecture seule de sa production (`panel_diag_capture` de la 5.194, journaux de la passerelle Supabase sur 24 h, `vinted_item_details`, fraîcheur `harvest_*`). ⚠️ Les compteurs `n` sont CUMULÉS depuis toujours (toutes versions) : un compteur non nul ne dit pas que le défaut vit encore — on lit l'échantillon daté (`rates.*.at`) et les journaux du jour.
+- ⚠️⚠️ **`vinted_accounts` réécrite jusqu'à 90 fois PAR MINUTE** (687 `POST` en 73 min, journaux du 20 oct.) : chaque requête de la page Vinted qui porte un `x-csrf-token` envoie un message `csrf` → `captureDomain` → la ligne entière, jetons identiques. Désormais une écriture quand les jetons ou le csrf CHANGENT, ou toutes les 30 min au plus (`empreinteCompte` FNV, jamais un jeton en clair ; `vrmCompteEcrit` dans `chrome.storage.local` ; posée seulement après une écriture réussie ; effacée par `noterRefus`). `audit-compte-ecritures.cjs` : 20 csrf ⇒ 1 écriture (20 sur l'avant), 3 mutations rouges.
+- ⚠️⚠️ **La page d'une annonce relue toutes les 6 h pour rien, et les 17 pauses Vinted venaient de là.** `fiche_codes_absents` 650 = `photos_page_ecrit` 650, échantillon `cles=` vide : `__NEXT_DATA__` ne porte plus l'annonce, les codes (catégorie, marque, couleur) ne sont JAMAIS trouvés (0 fiche sur 233 en base), donc `!codes` relançait chaque annonce. Et `photos_page_refuse_429` 17 = `vinted_frein_429` 17 : la pause qui suit refuse aussi bordereaux et réponses (`vinted_pause_refus` 8). ⇒ `aRelirePageAnnonce` : déjà lue par la page (`pageAt`) et restée incomplète ⇒ 3 jours (`PAGE_REESSAI_INCOMPLET_MS`) ; aucune photo ⇒ tout de suite. Le flux Next « app router » est lu (`texteDuFluxNext`, `objetsAutourDeLId` : seul l'objet dont l'id est celui de l'annonce, §5) et le format est NOTÉ (`fiche_format_*`, `pageFormat`, échantillon `fiche_codes` avec `next_data/next_f/id_vu`). ⚠️ **Non mesuré** : la vraie page (403 d'ici) — c'est `fiche_format_*` qui dira si le flux porte l'annonce.
+- ⚠️⚠️ **Une photo qui n'est PAS de la paire partait sur Leboncoin/eBay** (§5) : le même fichier `02_024a3_…` dans 29 annonces (toujours en position nPhotos+1, balayage d'images de la page), `06_01e6b_…` dans 17 (capture du panneau, position 6). ⇒ balayage plafonné à `nPhotos` ; `retirerPhotosEtrangeres` (un fichier présent dans ≥ 3 annonces aux couvertures toutes différentes, couverture d'aucune) à chaque écriture de `vinted_item_details` — la ligne entière se répare à la prochaine capture. Deux annonces d'une même paire ne déclenchent rien.
+- **`saveItemDetailMaintenant` (panneau) effaçait la fiche lue sur la page** (codes, `photoIds`) : gardée.
+- **`ventes_lecture_ratee` 164 sur 615** : la cause est maintenant notée (`ventes_lecture_ratee_{statut|pause}`) ; une pause déjà ouverte garde la garde entière.
+- **App** : « un site a changé le format de sa réponse messages » (État des connexions) venait des 250 `forme_inconnue_champ_conversation` des extensions < 5.193 (corps d'ERREUR `{code,message,message_code}`) ; l'échantillon du 17 oct. l'aurait affiché jusqu'au 24. `estCorpsErreurVinted` l'écarte (`audit-derive-erreur.cjs`, rouge sur l'avant).
+- **Constatés, pas des défauts actifs** : tous les `ecriture_ratee_*_400` (corrigés en 5.193 : 0 réponse ≥ 400 de son Chrome en 24 h) ; `forme_inconnue_champ_conversation` / `conversation_lecture_ou_forme_ratee` (5.193) ; `photos_annonce_refuse_404` (ancien chemin `/api/v2/items`, retiré) ; `ignore_partiel_*` (garde §4.2, voulue ; inbox fusionnée depuis 5.162) ; `ignore_billing_hors_sujet`, `ignore_dressing_autre_membre`, `abandon_sans_compte_*` (déconnecté) ; `label_ko_statuts_200_200_200` (PDF pas encore prêt, réessayé — `label_abandon_apres_essais` 9 : l'email prend le relais) ; `bordereau_refuse_400` 6 (`validation_error` de Vinted, 13 oct.) ; `*_refuse_401` (jeton du compte) ; `relais_*_reseau` (ordinateur en veille). Comptes `3156028798` (3 j) et `3191111372` (6 j) pas ouverts dans Chrome : leurs annonces restent relues publiquement (`enligne`).
+- ⚠️ **Hors extension, à Julien** : **4 173 lectures refusées (401) en 24 h** par l'ANCIEN script Gmail (Google Apps Script, `email_invoice_*`, `vrm_pro_facture` lus avec la clé publique) — recoller `scripts/gmail-forwarder.gs`.
+- Preuves : `audit-photos-passif.cjs` 35 contrôles (9 rouges sur la 5.195, 4 mutations rouges) ; `audit-compte-ecritures.cjs` ; `audit-derive-erreur.cjs`. Bancs badge, popup, session, pont, leboncoin verts. Extension **5.197.0**, zip régénéré, `EXT_ATTENDUE` suivie, aucune entrée d'`EXT_CAPACITES`.
