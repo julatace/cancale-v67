@@ -10824,3 +10824,36 @@ Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), ca
 - **Leboncoin → Colis** disait « Aucun colis » sans lecture de « Mes transactions » ⇒ « pas encore lu » (`data-lbc-colis-vide`). **Organisation** : la lecture ratée n'est plus rouge (§7) et dit que rien n'est perdu.
 - Bancs mis à la forme « une ligne par vente » sans les affaiblir (ouvrir la vente comme lui, viser le bouton VISIBLE) : achats-hors-plateforme, deux-extensions (+ `BANC_PORT`), menu-range (le bouton caché « Tous les écrans » de l'en-tête), ventes-bordereau, revendeurs, perfv (logo renommé `/vrm-logo-*`, l'en-tête « Article · état » n'est pas une vente), journee-premium (le bonjour à 0 px sur téléphone est compact), prouve-regle-offre (5 ancres suivies jusqu'au code actuel).
 - **Rouges AVANT #596, laissés (cause à part, notés)** : compact, dictee, lbc-publier-app (H : téléphone), mobile, numeros-lettres, numeros-remise-a-zero, photos-vinted, pont, sauvegarde, serie (la porte « Coût d'achat » introuvable sur Ventes), session, stats-premium (choix de Julien du 18 oct.), prouve-regle-offre (« base d'avant » : l'arbre `/tmp/avant-regle` n'existe que chez qui le fabrique).
+
+### Ce qui casse en production côté serveur — mesuré le 20 octobre
+Lecture seule : Vercel (erreurs 7 j, journaux 50 min, déploiements), Supabase (journaux
+edge/PostgREST/Postgres/auth sur 24 h glissantes, conseillers, `pg_stat_statements`),
+lignes `plantage_*`, `email_inconnu_*`, quarantaine, journal des emails.
+- **La base va bien.** Plus AUCUNE réponse 5xx de PostgREST depuis la 017 (dernière :
+  18 oct. 02:51 ; 101 le 17-18, 112 le 13-14) ; écritures de `main` toutes en 2xx
+  (≤ 1 s). Postgres : 3 erreurs de syntaxe (l'outil SQL) et rien d'autre. Auth : un
+  500 « unexpected EOF » isolé, aucun `refresh_token_already_used`, aucun 429. Aucun
+  déploiement en échec sur 7 jours. Plantages : 2 lignes (15 et 16 oct.), rien depuis.
+  Quarantaine : vide (593 lignes déjà rejouées). `email_inconnu_*` : des « Commande
+  mise à jour », « transfert bancaire », « remboursée » — gardés EXPRÈS sans action.
+- **Corrigé : le tableau des erreurs de production n'affichait que du bruit.** Le seul
+  groupe (1 336 lignes, 6 routes, depuis le 31 juillet) était `[DEP0169] url.parse()`,
+  émis par Node 24 de Vercel et `web-push` — aucune ligne de `api/` ne l'appelle.
+  `api/_lib/sans-bruit.js`, importé EN PREMIER par les 12 routes, retire CE code et
+  rien d'autre. `audit-sans-bruit.cjs` (charge chaque route pour de vrai,
+  `--pending-deprecation`) : 44 contrôles, 29 rouges sur l'avant, 4 rouges sous la
+  mutation « tout couper ». ⚠️ À vérifier après déploiement : si la plateforme émet
+  l'avertissement AVANT de charger le module, il reviendra (une fois par instance).
+- **Geste de Julien — l'ANCIEN script Gmail tourne encore, toutes les minutes** :
+  ~1 390 lectures × 3 par jour, directement sur la base avec l'ancienne clé publique
+  (`vrm_email_config`, `email_invoice_*`, `vrm_pro_facture`), toutes en **401** (les
+  clés JWT d'avant sont refusées). Les emails passent quand même (il retombe sur sa
+  date de secours) mais **aucune facture Pro ne peut partir**. Recoller
+  `scripts/gmail-forwarder.gs` du dépôt (avec sa clé), puis poser
+  `EMAIL_INBOUND_SECRET` sur Vercel — absente aujourd'hui, la route des emails
+  accepte donc encore un envoi sans clé (§ « la route des emails exige sa clé »).
+- Noté, normal : `rpc/vrm_equipe_lister` → 404 (~60/jour, une par ouverture) tant que
+  la 016 n'est pas appliquée (la route dit « pas encore activé ») ; quelques 401 au
+  réveil de l'iPhone (jeton expiré, le renouvellement et la reprise d'envoi existent).
+- Noté pour Julien : `STRIPE_SECRET_KEY` absente de Vercel (paiement non branché) ; le
+  commentaire de `STRIPE_PRICE_LOOKUP` dit encore « 9,99 € ».
