@@ -4649,20 +4649,32 @@ const beneficeDesJours = (jours, de, a) => {
 // fiche le porte (deux fiches ⇒ rien). Pas d'identité ⇒ pas de prix d'achat
 // (comptée dans la couverture « X sur Y »), jamais deviné.
 // Frais : Leboncoin = 0 (le prix FINAL capté est ce que le vendeur touche) ;
-// eBay = `totalMarketplaceFee` de la commande quand elle le porte (EUR), sinon
-// `null` (pas su). Entrées : `numLbc(v)` → N° ou ''/null ; `numEbayLigne(o, li)`
+// eBay = 0 aussi : le montant compté est déjà l'argent reçu (`montantRecuEbay` :
+// dû au vendeur − frais eBay) ; illisible ⇒ commande écartée. Entrées : `numLbc(v)` → N° ou ''/null ; `numEbayLigne(o, li)`
 // → N° ou ''/null ; `achat(fiche)` → nombre ou null.
 const ficheUniqueDuNumero = (numeros, k) => {
   if (!k) return null;
   const fs = Object.values(numeros || {}).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
   return fs.length === 1 ? fs[0] : null;
 };
-const fraisEbayCommande = (o) => {
-  const f = o && o.totalMarketplaceFee;
-  if (!f || typeof f !== 'object') return null;
-  if (f.currency && f.currency !== 'EUR') return null;
-  const n = Number(f.value);
-  return f.value != null && String(f.value).trim() !== '' && isFinite(n) ? n : null;
+// ── L'ARGENT QU'UNE COMMANDE eBAY RAPPORTE (revue argent eBay, 20 oct.) ─────
+// Décision du 3 octobre : eBay = « l'argent que tu reçois » =
+// `paymentSummary.totalDueSeller` − `totalMarketplaceFee`. Jamais
+// `pricingSummary.total` : il porte le PORT, que l'acheteur paie à eBay
+// (livraison gérée par eBay, §2.8) — le port n'est ni une recette ni une charge.
+// Montant ou frais absents, illisibles, ou dans une autre devise que l'euro ⇒
+// `eur: null` et la raison : la commande est ÉCARTÉE et dite, jamais comptée
+// au hasard ni convertie. UNE règle pour le CA déclaré, le vendu, le CA payé et
+// le bénéfice (§11).
+const montantRecuEbay = (o) => {
+  const lu = (m) => (m && typeof m === 'object' && m.value != null && String(m.value).trim() !== '' && isFinite(Number(m.value))) ? m : null;
+  const d = lu(o && o.paymentSummary && o.paymentSummary.totalDueSeller);
+  const f = lu(o && o.totalMarketplaceFee);
+  if (!d) return { eur: null, raison: 'montant reçu inconnu' };
+  if (d.currency !== 'EUR') return { eur: null, raison: 'devise ' + (d.currency || 'inconnue') };
+  if (!f) return { eur: null, raison: 'frais eBay inconnus' };
+  if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
+  return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
 };
 const ventesAutresBenefice = ({ lbc, ebay, numeros, achat, numLbc, numEbayLigne } = {}) => {
   const out = [], vus = new Set();
@@ -4676,15 +4688,14 @@ const ventesAutresBenefice = ({ lbc, ebay, numeros, achat, numLbc, numEbayLigne 
   }
   for (const o of (ebay || [])) {
     if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
-    const tot = (o.pricingSummary && o.pricingSummary.total) || {};
-    if (tot.currency && tot.currency !== 'EUR') continue;
-    const eur = Number(tot.value);
-    if (!isFinite(eur) || vus.has('ebay:' + o.orderId)) continue;
+    // L'argent reçu (frais eBay déjà retirés, port jamais compté) : frais = 0.
+    const eur = montantRecuEbay(o).eur;
+    if (eur == null || vus.has('ebay:' + o.orderId)) continue;
     vus.add('ebay:' + o.orderId);
     const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
     let a = lignes.length ? 0 : null;
     for (const li of lignes) { const x = achatDuNum(numEbayLigne(o, li)); if (x == null) { a = null; break; } a += x; }
-    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: fraisEbayCommande(o) });
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: 0 });
   }
   return out;
 };
@@ -4831,12 +4842,11 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, decl
     // du remboursement, et VRM quand il accepte une annulation :
     // `annulerCommandeRangee`). Ce n'est pas de l'argent reçu : hors du CA.
     if (!commandeEbayEngagee(e)) continue;
-    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     const id = 'ebay:' + e.orderId;
-    if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
-    const eur = Number(tot.value);
+    const recu = montantRecuEbay(e);
+    if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '' }); } continue; }
+    const eur = recu.eur;
     const t = Date.parse(e.creationDate || '');
-    if (!isFinite(eur)) continue;
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
@@ -4885,7 +4895,7 @@ const lectureIncomplete = ({ registre, ventes, ventesErreur, comptesEchec, verse
 //    Identité `plateforme:id`, jamais un titre (§5).
 const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   const lignes = [], vus = new Set();
-  let sansDate = 0;
+  let sansDate = 0, ecartees = 0;   // ecartees : commandes eBay au montant reçu illisible (montantRecuEbay)
   const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
   for (const o of (vinted || [])) {
     if (!o || (cachee && cachee(o))) continue;
@@ -4906,13 +4916,12 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
     if (!commandeEbayEngagee(e)) continue;   // annulée : rien de vendu (même règle que le CA déclaré)
-    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
-    if (tot.currency && tot.currency !== 'EUR') continue;
-    const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
-    if (!isFinite(eur) || !t) continue;
+    const eur = montantRecuEbay(e).eur, t = Date.parse(e.creationDate || '');
+    if (eur == null) { if (garde('ebay:' + e.orderId)) ecartees += 1; continue; }
+    if (!t) continue;
     if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
   }
-  return { lignes, sansDate };
+  return { lignes, sansDate, ecartees };
 };
 // Le résumé VENDU — aujourd'hui, ce mois, mois par mois — avec les bornes de
 // Ma journée (minuit LOCAL, le 1er du mois LOCAL). ⚠️ Pour les écrans qui ne
@@ -13173,9 +13182,12 @@ function caEbayPayees(orders) {
   // (revue argent, 19 oct.) Une commande annulée garde `PAID` : elle n'est pas
   // du chiffre d'affaires (même règle que le CA déclaré, `commandeEbayEngagee`).
   const paid = payees.filter(commandeEbayEngagee);
-  const totals=paid.map(o=>o.pricingSummary?.total);
-  if(totals.some(t=>!t || t.currency!=='EUR' || t.value==null || String(t.value).trim()==='' || !Number.isFinite(Number(t.value)) || Number(t.value)<0))return null;
-  return totals.reduce((sum,t)=>sum+Number(t.value),0);
+  // (revue argent eBay, 20 oct.) L'argent reçu, pas le total payé par
+  // l'acheteur (port compris) : `montantRecuEbay`. Une commande illisible ⇒
+  // « pas su » (null), jamais un total partiel présenté comme complet.
+  const recus=paid.map(o=>montantRecuEbay(o).eur);
+  if(recus.some(v=>v==null))return null;
+  return recus.reduce((sum,v)=>sum+Math.round(v*100),0)/100;
 }
 
 // ── CA FINALISÉ PAR PLATEFORME (propriétaire unique, §11) ──────────────────
@@ -14394,6 +14406,10 @@ function itemDeBrouillon(d) {
   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
   if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
   if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
+  // (19 oct., revue « argent ») « 1.250 » partait en 1,25 €, « 74 € » en NaN :
+  // la MÊME lecture que toute saisie de montant (`montantSaisi`) — le serveur
+  // refuse aussi (`prixLu`), ceci dit pourquoi AVANT d'envoyer.
+  { const px = montantSaisi(typeof d.prix === 'number' ? String(d.prix) : d.prix); if (!(px > 0)) return { err: 'Un prix en euros, par exemple 74 ou 74,50.' }; }
   // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
   // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
   // qu'un faux.
@@ -14416,7 +14432,7 @@ function itemDeBrouillon(d) {
       offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
     }
   }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).trim().replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -25599,7 +25615,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
       ...(ebayCommandes === null ? ['eBay'] : []),
     ];
     const attente = lbcCoqueLu === undefined || ebayCommandes === undefined;
-    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, finSansDate, manque, attente };
+    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
@@ -25662,13 +25678,14 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               </tbody>
             </table>
           </div>
-          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || versements === null) && (
+          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || calc.venduEbayEcartees > 0 || versements === null) && (
             <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
               {calc.manque.length > 0 && <div>Totaux partiels — sans {calc.manque.join(', ')} (pas pu lire) : chaque montant est un minimum.</div>}
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
               {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
               {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
               {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période.</div>}
+              {calc.venduEbayEcartees > 0 && <div data-ca-ebay-ecartees={calc.venduEbayEcartees}>{calc.venduEbayEcartees} commande{calc.venduEbayEcartees > 1 ? 's' : ''} eBay écartée{calc.venduEbayEcartees > 1 ? 's' : ''} : le montant que tu reçois (frais eBay retirés, port non compté) n'est pas lisible ou n'est pas en euros.</div>}
             </div>
           )}
         </>)}
@@ -30793,7 +30810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         + (e.regle && e.regle.etat === 'connue' ? `\n\nTa règle d'offre (dès ${prix(e.regle.accepte)}) peut tomber avec le changement de prix : VRM la relit après et te le dit.` : ''), ok: 'Baisser sur eBay' });
     if (!okc) return;
     setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'envoi', prix: e.sugg } }));
-    const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: e.itemId, price: e.sugg, ...corpsCompteEbay(e.compte) }));
+    const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: e.itemId, price: e.sugg, prixVu: e.prixActuel, ...corpsCompteEbay(e.compte) }));
     if (res.etat === 'ok') {
       // Ce que le changement de prix a fait à la règle d'offre (relue par la route).
       setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ok', prix: e.sugg, regleMsg: res.msg || '', regleTon: res.ton || 'ok' } }));
@@ -37523,6 +37540,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return <div key={x.compte+':'+x.orderId} data-ebay-ne-pas-poster-cmd={x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`}</div>;
             })}
             <button type="button" onClick={()=>onNav&&onNav('ebay_agent')} style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'0 12px',minHeight:44,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Ouvrir eBay → À traiter</button>
+          </div>
+        )}
+        {/* (19 oct., revue « argent ») Une commande eBay ni annulée, ni
+            remboursée en entier, ni partie, mais que VRM ne sait pas dire « à
+            poster » (remboursée en partie, paiement pas confirmé, état
+            d'expédition inconnu) : dite, jamais cachée. Le geste est dans eBay. */}
+        {colisEb && Array.isArray(colisEb.aVerifier) && colisEb.aVerifier.length>0 && (
+          <div data-ebay-a-verifier={colisEb.aVerifier.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
+            <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{colisEb.aVerifier.length>1?`${colisEb.aVerifier.length} commandes eBay à vérifier avant de poster`:'Une commande eBay à vérifier avant de poster'}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>Ni annulée, ni partie : regarde-la dans eBay avant de poster ou non.</div>
+            {colisEb.aVerifier.map(x => {
+              const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+              return <div key={x.compte+':'+x.orderId} data-ebay-a-verifier-cmd={x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`} <span style={{color:C.muted}}>· {x.etat}</span> · <a href={lienCommandeEbay(x.orderId)} target="_blank" rel="noopener noreferrer" style={{color:C.text}}>Ouvrir dans eBay ↗</a></div>;
+            })}
           </div>
         )}
         {emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}

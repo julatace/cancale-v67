@@ -50,12 +50,12 @@ const expediee = (o) => ['FULFILLED', 'SHIPPED'].includes(String((o && o.orderFu
 
 // `orders` : les commandes de TOUS les comptes actifs, marquées `_compte`
 // (app) — ou non marquées (serveur). Rend `null` ou
-//   { aPoster, nePasPoster, horsEnvoi }
+//   { aPoster, nePasPoster, horsEnvoi, aVerifier }
 // chaque entrée : { orderId, compte, pseudo, titre, sku, itemId, creationDate,
 //   articles, limite (ms|null), jours (int|null), authentification }
 export function colisEbay(orders, maintenant = Date.now()) {
   if (!Array.isArray(orders)) return null;
-  const aPoster = [], nePasPoster = [], horsEnvoi = [], vus = new Set();
+  const aPoster = [], nePasPoster = [], horsEnvoi = [], aVerifier = [], vus = new Set();
   for (const o of orders) {
     if (!o || typeof o !== 'object' || !o.orderId) continue;
     const cle = (o._compte || 'principal') + ':' + o.orderId;
@@ -76,7 +76,16 @@ export function colisEbay(orders, maintenant = Date.now()) {
     // « NE POSTE PAS » : l'acheteur a demandé l'annulation et le colis n'est pas
     // parti. Une annulation inconnue (ni refusée ni close) vaut « demandée ».
     if (!ANNULATION_CLOSE.includes(cancel) && !expediee(o)) { nePasPoster.push(e); continue; }
-    if (!etatCommandeEbay(o).peutExpedier) continue;
+    const etat = etatCommandeEbay(o);
+    if (!etat.peutExpedier) {
+      // (19 octobre, revue « argent ») Une commande qui n'est ni annulée, ni
+      // remboursée EN ENTIER, ni partie — mais dont VRM ne sait pas dire qu'elle
+      // est à poster (remboursée EN PARTIE, paiement pas encore confirmé, état
+      // d'expédition inconnu) disparaissait de Colis sans un mot. Un colis caché
+      // est un colis perdu : elle est « à vérifier dans eBay ».
+      if (etat.kind !== 'cancelled' && !(etat.kind === 'refunded' && String(o.orderPaymentStatus || '').toUpperCase() === 'FULLY_REFUNDED') && !etat.expedie && !expediee(o)) aVerifier.push({ ...e, etat: etat.label });
+      continue;
+    }
     const types = (Array.isArray(o.fulfillmentStartInstructions) ? o.fulfillmentStartInstructions : [])
       .map((f) => String((f && f.fulfillmentInstructionsType) || '').toUpperCase()).filter(Boolean);
     // Un type LU qui n'est pas un envoi (retrait en magasin, expédié par eBay,
@@ -85,8 +94,8 @@ export function colisEbay(orders, maintenant = Date.now()) {
     aPoster.push(e);
   }
   const tri = (a, b) => (a.limite == null) - (b.limite == null) || (a.limite || 0) - (b.limite || 0);
-  aPoster.sort(tri); nePasPoster.sort(tri);
-  return { aPoster, nePasPoster, horsEnvoi };
+  aPoster.sort(tri); nePasPoster.sort(tri); aVerifier.sort(tri);
+  return { aPoster, nePasPoster, horsEnvoi, aVerifier };
 }
 
 // Les nombres du widget et du rappel du matin : total · en retard · aujourd'hui
@@ -95,7 +104,7 @@ export function resumeColisEbay(c) {
   if (!c) return null;
   let overdue = 0, today = 0, tomorrow = 0;
   for (const x of c.aPoster) { if (x.jours == null) continue; if (x.jours < 0) overdue++; else if (x.jours === 0) today++; else if (x.jours === 1) tomorrow++; }
-  return { total: c.aPoster.length, overdue, today, tomorrow, nePasPoster: c.nePasPoster.length };
+  return { total: c.aPoster.length, overdue, today, tomorrow, nePasPoster: c.nePasPoster.length, aVerifier: (c.aVerifier || []).length };
 }
 
 // La page de la commande dans le Seller Hub d'eBay.fr (c'est là que s'achète

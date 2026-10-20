@@ -855,10 +855,10 @@ const RA = {};
   });
   await essaie('modifier : réponse sans Ack', async () => {
     remettre(); mode.trading = 'reseau';
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70' });
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70', prixVu: '80' });
     dit(o.code === 504 && o.corps.reason === 'incertain', 'changer un prix, réseau coupé ⇒ « incertain », jamais « eBay a refusé »', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
     remettre(); mode.trading = 'refus';
-    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70' });
+    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70', prixVu: '80' });
     dit(o2.code !== 504 && o2.corps.ok === false && o2.corps.reason !== 'incertain', 'l\'autre sens : un vrai refus (Ack Failure) reste un refus', `HTTP ${o2.code}`);
   });
 
@@ -1904,7 +1904,7 @@ const RA = {};
   await essaie('[R-prix-change]', async () => {
     const regleR2 = () => lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' }, '110000000301': { lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() - H, par: 'sync' } }, capturedAt: 5 } });
     avecR(); regleR2();
-    const o = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     const marque = o.journal.find((x) => x.ou === 'base' && /ebay_offres/.test(x.corps) && /en-cours/.test(x.corps));
     const rev = auCompte(o.journal).find((x) => x.appel === 'ReviseInventoryStatus');
     dit(!!marque && !!rev && marque.seq < rev.seq, '[R-prix-change] une annonce à règle : marquée « en cours » AVANT le changement de prix', `${marque && marque.seq} < ${rev && rev.seq}`);
@@ -1912,27 +1912,27 @@ const RA = {};
     dit(o.code === 200 && o.corps.regle && o.corps.regle.tombee === true && o.corps.regle.avant && o.corps.regle.avant.accepte === 70 && it && it.accepte === null,
       '[R-prix-change] eBay a fait tomber la règle ⇒ « tombée », ce qu\'elle était, et l\'entrée relue (aucune)', JSON.stringify(o.corps.regle));
     avecR(); regleR2(); mode.prix = 'garde';
-    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o2.code === 200 && o2.corps.regle.tombee === false && o2.corps.regle.lecture.accepte === 70 && o2.corps.regle.lecture.prix === 95, '[R-prix-change] eBay l\'a gardée ⇒ « pas tombée », relue à 70 € sur un prix de 95 €', JSON.stringify(o2.corps.regle));
     avecR(); regleR2(); mode.prix = 'refus-23004';
-    const o3 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '65' });
+    const o3 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '65', prixVu: '90' });
     const it3 = (offresDe(J) || {})['110000000302'];
     dit(o3.code === 422 && (o3.corps.erreurs || [])[0] && o3.corps.erreurs[0].code === '23004' && it3 && it3.lu === true && it3.accepte === 70, '[R-prix-change] eBay refuse le prix (23004) ⇒ 422 avec son code, l\'entrée = la relecture (jamais « en cours »)', JSON.stringify(it3));
     avecR(); regleR2(); mode.trading = 'reseau';
-    const o4 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o4 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     const it4 = (offresDe(J) || {})['110000000302'];
     dit(o4.code === 504 && it4 && it4.lu === false && it4.raison === 'incertain', '[R-prix-change] réseau coupé ⇒ 504, l\'entrée « incertaine »', JSON.stringify(it4));
     avecR(); regleR2(); mode.offresEcritureKo = true;
-    const o5 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o5 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o5.code === 503 && o5.corps.reason === 'note' && !auCompte(o5.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[R-prix-change] le marqueur ne s\'écrit pas ⇒ 503, le prix n\'est PAS changé', `HTTP ${o5.code}`);
     avecR(); regleR2();
-    const o6 = await app(JWT_J, { action: 'revise', itemId: '110000000301', price: '85' });
+    const o6 = await app(JWT_J, { action: 'revise', itemId: '110000000301', price: '85', prixVu: '80' });
     dit(o6.code === 200 && o6.corps.regle.tombee === false && !o6.journal.some((x) => x.ou === 'base' && /en-cours/.test(x.corps)), '[R-prix-change] une annonce SANS règle connue ⇒ « pas tombée », aucun marqueur', JSON.stringify(o6.corps.regle));
     avecR();
-    const o7 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o7 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o7.code === 200 && o7.corps.regle.tombee === null && (offresDe(J) || {})['110000000302'], '[R-prix-change] une annonce sans entrée ⇒ « pas su » (null), la lecture rangée', JSON.stringify(o7.corps.regle));
     avecR(); regleR2(); mode.offresKo = true;
-    const o8 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95' });
+    const o8 = await app(JWT_J, { action: 'revise', itemId: '110000000302', price: '95', prixVu: '90' });
     dit(o8.code === 200 && o8.corps.regle.tombee === null, '[R-prix-change] ligne des règles illisible ⇒ « pas su » (null), jamais « pas tombée »', JSON.stringify(o8.corps.regle));
     avecR(); regleR2();
     const o9 = await app(JWT_J, { action: 'revise', itemId: '110000000302', quantity: '2' });
@@ -2107,7 +2107,7 @@ const RA = {};
     const o = await app(JWT_J, { action: 'pubverify', item: { ...itemC, offre: { accepte: 66, refuse: null } } });
     const v = auCompte(o.journal).find((x) => x.appel === 'VerifyAddFixedPriceItem');
     dit(o.code === 200 && v && v.corps.includes(BLOC66), '[R-crea] « Vérifier » avec une règle (66 € sur 74 €) : le <Item> porte les offres et le seuil', v ? v.corps.slice(-400) : `HTTP ${o.code}`);
-    for (const [nom, it, reason] of [['seuil = prix', { ...itemC, offre: { accepte: 74 } }, 'offre'], ['prix illisible', { ...itemC, price: 'abc', offre: { accepte: 66 } }, 'offre'], ['sous la moitié', { ...itemC, offre: { accepte: 7 } }, 'sous-moitie']]) {
+    for (const [nom, it, reason] of [['seuil = prix', { ...itemC, offre: { accepte: 74 } }, 'offre'], ['prix illisible', { ...itemC, price: 'abc', offre: { accepte: 66 } }, 'prix'], ['sous la moitié', { ...itemC, offre: { accepte: 7 } }, 'sous-moitie']]) {
       avecR();
       const x = await app(JWT_J, { action: 'pubverify', item: it });
       dit(x.code === 400 && x.corps.reason === reason && zero(x), `[R-crea] ${nom} ⇒ 400 « ${reason} », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
@@ -2243,8 +2243,9 @@ const RA = {};
     avecR();const refusal=await app(JWT_J,{...body,confirme:false});dit(refusal.code===400 && auCompte(refusal.journal).length===0,'[Suite-edition] annuler ou omettre la confirmation ne contacte pas eBay');
   });
   await essaie('[Suite-devises]',async()=>{
-    const context={};vm.createContext(context);vm.runInContext(extraire(APP,'commandeEbayEngagee')+';'+extraire(APP,'caEbayPayees')+';this.ca=caEbayPayees;',context);
-    const order=(value,currency)=>({orderPaymentStatus:'PAID',pricingSummary:{total:{value,currency}}});
+    const context={};vm.createContext(context);vm.runInContext(extraire(APP,'commandeEbayEngagee')+';'+extraire(APP,'montantRecuEbay')+';'+extraire(APP,'caEbayPayees')+';this.ca=caEbayPayees;',context);
+    // (20 oct.) Le montant compté est l'argent REÇU (dû au vendeur − frais), jamais le total acheteur (port compris).
+    const order=(value,currency)=>({orderPaymentStatus:'PAID',pricingSummary:{total:{value:'999',currency:'EUR'}},paymentSummary:{totalDueSeller:{value,currency}},totalMarketplaceFee:{value:'0',currency:'EUR'}});
     dit(context.ca([order('25','EUR'),order('50','EUR')])===75,'[Suite-devises] les commandes payées en EUR donnent le montant exact');
     dit(context.ca([order('25','EUR'),order('50','USD')])===null && context.ca([order('25',undefined)])===null && context.ca([order('inconnu','EUR')])===null,'[Suite-devises] ni dollars ni devise ou montant inconnus ne deviennent des euros');
   });
@@ -2314,6 +2315,93 @@ const RA = {};
     const d = A.messageOffreCreation({ verifie: true, lecture: lec({ offresActives: true }), range: true }, { accepte: 66 });
     dit(a.issue === 'offres-inconnues' && !a.ok && /66,00/.test(a.msg) && !/pas encore relue/.test(a.msg) && b0.issue === 'non-relu' && !b0.ok && c.issue === 'ok' && !c.ok && d.ok === true,
       '[R-publie-offre] seuil relu sans l\'état des offres ⇒ « eBay montre ton seuil », jamais « pas encore relue » ; rien relu ⇒ pas relue ; posée mais pas notée ⇒ pas « ok »', JSON.stringify([a.issue, b0.issue, c.ok, d.ok]));
+  });
+
+  // ── 13. L'ARGENT (revue adverse du 19 octobre) ─────────────────────────────
+  // Julien : « la moindre erreur peut me faire perdre de l'argent ». Chaque
+  // contrôle ci-dessous a été ROUGE sur le code d'avant (méthode §6.1).
+  //  [ARG-prix]  le prix envoyé à eBay est EXACTEMENT celui tapé : « 1.250 »
+  //              partait en 1,25 €, « 74,999 » en 75,00 €, « 74 € » en NaN.
+  //              Une saisie qui n'est pas « 74 » / « 74,50 » ne part pas.
+  //  [ARG-port]  aucun chemin ne pose « livraison gratuite » (§2.8) : un `item`
+  //              sans `ebayGere` partait avec un port à 0,00 €.
+  //  [ARG-vu]    baisser un prix (`revise`) vérifie chez eBay que le prix de
+  //              départ est celui que l'écran a montré, en euros — sinon rien.
+  //  [ARG-colis] une commande payée pas encore partie n'est jamais cachée.
+  const AJOUTS = (j) => auCompte(j).filter((x) => /^(AddFixedPriceItem|VerifyAddFixedPriceItem)$/.test(x.appel));
+  for (const [prix, attendu] of [['1.250', null], ['74,999', null], ['74 €', null], ['0', null], ['-5', null], ['1e3', null], ['74,5', '74.50'], ['74', '74.00'], [74.5, '74.50']]) {
+    await essaie('[ARG-prix] publish ' + prix, async () => {
+      remettre();
+      const o = await app(JWT_J, { action: 'publish', item: { ...item, price: prix } });
+      const add = AJOUTS(o.journal);
+      const envoye = add.map((x) => (/<StartPrice>([^<]*)<\/StartPrice>/.exec(x.corps) || [])[1]);
+      if (attendu == null) dit(o.code === 400 && add.length === 0, `[ARG-prix] publier au prix ${JSON.stringify(prix)} ⇒ 400, rien n'est envoyé à eBay (jamais un autre montant)`, `HTTP ${o.code} · envoyé ${envoye.join(',') || '∅'}`);
+      else dit(o.code === 200 && envoye.length === 1 && envoye[0] === attendu, `[ARG-prix] publier au prix ${JSON.stringify(prix)} ⇒ StartPrice ${attendu}`, `HTTP ${o.code} · envoyé ${envoye.join(',') || '∅'}`);
+    });
+  }
+  await essaie('[ARG-prix] vérifier, programmer, baisser', async () => {
+    remettre();
+    const v = await app(JWT_J, { action: 'pubverify', item: { ...item, price: '1.250' } });
+    const p = await app(JWT_J, prog({ item: { ...item, numero: '30', price: '1.250' } }));
+    const r = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '1.250', prixVu: '80' });
+    dit(v.code === 400 && AJOUTS(v.journal).length === 0 && p.code === 400 && AJOUTS(p.journal).length === 0 && r.code === 400 && !auCompte(r.journal).some((x) => x.appel === 'ReviseInventoryStatus'),
+      '[ARG-prix] « 1.250 » refusé aussi à la vérification, à la programmation et au changement de prix — rien n\'est envoyé', `${v.code}/${p.code}/${r.code}`);
+  });
+  await essaie('[ARG-prix] règle d\'offre sur un prix illisible', async () => {
+    remettre();
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, price: '1.250', offre: { accepte: 1 } } });
+    dit(o.code === 400 && AJOUTS(o.journal).length === 0, '[ARG-prix] un seuil d\'offre ne se juge pas contre un prix mal lu (1,25 au lieu de 1 250) — 400, rien ne part', `HTTP ${o.code}`);
+  });
+  await essaie('[ARG-port] item sans ebayGere', async () => {
+    remettre();
+    const it2 = { ...item }; delete it2.ebayGere;
+    const o = await app(JWT_J, { action: 'publish', item: it2 });
+    const add = AJOUTS(o.journal);
+    const port = add.map((x) => (/<ShippingServiceCost>([^<]*)<\/ShippingServiceCost>/.exec(x.corps) || [])[1]).filter((x) => x != null);
+    dit(o.code === 200 && add.length === 1 && !add.some((x) => /<ShippingDetails>/.test(x.corps)) && !port.length, '[ARG-port] un item sans `ebayGere` part en livraison gérée par eBay — jamais un port posé par VRM (encore moins 0,00 €)', `HTTP ${o.code} · port ${port.join(',') || '∅'}`);
+  });
+  for (const cout of [undefined, '0', '0,00', 'abc']) {
+    await essaie('[ARG-port] tarif fixe ' + cout, async () => {
+      remettre();
+      const o = await app(JWT_J, { action: 'publish', item: { ...item, ebayGere: false, ...(cout === undefined ? {} : { shippingCost: cout }) } });
+      dit(o.code === 400 && AJOUTS(o.journal).length === 0, `[ARG-port] tarif fixe avec un port ${JSON.stringify(cout)} ⇒ 400 : VRM ne pose jamais « livraison gratuite »`, `HTTP ${o.code}`);
+    });
+  }
+  await essaie('[ARG-port] tarif fixe explicite', async () => {
+    remettre();
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, ebayGere: false, shippingCost: '5,90' } });
+    const add = AJOUTS(o.journal);
+    dit(o.code === 200 && add.length === 1 && /<ShippingServiceCost>5\.90<\/ShippingServiceCost>/.test(add[0].corps), '[ARG-port] l\'autre sens : un port explicite (5,90 €) part tel quel', `HTTP ${o.code}`);
+  });
+  await essaie('[ARG-vu] prix changé chez eBay', async () => {
+    remettre();
+    const a = ebay['at-J'].actives.find((x) => x.itemId === '110000000001'); a.prix = '90.0';
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    dit(o.code === 409 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus') && a.prix === '90.0',
+      '[ARG-vu] l\'écran montrait 80 €, eBay est à 90 € ⇒ 409, le prix n\'est PAS changé', `HTTP ${o.code} · prix chez eBay ${a.prix}`);
+    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53' });
+    dit(o2.code === 400 && !auCompte(o2.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] sans le prix vu ⇒ 400, rien n\'est envoyé', `HTTP ${o2.code}`);
+    const o3 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '90' });
+    dit(o3.code === 200 && a.prix === '53.00', '[ARG-vu] l\'autre sens : le prix vu est celui d\'eBay ⇒ changé', `HTTP ${o3.code} · ${a.prix}`);
+  });
+  await essaie('[ARG-vu] autre devise', async () => {
+    remettre();
+    const a = ebay['at-J'].actives.find((x) => x.itemId === '110000000001'); a.devise = 'USD';
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    dit(o.code === 409 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] une annonce en USD ⇒ rien n\'est changé (VRM écrit des euros)', `HTTP ${o.code}`);
+  });
+  await essaie('[ARG-vu] relecture ratée', async () => {
+    remettre(); mode.getitem = 'ko';
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '53', prixVu: '80' });
+    dit(o.code === 503 && !auCompte(o.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] eBay ne rend pas l\'annonce ⇒ 503, rien n\'est changé (« pas su »)', `HTTP ${o.code}`);
+  });
+  await essaie('[ARG-colis] payée, remboursée en partie, pas partie', async () => {
+    const m = await import('file://' + path.join(RACINE, 'api', '_lib', 'ebay-a-expedier.js'));
+    const cmd = (id, o) => ({ orderId: id, creationDate: '2026-10-18T10:00:00.000Z', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', cancelStatus: { cancelState: 'NONE_REQUESTED' }, lineItems: [{ title: 'Paire ' + id, sku: 'VRM-1' }], ...(o || {}) });
+    const c = m.colisEbay([cmd('A'), cmd('B', { orderPaymentStatus: 'PARTIALLY_REFUNDED' }), cmd('C', { orderFulfillmentStatus: '' }), cmd('D', { cancelStatus: { cancelState: 'CANCELED' } }), cmd('E', { orderPaymentStatus: 'FULLY_REFUNDED' }), cmd('F', { orderFulfillmentStatus: 'FULFILLED', orderPaymentStatus: 'PARTIALLY_REFUNDED' })]);
+    const ids = (l) => (l || []).map((x) => x.orderId).join(',');
+    dit(ids(c.aPoster) === 'A' && Array.isArray(c.aVerifier) && ids(c.aVerifier) === 'B,C',
+      '[ARG-colis] une commande payée qui n\'est pas partie n\'est jamais cachée : remboursée en partie (B) ou d\'état d\'expédition inconnu (C) ⇒ « à vérifier » ; annulée, remboursée en entier ou déjà partie ⇒ nulle part', `aPoster=${ids(c.aPoster)} · aVerifier=${ids(c.aVerifier)}`);
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────
