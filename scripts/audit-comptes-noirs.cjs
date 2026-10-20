@@ -63,7 +63,7 @@ function ctxAvec(etat, noirs, rallumes) {
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
-  vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' });
+  vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   return { ctx, appels };
 }
 const aEfface = (appels) => appels.some(a => a.startsWith('DELETE') && /vinted_accounts/.test(a));

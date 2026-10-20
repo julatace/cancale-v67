@@ -724,25 +724,35 @@ function renouvelerUneFois() {
 let _statutDernierRefus = null;
 async function supabaseUpsert(table, rows, onConflict) {
   const list = Array.isArray(rows) ? rows : [rows];
+  // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
+  //    ELLE UNE BASE CLOISONNÉE NE REÇOIT RIEN. Mesuré chez Julien :
+  //    `ecriture_ratee_vinted_accounts_400` ×82, `ecriture_ratee_harvest_*_400`
+  //    (txn, conv, inbox, seen_urls…). Session morte ou en pause : `withOwner`
+  //    rendait la ligne SANS `owner`, `sbHeaders` mettait la clé publique et la
+  //    cible retombait sur `id` / `vinted_user_id` — qu'aucun index unique ne
+  //    porte une fois cloisonnée ⇒ 400 à coup sûr, une requête pour rien. Et la
+  //    session était relue pour CHAQUE ligne puis pour l'en-tête : un
+  //    renouvellement en route envoyait `owner` d'un côté et la clé publique de
+  //    l'autre. Une seule lecture ⇒ une seule identité pour tout l'envoi.
+  //    `null` (cloisonnement pas su) garde le comportement d'avant.
   const envoyer = async () => {
-    const owned = [];
-    for (const r of list) owned.push(await withOwner(r));
-    // Sur app_data la cible du conflit depend du mode (solo / multi-vendeurs).
+    const cl = await isCloisonne();
+    const s = cl ? await authToken() : null;
+    if (cl === true && !(s && s.access_token && s.user_id)) return 'sans_session';
+    const owned = list.map((r) => ((cl && s) ? Object.assign({ owner: s.user_id }, r) : r));
     let target = onConflict;
-    if (table === 'app_data' && onConflict === 'id') target = await appDataConflict();
-    if (table === 'vinted_accounts' && onConflict === 'vinted_user_id' && await isCloisonne()) {
-      const s = await authToken();
-      if (s && s.user_id) target = 'owner,vinted_user_id';
-    }
+    if (cl && s && table === 'app_data' && onConflict === 'id') target = 'owner,id';
+    if (cl && s && table === 'vinted_accounts' && onConflict === 'vinted_user_id') target = 'owner,vinted_user_id';
     return fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
       method: 'POST',
-      headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(owned),
     });
   };
   let statut = 'reseau';
   try {
     let res = await envoyer();
+    if (res === 'sans_session') throw Object.assign(new Error('sans_session'), { statut: 'sans_session' });
     // ⚠️ UN SEUL nouvel essai, et SEULEMENT après un 401 sur une base
     //    cloisonnée dont la session vient d'être renouvelée : un 401 veut dire
     //    « la base a refusé AVANT d'écrire » (jeton périmé), donc rejouer ne peut
@@ -753,6 +763,7 @@ async function supabaseUpsert(table, rows, onConflict) {
     if (res.status === 401 && await isCloisonne()) {
       const s2 = await renouvelerUneFois();
       if (s2 && s2.access_token) res = await envoyer();
+      if (res === 'sans_session') throw Object.assign(new Error('sans_session'), { statut: 'sans_session' });
     }
     if (res.ok) {
       // La base a pris une ligne de CAPTURE : elle répond — le recul tombe
@@ -762,7 +773,7 @@ async function supabaseUpsert(table, rows, onConflict) {
       return true;
     }
     statut = String(res.status || 'inconnu');
-  } catch (_) { statut = 'reseau'; }
+  } catch (e) { statut = (e && e.statut) || 'reseau'; }
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
   //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
   try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
@@ -1434,6 +1445,21 @@ function verifFormeObjet(type, parsed, id) {
   } catch (_) { /* une sentinelle ne casse jamais la capture */ }
 }
 
+// ⚠️⚠️ 19 octobre (5.193) — UN REFUS DE VINTED N'EST PAS UNE CAPTURE. Mesuré chez
+//    Julien : `forme_inconnue_champ_conversation` ×246 avec
+//    `cles=[code,message,message_code]` — le corps d'une réponse d'ERREUR de
+//    Vinted (conversation introuvable, accès refusé…) jugé comme une
+//    conversation dont `messages` aurait été renommé : fausse alerte « Format
+//    d'un site » dans Réglages, et `conversation_lecture_ou_forme_ratee` ×206.
+//    Vinted met `code: 0` sur une réponse réussie ; un `code` non nul AVEC un
+//    `message_code` est un refus. On le compte pour ce qu'il est, on ne range
+//    rien, on ne juge aucune forme. Un profil d'erreur n'apprenait rien non plus
+//    (« banni » exige `is_account_banned === true`).
+function estErreurVinted(p) {
+  return !!(p && typeof p === 'object' && !Array.isArray(p)
+    && typeof p.message_code === 'string' && typeof p.code === 'number' && p.code !== 0);
+}
+
 async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
@@ -1451,6 +1477,7 @@ async function storeHarvest(domain, type, id, body) {
     echantillonRate(type, id, body);
     return;
   }
+  if (estErreurVinted(parsed)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return; }
   // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
   verifFormeListe(type, parsed, id);
@@ -3423,7 +3450,7 @@ async function capterPhotosAnnonces(uid) {
     }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
-    let n = 0, dirty = false;
+    let n = 0, dirty = false; const lues = [];
     for (const it of manquants) {
       if (n >= PHOTOS_MAX_PAR_VISITE) break;
       const k = `${uid}_${it.id}`;
@@ -3433,7 +3460,11 @@ async function capterPhotosAnnonces(uid) {
       memo[k] = Date.now();
       n++;
       const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(it.id)}`);
-      if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); continue; }
+      // 5.193 : un frein de Vinted (429/403), une pause, un 401 ou une coupure ne
+      // disent rien de l'annonce — le mémo de 6 h était posé quand même (mesuré :
+      // `photos_page_refuse_429` ×15). Même règle que les codes de retrait et les
+      // preuves de vente (`memoApresEchec`) ; un frein arrête la boucle.
+      if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); if (!rep.ok && memoApresEchec(memo, k, rep, PHOTOS_RETRY_MS)) break; continue; }
       const det = extraireDetailPage(rep.text, it.id);
       const urls = det.photos;
       if (!urls.length) {
@@ -3461,13 +3492,27 @@ async function capterPhotosAnnonces(uid) {
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
         codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
         couleur: det.couleur || prev.couleur || '' };
-      dirty = true;
+      dirty = true; lues.push(kk);
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
       else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
     }
-    if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
+    // ⚠️ 5.193 — on RELIT la ligne au moment d'écrire et on n'y pose que NOS
+    //    fiches (`lues`) : une fiche rangée pendant la boucle (page d'annonce
+    //    ouverte, clic « Publier ») restait sinon écrasée par la copie lue au
+    //    début. Relecture ratée ⇒ on n'écrit pas, et ces annonces perdent leur
+    //    mémo (elles seront relues, pas dans 6 h).
+    if (dirty) {
+      const ecrit = await unItemDetailsALaFois(async () => {
+        const rr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+        if (rr === null) return false;
+        const cur = (rr[0] && rr[0].data) || {};
+        for (const kk of lues) cur[kk] = dej[kk];
+        return supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+      });
+      if (!ecrit) for (const kk of lues) delete memo[`${uid}_${kk}`];
+    }
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
@@ -4101,6 +4146,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // ni photos pour la plupart des paires. On archive depuis le payload BRUT
   // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
   const brut = payload;
+  if (estErreurVinted(brut)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return 'erreur-vinted'; }
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
   verifFormeObjet(type, brut, '');
@@ -4423,7 +4469,7 @@ async function pageActiveFetch() {
   let stored = false, ratees = 0;
   const range = async (type, data, opts) => {
     const r = await storeHarvestRow(uid, type, data, domain, opts);
-    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
+    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
   };
   // ⚠️ NE JAMAIS ECRASER UNE MOISSON PAR DU VIDE. Une session expiree, une
   // page pas encore chargee ou un appel refuse renvoient une LISTE VIDE, pas
@@ -4492,7 +4538,7 @@ async function activeFetchActiveAccount() {
     const range = async (type, data, opts) => {
       if (!(await memeCompte())) return 'abandon';
       const r = await storeHarvestRow(uid, type, data, domain, opts);
-      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
+      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
       return r;
     };
     const fin = () => {
@@ -5048,7 +5094,22 @@ async function saveListingDate(id, ts, text) {
 // app_data `vinted_item_details` = { id: {description, photos, readAt} }.
 // Sert (1) aux annonces Leboncoin (vraie description au lieu d'un texte
 // générique) et (2) d'archive de tes textes/photos.
-async function saveItemDetail(id, detail) {
+// ⚠️⚠️ 19 octobre (5.193) — UNE SEULE ÉCRITURE À LA FOIS SUR `vinted_item_details`.
+//    C'est une ligne lue-fusionnée-réécrite EN ENTIER, et trois chemins
+//    l'écrivent : la page d'annonce ouverte (`saveDetail`), le clic « Publier »
+//    (`completerPhotos`) et la capture de fond (`capterPhotosAnnonces`, dont la
+//    boucle dure plusieurs secondes). Deux écritures simultanées : la seconde
+//    repartait d'une copie sans la fiche de la première, et l'EFFAÇAIT. Une
+//    chaîne de promesses les met à la queue — ce n'est pas un tampon de données
+//    (§4.9) : chacune relit la ligne en base au moment d'écrire.
+let _chaineItemDetails = Promise.resolve();
+function unItemDetailsALaFois(fn) {
+  const p = _chaineItemDetails.then(fn, fn);
+  _chaineItemDetails = p.then(() => {}, () => {});
+  return p;
+}
+function saveItemDetail(id, detail) { return unItemDetailsALaFois(() => saveItemDetailMaintenant(id, detail)); }
+async function saveItemDetailMaintenant(id, detail) {
   const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
   //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le

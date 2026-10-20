@@ -10230,7 +10230,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **95 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -10642,6 +10642,40 @@ iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expér
 - ⚠️ **Non mesuré** : un vrai Firefox Android, un vrai Orion, un vrai Samsung.
 - **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
   Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).
+
+### Fiabilité de l'extension, mesurée chez lui (19 octobre, 5.193)
+**Mesuré** (lecture seule, `panel_diag_capture`, extension installée **5.188**,
+captures du 17-18 oct. sur 7 comptes) : `ecriture_ratee_vinted_accounts_400` ×82,
+`ecriture_ratee_harvest_{txn,conv,inbox,seen_urls,profile}_400` (~40),
+`forme_inconnue_champ_conversation` ×246 avec `cles=[code,message,message_code]`,
+`conversation_lecture_ou_forme_ratee` ×206, `photos_page_refuse_429` ×15,
+`label_ko_statuts_200_200_200` ×32 (Vinted répond sans URL : pas un défaut de code).
+Quatre défauts, reproduits sur le vrai `background.js` (`audit-fiabilite-fond.cjs`,
+22 contrôles, **14 rouges sur la 5.192**, `--prouve` : 5/5 mutations rouges) :
+- ⚠️⚠️ **Base cloisonnée, session VRM morte ou en pause ⇒ écriture vouée au 400.**
+  `withOwner` sans `owner`, clé publique, cible `id`/`vinted_user_id` (aucun index
+  unique) : la capture perdue, une requête pour rien. Et la session était relue
+  par ligne puis pour l'en-tête (un renouvellement en route mélangeait `owner` et
+  clé publique). `supabaseUpsert` lit la session UNE fois ; cloisonnée sans
+  session ⇒ rien ne part, diagnostic `ecriture_ratee_<famille>_sans_session`, et
+  le logo dit « ta session VRM n'a pas pu être renouvelée » (plus « ça réessaie
+  tout seul »). `null` (pas su) garde le comportement d'avant.
+- **Un refus de Vinted (`code ≠ 0` + `message_code`) n'est plus une capture**
+  (`estErreurVinted`) : ni fausse alerte « Format d'un site », ni ligne rangée, ni
+  recul de la base dans la moisson ; compté `ignore_erreur_vinted_<type>`.
+- **`vinted_item_details` : une écriture à la fois** (`unItemDetailsALaFois`) —
+  la capture photo réécrivait la ligne depuis sa copie du début de boucle et
+  EFFAÇAIT une fiche rangée entre-temps (page ouverte, clic « Publier ») ; deux
+  `saveItemDetail` simultanés aussi. Elle relit au moment d'écrire et ne pose que
+  ses fiches ; relecture ratée ⇒ rien écrit, les annonces seront relues.
+- **Capture photo : un 429/403/401/coupure ne pose plus le mémo de 6 h**
+  (`memoApresEchec`, la règle des codes de retrait) et arrête la boucle.
+- ⚠️ Onze audits servaient une base « cloisonnée » (sonde de schéma à 200) **sans
+  session** — une forme où la production répond 400 (§6.3) : ils fournissent
+  maintenant une session (`ctx.authToken`).
+- **Geste de Julien** : installer la 5.193 (remplacer le dossier, puis ⟳ dans
+  chaque Chrome) ; s'il voit « session VRM n'a pas pu être renouvelée » sur le
+  logo, cliquer le logo pour se reconnecter.
 
 ### Messages : une offre en attente passe devant (19 octobre)
 Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.
