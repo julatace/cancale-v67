@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.200.0';
+const CODE_VERSION = '5.201.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1983,6 +1983,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
+          if (msg.action === 'numeroPourPublier') { sendResponse(await reserverNumeroPourOnglet(sender && sender.tab ? sender.tab.id : null, msg.domain || 'www.vinted.fr')); return; }
+          if (msg.action === 'numeros') {
+            const m = await numerosPourAffichage();
+            if (!m) { sendResponse({ ok: false }); return; }
+            const pick = (src, ids) => { const o = {}; for (const id of (Array.isArray(ids) ? ids.slice(0, 400) : [])) if (src[String(id)]) o[String(id)] = src[String(id)]; return o; };
+            sendResponse({ ok: true, items: pick(m.parItem, msg.items), convs: pick(m.parConv, msg.convs), txs: pick(m.parTx, msg.txs) }); return;
+          }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2215,6 +2222,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeSeenUrls(domain, msg.paths, msg.reponses);
   } else if (msg.kind === 'suppression' && msg.itemId) {
     noterSuppression(domain, msg.itemId, msg.status, msg.at);
+  } else if (msg.kind === 'publication') {
+    if (msg.itemId) noterPublication(sender && sender.tab ? sender.tab.id : null, msg.itemId, msg.status);
+    else noterDiag('publication_forme_inconnue');
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -2440,6 +2450,148 @@ async function rangerSuppressions() {
     const faits = new Set([...ranges].map(cle));
     await chrome.storage.local.set({ [SUPPR_FILE]: now.filter((e) => !faits.has(cle(e))) });
   } catch (_) {}
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// LE NUMÉRO SUR VINTED (20 octobre, 5.201)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à côté
+// du bouton Publier, et après, quand on va sur Vinted, qu'il y ait le numéro
+// dessus ; pareil dans les ventes ». Trois gestes, tous LECTURE ou écriture de
+// NOTRE base — zéro requête vers Vinted (§3) :
+//  1. la page de dépôt s'ouvre ⇒ on RÉSERVE le prochain numéro (jamais servi)
+//     dans `panel_num_reserves.attente` AVANT de l'afficher (sinon l'app pourrait
+//     le donner ailleurs entre-temps) ; illisible ou pas écrit ⇒ rien n'est
+//     affiché (« pas su » ne promet pas un numéro) ;
+//  2. Vinted répond à `POST /api/v2/item_upload/items` (2xx) avec l'identifiant
+//     de l'annonce créée ⇒ la réservation de CET onglet est liée à CETTE annonce
+//     (`items[itemId]`), une identité (§5) — l'app lui donne ce numéro-là ;
+//  3. sur les pages Vinted, un numéro n'est affiché que s'il est CONNU par
+//     identité : fiche de l'annonce, vente (transaction, conversation). Jamais
+//     un titre. Inconnu ⇒ rien.
+const RESA_LIGNE = 'panel_num_reserves';
+const RESA_ATTENTE_MS = 3 * 3600e3;
+const RESA_ITEMS_MAX = 400;
+const RESA_LOCAL = 'vrmNumResaOnglets';
+let _chaineResa = Promise.resolve();
+const unResaALaFois = (fn) => { const p = _chaineResa.then(fn, fn); _chaineResa = p.catch(() => {}); return p; };
+// Le prochain numéro jamais servi : APRÈS le plus haut (la règle `prochainLibre`
+// de l'app : jamais dans un trou), dans la série à lettre si elle est choisie.
+function prochainNumeroDe(main, resa, maintenant) {
+  const pref = String((main && main.vrm_num_prefixe) || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  const cles = [];
+  const add = (v) => { const c = cleNum(v); if (c) cles.push(c); };
+  for (const x of (Array.isArray(main && main.vinted_used_numeros) ? main.vinted_used_numeros : [])) add(x);
+  for (const e of Object.values((main && main.vinted_annonce_numeros) || {})) add(e && e.numero);
+  for (const e of Object.values((main && main.vinted_sale_overrides) || {})) add(e && e.numero);
+  const t = Number(maintenant) || Date.now();
+  for (const [n, v] of Object.entries((resa && resa.attente) || {})) { const at = Date.parse((v && v.at) || ''); if (!isNaN(at) && t - at < RESA_ATTENTE_MS) add(n); }
+  for (const v of Object.values((resa && resa.items) || {})) add(v && v.numero);
+  let c = 1;
+  for (const k of cles) {
+    if (!pref) { if (/^\d+$/.test(k) && Number(k) >= c) c = Number(k) + 1; }
+    else { const m = /^([A-Z]{1,3})(\d+)$/.exec(k); if (m && m[1] === pref && Number(m[2]) >= c) c = Number(m[2]) + 1; }
+  }
+  return pref ? pref + c : String(c);
+}
+function resaPropre(data, maintenant) {
+  const t = Number(maintenant) || Date.now();
+  const attente = {}, items = {};
+  for (const [n, v] of Object.entries((data && data.attente) || {})) { const at = Date.parse((v && v.at) || ''); if (!isNaN(at) && t - at < RESA_ATTENTE_MS) attente[n] = v; }
+  const its = Object.entries((data && data.items) || {}).filter(([id, v]) => /^\d{4,15}$/.test(id) && v && v.numero);
+  its.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
+  for (const [id, v] of its.slice(0, RESA_ITEMS_MAX)) items[id] = v;
+  return { attente, items };
+}
+async function lireResa() {
+  const rows = await sbGet(`app_data?id=eq.${RESA_LIGNE}&select=data`);
+  if (rows === null) return null;
+  return resaPropre(rows[0] && rows[0].data);
+}
+async function ecrireResa(r) {
+  const ok = await supabaseUpsert('app_data', [{ id: RESA_LIGNE, data: { attente: r.attente, items: r.items, capturedAt: new Date().toISOString(), ver: EXT_VERSION } }], 'id');
+  return ok !== false;
+}
+async function reserverNumeroPourOnglet(tabId, domain) {
+  return unResaALaFois(async () => {
+    if (tabId == null) return { ok: false, raison: 'onglet' };
+    await lierPublicationsEnAttente();
+    let loc = {};
+    try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return { ok: false, raison: 'stockage' }; }
+    const deja = loc[tabId];
+    if (deja && !deja.item && Date.now() - deja.at < RESA_ATTENTE_MS) return { ok: true, numero: deja.numero };
+    // Une publication vue mais pas encore rangée (base injoignable) : on la garde
+    // à part — une nouvelle réservation dans cet onglet ne doit pas l'effacer.
+    if (deja && deja.item) { loc['lie_' + tabId + '_' + deja.at] = deja; delete loc[tabId]; }
+    const uid = await activeAccountId(domain);
+    if (!uid) return { ok: false, raison: 'compte' };
+    const main = await lireMain(['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_num_prefixe']);
+    const r = await lireResa();
+    if (main === null || r === null) { noterDiag('resa_lecture_ratee'); return { ok: false, raison: 'lecture' }; }
+    const numero = prochainNumeroDe(main, r);
+    r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
+    if (!(await ecrireResa(r))) { noterDiag('resa_ecriture_ratee'); return { ok: false, raison: 'ecriture' }; }
+    loc[tabId] = { numero, at: Date.now(), uid: String(uid) };
+    try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
+    noterDiag('resa_posee');
+    notifierApp({ type: 'maj', quoi: 'numeros' });
+    return { ok: true, numero };
+  });
+}
+// La publication vue dans la page : on note l'identifiant sur la réservation de
+// l'onglet (stockage local, §4.9), puis on range — une écriture ratée repart au
+// geste suivant, la publication vue ne meurt pas avec le service worker.
+async function noterPublication(tabId, itemId, status) {
+  const id = String(itemId || ''), st = Number(status);
+  if (tabId == null || !/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('publication_refusee_forme'); return; }
+  return unResaALaFois(async () => {
+    let loc = {};
+    try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return; }
+    const r = loc[tabId];
+    if (!r || r.item) { noterDiag('publication_sans_resa'); return; }
+    loc[tabId] = { ...r, item: id };
+    try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
+    noterDiag('publication_vue');
+    await lierPublicationsEnAttente();
+  });
+}
+async function lierPublicationsEnAttente() {
+  let loc = {};
+  try { loc = (await chrome.storage.local.get(RESA_LOCAL))[RESA_LOCAL] || {}; } catch (_) { return; }
+  const aLier = Object.entries(loc).filter(([, v]) => v && v.item);
+  if (!aLier.length) return;
+  const r = await lireResa();
+  if (r === null) { noterDiag('publication_lecture_ratee'); return; }   // pas su : on n'écrase rien
+  for (const [, v] of aLier) {
+    if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid };
+    delete r.attente[v.numero];
+  }
+  if (!(await ecrireResa(r))) { noterDiag('publication_ecriture_ratee'); return; }
+  for (const [tab] of aLier) delete loc[tab];
+  try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
+  noterDiag('publication_liee');
+  _numsAffichage = null;
+  notifierApp({ type: 'maj', quoi: 'annonces' });
+}
+// Les numéros à AFFICHER sur Vinted, par identité seulement (cache 2 min).
+let _numsAffichage = null;
+async function numerosPourAffichage() {
+  if (_numsAffichage && Date.now() - _numsAffichage.at < 120000) return _numsAffichage;
+  const main = await lireMain(['vinted_annonce_numeros', 'vinted_sale_overrides']);
+  if (main === null) return null;
+  const r = await lireResa();
+  const parItem = {}, parTx = {}, parConv = {};
+  for (const [id, e] of Object.entries(main.vinted_annonce_numeros || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n) parItem[id] = n; }
+  if (r) for (const [id, v] of Object.entries(r.items)) if (!parItem[id]) parItem[id] = String(v.numero);
+  const txItems = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,item:meta->>item_id');
+  for (const row of (txItems || [])) { const m = /_txn_(\d+)$/.exec(String(row.id || '')); if (m && row.item && parItem[String(row.item)]) parTx[m[1]] = parItem[String(row.item)]; }
+  for (const [tx, e] of Object.entries(main.vinted_sale_overrides || {})) { const n = e && String(e.numero == null ? '' : e.numero).trim(); if (n && /^\d+$/.test(tx)) parTx[tx] = n; }
+  const ventes = await sbGetTout('app_data?id=like.harvest_*_orders_sold&select=id,o:data->payload->my_orders');
+  for (const row of (ventes || [])) for (const o of (Array.isArray(row.o) ? row.o : [])) {
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '', cv = o && o.conversation_id != null ? String(o.conversation_id) : '';
+    if (tx && cv && parTx[tx]) parConv[cv] = parTx[tx];
+  }
+  _numsAffichage = { at: Date.now(), parItem, parTx, parConv };
+  return _numsAffichage;
 }
 // <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
 // `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`

@@ -5068,6 +5068,41 @@ Mesuré : **0 ligne** dans `vrm_communaute_profils` — personne n'avait pu rejo
   pseudo pris, Leaflet refusé ⇒ liste ; il coupe le service worker et marque le
   rechargement de `main.jsx` déjà fait pour ce cas).
 
+### Le numéro VRM sur Vinted : à côté de « Publier », sur l'annonce, dans les ventes (20 octobre, 5.201)
+Julien : « quand on publie sur Vinted je veux que le numéro soit écrit à côté du
+bouton Publier, et après, sur Vinted, qu'il y ait le numéro dessus ; pareil dans
+les ventes ». Rien ne clique et rien ne part chez Vinted : on pose une étiquette
+dans la page (`vinted-capture.js`), et le fond lit et écrit NOTRE base.
+- **Page de dépôt** (`/items/new`) : le fond RÉSERVE le prochain numéro jamais
+  servi (`prochainNumeroDe` : après le plus haut du pool, des fiches et des ventes
+  corrigées ; série à lettre respectée) dans `panel_num_reserves.attente` AVANT de
+  l'afficher, une réservation par onglet (3 h). Base illisible ou écriture ratée
+  ⇒ aucun numéro montré (« VRM n'a pas pu réserver de numéro »).
+- **Publication** : `inject.js` lit l'identifiant de l'annonce dans la réponse 2xx
+  de `POST /api/v2/item_upload/items` (chemin vu dans ses `seen_urls`) ; le fond
+  LIE la réservation de l'onglet à CETTE annonce (`items[itemId]`) ; une écriture
+  ratée est gardée et liée au geste suivant.
+- **L'app** (`numerosReserves`, même règle que l'extension) : l'annonce publiée
+  prend le numéro réservé (s'il n'est pas déjà sur une autre fiche), aucune autre
+  paire ne prend un numéro réservé, et réservations illisibles ⇒ une annonce neuve
+  attend (pas de numéro deviné).
+- **Sur les pages Vinted** : étiquette « N°x » sur les liens d'annonce (dressing),
+  de conversation et de transaction (ventes, « Commande traitée »), et à côté du
+  titre d'une annonce — uniquement par identité (fiche, transaction → annonce,
+  vente corrigée, conversation → transaction). Inconnu ⇒ rien. Les ACHATS n'ont
+  pas de numéro VRM : rien n'y est affiché.
+- Preuves : `audit-numero-vinted.cjs` (vrai `background.js` + vrai `inject.js` +
+  règle de l'app, 20 contrôles, 4 rouges sur l'avant) ; banc `numero-vinted.cjs`
+  (vrai `vinted-capture.js` dans une fausse page Vinted, 390 et 1512 px, et l'app
+  qui donne le numéro réservé, 15 rouges sur l'avant).
+- ⚠️ **Non mesuré** : le DOM réel de Vinted (403 d'ici) — le libellé du bouton
+  (« Ajouter » / « Publier » cherchés), la forme exacte de la réponse de création
+  (`item.id` ou `id` lus ; une autre forme note `publication_forme_inconnue` et ne
+  lie rien), et les liens des pages de ventes. Si l'étiquette n'apparaît pas à
+  côté du bouton, elle se pose en bas à gauche de l'écran.
+- **Geste de Julien** : installer la 5.201, puis publier une annonce et regarder
+  à côté du bouton.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
