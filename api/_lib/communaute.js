@@ -43,6 +43,7 @@ const RAISONS = {
   session: 'Connecte-toi à VRM pour faire ça.',
   abonnement: "Ton abonnement n'est pas actif : la carte de la communauté est fermée pour l'instant.",
   pseudo: 'Ce pseudo ne va pas : 30 caractères au plus, sans « @ » (jamais ton adresse email).',
+  'pseudo-pris': 'Ce pseudo est déjà pris sur la carte : choisis-en un autre.',
   ville: 'Choisis une ville.',
   pays: "Ce pays n'est pas reconnu.",
   position: 'Je ne retrouve pas cette ville sur la carte. Choisis-en une dans la liste.',
@@ -76,35 +77,71 @@ export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
 // base arrondit encore (elle refuse toute autre valeur).
 export const arrondi = (x) => Math.round(Number(x) * 20) / 20;
 
-// ── LE GÉOCODAGE D'UNE VILLE (Nominatim, OpenStreetMap — gratuit, sans clé) ──
-const UA = { 'User-Agent': 'VRM/1.0 (carte de la communauté)', 'Accept-Language': 'fr' };
-function villeDe(j) {
+// ── LE GÉOCODAGE D'UNE VILLE — trois sources gratuites, sans clé ─────────────
+//   1. la Base Adresse Nationale (api-adresse.data.gouv.fr) : les communes de
+//      France, l'État la sert sans quota pour ce volume ;
+//   2. Photon (komoot, données OpenStreetMap) : le reste du monde ;
+//   3. Nominatim (OpenStreetMap) seulement si les deux autres n'ont rien rendu.
+// Chacune a 4 s ; une source muette ne fait pas échouer les autres. « Aucune
+// source n'a répondu » se dit (ok:false), jamais « aucune ville ».
+const UA = { 'User-Agent': 'VRM/1.0 (https://vrm.center)', 'Accept-Language': 'fr' };
+const enTemps = (f, url) => f(url, { headers: UA, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+const ville = (nom, pays, region, lat, lon) => {
+  const la = Number(lat), lo = Number(lon);
+  if (!nom || !Number.isFinite(la) || !Number.isFinite(lo)) return null;
+  return { nom: String(nom).slice(0, 80), pays: String(pays || 'FR').toUpperCase().slice(0, 2) || 'FR', region: String(region || '').slice(0, 80), lat: arrondi(la), lon: arrondi(lo) };
+};
+function villeNominatim(j) {
   const a = (j && j.address) || {};
-  const nom = a.city || a.town || a.village || a.municipality || a.hamlet || j.name || '';
-  const lat = Number(j && j.lat), lon = Number(j && j.lon);
-  if (!nom || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { nom: String(nom).slice(0, 80), pays: String(a.country_code || '').toUpperCase().slice(0, 2) || 'FR',
-    region: String(a.state || a.county || a.country || '').slice(0, 80), lat: arrondi(lat), lon: arrondi(lon) };
+  return ville(a.city || a.town || a.village || a.municipality || a.hamlet || (j && j.name), a.country_code, a.state || a.county || a.country, j && j.lat, j && j.lon);
+}
+const villesBan = (j) => (j && Array.isArray(j.features) ? j.features : []).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  const region = String(p.context || '').split(',').map((x) => x.trim()).filter(Boolean).slice(1).join(', ');
+  return ville(p.city || p.name, 'FR', region, c[1], c[0]);
+});
+const TYPES_VILLE = new Set(['city', 'town', 'village', 'locality', 'district', 'county']);
+const villesPhoton = (j) => (j && Array.isArray(j.features) ? j.features : []).filter((f) => {
+  const p = f.properties || {};
+  return TYPES_VILLE.has(p.type) || p.osm_value === 'city' || p.osm_value === 'town' || p.osm_value === 'village';
+}).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  return ville(p.type === 'city' || p.type === 'town' || p.type === 'village' ? p.name : (p.city || p.name), p.countrycode, p.state || p.country, c[1], c[0]);
+});
+const lireJson = async (f, url) => { try { const r = await enTemps(f, url); if (!r.ok) return null; return await r.json(); } catch (_) { return null; } };
+function sansDoublons(villes) {
+  const vus = new Set();
+  return villes.filter(Boolean).filter((v) => { const k = v.nom.toLowerCase() + '|' + v.pays + '|' + v.lat + '|' + v.lon; if (vus.has(k)) return false; vus.add(k); return true; });
 }
 export async function geocoderVille({ q, lat, lon }, f = fetch) {
   try {
-    if (q) {
+    if (q != null && String(q).trim() !== '') {
       const t = String(q).trim().slice(0, 80);
       if (t.length < 2) return { ok: true, villes: [] };
-      const r = await f(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featureType=settlement&q=${encodeURIComponent(t)}`, { headers: UA });
-      if (!r.ok) return { ok: false };
-      const j = await r.json();
-      if (!Array.isArray(j)) return { ok: false };
-      const vus = new Set();
-      const villes = j.map(villeDe).filter(Boolean).filter((v) => { const k = v.nom + '|' + v.pays + '|' + v.region; if (vus.has(k)) return false; vus.add(k); return true; });
-      return { ok: true, villes };
+      const e = encodeURIComponent(t);
+      const [ban, photon] = await Promise.all([
+        lireJson(f, `https://api-adresse.data.gouv.fr/search/?q=${e}&type=municipality&autocomplete=1&limit=6`),
+        lireJson(f, `https://photon.komoot.io/api/?q=${e}&limit=8&lang=fr`),
+      ]);
+      let villes = sansDoublons([...villesBan(ban), ...villesPhoton(photon)]);
+      if (!villes.length && ban === null && photon === null) {
+        const j = await lireJson(f, `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featureType=settlement&q=${e}`);
+        if (!Array.isArray(j)) return { ok: false };
+        villes = sansDoublons(j.map(villeNominatim));
+      }
+      return { ok: true, villes: villes.slice(0, 8) };
     }
     const la = Number(lat), lo = Number(lon);
     if (!Number.isFinite(la) || !Number.isFinite(lo)) return { ok: true, villes: [] };
-    const r = await f(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=10&lat=${la}&lon=${lo}`, { headers: UA });
-    if (!r.ok) return { ok: false };
-    const v = villeDe(await r.json());
-    return { ok: true, villes: v ? [v] : [] };
+    const ban = await lireJson(f, `https://api-adresse.data.gouv.fr/reverse/?lon=${lo}&lat=${la}&type=municipality&limit=1`);
+    let villes = villesBan(ban).filter(Boolean);
+    if (!villes.length) villes = villesPhoton(await lireJson(f, `https://photon.komoot.io/reverse?lon=${lo}&lat=${la}&lang=fr`)).filter(Boolean);
+    if (!villes.length) {
+      const j = await lireJson(f, `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=10&lat=${la}&lon=${lo}`);
+      if (j === null && ban === null) return { ok: false };
+      const v = j && villeNominatim(j); if (v) villes = [v];
+    }
+    return { ok: true, villes: villes.slice(0, 1) };
   } catch (_) { return { ok: false }; }
 }
 
@@ -151,7 +188,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     const d = await appel('vrm_communaute_rejoindre', { p_pseudo: String(corps.pseudo || '').slice(0, 60), p_ville: String(corps.ville || '').slice(0, 120),
       p_pays: String(corps.pays || 'FR').slice(0, 4), p_lat: arrondi(lat), p_lon: arrondi(lon) }, objet);
     if (d === undefined) return;
-    return d.ok === true ? dire(200, { ok: true, pid: d.pid }) : refus(String(d.raison || 'inconnue'));
+    return d.ok === true ? dire(200, { ok: true, pid: d.pid, pseudo: d.pseudo || null }) : refus(String(d.raison || 'inconnue'), d.raison === 'pseudo-pris' ? 409 : 400);
   }
   if (action === 'quitter') {
     const d = await appel('vrm_communaute_quitter', {}, (x) => typeof x === 'boolean');

@@ -115,6 +115,8 @@ const MUTATIONS = {
   'groupe-quitte-compte': { sql20: (s) => remplace(s, "where g.groupe = p_groupe and g.pid = p.pid and g.quitte_le is null) end", "where g.groupe = p_groupe and g.pid = p.pid) end", 'gqc') },
   'groupe-bloque-visible': { sql20: (s) => remplace(s, "                                             and (p.owner = auth.uid() or public.vrm_acces_pour(p.owner))\n                                             and not exists (select 1 from public.vrm_communaute_blocages b where b.qui = auth.uid() and b.bloque = p.owner)), '[]'::jsonb))",
     "                                             and (p.owner = auth.uid() or public.vrm_acces_pour(p.owner))), '[]'::jsonb))", 'gbv') },
+  'pseudo-libre': { sql20: (s) => remplace(remplace(s, "  if exists (select 1 from public.vrm_communaute_profils o where pg_catalog.lower(o.pseudo) = pg_catalog.lower(ps) and o.owner <> moi) then", '  if false then', 'pl1'),
+    'create unique index if not exists vrm_communaute_pseudo_unique on public.vrm_communaute_profils (lower(pseudo));\n', '', 'pl2') },
   'groupes-autrui': { sql20: (s) => remplace(s, "                  where m.pid = (select q.pid from public.vrm_communaute_profils q where q.owner = auth.uid()) and m.quitte_le is null), '[]'::jsonb))", "                  where m.quitte_le is null), '[]'::jsonb))", 'ga') },
   'effacer-019': { apres19: "create or replace function public.vrm_communaute_effacer(p_owner uuid) returns integer language plpgsql volatile security definer set search_path = '' as $$ begin return 0; end $$;" },
 };
@@ -691,6 +693,21 @@ async function partie020(mut) {
   const carteDe = (u) => J(u, 'select public.vrm_communaute_carte();');
   const ventesDe = (c, k) => { const l = c && Array.isArray(c.lignes) && c.lignes.find((x) => x.pid === pidDe[k]); return l ? l.ventes : undefined; };
   let G = null;
+
+  await essaie('020 : le pseudo unique', () => {
+    dit(J(U.B, "select public.vrm_communaute_rejoindre('membrea', 'Cancale', 'FR', 48.68, -1.85);").raison === 'pseudo-pris', 'un pseudo déjà pris (majuscules ignorées) est refusé');
+    dit(carteDe(U.B).moi.pseudo === 'MembreB', 'et rien n\'a changé pour celui qui a essayé');
+    const r = J(U.A, "select public.vrm_communaute_rejoindre('MembreA', 'Rennes', 'FR', 48.11, -1.68);");
+    dit(r && r.ok === true && r.pid === pidDe.A, 'garder SON pseudo en changeant de ville reste possible', JSON.stringify(r));
+    J(U.A, "select public.vrm_communaute_rejoindre('MembreA', 'Cancale', 'FR', 48.68, -1.85);");
+    const brut = run(`update public.vrm_communaute_profils set pseudo = 'MEMBREB' where owner = '${U.C}';`, { role: 'supabase_admin' });
+    dit(!brut.ok && /unique|duplicate/i.test(brut.err), 'la base refuse un doublon, même écrit par le propriétaire de la table');
+    const D2 = '76666666-6666-4666-8666-666666666666';
+    ADM(`insert into auth.users (id, email) values ('${D2}', 'g9@exemple.fr');`);
+    const v = J(D2, "select public.vrm_communaute_rejoindre('', 'Lyon', 'FR', 45.75, 4.85);");
+    dit(v && v.ok === true && /^Revendeur-[A-HJ-NP-Z2-9]{4}$/.test(v.pseudo), 'un pseudo laissé vide devient « Revendeur-XXXX » (jamais le même pour tous)', JSON.stringify(v));
+    en(D2, 'select public.vrm_communaute_quitter();');
+  });
 
   await essaie('020 : créer un groupe', () => {
     dit(creer(U.D, 'Accompagnement').raison === 'invisible', 'hors de la carte, on ne crée pas de groupe');

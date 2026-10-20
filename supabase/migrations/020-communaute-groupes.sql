@@ -30,6 +30,12 @@
 --     200 membres par groupe.
 --   • L'abonnement (`vrm_acces_pour`) et les blocages : comme la carte.
 --
+-- ET UN PSEUDO UNIQUE sur la carte (demande du même jour) : deux personnes ne
+-- portent jamais le même pseudo (majuscules ignorées) — index unique sur
+-- lower(pseudo) + `vrm_communaute_rejoindre` redéfinie (« pseudo-pris ») ; un
+-- pseudo laissé vide devient « Revendeur-XXXX ». ⚠️ L'index refuse l'installation
+-- si deux pseudos identiques existent déjà (mesuré le 20 octobre : 0 ligne).
+--
 -- « FERMER MON COMPTE » : `vrm_communaute_effacer` (018) efface la ligne de la
 -- carte, donc son `pid`. Ses adhésions ne désignent alors plus personne (elles
 -- ne portent ni compte ni email : un `pid` tiré au hasard, qui ne se relie plus
@@ -90,6 +96,7 @@ do $$ declare v text; begin
   end if;
 end $$;
 
+create unique index if not exists vrm_communaute_pseudo_unique on public.vrm_communaute_profils (lower(pseudo));
 create index if not exists vrm_communaute_membres_pid on public.vrm_communaute_membres (pid);
 create index if not exists vrm_communaute_groupes_createur on public.vrm_communaute_groupes (cree_par);
 alter table public.vrm_communaute_groupes enable row level security;
@@ -200,6 +207,43 @@ begin
   c := public.vrm_communaute_code_neuf();
   update public.vrm_communaute_groupes g set code = c where g.id = p_groupe;
   return jsonb_build_object('ok', true, 'code', c);
+end $$;
+
+-- ── 8 bis. REJOINDRE LA CARTE (remplace celle de la 018) : le pseudo unique ──
+create or replace function public.vrm_communaute_rejoindre(p_pseudo text, p_ville text, p_pays text, p_lat numeric, p_lon numeric)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare
+  moi uuid := auth.uid();
+  ps text := pg_catalog.btrim(coalesce(p_pseudo, ''));
+  vi text := pg_catalog.btrim(coalesce(p_ville, ''));
+  pa text := pg_catalog.upper(pg_catalog.btrim(coalesce(p_pays, 'FR')));
+  la numeric; lo numeric; r public.vrm_communaute_profils;
+begin
+  if moi is null then return jsonb_build_object('ok', false, 'raison', 'session'); end if;
+  if not public.vrm_acces_pour(moi) then return jsonb_build_object('ok', false, 'raison', 'abonnement'); end if;
+  if ps = '' then ps := 'Revendeur-' || pg_catalog.substr(public.vrm_communaute_code_neuf(), 1, 4); end if;
+  if pg_catalog.char_length(ps) > 30 or ps ~ '[@<>]' then return jsonb_build_object('ok', false, 'raison', 'pseudo'); end if;
+  if vi = '' or pg_catalog.char_length(vi) > 80 or vi ~ '[@<>]' then return jsonb_build_object('ok', false, 'raison', 'ville'); end if;
+  if pa = '' then pa := 'FR'; end if;
+  if pa !~ '^[A-Z]{2}$' then return jsonb_build_object('ok', false, 'raison', 'pays'); end if;
+  if p_lat is null or p_lon is null or p_lat < -90 or p_lat > 90 or p_lon < -180 or p_lon > 180 then
+    return jsonb_build_object('ok', false, 'raison', 'position');
+  end if;
+  -- JAMAIS une position exacte : la cellule de 0,05° (≈ 5 km) avant d'écrire.
+  la := pg_catalog.round(pg_catalog.round(p_lat * 20) / 20, 2);
+  lo := pg_catalog.round(pg_catalog.round(p_lon * 20) / 20, 2);
+  -- UN PSEUDO UNIQUE (sans tenir compte des majuscules) : personne ne prend le nom d'un autre.
+  if exists (select 1 from public.vrm_communaute_profils o where pg_catalog.lower(o.pseudo) = pg_catalog.lower(ps) and o.owner <> moi) then
+    return jsonb_build_object('ok', false, 'raison', 'pseudo-pris');
+  end if;
+  insert into public.vrm_communaute_profils as x (owner, pseudo, ville, pays, lat, lon)
+       values (moi, ps, vi, pa, la, lo)
+  on conflict (owner) do update set pseudo = excluded.pseudo, ville = excluded.ville, pays = excluded.pays,
+                                    lat = excluded.lat, lon = excluded.lon, maj_le = pg_catalog.now()
+  returning * into r;
+  return jsonb_build_object('ok', true, 'pid', r.pid, 'lat', r.lat, 'lon', r.lon, 'pseudo', r.pseudo);
+exception when unique_violation then
+  return jsonb_build_object('ok', false, 'raison', 'pseudo-pris');
 end $$;
 
 -- ── 9. LA CARTE (remplace celle de la 019) : + mes groupes et leurs membres ──
@@ -326,6 +370,7 @@ revoke all on function public.vrm_communaute_groupe_rejoindre(text) from public,
 revoke all on function public.vrm_communaute_groupe_quitter(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.vrm_communaute_groupe_code(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.vrm_communaute_carte() from public, anon, authenticated, service_role;
+revoke all on function public.vrm_communaute_rejoindre(text, text, text, numeric, numeric) from public, anon, authenticated, service_role;
 revoke all on function public.vrm_communaute_classement_calc(text, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.vrm_communaute_classement(text) from public, anon, authenticated, service_role;
 revoke all on function public.vrm_communaute_classement_groupe(text, uuid) from public, anon, authenticated, service_role;
@@ -334,6 +379,7 @@ grant execute on function public.vrm_communaute_groupe_rejoindre(text) to authen
 grant execute on function public.vrm_communaute_groupe_quitter(uuid) to authenticated;
 grant execute on function public.vrm_communaute_groupe_code(uuid) to authenticated;
 grant execute on function public.vrm_communaute_carte() to authenticated;
+grant execute on function public.vrm_communaute_rejoindre(text, text, text, numeric, numeric) to authenticated;
 grant execute on function public.vrm_communaute_classement(text) to authenticated;
 grant execute on function public.vrm_communaute_classement_groupe(text, uuid) to authenticated;
 

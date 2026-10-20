@@ -26,24 +26,28 @@ import { createPortal } from 'react-dom';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
 
-const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
-const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
+// Leaflet est EMBARQUÉ dans VRM (paquet npm leaflet 1.9.4, licence BSD-2), chargé
+// seulement à l'ouverture de la carte : un CDN bloqué (bloqueur de pub, réseau
+// d'entreprise, relais privé d'iCloud) ne peut plus empêcher la carte de s'afficher.
 let promesseLeaflet = null;
 function chargerLeaflet() {
   if (typeof window !== 'undefined' && window.L && window.L.map) return Promise.resolve(window.L);
   if (promesseLeaflet) return promesseLeaflet;
-  promesseLeaflet = new Promise((ok, ko) => {
-    if (!document.querySelector(`link[href="${LEAFLET_CSS}"]`)) {
-      const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = LEAFLET_CSS; l.crossOrigin = ''; document.head.appendChild(l);
-    }
-    const s = document.createElement('script'); s.src = LEAFLET_JS; s.async = true; s.crossOrigin = '';
-    const t = setTimeout(() => { promesseLeaflet = null; ko(new Error('délai')); }, 15000);
-    s.onload = () => { clearTimeout(t); if (window.L && window.L.map) ok(window.L); else { promesseLeaflet = null; ko(new Error('vide')); } };
-    s.onerror = () => { clearTimeout(t); promesseLeaflet = null; ko(new Error('réseau')); };
-    document.head.appendChild(s);
-  });
+  promesseLeaflet = Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([m]) => {
+    const L = (m && m.default && m.default.map) ? m.default : m;
+    if (!L || !L.map) throw new Error('vide');
+    window.L = L; return L;
+  }).catch((e) => { promesseLeaflet = null; throw e; });
   return promesseLeaflet;
 }
+// Deux fonds de carte : CARTO d'abord, OpenStreetMap si les tuiles CARTO ne
+// chargent pas (aucune tuile reçue et plusieurs refus) — jamais une carte grise.
+const FONDS = {
+  carto: (sombre) => ({ url: `https://{s}.basemaps.cartocdn.com/rastertiles/${sombre ? 'dark_all' : 'voyager'}/{z}/{x}/{y}{r}.png`, opts: { subdomains: 'abcd',
+    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>' } }),
+  osm: () => ({ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opts: {
+    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' } }),
+};
 
 const ENDPOINT = '/api/compte?mode=communaute';
 const PAS_SU = "Je n'ai pas pu lire la carte — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -64,7 +68,7 @@ function useApi(headers) {
 // ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), calque = useRef(null), fond = useRef(null);
-  const [pret, setPret] = useState(false);
+  const [pret, setPret] = useState(false), [source, setSource] = useState('carto');
   useEffect(() => {
     let vivant = true;
     chargerLeaflet().then((L) => {
@@ -74,20 +78,25 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
       calque.current = L.layerGroup().addTo(m);
       if (moi) m.setView([Number(moi.lat), Number(moi.lon)], 9);
       else m.setView([46.6, 2.4], 5);
+      // La boîte peut changer de taille après l'ouverture (onglet, rotation, coque) :
+      // sans ça Leaflet ne dessine que la zone du premier instant (carte grise).
+      if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(() => m.invalidateSize()); ro.observe(boite.current); m._vrmRo = ro; }
+      setTimeout(() => { if (carte.current) carte.current.invalidateSize(); }, 300);
       setPret(true);
     }).catch(() => { if (vivant) onEchec(); });
-    return () => { vivant = false; if (carte.current) { carte.current.remove(); carte.current = null; } };
+    return () => { vivant = false; if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; } };
   }, []);
   // Le fond suit le thème (clair / sombre), avec l'attribution exigée.
   useEffect(() => {
     if (!pret) return;
     const L = window.L, m = carte.current;
     if (fond.current) m.removeLayer(fond.current);
-    fond.current = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${sombre ? 'dark_all' : 'voyager'}/{z}/{x}/{y}{r}.png`, {
-      subdomains: 'abcd', maxZoom: 19,
-      attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-    }).addTo(m);
-  }, [pret, sombre]);
+    const f = FONDS[source](sombre);
+    let recues = 0, refus = 0;
+    fond.current = L.tileLayer(f.url, { maxZoom: 19, ...f.opts }).addTo(m);
+    fond.current.on('tileload', () => { recues++; });
+    fond.current.on('tileerror', () => { refus++; if (source === 'carto' && recues === 0 && refus >= 4) setSource('osm'); });
+  }, [pret, sombre, source]);
   // Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
   useEffect(() => {
     if (!pret) return;
@@ -121,25 +130,56 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   useEffect(() => {
     if (pret && moi) carte.current.flyTo([Number(moi.lat), Number(moi.lon)], Math.max(carte.current.getZoom(), 8), { duration: 0.6 });
   }, [pret, moi && moi.lat, moi && moi.lon]);
-  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} role="region" aria-label="Carte de la communauté">
+  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={source} role="region" aria-label="Carte de la communauté">
     <div className="vrm-cm-carte-fond" ref={boite} />
     {!pret && <p className="vrm-cm-carte-attente">Chargement de la carte…</p>}
   </div>;
 }
 
 // ── REJOINDRE / CHANGER DE VILLE ─────────────────────────────────────────────
+// Repli : si le serveur ne joint aucune source de villes, le navigateur
+// interroge lui-même la Base Adresse Nationale (communes de France, CORS
+// ouvert). Seul un NOM tapé part, jamais une position.
+const arr05 = (x) => Math.round(Number(x) * 20) / 20;
+async function villesDirectes(q) {
+  try {
+    const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&type=municipality&autocomplete=1&limit=6`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (Array.isArray(j.features) ? j.features : []).map((f) => {
+      const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+      return { nom: p.city || p.name, pays: 'FR', region: String(p.context || '').split(',').slice(1).map((x) => x.trim()).join(', '), lat: arr05(c[1]), lon: arr05(c[0]) };
+    }).filter((v) => v.nom && Number.isFinite(v.lat) && Number.isFinite(v.lon));
+  } catch (_) { return null; }
+}
 function Rejoindre({ api, moi, prenom, onFait, onAnnuler, FermeAuRetour }) {
-  const [pseudo, setPseudo] = useState(moi ? moi.pseudo : (prenom || 'Revendeur'));
+  const [pseudo, setPseudo] = useState(moi ? moi.pseudo : (prenom || ''));
   const [q, setQ] = useState(moi ? moi.ville : '');
   const [villes, setVilles] = useState(null), [choix, setChoix] = useState(null);
   const [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
-  const chercher = async (e) => {
-    e && e.preventDefault(); setMsg(''); setChoix(null);
-    if (q.trim().length < 2) { setMsg('Tape au moins deux lettres du nom de ta ville.'); return; }
-    setOccupe(true); const r = await api({ action: 'ville', q }); setOccupe(false);
+  const seqVille = useRef(0);
+  const chercher = async (e, discret) => {
+    e && e.preventDefault(); if (!discret) setMsg(''); setChoix(null);
+    const t = q.trim();
+    if (t.length < 2) { if (!discret) setMsg('Tape au moins deux lettres du nom de ta ville.'); return; }
+    const n = ++seqVille.current;
+    setCherche(true);
+    let r = await api({ action: 'ville', q: t });
+    if (!r.ok) { const d = await villesDirectes(t); if (d) r = { ok: true, villes: d }; }
+    if (n !== seqVille.current) return;
+    setCherche(false);
     if (!r.ok) { setVilles(null); setMsg(r.message || PAS_SU); return; }
+    setMsg('');
     setVilles(r.villes); if (!r.villes.length) setMsg('Aucune ville trouvée sous ce nom. Essaie l’orthographe exacte.');
   };
+  // Les villes se proposent pendant la frappe (après une courte pause).
+  const [cherche, setCherche] = useState(false);
+  useEffect(() => {
+    if (choix && choix.nom === q) return undefined;
+    if (q.trim().length < 2) { setVilles(null); return undefined; }
+    const id = setTimeout(() => chercher(null, true), 350);
+    return () => clearTimeout(id);
+  }, [q]);
   const localiser = () => {
     setMsg('');
     if (!navigator.geolocation) { setMsg('Ce navigateur ne sait pas te localiser : tape le nom de ta ville.'); return; }
@@ -165,11 +205,13 @@ function Rejoindre({ api, moi, prenom, onFait, onAnnuler, FermeAuRetour }) {
     <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label="Apparaître sur la carte" data-cm-rejoindre>
       <div className="vrm-cm-feuille-tete"><h3>{moi ? 'Changer ma présence' : 'Apparaître sur la carte'}</h3><button type="button" className="vrm-cm-x" onClick={onAnnuler} aria-label="Fermer">×</button></div>
       <p className="vrm-cm-note">Les autres verront <b>ton pseudo et ta ville</b>, placée à environ 5 km près. Jamais ton adresse, ton email ni tes comptes Vinted. Tu peux te retirer quand tu veux.</p>
-      <label className="vrm-cm-champ"><span>Ton pseudo</span>
-        <input value={pseudo} maxLength={30} onChange={(e) => setPseudo(e.target.value)} placeholder="Revendeur" data-cm-pseudo /></label>
+      <label className="vrm-cm-champ"><span>Ton pseudo (unique sur la carte)</span>
+        <input value={pseudo} maxLength={30} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton nom de revendeur" data-cm-pseudo /></label>
+      {moi && moi.discord && pseudo !== moi.discord && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(moi.discord)} data-cm-pseudo-discord>Utiliser mon pseudo Discord ({moi.discord})</button>}
       <form className="vrm-cm-ville" onSubmit={chercher}>
         <label className="vrm-cm-champ"><span>Ta ville</span>
-          <input value={q} maxLength={80} onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Cancale, Lyon, Bruxelles…" data-cm-ville-q /></label>
+          <input value={q} maxLength={80} autoComplete="off" onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Commence à taper : Cancale, Lyon…" data-cm-ville-q /></label>
+        {cherche && <p className="vrm-cm-note" role="status" data-cm-ville-cherche>Recherche…</p>}
         <div className="vrm-cm-ligne-boutons">
           <button type="submit" disabled={occupe} data-cm-chercher>Chercher</button>
           <button type="button" onClick={localiser} disabled={occupe} data-cm-localiser>Me localiser</button>
@@ -177,7 +219,7 @@ function Rejoindre({ api, moi, prenom, onFait, onAnnuler, FermeAuRetour }) {
       </form>
       {villes && villes.length > 0 && <ul className="vrm-cm-villes" role="listbox" aria-label="Villes trouvées">
         {villes.map((v, i) => { const pris = choix && choix.nom === v.nom && choix.lat === v.lat && choix.lon === v.lon;
-          return <li key={i}><button type="button" role="option" aria-selected={!!pris} className={pris ? 'pris' : ''} onClick={() => setChoix(v)} data-cm-ville-choix={v.nom}>
+          return <li key={i}><button type="button" role="option" aria-selected={!!pris} className={pris ? 'pris' : ''} onClick={() => { setChoix(v); setQ(v.nom); }} data-cm-ville-choix={v.nom}>
             <b>{v.nom}</b><span>{[v.region, v.pays].filter(Boolean).join(' · ')}</span></button></li>; })}
       </ul>}
       {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}

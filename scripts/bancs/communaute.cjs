@@ -158,6 +158,7 @@ function rpc(fn, args, uid) {
     const ps = String(args.p_pseudo || '').trim() || 'Revendeur', vi = String(args.p_ville || '').trim();
     if (ps.length > 30 || /[@<>]/.test(ps)) return { ok: false, raison: 'pseudo' };
     if (!vi) return { ok: false, raison: 'ville' };
+    if (Object.entries(B.profils).some(([o, p]) => o !== uid && p.pseudo.toLowerCase() === ps.toLowerCase())) return { ok: false, raison: 'pseudo-pris' };
     const anc = B.profils[uid];
     B.profils[uid] = { pid: anc ? anc.pid : uuid(), pseudo: ps, ville: vi, pays: String(args.p_pays || 'FR').toUpperCase(), lat: arr(args.p_lat), lon: arr(args.p_lon), cree_le: anc ? anc.cree_le : new Date(Date.now() + nId).toISOString() };
     return { ok: true, pid: B.profils[uid].pid };
@@ -247,6 +248,13 @@ global.fetch = async (url, opts = {}) => {
     const r = fauxSupabase(s, opts.method || 'GET', opts.headers || {}, { json: (() => { try { return JSON.parse(opts.body || '{}'); } catch (_) { return {}; } })(), __node: true });
     return new Response(r.body === '' ? null : r.body, { status: r.status, headers: r.headers });
   }
+  if (/api-adresse\.data\.gouv\.fr\/search/.test(s)) {
+    const q = new URL(s).searchParams.get('q').toLowerCase();
+    if (process.env.BANC_BAN === 'panne') return new Response('<html>502</html>', { status: 502 });
+    const villes = Object.entries(VILLES).filter(([k]) => k.startsWith(q.slice(0, 4))).flatMap(([, v]) => v);
+    return new Response(JSON.stringify({ features: villes.map((v) => ({ geometry: { coordinates: [Number(v.lon), Number(v.lat)] }, properties: { city: v.name, name: v.name, context: '35, Ille-et-Vilaine, Bretagne', type: 'municipality' } })) }), { status: 200 });
+  }
+  if (/photon\.komoot\.io/.test(s)) return new Response(JSON.stringify({ features: [] }), { status: 200 });
   if (/nominatim\.openstreetmap\.org\/search/.test(s)) { const q = new URL(s).searchParams.get('q').toLowerCase(); return new Response(JSON.stringify(VILLES[q] || []), { status: 200 }); }
   if (/nominatim\.openstreetmap\.org\/reverse/.test(s)) return new Response(JSON.stringify(VILLES.cancale[0]), { status: 200 });
   if (/api\.stripe\.com/.test(s)) return new Response('{}', { status: 404 });
@@ -263,9 +271,11 @@ const srv = http.createServer((q, r) => {
 let compte = null, LEAFLET = null;
 async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false }) {
   const mobile = largeur < 600;
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansLeaflet ? 'block' : 'allow', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
+  // Un morceau qui ne charge pas fait relire la page UNE fois (main.jsx) : on le marque déjà fait.
+  if (sansLeaflet) await pg.addInitScript(() => { try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) {} });
   await pg.addInitScript(({ s, sombre }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
@@ -283,6 +293,9 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
     }
     return ['image', 'media', 'font'].includes(rq.resourceType()) ? r.abort() : r.fulfill({ status: 404, body: '' });
   });
+  // Leaflet est embarqué (morceau /assets/leaflet-…) : « injoignable » = ce morceau refusé.
+  // (le service worker de VRM, qui sert /assets/ lui-même, est coupé pour ce cas)
+  if (sansLeaflet) await ctx.route(/\/assets\/leaflet[^/]*\.js/, (r) => r.fulfill({ status: 404, body: '' }));
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
@@ -661,6 +674,28 @@ async function partie020(nav) {
       await ctx.close();
     });
   }
+  console.log('\n── 020 · 390 px · la ville se propose pendant la frappe, le pseudo est unique');
+  await essaie('ville et pseudo', async () => {
+    reset();
+    B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
+    const { ctx, pg } = await ouvrir(nav, { qui: A, largeur: 390 });
+    await pg.click('[data-cm-apparaitre]');
+    await pg.fill('[data-cm-pseudo]', 'BRUNO');
+    await pg.fill('[data-cm-ville-q]', 'canc');
+    await pg.waitForSelector('[data-cm-ville-choix="Cancale"]', { timeout: 8000 }).catch(() => {});
+    dit(!!(await pg.$('[data-cm-ville-choix="Cancale"]')), 'taper « canc » propose Cancale, sans appuyer sur « Chercher »');
+    await pg.click('[data-cm-ville-choix="Cancale"]');
+    dit(await pg.$eval('[data-cm-ville-q]', (e) => e.value) === 'Cancale', 'toucher la ville la met dans le champ');
+    await pg.click('[data-cm-valider]');
+    await pg.waitForSelector('[data-cm-rejoindre] .vrm-cm-msg', { timeout: 8000 }).catch(() => {});
+    const t = await pg.$eval('[data-cm-rejoindre]', (e) => e.innerText).catch(() => '');
+    dit(/déjà pris/.test(t) && !B.profils[A], 'un pseudo déjà pris (« BRUNO ») est refusé et dit', t.slice(-90).replace(/\n/g, ' '));
+    await pg.fill('[data-cm-pseudo]', 'Alice');
+    await pg.click('[data-cm-valider]');
+    await pg.waitForSelector('[data-cm-moi="visible"]', { timeout: 8000 }).catch(() => {});
+    dit(B.profils[A] && B.profils[A].pseudo === 'Alice' && B.profils[A].ville === 'Cancale', 'avec un autre pseudo, Alice apparaît à Cancale');
+    await ctx.close();
+  });
   console.log('\n── 020 · sans la 020 sur la base');
   await essaie('sans 020', async () => {
     posePersonnes(); B.installe20 = false;

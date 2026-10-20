@@ -4974,8 +4974,31 @@ colle d'un bloc, et l'outil de la session peut l'appliquer.
   monde, membre parti compté, bloqué visible, groupes d'autrui) ; banc
   `communaute.cjs` partie 020 (1512 clair, 390 tactile sombre, et base sans la 020) ;
   mutation de l'écran « filtre de groupe retiré » ⇒ 4 rouges.
+- **Pseudo unique** (même migration, demande du même jour) : index unique sur
+  `lower(pseudo)` + `vrm_communaute_rejoindre` redéfinie (« pseudo-pris », 409) ;
+  vide ⇒ « Revendeur-XXXX ». L'écran propose « Utiliser mon pseudo Discord ».
 - **Pas fait** : la « connexion avec Discord » (un vrai bouton OAuth) — il faut une
-  application Discord à Julien (identifiant et secret sur Vercel), voir ci-dessous.
+  application Discord à Julien (identifiant et secret sur Vercel).
+
+### Carte de la communauté : « la ville ne rentre pas, la carte n'apparaît pas » (20 octobre)
+Mesuré : **0 ligne** dans `vrm_communaute_profils` — personne n'avait pu rejoindre.
+- **La ville** : le serveur ne demandait qu'à Nominatim (OpenStreetMap), qui refuse
+  souvent les serveurs partagés (Vercel). Trois sources désormais (`geocoderVille`) :
+  la **Base Adresse Nationale** (`api-adresse.data.gouv.fr`, communes de France),
+  **Photon** (komoot, le reste du monde), puis Nominatim si les deux se taisent ;
+  4 s chacune, User-Agent ASCII. Si le serveur ne joint rien, le **navigateur**
+  interroge la BAN lui-même (un nom tapé, jamais une position). Les villes se
+  proposent **pendant la frappe** (350 ms) ; toucher une ville la met dans le champ.
+- **La carte** : Leaflet n'est plus chargé depuis cdnjs (un bloqueur, un réseau ou
+  le relais privé d'iCloud l'empêchaient) : paquet npm `leaflet@1.9.4` (BSD-2),
+  morceau à part chargé à l'ouverture de la carte. `invalidateSize` sur
+  ResizeObserver (carte grise quand la boîte change de taille) ; fond OSM si les
+  tuiles CARTO ne viennent pas ; sur téléphone la carte annule le zoom 80 % de la
+  coque (`zoom:1.25`, Leaflet ne sait pas compter avec un zoom CSS parent).
+- ⚠️ Non mesuré : les trois services de géocodage depuis Vercel (bloqués d'ici) ;
+  la carte sur un vrai téléphone. Banc `communaute.cjs` : 129 contrôles (frappe,
+  pseudo pris, Leaflet refusé ⇒ liste ; il coupe le service worker et marque le
+  rechargement de `main.jsx` déjà fait pour ce cas).
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
