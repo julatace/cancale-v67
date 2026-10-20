@@ -127,6 +127,10 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
+      // Machine chargée : la file peut arriver après 3,5 s, et le banc lisait
+      // alors « aucun bouton » sur un écran intact (4 rouges, 20 oct.). On
+      // attend l'ÉTAT — la file rendue —, borné ; les contrôles restent exacts.
+      await pg.waitForSelector('[data-bouton-publier]', { timeout: 15000 }).catch(() => {});
       const lire = () => pg.evaluate(() => ({
         boutons: [...document.querySelectorAll('[data-bouton-publier]')].map((e) => ({ id: e.getAttribute('data-id'), etat: e.getAttribute('data-bouton-publier'), txt: e.innerText,
           photos: e.getAttribute('data-photos'), total: e.getAttribute('data-photos-total'),
