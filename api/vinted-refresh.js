@@ -1,3 +1,4 @@
+import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 // api/vinted-refresh.js
