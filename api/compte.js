@@ -920,7 +920,8 @@ async function communaute(req, res) {
 async function discordDebut(req, res) {
   const utilisateur = await vendeurExige(req, res);
   if (!utilisateur) return;
-  return debutDiscord(req, res, utilisateur);
+  const corps = await lireCorpsJson(req);
+  return debutDiscord(req, res, utilisateur, corps || {});
 }
 
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────

@@ -23,10 +23,10 @@ s=s.replace(marker,`
      const ligne=p.locator('.vrm-sale-row').first();check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=52),'vente repliée en une ligne '+width);await ligne.locator('.vrm-ledger-sale-toggle').click();
      const prix=p.locator('[data-cout-vente-saisir]').first(),relier=p.locator('[data-cout-vente-relier]').first();
      const a=await prix.boundingBox(),b=await relier.boundingBox();check(Math.abs(a.y-b.y)<2,'actions du coût côte à côte '+width);
-     check(await p.locator('.vrm-sale-row').first().locator('.vrm-ledger-sale-content').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'actions dépliées sans débordement '+width);
-     check(await p.locator('.vrm-sale-row').first().evaluate(e=>{const titre=e.querySelector('.vrm-sale-title').getBoundingClientRect(),prix=e.querySelector('[data-prix-vente]').getBoundingClientRect();return (prix.left>=titre.right-1||prix.top>=titre.bottom-1)&&prix.right<=e.getBoundingClientRect().right;}),'titre et montant sans chevauchement '+width);
+     check(await p.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-ledger-sale-content').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'actions dépliées sans débordement '+width);
+     check(await p.getByRole('dialog').evaluate(e=>{const titre=e.querySelector('h2'),prix=e.querySelector('header p'),a=titre.getBoundingClientRect(),b=prix.getBoundingClientRect();return titre.scrollWidth<=titre.clientWidth+1&&b.top>=a.bottom&&b.right<=e.getBoundingClientRect().right;}),'titre complet et montant sans chevauchement '+width);
     }
-    if(tab==='plat_vinted')await p.locator('.vrm-sale-row').first().locator('.vrm-ledger-sale-toggle').click();
+    if(tab==='plat_vinted')await p.getByRole('button',{name:'Fermer les détails de la vente',exact:true}).click();
     if(tab==='journee')check(await p.locator('.vrm-day-bar').evaluate(e=>(()=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e).backgroundColor),b=lum(getComputedStyle(e.querySelector('.vrm-day-bar-n')).color);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;})()),'bandeau des tâches contrasté '+width);
     if(tab==='journee')check(await p.locator('.vrm-app-header button[aria-label="Tous les écrans"]').isHidden(),'menu Gestion sans doublon en haut '+width);
     if(tab==='journee')check(await p.locator('.vrm-day-greeting').isHidden(),'bonjour retiré pour remonter les actions '+width);
