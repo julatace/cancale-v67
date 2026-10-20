@@ -36,7 +36,7 @@ const ctx = {
 };
 ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
 vm.createContext(ctx);
-vm.runInContext(src, ctx, { filename: 'background.js' });
+vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
 ctx.activeAccountId = async () => '123';
 
 const cas = async (url, body) => { ecrits.length = 0; try { await ctx.storeWriteReq('www.vinted.fr', 'POST', url, body); } catch (e) { return { err: e.message }; } return ecrits[0] || null; };

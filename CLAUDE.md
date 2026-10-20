@@ -10209,6 +10209,37 @@ captures et liste les cibles < 44 px) :
   commande en base) ; une commande eBay de plusieurs lignes n'a un prix d'achat
   que si toutes ses lignes sont reliées.
 
+### « Ton bénéfice » dans Ma journée, sur son choix (20 octobre)
+Julien : « la possibilité de mettre le bénéfice dans Ma journée ». Aucun mécanisme
+de cartes personnalisables n'existait : un réglage dédié.
+- **Facultatif** : `vrm_journee_benefice` (SYNC_KEYS, défaut **éteint**, rattrapé
+  par `onCloudReady` seulement s'il est resté à `false`, `useBeneficeJournee`).
+  Le geste est dans Ma journée (« + Afficher ton bénéfice dans Ma journée », en
+  bas, discret ; « Masquer de Ma journée » sur la carte) et dans Réglages →
+  Affichage (`BeneficeJourneeSetting`, interrupteur).
+- **Aucun second calcul (§11)** : la carte de Comptabilité et celle de Ma journée
+  passent par le MÊME crochet `useBeneficeCalcul(compta, periode)` (publication
+  `vrm_benefice_jours`, charges `vrm_compta`, CA déclaré publié, `beneficePeriode`).
+  Ma journée dit le **mois** (brut, net final, couverture « prix d'achat connus
+  pour X ventes sur Y », raison du « — » : achats · frais eBay · CA déclaré) et
+  **aujourd'hui** (`beneficeDesJours` sur la même publication : brut et net des
+  ventes ; charges et cotisations se comptent au mois). Jamais publié ⇒ « se
+  calcule dans l'écran Ventes », aucun montant. Lien « Détail › » vers
+  Comptabilité. Aucune couleur (§7). Attributs `data-journee-benef-*`.
+- ⚠️ Ma journée est elle-même un lecteur des ventes (`Comptabilite only="journee"`)
+  et PUBLIE le bénéfice dès que les ventes sont lues : « pas de publication » ne
+  se voit que si les ventes sont illisibles ou sur un appareil qui n'a rien lu.
+- Preuves : banc `scripts/bancs/benefice-journee.cjs` (port `BANC_PORT`, données
+  inventées, 1512 et 390 tactile, 52 contrôles ; il GARDE la ligne `main` écrite
+  par l'app) — absente par défaut, geste dans Ma journée, « pas su » sans
+  publication, brut/net/couverture/raison = Comptabilité (prix complets + une
+  charge fixe, puis un prix manquant), Réglages l'éteint. **26 rouges sur le
+  build d'origin/main** (§6.1) ; mutation « second calcul divergent » (charges
+  ignorées dans Ma journée) ⇒ 2 rouges (net 86,13 € contre 66,13 €).
+- Non mesuré : sa vraie base (données inventées) ; un choix basculé puis la page
+  rechargée en moins de ~1,3 s revient à l'ancien (délai d'envoi au nuage, comme
+  tout réglage synchronisé).
+
 ### La vente eBay arrive dans Colis, Ma journée, la cloche, le widget et le rappel du matin (19 octobre, agent eBay K7 en partie)
 « Rien ne se passe après une vente eBay » (etat.md) : une commande eBay payée n'était visible que dans eBay → Ventes. État K par K, lu dans le code : `docs/passation/notes/agent-ebay/etat.md` (en tête).
 - **Une règle** `colisEbay` (`api/_lib/ebay-a-expedier.js`, importée par l'app ET le serveur, §11) : à poster = `etatCommandeEbay(o).peutExpedier`, pas d'annulation demandée, un envoi (`fulfillmentInstructionsType` SHIP_TO ou absent — jamais un colis caché) ; « Ne poste pas » = annulation demandée (inconnue ⇒ demandée) ; date limite `lineItemFulfillmentInstructions.shipByDate` (ancien nom lu en repli — `ebay-agent.js` ne lisait que lui) ; authentification d'eBay signalée. `null` = pas su, jamais `[]`.
@@ -10230,7 +10261,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **94 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **95 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -10643,8 +10674,62 @@ iOS (Xcode, programme Apple 99 $/an, revue) ❌ sans chantier ; **Orion** expér
 - **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (cocher Firefox pour
   Android) puis remplir `LIENS_BOUTIQUES.firefox` ; sur iPhone, rien (relais).
 
+### Fiabilité de l'extension, mesurée chez lui (19 octobre, 5.193)
+**Mesuré** (lecture seule, `panel_diag_capture`, extension installée **5.188**,
+captures du 17-18 oct. sur 7 comptes) : `ecriture_ratee_vinted_accounts_400` ×82,
+`ecriture_ratee_harvest_{txn,conv,inbox,seen_urls,profile}_400` (~40),
+`forme_inconnue_champ_conversation` ×246 avec `cles=[code,message,message_code]`,
+`conversation_lecture_ou_forme_ratee` ×206, `photos_page_refuse_429` ×15,
+`label_ko_statuts_200_200_200` ×32 (Vinted répond sans URL : pas un défaut de code).
+Quatre défauts, reproduits sur le vrai `background.js` (`audit-fiabilite-fond.cjs`,
+22 contrôles, **14 rouges sur la 5.192**, `--prouve` : 5/5 mutations rouges) :
+- ⚠️⚠️ **Base cloisonnée, session VRM morte ou en pause ⇒ écriture vouée au 400.**
+  `withOwner` sans `owner`, clé publique, cible `id`/`vinted_user_id` (aucun index
+  unique) : la capture perdue, une requête pour rien. Et la session était relue
+  par ligne puis pour l'en-tête (un renouvellement en route mélangeait `owner` et
+  clé publique). `supabaseUpsert` lit la session UNE fois ; cloisonnée sans
+  session ⇒ rien ne part, diagnostic `ecriture_ratee_<famille>_sans_session`, et
+  le logo dit « ta session VRM n'a pas pu être renouvelée » (plus « ça réessaie
+  tout seul »). `null` (pas su) garde le comportement d'avant.
+- **Un refus de Vinted (`code ≠ 0` + `message_code`) n'est plus une capture**
+  (`estErreurVinted`) : ni fausse alerte « Format d'un site », ni ligne rangée, ni
+  recul de la base dans la moisson ; compté `ignore_erreur_vinted_<type>`.
+- **`vinted_item_details` : une écriture à la fois** (`unItemDetailsALaFois`) —
+  la capture photo réécrivait la ligne depuis sa copie du début de boucle et
+  EFFAÇAIT une fiche rangée entre-temps (page ouverte, clic « Publier ») ; deux
+  `saveItemDetail` simultanés aussi. Elle relit au moment d'écrire et ne pose que
+  ses fiches ; relecture ratée ⇒ rien écrit, les annonces seront relues.
+- **Capture photo : un 429/403/401/coupure ne pose plus le mémo de 6 h**
+  (`memoApresEchec`, la règle des codes de retrait) et arrête la boucle.
+- ⚠️ Onze audits servaient une base « cloisonnée » (sonde de schéma à 200) **sans
+  session** — une forme où la production répond 400 (§6.3) : ils fournissent
+  maintenant une session (`ctx.authToken`).
+- **Geste de Julien** : installer la 5.193 (remplacer le dossier, puis ⟳ dans
+  chaque Chrome) ; s'il voit « session VRM n'a pas pu être renouvelée » sur le
+  logo, cliquer le logo pour se reconnecter.
+
 ### Messages : une offre en attente passe devant (19 octobre)
 Dans la liste des conversations, après le compte ouvert dans Chrome, une conversation dont l'offre attend une réponse (`offreDeConv`, la même règle que la pastille et le fil) passe devant les plus récentes : elle expire, et y répondre décide d'une vente. Banc `messagerie.cjs` : ordre attendu `301` (offre) avant `303` (plus récente) — rouge sur l'ancien tri par date seule.
+
+### Revue argent de l'extension : publier sur Leboncoin, gestes Vinted (20 octobre, 5.194)
+Relecture adverse des chemins qui engagent de l'argent ou une vente. Chaque défaut a été REPRODUIT en exécutant le vrai code, il est rouge sur le code d'avant (§6.1) et rouge sous mutation.
+- **Leboncoin (`lbc.js`, `publierSansBooster`)** :
+  - un bouton de publication qui NOMME une option payante sans prix (« Publier avec le logo Urgent ») était cliqué ⇒ `NOM_BOOST` est vérifié sur le bouton (publication ET « Continuer ») ;
+  - un prix écrit « 2 EUR » passait ⇒ `PRIX_ARGENT` lit « eur » ;
+  - une option en interrupteur (`aria-pressed="true"`) n'était pas vue ⇒ elle est décochée, sinon rien ne part ;
+  - ⚠️ **un prix DÉJÀ sur la page et différent de celui de VRM** (ou illisible) laissait publier : `prixRelu` était calculé et jamais lu. Désormais `noterPrixPage` le relève (sessionStorage) et `prixRefus` bloque la publication avant ET juste avant le clic, en le disant. Le champ prend des euros (mesuré le 16 octobre) ;
+  - ⚠️ **la page rechargée après le clic recliquait** (double publication) : le clic est noté dans `vrmPublieClique:{id}` AVANT d'être fait. Stockage illisible ⇒ aucun clic.
+- **Vinted (`background.js`)** :
+  - ⚠️ une offre ACCEPTÉE par l'app partait sans confirmation : le `confirme` de l'app était jeté par `vmrExecUn` et par `bridge.js`. Il est relayé, et `executerPourApp` refuse l'acceptation sans lui (`code:'confirmation'`). Le relais du téléphone le pose seulement quand la ligne porte `confirme` ;
+  - un geste `exec` ou un bordereau en attente dans la file Vinted partait après une bascule de compte : `gardeStricte` est revérifié à son tour, DANS `avecVinted`.
+- **Preuves** :
+  - `audit-argent-lbc.cjs` (vrai Chromium, six cas, quatre mutations) ;
+  - `audit-argent-vinted.cjs` (vrai `background.js`, cinq cas, trois mutations) ;
+  - `audit-exec.cjs` et `bancs/leboncoin.cjs` mis à jour : la mutation du banc retire désormais les DEUX gardes du bouton.
+- **Examiné sans défaut confirmé** : `ebay.js` (ni prix ni catégorie posés sans formulaire vu) ; `label_latest` (déjà `audit-label-latest`) ; réponses automatiques (`audit-repondre`) ; relais (vus, échéance, confirmation, prise conditionnelle). `vintedSend` part avec le jeton du compte visé : la revérification du cookie est une défense §3, pas une vente fausse.
+- **Non mesuré** :
+  - le vrai leboncoin.fr (403 d'ici) : libellés réels des boutons et des interrupteurs, forme réelle du champ prix ;
+  - une paire vendue entre la mise en file et le clic (fenêtre de quelques secondes).
 
 ### Revue argent de l'app (20 octobre) — trois défauts, reproduits puis corrigés
 Relecture adverse des chemins qui coûtent de l'argent (N° tamponné, double vente, colis à poster, URSSAF, bénéfice, emails, factures). Chaque défaut est REPRODUIT dans `scripts/audit-revue-argent.cjs` (vraies fonctions de l'app dans un `vm`) : **9 rouges sur le code d'avant**, 15 verts après, `--prouve` 5 mutations sur 5 rouges.
@@ -10666,3 +10751,10 @@ Relecture adverse de tout ce qui engage de l'argent ou une vente sur eBay ; chaq
 - **Rejetés après vérification** : contrôle « déjà vendue » côté serveur (l'app garde : `gardePublier`, `numerosDejaVendus`) ; retrait automatique (le SKU est relu chez eBay) ; rembourser un retour (montant et devise comparés en centimes) ; annulation (état relu) ; promotion (confirmation, taux relu) ; répondre à une offre et modifier une annonce (`expectedPrice`) ; jetons (par compte, `jetonDe`) ; aucune option payante dans `itemXml` ; une quantité > 1 est son choix.
 - ⚠️ **Pré-existants, laissés** : `prouve-regle-offre.cjs` a 6 ancres périmées (déjà rouges sur 04d96f9) ; `ebay-comptes` (2, « le pseudo est sur la ligne »), `plateformes-premium` (1, cibles « Gérer » 32 px), `ebay-visuel` (2, point de statut), `revendeurs` et `compact` (délai d’attente) — tous rouges À L’IDENTIQUE sur origin/main.
 - ⚠️ **Non mesuré** : la réponse réelle d'eBay à un mauvais prix ; que `GetItem` rende la devise de `CurrentPrice` ; la forme réelle d'une commande `PARTIALLY_REFUNDED` ; la vraie forme de `paymentSummary.totalDueSeller` (0 commande eBay en base) — en livraison gérée par eBay, s'il contenait le port, il faudrait le retirer aussi. **Julien** : rien au-delà du déploiement.
+
+
+### Rappel URSSAF à l'échéance (fonction retenue le 11 octobre, 20 octobre)
+Le rappel du 30 septembre partait le 1er de chaque mois, sans date ni montant, quel que soit le rythme (trimestriel : deux rappels sur trois pour rien), même pour une période déjà notée « déclaré ». Une règle, `rappelUrssaf` (module, à côté d'`aPayerUrssaf`) : la période de la prochaine échéance (`nextUrssafDeadline`, rythme `vinted_urssaf_freq`) doit être FINIE ; tous ses mois notés dans `vrm_urssaf_declare` ⇒ rien ; rappel les 3 premiers jours du mois ET les 7 derniers jours avant l'échéance (ambre). Montant : la ligne publiée `vinted_urssaf_mois` (mois de la période seulement, `aPayerUrssaf`) ; absente ⇒ aucun montant (« se calcule dans Ventes ») ; ventes sans date de versement ⇒ « au moins ». Ma journée : action `data-job="urssaf"`, `data-urssaf-echeance` (AAAA-MM-JJ local), `data-urssaf-apayer`. Aucun cron, aucune notification serveur (le « rappel la veille au soir » reste à trancher par Julien). Preuves : `audit-rappel-urssaf.cjs` (14 contrôles, `--mutation=rythme|declare|zero|fenetre` 2 · 2 · 2 · 3 rouges) ; banc `rappel-urssaf.cjs` 8 rouges sur le build d'avant, 2 sous la mutation « registre ignoré ».
+- **Mesuré, pas construit — « achats à vérifier avant la date limite »** (lecture seule, 20 oct.) : la date limite existe, mais UNIQUEMENT dans le message d'action « Confirmation nécessaire » d'une conversation captée (`entity.subtitle` « d'ici le 21 sept. 15:59 », `interpolation_values.subtitle.return_shipment_date`, sans année ; « tu disposeras de 2 jours »). Vu dans **2 conversations sur ~1 400**, toutes deux anciennes ; les commandes et les transactions n'ont aucun champ de date limite ; **14 achats sur 581** ont leur conversation captée ; aucun achat n'est aujourd'hui dans l'état « livré, à confirmer ». ⚠️ `transaction.current_user_side` vaut « seller » sur ces deux achats où il est l'acheteur : ne pas s'y fier. Pour le construire, l'extension doit lire la conversation des achats livrés (comme `capterRetraits` le fait pour les colis au relais) — chantier extension.
+- **Pas construit — « fiche prête à l'arrivée d'un achat »** : rien ne relie un achat à une paire par identité (§5 « prix d'achat : aucun pont automatique » — il rephotographie ses paires) ; une fiche pré-remplie depuis l'achat serait un rapprochement deviné. À définir avec lui.
+
