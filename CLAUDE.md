@@ -4980,8 +4980,23 @@ colle d'un bloc, et l'outil de la session peut l'appliquer.
 - ✅ **Appliquée en production le 20 octobre** (sur son « ok fait tout »), par l'outil.
   Vérifiée : 7 tables, RLS forcé, aucun droit direct, 22 fonctions identiques au
   fichier (md5), empreinte `c86baf95…`.
-- **Pas fait** : la « connexion avec Discord » (un vrai bouton OAuth) — il faut une
-  application Discord à Julien (identifiant et secret sur Vercel).
+- **« Se connecter avec Discord »** (20 octobre, `api/_lib/discord.js`, toujours 12
+  fonctions) : OAuth2 Discord, portée `identify` SEULE, aucun jeton Discord gardé.
+  `POST ?mode=discord-debut` (session) rend l'adresse Discord + un nonce en cookie
+  HttpOnly ; `GET ?mode=discord` (retour, adresse déclarée chez Discord :
+  `https://vrm.center/api/compte?mode=discord`) vérifie le `state` signé ET le nonce
+  (le lien ne marche que dans le navigateur qui l'a demandé, une fois — leçon eBay
+  du 6 octobre), lit le pseudo, renvoie à l'app avec `#discord=…&preuve=…` ; l'app
+  rend la preuve AVEC SA SESSION (`action: discord-verifie`) et la base range le
+  pseudo (`vrm_communaute_discord`). Preuve liée au compte VRM et au pseudo, 15 min.
+  Ancien compte « nom#1234 » ⇒ dit, jamais inventé. Sans `DISCORD_CLIENT_ID` /
+  `DISCORD_CLIENT_SECRET` (Vercel, Production) : pas de bouton, la saisie à la main
+  reste. Application Discord de Julien : identifiant `1562176038098702467` (public) ;
+  ⚠️ son premier secret a été collé dans une conversation et RÉINITIALISÉ — le secret
+  ne vit que sur Vercel. Preuves : `audit-discord-oauth.cjs` (14 ; mutations
+  « sans nonce » 3 rouges, « sans preuve » 2) ; banc `communaute.cjs` (bouton, départ
+  chez Discord, retour rangé, preuve d'un autre compte refusée, pas réglé ⇒ pas de
+  bouton). Non mesuré : le vrai Discord (bloqué d'ici).
 
 ### Carte de la communauté : « la ville ne rentre pas, la carte n'apparaît pas » (20 octobre)
 Mesuré : **0 ligne** dans `vrm_communaute_profils` — personne n'avait pu rejoindre.

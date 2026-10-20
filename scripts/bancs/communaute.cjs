@@ -269,7 +269,7 @@ const srv = http.createServer((q, r) => {
 });
 
 let compte = null, LEAFLET = null;
-async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false }) {
+async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false, fragment = '' }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansLeaflet ? 'block' : 'allow', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
   const pg = await ctx.newPage();
@@ -299,7 +299,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
-    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement')) {
+    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement' || mode === 'discord-debut')) {
       let corps = null; try { corps = rq.postData() ? JSON.parse(rq.postData()) : null; } catch (_) {}
       const res = { code: 200, corps: null, setHeader() {}, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, end() { return this; } };
       const lecteur = corps ? (async function* () { yield Buffer.from(JSON.stringify(corps)); })() : null;
@@ -311,7 +311,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
-  await pg.goto(`http://localhost:${PORT}/?tab=communaute`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=communaute${fragment}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => { const e = document.querySelector('[data-communaute-etat]'); return e && e.getAttribute('data-communaute-etat') !== 'charge'; }, null, { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(800);
   return { ctx, pg, erreurs };
@@ -695,6 +695,38 @@ async function partie020(nav) {
     await pg.waitForSelector('[data-cm-moi="visible"]', { timeout: 8000 }).catch(() => {});
     dit(B.profils[A] && B.profils[A].pseudo === 'Alice' && B.profils[A].ville === 'Cancale', 'avec un autre pseudo, Alice apparaît à Cancale');
     await ctx.close();
+  });
+  console.log('\n── 1512 px · « Se connecter avec Discord »');
+  await essaie('discord oauth', async () => {
+    const avant = { id: process.env.DISCORD_CLIENT_ID, s: process.env.DISCORD_CLIENT_SECRET };
+    process.env.DISCORD_CLIENT_ID = '1562176038098702467'; process.env.DISCORD_CLIENT_SECRET = 'secret-de-banc-0123456789abcdef';
+    try {
+      posePersonnes();
+      let o = await ouvrir(nav, { qui: A });
+      dit(!!(await o.pg.$('[data-cm-discord-oauth]')), 'Discord réglé sur le serveur : le bouton « Se connecter avec Discord » est là');
+      let partie = '';
+      await o.pg.route('https://discord.com/**', (r) => { partie = r.request().url(); return r.fulfill({ status: 200, contentType: 'text/html', body: '<p>discord</p>' }); });
+      await o.pg.click('[data-cm-discord-oauth]');
+      await o.pg.waitForTimeout(1200);
+      dit(/^https:\/\/discord\.com\/oauth2\/authorize\?/.test(partie) && /scope=identify/.test(partie), 'le clic part chez Discord (portée « identify » seule)', partie.slice(0, 120));
+      await o.ctx.close();
+      const { signerPreuve } = await import(path.join(__dirname, '../../api/_lib/discord.js'));
+      const frag = '#discord=alice.discord&preuve=' + encodeURIComponent(signerPreuve(A, 'alice.discord'));
+      o = await ouvrir(nav, { qui: A, fragment: frag });
+      await o.pg.waitForFunction(() => document.querySelector('[data-cm-mon-discord="oui"]'), null, { timeout: 8000 }).catch(() => {});
+      dit(B.profils[A].discord === 'alice.discord' && !/discord=/.test(await o.pg.evaluate(() => location.hash)), 'au retour de Discord : le pseudo est rangé, et le fragment effacé de l’adresse');
+      await o.ctx.close();
+      posePersonnes();
+      o = await ouvrir(nav, { qui: A, fragment: '#discord=pirate.vrm&preuve=' + encodeURIComponent(signerPreuve(Bu, 'pirate.vrm')) });
+      await o.pg.waitForTimeout(1500);
+      dit(!B.profils[A].discord, 'une preuve faite pour un AUTRE compte VRM est refusée (rien n’est rangé)', String(B.profils[A].discord));
+      await o.ctx.close();
+      delete process.env.DISCORD_CLIENT_SECRET;
+      posePersonnes();
+      o = await ouvrir(nav, { qui: A });
+      dit(!(await o.pg.$('[data-cm-discord-oauth]')) && !!(await o.pg.$('[data-cm-discord-ajouter]')), 'Discord pas réglé : pas de bouton, la saisie à la main reste');
+      await o.ctx.close();
+    } finally { process.env.DISCORD_CLIENT_ID = avant.id || ''; if (avant.s) process.env.DISCORD_CLIENT_SECRET = avant.s; else delete process.env.DISCORD_CLIENT_SECRET; }
   });
   console.log('\n── 020 · sans la 020 sur la base');
   await essaie('sans 020', async () => {
