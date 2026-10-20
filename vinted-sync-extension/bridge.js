@@ -228,7 +228,9 @@
     }
 
     if (d.__vmr === 'exec' && d.reqId) {
-      relayer({ from: 'vmr-bridge', action: 'exec', uid: d.uid, method: d.method, endpoint: d.endpoint, body: d.body },
+      // 19 oct. : `confirme` voyage (accepter une offre VEND la paire : le fond
+      // l'exige, la confirmation de l'app ne se perd plus en route).
+      relayer({ from: 'vmr-bridge', action: 'exec', uid: d.uid, method: d.method, endpoint: d.endpoint, body: d.body, confirme: d.confirme === true },
         (resp, err) => poster({
           __vmr: 'result',
           reqId: d.reqId,

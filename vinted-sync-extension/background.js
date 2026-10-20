@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.193.0';
+const CODE_VERSION = '5.194.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5389,12 +5389,27 @@ async function executerPourApp(msg, sender) {
   const methode = String(msg.method || 'POST').toUpperCase();
   const permis = execPermis(methode, msg.endpoint);
   if (!permis) return { ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' };
+  // ⚠️⚠️ Revue du 19 oct. (rouge sur l'avant, `audit-argent-vinted.cjs`) :
+  //    accepter une offre VEND la paire. L'app envoyait bien `confirme` après sa
+  //    confirmation… et le pont le jetait : le fond ne l'exigeait que par le
+  //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
+  //    donc une offre sans elle. Exigé ici, pour toutes les voies.
+  if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: 'ce geste vend la paire : il demande ta confirmation — rien n\'est parti' };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await gardeStricte(msg.uid, acc, { lecture: !!permis.lecture });
   if (stop) return stop;
-  const r = await avecVinted(() => (methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body)));
+  // ⚠️ 19 oct. : la file peut attendre (une autre requête Vinted en vol) — le
+  //   compte du cookie est REVÉRIFIÉ à son tour, juste avant de partir. Basculé
+  //   entre-temps sur un autre compte ⇒ rien ne part (rouge sur l'avant).
+  let arret = null;
+  const r = await avecVinted(async () => {
+    arret = await gardeStricte(msg.uid, acc, { lecture: true });
+    if (arret) return null;
+    return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
+  });
+  if (arret) return arret;
   if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
@@ -5952,6 +5967,12 @@ async function executerCommande(msg) {
       return true;
     };
     try {
+      // ⚠️ 19 oct. : à SON tour dans la file (derrière d'autres bordereaux, ~16 s
+      //   chacun quand le PDF tarde), le compte du cookie est revérifié : basculé
+      //   sur un autre compte entre-temps ⇒ rien ne part chez Vinted (rouge sur
+      //   l'avant, `audit-argent-vinted.cjs`).
+      const aSonTour = await gardeStricte(uid, acc, { lecture: true });
+      if (aSonTour) { await majCmd(jobId, { etape: 'echec', code: aSonTour.code, raison: aSonTour.error }); return; }
       await noterDiag('commande_bordereau');
       // 1. Le bordereau existe peut-être déjà chez Vinted (commandé à la main,
       //    ou par la visite) : on regarde AVANT de commander — sinon Vinted
@@ -6088,7 +6109,7 @@ function relaisCommande(d) {
     try { corps = a.body == null ? '' : JSON.stringify(a.body); } catch (_) { return { refus: 'arguments' }; }
     if (corps.length > 4000) return { refus: 'arguments' };
     if (permis.confirmer && d.confirme !== true) return { refus: 'confirmation' };
-    return { type: 'exec', msg: { uid: String(a.uid), method: methode, endpoint: String(a.endpoint), body: a.body == null ? null : a.body } };
+    return { type: 'exec', msg: Object.assign({ uid: String(a.uid), method: methode, endpoint: String(a.endpoint), body: a.body == null ? null : a.body }, permis.confirmer ? { confirme: true } : {}) };
   }
   return { refus: 'non-autorise' };
 }

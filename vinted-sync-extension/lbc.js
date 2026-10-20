@@ -501,6 +501,45 @@
     prixRelu = { voulu: n, garde: isFinite(garde) ? garde : null };
     return ok;
   }
+  // ── LE PRIX DE LA PAGE EST-IL CELUI DE VRM ? (revue du 19 oct.) ────────────
+  //   `prixRelu` était calculé… et lu NULLE PART : la publication partait quel
+  //   que soit le prix resté dans le champ. Or `poserPrix(…, siVide)` ne touche
+  //   pas un champ déjà rempli (Leboncoin peut y écrire un prix suggéré ; un
+  //   champ peut aussi réécrire ce qu'on tape, ou le lire en centimes). Prouvé
+  //   au banc sur l'avant (`audit-argent-lbc.cjs`, cas C) : un prix de 150 €
+  //   posé par la page partait tel quel, VRM voulant 99 €. On ne lutte pas avec
+  //   le champ (on n'écrase pas) : on RELIT, et une paire dont le prix affiché
+  //   n'est pas celui de VRM — ou illisible — n'est PAS publiée toute seule.
+  //   Le constat est gardé dans l'onglet (sessionStorage) : l'étape options est
+  //   une autre adresse, le champ prix n'y est plus.
+  const lireEuros = (v) => {
+    const t = String(v == null ? '' : v).replace(/[\s\u00a0\u202f€]/g, '').replace(/eur(?:os?)?$/i, '');
+    if (!t) return '';
+    if (!/^\d{1,7}(?:[.,]\d{1,2})?$/.test(t)) return NaN;
+    return Number(t.replace(',', '.'));
+  };
+  const champPrix = () => document.querySelector('input[name="price_cents"]') || document.querySelector('input[name="price"]') || findField([/prix|price|montant/]);
+  const clePrixPage = (ad) => 'vrmPrixPage:' + String(ad && ad.id);
+  function noterPrixPage(ad) {
+    if (!ad) return;
+    const el = champPrix(); if (!el || DANS_ENTETE(el)) return;
+    const vu = lireEuros(el.value);
+    if (vu === '') return;                                         // vide : rien à juger encore
+    const voulu = Number(String(ad.price == null ? '' : ad.price).replace(',', '.'));
+    const ok = isFinite(voulu) && voulu > 0 && isFinite(vu) && Math.round(vu * 100) === Math.round(voulu * 100);
+    try { sessionStorage.setItem(clePrixPage(ad), JSON.stringify({ ok, vu: isFinite(vu) ? vu : null, voulu: isFinite(voulu) ? voulu : null })); } catch (_) {}
+  }
+  const fmtEuros = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(2).replace('.', ',')) + ' €';
+  function prixRefus(ad) {
+    if (!ad) return null;
+    noterPrixPage(ad);
+    let e = null;
+    try { e = JSON.parse(sessionStorage.getItem(clePrixPage(ad)) || 'null'); } catch (_) { e = null; }
+    if (!e || e.ok) return null;
+    if (e.voulu == null) return 'VRM n\'a pas de prix lisible pour cette paire — rien n\'est publié : mets le prix et publie toi-même, sans booster';
+    if (e.vu == null) return 'je n\'ai pas pu relire le prix de la page (VRM : ' + fmtEuros(e.voulu) + ') — rien n\'est publié : vérifie le prix et publie toi-même, sans booster';
+    return 'le prix sur la page (' + fmtEuros(e.vu) + ') n\'est pas celui de VRM (' + fmtEuros(e.voulu) + ') — rien n\'est publié : vérifie le prix et publie toi-même, sans booster';
+  }
   // ── LA LOCALISATION — Julien, 16 oct. : « elle doit mettre ce que le vendeur
   //    a rempli dans VRM ». Mesuré (`lbc_recon.etapes`) : un champ
   //    `name="location"` en liste à choisir, dont les propositions s'écrivent
@@ -1097,6 +1136,7 @@
       if (!t) continue;
       if (BTN_PUBLIER.test(t)) continue;              // ⚠️ on ne publie jamais tout seul
       if (PRIX_ARGENT.test(t)) continue;              // ⚠️ un bouton qui porte un prix ou un boost : jamais
+      if (NOM_BOOST.test(t)) continue;                // ⚠️ un bouton qui NOMME une option payante (« … et mettre en avant », « Urgent ») : jamais
       if (BTN_AVANCER.test(t)) {
         if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
         try { b.click(); } catch (_) {}
@@ -1147,14 +1187,21 @@
   //   libellé (« Pendant 7 jours 7 € ») — une case, un radio ou un interrupteur.
   //   Une case DANS un interrupteur déjà compté n'est comptée qu'une fois (sinon
   //   on la cliquait deux fois : décochée puis recochée).
-  const PRIX_ARGENT = /€|\beuros?\b|\d[.,]\d{2}\b|booster|boost|remont|payer|paiement|premium|\bpack\b|\bà la une\b|mise en avant/i;
-  const NOM_BOOST = /(gallery|galerie|bump|remont|toplist|top.?liste|urgent|boost|mise en avant|premium|\bpack\b|photos?\s*suppl|[àa] la une|logo)/i;
+  // ⚠️ Revue du 19 oct. (rouge sur l'avant, `audit-argent-lbc.cjs`) : « EUR »
+  //   n'était pas un prix (« Publier (2 EUR) » passait), « mettre en avant » non
+  //   plus, et `\bà la une\b` ne pouvait JAMAIS matcher (« à » n'est pas un
+  //   caractère de mot pour `\b` : il fallait une lettre collée devant).
+  const PRIX_ARGENT = /€|\beuros?\b|\beur\b|\d[.,]\d{2}\b|booster|boost|remont|payer|paiement|premium|\bpack\b|(?:^|[^a-zà-ÿ])[àa] la une|mise en avant|mettre en avant/i;
+  const NOM_BOOST = /(gallery|galerie|bump|remont|toplist|top.?liste|urgent|boost|mise en avant|mettre en avant|premium|\bpack\b|photos?\s*suppl|[àa] la une|logo)/i;
   function optionsBoost() {
-    const tous = Array.from(document.querySelectorAll('input[type="checkbox"],input[type="radio"],[role="checkbox"],[role="switch"],[role="radio"]')).filter((cb) => {
+    // ⚠️ 19 oct. : une option peut aussi être un INTERRUPTEUR `aria-pressed` (un
+    //   bouton) — restée allumée, elle passait inaperçue et la publication partait
+    //   avec elle (rouge sur l'avant, cas F).
+    const tous = Array.from(document.querySelectorAll('input[type="checkbox"],input[type="radio"],[role="checkbox"],[role="switch"],[role="radio"],[aria-pressed]')).filter((cb) => {
       if (DANS_ENTETE(cb)) return false;
       if (cb.closest && cb.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]')) return false;
-      const nom = ((cb.name || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '')).toLowerCase();
-      const lib = String(libelleDe(cb) || '');
+      const nom = ((cb.name || cb.getAttribute('name') || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '')).toLowerCase();
+      const lib = String(libelleDe(cb) || (cb.hasAttribute('aria-pressed') ? (cb.innerText || cb.textContent || '') : '') || '');
       if (NOM_BOOST.test(nom) || NOM_BOOST.test(lib)) return true;
       // Un choix qui porte un PRIX est payant (sauf « 0 € » / « gratuit ») —
       // SEULEMENT sur l'étape des options (mesurée : `/deposer-une-annonce/options`).
@@ -1166,7 +1213,7 @@
   }
   const estCoche = (cb) => {
     if (cb.tagName === 'INPUT') return !!cb.checked || cb.getAttribute('aria-checked') === 'true';
-    if (cb.getAttribute('aria-checked') === 'true') return true;
+    if (cb.getAttribute('aria-checked') === 'true' || cb.getAttribute('aria-pressed') === 'true') return true;
     const inp = cb.querySelector && cb.querySelector('input[type="checkbox"],input[type="radio"]');
     return !!(inp && inp.checked);
   };
@@ -1193,6 +1240,15 @@
     return false;
   }
   async function publierSansBooster() {
+    // 0) (19 oct.) le prix affiché doit être celui de VRM, et on ne publie
+    //    qu'UNE fois par onglet : une page rechargée après le clic (sans
+    //    confirmation) recliquait — une seconde publication (rouge sur l'avant).
+    const prixKO = prixRefus(pending);
+    if (prixKO) return { ok: false, raison: prixKO };
+    const cleClic = 'vrmPublieClique:' + String(pending && pending.id);
+    let dejaClique = true;
+    try { dejaClique = !!sessionStorage.getItem(cleClic); } catch (_) { dejaClique = true; }   // pas su ⇒ on ne clique pas
+    if (dejaClique) return { ok: false, raison: 'j\'ai déjà cliqué « Publier » pour cette paire dans cet onglet — vérifie dans Mes annonces ; je ne reclique jamais (une seconde publication est pire)' };
     // 1) décocher toute option payante — une à une, en vérifiant.
     const radio = radioGratuit();
     if (radio && !estCoche(radio)) { try { radio.click(); } catch (_) {} }
@@ -1222,11 +1278,16 @@
     const actif = (b) => !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !!libBtn(b);
     const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]');
     const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"],a[role="button"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI(el));
-    const sur = (b) => actif(b) && !PRIX_ARGENT.test(libBtn(b)) && !NEG.test(libBtn(b)) && !dansCarteOption(b, opts);
+    // ⚠️ 19 oct. : un bouton qui NOMME une option payante (« Publier avec le logo
+    //   Urgent ») l'AJOUTE — même sans prix écrit. Jamais cliqué (rouge sur l'avant).
+    const sur = (b) => actif(b) && !PRIX_ARGENT.test(libBtn(b)) && !NOM_BOOST.test(libBtn(b)) && !NEG.test(libBtn(b)) && !dansCarteOption(b, opts);
     const publier = btns.find((b) => sur(b) && PUBLIER.test(libBtn(b))) || btns.find((b) => sur(b) && CONTINUER.test(libBtn(b))) || null;
     if (!publier) return { ok: false, raison: 'je n\'ai pas trouvé de bouton de publication gratuite sur cette étape — rien n\'est cliqué, publie toi-même, sans booster' };
     // Dernière vérification, au moment même du clic.
     if (optionsBoost().some(estCoche)) return { ok: false, raison: 'une option payante s\'est activée — rien n\'est publié' };
+    const prixKO2 = prixRefus(pending);
+    if (prixKO2) return { ok: false, raison: prixKO2 };
+    try { sessionStorage.setItem(cleClic, String(Date.now())); } catch (_) { return { ok: false, raison: 'je ne peux pas retenir le clic dans cet onglet — rien n\'est publié : publie toi-même, sans booster' }; }
     try { publier.click(); } catch (_) {}
     return { ok: true, bouton: libBtn(publier).slice(0, 40) };
   }
@@ -1259,6 +1320,7 @@
     // Les menus React (pointure, état) — sans bloquer le comptage synchrone.
     remplirComposants(ad);
     if (activerLivraison() === 'active') n++;   // garantir l'envoi activé (son défaut)
+    noterPrixPage(ad);                          // 19 oct. : ce que le champ GARDE, jugé contre le prix de VRM
     // Puis on enchaîne l'étape : clic « Continuer » (JAMAIS « Publier »).
     avancer();
     return n;

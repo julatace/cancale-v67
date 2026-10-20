@@ -702,7 +702,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       dit(/sans booster/i.test(r.bandeau), 'le bandeau dit « publiée sans booster »', (r.bandeau || '').replace(/\n/g, ' ').slice(-70));
     }
     {
-      const faible = SRC.replace('actif(b) && !PRIX_ARGENT.test(libBtn(b)) && ', 'actif(b) && ');
+      // Deux gardes (prix ET nom d'option payante, 20 oct.) : on retire les deux.
+      const faible = SRC.replace('actif(b) && !PRIX_ARGENT.test(libBtn(b)) && !NOM_BOOST.test(libBtn(b)) && ', 'actif(b) && ');
       if (faible === SRC) dit(false, 'la garde « prix » attendue est introuvable — l\'audit ne prouve rien');
       else { const { r } = await lancerBoost(faible); dit(r.paid >= 1, '§6.1 — sans la garde « prix », le bouton PAYANT EST cliqué (donc la garde protège de la dépense)', '__paid=' + r.paid + ' __pub=' + r.pub); }
     }
